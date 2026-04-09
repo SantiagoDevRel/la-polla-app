@@ -3,7 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateOTP, validateOTP } from "@/lib/utils/otp";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/bot";
 import { getOTPMessage } from "@/lib/whatsapp/messages";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
+import crypto from "crypto";
 
 const generateSchema = z.object({
   phone: z.string().min(10, "Número de teléfono inválido"),
@@ -49,16 +52,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const otp = await generateOTP(parsed.data.phone);
-
-    if (process.env.NODE_ENV === "development") {
-      console.log(`[DEV] OTP para ${parsed.data.phone}: ${otp}`);
-      return NextResponse.json({
-        status: "OTP generado (modo desarrollo)",
-        dev_otp: otp,
-      });
+    // Verificar que WhatsApp está configurado
+    if (!process.env.META_WA_ACCESS_TOKEN || !process.env.META_WA_PHONE_NUMBER_ID) {
+      return NextResponse.json(
+        { error: "WhatsApp no configurado. Contacta al administrador." },
+        { status: 500 }
+      );
     }
 
+    const otp = await generateOTP(parsed.data.phone);
     await sendWhatsAppMessage(parsed.data.phone, getOTPMessage(otp));
 
     return NextResponse.json({ status: "OTP enviado por WhatsApp" });
@@ -68,7 +70,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT — Valida OTP
+// Genera una contraseña determinista por teléfono (el usuario nunca la ve, la auth real es por OTP)
+function derivePassword(phone: string): string {
+  return crypto
+    .createHmac("sha256", process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    .update(phone)
+    .digest("hex");
+}
+
+// PUT — Valida OTP y crea sesión en Supabase
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -81,7 +91,14 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const isValid = await validateOTP(parsed.data.phone, parsed.data.code);
+    const { phone, code } = parsed.data;
+
+    console.log("[AUTH] OTP recibido:", code);
+    console.log("[AUTH] Teléfono:", phone);
+
+    // 1. Validar OTP
+    const isValid = await validateOTP(phone, code);
+    console.log("[AUTH] Resultado validación OTP:", isValid);
 
     if (!isValid) {
       return NextResponse.json(
@@ -90,7 +107,55 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ status: "Verificado", phone: parsed.data.phone });
+    // 2. Buscar o crear usuario en Supabase con admin client
+    const admin = createAdminClient();
+    const password = derivePassword(phone);
+    const email = `${phone.replace("+", "")}@wa.lapolla.app`;
+
+    console.log("[AUTH] Creando/buscando usuario:", email);
+
+    // Intentar crear usuario (si ya existe, Supabase retorna error)
+    const { data: newUser, error: createError } = await admin.auth.admin.createUser({
+      email,
+      password,
+      phone,
+      email_confirm: true,
+      phone_confirm: true,
+      user_metadata: { phone, auth_method: "whatsapp_otp" },
+    });
+
+    if (createError && !createError.message.includes("already been registered")) {
+      console.error("[AUTH] Error creando usuario:", createError.message);
+      return NextResponse.json(
+        { error: "Error al crear cuenta" },
+        { status: 500 }
+      );
+    }
+
+    if (newUser?.user) {
+      console.log("[AUTH] Usuario nuevo creado:", newUser.user.id);
+    } else {
+      console.log("[AUTH] Usuario ya existe, procediendo con login");
+    }
+
+    // 3. Iniciar sesión con el server client (que setea cookies)
+    const supabase = createClient();
+    const { data: session, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      console.error("[AUTH] Error sesión:", signInError.message);
+      return NextResponse.json(
+        { error: "Error al iniciar sesión" },
+        { status: 500 }
+      );
+    }
+
+    console.log("[AUTH] Sesión creada:", session.user?.id);
+
+    return NextResponse.json({ status: "Verificado", phone });
   } catch (error) {
     console.error("Error validando OTP:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

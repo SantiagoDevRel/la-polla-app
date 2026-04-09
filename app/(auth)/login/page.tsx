@@ -1,10 +1,11 @@
 // app/(auth)/login/page.tsx — Página de inicio de sesión con OTP por WhatsApp
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Turnstile } from "@marsidev/react-turnstile";
 import axios from "axios";
+import PhoneInput from "@/components/ui/PhoneInput";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,9 +14,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const handlePhoneChange = useCallback((value: string) => {
+    setPhone(value);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!phone || phone.length < 10) {
+      setError("Ingresá un número de teléfono válido");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -25,8 +36,8 @@ export default function LoginPage() {
       });
       router.push(`/verify?phone=${encodeURIComponent(phone)}`);
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || "Error al enviar el código");
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setError(axiosErr.response?.data?.error || "Error al enviar el código");
     } finally {
       setLoading(false);
     }
@@ -35,11 +46,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-colombia-blue flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-6">
-        {process.env.NODE_ENV === "development" && (
-          <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 text-sm rounded-lg px-4 py-2 text-center">
-            Modo desarrollo — el OTP aparece en consola y en la respuesta del API
-          </div>
-        )}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-colombia-blue">⚽ La Polla</h1>
           <p className="text-gray-600 mt-2">
@@ -52,18 +58,7 @@ export default function LoginPage() {
             <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
               Número de WhatsApp
             </label>
-            <input
-              id="phone"
-              type="tel"
-              placeholder="573001234567"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-colombia-yellow focus:border-transparent outline-none text-lg"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Incluí el código de país (57 para Colombia)
-            </p>
+            <PhoneInput onChange={handlePhoneChange} />
           </div>
 
           <div className="flex justify-center">
@@ -79,7 +74,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading || !turnstileToken}
+            disabled={loading || !turnstileToken || !phone}
             className="w-full bg-colombia-yellow text-colombia-blue font-bold py-3 px-4 rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
           >
             {loading ? "Enviando..." : "Recibir código por WhatsApp"}

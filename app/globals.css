@@ -1,3 +1,4 @@
+/* app/globals.css — Estilos globales con colores tricolor colombiano */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,23 +6,26 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --colombia-yellow: #FCD116;
+  --colombia-blue: #003087;
+  --colombia-red: #CE1126;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Utilidades para mobile-first */
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
