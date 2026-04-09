@@ -9,12 +9,22 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  const { data: pollas } = await supabase
-    .from("pollas")
-    .select("*")
-    .or(`created_by.eq.${user.id},participants.cs.{${user.id}}`)
-    .order("created_at", { ascending: false })
-    .limit(10);
+  // Obtener IDs de pollas donde el usuario es participante
+  const { data: participantRows } = await supabase
+    .from("polla_participants")
+    .select("polla_id")
+    .eq("user_id", user.id);
+
+  const pollaIds = participantRows?.map((r) => r.polla_id) || [];
+
+  const { data: pollas } = pollaIds.length > 0
+    ? await supabase
+        .from("pollas")
+        .select("*")
+        .in("id", pollaIds)
+        .order("created_at", { ascending: false })
+        .limit(10)
+    : { data: [] };
 
   return (
     <div className="min-h-screen bg-gray-50">
