@@ -54,20 +54,12 @@ export default function BottomNav() {
               href={item.href}
               className="flex flex-col items-center py-2 min-w-[56px] min-h-[44px] transition-all duration-200 cursor-pointer"
             >
-              <div
-                className={`flex items-center justify-center rounded-full transition-all duration-200 ${
-                  isActive
-                    ? "bg-gold/10 px-4 py-1.5"
-                    : "px-3 py-1.5"
+              <Icon
+                className={`w-5 h-5 transition-colors duration-200 ${
+                  isActive ? "text-gold" : "text-text-secondary"
                 }`}
-              >
-                <Icon
-                  className={`w-6 h-6 transition-colors duration-200 ${
-                    isActive ? "text-gold" : "text-text-secondary"
-                  }`}
-                  strokeWidth={isActive ? 2.2 : 1.8}
-                />
-              </div>
+                strokeWidth={isActive ? 2.2 : 1.8}
+              />
               <span
                 className={`text-[10px] font-medium transition-colors duration-200 ${
                   isActive ? "text-gold" : "text-text-secondary"
