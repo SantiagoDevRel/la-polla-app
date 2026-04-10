@@ -25,10 +25,6 @@ const TOURNAMENT_LABELS: Record<string, string> = {
   liga_betplay_2025: "🇨🇴 BetPlay",
 };
 
-const PAYMENT_LABELS: Record<string, string> = {
-  admin_collects: "💰 Admin",
-  digital_pool: "📲 Digital",
-};
 
 export default function PollaCard({
   polla,
