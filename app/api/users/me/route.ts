@@ -39,6 +39,27 @@ export async function GET() {
 
     const ranks = (participations || []).map((p) => p.rank).filter((r): r is number => r !== null);
 
+    // Recent activity: last 3 scored predictions
+    const { data: recentPreds } = await admin
+      .from("predictions")
+      .select("points_earned, match_id, polla_id, matches(home_team, away_team), pollas(name)")
+      .eq("user_id", user.id)
+      .gt("points_earned", -1)
+      .not("points_earned", "is", null)
+      .order("submitted_at", { ascending: false })
+      .limit(3);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recentActivity = ((recentPreds || []) as any[]).map((r) => {
+      const match = Array.isArray(r.matches) ? r.matches[0] : r.matches;
+      const polla = Array.isArray(r.pollas) ? r.pollas[0] : r.pollas;
+      return {
+        matchName: match ? `${match.home_team} vs ${match.away_team}` : "Partido",
+        pollaName: polla?.name || "Polla",
+        pointsEarned: r.points_earned || 0,
+      };
+    });
+
     return NextResponse.json({
       profile: userData,
       stats: {
@@ -46,6 +67,7 @@ export async function GET() {
         predictionsCount: predCount || 0,
         bestRank: ranks.length > 0 ? Math.min(...ranks) : null,
       },
+      recentActivity,
     });
   } catch (error) {
     console.error("Error obteniendo perfil:", error);

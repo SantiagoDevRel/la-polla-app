@@ -206,10 +206,10 @@ export default async function DashboardPage() {
       {/* Header */}
       <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto flex items-center justify-between mb-6">
-          <h1 className="font-display text-3xl text-gold tracking-wide flex items-center gap-2">
-            <img src="/pollitos/logo.png" alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />
-            La Polla
-          </h1>
+          <div className="flex items-center gap-2">
+            <img src="/pollitos/logo.png" alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
+            <span className="font-display text-gold" style={{ fontSize: 18, letterSpacing: "0.1em" }}>La Polla</span>
+          </div>
           <div style={{
             width: 32, height: 32, borderRadius: "50%",
             border: "1.5px solid rgba(255,215,0,0.3)", overflow: "hidden",
