@@ -3,6 +3,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback } from "react";
+import { CheckCircle, XCircle, Info } from "lucide-react";
 
 type ToastType = "success" | "error" | "info";
 interface Toast { id: string; message: string; type: ToastType; }
@@ -16,10 +17,10 @@ const BORDER_COLORS: Record<ToastType, string> = {
   info: "var(--gold)",
 };
 
-const ICONS: Record<ToastType, string> = {
-  success: "✅",
-  error: "❌",
-  info: "ℹ️",
+const ICONS: Record<ToastType, React.ReactNode> = {
+  success: <CheckCircle className="w-4 h-4 inline-block" style={{ color: "var(--green-live)" }} />,
+  error: <XCircle className="w-4 h-4 inline-block" style={{ color: "var(--red-alert)" }} />,
+  info: <Info className="w-4 h-4 inline-block" style={{ color: "var(--gold)" }} />,
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {

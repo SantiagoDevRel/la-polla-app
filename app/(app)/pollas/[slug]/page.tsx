@@ -12,6 +12,9 @@ import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import InviteModal from "@/components/polla/InviteModal";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import UserAvatar from "@/components/ui/UserAvatar";
+import TournamentBadge from "@/components/shared/TournamentBadge";
+import { getTournamentBySlug } from "@/lib/tournaments";
+import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake } from "lucide-react";
 
 // ─── Tipos ───
 
@@ -39,10 +42,31 @@ interface Prediction {
 
 type TabType = "partidos" | "ranking" | "pagos" | "info";
 
-const TRN: Record<string, string> = {
-  worldcup_2026: "🌍 Mundial 26", champions_2025: "⭐ Champions",
-  liga_betplay_2025: "🇨🇴 BetPlay",
-};
+// TeamCrest — renders flag URL as img, falls back to 3-letter abbreviation
+function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: string }) {
+  if (flagUrl) {
+    return (
+      <img
+        src={flagUrl}
+        alt={teamName}
+        width={24}
+        height={24}
+        style={{ objectFit: "contain", borderRadius: "50%" }}
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+      />
+    );
+  }
+  return (
+    <span style={{
+      width: 24, height: 24, borderRadius: "50%",
+      background: "#1a2540", display: "flex",
+      alignItems: "center", justifyContent: "center",
+      fontSize: 8, fontWeight: 700, color: "#7a8499",
+    }}>
+      {teamName.slice(0, 3).toUpperCase()}
+    </span>
+  );
+}
 
 export default function PollaSlugPage() {
   const params = useParams();
@@ -130,7 +154,7 @@ export default function PollaSlugPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center animate-fade-in">
-          <div className="text-4xl mb-3">⚽</div>
+          <div className="mb-3"><Target className="w-10 h-10 text-gold mx-auto" /></div>
           <p className="text-text-secondary font-medium">Cargando polla...</p>
         </div>
       </div>
@@ -141,7 +165,7 @@ export default function PollaSlugPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="rounded-2xl p-6 text-center max-w-sm w-full bg-bg-card border border-border-subtle">
-          <div className="text-4xl mb-3">😕</div>
+          <div className="mb-3"><Info className="w-10 h-10 text-text-muted mx-auto" /></div>
           <p className="text-text-primary font-medium mb-4">{error || "Polla no encontrada"}</p>
           <button onClick={() => router.push("/dashboard")} className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold">
             Volver
@@ -152,13 +176,12 @@ export default function PollaSlugPage() {
   }
 
   const myP = participants.find((p) => p.user_id === currentUserId);
-  const trnLabel = TRN[polla.tournament] || `⚽ ${polla.tournament}`;
 
-  const TABS: { key: TabType; label: string; show: boolean }[] = [
-    { key: "partidos", label: "⚽ Partidos", show: true },
-    { key: "ranking", label: "🏆 Ranking", show: true },
-    { key: "pagos", label: "💰 Pagos", show: polla.payment_mode === "admin_collects" },
-    { key: "info", label: "ℹ️ Info", show: true },
+  const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
+    { key: "partidos", label: "Partidos", icon: <Target className="w-4 h-4" />, show: true },
+    { key: "ranking", label: "Ranking", icon: <Trophy className="w-4 h-4" />, show: true },
+    { key: "pagos", label: "Pagos", icon: <Banknote className="w-4 h-4" />, show: polla.payment_mode === "admin_collects" },
+    { key: "info", label: "Info", icon: <Info className="w-4 h-4" />, show: true },
   ];
 
   return (
@@ -169,7 +192,20 @@ export default function PollaSlugPage() {
           <div className="flex items-center gap-3 mb-2">
             <button onClick={() => router.push("/pollas")} className="text-text-secondary text-xl">←</button>
             <h1 className="text-lg font-bold text-text-primary truncate flex-1">{polla.name}</h1>
-            <span className="text-[11px] bg-bg-elevated text-text-secondary px-2 py-0.5 rounded-full">{trnLabel}</span>
+            <span
+              className="text-[11px] text-text-secondary rounded-full flex items-center"
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 20,
+                padding: "4px 10px",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <TournamentBadge tournamentSlug={polla.tournament} size="sm" />
+            </span>
           </div>
         </div>
       </header>
@@ -192,10 +228,12 @@ export default function PollaSlugPage() {
         <div className="flex overflow-x-auto gap-0 border-b border-border-subtle" style={{ scrollbarWidth: "none" }}>
           {TABS.filter((t) => t.show).map((t) => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`flex-shrink-0 px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-colors border-b-2 ${
+              className={`flex-shrink-0 px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
                 activeTab === t.key ? "text-gold border-gold" : "text-text-muted border-transparent hover:text-text-secondary"
               }`}
+              style={{ color: activeTab === t.key ? "#FFD700" : "#7a8499" }}
             >
+              {t.icon}
               {t.label}
             </button>
           ))}
@@ -239,10 +277,10 @@ export default function PollaSlugPage() {
                       <div className="flex items-center gap-3">
                         {/* Home */}
                         <div className="flex-1 text-right">
-                          <p className="font-semibold text-sm text-text-primary truncate">
-                            {match.home_team_flag && <span className="mr-1">{match.home_team_flag}</span>}
-                            {match.home_team}
-                          </p>
+                          <div className="flex items-center justify-end gap-2">
+                            <p className="font-semibold text-sm text-text-primary truncate">{match.home_team}</p>
+                            <TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} />
+                          </div>
                         </div>
 
                         {/* Score / Input */}
@@ -284,10 +322,10 @@ export default function PollaSlugPage() {
 
                         {/* Away */}
                         <div className="flex-1 text-left">
-                          <p className="font-semibold text-sm text-text-primary truncate">
-                            {match.away_team_flag && <span className="mr-1">{match.away_team_flag}</span>}
-                            {match.away_team}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
+                            <p className="font-semibold text-sm text-text-primary truncate">{match.away_team}</p>
+                          </div>
                         </div>
                       </div>
 
@@ -314,7 +352,7 @@ export default function PollaSlugPage() {
                       )}
 
                       {locked && match.status === "scheduled" && (
-                        <p className="mt-2 text-xs text-center text-text-muted">🔒 CERRADO</p>
+                        <p className="mt-2 text-xs text-center text-text-muted flex items-center justify-center gap-1"><Lock className="w-3 h-3" /> CERRADO</p>
                       )}
                     </div>
                   </motion.div>
@@ -339,7 +377,7 @@ export default function PollaSlugPage() {
                 )}
                 {participants.map((p, i) => {
                   const isMe = p.user_id === currentUserId;
-                  const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+                  const medalColor = i === 0 ? "#FFD700" : i === 1 ? "#C0C0C0" : i === 2 ? "#CD7F32" : null;
 
                   return (
                     <div key={p.id}
@@ -347,11 +385,13 @@ export default function PollaSlugPage() {
                       style={isMe ? { borderLeft: "2px solid var(--gold)" } : undefined}
                     >
                       <div className="w-8 text-center">
-                        {medal ? <span className="text-xl">{medal}</span> :
+                        {medalColor ? (
+                          <Trophy className="w-5 h-5 mx-auto" style={{ color: medalColor }} />
+                        ) : (
                           <span className={`score-font text-[20px] ${i < 3 ? "text-gold" : "text-text-muted"}`}>
                             {p.rank || i + 1}
                           </span>
-                        }
+                        )}
                       </div>
                       <UserAvatar avatarUrl={p.users?.avatar_url} displayName={p.users?.display_name} size="sm" />
                       <div className="flex-1 min-w-0">
@@ -376,7 +416,7 @@ export default function PollaSlugPage() {
             <ParticipantPayment pollaSlug={polla.slug} currentUserId={currentUserId} currentUserRole={currentUserRole} />
           ) : (
             <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
-              <span className="text-3xl">🤝</span>
+              <Handshake className="w-8 h-8 text-text-muted mx-auto" />
               <p className="text-text-secondary mt-2">No hay pagos para esta polla</p>
             </div>
           )
@@ -390,8 +430,8 @@ export default function PollaSlugPage() {
               {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
               <div className="grid grid-cols-2 gap-2 text-sm">
                 {[
-                  { label: "Torneo", value: trnLabel },
-                  { label: "Tipo", value: polla.type === "closed" ? "🔒 Privada" : "🌐 Abierta" },
+                  { label: "Torneo", value: getTournamentBySlug(polla.tournament)?.name || polla.tournament },
+                  { label: "Tipo", value: polla.type === "closed" ? "Privada" : "Abierta" },
                   { label: "Participantes", value: String(participants.length) },
                   { label: "Pago", value: polla.payment_mode === "admin_collects" ? "Admin" : "Digital" },
                 ].map((item) => (
@@ -413,7 +453,7 @@ export default function PollaSlugPage() {
             </div>
 
             <button onClick={() => setShowInviteModal(true)} className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all">
-              📤 Invitar amigos
+              <Share2 className="w-4 h-4 inline-block mr-1" /> Invitar amigos
             </button>
           </div>
         )}

@@ -1,6 +1,8 @@
 // components/polla/PollaCard.tsx — Tarjeta de polla con diseño "estadio de noche"
 // Border-left gold si admin, bg-card con hover, badges de torneo/estado/pago
 import { formatCOP } from "@/lib/formatCurrency";
+import TournamentBadge from "@/components/shared/TournamentBadge";
+import { Users, Banknote } from "lucide-react";
 
 interface PollaCardProps {
   polla: {
@@ -20,13 +22,6 @@ interface PollaCardProps {
   myRank?: number;
   isAdmin?: boolean;
 }
-
-const TOURNAMENT_LABELS: Record<string, string> = {
-  worldcup_2026: "🌍 Mundial 26",
-  champions_2025: "⭐ Champions",
-  la_liga_2025: "🇪🇸 La Liga",
-};
-
 
 export default function PollaCard({
   polla,
@@ -79,7 +74,7 @@ export default function PollaCard({
               color: "var(--text-secondary)",
             }}
           >
-            {TOURNAMENT_LABELS[polla.tournament] || `⚽ ${polla.tournament}`}
+            <TournamentBadge tournamentSlug={polla.tournament} size="sm" />
           </span>
           <span
             className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
@@ -95,11 +90,11 @@ export default function PollaCard({
         {/* Stats row */}
         <div className="flex items-center gap-3 text-xs text-text-muted">
           {participantCount !== undefined && (
-            <span>👥 {participantCount}</span>
+            <span className="flex items-center gap-1"><Users className="w-3 h-3" style={{ color: "#7a8499" }} /> {participantCount}</span>
           )}
           {polla.buy_in_amount > 0 && (
-            <span>
-              💰 {formatCOP(polla.buy_in_amount)}
+            <span className="flex items-center gap-1">
+              <Banknote className="w-3 h-3" style={{ color: "#7a8499" }} /> {formatCOP(polla.buy_in_amount)}
             </span>
           )}
           <span
