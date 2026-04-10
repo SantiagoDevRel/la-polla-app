@@ -11,6 +11,7 @@ const withPWA = withPWAInit({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  generateEtags: false,
   images: {
     remotePatterns: [
       {
@@ -18,6 +19,22 @@ const nextConfig = {
         hostname: "**",
       },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/tournaments/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+        ],
+      },
+      {
+        source: "/pollitos/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+        ],
+      },
+    ];
   },
 };
 

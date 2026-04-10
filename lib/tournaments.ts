@@ -27,7 +27,7 @@ export const TOURNAMENTS = [
     slug: "premier_2025",
     name: "Premier League",
     apiCode: "PL",
-    logoPath: "/tournaments/premier_league.png",
+    logoPath: "/tournaments/premier_league.webp",
     color: "#3d195b",
   },
   {

@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer } from "@/lib/animations";
-import { ArrowLeft, Check, ChevronRight, Info, Construction, Trophy } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Info, Construction, Trophy, Banknote, Smartphone, Lock, Globe } from "lucide-react";
 import { formatCOP } from "@/lib/formatCurrency";
 import { TOURNAMENTS } from "@/lib/tournaments";
 
@@ -52,14 +52,14 @@ const PAYMENT_MODE_OPTIONS = [
   {
     value: "admin_collects" as PaymentMode,
     title: "Admin maneja el pozo",
-    icon: "💰",
+    icon: "banknote",
     description: "Cada participante le envía el dinero al admin (Nequi, Bancolombia, efectivo).",
     tag: "Recomendado",
   },
   {
     value: "digital_pool" as PaymentMode,
     title: "Plataforma acumula",
-    icon: "📲",
+    icon: "smartphone",
     description: "Cada participante paga a través de la plataforma. El pozo se libera automáticamente.",
     tag: "Próximamente",
   },
@@ -308,10 +308,10 @@ export default function CrearPollaPage() {
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Tipo de polla</h2>
               <div className="grid grid-cols-2 gap-3">
-                {[{ val: "closed" as const, label: "Privada", desc: "Solo por invitación", icon: "🔒" }, { val: "open" as const, label: "Abierta", desc: "Cualquiera con el link", icon: "🌐" }].map((opt) => (
+                {[{ val: "closed" as const, label: "Privada", desc: "Solo por invitación", Icon: Lock }, { val: "open" as const, label: "Abierta", desc: "Cualquiera con el link", Icon: Globe }].map((opt) => (
                   <button key={opt.val} type="button" onClick={() => updateForm("type", opt.val)}
                     className={`p-4 rounded-xl border text-center transition-all cursor-pointer ${form.type === opt.val ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated"}`}>
-                    <span className="text-2xl block mb-1">{opt.icon}</span>
+                    <span className="block mb-1"><opt.Icon className="w-6 h-6 mx-auto" style={{ color: "#7a8499" }} /></span>
                     <span className="font-bold text-sm text-text-primary block">{opt.label}</span>
                     <span className="text-xs text-text-muted">{opt.desc}</span>
                   </button>
@@ -558,7 +558,9 @@ export default function CrearPollaPage() {
                       onClick={() => { if (!isDisabled) updateForm("paymentMode", option.value); }}
                       className={`w-full text-left p-4 rounded-xl border transition-all ${isDisabled ? "opacity-35 cursor-not-allowed border-border-subtle bg-bg-elevated" : isSelected ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated cursor-pointer"}`}>
                       <div className="flex items-start gap-3">
-                        <span className="text-2xl flex-shrink-0 mt-0.5">{option.icon}</span>
+                        <span className="flex-shrink-0 mt-0.5">
+                          {option.icon === "banknote" ? <Banknote className="w-6 h-6" style={{ color: "#7a8499" }} /> : <Smartphone className="w-6 h-6" style={{ color: "#7a8499" }} />}
+                        </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-text-primary">{option.title}</span>
