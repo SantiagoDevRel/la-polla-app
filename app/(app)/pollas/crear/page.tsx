@@ -1,7 +1,7 @@
 // app/(app)/pollas/crear/page.tsx — Wizard de 3 pasos para crear una nueva polla
 // Paso 1: Información básica (nombre, descripción, torneo, tipo)
 // Paso 2: Alcance de la polla (full, group_stage, knockouts)
-// Paso 3: Modo de pago (honor, admin_collects, digital_pool)
+// Paso 3: Modo de pago (admin_collects, digital_pool)
 "use client";
 
 import { useState } from "react";
@@ -9,11 +9,11 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer } from "@/lib/animations";
-import { ArrowLeft, Check, ChevronRight, Info, AlertTriangle, Construction, Trophy } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Info, Construction, Trophy } from "lucide-react";
 
 // ─── Tipos ───
 
-type PaymentMode = "digital_pool" | "admin_collects" | "honor";
+type PaymentMode = "digital_pool" | "admin_collects";
 type Scope = "full" | "group_stage" | "knockouts" | "custom";
 type Step = 1 | 2 | 3;
 
@@ -72,28 +72,20 @@ const PAYMENT_MODE_OPTIONS: {
   tag: string;
 }[] = [
   {
-    value: "digital_pool",
-    title: "Plataforma acumula",
-    icon: "📲",
-    description:
-      "Cada participante paga a través de la plataforma. El pozo se libera automáticamente al ganador.",
-    tag: "Coming soon",
-  },
-  {
     value: "admin_collects",
     title: "Admin maneja el pozo",
     icon: "💰",
     description:
-      "Cada participante le envía el dinero al admin (Nequi, Bancolombia, efectivo). El admin revisa y aprueba pagos.",
+      "Cada participante le envia el dinero al admin (Nequi, Bancolombia, efectivo). El admin revisa y aprueba pagos.",
     tag: "Recomendado",
   },
   {
-    value: "honor",
-    title: "Sin pago adelantado",
-    icon: "🤝",
+    value: "digital_pool",
+    title: "Plataforma acumula",
+    icon: "📲",
     description:
-      "No se cobra antes de jugar. Al final, cada participante le paga directamente al ganador.",
-    tag: "Gratis",
+      "Cada participante paga a traves de la plataforma. El pozo se libera automaticamente al ganador.",
+    tag: "Proximamente",
   },
 ];
 
@@ -110,7 +102,7 @@ export default function CrearPollaPage() {
     tournament: "worldcup_2026",
     type: "closed",
     scope: "full",
-    buyInAmount: 0,
+    buyInAmount: 10000,
     paymentMode: "admin_collects",
     adminPaymentInstructions: "",
   });
@@ -146,8 +138,8 @@ export default function CrearPollaPage() {
     setError("");
 
     // Validaciones del paso 3
-    if (form.paymentMode !== "honor" && form.buyInAmount <= 0) {
-      setError("El valor de entrada debe ser mayor a 0");
+    if (form.buyInAmount < 1000) {
+      setError("El valor minimo es $1.000");
       return;
     }
 
@@ -250,7 +242,7 @@ export default function CrearPollaPage() {
               {/* Nombre */}
               <div>
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Nombre de la polla
+                  Nombre de la polla <span className="text-red-alert">*</span>
                 </label>
                 <input
                   type="text"
@@ -278,7 +270,7 @@ export default function CrearPollaPage() {
 
             {/* Torneo — tarjetas seleccionables */}
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
-              <h2 className="text-base font-bold text-text-primary">Torneo</h2>
+              <h2 className="text-base font-bold text-text-primary">Torneo <span className="text-red-alert">*</span></h2>
               <div className="space-y-2">
                 {TOURNAMENTS.map((t) => {
                   const isSelected = form.tournament === t.value;
@@ -533,13 +525,12 @@ export default function CrearPollaPage() {
               </div>
             </div>
 
-            {/* Valor de entrada — oculto en honor mode */}
-            {form.paymentMode !== "honor" && (
-              <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
-                <h2 className="text-base font-bold text-text-primary">Valor de entrada</h2>
+            {/* Valor de entrada */}
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
+              <h2 className="text-base font-bold text-text-primary">Valor de entrada</h2>
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                    Valor por participante (COP)
+                    Valor por participante (COP) <span className="text-red-alert">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">
@@ -547,13 +538,13 @@ export default function CrearPollaPage() {
                     </span>
                     <input
                       type="number"
-                      min={0}
+                      min={1000}
                       step={1000}
                       value={form.buyInAmount || ""}
                       onChange={(e) =>
                         updateForm("buyInAmount", parseInt(e.target.value) || 0)
                       }
-                      placeholder="20000"
+                      placeholder="10000"
                       className="w-full pl-8 pr-16 py-3 rounded-xl outline-none transition-colors duration-200 bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted text-sm">
@@ -572,53 +563,8 @@ export default function CrearPollaPage() {
                   )}
                 </div>
               </div>
-            )}
 
-            {/* Campos condicionales según modo de pago */}
-
-            {/* honor: valor del pozo (opcional) */}
-            {form.paymentMode === "honor" && (
-              <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
-                <h2 className="text-base font-bold text-text-primary">Valor del pozo</h2>
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                    Valor total del pozo (COP)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">
-                      $
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      step={1000}
-                      value={form.buyInAmount || ""}
-                      onChange={(e) =>
-                        updateForm("buyInAmount", parseInt(e.target.value) || 0)
-                      }
-                      placeholder="Ej: 50000"
-                      className="w-full pl-8 pr-16 py-3 rounded-xl outline-none transition-colors duration-200 bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted text-sm">
-                      COP
-                    </span>
-                  </div>
-                  {form.buyInAmount > 0 && (
-                    <p className="text-xs text-text-muted mt-1.5">
-                      Referencial — cada participante debe{" "}
-                      {new Intl.NumberFormat("es-CO", {
-                        style: "currency",
-                        currency: "COP",
-                        maximumFractionDigits: 0,
-                      }).format(form.buyInAmount)}{" "}
-                      al ganador al final
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* admin_collects: instrucciones de pago */}
+            {/* Instrucciones de pago */}
             {form.paymentMode === "admin_collects" && (
               <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
                 <h2 className="text-base font-bold text-text-primary">
@@ -646,24 +592,7 @@ export default function CrearPollaPage() {
               </div>
             )}
 
-            {/* honor: disclaimer */}
-            {form.paymentMode === "honor" && (
-              <div className="rounded-xl p-4 flex items-start gap-3 bg-gold-dim border border-gold/20">
-                <AlertTriangle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-bold text-gold mb-1">
-                    Modo sin pago adelantado
-                  </h3>
-                  <p className="text-sm text-text-secondary leading-snug">
-                    En este modo, los participantes <strong className="text-text-primary">no pagan antes</strong> de unirse.
-                    Al terminar la polla, la plataforma indicará a cada participante cuánto debe
-                    y a quién pagarle. No hay forma de obligar el pago — funciona con confianza.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* digital_pool: coming soon */}
+            {/* digital_pool: proximamente */}
             {form.paymentMode === "digital_pool" && (
               <div className="rounded-xl p-4 flex items-start gap-3 bg-bg-elevated border border-border-subtle">
                 <Construction className="w-5 h-5 text-text-muted flex-shrink-0 mt-0.5" />

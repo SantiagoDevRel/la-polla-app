@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { staggerContainer, fadeUp } from "@/lib/animations";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 interface UserProfile {
   display_name: string;
@@ -32,6 +33,7 @@ export default function PerfilPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -39,6 +41,7 @@ export default function PerfilPage() {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+        setUserId(user.id);
 
         const { data: userData } = await supabase
           .from("users")
@@ -92,8 +95,6 @@ export default function PerfilPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">Cargando perfil...</p></div>;
   if (!profile) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">Error cargando perfil</p></div>;
 
-  const initial = profile.display_name.charAt(0).toUpperCase();
-
   return (
     <div className="min-h-screen">
       <header className="px-4 pt-4 pb-6" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
@@ -105,10 +106,13 @@ export default function PerfilPage() {
       <main className="max-w-lg mx-auto px-4 space-y-6 -mt-1">
         {/* Avatar + name */}
         <div className="rounded-2xl p-6 flex flex-col items-center bg-bg-card border border-border-subtle">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mb-3"
-            style={{ background: "linear-gradient(135deg, #FFD700, #FFA000)" }}>
-            <span className="score-font text-[36px] text-bg-base">{initial}</span>
-          </div>
+          <UserAvatar
+            userId={userId}
+            avatarUrl={profile.avatar_url}
+            displayName={profile.display_name}
+            size="xl"
+            className="mb-3 ring-2 ring-gold/30"
+          />
 
           {isEditing ? (
             <div className="flex items-center gap-2 w-full max-w-xs">

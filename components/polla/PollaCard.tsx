@@ -26,7 +26,6 @@ const TOURNAMENT_LABELS: Record<string, string> = {
 };
 
 const PAYMENT_LABELS: Record<string, string> = {
-  honor: "🤝 Honor",
   admin_collects: "💰 Admin",
   digital_pool: "📲 Digital",
 };
@@ -102,18 +101,18 @@ export default function PollaCard({
           )}
           {polla.buy_in_amount > 0 && (
             <span>
-              💰{" "}
-              {new Intl.NumberFormat("es-CO", {
-                style: "currency",
-                currency: polla.currency || "COP",
-                maximumFractionDigits: 0,
-              }).format(polla.buy_in_amount)}
+              💰 ${polla.buy_in_amount.toLocaleString("es-CO")}
             </span>
           )}
-          <span>
-            {PAYMENT_LABELS[polla.payment_mode] || polla.payment_mode}
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+              polla.type === "open"
+                ? "bg-green-live/10 text-green-live"
+                : "bg-bg-elevated text-text-secondary"
+            }`}
+          >
+            {polla.type === "open" ? "Publica" : "Privada"}
           </span>
-          <span>{polla.type === "closed" ? "🔒" : "🌐"}</span>
         </div>
 
         {/* My rank */}

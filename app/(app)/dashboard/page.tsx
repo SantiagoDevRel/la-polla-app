@@ -20,7 +20,7 @@ export default async function DashboardPage() {
 
   const displayName = publicUser?.display_name || user.phone || "Usuario";
   const firstName = displayName.split(" ")[0];
-  const initial = firstName.charAt(0).toUpperCase();
+  const avatarUrl = publicUser?.avatar_url || `https://api.dicebear.com/9.x/adventurer/svg?seed=${user.id}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
 
   // Participaciones
   const { data: participantRows } = await supabase
@@ -105,9 +105,7 @@ export default async function DashboardPage() {
             <Trophy className="w-7 h-7 text-gold" />
             La Polla
           </h1>
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gold to-amber-600 flex items-center justify-center text-sm font-bold text-bg-base ring-2 ring-gold/30">
-            {initial}
-          </div>
+          <img src={avatarUrl} alt={firstName} className="w-9 h-9 rounded-full object-cover ring-2 ring-gold/30" />
         </div>
 
         <div className="max-w-lg mx-auto">

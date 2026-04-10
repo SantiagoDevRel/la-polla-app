@@ -10,6 +10,8 @@ import { staggerContainer, fadeUp } from "@/lib/animations";
 import { useToast } from "@/components/ui/Toast";
 import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import InviteModal from "@/components/polla/InviteModal";
+import ScoringExplanation from "@/components/polla/ScoringExplanation";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 // ─── Tipos ───
 
@@ -176,10 +178,11 @@ export default function PollaSlugPage() {
       {myP && (
         <div className="px-4 py-1.5" style={{ backgroundColor: "var(--gold-dim)" }}>
           <div className="max-w-lg mx-auto flex items-center justify-between">
-            <span className="text-sm font-semibold text-gold">#{myP.rank || "—"} · {myP.total_points} pts</span>
-            {polla.payment_mode !== "honor" && (
-              <span className="text-xs text-text-secondary">{myP.paid ? "✅ Pagado" : "⏳ Pendiente"}</span>
-            )}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gold">#{myP.rank || "—"} · {myP.total_points} pts</span>
+              <ScoringExplanation />
+            </div>
+            <span className="text-xs text-text-secondary">{myP.paid ? "Pagado" : "Pendiente"}</span>
           </div>
         </div>
       )}
@@ -350,14 +353,13 @@ export default function PollaSlugPage() {
                           </span>
                         }
                       </div>
+                      <UserAvatar userId={p.user_id} avatarUrl={p.users?.avatar_url} displayName={p.users?.display_name} size="sm" />
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium text-sm truncate ${isMe ? "text-gold font-bold" : "text-text-primary"}`}>
                           {p.users?.display_name || "Usuario"}
                           {isMe && <span className="ml-1 text-xs text-gold">(tú)</span>}
                         </p>
-                        {polla.payment_mode !== "honor" && (
-                          <p className="text-xs text-text-muted">{p.paid ? "✅ Pagado" : "⏳ Pendiente"}</p>
-                        )}
+                        <p className="text-xs text-text-muted">{p.paid ? "Pagado" : "Pendiente"}</p>
                       </div>
                       <span className="score-font text-[18px] text-text-primary">{p.total_points}</span>
                     </div>
@@ -375,7 +377,7 @@ export default function PollaSlugPage() {
           ) : (
             <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
               <span className="text-3xl">🤝</span>
-              <p className="text-text-secondary mt-2">Esta polla usa sistema de honor</p>
+              <p className="text-text-secondary mt-2">No hay pagos para esta polla</p>
             </div>
           )
         )}
@@ -391,7 +393,7 @@ export default function PollaSlugPage() {
                   { label: "Torneo", value: trnLabel },
                   { label: "Tipo", value: polla.type === "closed" ? "🔒 Privada" : "🌐 Abierta" },
                   { label: "Participantes", value: String(participants.length) },
-                  { label: "Pago", value: polla.payment_mode === "honor" ? "🤝 Honor" : polla.payment_mode === "admin_collects" ? "💰 Admin" : "📲 Digital" },
+                  { label: "Pago", value: polla.payment_mode === "admin_collects" ? "Admin" : "Digital" },
                 ].map((item) => (
                   <div key={item.label} className="rounded-xl p-2 bg-bg-elevated">
                     <p className="text-[10px] text-text-muted">{item.label}</p>
