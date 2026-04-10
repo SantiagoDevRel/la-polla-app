@@ -187,21 +187,27 @@ async function main() {
   // STEP 1: Find Santiago (existing user)
   // ────────────────────────────────────
   console.log("1. Finding Santiago (existing user)...");
-  const { data: santiagoRow, error: santiagoErr } = await supabase
-    .from("users")
-    .select("id, display_name, whatsapp_number")
-    .ilike("display_name", "%santiago%")
-    .limit(1)
-    .single();
 
-  if (santiagoErr || !santiagoRow) {
-    console.error("   ✗ Santiago not found in users table. Make sure he exists first.");
-    console.error("   Error:", santiagoErr?.message);
+  // Look up via auth.users to get the correct auth UID (which is what RLS uses)
+  const { data: authUsers } = await supabase.auth.admin.listUsers();
+  const santiagoAuth = authUsers?.users?.find(
+    (u) => u.email === "351934255581@wa.lapolla.app" || u.phone === "351934255581"
+  );
+
+  if (!santiagoAuth) {
+    console.error("   ✗ Santiago not found in auth.users. Make sure he exists first.");
     process.exit(1);
   }
 
-  console.log(`   ✓ Santiago found: ${santiagoRow.id} (${santiagoRow.display_name})`);
-  const santiagoId = santiagoRow.id;
+  // Also verify public.users row exists
+  const { data: santiagoRow } = await supabase
+    .from("users")
+    .select("id, display_name")
+    .eq("id", santiagoAuth.id)
+    .single();
+
+  console.log(`   ✓ Santiago found: auth.id=${santiagoAuth.id}, public.users=${santiagoRow?.display_name || "(missing)"}`);
+  const santiagoId = santiagoAuth.id;
 
   // ────────────────────────────────────
   // STEP 2: Create test users via Supabase Auth
