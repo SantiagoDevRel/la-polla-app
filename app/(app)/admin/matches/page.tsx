@@ -12,21 +12,12 @@ import { motion } from "framer-motion";
 import { staggerContainer, fadeUp } from "@/lib/animations";
 import { ArrowLeft, RefreshCw, AlertTriangle } from "lucide-react";
 
-// Calcula la temporada dinámicamente
-function getCurrentSeason(leagueId: number): number {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const multiYear = [2, 3, 4, 5, 848]; // UCL, Europa, top ligas
-  return multiYear.includes(leagueId) ? (month >= 6 ? year : year - 1) : year;
-}
-
-// Ligas disponibles para sincronizar
+// Competiciones disponibles (football-data.org IDs)
 const LEAGUES = [
-  { id: 2, label: "Champions League", tournament: "champions", active: true },
-  { id: 1, label: "Copa del Mundo 2026", tournament: "worldcup_2026", active: true },
-  { id: 239, label: "Liga BetPlay", tournament: "liga_betplay", active: false },
-].map((l) => ({ ...l, season: getCurrentSeason(l.id) }));
+  { id: 2001, label: "Champions League", tournament: "champions_2025", active: true },
+  { id: 2000, label: "Copa del Mundo 2026", tournament: "worldcup_2026", active: true },
+  { id: 2014, label: "La Liga", tournament: "la_liga_2025", active: true },
+];
 
 interface SyncResult {
   synced: number;
@@ -40,6 +31,8 @@ export default function AdminMatchesPage() {
   const [loading, setLoading] = useState<number | null>(null);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<string | null>(null);
 
   // Verificar que el usuario es admin de al menos una polla
   useEffect(() => {
@@ -66,20 +59,38 @@ export default function AdminMatchesPage() {
     }
   }, [checkingAccess, hasAccess, router]);
 
-  async function handleSync(leagueId: number, season: number) {
-    setLoading(leagueId);
+  async function handlePurge() {
+    if (!confirm("Eliminar todos los partidos anteriores al 1 enero 2026?")) return;
+    setPurging(true);
+    setPurgeResult(null);
+    try {
+      const { data } = await axios.post(
+        "/api/admin/matches/purge",
+        {},
+        { headers: { "x-cron-secret": process.env.NEXT_PUBLIC_CRON_SECRET || "" } }
+      );
+      setPurgeResult(`${data.deleted} partidos eliminados`);
+    } catch {
+      setPurgeResult("Error al purgar partidos");
+    } finally {
+      setPurging(false);
+    }
+  }
+
+  async function handleSync(competitionId: number, tournament: string) {
+    setLoading(competitionId);
     try {
       const { data } = await axios.post(
         "/api/matches/sync",
-        { leagueId, season },
+        { competitionId, tournament },
         { headers: { "x-cron-secret": process.env.NEXT_PUBLIC_CRON_SECRET || "" } }
       );
-      setResults((prev) => ({ ...prev, [leagueId]: data }));
+      setResults((prev) => ({ ...prev, [competitionId]: data }));
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setResults((prev) => ({
         ...prev,
-        [leagueId]: e.response?.data?.error || "Error desconocido",
+        [competitionId]: e.response?.data?.error || "Error desconocido",
       }));
     } finally {
       setLoading(null);
@@ -129,10 +140,10 @@ export default function AdminMatchesPage() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="font-bold text-text-primary">{league.label}</p>
-                  <p className="text-xs text-text-muted">League ID: {league.id} · Season: {league.season}</p>
+                  <p className="text-xs text-text-muted">Competition ID: {league.id} (football-data.org)</p>
                 </div>
                 <button
-                  onClick={() => handleSync(league.id, league.season)}
+                  onClick={() => handleSync(league.id, league.tournament)}
                   disabled={isLoading}
                   className="flex items-center gap-1.5 bg-gold text-bg-base px-5 py-3 rounded-xl text-sm font-semibold
                              hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] disabled:opacity-40 transition-all duration-200 cursor-pointer"
@@ -167,11 +178,25 @@ export default function AdminMatchesPage() {
           <div>
             <p className="font-bold text-gold mb-1">Nota sobre Copa del Mundo 2026</p>
             <p className="text-sm text-text-secondary leading-snug">
-              Si devuelve 0 partidos o error, el fixture oficial aún no está publicado en API-Football.
+              Si devuelve 0 partidos, el fixture oficial aun no esta publicado.
               Es normal hasta que la FIFA confirme el calendario completo.
-              El plan gratuito solo soporta temporadas 2022-2024.
             </p>
           </div>
+        </div>
+
+        {/* Purgar partidos antiguos */}
+        <div className="rounded-xl p-4 bg-bg-card border border-border-subtle space-y-3">
+          <p className="text-sm font-bold text-text-primary">Mantenimiento</p>
+          <button
+            onClick={handlePurge}
+            disabled={purging}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold bg-red-alert text-white hover:bg-red-alert/90 transition-all duration-200 disabled:opacity-40 cursor-pointer"
+          >
+            {purging ? "Purgando..." : "Purgar partidos anteriores a 2026"}
+          </button>
+          {purgeResult && (
+            <p className="text-sm text-center text-text-secondary">{purgeResult}</p>
+          )}
         </div>
       </main>
     </div>

@@ -75,7 +75,19 @@ body::before {
   to { opacity: 1; }
 }
 
+@keyframes dotPulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(0,230,118,0.5); }
+  50% { box-shadow: 0 0 9px rgba(0,230,118,0.9); }
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.5); }
+}
+
 .animate-pulse-live { animation: pulse-live 1.5s ease-in-out infinite; }
+.dot-active-pulse { animation: dotPulse 2s infinite; }
+.ldot-red-pulse { animation: livePulse 1.2s infinite; }
 .animate-slide-up { animation: slide-up 0.25s ease-out forwards; }
 .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
 
@@ -92,3 +104,6 @@ body::before {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+.hide-scrollbar { scrollbar-width: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
