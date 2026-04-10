@@ -7,7 +7,7 @@ import {
   sendListMessage,
   sendCTAButton,
 } from "./interactive";
-import { setState, getState } from "./state";
+import { setState } from "./state";
 import { formatTablaWA } from "./tabla";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://lapolla.app";
