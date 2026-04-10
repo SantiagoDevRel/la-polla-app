@@ -6,7 +6,10 @@ import { fetchCompetitionMatches, rateLimitDelay, FDMatch } from "./client";
 // Competiciones activas en produccion
 const COMPETITIONS = [
   { id: 2001, tournament: "champions_2025", label: "Champions League" },
+  { id: 2000, tournament: "worldcup_2026", label: "FIFA World Cup 2026" },
   { id: 2014, tournament: "la_liga_2025", label: "La Liga" },
+  { id: 2021, tournament: "premier_league", label: "Premier League" },
+  { id: 2019, tournament: "seria_a", label: "Serie A" },
 ];
 
 // Mapeo de status de football-data.org a nuestro schema
