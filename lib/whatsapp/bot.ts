@@ -4,7 +4,7 @@ import axios from "axios";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateOTP } from "@/lib/utils/otp";
 import { getOTPMessage } from "./messages";
-import { getState, clearState } from "./state";
+import { getState, setState, clearState } from "./state";
 import {
   handleMainMenu,
   handleUnknownUser,
@@ -15,7 +15,19 @@ import {
   handleLeaderboard,
   handleResults,
   handleJoinPolla,
+  handleHelp,
+  handleProfile,
+  handleHelpTopic,
+  handleConfirmPrediction,
 } from "./flows";
+
+// Validate required env vars on module load
+if (!process.env.META_WA_PHONE_NUMBER_ID) {
+  console.error("[WA] META_WA_PHONE_NUMBER_ID is not set — bot will not send messages.");
+}
+if (!process.env.META_WA_ACCESS_TOKEN) {
+  console.error("[WA] META_WA_ACCESS_TOKEN is not set — bot will not send messages.");
+}
 
 const WA_API_URL = `https://graph.facebook.com/v21.0/${process.env.META_WA_PHONE_NUMBER_ID}/messages`;
 
@@ -167,6 +179,9 @@ async function logMessage(
 export async function processIncomingMessage(message: IncomingMessage) {
   const { from, type, text, interactive } = message;
 
+  // Log raw phone number for debugging (Colombian numbers start with 57)
+  console.log(`[WA] Incoming from: ${from} | type: ${type}`);
+
   // Log inbound message
   const inboundContent =
     text?.body ||
@@ -235,19 +250,37 @@ export async function processIncomingMessage(message: IncomingMessage) {
       }
     }
 
+    // Help keywords
+    if (["ayuda", "help"].includes(body)) {
+      await handleHelp(from);
+      return;
+    }
+
+    // Profile keywords
+    if (["perfil", "profile"].includes(body)) {
+      await handleProfile(from, user.id);
+      return;
+    }
+
     // Menu keywords
-    if (["hola", "hi", "inicio", "menu", "menú", "ayuda", "help"].includes(body)) {
+    if (["hola", "hi", "inicio", "menu", "menú"].includes(body)) {
       await handleMainMenu(from, user.display_name);
       return;
     }
 
-    // Default: show menu
-    await handleMainMenu(from, user.display_name);
+    // Default: fallback message
+    await sendTextMessage(
+      from,
+      "🤔 Parce, no entendí bien. Escribe *menu* para ver las opciones o *ayuda* si tenés dudas."
+    );
     return;
   }
 
-  // 5. Any other message type: show menu
-  await handleMainMenu(from, user.display_name);
+  // 5. Any other message type: fallback
+  await sendTextMessage(
+    from,
+    "🤔 Parce, no entendí bien. Escribe *menu* para ver las opciones o *ayuda* si tenés dudas."
+  );
 }
 
 // ─── Payload Router ───
@@ -267,7 +300,18 @@ async function routePayload(
     return;
   }
 
-  if (payload === "mis_pollas") {
+  // Main menu buttons (new IDs)
+  if (payload === "menu_mis_pollas" || payload === "mis_pollas") {
+    await handleMisPollas(from, user.id);
+    return;
+  }
+
+  if (payload === "menu_predecir" || payload === "pronosticar") {
+    await handleMisPollas(from, user.id);
+    return;
+  }
+
+  if (payload === "menu_tabla" || payload === "tabla") {
     await handleMisPollas(from, user.id);
     return;
   }
@@ -278,19 +322,23 @@ async function routePayload(
     return;
   }
 
-  if (payload === "pronosticar") {
-    await handleMisPollas(from, user.id);
-    return;
-  }
-
   if (payload.startsWith("pred_")) {
     const pollaId = payload.replace("pred_", "").replace("next_", "");
     await handlePronosticar(from, user.id, pollaId);
     return;
   }
 
-  if (payload === "tabla") {
-    await handleMisPollas(from, user.id);
+  if (payload.startsWith("match_")) {
+    const state = getState(from);
+    if (state && state.pollaId) {
+      const matchId = payload.replace("match_", "");
+      setState(from, {
+        action: "waiting_prediction",
+        pollaId: state.pollaId,
+        matchId,
+      });
+      await handlePronosticar(from, user.id, state.pollaId, matchId);
+    }
     return;
   }
 
@@ -303,6 +351,40 @@ async function routePayload(
   if (payload.startsWith("results_")) {
     const pollaId = payload.replace("results_", "");
     await handleResults(from, user.id, pollaId);
+    return;
+  }
+
+  // Prediction confirmation
+  if (payload === "confirm_yes") {
+    const state = getState(from);
+    if (state && state.action === "confirm_prediction") {
+      await handleConfirmPrediction(from, user, state);
+    }
+    return;
+  }
+
+  if (payload === "confirm_no") {
+    const state = getState(from);
+    if (state && state.pollaId) {
+      await handlePronosticar(from, user.id, state.pollaId);
+    }
+    return;
+  }
+
+  // Help menu
+  if (payload === "menu_ayuda") {
+    await handleHelp(from);
+    return;
+  }
+
+  if (payload.startsWith("help_")) {
+    await handleHelpTopic(from, user, payload);
+    return;
+  }
+
+  // Profile
+  if (payload === "menu_perfil" || payload === "help_perfil") {
+    await handleProfile(from, user.id);
     return;
   }
 
