@@ -1,4 +1,4 @@
-// components/ui/Input.tsx — Componente de input reutilizable con estilos del design system
+// components/ui/Input.tsx — Componente de input reutilizable "estadio de noche"
 import { forwardRef } from "react";
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -11,18 +11,18 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div>
         {label && (
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-text-secondary mb-1.5">
             {label}
           </label>
         )}
         <input
           ref={ref}
-          className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-colombia-yellow focus:border-transparent outline-none ${
-            error ? "border-colombia-red" : "border-gray-300"
+          className={`w-full px-4 py-3 rounded-xl outline-none transition-colors bg-bg-base border text-text-primary placeholder:text-text-muted ${
+            error ? "border-red-alert" : "border-border-subtle focus:border-gold/50"
           } ${className}`}
           {...props}
         />
-        {error && <p className="text-colombia-red text-xs mt-1">{error}</p>}
+        {error && <p className="text-red-alert text-xs mt-1">{error}</p>}
       </div>
     );
   }

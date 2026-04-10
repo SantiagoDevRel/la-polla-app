@@ -5,8 +5,8 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import {
   getCountries,
   getCountryCallingCode,
+  type Country as CountryCode,
 } from "react-phone-number-input";
-import type { CountryCode } from "react-phone-number-input";
 import flags from "react-phone-number-input/flags";
 
 // Nombres de países en español colombiano
@@ -74,7 +74,7 @@ function getCountryName(code: CountryCode): string {
 function Flag({ country, className }: { country: CountryCode; className?: string }) {
   const FlagComponent = flags[country];
   if (!FlagComponent) return <span className={className}>{country}</span>;
-  return <FlagComponent title={getCountryName(country)} className={className} />;
+  return <FlagComponent title={getCountryName(country)} {...(className ? { className } : {})} />;
 }
 
 interface PhoneInputProps {
@@ -150,16 +150,16 @@ export default function PhoneInput({ onChange }: PhoneInputProps) {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <div className="flex border border-gray-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-colombia-yellow focus-within:border-transparent">
+      <div className="flex rounded-xl overflow-hidden border border-border-subtle focus-within:border-gold/50 transition-colors">
         {/* Botón de país */}
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-1.5 px-3 py-3 bg-gray-50 border-r border-gray-300 hover:bg-gray-100 transition-colors shrink-0"
+          className="flex items-center gap-1.5 px-3 py-3 border-r border-border-subtle hover:bg-bg-card-hover transition-colors shrink-0 bg-bg-elevated"
         >
           <Flag country={country} className="w-6 h-4 inline-block" />
-          <span className="text-sm font-medium text-gray-700">+{callingCode}</span>
-          <svg className={`w-3 h-3 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <span className="text-sm font-medium text-text-primary">+{callingCode}</span>
+          <svg className={`w-3 h-3 text-text-muted transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
@@ -170,35 +170,36 @@ export default function PhoneInput({ onChange }: PhoneInputProps) {
           value={localNumber}
           onChange={(e) => setLocalNumber(e.target.value.replace(/\D/g, ""))}
           placeholder="3117312391"
-          className="flex-1 px-3 py-3 outline-none text-lg min-w-0"
+          className="flex-1 px-3 py-3 outline-none text-lg min-w-0 bg-bg-base text-text-primary placeholder:text-text-muted"
           required
         />
       </div>
 
       {/* Hint */}
-      <p className="text-xs text-gray-500 mt-1">
+      <p className="text-xs text-text-muted mt-1">
         Número sin código de país
       </p>
 
       {/* Dropdown de países */}
       {open && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-72 flex flex-col overflow-hidden">
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl max-h-72 flex flex-col overflow-hidden bg-bg-card border border-border-medium"
+          style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
           {/* Búsqueda */}
-          <div className="p-2 border-b border-gray-100">
+          <div className="p-2 border-b border-border-subtle">
             <input
               ref={searchRef}
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar país o código..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-colombia-yellow"
+              className="w-full px-3 py-2 text-sm rounded-lg outline-none bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
             />
           </div>
 
           {/* Lista de países */}
           <div className="overflow-y-auto overscroll-contain">
             {countries.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-gray-400 text-center">
+              <p className="px-4 py-3 text-sm text-text-muted text-center">
                 No se encontraron países
               </p>
             ) : (
@@ -210,15 +211,15 @@ export default function PhoneInput({ onChange }: PhoneInputProps) {
                     key={c}
                     type="button"
                     onClick={() => handleSelect(c)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-colombia-yellow/10 transition-colors ${
-                      isSelected ? "bg-colombia-yellow/20 font-medium" : ""
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-bg-card-hover transition-colors ${
+                      isSelected ? "bg-gold-dim" : ""
                     }`}
                   >
                     <Flag country={c} className="w-6 h-4 inline-block shrink-0" />
-                    <span className="text-sm text-gray-800 truncate flex-1">
+                    <span className={`text-sm truncate flex-1 ${isSelected ? "text-gold font-medium" : "text-text-primary"}`}>
                       {getCountryName(c)}
                     </span>
-                    <span className="text-sm text-gray-500 shrink-0">+{code}</span>
+                    <span className="text-sm text-text-muted shrink-0">+{code}</span>
                   </button>
                 );
               })

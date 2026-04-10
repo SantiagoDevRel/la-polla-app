@@ -1,4 +1,4 @@
-// components/ui/Button.tsx — Componente de botón reutilizable con variantes del design system colombiano
+// components/ui/Button.tsx — Componente de botón reutilizable con variantes "estadio de noche"
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger";
   loading?: boolean;
@@ -13,14 +13,14 @@ export default function Button({
   ...props
 }: ButtonProps) {
   const variants = {
-    primary: "bg-colombia-yellow text-colombia-blue hover:bg-yellow-400",
-    secondary: "bg-white text-colombia-blue border border-gray-200 hover:bg-gray-50",
-    danger: "bg-colombia-red text-white hover:bg-red-700",
+    primary: "bg-gold text-bg-base hover:brightness-110",
+    secondary: "bg-bg-card text-text-secondary border border-border-subtle hover:bg-bg-card-hover",
+    danger: "bg-red-alert text-bg-base hover:brightness-110",
   };
 
   return (
     <button
-      className={`font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
+      className={`font-bold py-3 px-4 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >

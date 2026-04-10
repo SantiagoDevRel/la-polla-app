@@ -12,7 +12,8 @@ Santiago Trujillo (GitHub: SantiagoDevRel). Colombian Developer Advocate based b
 ## Stack
 - **Framework**: Next.js 14 App Router
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS (custom colors: colombia-blue, colombia-yellow, colombia-red)
+- **Styling**: Tailwind CSS ("Estadio de Noche" dark design system — gold accent, custom tokens)
+- **Icons**: lucide-react (SVG icons for nav, UI elements)
 - **Database**: Supabase (PostgreSQL with RLS enabled on all tables)
 - **Auth**: WhatsApp OTP via Meta WhatsApp Cloud API — no passwords, no bypass, no dev mode
 - **Bot**: Meta WhatsApp Cloud API webhook
@@ -26,33 +27,55 @@ Santiago Trujillo (GitHub: SantiagoDevRel). Colombian Developer Advocate based b
 ```
 app/
   (app)/                  # Authenticated routes (protected by middleware)
-    dashboard/page.tsx    # Main dashboard — lists user's pollas
-    layout.tsx
+    dashboard/page.tsx    # Main dashboard — greeting, pollas, upcoming matches
+    layout.tsx            # ToastProvider + BottomNav wrapper + pb-20
+    admin/
+      matches/page.tsx    # Admin panel for manual API-Football sync
+    explorar/page.tsx     # Browse open pollas
+    perfil/page.tsx       # User profile, edit name, stats, logout
     pollas/
-      crear/page.tsx      # Create new polla form
-      [slug]/page.tsx     # Polla detail: matches, predictions, ranking
+      page.tsx            # Mis Pollas — list with Active/Finished tabs
+      crear/page.tsx      # 3-step wizard: info → scope → payment mode
+      [slug]/page.tsx     # Polla detail: 4 tabs (partidos, ranking, pagos, info)
+    unirse/
+      [slug]/page.tsx     # Join a polla by slug
   (auth)/                 # Public auth routes
     login/page.tsx
     verify/page.tsx
   api/
     auth/otp/route.ts     # OTP generate + verify
-    matches/route.ts      # Match sync
-    pollas/route.ts       # GET (list) + POST (create)
-    pollas/[slug]/route.ts            # GET polla by slug with participants + matches + predictions
+    matches/route.ts      # GET matches from Supabase
+    matches/sync/route.ts # POST — sync from API-Football (requires CRON_SECRET header)
+    pollas/route.ts       # GET (list) + POST (create) — supports 3 payment modes
+    pollas/public/route.ts           # GET open pollas (no auth required)
+    pollas/[slug]/route.ts           # GET polla by slug with participants + matches + predictions
     pollas/[slug]/predictions/route.ts # POST upsert prediction for a match
+    pollas/[slug]/payments/route.ts  # GET/POST/PATCH — payment proof + admin approve/reject
+    pollas/[slug]/join/route.ts      # POST — join an open polla
+    users/me/route.ts               # PATCH — update display_name
     whatsapp/send/route.ts
     whatsapp/webhook/route.ts
 components/
-  polla/PollaCard.tsx
+  polla/PollaCard.tsx              # Redesigned card with badges, stats, rank
   polla/MatchPredictionCard.tsx
+  polla/ParticipantPayment.tsx     # Wrapper: shows PaymentSubmitForm or AdminPaymentReview by role
+  polla/PaymentSubmitForm.tsx      # Participant uploads payment proof (admin_collects mode)
+  polla/AdminPaymentReview.tsx     # Admin reviews/approves/rejects payments
+  polla/InviteModal.tsx            # Bottom-sheet modal for sharing invite link
   ui/Button.tsx Input.tsx PhoneInput.tsx
+  ui/Toast.tsx                     # Global toast notification system (replaces all alert())
+  ui/BottomNav.tsx                 # Mobile bottom navigation bar (5 items)
   whatsapp/WhatsAppButton.tsx
 lib/
   api-football/client.ts mappers.ts sync.ts
   supabase/admin.ts client.ts middleware.ts server.ts
   utils/otp.ts points.ts
   whatsapp/bot.ts messages.ts
+scripts/
+  seed-matches.ts         # Seed script: imports Champions + World Cup matches from API-Football
+  tsconfig.scripts.json   # Separate tsconfig for running scripts with ts-node
 supabase/migrations/001_initial_schema.sql
+supabase/migrations/002_payment_mode_fields.sql  # Adds admin_payment_instructions to pollas
 middleware.ts             # Auth middleware — redirects unauthenticated users to /login
 ```
 
@@ -67,10 +90,10 @@ middleware.ts             # Auth middleware — redirects unauthenticated users 
 `id` uuid PK | `external_id` varchar(50) UNIQUE (API-Football ID) | `tournament` varchar(50) | `match_day` int | `phase` varchar(30) | `home_team` / `away_team` varchar(60) | `home_team_flag` / `away_team_flag` text | `scheduled_at` timestamptz | `venue` varchar(100) | `home_score` / `away_score` int (null until finished) | `status` ENUM('scheduled','live','finished','cancelled')
 
 ### pollas
-`id` uuid PK | `slug` varchar(50) UNIQUE | `name` varchar(100) | `description` text | `created_by` uuid → users | `type` ENUM('open','closed') | `status` ENUM('active','finished','cancelled') | `tournament` varchar(50) | `scope` ENUM('full','group_stage','knockouts','custom') | `match_ids` uuid[] (only for scope=custom) | `buy_in_amount` numeric | `currency` varchar(10) DEFAULT 'COP' | `platform_fee_pct` numeric DEFAULT 0.00 | `prize_pool` numeric | `points_exact` int DEFAULT 5 | `points_winner` int DEFAULT 2 | `points_one_team` int DEFAULT 1 | `payment_mode` ENUM('honor','admin_collects','digital_pool') | `starts_at` / `ends_at` timestamptz
+`id` uuid PK | `slug` varchar(50) UNIQUE | `name` varchar(100) | `description` text | `created_by` uuid → users | `type` ENUM('open','closed') | `status` ENUM('active','finished','cancelled') | `tournament` varchar(50) | `scope` ENUM('full','group_stage','knockouts','custom') | `match_ids` uuid[] (only for scope=custom) | `buy_in_amount` numeric | `currency` varchar(10) DEFAULT 'COP' | `platform_fee_pct` numeric DEFAULT 0.00 | `prize_pool` numeric | `points_exact` int DEFAULT 5 | `points_winner` int DEFAULT 2 | `points_one_team` int DEFAULT 1 | `payment_mode` ENUM('honor','admin_collects','digital_pool') | `admin_payment_instructions` text (only for admin_collects mode) | `starts_at` / `ends_at` timestamptz
 
 ### polla_participants
-`id` uuid PK | `polla_id` → pollas | `user_id` → users | `role` ENUM('admin','player') | `status` ENUM('pending','approved','rejected') | `paid` bool | `paid_at` timestamptz | `paid_amount` numeric | `payment_note` text | `total_points` int DEFAULT 0 | `rank` int | UNIQUE(polla_id, user_id)
+`id` uuid PK | `polla_id` → pollas | `user_id` → users | `role` ENUM('admin','player') | `status` ENUM('pending','approved','rejected') | `paid` bool | `paid_at` timestamptz | `paid_amount` numeric | `payment_note` text | `payment_proof_url` text | `payment_mode_note` text | `total_points` int DEFAULT 0 | `rank` int | UNIQUE(polla_id, user_id)
 
 ### predictions
 `id` uuid PK | `polla_id` → pollas | `user_id` → users | `match_id` → matches | `predicted_home` int | `predicted_away` int | `locked` bool DEFAULT false | `visible` bool DEFAULT false (becomes true when match goes live) | `points_earned` int DEFAULT 0 | UNIQUE(polla_id, user_id, match_id)
@@ -107,9 +130,13 @@ middleware.ts             # Auth middleware — redirects unauthenticated users 
 
 ## API-Football (RapidAPI)
 - Used as the oracle for match results
-- World Cup 2026 tournament ID: to be confirmed after tournament starts
+- World Cup 2026 tournament ID: 1 (not available on free plan yet — seasons 2022-2024 only)
+- Champions League ID: 2
 - Liga BetPlay (Colombia) ID: 239
-- Sync module: `lib/api-football/sync.ts`
+- Sync module: `lib/api-football/sync.ts` — exports `syncLeague(leagueId, season)`
+- Seed script: `scripts/seed-matches.ts` — run with `npx ts-node -P scripts/tsconfig.scripts.json -r tsconfig-paths/register scripts/seed-matches.ts`
+- Admin panel: `/admin/matches` — manual sync from UI
+- Tournament name mapping in sync.ts: `1_2026→worldcup_2026`, `2_2024→champions_2025`, `239_2025→liga_betplay_2025`
 
 ## Cloudflare Turnstile
 - Test keys configured for localhost (always pass in dev)
@@ -140,28 +167,41 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=
 RAPIDAPI_KEY=
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
+CRON_SECRET=
+NEXT_PUBLIC_CRON_SECRET=
 ```
 
 ---
 
 ## Current status and what is NOT built yet
-As of the start of this session:
-- Base setup, Supabase schema, WhatsApp OTP auth, and basic dashboard: DONE
-- `app/(app)/pollas/[slug]/page.tsx`: built in current session
-- `app/api/pollas/[slug]/route.ts`: built in current session
-- `app/api/pollas/[slug]/predictions/route.ts`: built in current session
+- Full mobile-first frontend: DONE (dashboard, pollas list, detail, explore, join, profile)
+- Toast notification system (replaced all alert()): DONE
+- Bottom navigation bar: DONE
+- Crear polla (wizard 3 pasos: info → scope → payment mode): DONE
+- Fix honor mode (buy-in optional for honor): DONE
+- Payment management (participant upload proof + admin approve/reject): DONE
+- Polla detail page with 4 tabs (partidos, ranking, pagos, info): DONE
+- Invite modal with copy link + WhatsApp share: DONE
+- Explore page (browse open pollas): DONE
+- Join polla flow (/unirse/[slug]): DONE
+- User profile page with edit name + stats + logout: DONE
+- Admin matches sync panel (`/admin/matches`): DONE
+- Match import from API-Football (`syncLeague` function): DONE
+- `scripts/seed-matches.ts`: DONE — Champions League 2024-25 (279 matches synced)
+- Auth trigger (auth.users → public.users sync): DONE (migration 003)
+- World Cup 2026: not available on free API plan (seasons 2022-2024 only)
 - WhatsApp bot webhook: built but NOT connected (needs public URL)
-- Match import from API-Football: NOT done
 - Vercel deploy: NOT done
 - System User Token (permanent Meta token): NOT done
 - Real Turnstile keys: NOT done
 
 ## Pending work in priority order
-1. Import World Cup 2026 matches from API-Football
-2. Connect WhatsApp webhook (ngrok for dev, then Vercel URL)
-3. Vercel deploy
-4. Replace temporary Meta access token with System User Token
-5. Replace Cloudflare Turnstile test keys with production keys
+1. Run seed-matches.ts to populate Champions League fixtures in production DB
+2. Import World Cup 2026 matches (pending FIFA fixture release)
+3. Connect WhatsApp webhook (needs public URL — ngrok or Vercel deploy)
+4. Vercel deploy
+5. Replace temporary Meta access token with System User Token
+6. Replace Cloudflare Turnstile test keys with production keys
 
 ---
 

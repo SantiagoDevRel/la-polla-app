@@ -26,11 +26,11 @@ export default function MatchPredictionCard({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4">
-      <p className="text-xs text-gray-500 text-center mb-3">{date}</p>
+    <div className="rounded-xl p-4 bg-bg-card border border-border-subtle">
+      <p className="text-xs text-text-muted text-center mb-3">{date}</p>
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 text-right">
-          <p className="font-medium text-sm text-colombia-blue truncate">{homeTeam}</p>
+          <p className="font-medium text-sm text-text-primary truncate">{homeTeam}</p>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -39,25 +39,25 @@ export default function MatchPredictionCard({
             max={99}
             value={homeScore}
             onChange={(e) => setHomeScore(parseInt(e.target.value) || 0)}
-            className="w-12 h-12 text-center border border-gray-300 rounded-lg text-lg font-bold focus:ring-2 focus:ring-colombia-yellow focus:border-transparent outline-none"
+            className="w-12 h-12 text-center rounded-lg score-font text-xl outline-none transition-colors bg-bg-elevated border-2 border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
           />
-          <span className="text-gray-400 font-bold">-</span>
+          <span className="text-text-muted font-bold">-</span>
           <input
             type="number"
             min={0}
             max={99}
             value={awayScore}
             onChange={(e) => setAwayScore(parseInt(e.target.value) || 0)}
-            className="w-12 h-12 text-center border border-gray-300 rounded-lg text-lg font-bold focus:ring-2 focus:ring-colombia-yellow focus:border-transparent outline-none"
+            className="w-12 h-12 text-center rounded-lg score-font text-xl outline-none transition-colors bg-bg-elevated border-2 border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
           />
         </div>
         <div className="flex-1">
-          <p className="font-medium text-sm text-colombia-blue truncate">{awayTeam}</p>
+          <p className="font-medium text-sm text-text-primary truncate">{awayTeam}</p>
         </div>
       </div>
       <button
         onClick={handleSave}
-        className="w-full mt-3 bg-colombia-blue text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition-colors"
+        className="w-full mt-3 bg-gold text-bg-base py-2.5 rounded-lg text-sm font-bold hover:brightness-110 transition-all"
       >
         Guardar pronóstico
       </button>

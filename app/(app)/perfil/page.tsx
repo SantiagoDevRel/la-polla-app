@@ -1,0 +1,152 @@
+// app/(app)/perfil/page.tsx — Perfil del usuario "estadio de noche"
+// Avatar con gradiente gold, nombre editable, stats, logout
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
+import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/Toast";
+
+interface UserProfile {
+  display_name: string;
+  whatsapp_number: string;
+  avatar_url: string | null;
+}
+
+interface UserStats {
+  pollasCount: number;
+  predictionsCount: number;
+  bestRank: number | null;
+}
+
+export default function PerfilPage() {
+  const router = useRouter();
+  const { showToast } = useToast();
+
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState<UserStats>({ pollasCount: 0, predictionsCount: 0, bestRank: null });
+  const [editName, setEditName] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: userData } = await supabase
+          .from("users")
+          .select("display_name, whatsapp_number, avatar_url")
+          .eq("id", user.id)
+          .single();
+
+        if (userData) {
+          setProfile(userData);
+          setEditName(userData.display_name);
+        }
+
+        const { data: participations } = await supabase
+          .from("polla_participants")
+          .select("polla_id, rank")
+          .eq("user_id", user.id);
+
+        const { count: predCount } = await supabase
+          .from("predictions")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id);
+
+        const ranks = (participations || []).map((p) => p.rank).filter((r): r is number => r !== null);
+        setStats({
+          pollasCount: participations?.length || 0,
+          predictionsCount: predCount || 0,
+          bestRank: ranks.length > 0 ? Math.min(...ranks) : null,
+        });
+      } catch { /* silently fail */ } finally { setLoading(false); }
+    }
+    load();
+  }, []);
+
+  async function handleSaveName() {
+    if (editName.trim().length < 2) { showToast("Mínimo 2 caracteres", "error"); return; }
+    setSaving(true);
+    try {
+      await axios.patch("/api/users/me", { display_name: editName.trim() });
+      setProfile((prev) => prev ? { ...prev, display_name: editName.trim() } : prev);
+      setIsEditing(false);
+      showToast("Nombre actualizado", "success");
+    } catch { showToast("Error actualizando nombre", "error"); } finally { setSaving(false); }
+  }
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">Cargando perfil...</p></div>;
+  if (!profile) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">Error cargando perfil</p></div>;
+
+  const initial = profile.display_name.charAt(0).toUpperCase();
+
+  return (
+    <div className="min-h-screen">
+      <header className="px-4 pt-4 pb-6" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
+        <div className="max-w-lg mx-auto">
+          <h1 className="text-xl font-bold text-text-primary text-center">Mi Perfil</h1>
+        </div>
+      </header>
+
+      <main className="max-w-lg mx-auto px-4 space-y-6 -mt-1">
+        {/* Avatar + name */}
+        <div className="rounded-2xl p-6 flex flex-col items-center bg-bg-card border border-border-subtle">
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mb-3"
+            style={{ background: "linear-gradient(135deg, #FFD700, #FFA000)" }}>
+            <span className="score-font text-[36px] text-bg-base">{initial}</span>
+          </div>
+
+          {isEditing ? (
+            <div className="flex items-center gap-2 w-full max-w-xs">
+              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus
+                className="flex-1 px-3 py-2 rounded-lg text-center outline-none text-text-primary bg-bg-elevated border border-border-medium focus:border-gold" />
+              <button onClick={handleSaveName} disabled={saving}
+                className="bg-gold text-bg-base font-semibold px-4 py-2 rounded-lg text-sm">
+                {saving ? "..." : "OK"}
+              </button>
+              <button onClick={() => { setIsEditing(false); setEditName(profile.display_name); }}
+                className="text-text-muted text-sm">✕</button>
+            </div>
+          ) : (
+            <button onClick={() => setIsEditing(true)} className="text-lg font-bold text-text-primary hover:text-gold transition-colors">
+              {profile.display_name} ✏️
+            </button>
+          )}
+          <p className="text-text-secondary text-sm mt-1">📱 {profile.whatsapp_number}</p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { value: String(stats.pollasCount), label: "Pollas" },
+            { value: String(stats.predictionsCount), label: "Pronósticos" },
+            { value: stats.bestRank ? `#${stats.bestRank}` : "—", label: "Mejor pos" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl p-4 text-center bg-bg-card border border-border-subtle">
+              <p className="score-font text-[32px] text-gold">{s.value}</p>
+              <p className="text-[11px] text-text-muted">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Logout */}
+        <button onClick={handleLogout}
+          className="w-full py-3 rounded-xl font-medium transition-colors text-red-alert border border-red-dim hover:bg-red-dim">
+          Cerrar sesión
+        </button>
+      </main>
+    </div>
+  );
+}

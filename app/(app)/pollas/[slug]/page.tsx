@@ -1,75 +1,55 @@
-// app/(app)/pollas/[slug]/page.tsx — Vista completa de una polla: partidos, pronósticos y ranking
+// app/(app)/pollas/[slug]/page.tsx — Vista completa de polla "estadio de noche"
+// 4 tabs: Partidos, Ranking, Pagos, Info — con marcadores Bebas Neue y inputs gold glow
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
+import { useToast } from "@/components/ui/Toast";
+import ParticipantPayment from "@/components/polla/ParticipantPayment";
+import InviteModal from "@/components/polla/InviteModal";
 
-// Tipos basados en el schema de Supabase
+// ─── Tipos ───
+
 interface Polla {
-  id: string;
-  slug: string;
-  name: string;
-  description: string;
-  tournament: string;
-  status: string;
-  buy_in_amount: number;
-  currency: string;
-  payment_mode: string;
-  points_exact: number;
-  points_winner: number;
-  points_one_team: number;
-  created_by: string;
+  id: string; slug: string; name: string; description: string;
+  tournament: string; status: string; buy_in_amount: number; currency: string;
+  payment_mode: string; points_exact: number; points_winner: number;
+  points_one_team: number; created_by: string; scope: string; type: string;
+  admin_payment_instructions: string | null;
 }
-
 interface Participant {
-  id: string;
-  user_id: string;
-  role: string;
-  total_points: number;
-  rank: number;
+  id: string; user_id: string; role: string; total_points: number; rank: number;
   paid: boolean;
-  users: {
-    id: string;
-    display_name: string;
-    whatsapp_number: string;
-    avatar_url: string | null;
-  };
+  users: { id: string; display_name: string; whatsapp_number: string; avatar_url: string | null };
 }
-
 interface Match {
-  id: string;
-  home_team: string;
-  away_team: string;
-  home_team_flag: string;
-  away_team_flag: string;
-  scheduled_at: string;
-  status: string;
-  home_score: number | null;
-  away_score: number | null;
-  phase: string;
+  id: string; home_team: string; away_team: string; home_team_flag: string;
+  away_team_flag: string; scheduled_at: string; status: string;
+  home_score: number | null; away_score: number | null; phase: string;
 }
-
 interface Prediction {
-  id: string;
-  match_id: string;
-  predicted_home: number;
-  predicted_away: number;
-  locked: boolean;
-  visible: boolean;
-  points_earned: number;
+  id: string; match_id: string; predicted_home: number; predicted_away: number;
+  locked: boolean; visible: boolean; points_earned: number;
 }
 
-type TabType = "partidos" | "ranking";
+type TabType = "partidos" | "ranking" | "pagos" | "info";
+
+const TRN: Record<string, string> = {
+  worldcup_2026: "🌍 Mundial 26", champions_2025: "⭐ Champions",
+  liga_betplay_2025: "🇨🇴 BetPlay",
+};
 
 export default function PollaSlugPage() {
   const params = useParams();
   const router = useRouter();
+  const { showToast } = useToast();
   const slug = params.slug as string;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("partidos");
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   const [polla, setPolla] = useState<Polla | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -78,18 +58,11 @@ export default function PollaSlugPage() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserRole, setCurrentUserRole] = useState("");
 
-  // Estado local de pronósticos pendientes de guardar
-  const [draftPredictions, setDraftPredictions] = useState<
-    Record<string, { home: string; away: string }>
-  >({});
-  const [savingMatchId, setSavingMatchId] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadPollaData();
-  }, [slug]);
-
-  async function loadPollaData() {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const { data } = await axios.get(`/api/pollas/${slug}`);
@@ -99,76 +72,62 @@ export default function PollaSlugPage() {
       setPredictions(data.predictions);
       setCurrentUserId(data.currentUserId);
       setCurrentUserRole(data.currentUserRole);
-
-      // Inicializar drafts con predicciones existentes
-      const drafts: Record<string, { home: string; away: string }> = {};
-      data.predictions.forEach((pred: Prediction) => {
-        drafts[pred.match_id] = {
-          home: pred.predicted_home.toString(),
-          away: pred.predicted_away.toString(),
-        };
+      const d: Record<string, { home: string; away: string }> = {};
+      data.predictions.forEach((p: Prediction) => {
+        d[p.match_id] = { home: p.predicted_home.toString(), away: p.predicted_away.toString() };
       });
-      setDraftPredictions(drafts);
+      setDrafts(d);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setError(e.response?.data?.error || "Error cargando la polla");
     } finally {
       setLoading(false);
     }
-  }
+  }, [slug]);
 
-  // Guardar o actualizar un pronóstico individual
-  async function savePrediction(matchId: string) {
-    const draft = draftPredictions[matchId];
-    if (!draft || draft.home === "" || draft.away === "") return;
+  useEffect(() => { loadData(); }, [loadData]);
 
-    setSavingMatchId(matchId);
+  async function savePred(matchId: string) {
+    const d = drafts[matchId];
+    if (!d || d.home === "" || d.away === "") return;
+    setSavingId(matchId);
     try {
       await axios.post(`/api/pollas/${slug}/predictions`, {
-        matchId,
-        predictedHome: parseInt(draft.home),
-        predictedAway: parseInt(draft.away),
+        matchId, predictedHome: parseInt(d.home), predictedAway: parseInt(d.away),
       });
-      setSaveSuccess(matchId);
-      setTimeout(() => setSaveSuccess(null), 2000);
-      // Recargar predicciones actualizadas
+      setSavedId(matchId);
+      showToast("Pronóstico guardado", "success");
+      setTimeout(() => setSavedId(null), 2000);
       const { data } = await axios.get(`/api/pollas/${slug}`);
       setPredictions(data.predictions);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      alert(e.response?.data?.error || "Error guardando pronóstico");
+      showToast(e.response?.data?.error || "Error guardando", "error");
     } finally {
-      setSavingMatchId(null);
+      setSavingId(null);
     }
   }
 
-  function getPredictionForMatch(matchId: string): Prediction | undefined {
-    return predictions.find((p) => p.match_id === matchId);
-  }
+  function getPred(matchId: string) { return predictions.find((p) => p.match_id === matchId); }
 
-  function formatDate(dateStr: string): string {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("es-CO", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+  function fmtDate(d: string) {
+    return new Date(d).toLocaleDateString("es-CO", {
+      weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
     });
   }
 
-  function isMatchLocked(match: Match): boolean {
-    if (match.status === "live" || match.status === "finished") return true;
-    const fiveMinBefore = new Date(match.scheduled_at).getTime() - 5 * 60 * 1000;
-    return Date.now() >= fiveMinBefore;
+  function isLocked(m: Match) {
+    if (m.status === "live" || m.status === "finished") return true;
+    return Date.now() >= new Date(m.scheduled_at).getTime() - 5 * 60 * 1000;
   }
 
+  // Loading skeleton
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center animate-fade-in">
           <div className="text-4xl mb-3">⚽</div>
-          <p className="text-colombia-blue font-medium">Cargando polla...</p>
+          <p className="text-text-secondary font-medium">Cargando polla...</p>
         </div>
       </div>
     );
@@ -176,275 +135,180 @@ export default function PollaSlugPage() {
 
   if (error || !polla) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl p-6 text-center shadow-sm max-w-sm w-full">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="rounded-2xl p-6 text-center max-w-sm w-full bg-bg-card border border-border-subtle">
           <div className="text-4xl mb-3">😕</div>
-          <p className="text-gray-700 font-medium mb-4">{error || "Polla no encontrada"}</p>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="bg-colombia-blue text-white px-6 py-2 rounded-xl font-medium"
-          >
-            Volver al inicio
+          <p className="text-text-primary font-medium mb-4">{error || "Polla no encontrada"}</p>
+          <button onClick={() => router.push("/dashboard")} className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold">
+            Volver
           </button>
         </div>
       </div>
     );
   }
 
-  const myParticipant = participants.find((p) => p.user_id === currentUserId);
-  const paymentModeLabel: Record<string, string> = {
-    honor: "Honor 🤝",
-    admin_collects: "Admin recoge 💰",
-    digital_pool: "Pozo digital 📲",
-  };
+  const myP = participants.find((p) => p.user_id === currentUserId);
+  const trnLabel = TRN[polla.tournament] || `⚽ ${polla.tournament}`;
+
+  const TABS: { key: TabType; label: string; show: boolean }[] = [
+    { key: "partidos", label: "⚽ Partidos", show: true },
+    { key: "ranking", label: "🏆 Ranking", show: true },
+    { key: "pagos", label: "💰 Pagos", show: polla.payment_mode === "admin_collects" },
+    { key: "info", label: "ℹ️ Info", show: true },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-colombia-blue text-white p-4 shadow-lg">
+      <header className="px-4 pt-4 pb-3" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-2">
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="text-colombia-yellow text-xl"
-            >
-              ←
-            </button>
-            <h1 className="text-lg font-bold truncate">{polla.name}</h1>
-          </div>
-          {/* Stats rápidos */}
-          <div className="flex gap-4 text-sm text-blue-200">
-            <span>{participants.length} participantes</span>
-            <span>·</span>
-            <span>{paymentModeLabel[polla.payment_mode]}</span>
-            {polla.buy_in_amount > 0 && (
-              <>
-                <span>·</span>
-                <span>
-                  {new Intl.NumberFormat("es-CO", {
-                    style: "currency",
-                    currency: polla.currency,
-                    maximumFractionDigits: 0,
-                  }).format(polla.buy_in_amount)}
-                </span>
-              </>
-            )}
+            <button onClick={() => router.push("/pollas")} className="text-text-secondary text-xl">←</button>
+            <h1 className="text-lg font-bold text-text-primary truncate flex-1">{polla.name}</h1>
+            <span className="text-[11px] bg-bg-elevated text-text-secondary px-2 py-0.5 rounded-full">{trnLabel}</span>
           </div>
         </div>
       </header>
 
-      {/* Mi posición actual */}
-      {myParticipant && (
-        <div className="bg-colombia-yellow px-4 py-2">
-          <div className="max-w-lg mx-auto flex items-center justify-between text-colombia-blue text-sm font-medium">
-            <span>Mi posición: #{myParticipant.rank || "—"}</span>
-            <span>{myParticipant.total_points} pts</span>
+      {/* Position band */}
+      {myP && (
+        <div className="px-4 py-1.5" style={{ backgroundColor: "var(--gold-dim)" }}>
+          <div className="max-w-lg mx-auto flex items-center justify-between">
+            <span className="text-sm font-semibold text-gold">#{myP.rank || "—"} · {myP.total_points} pts</span>
             {polla.payment_mode !== "honor" && (
-              <span>{myParticipant.paid ? "✅ Pagado" : "⏳ Pendiente"}</span>
+              <span className="text-xs text-text-secondary">{myP.paid ? "✅ Pagado" : "⏳ Pendiente"}</span>
             )}
           </div>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="max-w-lg mx-auto px-4 pt-4">
-        <div className="flex bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
-          <button
-            onClick={() => setActiveTab("partidos")}
-            className={`flex-1 py-3 text-sm font-bold transition-colors ${
-              activeTab === "partidos"
-                ? "bg-colombia-blue text-white"
-                : "text-gray-500 hover:text-colombia-blue"
-            }`}
-          >
-            ⚽ Partidos
-          </button>
-          <button
-            onClick={() => setActiveTab("ranking")}
-            className={`flex-1 py-3 text-sm font-bold transition-colors ${
-              activeTab === "ranking"
-                ? "bg-colombia-blue text-white"
-                : "text-gray-500 hover:text-colombia-blue"
-            }`}
-          >
-            🏆 Ranking
-          </button>
+      <div className="max-w-lg mx-auto px-4 pt-3">
+        <div className="flex overflow-x-auto gap-0 border-b border-border-subtle" style={{ scrollbarWidth: "none" }}>
+          {TABS.filter((t) => t.show).map((t) => (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className={`flex-shrink-0 px-4 py-2.5 text-xs font-semibold whitespace-nowrap transition-colors border-b-2 ${
+                activeTab === t.key ? "text-gold border-gold" : "text-text-muted border-transparent hover:text-text-secondary"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
       <main className="max-w-lg mx-auto p-4 space-y-3">
-        {/* TAB: PARTIDOS Y PRONÓSTICOS */}
+        {/* ── TAB PARTIDOS ── */}
         {activeTab === "partidos" && (
           <>
             {matches.length === 0 ? (
-              <div className="bg-white rounded-xl p-6 text-center shadow-sm">
-                <p className="text-gray-500">
-                  No hay partidos cargados aún para este torneo.
-                </p>
+              <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
+                <p className="text-text-muted">No hay partidos cargados aún.</p>
               </div>
             ) : (
               matches.map((match) => {
-                const pred = getPredictionForMatch(match.id);
-                const draft = draftPredictions[match.id] || {
-                  home: pred?.predicted_home?.toString() ?? "",
-                  away: pred?.predicted_away?.toString() ?? "",
-                };
-                const locked = isMatchLocked(match);
-                const isSaving = savingMatchId === match.id;
-                const justSaved = saveSuccess === match.id;
+                const pred = getPred(match.id);
+                const draft = drafts[match.id] || { home: pred?.predicted_home?.toString() ?? "", away: pred?.predicted_away?.toString() ?? "" };
+                const locked = isLocked(match);
+                const saving = savingId === match.id;
+                const saved = savedId === match.id;
 
                 return (
-                  <div
-                    key={match.id}
-                    className="bg-white rounded-xl shadow-sm overflow-hidden"
-                  >
+                  <div key={match.id} className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
                     {/* Status badge */}
-                    <div
-                      className={`px-4 py-1 text-xs font-bold text-center ${
-                        match.status === "live"
-                          ? "bg-green-500 text-white"
-                          : match.status === "finished"
-                          ? "bg-gray-400 text-white"
-                          : "bg-blue-50 text-colombia-blue"
-                      }`}
-                    >
-                      {match.status === "live"
-                        ? "🔴 EN VIVO"
-                        : match.status === "finished"
-                        ? "✅ FINALIZADO"
-                        : formatDate(match.scheduled_at)}
+                    <div className={`px-4 py-1.5 text-[11px] font-bold text-center ${
+                      match.status === "live" ? "bg-green-dim text-green-live" :
+                      match.status === "finished" ? "bg-bg-elevated text-text-muted" :
+                      "text-text-secondary"
+                    }`} style={match.status === "scheduled" ? { backgroundColor: "var(--bg-card-elevated)" } : undefined}>
+                      {match.status === "live" ? (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-green-live animate-pulse-live" />
+                          EN VIVO
+                        </span>
+                      ) : match.status === "finished" ? "FINALIZADO" : fmtDate(match.scheduled_at)}
                     </div>
 
                     <div className="p-4">
-                      {/* Equipos y resultado/pronóstico */}
                       <div className="flex items-center gap-3">
-                        {/* Equipo local */}
+                        {/* Home */}
                         <div className="flex-1 text-right">
-                          <p className="font-bold text-sm text-gray-800 truncate">
-                            {match.home_team_flag && (
-                              <span className="mr-1">{match.home_team_flag}</span>
-                            )}
+                          <p className="font-semibold text-sm text-text-primary truncate">
+                            {match.home_team_flag && <span className="mr-1">{match.home_team_flag}</span>}
                             {match.home_team}
                           </p>
                         </div>
 
-                        {/* Marcador o inputs de pronóstico */}
+                        {/* Score / Input */}
                         <div className="flex items-center gap-2">
                           {match.status === "finished" || match.status === "live" ? (
-                            // Mostrar resultado real
-                            <div className="flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-lg">
-                              <span className="font-bold text-lg text-gray-800">
+                            <div className="flex items-center gap-2 px-3">
+                              <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
                                 {match.home_score ?? "—"}
                               </span>
-                              <span className="text-gray-400">-</span>
-                              <span className="font-bold text-lg text-gray-800">
+                              <span className="text-text-muted text-lg">—</span>
+                              <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
                                 {match.away_score ?? "—"}
                               </span>
                             </div>
                           ) : (
-                            // Input de pronóstico
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                min={0}
-                                max={20}
-                                disabled={locked}
-                                value={draft.home}
-                                onChange={(e) =>
-                                  setDraftPredictions((prev) => ({
-                                    ...prev,
-                                    [match.id]: { ...draft, home: e.target.value },
-                                  }))
-                                }
-                                className={`w-10 h-10 text-center font-bold text-lg border-2 rounded-lg outline-none ${
-                                  locked
-                                    ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
-                                    : "border-colombia-yellow focus:border-colombia-blue"
+                            <div className="flex items-center gap-2">
+                              <input type="number" min={0} max={20} disabled={locked} value={draft.home}
+                                onChange={(e) => setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, home: e.target.value } }))}
+                                className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
+                                  locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
+                                  : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
                                 }`}
+                                style={{ border: "2px solid" }}
                                 placeholder="0"
                               />
-                              <span className="text-gray-400 font-bold">-</span>
-                              <input
-                                type="number"
-                                min={0}
-                                max={20}
-                                disabled={locked}
-                                value={draft.away}
-                                onChange={(e) =>
-                                  setDraftPredictions((prev) => ({
-                                    ...prev,
-                                    [match.id]: { ...draft, away: e.target.value },
-                                  }))
-                                }
-                                className={`w-10 h-10 text-center font-bold text-lg border-2 rounded-lg outline-none ${
-                                  locked
-                                    ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
-                                    : "border-colombia-yellow focus:border-colombia-blue"
+                              <span className="text-text-muted font-bold">—</span>
+                              <input type="number" min={0} max={20} disabled={locked} value={draft.away}
+                                onChange={(e) => setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, away: e.target.value } }))}
+                                className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
+                                  locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
+                                  : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
                                 }`}
+                                style={{ border: "2px solid" }}
                                 placeholder="0"
                               />
                             </div>
                           )}
                         </div>
 
-                        {/* Equipo visitante */}
+                        {/* Away */}
                         <div className="flex-1 text-left">
-                          <p className="font-bold text-sm text-gray-800 truncate">
-                            {match.away_team_flag && (
-                              <span className="mr-1">{match.away_team_flag}</span>
-                            )}
+                          <p className="font-semibold text-sm text-text-primary truncate">
+                            {match.away_team_flag && <span className="mr-1">{match.away_team_flag}</span>}
                             {match.away_team}
                           </p>
                         </div>
                       </div>
 
-                      {/* Pronóstico guardado y puntos ganados */}
+                      {/* Previous prediction + points */}
                       {match.status === "finished" && pred && pred.visible && (
                         <div className="mt-2 flex items-center justify-between text-xs">
-                          <span className="text-gray-400">
-                            Tu pronóstico: {pred.predicted_home} - {pred.predicted_away}
-                          </span>
-                          <span
-                            className={`font-bold ${
-                              pred.points_earned > 0 ? "text-green-600" : "text-gray-400"
-                            }`}
-                          >
-                            {pred.points_earned > 0
-                              ? `+${pred.points_earned} pts`
-                              : "0 pts"}
+                          <span className="text-text-muted">Tu pronóstico: {pred.predicted_home} - {pred.predicted_away}</span>
+                          <span className={`font-bold ${pred.points_earned > 0 ? "text-gold" : "text-text-muted"}`}>
+                            {pred.points_earned > 0 ? `+${pred.points_earned} pts` : "0 pts"}
                           </span>
                         </div>
                       )}
 
-                      {/* Botón guardar pronóstico */}
+                      {/* Save button */}
                       {!locked && match.status === "scheduled" && (
-                        <button
-                          onClick={() => savePrediction(match.id)}
-                          disabled={
-                            isSaving ||
-                            draft.home === "" ||
-                            draft.away === ""
-                          }
-                          className={`mt-3 w-full py-2 rounded-lg text-sm font-bold transition-colors ${
-                            justSaved
-                              ? "bg-green-500 text-white"
-                              : "bg-colombia-blue text-white hover:bg-blue-800 disabled:opacity-40"
+                        <button onClick={() => savePred(match.id)}
+                          disabled={saving || draft.home === "" || draft.away === ""}
+                          className={`mt-3 w-full py-2.5 rounded-xl text-sm font-semibold uppercase tracking-wide transition-all ${
+                            saved ? "bg-green-live text-bg-base" : "bg-gold text-bg-base hover:brightness-110 disabled:opacity-30"
                           }`}
                         >
-                          {isSaving
-                            ? "Guardando..."
-                            : justSaved
-                            ? "✅ Guardado"
-                            : pred
-                            ? "Actualizar pronóstico"
-                            : "Guardar pronóstico"}
+                          {saving ? "Guardando..." : saved ? "✅ Guardado" : pred ? "Actualizar" : "Guardar"}
                         </button>
                       )}
 
                       {locked && match.status === "scheduled" && (
-                        <p className="mt-2 text-xs text-center text-gray-400">
-                          🔒 Pronóstico cerrado (menos de 5 minutos para el partido)
-                        </p>
+                        <p className="mt-2 text-xs text-center text-text-muted">🔒 CERRADO</p>
                       )}
                     </div>
                   </div>
@@ -454,85 +318,104 @@ export default function PollaSlugPage() {
           </>
         )}
 
-        {/* TAB: RANKING */}
+        {/* ── TAB RANKING ── */}
         {activeTab === "ranking" && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
             {participants.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">
-                No hay participantes aún.
-              </div>
+              <div className="p-6 text-center text-text-muted">No hay participantes aún.</div>
             ) : (
-              participants.map((participant, index) => {
-                const isMe = participant.user_id === currentUserId;
-                const medal =
-                  index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : null;
-
-                return (
-                  <div
-                    key={participant.id}
-                    className={`flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-0 ${
-                      isMe ? "bg-yellow-50" : ""
-                    }`}
-                  >
-                    {/* Posición */}
-                    <div className="w-8 text-center">
-                      {medal ? (
-                        <span className="text-xl">{medal}</span>
-                      ) : (
-                        <span className="text-sm font-bold text-gray-400">
-                          #{participant.rank || index + 1}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Nombre */}
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`font-medium text-sm truncate ${
-                          isMe ? "text-colombia-blue font-bold" : "text-gray-800"
-                        }`}
-                      >
-                        {participant.users?.display_name || "Usuario"}
-                        {isMe && (
-                          <span className="ml-1 text-xs text-colombia-blue">(tú)</span>
-                        )}
-                      </p>
-                      {polla.payment_mode !== "honor" && (
-                        <p className="text-xs text-gray-400">
-                          {participant.paid ? "✅ Pagado" : "⏳ Pendiente"}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Puntos */}
-                    <div className="text-right">
-                      <p className="font-bold text-colombia-blue">
-                        {participant.total_points} pts
-                      </p>
-                    </div>
+              <>
+                {matches.every((m) => m.status === "scheduled") && (
+                  <div className="px-4 py-3 text-xs text-text-secondary text-center" style={{ backgroundColor: "var(--bg-card-elevated)" }}>
+                    El ranking se actualiza cuando terminen los partidos
                   </div>
-                );
-              })
+                )}
+                {participants.map((p, i) => {
+                  const isMe = p.user_id === currentUserId;
+                  const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+
+                  return (
+                    <div key={p.id}
+                      className={`flex items-center gap-3 px-4 py-3 border-b border-border-subtle last:border-0 ${isMe ? "bg-gold-dim" : ""}`}
+                      style={isMe ? { borderLeft: "2px solid var(--gold)" } : undefined}
+                    >
+                      <div className="w-8 text-center">
+                        {medal ? <span className="text-xl">{medal}</span> :
+                          <span className={`score-font text-[20px] ${i < 3 ? "text-gold" : "text-text-muted"}`}>
+                            {p.rank || i + 1}
+                          </span>
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium text-sm truncate ${isMe ? "text-gold font-bold" : "text-text-primary"}`}>
+                          {p.users?.display_name || "Usuario"}
+                          {isMe && <span className="ml-1 text-xs text-gold">(tú)</span>}
+                        </p>
+                        {polla.payment_mode !== "honor" && (
+                          <p className="text-xs text-text-muted">{p.paid ? "✅ Pagado" : "⏳ Pendiente"}</p>
+                        )}
+                      </div>
+                      <span className="score-font text-[18px] text-text-primary">{p.total_points}</span>
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
         )}
 
-        {/* Botón compartir / invitar (solo admin) */}
-        {currentUserRole === "admin" && (
-          <div className="pt-2">
-            <button
-              onClick={() => {
-                const url = `${window.location.origin}/unirse/${polla.slug}`;
-                navigator.clipboard.writeText(url);
-                alert("¡Link copiado! Compártelo con tus amigos por WhatsApp");
-              }}
-              className="w-full bg-green-500 text-white font-bold py-3 rounded-xl hover:bg-green-600 transition-colors"
-            >
-              📤 Copiar link de invitación
+        {/* ── TAB PAGOS ── */}
+        {activeTab === "pagos" && (
+          polla.payment_mode === "admin_collects" ? (
+            <ParticipantPayment pollaSlug={polla.slug} currentUserId={currentUserId} currentUserRole={currentUserRole} />
+          ) : (
+            <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
+              <span className="text-3xl">🤝</span>
+              <p className="text-text-secondary mt-2">Esta polla usa sistema de honor</p>
+            </div>
+          )
+        )}
+
+        {/* ── TAB INFO ── */}
+        {activeTab === "info" && (
+          <div className="space-y-4">
+            <div className="rounded-2xl p-5 space-y-3 bg-bg-card border border-border-subtle">
+              <h3 className="font-bold text-text-primary">{polla.name}</h3>
+              {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {[
+                  { label: "Torneo", value: trnLabel },
+                  { label: "Tipo", value: polla.type === "closed" ? "🔒 Privada" : "🌐 Abierta" },
+                  { label: "Participantes", value: String(participants.length) },
+                  { label: "Pago", value: polla.payment_mode === "honor" ? "🤝 Honor" : polla.payment_mode === "admin_collects" ? "💰 Admin" : "📲 Digital" },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-xl p-2 bg-bg-elevated">
+                    <p className="text-[10px] text-text-muted">{item.label}</p>
+                    <p className="font-medium text-text-primary text-sm">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl p-5 bg-bg-card border border-border-subtle">
+              <h4 className="font-bold text-text-primary mb-2">Sistema de puntos</h4>
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between"><span className="text-text-secondary">Marcador exacto</span><span className="font-bold text-gold">{polla.points_exact} pts</span></div>
+                <div className="flex justify-between"><span className="text-text-secondary">Resultado correcto</span><span className="font-bold text-blue-info">{polla.points_winner} pts</span></div>
+                <div className="flex justify-between"><span className="text-text-secondary">Un equipo exacto</span><span className="font-bold text-text-secondary">{polla.points_one_team} pt</span></div>
+              </div>
+            </div>
+
+            <button onClick={() => setShowInviteModal(true)} className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all">
+              📤 Invitar amigos
             </button>
           </div>
         )}
       </main>
+
+      {showInviteModal && (
+        <InviteModal pollaSlug={polla.slug} pollaName={polla.name} isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} />
+      )}
     </div>
   );
 }

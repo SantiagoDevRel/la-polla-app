@@ -44,18 +44,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-colombia-blue flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <div
+        className="w-full max-w-md rounded-2xl p-6 space-y-6 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
+        style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
+      >
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-colombia-blue">⚽ La Polla</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="font-display text-[40px] text-gold tracking-wide">
+            La Polla
+          </h1>
+          <p className="text-text-secondary mt-1">
             Ingresá tu número de WhatsApp para recibir tu código de acceso
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="phone" className="block text-sm font-medium text-text-secondary mb-1.5">
               Número de WhatsApp
             </label>
             <PhoneInput onChange={handlePhoneChange} />
@@ -69,20 +74,21 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="text-colombia-red text-sm text-center">{error}</p>
+            <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading || !turnstileToken || !phone}
-            className="w-full bg-colombia-yellow text-colombia-blue font-bold py-3 px-4 rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+            className="w-full bg-gold text-bg-base font-bold py-3.5 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-lg"
+            style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
           >
             {loading ? "Enviando..." : "Recibir código por WhatsApp"}
           </button>
         </form>
 
-        <div className="border-t border-colombia-yellow pt-4">
-          <p className="text-center text-sm text-gray-500">
+        <div className="border-t border-border-subtle pt-4">
+          <p className="text-center text-sm text-text-muted">
             Al continuar, aceptás nuestros términos y condiciones
           </p>
         </div>
