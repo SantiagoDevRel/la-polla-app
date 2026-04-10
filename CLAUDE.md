@@ -402,4 +402,31 @@ All UI (crear polla, explorar, etc.) should only show these two. Admin page keep
 
 ---
 
+## WhatsApp Bot Architecture
+
+### Files
+- `lib/whatsapp/bot.ts` — Message sending (Meta API via axios), routing, processing. Env vars: `META_WA_PHONE_NUMBER_ID`, `META_WA_ACCESS_TOKEN`
+- `lib/whatsapp/flows.ts` — All conversation flows. Colombian parcero Spanish tone. Uses interactive messages via `interactive.ts`
+- `lib/whatsapp/interactive.ts` — `sendReplyButtons`, `sendListMessage`, `sendCTAButton` (Meta Cloud API via fetch)
+- `lib/whatsapp/tabla.ts` — `formatTablaWA()` monospace leaderboard formatter
+- `lib/whatsapp/state.ts` — In-memory conversation state with 10min TTL
+- `lib/whatsapp/messages.ts` — OTP message template
+- `app/api/whatsapp/webhook/route.ts` — Meta webhook handler (DO NOT TOUCH)
+- `app/api/whatsapp/test-send/route.ts` — Dev-only test endpoint
+
+### Tone Rules (non-negotiable)
+- Colombian parcero Spanish: "parce", "listo", "eso es", "pilas", "bacano"
+- Emojis: 🐔 brand, ⚽ matches, 🏆 leaderboard, 💰 buy-in, 🎯 predictions, 📊 standings
+- Footer: "🐔 La Polla Colombiana"
+- Never formal language. Never "estimado usuario"
+
+### Button ID → Route mapping
+Main menu: `menu_mis_pollas`, `menu_predecir`, `menu_tabla`
+Polla menu: `pred_{id}`, `rank_{id}`, `results_{id}`
+Confirmation: `confirm_yes`, `confirm_no`
+Navigation: `menu`, `polla_{id}`, `match_{id}`
+Help: `menu_ayuda`, `help_puntaje`, `help_crear`, `menu_perfil`
+
+---
+
 *Last updated: 2026-04-10 | To update: say "update UI system" in Claude.ai chat*
