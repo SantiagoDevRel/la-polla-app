@@ -52,12 +52,16 @@ export async function GET(
       .eq("polla_id", polla.id)
       .order("total_points", { ascending: false });
 
-    // Cargar partidos del torneo de la polla
-    const { data: matches } = await supabase
-      .from("matches")
-      .select("*")
-      .eq("tournament", polla.tournament)
-      .order("scheduled_at", { ascending: true });
+    // Cargar partidos — por match_ids si existen, sino por torneo (legacy)
+    let matchQuery = supabase.from("matches").select("*");
+
+    if (polla.match_ids && polla.match_ids.length > 0) {
+      matchQuery = matchQuery.in("id", polla.match_ids);
+    } else {
+      matchQuery = matchQuery.eq("tournament", polla.tournament);
+    }
+
+    const { data: matches } = await matchQuery.order("scheduled_at", { ascending: true });
 
     // Cargar predicciones del usuario en esta polla
     const { data: predictions } = await supabase

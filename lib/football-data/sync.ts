@@ -1,18 +1,16 @@
 // lib/football-data/sync.ts — Sync de partidos desde football-data.org a Supabase
-// Reemplaza el sync de API-Football para obtener fixtures
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchCompetitionMatches, rateLimitDelay, FDMatch } from "./client";
 
-// Competiciones activas en produccion
+// Competiciones activas — slug must match what crear polla + pollas table use
 const COMPETITIONS = [
   { id: 2001, tournament: "champions_2025", label: "Champions League" },
   { id: 2000, tournament: "worldcup_2026", label: "FIFA World Cup 2026" },
-  { id: 2014, tournament: "la_liga_2025", label: "La Liga" },
-  { id: 2021, tournament: "premier_league", label: "Premier League" },
-  { id: 2019, tournament: "seria_a", label: "Serie A" },
+  { id: 2014, tournament: "laliga_2025", label: "La Liga" },
+  { id: 2021, tournament: "premier_2025", label: "Premier League" },
+  { id: 2019, tournament: "seriea_2025", label: "Serie A" },
 ];
 
-// Mapeo de status de football-data.org a nuestro schema
 function mapStatus(fdStatus: string): "scheduled" | "live" | "finished" | "cancelled" {
   switch (fdStatus) {
     case "SCHEDULED":
@@ -33,7 +31,6 @@ function mapStatus(fdStatus: string): "scheduled" | "live" | "finished" | "cance
   }
 }
 
-// Mapeo de stage a nuestro formato de phase
 function mapPhase(stage: string): string {
   const map: Record<string, string> = {
     GROUP_STAGE: "group_stage",
@@ -46,6 +43,7 @@ function mapPhase(stage: string): string {
     LAST_16: "round_of_16",
     LAST_32: "round_of_32",
     PLAYOFF: "playoff",
+    REGULAR_SEASON: "regular_season",
   };
   return map[stage] || stage.toLowerCase().replace(/[\s-]+/g, "_");
 }
@@ -68,10 +66,6 @@ function mapMatchToRow(match: FDMatch, tournament: string) {
   };
 }
 
-/**
- * Sincroniza todos los partidos de una competicion de football-data.org a Supabase.
- * Usa upsert con external_id como campo de conflicto.
- */
 export async function syncCompetition(
   competitionId: number,
   tournament: string,
@@ -121,9 +115,6 @@ export async function syncCompetition(
   return { synced, errors, total: matches.length };
 }
 
-/**
- * Sincroniza todas las competiciones activas.
- */
 export async function syncAllCompetitions(): Promise<
   Record<string, { synced: number; errors: number; total: number }>
 > {
@@ -136,7 +127,6 @@ export async function syncAllCompetitions(): Promise<
       console.error(`[sync] Error fatal syncing ${comp.label}:`, err);
       results[comp.tournament] = { synced: 0, errors: 1, total: 0 };
     }
-    // Rate limit delay between competitions
     await rateLimitDelay();
   }
 
