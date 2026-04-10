@@ -54,8 +54,9 @@ body::before {
   z-index: 0;
 }
 
-/* Números deportivos */
-.score-font {
+/* Números deportivos — Bebas Neue */
+.score-font,
+.font-display {
   font-family: 'Bebas Neue', cursive;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;

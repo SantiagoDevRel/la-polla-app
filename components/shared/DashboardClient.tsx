@@ -245,7 +245,7 @@ function PollaSelectorWithLeaderboard({
         }}
       >
         <div style={{ display: "flex", gap: 7, width: "max-content", paddingRight: 15 }}>
-          {pollas.map((polla) => {
+          {pollas.slice(0, 3).map((polla) => {
             const isSelected = polla.id === selectedPollaId;
             return (
               <button
@@ -301,6 +301,31 @@ function PollaSelectorWithLeaderboard({
               </button>
             );
           })}
+          {/* "Ver todas" link */}
+          {pollas.length > 3 && (
+            <a
+              href="/pollas"
+              style={{
+                flexShrink: 0,
+                background: "#0e1420",
+                border: "1px solid rgba(255,255,255,0.06)",
+                borderRadius: 12,
+                padding: "8px 12px",
+                minWidth: 100,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+                color: "#4a5568",
+                fontWeight: 500,
+                fontFamily: "'Outfit', sans-serif",
+                textDecoration: "none",
+                cursor: "pointer",
+              }}
+            >
+              Ver todas →
+            </a>
+          )}
         </div>
       </div>
 

@@ -43,33 +43,17 @@ export default function PerfilPage() {
         if (!user) return;
         setUserId(user.id);
 
-        const { data: userData } = await supabase
-          .from("users")
-          .select("display_name, whatsapp_number, avatar_url")
-          .eq("id", user.id)
-          .single();
+        // Fetch profile + stats via API (bypasses RLS issues on polla_participants)
+        const { data } = await axios.get("/api/users/me");
 
-        if (userData) {
-          setProfile(userData);
-          setEditName(userData.display_name);
+        if (data.profile) {
+          setProfile(data.profile);
+          setEditName(data.profile.display_name);
         }
 
-        const { data: participations } = await supabase
-          .from("polla_participants")
-          .select("polla_id, rank")
-          .eq("user_id", user.id);
-
-        const { count: predCount } = await supabase
-          .from("predictions")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id);
-
-        const ranks = (participations || []).map((p) => p.rank).filter((r): r is number => r !== null);
-        setStats({
-          pollasCount: participations?.length || 0,
-          predictionsCount: predCount || 0,
-          bestRank: ranks.length > 0 ? Math.min(...ranks) : null,
-        });
+        if (data.stats) {
+          setStats(data.stats);
+        }
       } catch { /* silently fail */ } finally { setLoading(false); }
     }
     load();
