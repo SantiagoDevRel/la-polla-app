@@ -3,8 +3,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
-import { Trophy, UserPlus, Settings } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import DashboardClient from "@/components/shared/DashboardClient";
+import { getLiveMatches, getTodayMatches } from "@/lib/football-api";
+import type { FootballMatch } from "@/lib/football-api";
 
 const TOURNAMENT_NAMES: Record<string, string> = {
   champions_2025: "Champions League",
@@ -39,7 +41,6 @@ export default async function DashboardPage() {
     .eq("user_id", user.id);
 
   const pollaIds = participantRows?.map((r) => r.polla_id) || [];
-  const isAdminOfAnyPolla = participantRows?.some((r) => r.role === "admin") || false;
 
   // Active pollas
   const { data: pollas } = pollaIds.length > 0
@@ -66,57 +67,42 @@ export default async function DashboardPage() {
     }
   }
 
-  // Quick stats
-  const totalPollas = participantRows?.length || 0;
-  const ranks = (participantRows || []).map((r) => r.rank).filter((r): r is number => r !== null);
-  const bestRank = ranks.length > 0 ? Math.min(...ranks) : null;
-
-  // ── Live/recent matches from user's active pollas' tournaments ──
+  // ── Live matches from football-data.org API ──
   const tournaments = Array.from(
     new Set((pollas || []).map((p: { tournament: string }) => p.tournament))
   );
 
-  interface LiveMatchRaw {
+  let liveMatches: {
     id: string; home_team: string; away_team: string;
     home_team_flag: string | null; away_team_flag: string | null;
     home_score: number | null; away_score: number | null;
-    status: string; tournament: string;
-  }
+    status: "live" | "finished"; elapsed: number | null;
+    tournament: string; predicted_home: number | null; predicted_away: number | null;
+  }[] = [];
 
-  let liveMatchesRaw: LiveMatchRaw[] = [];
   if (tournaments.length > 0) {
-    const { data: matches } = await admin
-      .from("matches")
-      .select("id, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, tournament")
-      .in("tournament", tournaments)
-      .in("status", ["live", "finished"])
-      .order("scheduled_at", { ascending: false })
-      .limit(10);
-    liveMatchesRaw = (matches || []) as LiveMatchRaw[];
-  }
+    // Try real API first: live matches, then today's matches
+    let apiMatches: FootballMatch[] = [];
+    try {
+      const [live, today] = await Promise.all([
+        getLiveMatches(tournaments),
+        getTodayMatches(tournaments),
+      ]);
+      // Merge: live first, then today's finished, dedup by ID
+      const seen = new Set<string>();
+      for (const m of [...live, ...today]) {
+        if (!seen.has(m.id) && (m.status === "live" || m.status === "finished")) {
+          seen.add(m.id);
+          apiMatches.push(m);
+        }
+      }
+    } catch (err) {
+      console.error("[dashboard] Football API error:", err);
+    }
 
-  // Get user predictions for these matches
-  const matchIds = liveMatchesRaw.map((m) => m.id);
-  interface PredictionRow {
-    match_id: string; predicted_home: number; predicted_away: number;
-  }
-  let userPredictions: PredictionRow[] = [];
-  if (matchIds.length > 0) {
-    const { data: preds } = await admin
-      .from("predictions")
-      .select("match_id, predicted_home, predicted_away")
-      .eq("user_id", user.id)
-      .in("match_id", matchIds);
-    userPredictions = (preds || []) as PredictionRow[];
-  }
-
-  const predMap = new Map(userPredictions.map((p) => [p.match_id, p]));
-
-  const liveMatches = liveMatchesRaw
-    .filter((m) => m.status === "live" || m.status === "finished")
-    .map((m) => {
-      const pred = predMap.get(m.id);
-      return {
+    if (apiMatches.length > 0) {
+      // Use real API matches (no predictions for these since they're display-only)
+      liveMatches = apiMatches.slice(0, 10).map((m) => ({
         id: m.id,
         home_team: m.home_team,
         away_team: m.away_team,
@@ -125,12 +111,55 @@ export default async function DashboardPage() {
         home_score: m.home_score,
         away_score: m.away_score,
         status: m.status as "live" | "finished",
-        elapsed: null,
+        elapsed: m.elapsed,
         tournament: m.tournament,
-        predicted_home: pred?.predicted_home ?? null,
-        predicted_away: pred?.predicted_away ?? null,
-      };
-    });
+        predicted_home: null,
+        predicted_away: null,
+      }));
+    } else {
+      // Fallback: use Supabase seeded matches
+      const { data: dbMatches } = await admin
+        .from("matches")
+        .select("id, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, tournament")
+        .in("tournament", tournaments)
+        .in("status", ["live", "finished"])
+        .order("scheduled_at", { ascending: false })
+        .limit(10);
+
+      const matchIds = (dbMatches || []).map((m) => m.id);
+      interface PredictionRow { match_id: string; predicted_home: number; predicted_away: number; }
+      let userPredictions: PredictionRow[] = [];
+      if (matchIds.length > 0) {
+        const { data: preds } = await admin
+          .from("predictions")
+          .select("match_id, predicted_home, predicted_away")
+          .eq("user_id", user.id)
+          .in("match_id", matchIds);
+        userPredictions = (preds || []) as PredictionRow[];
+      }
+      const predMap = new Map(userPredictions.map((p) => [p.match_id, p]));
+
+      liveMatches = (dbMatches || [])
+        .filter((m) => m.status === "live" || m.status === "finished")
+        .map((m) => {
+          const pred = predMap.get(m.id);
+          return {
+            id: m.id,
+            home_team: m.home_team,
+            away_team: m.away_team,
+            home_team_flag: m.home_team_flag,
+            away_team_flag: m.away_team_flag,
+            home_score: m.home_score,
+            away_score: m.away_score,
+            status: m.status as "live" | "finished",
+            elapsed: null,
+            tournament: m.tournament,
+            predicted_home: pred?.predicted_home ?? null,
+            predicted_away: pred?.predicted_away ?? null,
+          };
+        });
+    }
+  }
 
   // ── Leaderboard data for all user pollas ──
   let leaderboardData: { pollaId: string; userId: string; displayName: string; totalPoints: number; rank: number }[] = [];
@@ -175,7 +204,7 @@ export default async function DashboardPage() {
       <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto flex items-center justify-between mb-6">
           <h1 className="font-display text-3xl text-gold tracking-wide flex items-center gap-2">
-            <Trophy className="w-7 h-7 text-gold" />
+            <img src="/pollitos/logo.png" alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />
             La Polla
           </h1>
           <div style={{
@@ -200,22 +229,6 @@ export default async function DashboardPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 space-y-2 -mt-1">
-        {/* Quick stats */}
-        {totalPollas > 0 && (
-          <div className="flex gap-2 mb-2">
-            <div className="flex-1 rounded-xl px-3 py-2 bg-bg-elevated border border-border-subtle text-center">
-              <span className="font-display text-xl text-text-primary tabular-nums">{totalPollas}</span>
-              <span className="text-text-muted text-[11px] ml-1">pollas</span>
-            </div>
-            {bestRank && (
-              <div className="flex-1 rounded-xl px-3 py-2 bg-bg-elevated border border-border-subtle text-center">
-                <span className="font-display text-xl text-gold tabular-nums">#{bestRank}</span>
-                <span className="text-text-muted text-[11px] ml-1">mejor pos</span>
-              </div>
-            )}
-          </div>
-        )}
-
         {pollas && pollas.length > 0 ? (
           <DashboardClient
             liveMatches={liveMatches}
@@ -245,17 +258,6 @@ export default async function DashboardPage() {
               Crear tu primera polla
             </a>
           </section>
-        )}
-
-        {/* Admin link */}
-        {isAdminOfAnyPolla && (
-          <a
-            href="/admin/matches"
-            className="flex items-center justify-center gap-2 text-sm text-text-muted hover:text-gold transition-colors duration-200 py-4"
-          >
-            <Settings className="w-4 h-4" />
-            Panel admin de partidos
-          </a>
         )}
       </main>
     </div>
