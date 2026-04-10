@@ -353,7 +353,7 @@ export default function PollaSlugPage() {
                           </span>
                         }
                       </div>
-                      <UserAvatar userId={p.user_id} avatarUrl={p.users?.avatar_url} displayName={p.users?.display_name} size="sm" />
+                      <UserAvatar avatarUrl={p.users?.avatar_url} displayName={p.users?.display_name} size="sm" />
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium text-sm truncate ${isMe ? "text-gold font-bold" : "text-text-primary"}`}>
                           {p.users?.display_name || "Usuario"}

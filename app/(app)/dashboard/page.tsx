@@ -7,6 +7,7 @@ import { UserPlus } from "lucide-react";
 import DashboardClient from "@/components/shared/DashboardClient";
 import { getLiveMatches, getTodayMatches } from "@/lib/football-api";
 import type { FootballMatch } from "@/lib/football-api";
+import { getPollitoBase } from "@/lib/pollitos";
 
 const TOURNAMENT_NAMES: Record<string, string> = {
   champions_2025: "Champions League",
@@ -31,8 +32,7 @@ export default async function DashboardPage() {
 
   const displayName = publicUser?.display_name || user.phone || "Usuario";
   const firstName = displayName.split(" ")[0];
-  // Temporary: all users get the same pollito logo
-  const avatarUrl = "/pollitos/logo.png";
+  const avatarUrl = getPollitoBase(publicUser?.avatar_url);
 
   // Participations
   const { data: participantRows } = await admin
@@ -165,13 +165,13 @@ export default async function DashboardPage() {
   }
 
   // ── Leaderboard data for all user pollas ──
-  let leaderboardData: { pollaId: string; userId: string; displayName: string; totalPoints: number; rank: number }[] = [];
+  let leaderboardData: { pollaId: string; userId: string; displayName: string; avatarUrl: string | null; totalPoints: number; rank: number }[] = [];
   if (pollaIds.length > 0) {
     const activePollaIds = pollaIds.filter((id) => (pollas || []).some((p: { id: string }) => p.id === id));
     if (activePollaIds.length > 0) {
       const { data: lbRows } = await admin
         .from("polla_participants")
-        .select("polla_id, user_id, total_points, rank, users(display_name)")
+        .select("polla_id, user_id, total_points, rank, users(display_name, avatar_url)")
         .in("polla_id", activePollaIds)
         .order("rank", { ascending: true })
         .limit(50);
@@ -183,6 +183,7 @@ export default async function DashboardPage() {
           pollaId: r.polla_id,
           userId: r.user_id,
           displayName: userData?.display_name || "Usuario",
+          avatarUrl: userData?.avatar_url || null,
           totalPoints: r.total_points || 0,
           rank: r.rank || 999,
         };
@@ -207,7 +208,7 @@ export default async function DashboardPage() {
       <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <img src="/pollitos/logo.png" alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
+            <img src="/pollitos/logo_realistic.webp" alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
             <span className="font-display text-gold" style={{ fontSize: 18, letterSpacing: "0.1em" }}>La Polla</span>
           </div>
           <div style={{

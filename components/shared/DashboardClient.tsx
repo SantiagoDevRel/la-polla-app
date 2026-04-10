@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { TOURNAMENT_ICONS } from "@/components/shared/PollaCard";
 import { formatCOP } from "@/lib/formatCurrency";
+import { getPollitoByPosition } from "@/lib/pollitos";
 
 // ─── Types ───
 
@@ -38,6 +39,7 @@ interface LeaderboardEntry {
   pollaId: string;
   userId: string;
   displayName: string;
+  avatarUrl: string | null;
   totalPoints: number;
   rank: number;
 }
@@ -362,13 +364,13 @@ function PollaSelectorWithLeaderboard({
               }}>
                 {entry.rank}
               </span>
-              {/* Avatar */}
+              {/* Avatar — dynamic pollito by position */}
               <div style={{
                 width: 28, height: 28, borderRadius: "50%",
                 border: "1px solid rgba(255,215,0,0.2)", overflow: "hidden",
                 flexShrink: 0,
               }}>
-                <img src="/pollitos/logo.png" alt="" style={{ width: 28, height: 28, objectFit: "cover" }} />
+                <img src={getPollitoByPosition(entry.avatarUrl, entry.rank, leaderboard.length)} alt="" style={{ width: 28, height: 28, objectFit: "cover" }} />
               </div>
               {/* Name */}
               <span style={{ fontSize: 12, fontWeight: 600, color: "#f0f4ff", flex: 1 }}>

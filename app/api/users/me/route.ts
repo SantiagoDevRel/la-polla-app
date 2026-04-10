@@ -11,6 +11,7 @@ const updateSchema = z.object({
     .string()
     .min(2, "El nombre debe tener al menos 2 caracteres")
     .max(50, "El nombre debe tener máximo 50 caracteres"),
+  avatar_url: z.string().max(50).optional(),
 });
 
 export async function GET() {
@@ -96,9 +97,12 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const updateData: Record<string, string> = { display_name: parsed.data.display_name };
+    if (parsed.data.avatar_url) updateData.avatar_url = parsed.data.avatar_url;
+
     const { error } = await supabase
       .from("users")
-      .update({ display_name: parsed.data.display_name })
+      .update(updateData)
       .eq("id", user.id);
 
     if (error) throw error;
