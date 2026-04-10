@@ -2,7 +2,9 @@
 // Greeting, pollas activas, partidos próximos, quick stats
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { Trophy, UserPlus, Settings } from "lucide-react";
 import PollaCard from "@/components/polla/PollaCard";
+import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -95,30 +97,22 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Header — gradiente */}
-      <header
-        className="px-4 pt-4 pb-6"
-        style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}
-      >
+    <div className="min-h-screen bg-gradient-to-b from-[#0a1628] via-bg-base to-bg-base">
+      {/* Header */}
+      <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto flex items-center justify-between mb-6">
-          <h1 className="font-display text-[28px] text-gold tracking-wide">
-            ⚽ La Polla
+          <h1 className="font-display text-3xl text-gold tracking-wide flex items-center gap-2">
+            <Trophy className="w-7 h-7 text-gold" />
+            La Polla
           </h1>
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-text-primary"
-            style={{
-              backgroundColor: "var(--bg-card-elevated)",
-              border: "1px solid var(--border-gold)",
-            }}
-          >
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gold to-amber-600 flex items-center justify-center text-sm font-bold text-bg-base ring-2 ring-gold/30">
             {initial}
           </div>
         </div>
 
         <div className="max-w-lg mx-auto">
           <h2 className="text-2xl font-bold text-text-primary">
-            Hola, {firstName} 👋
+            Hola, <span className="text-gold">{firstName}</span>
           </h2>
           <p className="text-text-secondary text-sm mt-0.5">
             ¿Listo para pronosticar?
@@ -130,13 +124,13 @@ export default async function DashboardPage() {
         {/* Quick stats */}
         {totalPollas > 0 && (
           <div className="flex gap-2">
-            <div className="flex-1 rounded-xl px-3 py-2 bg-bg-elevated text-center">
-              <span className="text-text-primary font-bold text-sm">{totalPollas}</span>
+            <div className="flex-1 rounded-xl px-3 py-2 bg-bg-elevated border border-border-subtle text-center">
+              <span className="font-display text-xl text-text-primary tabular-nums">{totalPollas}</span>
               <span className="text-text-muted text-[11px] ml-1">pollas</span>
             </div>
             {bestRank && (
-              <div className="flex-1 rounded-xl px-3 py-2 bg-bg-elevated text-center">
-                <span className="text-gold font-bold text-sm">#{bestRank}</span>
+              <div className="flex-1 rounded-xl px-3 py-2 bg-bg-elevated border border-border-subtle text-center">
+                <span className="font-display text-xl text-gold tabular-nums">#{bestRank}</span>
                 <span className="text-text-muted text-[11px] ml-1">mejor pos</span>
               </div>
             )}
@@ -153,11 +147,7 @@ export default async function DashboardPage() {
               {upcomingMatches.map((match) => (
                 <div
                   key={match.id}
-                  className="rounded-xl p-3 min-w-[200px] flex-shrink-0"
-                  style={{
-                    backgroundColor: "var(--bg-card)",
-                    border: "1px solid var(--border-subtle)",
-                  }}
+                  className="rounded-xl p-3 min-w-[200px] flex-shrink-0 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300"
                 >
                   <div className="text-[11px] text-text-secondary mb-2">
                     {new Date(match.scheduled_at).toLocaleTimeString("es-CO", {
@@ -194,49 +184,45 @@ export default async function DashboardPage() {
             <h3 className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-2">
               Tus pollas
             </h3>
-            <div className="space-y-3">
+            <AnimatedList className="space-y-3">
               {pollas.map((polla) => {
                 const { myPoints, myRank, isAdmin } = getParticipantData(polla.id);
                 return (
-                  <PollaCard
-                    key={polla.id}
-                    polla={polla}
-                    participantCount={participantCounts[polla.id]}
-                    myPoints={myPoints}
-                    myRank={myRank}
-                    isAdmin={isAdmin}
-                  />
+                  <AnimatedItem key={polla.id}>
+                    <PollaCard
+                      polla={polla}
+                      participantCount={participantCounts[polla.id]}
+                      myPoints={myPoints}
+                      myRank={myRank}
+                      isAdmin={isAdmin}
+                    />
+                  </AnimatedItem>
                 );
               })}
-            </div>
+            </AnimatedList>
           </section>
         ) : (
-          <section
-            className="rounded-2xl p-8 text-center"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            {/* Minimalist pitch outline */}
-            <svg viewBox="0 0 120 80" className="w-24 h-16 mx-auto mb-4 opacity-10">
-              <rect x="1" y="1" width="118" height="78" rx="2" fill="none" stroke="white" strokeWidth="1" />
-              <line x1="60" y1="1" x2="60" y2="79" stroke="white" strokeWidth="0.5" />
-              <circle cx="60" cy="40" r="12" fill="none" stroke="white" strokeWidth="0.5" />
-              <rect x="1" y="20" width="18" height="40" fill="none" stroke="white" strokeWidth="0.5" />
-              <rect x="101" y="20" width="18" height="40" fill="none" stroke="white" strokeWidth="0.5" />
+          <section className="rounded-2xl p-8 text-center bg-bg-card/80 backdrop-blur-sm border border-gold/20 shadow-[0_0_24px_rgba(255,215,0,0.12)]">
+            {/* Minimalist pitch outline — gold toned */}
+            <svg viewBox="0 0 120 80" className="w-24 h-16 mx-auto mb-4 opacity-20">
+              <rect x="1" y="1" width="118" height="78" rx="2" fill="none" stroke="#FFD700" strokeWidth="1" />
+              <line x1="60" y1="1" x2="60" y2="79" stroke="#FFD700" strokeWidth="0.5" />
+              <circle cx="60" cy="40" r="12" fill="none" stroke="#FFD700" strokeWidth="0.5" />
+              <rect x="1" y="20" width="18" height="40" fill="none" stroke="#FFD700" strokeWidth="0.5" />
+              <rect x="101" y="20" width="18" height="40" fill="none" stroke="#FFD700" strokeWidth="0.5" />
             </svg>
-            <h3 className="font-bold text-text-primary text-lg mb-1">
-              ¡Bienvenido a La Polla!
+            <h3 className="font-display text-2xl text-text-primary tracking-wide mb-1">
+              Bienvenido a La Polla
             </h3>
-            <p className="text-text-secondary text-sm mb-4">
+            <p className="text-text-secondary text-sm mb-5">
               Creá tu primera polla o unite a una existente
             </p>
             <a
               href="/pollas/crear"
-              className="inline-block bg-gold text-bg-base font-semibold py-3 px-6 rounded-xl hover:brightness-110 transition-all"
+              className="inline-flex items-center gap-2 bg-gold text-bg-base font-semibold py-3 px-6 rounded-xl hover:scale-[1.02] hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] hover:brightness-110 transition-all duration-200 cursor-pointer"
             >
-              Crear tu primera polla 🏆
+              <UserPlus className="w-5 h-5" />
+              Crear tu primera polla
             </a>
           </section>
         )}
@@ -245,9 +231,10 @@ export default async function DashboardPage() {
         {isAdminOfAnyPolla && (
           <a
             href="/admin/matches"
-            className="block text-center text-sm text-text-muted hover:text-gold transition-colors"
+            className="flex items-center justify-center gap-2 text-sm text-text-muted hover:text-gold transition-colors duration-200"
           >
-            ⚙️ Panel admin de partidos
+            <Settings className="w-4 h-4" />
+            Panel admin de partidos
           </a>
         )}
       </main>

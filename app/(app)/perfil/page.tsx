@@ -5,6 +5,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { motion } from "framer-motion";
+import { staggerContainer, fadeUp } from "@/lib/animations";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 
@@ -128,18 +130,18 @@ export default function PerfilPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="grid grid-cols-3 gap-3">
           {[
             { value: String(stats.pollasCount), label: "Pollas" },
             { value: String(stats.predictionsCount), label: "Pronósticos" },
             { value: stats.bestRank ? `#${stats.bestRank}` : "—", label: "Mejor pos" },
           ].map((s) => (
-            <div key={s.label} className="rounded-xl p-4 text-center bg-bg-card border border-border-subtle">
+            <motion.div key={s.label} variants={fadeUp} className="rounded-xl p-4 text-center bg-bg-card border border-border-subtle">
               <p className="score-font text-[32px] text-gold">{s.value}</p>
               <p className="text-[11px] text-text-muted">{s.label}</p>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         {/* Logout */}
         <button onClick={handleLogout}

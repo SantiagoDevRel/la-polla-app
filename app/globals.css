@@ -1,30 +1,93 @@
-/* app/globals.css — Estilos globales con colores tricolor colombiano */
+/* app/globals.css — Sistema de diseño "estadio de noche" para La Polla */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --colombia-yellow: #FCD116;
-  --colombia-blue: #003087;
-  --colombia-red: #CE1126;
+  /* Superficies */
+  --bg-base: #080c10;
+  --bg-card: #0e1420;
+  --bg-card-hover: #152032;
+  --bg-card-elevated: #192840;
+
+  /* Bordes */
+  --border-subtle: #1a2535;
+  --border-medium: #243448;
+  --border-gold: rgba(255, 215, 0, 0.35);
+
+  /* Texto */
+  --text-primary: #eef2ff;
+  --text-secondary: #7089aa;
+  --text-muted: #3d5470;
+
+  /* Acentos */
+  --gold: #FFD700;
+  --gold-dim: rgba(255, 215, 0, 0.15);
+  --green-live: #00e676;
+  --green-dim: rgba(0, 230, 118, 0.12);
+  --red-alert: #ff3d57;
+  --red-dim: rgba(255, 61, 87, 0.12);
+  --blue-info: #4fc3f7;
 }
 
+* { box-sizing: border-box; }
+
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Outfit', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Utilidades para mobile-first */
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Textura sutil de puntos — da profundidad */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.015) 1px, transparent 0);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: 0;
+}
 
+/* Números deportivos */
+.score-font {
+  font-family: 'Bebas Neue', cursive;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+/* Animaciones */
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-pulse-live { animation: pulse-live 1.5s ease-in-out infinite; }
+.animate-slide-up { animation: slide-up 0.25s ease-out forwards; }
+.animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer utilities {
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }

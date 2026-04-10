@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import PollaCard from "@/components/polla/PollaCard";
+import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
 
 interface PublicPolla {
   id: string; name: string; slug: string; description?: string;
@@ -45,7 +46,13 @@ export default function ExplorarPage() {
         {loading ? (
           <div className="text-center py-8"><div className="text-4xl mb-2">🔍</div><p className="text-text-muted text-sm">Buscando pollas...</p></div>
         ) : filtered.length > 0 ? (
-          filtered.map((polla) => <PollaCard key={polla.id} polla={polla} participantCount={polla.participant_count} />)
+          <AnimatedList className="space-y-3">
+            {filtered.map((polla) => (
+              <AnimatedItem key={polla.id}>
+                <PollaCard polla={polla} participantCount={polla.participant_count} />
+              </AnimatedItem>
+            ))}
+          </AnimatedList>
         ) : (
           <div className="rounded-2xl p-8 text-center bg-bg-card border border-border-subtle">
             <div className="text-4xl mb-3">📭</div>

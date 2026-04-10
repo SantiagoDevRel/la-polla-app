@@ -7,7 +7,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { ArrowLeft, Check, ChevronRight, Info, AlertTriangle, Construction } from "lucide-react";
+import { motion } from "framer-motion";
+import { staggerContainer, fadeUp } from "@/lib/animations";
+import { ArrowLeft, Check, ChevronRight, Info, AlertTriangle, Construction, Trophy } from "lucide-react";
 
 // ─── Tipos ───
 
@@ -200,12 +202,12 @@ export default function CrearPollaPage() {
               <div key={s} className="flex items-center">
                 {/* Círculo del paso */}
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                  className={`w-8 h-8 rounded-full flex items-center justify-center font-display text-base tracking-wide transition-all ${
                     s < step
                       ? "bg-green-live text-bg-base"
                       : s === step
-                      ? "bg-gold text-bg-base"
-                      : "bg-bg-elevated text-text-muted"
+                      ? "bg-gold text-bg-base shadow-[0_0_12px_rgba(255,215,0,0.3)]"
+                      : "bg-bg-elevated border border-border-subtle text-text-muted"
                   }`}
                 >
                   {s < step ? <Check className="w-4 h-4" /> : s}
@@ -241,8 +243,8 @@ export default function CrearPollaPage() {
             PASO 1 — Información básica
            ════════════════════════════════════ */}
         {step === 1 && (
-          <div className="space-y-5">
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card border border-border-subtle">
+          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
               <h2 className="text-base font-bold text-text-primary">Información básica</h2>
 
               {/* Nombre */}
@@ -255,7 +257,7 @@ export default function CrearPollaPage() {
                   value={form.name}
                   onChange={(e) => updateForm("name", e.target.value)}
                   placeholder="Ej: Polla Mundial Oficina"
-                  className="w-full px-4 py-3 rounded-xl outline-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
+                  className="w-full px-4 py-3 rounded-xl outline-none transition-colors duration-200 bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
                 />
               </div>
 
@@ -275,7 +277,7 @@ export default function CrearPollaPage() {
             </div>
 
             {/* Torneo — tarjetas seleccionables */}
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card border border-border-subtle">
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
               <h2 className="text-base font-bold text-text-primary">Torneo</h2>
               <div className="space-y-2">
                 {TOURNAMENTS.map((t) => {
@@ -288,12 +290,12 @@ export default function CrearPollaPage() {
                       onClick={() => {
                         if (t.available) updateForm("tournament", t.value);
                       }}
-                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all flex items-center gap-3 ${
+                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 flex items-center gap-3 ${
                         !t.available
-                          ? "opacity-30 cursor-not-allowed border-border-subtle bg-bg-base"
+                          ? "opacity-30 cursor-not-allowed border-border-subtle bg-bg-elevated"
                           : isSelected
-                          ? "border-gold bg-gold-dim"
-                          : "border-border-subtle hover:border-border-medium bg-bg-base"
+                          ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
+                          : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated cursor-pointer"
                       }`}
                     >
                       <span className="text-xl">{t.icon}</span>
@@ -321,16 +323,16 @@ export default function CrearPollaPage() {
             </div>
 
             {/* Tipo: abierta o cerrada — dos tarjetas */}
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card border border-border-subtle">
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
               <h2 className="text-base font-bold text-text-primary">Tipo de polla</h2>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => updateForm("type", "closed")}
-                  className={`p-4 rounded-xl border text-center transition-all ${
+                  className={`p-4 rounded-xl border text-center transition-all duration-200 cursor-pointer ${
                     form.type === "closed"
-                      ? "border-gold bg-gold-dim"
-                      : "border-border-subtle hover:border-border-medium bg-bg-base"
+                      ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
+                      : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated"
                   }`}
                 >
                   <span className="text-2xl block mb-1">🔒</span>
@@ -340,10 +342,10 @@ export default function CrearPollaPage() {
                 <button
                   type="button"
                   onClick={() => updateForm("type", "open")}
-                  className={`p-4 rounded-xl border text-center transition-all ${
+                  className={`p-4 rounded-xl border text-center transition-all duration-200 cursor-pointer ${
                     form.type === "open"
-                      ? "border-gold bg-gold-dim"
-                      : "border-border-subtle hover:border-border-medium bg-bg-base"
+                      ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
+                      : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated"
                   }`}
                 >
                   <span className="text-2xl block mb-1">🌐</span>
@@ -362,20 +364,20 @@ export default function CrearPollaPage() {
             <button
               type="button"
               onClick={() => goToStep(2)}
-              className="w-full bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all text-lg flex items-center justify-center gap-2"
+              className="w-full bg-gold text-bg-base font-bold py-4 rounded-xl hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] transition-all duration-200 text-lg flex items-center justify-center gap-2 cursor-pointer"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
             >
               Siguiente <ChevronRight className="w-5 h-5" />
             </button>
-          </div>
+          </motion.div>
         )}
 
         {/* ════════════════════════════════════
             PASO 2 — Alcance de la polla
            ════════════════════════════════════ */}
         {step === 2 && (
-          <div className="space-y-5">
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card border border-border-subtle">
+          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
               <h2 className="text-base font-bold text-text-primary">Alcance de la polla</h2>
               <p className="text-sm text-text-secondary">
                 Elige qué partidos se incluirán en los pronósticos
@@ -395,10 +397,10 @@ export default function CrearPollaPage() {
                       key={option.value}
                       type="button"
                       onClick={() => updateForm("scope", option.value)}
-                      className={`w-full text-left p-4 rounded-xl border transition-all ${
+                      className={`w-full text-left p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
                         isSelected
-                          ? "border-gold bg-gold-dim"
-                          : "border-border-subtle hover:border-border-medium bg-bg-base"
+                          ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
+                          : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated"
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -443,7 +445,7 @@ export default function CrearPollaPage() {
               <button
                 type="button"
                 onClick={() => goToStep(1)}
-                className="flex-1 font-bold py-4 rounded-xl transition-colors bg-bg-card text-text-secondary border border-border-subtle hover:bg-bg-card-hover"
+                className="flex-1 font-bold py-4 rounded-xl transition-all duration-200 bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 hover:bg-bg-card-hover cursor-pointer"
               >
                 <span className="flex items-center justify-center gap-1">
                   <ArrowLeft className="w-4 h-4" /> Atrás
@@ -452,22 +454,22 @@ export default function CrearPollaPage() {
               <button
                 type="button"
                 onClick={() => goToStep(3)}
-                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-1"
+                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
                 style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
               >
                 Siguiente <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* ════════════════════════════════════
             PASO 3 — Modo de pago
            ════════════════════════════════════ */}
         {step === 3 && (
-          <div className="space-y-5">
+          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
             {/* Selección del modo de pago */}
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card border border-border-subtle">
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
               <h2 className="text-base font-bold text-text-primary">Modo de pago</h2>
               <p className="text-sm text-text-secondary">
                 Elige cómo se maneja el dinero de la polla
@@ -486,12 +488,12 @@ export default function CrearPollaPage() {
                       onClick={() => {
                         if (!isDisabled) updateForm("paymentMode", option.value);
                       }}
-                      className={`w-full text-left p-4 rounded-xl border transition-all ${
+                      className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
                         isDisabled
-                          ? "opacity-35 cursor-not-allowed border-border-subtle bg-bg-base"
+                          ? "opacity-35 cursor-not-allowed border-border-subtle bg-bg-elevated"
                           : isSelected
-                          ? "border-gold bg-gold-dim"
-                          : "border-border-subtle hover:border-border-medium bg-bg-base"
+                          ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
+                          : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated cursor-pointer"
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -500,12 +502,12 @@ export default function CrearPollaPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-text-primary">{option.title}</span>
                             <span
-                              className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                              className={`text-[10px] px-3 py-1 rounded-full font-medium ${
                                 isDisabled
-                                  ? "bg-bg-elevated text-text-muted"
+                                  ? "bg-bg-card-hover text-text-muted border border-border-subtle"
                                   : option.value === "admin_collects"
-                                  ? "bg-gold-dim text-gold"
-                                  : "bg-green-dim text-green-live"
+                                  ? "bg-gold/10 text-gold border border-gold/20"
+                                  : "bg-green-live/10 text-green-live"
                               }`}
                             >
                               {option.tag}
@@ -533,7 +535,7 @@ export default function CrearPollaPage() {
 
             {/* Valor de entrada — oculto en honor mode */}
             {form.paymentMode !== "honor" && (
-              <div className="rounded-2xl p-5 space-y-4 bg-bg-card border border-border-subtle">
+              <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
                 <h2 className="text-base font-bold text-text-primary">Valor de entrada</h2>
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -552,7 +554,7 @@ export default function CrearPollaPage() {
                         updateForm("buyInAmount", parseInt(e.target.value) || 0)
                       }
                       placeholder="20000"
-                      className="w-full pl-8 pr-16 py-3 rounded-xl outline-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
+                      className="w-full pl-8 pr-16 py-3 rounded-xl outline-none transition-colors duration-200 bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted text-sm">
                       COP
@@ -576,7 +578,7 @@ export default function CrearPollaPage() {
 
             {/* honor: valor del pozo (opcional) */}
             {form.paymentMode === "honor" && (
-              <div className="rounded-2xl p-5 space-y-4 bg-bg-card border border-border-subtle">
+              <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
                 <h2 className="text-base font-bold text-text-primary">Valor del pozo</h2>
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -595,7 +597,7 @@ export default function CrearPollaPage() {
                         updateForm("buyInAmount", parseInt(e.target.value) || 0)
                       }
                       placeholder="Ej: 50000"
-                      className="w-full pl-8 pr-16 py-3 rounded-xl outline-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
+                      className="w-full pl-8 pr-16 py-3 rounded-xl outline-none transition-colors duration-200 bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted text-sm">
                       COP
@@ -618,7 +620,7 @@ export default function CrearPollaPage() {
 
             {/* admin_collects: instrucciones de pago */}
             {form.paymentMode === "admin_collects" && (
-              <div className="rounded-2xl p-5 space-y-4 bg-bg-card border border-border-subtle">
+              <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
                 <h2 className="text-base font-bold text-text-primary">
                   Instrucciones de pago
                 </h2>
@@ -685,7 +687,7 @@ export default function CrearPollaPage() {
               <button
                 type="button"
                 onClick={() => goToStep(2)}
-                className="flex-1 font-bold py-4 rounded-xl transition-colors bg-bg-card text-text-secondary border border-border-subtle hover:bg-bg-card-hover"
+                className="flex-1 font-bold py-4 rounded-xl transition-all duration-200 bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 hover:bg-bg-card-hover cursor-pointer"
               >
                 <span className="flex items-center justify-center gap-1">
                   <ArrowLeft className="w-4 h-4" /> Atrás
@@ -695,13 +697,13 @@ export default function CrearPollaPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={loading || form.paymentMode === "digital_pool"}
-                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
               >
-                {loading ? "Creando..." : "Crear polla 🏆"}
+                {loading ? "Creando..." : <><span>Crear polla</span><Trophy className="w-5 h-5" /></>}
               </button>
             </div>
-          </div>
+          </motion.div>
         )}
       </main>
     </div>

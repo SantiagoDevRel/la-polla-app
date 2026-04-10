@@ -8,6 +8,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { motion } from "framer-motion";
+import { staggerContainer, fadeUp } from "@/lib/animations";
 import { ArrowLeft, RefreshCw, AlertTriangle } from "lucide-react";
 
 // Ligas disponibles para sincronizar
@@ -92,7 +94,7 @@ export default function AdminMatchesPage() {
         style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}
       >
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => router.push("/dashboard")} className="text-text-secondary hover:text-gold transition-colors">
+          <button onClick={() => router.push("/dashboard")} className="text-text-secondary hover:text-gold transition-colors duration-200 cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-bold text-text-primary">Admin — Partidos</h1>
@@ -105,12 +107,13 @@ export default function AdminMatchesPage() {
           no duplica partidos existentes.
         </p>
 
+        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
         {LEAGUES.map((league) => {
           const result = results[league.id];
           const isLoading = loading === league.id;
 
           return (
-            <div key={league.id} className="rounded-2xl p-4 bg-bg-card border border-border-subtle">
+            <motion.div key={league.id} variants={fadeUp} className="rounded-2xl p-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 hover:shadow-[0_0_20px_rgba(255,215,0,0.08)] transition-all duration-300">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="font-bold text-text-primary">{league.label}</p>
@@ -119,8 +122,8 @@ export default function AdminMatchesPage() {
                 <button
                   onClick={() => handleSync(league.id, league.season)}
                   disabled={isLoading}
-                  className="flex items-center gap-1.5 bg-gold text-bg-base px-4 py-2 rounded-lg text-sm font-bold
-                             hover:brightness-110 disabled:opacity-40 transition-all"
+                  className="flex items-center gap-1.5 bg-gold text-bg-base px-5 py-3 rounded-xl text-sm font-semibold
+                             hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] disabled:opacity-40 transition-all duration-200 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
                   {isLoading ? "Sync..." : "Sync"}
@@ -142,11 +145,12 @@ export default function AdminMatchesPage() {
                   )}
                 </div>
               )}
-            </div>
+            </motion.div>
           );
         })}
+        </motion.div>
 
-        <div className="rounded-xl p-4 flex items-start gap-3 bg-gold-dim border border-gold/20">
+        <div className="rounded-xl p-4 flex items-start gap-3 bg-gold/10 border border-gold/20">
           <AlertTriangle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-bold text-gold mb-1">Nota sobre Copa del Mundo 2026</p>

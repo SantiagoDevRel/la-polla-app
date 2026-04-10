@@ -5,6 +5,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
+import { motion } from "framer-motion";
+import { staggerContainer, fadeUp } from "@/lib/animations";
 import { useToast } from "@/components/ui/Toast";
 import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import InviteModal from "@/components/polla/InviteModal";
@@ -206,7 +208,8 @@ export default function PollaSlugPage() {
                 <p className="text-text-muted">No hay partidos cargados aún.</p>
               </div>
             ) : (
-              matches.map((match) => {
+              <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3">
+              {matches.map((match) => {
                 const pred = getPred(match.id);
                 const draft = drafts[match.id] || { home: pred?.predicted_home?.toString() ?? "", away: pred?.predicted_away?.toString() ?? "" };
                 const locked = isLocked(match);
@@ -214,7 +217,7 @@ export default function PollaSlugPage() {
                 const saved = savedId === match.id;
 
                 return (
-                  <div key={match.id} className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
+                  <motion.div key={match.id} variants={fadeUp} className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
                     {/* Status badge */}
                     <div className={`px-4 py-1.5 text-[11px] font-bold text-center ${
                       match.status === "live" ? "bg-green-dim text-green-live" :
@@ -311,9 +314,10 @@ export default function PollaSlugPage() {
                         <p className="mt-2 text-xs text-center text-text-muted">🔒 CERRADO</p>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 );
-              })
+              })}
+              </motion.div>
             )}
           </>
         )}

@@ -23,13 +23,16 @@ export async function POST(request: NextRequest) {
 
     const entry = body.entry?.[0];
     const changes = entry?.changes?.[0];
-    const message = changes?.value?.messages?.[0];
+    const value = changes?.value;
+    const message = value?.messages?.[0];
 
     if (message) {
       await processIncomingMessage({
         from: message.from,
         type: message.type,
         text: message.text,
+        interactive: message.interactive,
+        wa_message_id: message.id,
       });
     }
 

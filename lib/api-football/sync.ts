@@ -11,8 +11,8 @@
  * ya que estas operaciones son server-side y no tienen contexto de usuario.
  */
 
-import { createClient } from '@supabase/supabase-js';
 import { apiFootballGet } from './client';
+import { createAdminClient } from '../supabase/admin';
 import {
   ApiFootballFixture,
   MatchRow,
@@ -24,29 +24,11 @@ import {
 
 // ─────────────────────────────────────────
 // Supabase service role client
+// Usa createAdminClient de lib/supabase/admin.ts
 // ─────────────────────────────────────────
 
-/**
- * Cliente de Supabase con service_role key.
- * IMPORTANTE: Solo usar server-side. Nunca exponer al cliente.
- *
- * Variables de entorno requeridas:
- * - NEXT_PUBLIC_SUPABASE_URL: URL del proyecto Supabase
- * - SUPABASE_SERVICE_ROLE_KEY: Service role key (NO la anon key)
- */
 function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error(
-      'Faltan variables de entorno de Supabase: NEXT_PUBLIC_SUPABASE_URL y/o SUPABASE_SERVICE_ROLE_KEY'
-    );
-  }
-
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  return createAdminClient();
 }
 
 // ─────────────────────────────────────────
@@ -63,7 +45,100 @@ const WORLD_CUP_SEASON = 2026;
 const TOURNAMENT_ID = 'worldcup_2026';
 
 // ─────────────────────────────────────────
-// 1. IMPORTAR PARTIDOS DEL MUNDIAL 2026
+// 0. SYNC GENÉRICO POR LIGA
+// ─────────────────────────────────────────
+
+/**
+ * Mapeo de league ID + season a nombre de torneo en nuestra DB.
+ * Si la combinación no está mapeada, genera un nombre automático: "league_{id}_{season}"
+ */
+const TOURNAMENT_NAMES: Record<string, string> = {
+  '1_2026': 'worldcup_2026',
+  '2_2024': 'champions_2025',       // Champions 2024-2025 season
+  '2_2025': 'champions_2026',       // Champions 2025-2026 season
+  '239_2025': 'liga_betplay_2025',
+  '239_2024': 'liga_betplay_2024',
+};
+
+function getTournamentName(leagueId: number, season: number): string {
+  return TOURNAMENT_NAMES[`${leagueId}_${season}`] || `league_${leagueId}_${season}`;
+}
+
+/**
+ * Sincroniza todos los partidos de una liga/temporada desde API-Football a Supabase.
+ *
+ * Función genérica que reemplaza importMatches() para soportar cualquier liga.
+ * Usa upsert con external_id como campo de conflicto para evitar duplicados.
+ *
+ * @param leagueId - ID de la liga en API-Football (1=World Cup, 2=Champions, 239=BetPlay)
+ * @param season - Temporada (ej: 2024, 2025, 2026)
+ * @returns Resumen: { synced, errors, total }
+ */
+export async function syncLeague(
+  leagueId: number,
+  season: number
+): Promise<{ synced: number; errors: number; total: number }> {
+  const tournament = getTournamentName(leagueId, season);
+  console.log(`[sync] Sincronizando league=${leagueId} season=${season} → tournament="${tournament}"`);
+
+  // 1. Consultar API-Football por todos los fixtures de la liga/temporada
+  const fixtures = await apiFootballGet<ApiFootballFixture>('/fixtures', {
+    league: leagueId,
+    season,
+  });
+
+  console.log(`[sync] API-Football devolvió ${fixtures.length} fixtures`);
+
+  if (fixtures.length === 0) {
+    return { synced: 0, errors: 0, total: 0 };
+  }
+
+  const supabase = getSupabaseAdmin();
+  let synced = 0;
+  let errors = 0;
+
+  // 2. Procesar cada fixture
+  for (const fixture of fixtures) {
+    if (!isValidFixture(fixture)) {
+      console.warn(
+        `[sync] Fixture inválido, saltando:`,
+        JSON.stringify(fixture).substring(0, 200)
+      );
+      errors++;
+      continue;
+    }
+
+    // 3. Mapear al schema de Supabase
+    const matchRow: MatchRow = mapFixtureToMatch(fixture, tournament);
+
+    try {
+      // 4. Upsert usando external_id como campo de conflicto
+      const { error } = await supabase
+        .from('matches')
+        .upsert(matchRow, { onConflict: 'external_id' });
+
+      if (error) {
+        console.error(`[sync] Error en upsert fixture ${matchRow.external_id}:`, error.message);
+        errors++;
+      } else {
+        synced++;
+      }
+    } catch (err) {
+      console.error(
+        `[sync] Error inesperado en fixture ${matchRow.external_id}:`,
+        err instanceof Error ? err.message : err
+      );
+      errors++;
+    }
+  }
+
+  const result = { synced, errors, total: fixtures.length };
+  console.log(`[sync] Sincronización completada:`, result);
+  return result;
+}
+
+// ─────────────────────────────────────────
+// 1. IMPORTAR PARTIDOS DEL MUNDIAL 2026 (legacy — usa syncLeague internamente)
 // ─────────────────────────────────────────
 
 /**
