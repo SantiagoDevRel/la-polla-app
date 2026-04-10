@@ -10,6 +10,7 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, Construction, Trophy } from "lucide-react";
+import { formatCOP } from "@/lib/formatCurrency";
 
 // ─── Tipos ───
 
@@ -553,11 +554,7 @@ export default function CrearPollaPage() {
                   </div>
                   {form.buyInAmount > 0 && (
                     <p className="text-xs text-text-muted mt-1.5">
-                      {new Intl.NumberFormat("es-CO", {
-                        style: "currency",
-                        currency: "COP",
-                        maximumFractionDigits: 0,
-                      }).format(form.buyInAmount)}{" "}
+                      {formatCOP(form.buyInAmount)}{" "}
                       por persona
                     </p>
                   )}

@@ -15,10 +15,12 @@ const TRN_LABELS: Record<string, string> = {
 // ─── FLOW 1: Main Menu ───
 
 export async function handleMainMenu(phone: string, displayName: string) {
+  // Si display_name es un número de teléfono, usar "parcero" en vez
+  const name = /^\d{8,15}$/.test(displayName.replace("+", "")) ? "parcero" : displayName.split(" ")[0];
   await sendButtonMessage(
     phone,
     "⚽ La Polla",
-    `Hola ${displayName}! Que quieres hacer?`,
+    `Hola ${name}! Que quieres hacer?`,
     [
       { id: "mis_pollas", title: "Mis Pollas" },
       { id: "pronosticar", title: "Pronosticar" },

@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
+import { formatCOP } from "@/lib/formatCurrency";
 
 interface PollaInfo {
   id: string; slug: string; name: string; description: string;
@@ -87,7 +88,7 @@ export default function UnirsePage() {
             </div>
             <div className="rounded-xl p-3 bg-bg-elevated">
               <p className="score-font text-2xl text-gold">
-                {polla.buy_in_amount > 0 ? `$${polla.buy_in_amount.toLocaleString("es-CO")}` : "Gratis"}
+                {polla.buy_in_amount > 0 ? formatCOP(polla.buy_in_amount) : "Gratis"}
               </p>
               <p className="text-[11px] text-text-muted">{polla.buy_in_amount > 0 ? "Entrada (COP)" : "Sin costo"}</p>
             </div>

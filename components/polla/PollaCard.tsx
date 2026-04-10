@@ -1,5 +1,7 @@
 // components/polla/PollaCard.tsx — Tarjeta de polla con diseño "estadio de noche"
 // Border-left gold si admin, bg-card con hover, badges de torneo/estado/pago
+import { formatCOP } from "@/lib/formatCurrency";
+
 interface PollaCardProps {
   polla: {
     id: string;
@@ -97,7 +99,7 @@ export default function PollaCard({
           )}
           {polla.buy_in_amount > 0 && (
             <span>
-              💰 ${polla.buy_in_amount.toLocaleString("es-CO")}
+              💰 {formatCOP(polla.buy_in_amount)}
             </span>
           )}
           <span

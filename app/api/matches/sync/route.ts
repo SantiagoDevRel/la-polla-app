@@ -5,7 +5,8 @@ import { syncLeague } from "@/lib/api-football/sync";
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
-  if (secret !== process.env.CRON_SECRET) {
+  const validSecret = process.env.CRON_SECRET || process.env.NEXT_PUBLIC_CRON_SECRET;
+  if (!validSecret || secret !== validSecret) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

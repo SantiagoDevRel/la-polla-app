@@ -208,7 +208,7 @@ export default function PollaSlugPage() {
           <>
             {matches.length === 0 ? (
               <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
-                <p className="text-text-muted">No hay partidos cargados aún.</p>
+                <p className="text-text-muted">No hay partidos cargados aun. Los partidos se actualizaran cuando el calendario sea confirmado.</p>
               </div>
             ) : (
               <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3">

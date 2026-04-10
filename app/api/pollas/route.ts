@@ -1,11 +1,11 @@
 // app/api/pollas/route.ts — CRUD de pollas (crear y listar pollas del usuario)
-// Soporta los 3 modos de pago: honor, admin_collects, digital_pool
+// Soporta 2 modos de pago: admin_collects, digital_pool
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
 // Enum de modos de pago válidos en la DB
-const paymentModes = ["honor", "admin_collects", "digital_pool"] as const;
+const paymentModes = ["admin_collects", "digital_pool"] as const;
 
 // Schema base para crear una polla
 const createPollaSchema = z
@@ -36,16 +36,11 @@ const createPollaSchema = z
       path: ["adminPaymentInstructions"],
     }
   )
-  // Validación: buy_in_amount debe ser > 0, excepto para honor mode donde es opcional
+  // Validación: buy_in_amount debe ser >= 1000
   .refine(
-    (data) => {
-      // Para honor mode, buy-in es opcional (puede ser 0)
-      if (data.paymentMode === "honor") return true;
-      // Para los otros modos, debe ser > 0
-      return data.buyInAmount > 0;
-    },
+    (data) => data.buyInAmount >= 1000,
     {
-      message: "El valor de entrada debe ser mayor a 0",
+      message: "El valor minimo es $1.000",
       path: ["buyInAmount"],
     }
   );
