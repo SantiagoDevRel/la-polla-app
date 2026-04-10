@@ -17,8 +17,10 @@ const SIZES = {
 };
 
 export default function UserAvatar({
-  userId,
-  avatarUrl,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  userId: _userId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  avatarUrl: _avatarUrl,
   displayName,
   size = "md",
   className = "",
