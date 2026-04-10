@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
   const challenge = searchParams.get("hub.challenge");
 
   const expectedToken = process.env.META_WA_WEBHOOK_VERIFY_TOKEN;
-  console.log("[Webhook Verify] mode:", mode, "| token match:", token === expectedToken, "| env exists:", !!expectedToken);
 
   if (mode === "subscribe" && token === expectedToken) {
     return new NextResponse(challenge, { status: 200 });
@@ -25,6 +24,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log("[Webhook POST] body keys:", Object.keys(body));
 
     const entry = body.entry?.[0];
     const changes = entry?.changes?.[0];
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     const message = value?.messages?.[0];
 
     if (message) {
+      console.log("[Webhook POST] message from:", message.from, "type:", message.type);
       await processIncomingMessage({
         from: message.from,
         type: message.type,
@@ -39,11 +40,19 @@ export async function POST(request: NextRequest) {
         interactive: message.interactive,
         wa_message_id: message.id,
       });
+      console.log("[Webhook POST] processIncomingMessage completed");
+    } else {
+      console.log("[Webhook POST] no message in payload — status update or other event");
     }
 
     return NextResponse.json({ status: "ok" });
-  } catch (error) {
-    console.error("Error procesando webhook de WhatsApp:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error("[Webhook POST] ERROR:", err.message);
+    console.error("[Webhook POST] Stack:", err.stack);
+    return NextResponse.json(
+      { error: "Error interno", detail: err.message },
+      { status: 500 }
+    );
   }
 }
