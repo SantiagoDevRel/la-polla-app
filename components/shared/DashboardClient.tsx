@@ -48,12 +48,6 @@ interface DashboardClientProps {
   leaderboardData: LeaderboardEntry[];
 }
 
-const TOURNAMENT_NAMES: Record<string, string> = {
-  champions_2025: "Champions League",
-  worldcup_2026: "Mundial 2026",
-  la_liga_2025: "La Liga",
-};
-
 // ─── Live Matches Banner ───
 
 function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
