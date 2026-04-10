@@ -1,6 +1,7 @@
 // app/(app)/dashboard/page.tsx — Dashboard principal "estadio de noche"
 // Greeting, live matches banner, polla selector + leaderboard, quick stats
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { Trophy, UserPlus, Settings } from "lucide-react";
 import DashboardClient from "@/components/shared/DashboardClient";
@@ -16,8 +17,11 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Use admin client for data queries to bypass RLS infinite recursion on polla_participants
+  const admin = createAdminClient();
+
   // User profile
-  const { data: publicUser } = await supabase
+  const { data: publicUser } = await admin
     .from("users")
     .select("display_name, avatar_url")
     .eq("id", user.id)
@@ -29,7 +33,7 @@ export default async function DashboardPage() {
   const avatarUrl = "/pollitos/logo.png";
 
   // Participations
-  const { data: participantRows } = await supabase
+  const { data: participantRows } = await admin
     .from("polla_participants")
     .select("polla_id, role, total_points, rank")
     .eq("user_id", user.id);
@@ -39,7 +43,7 @@ export default async function DashboardPage() {
 
   // Active pollas
   const { data: pollas } = pollaIds.length > 0
-    ? await supabase
+    ? await admin
         .from("pollas")
         .select("*")
         .in("id", pollaIds)
@@ -51,7 +55,7 @@ export default async function DashboardPage() {
   // Participant counts per polla
   const participantCounts: Record<string, number> = {};
   if (pollaIds.length > 0) {
-    const { data: counts } = await supabase
+    const { data: counts } = await admin
       .from("polla_participants")
       .select("polla_id")
       .in("polla_id", pollaIds);
@@ -81,7 +85,7 @@ export default async function DashboardPage() {
 
   let liveMatchesRaw: LiveMatchRaw[] = [];
   if (tournaments.length > 0) {
-    const { data: matches } = await supabase
+    const { data: matches } = await admin
       .from("matches")
       .select("id, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, tournament")
       .in("tournament", tournaments)
@@ -98,7 +102,7 @@ export default async function DashboardPage() {
   }
   let userPredictions: PredictionRow[] = [];
   if (matchIds.length > 0) {
-    const { data: preds } = await supabase
+    const { data: preds } = await admin
       .from("predictions")
       .select("match_id, predicted_home, predicted_away")
       .eq("user_id", user.id)
@@ -133,7 +137,7 @@ export default async function DashboardPage() {
   if (pollaIds.length > 0) {
     const activePollaIds = pollaIds.filter((id) => (pollas || []).some((p: { id: string }) => p.id === id));
     if (activePollaIds.length > 0) {
-      const { data: lbRows } = await supabase
+      const { data: lbRows } = await admin
         .from("polla_participants")
         .select("polla_id, user_id, total_points, rank, users(display_name)")
         .in("polla_id", activePollaIds)
