@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processIncomingMessage } from "@/lib/whatsapp/bot";
 
+export const dynamic = "force-dynamic";
+
 // Verificación del webhook (GET) - Meta envía un challenge para validar
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -9,7 +11,10 @@ export async function GET(request: NextRequest) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === process.env.META_WA_WEBHOOK_VERIFY_TOKEN) {
+  const expectedToken = process.env.META_WA_WEBHOOK_VERIFY_TOKEN;
+  console.log("[Webhook Verify] mode:", mode, "| token match:", token === expectedToken, "| env exists:", !!expectedToken);
+
+  if (mode === "subscribe" && token === expectedToken) {
     return new NextResponse(challenge, { status: 200 });
   }
 
