@@ -35,7 +35,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Rutas públicas que no requieren autenticación
-  const publicRoutes = ["/login", "/verify", "/api/auth"];
+  const publicRoutes = ["/login", "/verify", "/onboarding", "/api/auth"];
   const isPublicRoute = publicRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   );

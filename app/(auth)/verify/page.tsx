@@ -27,7 +27,7 @@ function VerifyForm() {
 
     try {
       await axios.put("/api/auth/otp", { phone, code });
-      router.push("/dashboard");
+      router.push("/onboarding");
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
       setError(axiosError.response?.data?.error || "Código inválido");
