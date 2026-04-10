@@ -1,7 +1,24 @@
 // app/api/matches/sync/route.ts — Endpoint para sincronizar partidos desde football-data.org
-// Acepta competitionId (football-data.org) o leagueId+season (legacy API-Football)
+// GET: sync all competitions (requires cron secret in query param or header)
+// POST: sync specific competition
 import { NextRequest, NextResponse } from "next/server";
-import { syncCompetition, COMPETITIONS } from "@/lib/football-data/sync";
+import { syncCompetition, syncAllCompetitions, COMPETITIONS } from "@/lib/football-data/sync";
+
+export async function GET(request: NextRequest) {
+  const secret = request.nextUrl.searchParams.get("secret") || request.headers.get("x-cron-secret");
+  const validSecret = process.env.CRON_SECRET || process.env.NEXT_PUBLIC_CRON_SECRET;
+  if (!validSecret || secret !== validSecret) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  try {
+    const results = await syncAllCompetitions();
+    return NextResponse.json({ results, competitions: COMPETITIONS.map((c) => c.label) });
+  } catch (error) {
+    console.error("[sync GET] Error:", error);
+    return NextResponse.json({ error: "Error en sync" }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");

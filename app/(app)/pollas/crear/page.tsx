@@ -32,9 +32,11 @@ interface FormState {
 // ─── Datos de configuración ───
 
 const TOURNAMENTS = [
-  { value: "champions_2025", label: "Champions League", icon: "⭐" },
-  { value: "worldcup_2026", label: "Mundial 2026", icon: "🌍" },
-  { value: "la_liga_2025", label: "La Liga", icon: "🇪🇸" },
+  { value: "champions_2025", label: "Champions League", logo: "/tournaments/champions_league.svg" },
+  { value: "worldcup_2026", label: "Mundial 2026", logo: "/tournaments/world_cup.svg" },
+  { value: "la_liga_2025", label: "La Liga", logo: "/tournaments/la_liga.png" },
+  { value: "premier_league", label: "Premier League", logo: "/tournaments/premier_league.png" },
+  { value: "seria_a", label: "Serie A", logo: "/tournaments/seria_a.png" },
 ];
 
 const SCOPE_OPTIONS: {
@@ -285,7 +287,7 @@ export default function CrearPollaPage() {
                           : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated"
                       }`}
                     >
-                      <span className="text-xl">{t.icon}</span>
+                      <img src={t.logo} alt={t.label} width={24} height={24} style={{ objectFit: "contain", borderRadius: 4 }} />
                       <span className="font-medium text-text-primary flex-1">{t.label}</span>
                       <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${

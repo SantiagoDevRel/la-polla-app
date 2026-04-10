@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { UserPlus } from "lucide-react";
 import DashboardClient from "@/components/shared/DashboardClient";
 import { getLiveMatches, getTodayMatches } from "@/lib/football-api";
@@ -185,7 +186,7 @@ export default async function DashboardPage() {
           displayName: userData?.display_name || "Usuario",
           avatarUrl: userData?.avatar_url || null,
           totalPoints: r.total_points || 0,
-          rank: r.rank || 999,
+          rank: r.rank ?? 1,
         };
       });
     }
@@ -209,16 +210,18 @@ export default async function DashboardPage() {
         <div className="max-w-lg mx-auto flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <img src="/pollitos/logo_realistic.webp" alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
-            <span className="font-display text-gold" style={{ fontSize: 18, letterSpacing: "0.1em" }}>La Polla</span>
+            <span className="text-gold" style={{ fontSize: 18, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Outfit', sans-serif" }}>La Polla</span>
           </div>
-          <div style={{
-            width: 32, height: 32, borderRadius: "50%",
-            border: "1.5px solid rgba(255,215,0,0.3)", overflow: "hidden",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "#1a2540",
-          }}>
-            <img src={avatarUrl} alt={firstName} style={{ width: 32, height: 32, objectFit: "cover", borderRadius: "50%" }} />
-          </div>
+          <Link href="/perfil">
+            <div style={{
+              width: 32, height: 32, borderRadius: "50%",
+              border: "1.5px solid rgba(255,215,0,0.3)", overflow: "hidden",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "#1a2540",
+            }}>
+              <img src={avatarUrl} alt={firstName} style={{ width: 32, height: 32, objectFit: "cover", borderRadius: "50%" }} />
+            </div>
+          </Link>
         </div>
 
         <div className="max-w-lg mx-auto">
