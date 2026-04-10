@@ -82,23 +82,26 @@ export default async function DashboardPage() {
 
   if (tournaments.length > 0) {
     // Try real API first: live matches, then today's matches
-    let apiMatches: FootballMatch[] = [];
-    try {
-      const [live, today] = await Promise.all([
-        getLiveMatches(tournaments),
-        getTodayMatches(tournaments),
-      ]);
-      // Merge: live first, then today's finished, dedup by ID
-      const seen = new Set<string>();
-      for (const m of [...live, ...today]) {
-        if (!seen.has(m.id) && (m.status === "live" || m.status === "finished")) {
-          seen.add(m.id);
-          apiMatches.push(m);
+    const apiMatches: FootballMatch[] = await (async () => {
+      try {
+        const [live, today] = await Promise.all([
+          getLiveMatches(tournaments),
+          getTodayMatches(tournaments),
+        ]);
+        const seen = new Set<string>();
+        const merged: FootballMatch[] = [];
+        for (const m of [...live, ...today]) {
+          if (!seen.has(m.id) && (m.status === "live" || m.status === "finished")) {
+            seen.add(m.id);
+            merged.push(m);
+          }
         }
+        return merged;
+      } catch (err) {
+        console.error("[dashboard] Football API error:", err);
+        return [];
       }
-    } catch (err) {
-      console.error("[dashboard] Football API error:", err);
-    }
+    })();
 
     if (apiMatches.length > 0) {
       // Use real API matches (no predictions for these since they're display-only)
