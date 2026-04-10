@@ -32,8 +32,9 @@ interface FormState {
 // ─── Datos de configuración ───
 
 const TOURNAMENTS = [
-  { value: "champions_2025", label: "Champions League 2025-26", icon: "⭐", available: true },
-  { value: "worldcup_2026", label: "Mundial 2026", icon: "🌍", available: true },
+  { value: "champions_2025", label: "Champions League", icon: "⭐" },
+  { value: "worldcup_2026", label: "Mundial 2026", icon: "🌍" },
+  { value: "la_liga_2025", label: "La Liga", icon: "🇪🇸" },
 ];
 
 const SCOPE_OPTIONS: {
@@ -94,6 +95,7 @@ export default function CrearPollaPage() {
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [customBuyIn, setCustomBuyIn] = useState(false);
   const [form, setForm] = useState<FormState>({
     name: "",
     description: "",
@@ -511,40 +513,90 @@ export default function CrearPollaPage() {
               </div>
             </div>
 
-            {/* Valor de entrada */}
+            {/* Cuota de entrada */}
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
-              <h2 className="text-base font-bold text-text-primary">Valor de entrada</h2>
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                    Valor por participante (COP) <span className="text-red-alert">*</span>
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">
-                      $
-                    </span>
-                    <input
-                      type="number"
-                      min={1000}
-                      step={1000}
-                      value={form.buyInAmount || ""}
-                      onChange={(e) =>
-                        updateForm("buyInAmount", parseInt(e.target.value) || 0)
-                      }
-                      placeholder="10000"
-                      className="w-full pl-8 pr-16 py-3 rounded-xl outline-none transition-colors duration-200 bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted text-sm">
-                      COP
-                    </span>
-                  </div>
-                  {form.buyInAmount > 0 && (
-                    <p className="text-xs text-text-muted mt-1.5">
-                      {formatCOP(form.buyInAmount)}{" "}
-                      por persona
-                    </p>
-                  )}
-                </div>
+              <div>
+                <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+                  Cuota de entrada <span className="text-red-alert">*</span>
+                  <span
+                    className="inline-flex items-center justify-center cursor-pointer"
+                    title="Cuota por persona — cada participante paga este valor al unirse"
+                    style={{ color: "#4a5568" }}
+                  >
+                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+                    </svg>
+                  </span>
+                </h2>
+                <p style={{ fontSize: 11, color: "#7a8499", marginTop: 4 }}>
+                  Mínimo $1.000 · por persona
+                </p>
               </div>
+
+              {/* Preset amount chips */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[10000, 50000, 100000].map((amount) => {
+                  const isSelected = form.buyInAmount === amount && !customBuyIn;
+                  return (
+                    <button
+                      key={amount}
+                      type="button"
+                      onClick={() => { updateForm("buyInAmount", amount); setCustomBuyIn(false); }}
+                      style={{
+                        background: isSelected ? "rgba(255,215,0,0.1)" : "#131d2e",
+                        border: isSelected ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        color: isSelected ? "#FFD700" : "#7a8499",
+                        fontSize: 12,
+                        fontWeight: isSelected ? 700 : 500,
+                        cursor: "pointer",
+                        fontFamily: "'Outfit', sans-serif",
+                      }}
+                    >
+                      {formatCOP(amount)}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => { setCustomBuyIn(true); updateForm("buyInAmount", 0); }}
+                  style={{
+                    background: customBuyIn ? "rgba(255,215,0,0.1)" : "#131d2e",
+                    border: customBuyIn ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 8,
+                    padding: "6px 10px",
+                    color: customBuyIn ? "#FFD700" : "#7a8499",
+                    fontSize: 12,
+                    fontWeight: customBuyIn ? 700 : 500,
+                    cursor: "pointer",
+                    fontFamily: "'Outfit', sans-serif",
+                  }}
+                >
+                  Otro valor
+                </button>
+              </div>
+
+              {/* Manual input — only shown when "Otro valor" is selected */}
+              {customBuyIn && (
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    min={1000}
+                    step={1000}
+                    value={form.buyInAmount || ""}
+                    onChange={(e) =>
+                      updateForm("buyInAmount", parseInt(e.target.value) || 0)
+                    }
+                    placeholder="10000"
+                    className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors duration-200 bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
+                  />
+                </div>
+              )}
+            </div>
 
             {/* Instrucciones de pago */}
             {form.paymentMode === "admin_collects" && (

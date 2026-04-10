@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Polla — UI Mockup v4</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#030608;font-family:'Outfit',sans-serif;padding:40px 20px 60px}
+.page-title{text-align:center;margin-bottom:32px}
+.page-title h1{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.1em;color:#FFD700}
+.page-title p{font-size:12px;color:#4a5568;margin-top:4px}
+.screens-row{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.screen-col{display:flex;flex-direction:column;align-items:center;gap:8px}
+.screen-label{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4a5568}
+.phone{width:310px;background:#080c10;border-radius:36px;border:2px solid #1a2540;overflow:hidden;display:flex;flex-direction:column}
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:10px 20px 5px;background:#080c10;flex-shrink:0}
+.stime{font-size:12px;font-weight:700;color:#f0f4ff}
+.sicons{display:flex;gap:5px;align-items:center}
+.sbody{padding:0 15px 12px;flex:1}
+.bnav{display:flex;align-items:center;padding:6px 0 16px;background:rgba(8,12,16,.98);border-top:1px solid #1a2540;flex-shrink:0}
+.ntab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.ntab svg{width:20px;height:20px;stroke:#4a5568;fill:none;stroke-width:1.8}
+.ntab span{font-size:9px;color:#4a5568;font-weight:500}
+.ntab.on svg{stroke:#FFD700}
+.ntab.on span{color:#FFD700}
+.nfab-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.nfab{width:46px;height:46px;border-radius:50%;background:#FFD700;display:flex;align-items:center;justify-content:center;margin-top:-18px;border:3px solid #080c10;cursor:pointer}
+.nfab svg{width:20px;height:20px;stroke:#080c10;fill:none;stroke-width:2.5}
+.nfab-lbl{font-size:9px;color:#FFD700;font-weight:700}
+.homerow{display:flex;justify-content:space-between;align-items:center;padding-top:6px}
+.logorow{display:flex;align-items:center;gap:7px}
+.logorow svg{width:18px;height:18px}
+.logorow span{font-family:'Bebas Neue',sans-serif;font-size:18px;color:#f0f4ff;letter-spacing:.1em}
+.avsm{width:32px;height:32px;border-radius:50%;border:1.5px solid rgba(255,215,0,.3);overflow:hidden;display:flex;align-items:center;justify-content:center;background:#1a2540}
+.hblock{padding:10px 0 6px}
+.hsub{font-size:12px;color:#7a8499}
+.hname{font-size:24px;font-weight:700;line-height:1.1}
+.hname span{color:#FFD700}
+.hq{font-size:12px;color:#7a8499;margin-top:2px;margin-bottom:4px}
+.shead{display:flex;justify-content:space-between;align-items:center;margin:12px 0 8px}
+.shead-t{font-size:13px;font-weight:700;color:#f0f4ff}
+.pgtitle{font-size:20px;font-weight:700;color:#f0f4ff;padding:12px 0 8px;display:flex;align-items:center;gap:8px}
+.pgtitle svg{width:20px;height:20px;flex-shrink:0}
+
+/* LIVE BANNER */
+.live-section{margin:12px 0 14px}
+.live-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.live-section-title{font-size:13px;font-weight:700;color:#f0f4ff}
+.live-indicator{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#ff3d57;letter-spacing:.04em}
+.ldot-red{width:6px;height:6px;border-radius:50%;background:#ff3d57;animation:lp 1.2s infinite}
+@keyframes lp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}
+.live-track-wrap{margin:0 -15px;padding:0 15px;overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x;scrollbar-width:none}
+.live-track-wrap::-webkit-scrollbar{display:none}
+.live-track{display:flex;gap:8px;padding-right:15px;width:max-content}
+.live-card{width:148px;flex-shrink:0;background:#0e1420;border:1px solid rgba(255,61,87,.2);border-radius:12px;padding:9px 10px 8px}
+.live-card.fin{border-color:rgba(255,255,255,.05);opacity:.6}
+.lc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.lc-live{display:flex;align-items:center;gap:4px;font-size:9px;font-weight:700;color:#ff3d57;letter-spacing:.05em;text-transform:uppercase}
+.lc-time{font-size:9px;color:#7a8499}
+.lc-teams{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.lc-team{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.lc-logo{width:24px;height:24px;border-radius:50%;background:#131d2e;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:7px;color:#7a8499;letter-spacing:.04em}
+.lc-tname{font-size:9px;font-weight:600;color:#b0b8c8;text-align:center;max-width:46px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lc-score-block{display:flex;flex-direction:column;align-items:center}
+.lc-digits{font-family:'Bebas Neue',sans-serif;font-size:26px;color:#f0f4ff;letter-spacing:.04em;line-height:1;display:flex;align-items:center;gap:2px}
+.lc-digits.fin{color:#7a8499}
+.lc-sep{font-family:'Bebas Neue',sans-serif;font-size:20px;color:#4a5568}
+.lc-pred{font-size:8px;color:#4a5568;text-align:center;margin-top:4px}
+.lc-pred .hit{color:#00e676;font-weight:700}
+.lc-pred .miss{color:#ff3d57;font-weight:700}
+
+/* POLLAS SELECTOR */
+.pollas-selector-wrap{margin:0 -15px;padding:0 15px;overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x;scrollbar-width:none;margin-bottom:10px}
+.pollas-selector-wrap::-webkit-scrollbar{display:none}
+.pollas-selector{display:flex;gap:7px;width:max-content;padding-right:15px}
+.polla-tab{flex-shrink:0;background:#0e1420;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:8px 12px;cursor:pointer;min-width:128px;transition:border-color .2s}
+.polla-tab.active{border-color:rgba(255,215,0,.35);background:rgba(255,215,0,.05)}
+.pt-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.pt-tournament{display:flex;align-items:center;gap:4px;font-size:10px;color:#7a8499;font-weight:500}
+.pt-tournament svg{width:10px;height:10px;flex-shrink:0}
+.dot-active{width:6px;height:6px;border-radius:50%;background:#00e676;box-shadow:0 0 5px rgba(0,230,118,.6);animation:dpulse 2s infinite;flex-shrink:0;display:inline-block}
+@keyframes dpulse{0%,100%{box-shadow:0 0 4px rgba(0,230,118,.5)}50%{box-shadow:0 0 9px rgba(0,230,118,.9)}}
+.dot-ended{width:6px;height:6px;border-radius:50%;background:#3a4454;flex-shrink:0;display:inline-block}
+.pt-name{font-size:13px;font-weight:600;color:#f0f4ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:116px}
+.pt-meta{font-size:10px;color:#7a8499;margin-top:2px}
+.pt-meta span{color:#FFD700;font-weight:600}
+
+/* LEADERBOARD */
+.lbbox{background:#0e1420;border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:8px 12px;margin-bottom:10px}
+.lb-title{font-size:11px;font-weight:600;color:#7a8499;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.05)}
+.lbrow{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.lbrow:last-child{border-bottom:none}
+.lbpos{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.05em;min-width:18px;text-align:center}
+.lbav{width:28px;height:28px;border-radius:50%;background:#131d2e;border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#7a8499;flex-shrink:0}
+.lbnm{font-size:12px;font-weight:600;color:#f0f4ff;flex:1}
+.lbpt{font-family:'Bebas Neue',sans-serif;font-size:18px;color:#FFD700;letter-spacing:.05em}
+.lbu{font-size:9px;color:#7a8499}
+
+/* POLLA CARD v4 — dot aligned via ctop-right flex group */
+.pcard{background:#0e1420;border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .2s,background .15s}
+.pcard:hover{border-color:rgba(255,215,0,.22);background:#0f1726}
+.pcard.hi{border-color:rgba(255,215,0,.16)}
+.ctop{display:flex;align-items:center;margin-bottom:5px;gap:6px}
+.ctournament{display:flex;align-items:center;gap:5px;flex:1;min-width:0}
+.tico{width:14px;height:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tico svg{width:13px;height:13px}
+.tname{font-size:10px;font-weight:600;color:#7a8499;letter-spacing:.01em;white-space:nowrap}
+/* dot + arrow in a tight group pushed to right */
+.ctop-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.cname{font-size:15px;font-weight:600;color:#f0f4ff;margin-bottom:7px;line-height:1.2}
+.cfoot{display:flex;align-items:center;gap:8px}
+.cfoot-item{display:flex;align-items:center;gap:4px;font-size:11px;color:#7a8499}
+.cfoot-item svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2}
+.cfoot-sep{width:3px;height:3px;border-radius:50%;background:#2a3347;flex-shrink:0}
+.cfoot-amt{font-size:12px;color:#FFD700;font-weight:700}
+.cfoot-vis{font-size:11px;color:#4a5568}
+.carrow{width:13px;height:13px;flex-shrink:0}
+
+/* SEARCH + CHIPS */
+.search{background:#0e1420;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px;color:#4a5568;font-size:13px}
+.search svg{width:14px;height:14px;stroke:#4a5568;fill:none;stroke-width:2;flex-shrink:0}
+.chips{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chipon{border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;background:rgba(255,215,0,.1);color:#FFD700;border:1px solid rgba(255,215,0,.22);display:inline-flex;align-items:center;gap:5px}
+.chipoff{border-radius:20px;padding:4px 10px;font-size:11px;font-weight:500;cursor:pointer;white-space:nowrap;background:#0e1420;color:#4a5568;border:1px solid rgba(255,255,255,.06);display:inline-flex;align-items:center;gap:5px}
+.chip-ico{width:13px;height:13px;display:flex;align-items:center;justify-content:center}
+.chip-ico svg{width:13px;height:13px}
+
+/* TAB SWITCH */
+.tabsw{display:flex;background:#0e1420;border-radius:10px;padding:3px;margin-bottom:12px;border:1px solid rgba(255,255,255,.06);gap:2px}
+.tbon{flex:1;padding:7px;border-radius:8px;background:rgba(255,215,0,.12);color:#FFD700;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;justify-content:center;gap:4px}
+.tbon svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
+.tboff{flex:1;padding:7px;border-radius:8px;background:transparent;color:#4a5568;font-size:12px;font-weight:500;border:none;cursor:pointer;font-family:'Outfit',sans-serif;display:flex;align-items:center;justify-content:center;gap:4px}
+.tboff svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
+
+/* BUTTONS */
+.btnp{background:#FFD700;color:#080c10;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;border:none;border-radius:11px;padding:12px 20px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%}
+.btnp svg{width:14px;height:14px;stroke:#080c10;fill:none;stroke-width:2.5}
+.btns{background:#131d2e;color:#7a8499;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:12px 20px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:1}
+.btnout{width:100%;background:transparent;border:1px solid rgba(255,61,87,.25);border-radius:11px;padding:12px;color:#ff3d57;font-size:13px;font-weight:600;font-family:'Outfit',sans-serif;cursor:pointer}
+.btnrow{display:flex;gap:8px;margin-top:4px;padding-bottom:14px}
+
+/* FORM */
+.fsec{background:#0e1420;border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:14px;margin-bottom:10px}
+.fstitle{font-size:13px;font-weight:700;color:#f0f4ff;margin-bottom:10px;display:flex;align-items:center;gap:5px}
+.flabel{font-size:11px;color:#7a8499;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+/* bare (i) icon — no bubble */
+.info-icon{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#4a5568}
+.info-icon:hover{color:#7a8499}
+.info-icon svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2}
+.finput{width:100%;background:#131d2e;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;color:#f0f4ff;font-size:13px;font-family:'Outfit',sans-serif;margin-bottom:10px;outline:none;transition:border-color .15s}
+.finput:focus{border-color:rgba(255,215,0,.4)}
+.finput::placeholder{color:#4a5568}
+.amtchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.amtchip{background:#131d2e;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:6px 10px;color:#7a8499;font-size:12px;font-weight:500;cursor:pointer;font-family:'Outfit',sans-serif}
+.amtchip.sel{background:rgba(255,215,0,.1);border-color:rgba(255,215,0,.3);color:#FFD700;font-weight:700}
+.tornopt{display:flex;align-items:center;justify-content:space-between;background:#131d2e;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 12px;margin-bottom:7px;cursor:pointer}
+.tornopt.sel{border-color:rgba(255,215,0,.4);background:rgba(255,215,0,.05)}
+.tornleft{display:flex;align-items:center;gap:10px}
+.tornicon{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center}
+.tornicon svg{width:15px;height:15px}
+.tornnm{font-size:13px;font-weight:600;color:#f0f4ff}
+.tornsub{font-size:10px;color:#7a8499;margin-top:1px}
+.rdot{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rdot.chk{border-color:#FFD700}
+.rinner{width:8px;height:8px;border-radius:50%;background:#FFD700}
+
+/* STEPPER */
+.stepper{display:flex;align-items:center;justify-content:center;margin-bottom:18px;padding-top:4px}
+.step{display:flex;flex-direction:column;align-items:center;gap:4px}
+.snum{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;font-family:'Outfit',sans-serif}
+.snum.done{background:#FFD700;color:#080c10}
+.snum.act{background:#FFD700;color:#080c10}
+.snum.pend{background:#1a2540;color:#4a5568;border:1px solid rgba(255,255,255,.07)}
+.slbl{font-size:10px;font-weight:500;color:#4a5568}
+.slbl.act{color:#FFD700}
+.sline{width:32px;height:2px;margin-bottom:14px;flex-shrink:0}
+.sline.done{background:#FFD700}
+.sline.pend{background:#1a2540}
+
+/* PROFILE */
+.statrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.statcard{background:#0e1420;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 6px;text-align:center}
+.statnum{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.05em;color:#FFD700;line-height:1}
+.statlbl{font-size:10px;color:#7a8499;margin-top:3px}
+.profcard{background:#0e1420;border:1px solid rgba(255,255,255,.06);border-radius:18px;padding:20px;display:flex;flex-direction:column;align-items:center;margin-bottom:10px;gap:6px}
+.avring{width:70px;height:70px;border-radius:50%;border:2px solid rgba(255,215,0,.4);padding:3px}
+.avinner{width:100%;height:100%;border-radius:50%;background:#1a2540;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.profname{font-size:17px;font-weight:700;color:#f0f4ff;display:flex;align-items:center;gap:6px}
+.editbtn{background:rgba(255,215,0,.1);border:none;border-radius:5px;padding:3px 5px;cursor:pointer}
+.editbtn svg{width:11px;height:11px;stroke:#FFD700;fill:none;stroke-width:2;display:block}
+.profph{font-size:11px;color:#7a8499;display:flex;align-items:center;gap:4px}
+.ptrow{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.ptrow:last-child{border-bottom:none}
+.ptdesc{font-size:12px;color:#f0f4ff}
+.ptval{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.05em}
+.actrow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.actrow:last-child{border-bottom:none}
+.actmatch{font-size:12px;font-weight:600;color:#f0f4ff}
+.actpool{font-size:10px;color:#7a8499;margin-top:1px}
+.divider{height:10px}
+</style>
+</head>
+<body>
+<div class="page-title">
+  <h1>La Polla — UI Mockup v4</h1>
+  <p>Dot alineado · Banner táctil · Selector de pollas swipeable · (i) limpio</p>
+</div>
+<div class="screens-row">
+
+<!-- ══ SCREEN 1: INICIO ══ -->
+<div class="screen-col">
+<div class="screen-label">Inicio</div>
+<div class="phone">
+  <div class="sbar"><span class="stime">9:41</span><div class="sicons"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><path d="M1.5 8.5C5.36 4.64 10.45 2.5 12 2.5s6.64 2.14 10.5 6M4.5 11.5C7.6 8.4 9.85 7 12 7s4.4 1.4 7.5 4.5M10 17.5a2 2 0 014 0"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="M17 10h3v4h-3"/></svg></div></div>
+  <div class="sbody">
+    <div class="homerow"><div class="logorow"><svg viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg><span>La Polla</span></div><div class="avsm"><svg width="28" height="28" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#1a2540"/><circle cx="50" cy="38" r="18" fill="#FFD700" opacity=".85"/><ellipse cx="50" cy="82" rx="24" ry="20" fill="#FFD700" opacity=".65"/></svg></div></div>
+    <div class="hblock"><div class="hsub">Hola,</div><div class="hname"><span>Santiago</span></div><div class="hq">¿Listo pa' pronosticar?</div></div>
+
+    <!-- LIVE BANNER — swipeable -->
+    <div class="live-section">
+      <div class="live-section-head"><span class="live-section-title">Partidos en curso</span><span class="live-indicator"><span class="ldot-red"></span>En Vivo</span></div>
+      <div class="live-track-wrap">
+        <div class="live-track">
+          <div class="live-card">
+            <div class="lc-head"><div class="lc-live"><span class="ldot-red"></span>Vivo</div><div class="lc-time">45'</div></div>
+            <div class="lc-teams">
+              <div class="lc-team"><div class="lc-logo">COL</div><div class="lc-tname">Colombia</div></div>
+              <div class="lc-score-block"><div class="lc-digits"><span>1</span><span class="lc-sep">–</span><span>0</span></div></div>
+              <div class="lc-team"><div class="lc-logo">BRA</div><div class="lc-tname">Brasil</div></div>
+            </div>
+            <div class="lc-pred">Tu pred: <span class="miss">2–1</span></div>
+          </div>
+          <div class="live-card">
+            <div class="lc-head"><div class="lc-live"><span class="ldot-red"></span>Vivo</div><div class="lc-time">67'</div></div>
+            <div class="lc-teams">
+              <div class="lc-team"><div class="lc-logo">ARG</div><div class="lc-tname">Argentina</div></div>
+              <div class="lc-score-block"><div class="lc-digits"><span>2</span><span class="lc-sep">–</span><span>2</span></div></div>
+              <div class="lc-team"><div class="lc-logo">FRA</div><div class="lc-tname">Francia</div></div>
+            </div>
+            <div class="lc-pred">Tu pred: <span class="hit">2–2</span> ✓</div>
+          </div>
+          <div class="live-card fin">
+            <div class="lc-head"><div class="lc-live" style="color:#4a5568"><span style="width:6px;height:6px;border-radius:50%;background:#3a4454;display:inline-block"></span>Final</div><div class="lc-time">90'</div></div>
+            <div class="lc-teams">
+              <div class="lc-team"><div class="lc-logo">ESP</div><div class="lc-tname">España</div></div>
+              <div class="lc-score-block"><div class="lc-digits fin"><span>3</span><span class="lc-sep">–</span><span>1</span></div></div>
+              <div class="lc-team"><div class="lc-logo">POR</div><div class="lc-tname">Portugal</div></div>
+            </div>
+            <div class="lc-pred" style="color:#ff3d57">Tu pred: 1–1</div>
+          </div>
+          <div class="live-card">
+            <div class="lc-head"><div class="lc-live"><span class="ldot-red"></span>Vivo</div><div class="lc-time">22'</div></div>
+            <div class="lc-teams">
+              <div class="lc-team"><div class="lc-logo">MEX</div><div class="lc-tname">México</div></div>
+              <div class="lc-score-block"><div class="lc-digits"><span>0</span><span class="lc-sep">–</span><span>0</span></div></div>
+              <div class="lc-team"><div class="lc-logo">USA</div><div class="lc-tname">USA</div></div>
+            </div>
+            <div class="lc-pred">Tu pred: <span>1–0</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POLLAS SELECTOR swipeable -->
+    <div class="shead"><span class="shead-t">Mis pollas</span></div>
+    <div class="pollas-selector-wrap">
+      <div class="pollas-selector">
+        <div class="polla-tab active">
+          <div class="pt-top"><div class="pt-tournament"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6baaf5" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 010 18M3 12h18"/></svg>Mundial 26</div><span class="dot-active"></span></div>
+          <div class="pt-name">Polla con la novia</div>
+          <div class="pt-meta"><span>4</span> jugadores · <span>$10.000</span></div>
+        </div>
+        <div class="polla-tab">
+          <div class="pt-top"><div class="pt-tournament"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#a0a8ff" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>Champions</div><span class="dot-active"></span></div>
+          <div class="pt-name">Test champions</div>
+          <div class="pt-meta"><span>5</span> jugadores · <span>$10.000</span></div>
+        </div>
+        <div class="polla-tab">
+          <div class="pt-top"><div class="pt-tournament"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6baaf5" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 010 18M3 12h18"/></svg>Mundial 26</div><span class="dot-active"></span></div>
+          <div class="pt-name">test mundial2</div>
+          <div class="pt-meta"><span>0</span> jugadores · <span>$1.000</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div class="lbbox">
+      <div class="lb-title">Tabla — Polla con la novia</div>
+      <div class="lbrow"><div class="lbpos" style="color:#FFD700">1</div><div class="lbav" style="background:rgba(255,215,0,.12);color:#FFD700;border-color:rgba(255,215,0,.2)">ST</div><div class="lbnm">Santiago</div><div class="lbpt">12</div><span class="lbu">pts</span></div>
+      <div class="lbrow"><div class="lbpos" style="color:#b0b8c8">2</div><div class="lbav">VA</div><div class="lbnm">Valentina</div><div class="lbpt" style="color:#b0b8c8">9</div><span class="lbu">pts</span></div>
+      <div class="lbrow"><div class="lbpos" style="color:#c28a4a">3</div><div class="lbav">CA</div><div class="lbnm">Camilo</div><div class="lbpt" style="color:#c28a4a">7</div><span class="lbu">pts</span></div>
+      <div class="lbrow"><div class="lbpos" style="color:#4a5568">4</div><div class="lbav">MR</div><div class="lbnm">Mariana</div><div class="lbpt" style="color:#4a5568">4</div><span class="lbu">pts</span></div>
+    </div>
+  </div>
+  <div class="bnav">
+    <div class="ntab on"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Inicio</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>Explorar</span></div>
+    <div class="nfab-col"><div class="nfab"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><span class="nfab-lbl">Crear</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg><span>Pollas</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Perfil</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ SCREEN 2: EXPLORAR ══ -->
+<div class="screen-col">
+<div class="screen-label">Explorar</div>
+<div class="phone">
+  <div class="sbar"><span class="stime">9:41</span><div class="sicons"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><path d="M1.5 8.5C5.36 4.64 10.45 2.5 12 2.5s6.64 2.14 10.5 6M4.5 11.5C7.6 8.4 9.85 7 12 7s4.4 1.4 7.5 4.5M10 17.5a2 2 0 014 0"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="M17 10h3v4h-3"/></svg></div></div>
+  <div class="sbody">
+    <div class="pgtitle"><svg viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Explorar pollas</div>
+    <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>Buscar por nombre...</span></div>
+    <div class="chips">
+      <span class="chipon"><span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg></span>Todos</span>
+      <span class="chipoff"><span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#6baaf5" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 010 18M3 12h18"/></svg></span>Mundial 26</span>
+      <span class="chipoff"><span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#a0a8ff" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg></span>Champions</span>
+      <span class="chipoff"><span class="chip-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#4dd9a0" stroke-width="2"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.5C16.5 22.15 20 17.25 20 12V6l-8-4z"/></svg></span>Liga BetPlay</span>
+    </div>
+
+    <div class="pcard"><div class="ctop"><div class="ctournament"><span class="tico"><svg viewBox="0 0 24 24" fill="none" stroke="#6baaf5" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 010 18M3 12h18"/></svg></span><span class="tname">Mundial 2026</span></div><div class="ctop-right"><span class="dot-active"></span><svg class="carrow" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div><div class="cname">Polla oficina Ecopetrol</div><div class="cfoot"><div class="cfoot-item"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>12</div><div class="cfoot-sep"></div><span class="cfoot-amt">$20.000</span><div class="cfoot-sep"></div><span class="cfoot-vis">Pública</span></div></div>
+    <div class="pcard"><div class="ctop"><div class="ctournament"><span class="tico"><svg viewBox="0 0 24 24" fill="none" stroke="#a0a8ff" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg></span><span class="tname" style="color:#8a90cc">Champions League</span></div><div class="ctop-right"><span class="dot-active"></span><svg class="carrow" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div><div class="cname">UCL Final — Los del Sur</div><div class="cfoot"><div class="cfoot-item"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>31</div><div class="cfoot-sep"></div><span class="cfoot-amt">$15.000</span><div class="cfoot-sep"></div><span class="cfoot-vis">Pública</span></div></div>
+    <div class="pcard"><div class="ctop"><div class="ctournament"><span class="tico"><svg viewBox="0 0 24 24" fill="none" stroke="#6baaf5" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 010 18M3 12h18"/></svg></span><span class="tname">Mundial 2026</span></div><div class="ctop-right"><span class="dot-active"></span><svg class="carrow" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div><div class="cname">test mundial fase de grupos</div><div class="cfoot"><div class="cfoot-item"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>0</div><div class="cfoot-sep"></div><span class="cfoot-amt">$1.000</span><div class="cfoot-sep"></div><span class="cfoot-vis">Pública</span></div></div>
+    <div class="pcard"><div class="ctop"><div class="ctournament"><span class="tico"><svg viewBox="0 0 24 24" fill="none" stroke="#4dd9a0" stroke-width="2"><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.5C16.5 22.15 20 17.25 20 12V6l-8-4z"/></svg></span><span class="tname" style="color:#4a7a6a">Liga BetPlay</span></div><div class="ctop-right"><span class="dot-active"></span><svg class="carrow" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div><div class="cname">Polla BetPlay Apertura</div><div class="cfoot"><div class="cfoot-item"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>7</div><div class="cfoot-sep"></div><span class="cfoot-amt">$5.000</span><div class="cfoot-sep"></div><span class="cfoot-vis">Privada</span></div></div>
+  </div>
+  <div class="bnav">
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Inicio</span></div>
+    <div class="ntab on"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>Explorar</span></div>
+    <div class="nfab-col"><div class="nfab"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><span class="nfab-lbl">Crear</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg><span>Pollas</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Perfil</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ SCREEN 3: MIS POLLAS ══ -->
+<div class="screen-col">
+<div class="screen-label">Mis Pollas</div>
+<div class="phone">
+  <div class="sbar"><span class="stime">9:41</span><div class="sicons"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><path d="M1.5 8.5C5.36 4.64 10.45 2.5 12 2.5s6.64 2.14 10.5 6M4.5 11.5C7.6 8.4 9.85 7 12 7s4.4 1.4 7.5 4.5M10 17.5a2 2 0 014 0"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="M17 10h3v4h-3"/></svg></div></div>
+  <div class="sbody">
+    <div class="pgtitle"><svg viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg>Mis Pollas</div>
+    <div class="tabsw"><button class="tbon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>Activas</button><button class="tboff"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Terminadas</button></div>
+
+    <div class="pcard hi"><div class="ctop"><div class="ctournament"><span class="tico"><svg viewBox="0 0 24 24" fill="none" stroke="#a0a8ff" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg></span><span class="tname" style="color:#8a90cc">Champions League</span></div><div class="ctop-right"><span class="dot-active"></span><svg class="carrow" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div><div class="cname">Test champions</div><div class="cfoot"><div class="cfoot-item"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>5</div><div class="cfoot-sep"></div><span class="cfoot-amt">$10.000</span><div class="cfoot-sep"></div><span class="cfoot-vis">Privada</span></div></div>
+    <div class="pcard"><div class="ctop"><div class="ctournament"><span class="tico"><svg viewBox="0 0 24 24" fill="none" stroke="#6baaf5" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 010 18M3 12h18"/></svg></span><span class="tname">Mundial 2026</span></div><div class="ctop-right"><span class="dot-active"></span><svg class="carrow" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div><div class="cname">Polla con la novia</div><div class="cfoot"><div class="cfoot-item"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>4</div><div class="cfoot-sep"></div><span class="cfoot-amt">$10.000</span><div class="cfoot-sep"></div><span class="cfoot-vis">Pública</span></div></div>
+    <div class="pcard"><div class="ctop"><div class="ctournament"><span class="tico"><svg viewBox="0 0 24 24" fill="none" stroke="#6baaf5" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 010 18M3 12h18"/></svg></span><span class="tname">Mundial 2026</span></div><div class="ctop-right"><span class="dot-active"></span><svg class="carrow" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div><div class="cname">test mundial2</div><div class="cfoot"><div class="cfoot-item"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>0</div><div class="cfoot-sep"></div><span class="cfoot-amt">$1.000</span><div class="cfoot-sep"></div><span class="cfoot-vis">Pública</span></div></div>
+    <div class="pcard"><div class="ctop"><div class="ctournament"><span class="tico"><svg viewBox="0 0 24 24" fill="none" stroke="#6baaf5" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a15 15 0 010 18M3 12h18"/></svg></span><span class="tname">Mundial 2026</span></div><div class="ctop-right"><span class="dot-active"></span><svg class="carrow" viewBox="0 0 24 24" fill="none" stroke="#4a5568" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div></div><div class="cname">test full polla mundial</div><div class="cfoot"><div class="cfoot-item"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>2</div><div class="cfoot-sep"></div><span class="cfoot-amt">$9.000</span><div class="cfoot-sep"></div><span class="cfoot-vis">Pública</span></div></div>
+    <button class="btnp" style="margin-top:8px"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Crear nueva polla</button>
+    <div class="divider"></div>
+  </div>
+  <div class="bnav">
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Inicio</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>Explorar</span></div>
+    <div class="nfab-col"><div class="nfab"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><span class="nfab-lbl">Crear</span></div>
+    <div class="ntab on"><svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg><span>Pollas</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Perfil</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ SCREEN 4: PERFIL ══ -->
+<div class="screen-col">
+<div class="screen-label">Perfil</div>
+<div class="phone">
+  <div class="sbar"><span class="stime">9:41</span><div class="sicons"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><path d="M1.5 8.5C5.36 4.64 10.45 2.5 12 2.5s6.64 2.14 10.5 6M4.5 11.5C7.6 8.4 9.85 7 12 7s4.4 1.4 7.5 4.5M10 17.5a2 2 0 014 0"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="M17 10h3v4h-3"/></svg></div></div>
+  <div class="sbody">
+    <div class="pgtitle" style="justify-content:center;padding-bottom:10px;">Mi Perfil</div>
+    <div class="profcard"><div class="avring"><div class="avinner"><svg width="62" height="62" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="#1a2540"/><circle cx="50" cy="38" r="20" fill="#FFD700" opacity=".9"/><circle cx="43" cy="36" r="3.5" fill="#080c10"/><circle cx="57" cy="36" r="3.5" fill="#080c10"/><path d="M43 46 Q50 53 57 46" stroke="#080c10" stroke-width="2.5" fill="none" stroke-linecap="round"/><ellipse cx="50" cy="84" rx="26" ry="20" fill="#FFD700" opacity=".7"/></svg></div></div><div class="profname">Santiago<button class="editbtn"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></div><div class="profph"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#7a8499" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="17" r="1"/></svg>351 934 255 581</div></div>
+    <div class="statrow"><div class="statcard"><div class="statnum">4</div><div class="statlbl">Pollas</div></div><div class="statcard"><div class="statnum">24</div><div class="statlbl">Pronósticos</div></div><div class="statcard"><div class="statnum" style="font-size:20px">1°</div><div class="statlbl">Mejor pos.</div></div></div>
+    <div class="fsec">
+      <div class="fstitle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Actividad reciente</div>
+      <div class="actrow"><div><div class="actmatch">Colombia vs Brasil</div><div class="actpool">Polla con la novia</div></div><div style="text-align:right"><div class="statnum" style="font-size:20px;color:#00e676">+5</div><div style="font-size:9px;color:#7a8499">pts</div></div></div>
+      <div class="actrow"><div><div class="actmatch">Argentina vs Francia</div><div class="actpool">Test champions</div></div><div style="text-align:right"><div class="statnum" style="font-size:20px">+3</div><div style="font-size:9px;color:#7a8499">pts</div></div></div>
+      <div class="actrow"><div><div class="actmatch">España vs Portugal</div><div class="actpool">test mundial2</div></div><div style="text-align:right"><div class="statnum" style="font-size:20px;color:#4a5568">+0</div><div style="font-size:9px;color:#7a8499">pts</div></div></div>
+    </div>
+    <div class="fsec">
+      <div class="fstitle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>¿Cómo se puntúa?</div>
+      <div class="ptrow"><span class="ptdesc">Resultado exacto</span><span class="ptval" style="color:#FFD700">5 pts</span></div>
+      <div class="ptrow"><span class="ptdesc">Ganador + diferencia</span><span class="ptval" style="color:#f0f4ff">3 pts</span></div>
+      <div class="ptrow"><span class="ptdesc">Ganador correcto</span><span class="ptval" style="color:#f0f4ff">2 pts</span></div>
+      <div class="ptrow"><span class="ptdesc">Goles de un equipo</span><span class="ptval" style="color:#f0f4ff">1 pt</span></div>
+      <div class="ptrow"><span class="ptdesc">Sin aciertos</span><span class="ptval" style="color:#4a5568">0 pts</span></div>
+    </div>
+    <button class="btnout">Cerrar sesión</button>
+    <div style="height:16px"></div>
+  </div>
+  <div class="bnav">
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Inicio</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>Explorar</span></div>
+    <div class="nfab-col"><div class="nfab"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><span class="nfab-lbl">Crear</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg><span>Pollas</span></div>
+    <div class="ntab on"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Perfil</span></div>
+  </div>
+</div>
+</div>
+
+<!-- ══ SCREEN 5: CREAR POLLA ══ -->
+<div class="screen-col">
+<div class="screen-label">Crear Polla</div>
+<div class="phone">
+  <div class="sbar"><span class="stime">9:41</span><div class="sicons"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><path d="M1.5 8.5C5.36 4.64 10.45 2.5 12 2.5s6.64 2.14 10.5 6M4.5 11.5C7.6 8.4 9.85 7 12 7s4.4 1.4 7.5 4.5M10 17.5a2 2 0 014 0"/></svg><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f4ff" stroke-width="1.8"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="M17 10h3v4h-3"/></svg></div></div>
+  <div class="sbody">
+    <div class="pgtitle"><button style="background:none;border:none;cursor:pointer;padding:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7a8499" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg></button>Crear nueva polla</div>
+    <div class="stepper">
+      <div class="step"><div class="snum done"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#080c10" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><div class="slbl act">Info</div></div>
+      <div class="sline done"></div>
+      <div class="step"><div class="snum act">2</div><div class="slbl act">Alcance</div></div>
+      <div class="sline pend"></div>
+      <div class="step"><div class="snum pend">3</div><div class="slbl">Pago</div></div>
+    </div>
+    <div class="fsec">
+      <div class="fstitle">Visibilidad</div>
+      <div class="tornopt sel"><div class="tornleft"><div class="tornicon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg></div><div><div class="tornnm">Pública</div><div class="tornsub">Cualquiera puede unirse</div></div></div><div class="rdot chk"><div class="rinner"></div></div></div>
+      <div class="tornopt"><div class="tornleft"><div class="tornicon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7a8499" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div><div><div class="tornnm" style="color:#7a8499">Privada</div><div class="tornsub">Solo con invitación</div></div></div><div class="rdot"></div></div>
+    </div>
+    <div class="fsec">
+      <!-- (i) bare icon, no bubble -->
+      <div class="fstitle">
+        Cuota de entrada <span style="color:#ff3d57">*</span>
+        <span class="info-icon" title="Cuota por persona — cada participante paga este valor al unirse">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        </span>
+      </div>
+      <div class="flabel">Mínimo $1.000 · por persona</div>
+      <div class="amtchips">
+        <span class="amtchip">$10.000</span>
+        <span class="amtchip sel">$50.000</span>
+        <span class="amtchip">$100.000</span>
+        <span class="amtchip">Otro valor</span>
+      </div>
+      <input class="finput" type="text" value="$50.000" placeholder="Ej: $50.000">
+    </div>
+    <div class="btnrow"><button class="btns">Atrás</button><button class="btnp" style="flex:2">Continuar<svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button></div>
+  </div>
+  <div class="bnav">
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Inicio</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><span>Explorar</span></div>
+    <div class="nfab-col"><div class="nfab"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><span class="nfab-lbl">Crear</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0012 0V2z"/></svg><span>Pollas</span></div>
+    <div class="ntab"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Perfil</span></div>
+  </div>
+</div>
+</div>
+
+</div>
+</body>
+</html>

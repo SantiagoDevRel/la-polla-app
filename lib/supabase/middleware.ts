@@ -40,7 +40,8 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith(route)
   );
   const isApiWebhook = request.nextUrl.pathname.startsWith("/api/whatsapp/webhook") ||
-    request.nextUrl.pathname.startsWith("/api/matches/sync");
+    request.nextUrl.pathname.startsWith("/api/matches/sync") ||
+    request.nextUrl.pathname.startsWith("/api/admin/");
 
   if (!user && !isPublicRoute && !isApiWebhook) {
     const url = request.nextUrl.clone();

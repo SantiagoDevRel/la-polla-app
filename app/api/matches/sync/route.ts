@@ -1,7 +1,7 @@
-// app/api/matches/sync/route.ts — Admin endpoint para sincronizar partidos desde API-Football
-// Solo accesible con CRON_SECRET header para evitar llamadas no autorizadas
+// app/api/matches/sync/route.ts — Endpoint para sincronizar partidos desde football-data.org
+// Acepta competitionId (football-data.org) o leagueId+season (legacy API-Football)
 import { NextRequest, NextResponse } from "next/server";
-import { syncLeague } from "@/lib/api-football/sync";
+import { syncCompetition, COMPETITIONS } from "@/lib/football-data/sync";
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
@@ -11,20 +11,48 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const { leagueId, season } = body as { leagueId?: number; season?: number };
+  const { competitionId, tournament, status } = body as {
+    competitionId?: number;
+    tournament?: string;
+    status?: string;
+    // Legacy fields (ignored now)
+    leagueId?: number;
+    season?: number;
+  };
 
-  if (!leagueId || !season) {
-    return NextResponse.json(
-      { error: "leagueId y season son requeridos" },
-      { status: 400 }
-    );
+  // If competitionId provided, sync that specific competition
+  if (competitionId && tournament) {
+    try {
+      const result = await syncCompetition(competitionId, tournament, status);
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error("[sync route] Error:", error);
+      return NextResponse.json({ error: "Error en sync" }, { status: 500 });
+    }
   }
 
-  try {
-    const result = await syncLeague(leagueId, season);
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error("Sync error:", error);
-    return NextResponse.json({ error: "Error en sync" }, { status: 500 });
+  // Fallback: try to find competition by legacy leagueId
+  const legacyLeagueId = body.leagueId;
+  if (legacyLeagueId) {
+    // Map legacy API-Football IDs to football-data.org
+    const legacyMap: Record<number, { id: number; tournament: string }> = {
+      2: { id: 2001, tournament: "champions_2025" },   // UCL
+      1: { id: 2000, tournament: "worldcup_2026" },     // World Cup (FIFA ID in football-data)
+    };
+    const mapped = legacyMap[legacyLeagueId];
+    if (mapped) {
+      try {
+        const result = await syncCompetition(mapped.id, mapped.tournament, status);
+        return NextResponse.json(result);
+      } catch (error) {
+        console.error("[sync route] Error:", error);
+        return NextResponse.json({ error: "Error en sync" }, { status: 500 });
+      }
+    }
   }
+
+  return NextResponse.json(
+    { error: "competitionId y tournament son requeridos", availableCompetitions: COMPETITIONS },
+    { status: 400 }
+  );
 }

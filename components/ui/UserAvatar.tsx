@@ -16,10 +16,6 @@ const SIZES = {
   xl: "w-20 h-20",
 };
 
-function getDicebearUrl(seed: string) {
-  return `https://api.dicebear.com/9.x/adventurer/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`;
-}
-
 export default function UserAvatar({
   userId,
   avatarUrl,
@@ -27,7 +23,8 @@ export default function UserAvatar({
   size = "md",
   className = "",
 }: UserAvatarProps) {
-  const src = avatarUrl || getDicebearUrl(userId);
+  // Temporary: all users get the same pollito logo until more variants are added
+  const src = "/pollitos/logo.png";
   const alt = displayName || "Avatar";
 
   return (
