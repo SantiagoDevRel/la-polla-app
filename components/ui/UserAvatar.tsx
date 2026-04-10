@@ -1,39 +1,39 @@
-// components/ui/UserAvatar.tsx — Avatar con Dicebear fallback
-// Usa avatar_url si existe, sino genera un avatar Dicebear con el UUID como seed
+// components/ui/UserAvatar.tsx — Pollito avatar component
+// Uses avatar_url (pollito type string) from users table to render the correct pollito
+
+import { getPollitoBase } from "@/lib/pollitos";
 
 interface UserAvatarProps {
-  userId: string;
   avatarUrl?: string | null;
   displayName?: string;
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }
 
-const SIZES = {
-  sm: "w-8 h-8",
-  md: "w-10 h-10",
-  lg: "w-12 h-12",
-  xl: "w-20 h-20",
+const SIZES: Record<string, { css: string; px: number }> = {
+  sm: { css: "w-8 h-8", px: 32 },
+  md: { css: "w-10 h-10", px: 40 },
+  lg: { css: "w-12 h-12", px: 48 },
+  xl: { css: "w-20 h-20", px: 80 },
 };
 
 export default function UserAvatar({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  userId: _userId,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  avatarUrl: _avatarUrl,
+  avatarUrl,
   displayName,
   size = "md",
   className = "",
 }: UserAvatarProps) {
-  // Temporary: all users get the same pollito logo until more variants are added
-  const src = "/pollitos/logo.png";
+  const src = getPollitoBase(avatarUrl);
   const alt = displayName || "Avatar";
+  const s = SIZES[size] || SIZES.md;
 
   return (
     <img
       src={src}
       alt={alt}
-      className={`${SIZES[size]} rounded-full object-cover flex-shrink-0 ${className}`}
+      width={s.px}
+      height={s.px}
+      className={`${s.css} rounded-full object-cover flex-shrink-0 ${className}`}
     />
   );
 }
