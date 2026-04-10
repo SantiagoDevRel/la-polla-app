@@ -377,4 +377,29 @@ Before writing any component:
 
 ---
 
-*Last updated: 2026-04-09 | To update: say "update UI system" in Claude.ai chat*
+---
+
+## Rule: Season/Date Verification
+
+Before any API call that fetches fixtures or match data, always verify the current season is correct.
+
+- Get current year dynamically: `new Date().getFullYear()`
+- For competitions that span two years (Champions League, Europa League), use the season that started in the current academic year:
+  - If current month >= 6 (June): season = currentYear
+  - If current month < 6 (January–May): season = currentYear - 1
+  - Example: April 2026 → season = 2025 (the 2025/26 UCL season started in 2025)
+- For competitions that run within a single calendar year (World Cup, Copa América): season = currentYear
+- Never hardcode a season year. Always derive it from the current date.
+- When in doubt, log the season being used so it's visible in Vercel logs.
+
+### Active Tournaments (Production)
+
+Only two tournaments are active in production:
+- **Champions League** — API-Football league ID: 2
+- **FIFA World Cup 2026** — API-Football league ID: 1
+
+All UI (crear polla, explorar, etc.) should only show these two. Admin page keeps full access.
+
+---
+
+*Last updated: 2026-04-10 | To update: say "update UI system" in Claude.ai chat*

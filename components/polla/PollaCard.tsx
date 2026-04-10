@@ -24,7 +24,6 @@ interface PollaCardProps {
 const TOURNAMENT_LABELS: Record<string, string> = {
   worldcup_2026: "🌍 Mundial 26",
   champions_2025: "⭐ Champions",
-  liga_betplay_2025: "🇨🇴 BetPlay",
 };
 
 

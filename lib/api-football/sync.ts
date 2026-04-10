@@ -38,11 +38,35 @@ function getSupabaseAdmin() {
 /** FIFA World Cup league ID en API-Football */
 const WORLD_CUP_LEAGUE_ID = 1;
 
-/** Temporada del Mundial 2026 */
-const WORLD_CUP_SEASON = 2026;
-
 /** Identificador del torneo en nuestra DB */
 const TOURNAMENT_ID = 'worldcup_2026';
+
+// ─────────────────────────────────────────
+// Cálculo dinámico de temporada
+// ─────────────────────────────────────────
+
+/** Ligas que abarcan dos años (temporada comienza en segundo semestre) */
+const MULTI_YEAR_LEAGUES = new Set([2, 3, 4, 5, 848]); // UCL, Europa League, top-5 ligas europeas
+
+/**
+ * Calcula la temporada correcta para una liga dada.
+ * - Ligas multi-año (UCL, etc.): si estamos >= junio, season = year actual; si < junio, season = year - 1
+ * - Ligas de año único (Mundial, Copa América): season = year actual
+ */
+export function getSeasonForLeague(leagueId: number): number {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-12
+
+  if (MULTI_YEAR_LEAGUES.has(leagueId)) {
+    const season = currentMonth >= 6 ? currentYear : currentYear - 1;
+    console.log(`[sync] Liga ${leagueId} (multi-año): mes=${currentMonth}, season=${season}`);
+    return season;
+  }
+
+  console.log(`[sync] Liga ${leagueId} (año único): season=${currentYear}`);
+  return currentYear;
+}
 
 // ─────────────────────────────────────────
 // 0. SYNC GENÉRICO POR LIGA
@@ -54,8 +78,8 @@ const TOURNAMENT_ID = 'worldcup_2026';
  */
 const TOURNAMENT_NAMES: Record<string, string> = {
   '1_2026': 'worldcup_2026',
-  '2_2024': 'champions_2025',       // Champions 2024-2025 season
-  '2_2025': 'champions_2026',       // Champions 2025-2026 season
+  '2_2024': 'champions_2025',       // Champions 2024-2025 season (started Aug 2024)
+  '2_2025': 'champions_2025',       // Champions 2025-2026 season — maps to same DB tournament
   '239_2025': 'liga_betplay_2025',
   '239_2024': 'liga_betplay_2024',
 };
@@ -82,14 +106,26 @@ export async function syncLeague(
   console.log(`[sync] Sincronizando league=${leagueId} season=${season} → tournament="${tournament}"`);
 
   // 1. Consultar API-Football por todos los fixtures de la liga/temporada
-  const fixtures = await apiFootballGet<ApiFootballFixture>('/fixtures', {
-    league: leagueId,
-    season,
-  });
+  let fixtures: ApiFootballFixture[];
+  try {
+    fixtures = await apiFootballGet<ApiFootballFixture>('/fixtures', {
+      league: leagueId,
+      season,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Manejar errores de suscripción o acceso gracefully
+    if (msg.includes('403') || msg.includes('subscription') || msg.includes('plan')) {
+      console.warn(`[sync] Liga ${leagueId} season ${season} requiere plan pago de API-Football: ${msg}`);
+      return { synced: 0, errors: 0, total: 0 };
+    }
+    throw err;
+  }
 
-  console.log(`[sync] API-Football devolvió ${fixtures.length} fixtures`);
+  console.log(`[sync] API-Football devolvió ${fixtures.length} fixtures para liga ${leagueId} season ${season}`);
 
   if (fixtures.length === 0) {
+    console.warn(`[sync] Fixtures no disponibles aun para liga ${leagueId} season ${season}`);
     return { synced: 0, errors: 0, total: 0 };
   }
 
@@ -165,10 +201,11 @@ export async function importMatches(): Promise<{
 }> {
   console.log('[sync] Iniciando importación de partidos del Mundial 2026...');
 
-  // 1. Consultar API-Football por todos los fixtures del Mundial 2026
+  // 1. Consultar API-Football por todos los fixtures del Mundial
+  const worldCupSeason = getSeasonForLeague(WORLD_CUP_LEAGUE_ID);
   const fixtures = await apiFootballGet<ApiFootballFixture>('/fixtures', {
     league: WORLD_CUP_LEAGUE_ID,
-    season: WORLD_CUP_SEASON,
+    season: worldCupSeason,
   });
 
   console.log(`[sync] API-Football devolvió ${fixtures.length} fixtures`);

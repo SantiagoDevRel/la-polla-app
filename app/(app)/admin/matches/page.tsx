@@ -12,12 +12,21 @@ import { motion } from "framer-motion";
 import { staggerContainer, fadeUp } from "@/lib/animations";
 import { ArrowLeft, RefreshCw, AlertTriangle } from "lucide-react";
 
+// Calcula la temporada dinámicamente
+function getCurrentSeason(leagueId: number): number {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const multiYear = [2, 3, 4, 5, 848]; // UCL, Europa, top ligas
+  return multiYear.includes(leagueId) ? (month >= 6 ? year : year - 1) : year;
+}
+
 // Ligas disponibles para sincronizar
 const LEAGUES = [
-  { id: 2, season: 2024, label: "Champions League 2024-2025", tournament: "champions_2025" },
-  { id: 1, season: 2026, label: "Copa del Mundo 2026", tournament: "worldcup_2026" },
-  { id: 239, season: 2025, label: "Liga BetPlay 2025", tournament: "liga_betplay_2025" },
-];
+  { id: 2, label: "Champions League", tournament: "champions", active: true },
+  { id: 1, label: "Copa del Mundo 2026", tournament: "worldcup_2026", active: true },
+  { id: 239, label: "Liga BetPlay", tournament: "liga_betplay", active: false },
+].map((l) => ({ ...l, season: getCurrentSeason(l.id) }));
 
 interface SyncResult {
   synced: number;
@@ -106,6 +115,9 @@ export default function AdminMatchesPage() {
           Sincroniza partidos desde API-Football. Cada sync hace upsert —
           no duplica partidos existentes.
         </p>
+        <div className="rounded-lg p-3 bg-blue-info/10 border border-blue-info/20 text-xs text-blue-info">
+          Solo Champions League (ID 2) y Mundial 2026 (ID 1) estan activos en produccion.
+        </div>
 
         <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
         {LEAGUES.map((league) => {

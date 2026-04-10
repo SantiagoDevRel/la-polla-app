@@ -32,11 +32,8 @@ interface FormState {
 // ─── Datos de configuración ───
 
 const TOURNAMENTS = [
+  { value: "champions_2025", label: "Champions League 2025-26", icon: "⭐", available: true },
   { value: "worldcup_2026", label: "Mundial 2026", icon: "🌍", available: true },
-  { value: "champions_2025", label: "Champions League 2024-25", icon: "⭐", available: true },
-  { value: "liga_betplay_2025", label: "Liga BetPlay 2025", icon: "🇨🇴", available: true },
-  { value: "la_liga", label: "La Liga", icon: "🇪🇸", available: false, tag: "Próximamente" },
-  { value: "premier_league", label: "Premier League", icon: "🏴\u200D", available: false, tag: "Próximamente" },
 ];
 
 const SCOPE_OPTIONS: {
@@ -100,7 +97,7 @@ export default function CrearPollaPage() {
   const [form, setForm] = useState<FormState>({
     name: "",
     description: "",
-    tournament: "worldcup_2026",
+    tournament: "champions_2025",
     type: "closed",
     scope: "full",
     buyInAmount: 10000,
@@ -279,36 +276,24 @@ export default function CrearPollaPage() {
                     <button
                       key={t.value}
                       type="button"
-                      disabled={!t.available}
-                      onClick={() => {
-                        if (t.available) updateForm("tournament", t.value);
-                      }}
-                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 flex items-center gap-3 ${
-                        !t.available
-                          ? "opacity-30 cursor-not-allowed border-border-subtle bg-bg-elevated"
-                          : isSelected
+                      onClick={() => updateForm("tournament", t.value)}
+                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 flex items-center gap-3 cursor-pointer ${
+                        isSelected
                           ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
-                          : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated cursor-pointer"
+                          : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated"
                       }`}
                     >
                       <span className="text-xl">{t.icon}</span>
                       <span className="font-medium text-text-primary flex-1">{t.label}</span>
-                      {!t.available && t.tag && (
-                        <span className="text-[10px] bg-bg-elevated text-text-muted px-2 py-0.5 rounded-full">
-                          {t.tag}
-                        </span>
-                      )}
-                      {t.available && (
-                        <div
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                            isSelected
-                              ? "border-gold bg-gold"
-                              : "border-border-medium"
-                          }`}
-                        >
-                          {isSelected && <div className="w-2 h-2 rounded-full bg-bg-base" />}
-                        </div>
-                      )}
+                      <div
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                          isSelected
+                            ? "border-gold bg-gold"
+                            : "border-border-medium"
+                        }`}
+                      >
+                        {isSelected && <div className="w-2 h-2 rounded-full bg-bg-base" />}
+                      </div>
                     </button>
                   );
                 })}
