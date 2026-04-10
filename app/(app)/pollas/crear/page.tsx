@@ -1,94 +1,71 @@
-// app/(app)/pollas/crear/page.tsx — Wizard de 3 pasos para crear una nueva polla
-// Paso 1: Información básica (nombre, descripción, torneo, tipo)
-// Paso 2: Alcance de la polla (full, group_stage, knockouts)
-// Paso 3: Modo de pago (admin_collects, digital_pool)
+// app/(app)/pollas/crear/page.tsx — Wizard de 4 pasos para crear una nueva polla
+// Paso 1: Info (nombre, torneo, tipo)
+// Paso 2: Partidos (selección de partidos del torneo)
+// Paso 3: Alcance (visibilidad, cuota de entrada)
+// Paso 4: Pago (modo de pago, instrucciones)
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, Construction, Trophy } from "lucide-react";
 import { formatCOP } from "@/lib/formatCurrency";
+import { TOURNAMENTS } from "@/lib/tournaments";
 
 // ─── Tipos ───
 
 type PaymentMode = "digital_pool" | "admin_collects";
-type Scope = "full" | "group_stage" | "knockouts" | "custom";
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 interface FormState {
   name: string;
   description: string;
   tournament: string;
   type: "open" | "closed";
-  scope: Scope;
   buyInAmount: number;
   paymentMode: PaymentMode;
   adminPaymentInstructions: string;
 }
 
+interface MatchRow {
+  id: string;
+  external_id: string;
+  tournament: string;
+  home_team: string;
+  away_team: string;
+  home_team_flag: string | null;
+  away_team_flag: string | null;
+  scheduled_at: string;
+  status: string;
+  home_score: number | null;
+  away_score: number | null;
+  match_day: number | null;
+  phase: string | null;
+  venue: string | null;
+}
+
 // ─── Datos de configuración ───
 
-const TOURNAMENTS = [
-  { value: "champions_2025", label: "Champions League", logo: "/tournaments/champions_league.svg" },
-  { value: "worldcup_2026", label: "Mundial 2026", logo: "/tournaments/world_cup.svg" },
-  { value: "la_liga_2025", label: "La Liga", logo: "/tournaments/la_liga.png" },
-  { value: "premier_league", label: "Premier League", logo: "/tournaments/premier_league.png" },
-  { value: "seria_a", label: "Serie A", logo: "/tournaments/seria_a.png" },
-];
-
-const SCOPE_OPTIONS: {
-  value: Scope;
-  title: string;
-  icon: string;
-  description: string;
-}[] = [
+const PAYMENT_MODE_OPTIONS = [
   {
-    value: "full",
-    title: "Torneo completo",
-    icon: "🏆",
-    description: "Todos los partidos del torneo. Más emoción, más pronósticos.",
-  },
-  {
-    value: "group_stage",
-    title: "Fase de grupos",
-    icon: "⚽",
-    description: "Solo los partidos de la fase de grupos.",
-  },
-  {
-    value: "knockouts",
-    title: "Eliminatorias",
-    icon: "🥊",
-    description: "Desde octavos hasta la final.",
-  },
-];
-
-const PAYMENT_MODE_OPTIONS: {
-  value: PaymentMode;
-  title: string;
-  icon: string;
-  description: string;
-  tag: string;
-}[] = [
-  {
-    value: "admin_collects",
+    value: "admin_collects" as PaymentMode,
     title: "Admin maneja el pozo",
     icon: "💰",
-    description:
-      "Cada participante le envia el dinero al admin (Nequi, Bancolombia, efectivo). El admin revisa y aprueba pagos.",
+    description: "Cada participante le envía el dinero al admin (Nequi, Bancolombia, efectivo).",
     tag: "Recomendado",
   },
   {
-    value: "digital_pool",
+    value: "digital_pool" as PaymentMode,
     title: "Plataforma acumula",
     icon: "📲",
-    description:
-      "Cada participante paga a traves de la plataforma. El pozo se libera automaticamente al ganador.",
-    tag: "Proximamente",
+    description: "Cada participante paga a través de la plataforma. El pozo se libera automáticamente.",
+    tag: "Próximamente",
   },
 ];
+
+type GroupBy = "date" | "jornada" | "phase";
 
 // ─── Componente principal ───
 
@@ -103,60 +80,146 @@ export default function CrearPollaPage() {
     description: "",
     tournament: "champions_2025",
     type: "closed",
-    scope: "full",
     buyInAmount: 10000,
     paymentMode: "admin_collects",
     adminPaymentInstructions: "",
   });
 
-  // Helper para actualizar un campo del form
+  // Match selection state
+  const [matches, setMatches] = useState<MatchRow[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [selectedMatchIds, setSelectedMatchIds] = useState<Set<string>>(new Set());
+  const [groupBy, setGroupBy] = useState<GroupBy>("date");
+
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Validación y navegación entre pasos
-  function goToStep(targetStep: Step) {
-    setError("");
-
-    // Validación antes de avanzar
-    if (targetStep > step) {
-      if (step === 1) {
-        if (form.name.trim().length < 3) {
-          setError("El nombre debe tener al menos 3 caracteres");
-          return;
-        }
-        if (!form.tournament) {
-          setError("Selecciona un torneo");
-          return;
-        }
+  // Fetch matches when tournament changes and we're on step 2
+  useEffect(() => {
+    if (step !== 2) return;
+    async function loadMatches() {
+      setMatchesLoading(true);
+      try {
+        const { data } = await axios.get(`/api/matches?tournament=${form.tournament}&status=scheduled`);
+        setMatches(data.matches || []);
+      } catch {
+        setMatches([]);
+      } finally {
+        setMatchesLoading(false);
       }
     }
+    loadMatches();
+  }, [step, form.tournament]);
 
+  // Group matches
+  const groupedMatches = useMemo(() => {
+    const groups: { key: string; label: string; matchIds: string[]; matches: MatchRow[] }[] = [];
+    const map = new Map<string, { label: string; matches: MatchRow[] }>();
+
+    for (const m of matches) {
+      let key: string;
+      let label: string;
+
+      if (groupBy === "date") {
+        const d = new Date(m.scheduled_at);
+        key = d.toISOString().split("T")[0];
+        label = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+        label = label.charAt(0).toUpperCase() + label.slice(1);
+      } else if (groupBy === "jornada") {
+        key = `md-${m.match_day ?? "sin"}`;
+        label = m.match_day ? `Jornada ${m.match_day}` : "Sin jornada";
+      } else {
+        key = m.phase || "unknown";
+        label = formatPhase(m.phase);
+      }
+
+      if (!map.has(key)) map.set(key, { label, matches: [] });
+      map.get(key)!.matches.push(m);
+    }
+
+    map.forEach(({ label, matches: ms }, key) => {
+      groups.push({ key, label, matchIds: ms.map((m: MatchRow) => m.id), matches: ms });
+    });
+
+    return groups;
+  }, [matches, groupBy]);
+
+  function formatPhase(phase: string | null): string {
+    const labels: Record<string, string> = {
+      group_stage: "Fase de grupos",
+      league_stage: "Fase de liga",
+      regular_season: "Temporada regular",
+      round_of_32: "Dieciseisavos",
+      round_of_16: "Octavos de final",
+      quarter_finals: "Cuartos de final",
+      semi_finals: "Semifinales",
+      final: "Final",
+      third_place: "Tercer puesto",
+      playoff: "Playoffs",
+    };
+    return labels[phase || ""] || phase || "Otros";
+  }
+
+  function toggleMatch(id: string) {
+    setSelectedMatchIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleGroup(matchIds: string[]) {
+    const allSelected = matchIds.every((id) => selectedMatchIds.has(id));
+    setSelectedMatchIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        matchIds.forEach((id) => next.delete(id));
+      } else {
+        matchIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedMatchIds(new Set(matches.map((m) => m.id)));
+  }
+
+  function deselectAll() {
+    setSelectedMatchIds(new Set());
+  }
+
+  // Validation and navigation
+  function goToStep(targetStep: Step) {
+    setError("");
+    if (targetStep > step) {
+      if (step === 1) {
+        if (form.name.trim().length < 3) { setError("El nombre debe tener al menos 3 caracteres"); return; }
+        if (!form.tournament) { setError("Selecciona un torneo"); return; }
+      }
+      if (step === 2) {
+        if (selectedMatchIds.size === 0) { setError("Selecciona al menos 1 partido"); return; }
+      }
+    }
     setStep(targetStep);
   }
 
-  // Submit final en paso 3
+  // Submit
   async function handleSubmit() {
     setError("");
-
-    // Validaciones del paso 3
-    if (form.buyInAmount < 1000) {
-      setError("El valor minimo es $1.000");
-      return;
-    }
-
-    if (
-      form.paymentMode === "admin_collects" &&
-      form.adminPaymentInstructions.trim() === ""
-    ) {
-      setError("Debes indicar instrucciones de pago para los participantes");
-      return;
+    if (form.buyInAmount < 1000) { setError("El valor mínimo es $1.000"); return; }
+    if (form.paymentMode === "admin_collects" && form.adminPaymentInstructions.trim() === "") {
+      setError("Debes indicar instrucciones de pago"); return;
     }
 
     setLoading(true);
-
     try {
-      const { data } = await axios.post("/api/pollas", form);
+      const { data } = await axios.post("/api/pollas", {
+        ...form,
+        scope: "custom",
+        matchIds: Array.from(selectedMatchIds),
+      });
       router.push(`/pollas/${data.polla.slug}`);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -166,65 +229,38 @@ export default function CrearPollaPage() {
     }
   }
 
-  // Determinar si el torneo seleccionado soporta múltiples scopes
-  // Solo World Cup tiene fase de grupos y eliminatorias separadas
-  const tournamentHasMultipleScopes = form.tournament === "worldcup_2026";
+  const STEP_LABELS = ["Info", "Partidos", "Alcance", "Pago"];
 
-  const STEP_LABELS = ["Info", "Alcance", "Pago"];
+  const tournamentMeta = TOURNAMENTS.find((t) => t.slug === form.tournament);
 
   return (
     <div className="min-h-screen">
-      {/* Header con indicador de progreso */}
-      <header
-        className="px-4 pt-4 pb-5"
-        style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}
-      >
+      {/* Header */}
+      <header className="px-4 pt-4 pb-5" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-4">
-            <button
-              onClick={() => (step === 1 ? router.back() : goToStep((step - 1) as Step))}
-              className="text-text-secondary hover:text-gold transition-colors"
-            >
+            <button onClick={() => (step === 1 ? router.back() : goToStep((step - 1) as Step))} className="text-text-secondary hover:text-gold transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <h1 className="text-lg font-bold text-text-primary">Crear nueva polla</h1>
           </div>
 
-          {/* Indicador de progreso: 3 círculos con líneas */}
+          {/* Stepper — 4 steps */}
           <div className="flex items-center justify-center gap-0">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex items-center">
-                {/* Círculo del paso */}
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center font-display text-base tracking-wide transition-all ${
-                    s < step
-                      ? "bg-green-live text-bg-base"
-                      : s === step
-                      ? "bg-gold text-bg-base shadow-[0_0_12px_rgba(255,215,0,0.3)]"
-                      : "bg-bg-elevated border border-border-subtle text-text-muted"
-                  }`}
-                >
-                  {s < step ? <Check className="w-4 h-4" /> : s}
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                  s < step ? "bg-green-live text-bg-base" : s === step ? "bg-gold text-bg-base shadow-[0_0_12px_rgba(255,215,0,0.3)]" : "bg-bg-elevated border border-border-subtle text-text-muted"
+                }`}>
+                  {s < step ? <Check className="w-3.5 h-3.5" /> : s}
                 </div>
-                {/* Línea entre círculos */}
-                {s < 3 && (
-                  <div
-                    className={`w-10 h-0.5 transition-colors ${
-                      s < step ? "bg-green-live" : "bg-border-subtle"
-                    }`}
-                  />
-                )}
+                {s < 4 && <div className={`w-6 h-0.5 transition-colors ${s < step ? "bg-green-live" : "bg-border-subtle"}`} />}
               </div>
             ))}
           </div>
-          <div className="flex justify-center gap-8 mt-1.5">
+          <div className="flex justify-center gap-4 mt-1">
             {STEP_LABELS.map((label, i) => (
-              <span
-                key={label}
-                className={`text-[10px] font-medium ${
-                  i + 1 === step ? "text-gold" : i + 1 < step ? "text-green-live" : "text-text-muted"
-                }`}
-              >
+              <span key={label} className={`text-[9px] font-medium ${i + 1 === step ? "text-gold" : i + 1 < step ? "text-green-live" : "text-text-muted"}`}>
                 {label}
               </span>
             ))}
@@ -233,69 +269,34 @@ export default function CrearPollaPage() {
       </header>
 
       <main className="max-w-lg mx-auto p-4">
-        {/* ════════════════════════════════════
-            PASO 1 — Información básica
-           ════════════════════════════════════ */}
+        {/* ═══ PASO 1 — Info ═══ */}
         {step === 1 && (
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Información básica</h2>
-
-              {/* Nombre */}
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Nombre de la polla <span className="text-red-alert">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => updateForm("name", e.target.value)}
-                  placeholder="Ej: Polla Mundial Oficina"
-                  className="w-full px-4 py-3 rounded-xl outline-none transition-colors duration-200 bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
-                />
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Nombre <span className="text-red-alert">*</span></label>
+                <input type="text" value={form.name} onChange={(e) => updateForm("name", e.target.value)} placeholder="Ej: Polla Mundial Oficina"
+                  className="w-full px-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50" />
               </div>
-
-              {/* Descripción */}
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">
-                  Descripción (opcional)
-                </label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => updateForm("description", e.target.value)}
-                  placeholder="Descripción de la polla..."
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-xl outline-none resize-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
-                />
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">Descripción (opcional)</label>
+                <textarea value={form.description} onChange={(e) => updateForm("description", e.target.value)} placeholder="Descripción..." rows={2}
+                  className="w-full px-4 py-3 rounded-xl outline-none resize-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50" />
               </div>
             </div>
 
-            {/* Torneo — tarjetas seleccionables */}
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Torneo <span className="text-red-alert">*</span></h2>
               <div className="space-y-2">
                 {TOURNAMENTS.map((t) => {
-                  const isSelected = form.tournament === t.value;
+                  const isSelected = form.tournament === t.slug;
                   return (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => updateForm("tournament", t.value)}
-                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 flex items-center gap-3 cursor-pointer ${
-                        isSelected
-                          ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
-                          : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated"
-                      }`}
-                    >
-                      <img src={t.logo} alt={t.label} width={24} height={24} style={{ objectFit: "contain", borderRadius: 4 }} />
-                      <span className="font-medium text-text-primary flex-1">{t.label}</span>
-                      <div
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                          isSelected
-                            ? "border-gold bg-gold"
-                            : "border-border-medium"
-                        }`}
-                      >
+                    <button key={t.slug} type="button" onClick={() => { updateForm("tournament", t.slug); setSelectedMatchIds(new Set()); }}
+                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 flex items-center gap-3 cursor-pointer ${isSelected ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated"}`}>
+                      <img src={t.logoPath} alt={t.name} width={24} height={24} style={{ objectFit: "contain", borderRadius: 4 }} />
+                      <span className="font-medium text-text-primary flex-1">{t.name}</span>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? "border-gold bg-gold" : "border-border-medium"}`}>
                         {isSelected && <div className="w-2 h-2 rounded-full bg-bg-base" />}
                       </div>
                     </button>
@@ -304,209 +305,266 @@ export default function CrearPollaPage() {
               </div>
             </div>
 
-            {/* Tipo: abierta o cerrada — dos tarjetas */}
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Tipo de polla</h2>
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => updateForm("type", "closed")}
-                  className={`p-4 rounded-xl border text-center transition-all duration-200 cursor-pointer ${
-                    form.type === "closed"
-                      ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
-                      : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated"
-                  }`}
-                >
-                  <span className="text-2xl block mb-1">🔒</span>
-                  <span className="font-bold text-sm text-text-primary block">Privada</span>
-                  <span className="text-xs text-text-muted">Solo por invitación</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateForm("type", "open")}
-                  className={`p-4 rounded-xl border text-center transition-all duration-200 cursor-pointer ${
-                    form.type === "open"
-                      ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
-                      : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated"
-                  }`}
-                >
-                  <span className="text-2xl block mb-1">🌐</span>
-                  <span className="font-bold text-sm text-text-primary block">Abierta</span>
-                  <span className="text-xs text-text-muted">Cualquiera con el link</span>
-                </button>
+                {[{ val: "closed" as const, label: "Privada", desc: "Solo por invitación", icon: "🔒" }, { val: "open" as const, label: "Abierta", desc: "Cualquiera con el link", icon: "🌐" }].map((opt) => (
+                  <button key={opt.val} type="button" onClick={() => updateForm("type", opt.val)}
+                    className={`p-4 rounded-xl border text-center transition-all cursor-pointer ${form.type === opt.val ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated"}`}>
+                    <span className="text-2xl block mb-1">{opt.icon}</span>
+                    <span className="font-bold text-sm text-text-primary block">{opt.label}</span>
+                    <span className="text-xs text-text-muted">{opt.desc}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Error y botón siguiente */}
-            {error && (
-              <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">
-                {error}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => goToStep(2)}
-              className="w-full bg-gold text-bg-base font-bold py-4 rounded-xl hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] transition-all duration-200 text-lg flex items-center justify-center gap-2 cursor-pointer"
-              style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
-            >
+            {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
+            <button type="button" onClick={() => goToStep(2)}
+              className="w-full bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all text-lg flex items-center justify-center gap-2 cursor-pointer"
+              style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}>
               Siguiente <ChevronRight className="w-5 h-5" />
             </button>
           </motion.div>
         )}
 
-        {/* ════════════════════════════════════
-            PASO 2 — Alcance de la polla
-           ════════════════════════════════════ */}
+        {/* ═══ PASO 2 — Partidos ═══ */}
         {step === 2 && (
-          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
-              <h2 className="text-base font-bold text-text-primary">Alcance de la polla</h2>
-              <p className="text-sm text-text-secondary">
-                Elige qué partidos se incluirán en los pronósticos
-              </p>
+          <div className="space-y-3 pb-20">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-text-primary">Selecciona los partidos</h2>
+                <p style={{ fontSize: 12, color: selectedMatchIds.size > 0 ? "#FFD700" : "#7a8499", fontWeight: selectedMatchIds.size > 0 ? 600 : 400 }}>
+                  {selectedMatchIds.size > 0 ? `${selectedMatchIds.size} partidos seleccionados` : "Ningún partido seleccionado"}
+                </p>
+              </div>
+              {tournamentMeta && <img src={tournamentMeta.logoPath} alt="" width={28} height={28} style={{ objectFit: "contain", opacity: 0.6 }} />}
+            </div>
 
-              <div className="space-y-3">
-                {SCOPE_OPTIONS.map((option) => {
-                  const isSelected = form.scope === option.value;
-                  // Solo World Cup muestra las 3 opciones, otros solo "full"
-                  const isAvailable =
-                    tournamentHasMultipleScopes || option.value === "full";
+            {/* Group filters */}
+            <div className="hide-scrollbar" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
+              {(["date", "jornada", "phase"] as GroupBy[]).map((g) => (
+                <button key={g} onClick={() => setGroupBy(g)} style={{
+                  borderRadius: 20, padding: "4px 10px", fontSize: 11, fontWeight: groupBy === g ? 600 : 500, cursor: "pointer", whiteSpace: "nowrap",
+                  background: groupBy === g ? "rgba(255,215,0,0.1)" : "#0e1420", color: groupBy === g ? "#FFD700" : "#4a5568",
+                  border: groupBy === g ? "1px solid rgba(255,215,0,0.22)" : "1px solid rgba(255,255,255,0.06)", fontFamily: "'Outfit', sans-serif",
+                }}>
+                  {{ date: "Por fecha", jornada: "Por jornada", phase: "Por fase" }[g]}
+                </button>
+              ))}
+            </div>
 
-                  if (!isAvailable) return null;
+            {/* Quick actions */}
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={selectAll} style={{ fontSize: 11, color: "#7a8499", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline" }}>
+                Seleccionar todo
+              </button>
+              <button onClick={deselectAll} style={{ fontSize: 11, color: "#7a8499", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline" }}>
+                Deseleccionar todo
+              </button>
+            </div>
 
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => updateForm("scope", option.value)}
-                      className={`w-full text-left p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
-                        isSelected
-                          ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
-                          : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated"
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl flex-shrink-0">{option.icon}</span>
-                        <div className="flex-1">
-                          <p className="font-bold text-text-primary">{option.title}</p>
-                          <p className="text-sm text-text-secondary leading-snug mt-0.5">
-                            {option.description}
-                          </p>
-                        </div>
-                        <div
-                          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-1 flex items-center justify-center transition-colors ${
-                            isSelected
-                              ? "border-gold bg-gold"
-                              : "border-border-medium"
-                          }`}
-                        >
-                          {isSelected && <div className="w-2 h-2 rounded-full bg-bg-base" />}
-                        </div>
+            {matchesLoading ? (
+              <div className="text-center py-8"><p className="text-text-muted text-sm">Cargando partidos...</p></div>
+            ) : matches.length === 0 ? (
+              <div className="text-center py-8 rounded-2xl bg-bg-card border border-border-subtle">
+                <p className="text-text-muted text-sm">No hay partidos programados para este torneo</p>
+              </div>
+            ) : (
+              groupedMatches.map((group) => {
+                const allGroupSelected = group.matchIds.every((id) => selectedMatchIds.has(id));
+                return (
+                  <div key={group.key}>
+                    {/* Group header */}
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "8px 0 6px", borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    }}>
+                      <div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#f0f4ff" }}>{group.label}</span>
+                        <span style={{ fontSize: 11, color: "#4a5568", marginLeft: 6 }}>· {group.matches.length} partidos</span>
                       </div>
-                    </button>
-                  );
-                })}
+                      <button onClick={() => toggleGroup(group.matchIds)} style={{
+                        fontSize: 10, color: allGroupSelected ? "#ff3d57" : "#FFD700", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontWeight: 600,
+                      }}>
+                        {allGroupSelected ? "Deseleccionar" : "Sel. todos"} →
+                      </button>
+                    </div>
+
+                    {/* Match rows */}
+                    {group.matches.map((m) => {
+                      const isChecked = selectedMatchIds.has(m.id);
+                      const time = new Date(m.scheduled_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+                      return (
+                        <div key={m.id} onClick={() => toggleMatch(m.id)} style={{
+                          display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", cursor: "pointer",
+                          borderBottom: "1px solid rgba(255,255,255,0.04)", background: isChecked ? "rgba(255,215,0,0.03)" : "transparent",
+                        }}>
+                          {/* Checkbox */}
+                          <div style={{
+                            width: 20, height: 20, borderRadius: 4, flexShrink: 0,
+                            border: isChecked ? "none" : "1px solid rgba(255,255,255,0.15)",
+                            background: isChecked ? "#FFD700" : "transparent",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            {isChecked && (
+                              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#080c10" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+                            )}
+                          </div>
+
+                          {/* Home team */}
+                          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                            {m.home_team_flag ? (
+                              <img src={m.home_team_flag} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                            ) : (
+                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#7a8499", flexShrink: 0 }}>
+                                {m.home_team.substring(0, 3).toUpperCase()}
+                              </div>
+                            )}
+                            <span style={{ fontSize: 12, fontWeight: 500, color: "#f0f4ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {m.home_team}
+                            </span>
+                          </div>
+
+                          <span style={{ fontSize: 10, color: "#4a5568", flexShrink: 0 }}>vs</span>
+
+                          {/* Away team */}
+                          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                            {m.away_team_flag ? (
+                              <img src={m.away_team_flag} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                            ) : (
+                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#7a8499", flexShrink: 0 }}>
+                                {m.away_team.substring(0, 3).toUpperCase()}
+                              </div>
+                            )}
+                            <span style={{ fontSize: 12, fontWeight: 500, color: "#f0f4ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {m.away_team}
+                            </span>
+                          </div>
+
+                          {/* Time */}
+                          <span style={{ fontSize: 10, color: "#7a8499", flexShrink: 0, minWidth: 36, textAlign: "right" }}>{time}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })
+            )}
+
+            {/* Sticky bottom bar */}
+            <div style={{
+              position: "fixed", bottom: 68, left: 0, right: 0, background: "#080c10", borderTop: "1px solid #1a2540", padding: "12px 16px",
+              display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 40,
+            }}>
+              <span style={{ fontSize: 12, color: selectedMatchIds.size > 0 ? "#f0f4ff" : "#4a5568" }}>
+                {selectedMatchIds.size > 0 ? `${selectedMatchIds.size} partidos` : "Ningún partido"}
+              </span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => goToStep(1)} style={{
+                  padding: "8px 14px", borderRadius: 10, background: "#131d2e", color: "#7a8499", border: "1px solid rgba(255,255,255,0.08)",
+                  fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit', sans-serif",
+                }}>
+                  Atrás
+                </button>
+                <button onClick={() => goToStep(3)} disabled={selectedMatchIds.size === 0} style={{
+                  padding: "8px 18px", borderRadius: 10, background: selectedMatchIds.size > 0 ? "#FFD700" : "rgba(255,215,0,0.3)", color: "#080c10",
+                  fontSize: 13, fontWeight: 700, cursor: selectedMatchIds.size > 0 ? "pointer" : "default", fontFamily: "'Outfit', sans-serif",
+                  opacity: selectedMatchIds.size === 0 ? 0.4 : 1, border: "none",
+                }}>
+                  Continuar →
+                </button>
               </div>
             </div>
 
-            {/* Nota informativa */}
+            {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
+          </div>
+        )}
+
+        {/* ═══ PASO 3 — Alcance (cuota + visibilidad) ═══ */}
+        {step === 3 && (
+          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
+            {/* Cuota de entrada */}
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
+              <div>
+                <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+                  Cuota de entrada <span className="text-red-alert">*</span>
+                  <span className="inline-flex items-center justify-center cursor-pointer" title="Cuota por persona" style={{ color: "#4a5568" }}>
+                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
+                  </span>
+                </h2>
+                <p style={{ fontSize: 11, color: "#7a8499", marginTop: 4 }}>Mínimo $1.000 · por persona</p>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[10000, 50000, 100000].map((amount) => {
+                  const isSel = form.buyInAmount === amount && !customBuyIn;
+                  return (
+                    <button key={amount} type="button" onClick={() => { updateForm("buyInAmount", amount); setCustomBuyIn(false); }}
+                      style={{ background: isSel ? "rgba(255,215,0,0.1)" : "#131d2e", border: isSel ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 8, padding: "6px 10px", color: isSel ? "#FFD700" : "#7a8499", fontSize: 12, fontWeight: isSel ? 700 : 500, cursor: "pointer", fontFamily: "'Outfit', sans-serif" }}>
+                      {formatCOP(amount)}
+                    </button>
+                  );
+                })}
+                <button type="button" onClick={() => { setCustomBuyIn(true); updateForm("buyInAmount", 0); }}
+                  style={{ background: customBuyIn ? "rgba(255,215,0,0.1)" : "#131d2e", border: customBuyIn ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 8, padding: "6px 10px", color: customBuyIn ? "#FFD700" : "#7a8499", fontSize: 12, fontWeight: customBuyIn ? 700 : 500, cursor: "pointer", fontFamily: "'Outfit', sans-serif" }}>
+                  Otro valor
+                </button>
+              </div>
+              {customBuyIn && (
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">$</span>
+                  <input type="number" min={1000} step={1000} value={form.buyInAmount || ""} onChange={(e) => updateForm("buyInAmount", parseInt(e.target.value) || 0)} placeholder="10000"
+                    className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50" />
+                </div>
+              )}
+            </div>
+
+            {/* Summary */}
             <div className="rounded-xl p-4 flex items-start gap-2.5 bg-bg-elevated border border-border-subtle">
               <Info className="w-4 h-4 text-blue-info flex-shrink-0 mt-0.5" />
               <p className="text-sm text-text-secondary">
-                Los partidos se cargarán automáticamente según el alcance que elijas.
+                {selectedMatchIds.size} partidos seleccionados · {tournamentMeta?.name || form.tournament}
               </p>
             </div>
 
-            {/* Botones de navegación */}
-            {error && (
-              <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">
-                {error}
-              </p>
-            )}
+            {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => goToStep(1)}
-                className="flex-1 font-bold py-4 rounded-xl transition-all duration-200 bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 hover:bg-bg-card-hover cursor-pointer"
-              >
-                <span className="flex items-center justify-center gap-1">
-                  <ArrowLeft className="w-4 h-4" /> Atrás
-                </span>
+              <button type="button" onClick={() => goToStep(2)} className="flex-1 font-bold py-4 rounded-xl bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 cursor-pointer">
+                <span className="flex items-center justify-center gap-1"><ArrowLeft className="w-4 h-4" /> Atrás</span>
               </button>
-              <button
-                type="button"
-                onClick={() => goToStep(3)}
-                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
-                style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
-              >
+              <button type="button" onClick={() => goToStep(4)}
+                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}>
                 Siguiente <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </motion.div>
         )}
 
-        {/* ════════════════════════════════════
-            PASO 3 — Modo de pago
-           ════════════════════════════════════ */}
-        {step === 3 && (
+        {/* ═══ PASO 4 — Pago ═══ */}
+        {step === 4 && (
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
-            {/* Selección del modo de pago */}
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
+            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Modo de pago</h2>
-              <p className="text-sm text-text-secondary">
-                Elige cómo se maneja el dinero de la polla
-              </p>
-
               <div className="space-y-3">
                 {PAYMENT_MODE_OPTIONS.map((option) => {
                   const isSelected = form.paymentMode === option.value;
                   const isDisabled = option.value === "digital_pool";
-
                   return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      disabled={isDisabled}
-                      onClick={() => {
-                        if (!isDisabled) updateForm("paymentMode", option.value);
-                      }}
-                      className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${
-                        isDisabled
-                          ? "opacity-35 cursor-not-allowed border-border-subtle bg-bg-elevated"
-                          : isSelected
-                          ? "border-gold/30 bg-gold/10 shadow-[0_0_12px_rgba(255,215,0,0.1)]"
-                          : "border-border-subtle hover:border-gold/20 hover:bg-bg-card-hover bg-bg-elevated cursor-pointer"
-                      }`}
-                    >
+                    <button key={option.value} type="button" disabled={isDisabled}
+                      onClick={() => { if (!isDisabled) updateForm("paymentMode", option.value); }}
+                      className={`w-full text-left p-4 rounded-xl border transition-all ${isDisabled ? "opacity-35 cursor-not-allowed border-border-subtle bg-bg-elevated" : isSelected ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated cursor-pointer"}`}>
                       <div className="flex items-start gap-3">
                         <span className="text-2xl flex-shrink-0 mt-0.5">{option.icon}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-text-primary">{option.title}</span>
-                            <span
-                              className={`text-[10px] px-3 py-1 rounded-full font-medium ${
-                                isDisabled
-                                  ? "bg-bg-card-hover text-text-muted border border-border-subtle"
-                                  : option.value === "admin_collects"
-                                  ? "bg-gold/10 text-gold border border-gold/20"
-                                  : "bg-green-live/10 text-green-live"
-                              }`}
-                            >
-                              {option.tag}
-                            </span>
+                            <span className={`text-[10px] px-3 py-1 rounded-full font-medium ${isDisabled ? "bg-bg-card-hover text-text-muted border border-border-subtle" : "bg-gold/10 text-gold border border-gold/20"}`}>{option.tag}</span>
                           </div>
-                          <p className="text-sm text-text-secondary leading-snug">
-                            {option.description}
-                          </p>
-                        </div>
-                        <div
-                          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-1 flex items-center justify-center transition-colors ${
-                            isSelected
-                              ? "border-gold bg-gold"
-                              : "border-border-medium"
-                          }`}
-                        >
-                          {isSelected && <div className="w-2 h-2 rounded-full bg-bg-base" />}
+                          <p className="text-sm text-text-secondary leading-snug">{option.description}</p>
                         </div>
                       </div>
                     </button>
@@ -515,156 +573,33 @@ export default function CrearPollaPage() {
               </div>
             </div>
 
-            {/* Cuota de entrada */}
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
-              <div>
-                <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
-                  Cuota de entrada <span className="text-red-alert">*</span>
-                  <span
-                    className="inline-flex items-center justify-center cursor-pointer"
-                    title="Cuota por persona — cada participante paga este valor al unirse"
-                    style={{ color: "#4a5568" }}
-                  >
-                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
-                    </svg>
-                  </span>
-                </h2>
-                <p style={{ fontSize: 11, color: "#7a8499", marginTop: 4 }}>
-                  Mínimo $1.000 · por persona
-                </p>
-              </div>
-
-              {/* Preset amount chips */}
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {[10000, 50000, 100000].map((amount) => {
-                  const isSelected = form.buyInAmount === amount && !customBuyIn;
-                  return (
-                    <button
-                      key={amount}
-                      type="button"
-                      onClick={() => { updateForm("buyInAmount", amount); setCustomBuyIn(false); }}
-                      style={{
-                        background: isSelected ? "rgba(255,215,0,0.1)" : "#131d2e",
-                        border: isSelected ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 8,
-                        padding: "6px 10px",
-                        color: isSelected ? "#FFD700" : "#7a8499",
-                        fontSize: 12,
-                        fontWeight: isSelected ? 700 : 500,
-                        cursor: "pointer",
-                        fontFamily: "'Outfit', sans-serif",
-                      }}
-                    >
-                      {formatCOP(amount)}
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => { setCustomBuyIn(true); updateForm("buyInAmount", 0); }}
-                  style={{
-                    background: customBuyIn ? "rgba(255,215,0,0.1)" : "#131d2e",
-                    border: customBuyIn ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 8,
-                    padding: "6px 10px",
-                    color: customBuyIn ? "#FFD700" : "#7a8499",
-                    fontSize: 12,
-                    fontWeight: customBuyIn ? 700 : 500,
-                    cursor: "pointer",
-                    fontFamily: "'Outfit', sans-serif",
-                  }}
-                >
-                  Otro valor
-                </button>
-              </div>
-
-              {/* Manual input — only shown when "Otro valor" is selected */}
-              {customBuyIn && (
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    min={1000}
-                    step={1000}
-                    value={form.buyInAmount || ""}
-                    onChange={(e) =>
-                      updateForm("buyInAmount", parseInt(e.target.value) || 0)
-                    }
-                    placeholder="10000"
-                    className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors duration-200 bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Instrucciones de pago */}
             {form.paymentMode === "admin_collects" && (
-              <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 transition-all duration-300">
-                <h2 className="text-base font-bold text-text-primary">
-                  Instrucciones de pago
-                </h2>
-                <p className="text-sm text-text-secondary">
-                  Indica a los participantes cómo enviarte el dinero
-                </p>
-                <textarea
-                  value={form.adminPaymentInstructions}
-                  onChange={(e) =>
-                    updateForm("adminPaymentInstructions", e.target.value)
-                  }
-                  placeholder="Ej: Enviar a Nequi 310-123-4567 a nombre de Juan Pérez. Enviar comprobante por la plataforma."
-                  rows={4}
-                  className="w-full px-4 py-3 rounded-xl outline-none resize-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
-                />
-                <div className="flex items-start gap-2.5 rounded-xl p-3 bg-bg-elevated border border-border-subtle">
-                  <Info className="w-4 h-4 text-blue-info flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-text-secondary">
-                    Los participantes verán estas instrucciones y podrán subir un comprobante
-                    de pago. Tú revisarás y aprobarás cada pago manualmente.
-                  </p>
-                </div>
+              <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
+                <h2 className="text-base font-bold text-text-primary">Instrucciones de pago</h2>
+                <textarea value={form.adminPaymentInstructions} onChange={(e) => updateForm("adminPaymentInstructions", e.target.value)}
+                  placeholder="Ej: Enviar a Nequi 310-123-4567" rows={4}
+                  className="w-full px-4 py-3 rounded-xl outline-none resize-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50" />
               </div>
             )}
 
-            {/* digital_pool: proximamente */}
             {form.paymentMode === "digital_pool" && (
               <div className="rounded-xl p-4 flex items-start gap-3 bg-bg-elevated border border-border-subtle">
                 <Construction className="w-5 h-5 text-text-muted flex-shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-bold text-text-secondary mb-1">Coming soon</h3>
-                  <p className="text-sm text-text-muted leading-snug">
-                    El pago a través de la plataforma estará disponible pronto.
-                    Por ahora, usa el modo &quot;Admin maneja el pozo&quot;.
-                  </p>
+                  <h3 className="font-bold text-text-secondary mb-1">Próximamente</h3>
+                  <p className="text-sm text-text-muted leading-snug">El pago a través de la plataforma estará disponible pronto.</p>
                 </div>
               </div>
             )}
 
-            {/* Error y botones */}
-            {error && (
-              <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">
-                {error}
-              </p>
-            )}
+            {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => goToStep(2)}
-                className="flex-1 font-bold py-4 rounded-xl transition-all duration-200 bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 hover:bg-bg-card-hover cursor-pointer"
-              >
-                <span className="flex items-center justify-center gap-1">
-                  <ArrowLeft className="w-4 h-4" /> Atrás
-                </span>
+              <button type="button" onClick={() => goToStep(3)} className="flex-1 font-bold py-4 rounded-xl bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 cursor-pointer">
+                <span className="flex items-center justify-center gap-1"><ArrowLeft className="w-4 h-4" /> Atrás</span>
               </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading || form.paymentMode === "digital_pool"}
-                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
-                style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
-              >
+              <button type="button" onClick={handleSubmit} disabled={loading || form.paymentMode === "digital_pool"}
+                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}>
                 {loading ? "Creando..." : <><span>Crear polla</span><Trophy className="w-5 h-5" /></>}
               </button>
             </div>

@@ -19,6 +19,10 @@ interface PollaCardProps {
 const TOURNAMENT_ICONS: Record<string, string> = {
   champions_2025: "/tournaments/champions_league.svg",
   worldcup_2026: "/tournaments/world_cup.svg",
+  laliga_2025: "/tournaments/la_liga.png",
+  premier_2025: "/tournaments/premier_league.png",
+  seriea_2025: "/tournaments/seria_a.png",
+  // Legacy slugs (backward compat)
   la_liga_2025: "/tournaments/la_liga.png",
   premier_league: "/tournaments/premier_league.png",
   seria_a: "/tournaments/seria_a.png",

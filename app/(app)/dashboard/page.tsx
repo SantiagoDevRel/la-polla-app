@@ -9,12 +9,7 @@ import DashboardClient from "@/components/shared/DashboardClient";
 import { getLiveMatches, getTodayMatches } from "@/lib/football-api";
 import type { FootballMatch } from "@/lib/football-api";
 import { getPollitoBase } from "@/lib/pollitos";
-
-const TOURNAMENT_NAMES: Record<string, string> = {
-  champions_2025: "Champions League",
-  worldcup_2026: "Mundial 2026",
-  la_liga_2025: "La Liga",
-};
+import { getTournamentName } from "@/lib/tournaments";
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -197,7 +192,7 @@ export default async function DashboardPage() {
     id: p.id,
     name: p.name,
     tournament: p.tournament,
-    tournamentName: TOURNAMENT_NAMES[p.tournament] || p.tournament,
+    tournamentName: getTournamentName(p.tournament),
     isActive: p.status === "active",
     participantCount: participantCounts[p.id] || 0,
     entryFee: p.buy_in_amount || 0,
@@ -208,10 +203,10 @@ export default async function DashboardPage() {
       {/* Header */}
       <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <img src="/pollitos/logo_realistic.webp" alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
+          <Link href="/dashboard" className="flex items-center gap-2" style={{ textDecoration: "none" }}>
+            <img src="/pollitos/logo_realistic.webp" alt="" style={{ width: 36, height: 36, objectFit: "contain" }} />
             <span className="text-gold" style={{ fontSize: 18, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Outfit', sans-serif" }}>La Polla</span>
-          </div>
+          </Link>
           <Link href="/perfil">
             <div style={{
               width: 32, height: 32, borderRadius: "50%",

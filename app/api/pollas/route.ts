@@ -17,6 +17,7 @@ const createPollaSchema = z
     type: z.enum(["open", "closed"]).default("closed"),
     buyInAmount: z.number().min(0, "El valor de entrada no puede ser negativo"),
     paymentMode: z.enum(paymentModes),
+    matchIds: z.array(z.string()).optional(),
     // Solo requerido cuando paymentMode === 'admin_collects'
     adminPaymentInstructions: z.string().optional(),
   })
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
-    // Insertar la polla con los campos del modo de pago
+    // Insertar la polla con los campos del modo de pago + match_ids
     const { data: polla, error } = await supabase
       .from("pollas")
       .insert({
@@ -121,6 +122,7 @@ export async function POST(request: NextRequest) {
           parsed.data.paymentMode === "admin_collects"
             ? parsed.data.adminPaymentInstructions
             : null,
+        match_ids: parsed.data.matchIds || null,
         created_by: user.id,
       })
       .select()
@@ -146,6 +148,7 @@ export async function POST(request: NextRequest) {
               parsed.data.paymentMode === "admin_collects"
                 ? parsed.data.adminPaymentInstructions
                 : null,
+            match_ids: parsed.data.matchIds || null,
             created_by: user.id,
           })
           .select()

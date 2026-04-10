@@ -16,11 +16,7 @@ interface PollaData {
   participant_count?: number;
 }
 
-const TOURNAMENT_NAMES: Record<string, string> = {
-  champions_2025: "Champions League",
-  worldcup_2026: "Mundial 2026",
-  la_liga_2025: "La Liga",
-};
+import { getTournamentName } from "@/lib/tournaments";
 
 type TabFilter = "active" | "finished";
 
@@ -126,7 +122,7 @@ export default function MisPollasPage() {
               <AnimatedItem key={polla.id}>
                 <PollaCard
                   name={polla.name}
-                  tournamentName={TOURNAMENT_NAMES[polla.tournament] || polla.tournament}
+                  tournamentName={getTournamentName(polla.tournament)}
                   tournamentIconPath={TOURNAMENT_ICONS[polla.tournament] || ""}
                   entryFee={polla.buy_in_amount}
                   participantCount={polla.participant_count ?? 0}
