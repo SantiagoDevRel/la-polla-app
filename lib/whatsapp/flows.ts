@@ -11,7 +11,7 @@ import { setState } from "./state";
 import { formatTablaWA } from "./tabla";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://lapolla.app";
-const FOOTER = "🐔 La Polla Colombiana";
+const FOOTER = "La Polla Colombiana 🐥";
 
 const TRN_LABELS: Record<string, string> = {
   worldcup_2026: "Mundial 2026 🏆",
@@ -29,13 +29,13 @@ export async function handleMainMenu(phone: string, displayName: string) {
 
   await sendReplyButtons(
     phone,
-    `¡Hola ${name}! ¿Qué vamos a hacer hoy, parce? 🐔`,
+    `Hey ${name} qué vamos a hacer hoy parce?`,
     [
       { id: "menu_mis_pollas", title: "Mis Pollas 🏆" },
       { id: "menu_predecir", title: "Predecir ⚽" },
       { id: "menu_tabla", title: "Ver Tabla 📊" },
     ],
-    "🐔 La Polla",
+    "La Polla 🐥",
     FOOTER
   );
 }
@@ -46,12 +46,12 @@ export async function handleUnknownUser(phone: string) {
   await sendTextMessage(
     phone,
     `¡Ey parce! 👋 No tenés cuenta en La Polla todavía.\n\n` +
-      `Registrate acá y empezá a jugar 🐔`
+      `Registrate acá y empezá a jugar 🐥`
   );
   await sendCTAButton(
     phone,
     "_Creá tu cuenta en 30 segundos_",
-    "Registrarme 🐔",
+    "Registrarme 🐥",
     APP_URL,
     FOOTER
   );
@@ -74,7 +74,7 @@ export async function handleMisPollas(phone: string, userId: string) {
     );
     await sendCTAButton(
       phone,
-      "Dale, creá tu polla y armá el parche 🐔",
+      "Dale, creá tu polla y armá el parche 🐥",
       "Ir a La Polla",
       APP_URL,
       FOOTER
@@ -93,11 +93,11 @@ export async function handleMisPollas(phone: string, userId: string) {
   if (!pollas || pollas.length === 0) {
     await sendTextMessage(
       phone,
-      "😴 No tenés pollas activas en este momento, parce.\n\n_Creá una nueva y armá el parche_"
+      "😴 No tenés pollas activas en este momento parce.\n\n_Creá una nueva y armá el parche_"
     );
     await sendCTAButton(
       phone,
-      "Dale, creá una polla nueva 🐔",
+      "Dale, creá una polla nueva 🐥",
       "Crear polla",
       `${APP_URL}/pollas/crear`,
       FOOTER
@@ -129,7 +129,7 @@ export async function handleMisPollas(phone: string, userId: string) {
 
   await sendListMessage(
     phone,
-    `Escoge cuál polla querés ver, parce 👇`,
+    `Escoge cuál polla querés ver parce 👇`,
     "Ver mis pollas",
     [{ title: "Activas", rows }],
     "Tus Pollas",
@@ -175,7 +175,7 @@ export async function handlePollaMenu(
       `⚽ Torneo: ${trnLabel}\n` +
       `📊 Tu posición: *#${participant?.rank || "—"}*\n` +
       `🎯 Tus puntos: *${participant?.total_points || 0}*\n\n` +
-      `¿Qué querés hacer, parce?`,
+      `¿Qué querés hacer parce?`,
     [
       { id: `pred_${pollaId}`, title: "Predecir 🎯" },
       { id: `rank_${pollaId}`, title: "Ver Tabla 📊" },
@@ -222,7 +222,7 @@ export async function handlePronosticar(
   if (!matches || matches.length === 0) {
     await sendReplyButtons(
       phone,
-      "😴 No hay partidos pendientes para pronosticar, parce.\n\n_Pilas, te aviso cuando haya nuevos_",
+      "😴 No hay partidos pendientes para pronosticar parce.\n\n_Pilas, te aviso cuando haya nuevos_",
       [
         { id: `polla_${pollaId}`, title: "⬅️ Volver" },
         { id: "menu", title: "🏠 Menú" },
@@ -298,7 +298,7 @@ export async function handlePronosticar(
 
   await sendListMessage(
     phone,
-    `¿Cuál partido querés predecir, parce? ⚽`,
+    `¿Cuál partido querés predecir parce? ⚽`,
     "Ver partidos",
     [{ title: "Partidos disponibles", rows }],
     `🎯 ${polla.name}`,
@@ -464,7 +464,7 @@ export async function handleConfirmPrediction(
     phone,
     `✅ ¡Listo parce! Pronóstico guardado 🎯\n\n` +
       `⚽ *${match.home_team}* *${predictedHome}* - *${predictedAway}* *${match.away_team}*\n\n` +
-      `_Eso es, a esperar el partido_ 🐔`,
+      `_Eso es, a esperar el partido_ 🐥`,
     [
       { id: `pred_next_${pollaId}`, title: "Siguiente ➡️" },
       { id: "menu", title: "🏠 Menú" },
@@ -504,7 +504,7 @@ export async function handleLeaderboard(
   if (!participants || participants.length === 0) {
     await sendTextMessage(
       phone,
-      "😅 No hay participantes en esta polla aún, parce."
+      "😅 No hay participantes en esta polla aún parce."
     );
     return;
   }
@@ -611,7 +611,7 @@ export async function handleResults(
   if (!matches || matches.length === 0) {
     await sendReplyButtons(
       phone,
-      "😴 No hay resultados disponibles aún, parce.\n\n_Pilas, te aviso cuando se jueguen partidos_",
+      "😴 No hay resultados disponibles aún parce.\n\n_Pilas, te aviso cuando se jueguen partidos_",
       [
         { id: `polla_${pollaId}`, title: "⬅️ Volver" },
         { id: "menu", title: "🏠 Menú" },
@@ -692,7 +692,7 @@ export async function handleJoinPolla(
   if (polla.status !== "active") {
     await sendTextMessage(
       phone,
-      `😅 La polla *${polla.name}* ya no está activa, parce.`
+      `😅 La polla *${polla.name}* ya no está activa parce.`
     );
     return;
   }
@@ -708,7 +708,7 @@ export async function handleJoinPolla(
   if (existing) {
     await sendReplyButtons(
       phone,
-      `¡Parce, ya sos parte de *${polla.name}*! 🐔\n\n_Dale, poné tus pronósticos_`,
+      `¡Parce, ya sos parte de *${polla.name}*! 🐥\n\n_Dale, poné tus pronósticos_`,
       [
         { id: `pred_${polla.id}`, title: "Predecir 🎯" },
         { id: `rank_${polla.id}`, title: "Ver Tabla 📊" },
@@ -740,7 +740,7 @@ export async function handleJoinPolla(
   await sendReplyButtons(
     phone,
     `🎉 ¡Listo parce! Ya sos parte de *${polla.name}*\n\n` +
-      `Eso es, ahora poné tus pronósticos y demostrá quién sabe de fútbol 🐔⚽`,
+      `Eso es, ahora poné tus pronósticos y demostrá quién sabe de fútbol 🐥⚽`,
     [
       { id: `pred_${polla.id}`, title: "Predecir 🎯" },
       { id: "menu", title: "🏠 Menú" },
@@ -755,7 +755,7 @@ export async function handleJoinPolla(
 export async function handleHelp(phone: string) {
   await sendListMessage(
     phone,
-    "Escoge una opción, parce 👇",
+    "Escoge una opción parce 👇",
     "Ver opciones",
     [
       {
@@ -826,7 +826,7 @@ export async function handleHelpTopic(
   if (topic === "help_crear") {
     await sendCTAButton(
       phone,
-      "Creá tu polla desde la web, es bacano y rapidito 🐔\n\n_Elegí torneo, poné el nombre y compartile el link al parche_",
+      "Creá tu polla desde la web, es bacano y rapidito 🐥\n\n_Elegí torneo, poné el nombre y compartile el link al parche_",
       "Crear mi polla 🏆",
       `${APP_URL}/pollas/crear`,
       FOOTER
@@ -887,7 +887,7 @@ export async function handleProfile(phone: string, userId: string) {
 
   await sendTextMessage(
     phone,
-    `🐔 *Tu Perfil*\n\n` +
+    `🐥 *Tu Perfil*\n\n` +
       `👤 *${name}*\n` +
       `📊 Pollas activas: *${activeCount}*\n` +
       `🎯 Predicciones: *${predCount}*\n` +
