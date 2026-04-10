@@ -8,7 +8,8 @@ export const metadata: Metadata = {
     "La mejor polla deportiva de Colombia. Creá tu polla, invitá a tus parceros y ganá prediciendo resultados de fútbol.",
   manifest: "/manifest.json",
   icons: {
-    apple: "/icons/icon-192x192.png",
+    icon: "/pollitos/logo_realistic.webp",
+    apple: "/pollitos/logo_realistic.webp",
   },
 };
 
