@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { staggerContainer, fadeUp } from "@/lib/animations";
+import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, AlertTriangle, Construction, Trophy } from "lucide-react";
 
 // ─── Tipos ───

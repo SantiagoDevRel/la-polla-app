@@ -19,7 +19,7 @@ export async function GET() {
 
     // Contar participantes por polla
     const pollaIds = (pollas || []).map((p) => p.id);
-    let participantCounts: Record<string, number> = {};
+    const participantCounts: Record<string, number> = {};
 
     if (pollaIds.length > 0) {
       const { data: counts } = await supabase

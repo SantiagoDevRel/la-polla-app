@@ -152,7 +152,6 @@ export async function handlePronosticar(
     return;
   }
 
-  const now = new Date().toISOString();
   const lockWindow = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
   // Get upcoming matches that are still open for predictions
