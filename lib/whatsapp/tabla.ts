@@ -48,8 +48,6 @@ export function formatTablaWA(rows: TablaRow[], pollaName: string): string {
 
   const allRows = isUserInTop || !userRow ? top5 : top5;
   const maxPos = Math.max(...allRows.map((r) => r.position), 0);
-  const isLastKnown = allRows.length > 0;
-
   let text = `🏆 *Tabla — ${pollaName}*\n\n\`\`\`\n`;
 
   for (let i = 0; i < allRows.length; i++) {
