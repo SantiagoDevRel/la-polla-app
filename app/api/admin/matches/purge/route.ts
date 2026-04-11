@@ -1,11 +1,15 @@
 // app/api/admin/matches/purge/route.ts — Elimina partidos anteriores a 2026-01-01
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 export async function POST(request: NextRequest) {
-  const secret = request.headers.get("x-cron-secret");
-  const validSecret = process.env.CRON_SECRET;
-  if (!validSecret || secret !== validSecret) {
+  // Dual auth: admin user session OR valid cron secret (server-only)
+  const adminCheck = await isCurrentUserAdmin();
+  const cronSecret = request.headers.get("x-cron-secret");
+  const validCronSecret = process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET;
+
+  if (!adminCheck && !validCronSecret) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 

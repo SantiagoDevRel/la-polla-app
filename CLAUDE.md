@@ -411,7 +411,7 @@ All UI (crear polla, explorar, etc.) should only show these two. Admin page keep
 - `lib/whatsapp/tabla.ts` — `formatTablaWA()` monospace leaderboard formatter
 - `lib/whatsapp/state.ts` — In-memory conversation state with 10min TTL
 - `lib/whatsapp/messages.ts` — OTP message template
-- `app/api/whatsapp/webhook/route.ts` — Meta webhook handler (DO NOT TOUCH)
+- `app/api/whatsapp/webhook/route.ts` — Meta webhook handler (signature-verified via META_WA_APP_SECRET)
 - `app/api/whatsapp/test-send/route.ts` — Dev-only test endpoint
 
 ### Tone Rules (non-negotiable)
@@ -429,4 +429,35 @@ Help: `menu_ayuda`, `help_puntaje`, `help_crear`, `menu_perfil`
 
 ---
 
-*Last updated: 2026-04-10 | To update: say "update UI system" in Claude.ai chat*
+---
+
+## Security Architecture (added 2026-04-11)
+
+### Admin Access Control
+- `users.is_admin` column (boolean) — set via migration 005. Two known admins: 573117312391, 351934255581
+- `lib/auth/admin.ts` — `isCurrentUserAdmin()` server-side check, used in API routes and admin layout
+- `app/(app)/admin/layout.tsx` — server-side layout guard, redirects non-admins to /dashboard
+- Admin API routes (`/api/admin/*`, `/api/matches/sync`) use dual auth: admin session OR CRON_SECRET header
+- Admin page uses Server Actions (`actions.ts`) — no secrets in client bundle
+
+### Env Var Rules
+- NEVER use `NEXT_PUBLIC_` prefix for secrets (CRON_SECRET, META_WA_APP_SECRET, etc.)
+- `CRON_SECRET` — server-only, used by Vercel cron jobs and admin API dual-auth
+- `META_WA_APP_SECRET` — server-only, used for WhatsApp webhook signature verification
+
+### WhatsApp Webhook Security
+- POST handler verifies `X-Hub-Signature-256` using HMAC-SHA256 with META_WA_APP_SECRET
+- Raw body is read as text before parsing to preserve bytes for signature verification
+- If META_WA_APP_SECRET is not set, verification is skipped with a console warning (dev mode)
+
+### OTP Rate Limiting
+- `otp_rate_limits` table (migration 006) — tracks attempts per phone number
+- Generate: 5 attempts per phone per hour
+- Verify: 5 attempts per phone per 15 minutes
+- Enforced in `app/api/auth/otp/route.ts` via `lib/auth/rate-limit.ts`
+
+### Security Headers
+- Configured in `next.config.mjs` headers() for all routes
+- CSP, HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, Permissions-Policy
+
+*Last updated: 2026-04-11 | To update: say "update UI system" in Claude.ai chat*

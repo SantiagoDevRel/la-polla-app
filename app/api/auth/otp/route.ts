@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateOTP, validateOTP } from "@/lib/utils/otp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -27,6 +28,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: parsed.error.issues[0].message },
         { status: 400 }
+      );
+    }
+
+    // Rate limit check — 5 generate attempts per phone per hour
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? undefined;
+    const limit = await checkAndRecordAttempt(parsed.data.phone, "generate", ip);
+    if (limit.blocked) {
+      return NextResponse.json(
+        {
+          error: "Demasiados intentos. Espera antes de solicitar otro código.",
+          retryAfter: limit.retryAfter,
+        },
+        { status: 429 }
       );
     }
 
@@ -83,6 +97,19 @@ export async function PUT(request: NextRequest) {
     }
 
     const { phone, code } = parsed.data;
+
+    // Rate limit check — 5 verify attempts per phone per 15 minutes
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? undefined;
+    const verifyLimit = await checkAndRecordAttempt(phone, "verify", ip);
+    if (verifyLimit.blocked) {
+      return NextResponse.json(
+        {
+          error: "Demasiados intentos fallidos. Espera 15 minutos.",
+          retryAfter: verifyLimit.retryAfter,
+        },
+        { status: 429 }
+      );
+    }
 
     console.log("[AUTH] OTP recibido:", code);
     console.log("[AUTH] Teléfono:", phone);

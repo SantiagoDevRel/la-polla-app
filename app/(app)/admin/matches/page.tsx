@@ -1,16 +1,13 @@
-// app/(app)/admin/matches/page.tsx — Panel de admin para sync manual de partidos desde API-Football
-// Solo accesible si el usuario tiene alguna polla con role = 'admin'
-// NOTA de deuda técnica: el CRON_SECRET se envía desde el frontend vía NEXT_PUBLIC_CRON_SECRET.
-// Esto es aceptable para un MVP/testing pero no es producción-grade.
-// En producción, este endpoint debería validar que el usuario sea admin vía session.
+// app/(app)/admin/matches/page.tsx — Panel de admin para sync manual de partidos
+// Protected server-side by app/(app)/admin/layout.tsx — no client-side access check needed
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer, fadeUp } from "@/lib/animations";
 import { ArrowLeft, RefreshCw, AlertTriangle } from "lucide-react";
+import { syncMatchesAction, purgeMatchesAction } from "./actions";
 
 // Competiciones disponibles (football-data.org IDs)
 const LEAGUES = [
@@ -29,47 +26,16 @@ export default function AdminMatchesPage() {
   const router = useRouter();
   const [results, setResults] = useState<Record<number, SyncResult | string>>({});
   const [loading, setLoading] = useState<number | null>(null);
-  const [checkingAccess, setCheckingAccess] = useState(true);
-  const [hasAccess, setHasAccess] = useState(false);
   const [purging, setPurging] = useState(false);
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
-
-  // Verificar que el usuario es admin de al menos una polla
-  useEffect(() => {
-    async function checkAdminAccess() {
-      try {
-        const { data } = await axios.get("/api/pollas");
-        const pollas = data.pollas || [];
-        // Si el usuario tiene pollas, tiene acceso al admin
-        // (el GET /api/pollas ya filtra por usuario autenticado)
-        setHasAccess(pollas.length > 0);
-      } catch {
-        setHasAccess(false);
-      } finally {
-        setCheckingAccess(false);
-      }
-    }
-    checkAdminAccess();
-  }, []);
-
-  // Redirigir si no tiene acceso
-  useEffect(() => {
-    if (!checkingAccess && !hasAccess) {
-      router.push("/dashboard");
-    }
-  }, [checkingAccess, hasAccess, router]);
 
   async function handlePurge() {
     if (!confirm("Eliminar todos los partidos anteriores al 1 enero 2026?")) return;
     setPurging(true);
     setPurgeResult(null);
     try {
-      const { data } = await axios.post(
-        "/api/admin/matches/purge",
-        {},
-        { headers: { "x-cron-secret": process.env.NEXT_PUBLIC_CRON_SECRET || "" } }
-      );
-      setPurgeResult(`${data.deleted} partidos eliminados`);
+      const result = await purgeMatchesAction();
+      setPurgeResult(`${result.deleted} partidos eliminados`);
     } catch {
       setPurgeResult("Error al purgar partidos");
     } finally {
@@ -80,32 +46,18 @@ export default function AdminMatchesPage() {
   async function handleSync(competitionId: number, tournament: string) {
     setLoading(competitionId);
     try {
-      const { data } = await axios.post(
-        "/api/matches/sync",
-        { competitionId, tournament },
-        { headers: { "x-cron-secret": process.env.NEXT_PUBLIC_CRON_SECRET || "" } }
-      );
-      setResults((prev) => ({ ...prev, [competitionId]: data }));
+      const result = await syncMatchesAction(competitionId, tournament);
+      setResults((prev) => ({ ...prev, [competitionId]: result }));
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
+      const e = err as Error;
       setResults((prev) => ({
         ...prev,
-        [competitionId]: e.response?.data?.error || "Error desconocido",
+        [competitionId]: e.message || "Error desconocido",
       }));
     } finally {
       setLoading(null);
     }
   }
-
-  if (checkingAccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-text-muted text-sm">Verificando acceso...</p>
-      </div>
-    );
-  }
-
-  if (!hasAccess) return null;
 
   return (
     <div className="min-h-screen">
