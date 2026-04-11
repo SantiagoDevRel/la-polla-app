@@ -93,6 +93,7 @@ export default function PollaSlugPage() {
   const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
   const awayInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const homeInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const loadData = useCallback(async () => {
     try {
@@ -335,7 +336,7 @@ export default function PollaSlugPage() {
               </div>
             ) : (
               <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3">
-              {matches.map((match) => {
+              {matches.map((match, matchIndex) => {
                 const pred = getPred(match.id);
                 const draft = drafts[match.id] || { home: pred?.predicted_home?.toString() ?? "", away: pred?.predicted_away?.toString() ?? "" };
                 const locked = isLocked(match);
@@ -381,6 +382,7 @@ export default function PollaSlugPage() {
                           ) : (
                             <div className="flex items-center gap-2">
                               <input type="number" min={0} max={20} disabled={locked} value={draft.home}
+                                ref={(el) => { homeInputRefs.current[match.id] = el; }}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, home: val } }));
@@ -398,8 +400,19 @@ export default function PollaSlugPage() {
                               <input type="number" min={0} max={20} disabled={locked} value={draft.away}
                                 ref={(el) => { awayInputRefs.current[match.id] = el; }}
                                 onChange={(e) => {
-                                  setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, away: e.target.value } }));
+                                  const val = e.target.value;
+                                  setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, away: val } }));
                                   setTouchedMatches((prev) => new Set(prev).add(match.id));
+                                  if (val.length >= 1) {
+                                    // Jump to next game's home input
+                                    for (let i = matchIndex + 1; i < matches.length; i++) {
+                                      const nextMatch = matches[i];
+                                      if (nextMatch.status === "scheduled" && homeInputRefs.current[nextMatch.id]) {
+                                        homeInputRefs.current[nextMatch.id]?.focus();
+                                        break;
+                                      }
+                                    }
+                                  }
                                 }}
                                 className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
                                   locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"

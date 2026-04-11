@@ -10,6 +10,7 @@ import { staggerContainer, fadeUp } from "@/lib/animations";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import UserAvatar from "@/components/ui/UserAvatar";
+import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 
 interface UserProfile {
   display_name: string;
@@ -40,6 +41,8 @@ export default function PerfilPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -78,6 +81,16 @@ export default function PerfilPage() {
     router.push("/login");
   }
 
+  async function handleAvatarChange(pollitoId: string) {
+    setSavingAvatar(true);
+    try {
+      await axios.patch("/api/users/me", { avatar_url: pollitoId });
+      setProfile((prev) => prev ? { ...prev, avatar_url: pollitoId } : prev);
+      setShowAvatarPicker(false);
+      showToast("Pollito actualizado", "success");
+    } catch { showToast("Error actualizando pollito", "error"); } finally { setSavingAvatar(false); }
+  }
+
   function pointsColor(pts: number): string {
     if (pts >= 5) return "#00e676";
     if (pts >= 2) return "#FFD700";
@@ -106,12 +119,54 @@ export default function PerfilPage() {
       <main className="max-w-lg mx-auto px-4 space-y-6 -mt-1">
         {/* Avatar + name */}
         <div className="rounded-2xl p-6 flex flex-col items-center bg-bg-card border border-border-subtle">
-          <UserAvatar
-            avatarUrl={profile.avatar_url}
-            displayName={profile.display_name}
-            size="xl"
-            className="mb-3 ring-2 ring-gold/30"
-          />
+          <button
+            type="button"
+            onClick={() => setShowAvatarPicker(!showAvatarPicker)}
+            className="relative mb-3 cursor-pointer group"
+          >
+            <UserAvatar
+              avatarUrl={profile.avatar_url}
+              displayName={profile.display_name}
+              size="xl"
+              className="ring-2 ring-gold/30 group-hover:ring-gold/60 transition-all"
+            />
+            <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-gold flex items-center justify-center shadow-lg">
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#080c10" strokeWidth="2.5">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </span>
+          </button>
+
+          {showAvatarPicker && (
+            <div className="w-full mb-4 rounded-xl p-3 bg-bg-elevated border border-border-subtle">
+              <p className="text-xs text-text-secondary text-center mb-3">Elige tu pollito</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                {POLLITO_TYPES.map((p) => {
+                  const isSelected = profile.avatar_url === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      disabled={savingAvatar}
+                      onClick={() => handleAvatarChange(p.id)}
+                      className="cursor-pointer flex flex-col items-center gap-1 rounded-xl p-2 transition-all"
+                      style={{
+                        background: isSelected ? "rgba(255,215,0,0.08)" : "#131d2e",
+                        border: isSelected ? "2px solid #FFD700" : "2px solid rgba(255,255,255,0.06)",
+                        opacity: savingAvatar ? 0.5 : 1,
+                      }}
+                    >
+                      <img src={getPollitoBase(p.id)} alt={p.label} style={{ width: 40, height: 40, objectFit: "contain" }} />
+                      <span style={{ fontSize: 8, color: isSelected ? "#FFD700" : "#7a8499", fontWeight: isSelected ? 600 : 400, textAlign: "center", lineHeight: 1.2 }}>
+                        {p.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {isEditing ? (
             <div className="flex items-center gap-2 w-full max-w-xs">
