@@ -147,7 +147,7 @@ export default function LoginPage() {
                   ABRE WHATSAPP
                 </h1>
                 <p className="text-text-secondary text-sm mt-2 leading-relaxed">
-                  Escribile al bot para recibir tu codigo de verificacion.
+                  Tocá el botón, enviá el mensaje y en segundos te llega el código 🔐
                 </p>
               </>
             ) : (
@@ -168,14 +168,14 @@ export default function LoginPage() {
             <>
               {/* New user: must message bot first (WhatsApp policy) */}
               <a
-                href={`https://wa.me/${BOT_PHONE}?text=hola`}
+                href={`https://wa.me/${BOT_PHONE}?text=Parce%2C%20quiero%20entrar%20a%20La%20Polla%20%F0%9F%90%A3%20%E2%80%94%20m%C3%A1ndame%20el%20c%C3%B3digo%20de%20verificaci%C3%B3n`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-center gap-2 bg-gold text-bg-base font-bold py-4 px-4 rounded-xl hover:brightness-110 transition-all text-lg cursor-pointer"
                 style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
               >
                 <MessageCircle className="w-5 h-5" />
-                Escribirle al bot
+                Escribirle al bot 💬
               </a>
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-border-subtle" />
@@ -229,13 +229,13 @@ export default function LoginPage() {
 
             {!isNewUser && (
               <a
-                href={`https://wa.me/${BOT_PHONE}?text=hola`}
+                href={`https://wa.me/${BOT_PHONE}?text=Parce%2C%20quiero%20entrar%20a%20La%20Polla%20%F0%9F%90%A3%20%E2%80%94%20m%C3%A1ndame%20el%20c%C3%B3digo%20de%20verificaci%C3%B3n`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full text-text-muted text-xs text-center hover:text-gold transition-colors flex items-center justify-center gap-1"
               >
                 <MessageCircle className="w-3 h-3" />
-                No recibiste el codigo? Escribile al bot
+                ¿No te llegó el código? Escríbele al bot 💬
               </a>
             )}
           </form>
