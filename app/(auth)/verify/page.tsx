@@ -1,4 +1,5 @@
-// app/(auth)/verify/page.tsx — Página de verificación del código OTP
+// app/(auth)/verify/page.tsx — OTP verification page
+// This page is linked from the WhatsApp bot CTA button after sending the OTP
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
@@ -9,28 +10,43 @@ import { ArrowLeft } from "lucide-react";
 function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const phone = searchParams.get("phone") || "";
+  const phoneFromParams = searchParams.get("phone") || "";
+  const [phone, setPhone] = useState(phoneFromParams);
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // If no phone in URL params, check localStorage (set by login page)
     if (!phone) {
-      router.push("/login");
+      const stored = typeof window !== "undefined" ? localStorage.getItem("la_polla_verify_phone") : null;
+      if (stored) {
+        setPhone(stored);
+      }
     }
-  }, [phone, router]);
+  }, [phone]);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!phone) {
+      setError("Numero de telefono no encontrado. Vuelve al login.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       await axios.put("/api/auth/otp", { phone, code });
+      // Clean up
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("la_polla_verify_phone");
+      }
       router.push("/onboarding");
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
-      setError(axiosError.response?.data?.error || "Código inválido");
+      setError(axiosError.response?.data?.error || "Codigo invalido o expirado");
     } finally {
       setLoading(false);
     }
@@ -42,16 +58,33 @@ function VerifyForm() {
       style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
     >
       <div className="text-center">
-        <h1 className="font-display text-[32px] text-gold tracking-wide">Verificación</h1>
+        <h1 className="font-display text-[32px] text-gold tracking-wide">
+          INGRESA TU CODIGO
+        </h1>
         <p className="text-text-secondary mt-1">
-          Ingresá el código de 6 dígitos que te enviamos por WhatsApp
+          Copia el codigo que te envio el bot
         </p>
         {phone && (
           <p className="text-sm text-gold font-medium mt-1.5">
-            📱 {phone}
+            {phone}
           </p>
         )}
       </div>
+
+      {!phone && (
+        <div className="rounded-xl p-4 bg-bg-elevated border border-border-subtle">
+          <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            Numero de WhatsApp
+          </label>
+          <input
+            type="tel"
+            placeholder="+573001234567"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl outline-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
+          />
+        </div>
+      )}
 
       <form onSubmit={handleVerify} className="space-y-4">
         <div>
@@ -63,6 +96,7 @@ function VerifyForm() {
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             className="w-full px-4 py-4 rounded-xl outline-none text-center score-font text-[36px] tracking-[0.5em] transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
             required
+            autoFocus
           />
         </div>
 
@@ -76,7 +110,7 @@ function VerifyForm() {
           className="w-full bg-gold text-bg-base font-bold py-3.5 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-lg"
           style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
         >
-          {loading ? "Verificando..." : "Verificar código"}
+          {loading ? "Verificando..." : "Verificar codigo"}
         </button>
 
         <button
@@ -84,7 +118,7 @@ function VerifyForm() {
           onClick={() => router.push("/login")}
           className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5"
         >
-          <ArrowLeft className="w-4 h-4" /> Cambiar número
+          <ArrowLeft className="w-4 h-4" /> Cambiar numero
         </button>
       </form>
     </div>

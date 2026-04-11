@@ -1,8 +1,7 @@
-// app/api/auth/otp/route.ts — Endpoint para generar y validar códigos OTP vía WhatsApp
+// app/api/auth/otp/route.ts — Endpoint para generar y validar códigos OTP
+// OTP is saved to Supabase. The WhatsApp bot detects it when the user messages.
 import { NextRequest, NextResponse } from "next/server";
 import { generateOTP, validateOTP } from "@/lib/utils/otp";
-import { sendWhatsAppMessage } from "@/lib/whatsapp/bot";
-import { getOTPMessage } from "@/lib/whatsapp/messages";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
@@ -52,18 +51,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar que WhatsApp está configurado
-    if (!process.env.META_WA_ACCESS_TOKEN || !process.env.META_WA_PHONE_NUMBER_ID) {
-      return NextResponse.json(
-        { error: "WhatsApp no configurado. Contacta al administrador." },
-        { status: 500 }
-      );
-    }
+    // Generate OTP and save to Supabase (bot will deliver it when user messages)
+    await generateOTP(parsed.data.phone);
 
-    const otp = await generateOTP(parsed.data.phone);
-    await sendWhatsAppMessage(parsed.data.phone, getOTPMessage(otp));
-
-    return NextResponse.json({ status: "OTP enviado por WhatsApp" });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error generando OTP:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
