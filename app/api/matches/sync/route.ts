@@ -3,11 +3,15 @@
 // POST: sync specific competition
 import { NextRequest, NextResponse } from "next/server";
 import { syncCompetition, syncAllCompetitions, COMPETITIONS } from "@/lib/football-data/sync";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 export async function GET(request: NextRequest) {
+  // Dual auth: admin user session OR valid cron secret (server-only)
+  const adminCheck = await isCurrentUserAdmin();
   const secret = request.nextUrl.searchParams.get("secret") || request.headers.get("x-cron-secret");
-  const validSecret = process.env.CRON_SECRET;
-  if (!validSecret || secret !== validSecret) {
+  const validCronSecret = process.env.CRON_SECRET && secret === process.env.CRON_SECRET;
+
+  if (!adminCheck && !validCronSecret) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
@@ -21,9 +25,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const secret = request.headers.get("x-cron-secret");
-  const validSecret = process.env.CRON_SECRET;
-  if (!validSecret || secret !== validSecret) {
+  // Dual auth: admin user session OR valid cron secret (server-only)
+  const adminCheck = await isCurrentUserAdmin();
+  const cronSecret = request.headers.get("x-cron-secret");
+  const validCronSecret = process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET;
+
+  if (!adminCheck && !validCronSecret) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
