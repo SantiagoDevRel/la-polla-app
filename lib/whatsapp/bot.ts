@@ -3,7 +3,9 @@
 import axios from "axios";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateOTP } from "@/lib/utils/otp";
+import { findPendingOTP, markOTPSent } from "@/lib/utils/otp";
 import { getOTPMessage } from "./messages";
+import { sendCTAButton } from "./interactive";
 import { getState, setState, clearState } from "./state";
 import {
   handleMainMenu,
@@ -189,6 +191,31 @@ export async function processIncomingMessage(message: IncomingMessage) {
     interactive?.list_reply?.title ||
     "[unknown]";
   await logMessage(from, "inbound", type, inboundContent);
+
+  // 0. Check for pending OTP BEFORE normal routing
+  // This allows new users (not yet in DB) to receive their OTP
+  try {
+    const pendingOTP = await findPendingOTP(from);
+    if (pendingOTP) {
+      console.log(`[WA] Found pending OTP for ${from}, delivering...`);
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
+      await sendCTAButton(
+        from,
+        `🔐 *Tu código de verificación*\n\n` +
+          `*${pendingOTP.code}*\n\n` +
+          `Válido por 10 minutos\n` +
+          `Ingresa este código en la app para continuar 👇`,
+        "Abrir La Polla 🐔",
+        `${APP_URL}/verify`,
+        "La Polla Colombiana 🐥"
+      );
+      await markOTPSent(pendingOTP.id);
+      return;
+    }
+  } catch (err) {
+    console.error("[WA] Error checking pending OTP:", err);
+    // Continue normal flow if OTP check fails
+  }
 
   // 1. Lookup user by phone number
   const supabase = createAdminClient();
