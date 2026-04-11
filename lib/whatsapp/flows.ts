@@ -10,7 +10,7 @@ import {
 import { setState } from "./state";
 import { formatTablaWA } from "./tabla";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://lapolla.app";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
 const FOOTER = "La Polla Colombiana 🐥";
 
 const TRN_LABELS: Record<string, string> = {
@@ -45,13 +45,14 @@ export async function handleMainMenu(phone: string, displayName: string) {
 export async function handleUnknownUser(phone: string) {
   await sendTextMessage(
     phone,
-    `¡Ey parce! 👋 No tenés cuenta en La Polla todavía.\n\n` +
-      `Registrate acá y empezá a jugar 🐥`
+    `¡Hola parce! 👋 Bienvenido a La Polla 🐔\n\n` +
+      `Todavía no tenés cuenta, pero eso se arregla en 30 segundos.\n` +
+      `Tocá el botón de abajo y armá tu cuenta para empezar a jugar 👇`
   );
   await sendCTAButton(
     phone,
-    "_Creá tu cuenta en 30 segundos_",
-    "Registrarme 🐥",
+    "¡Listo parce! Creá tu cuenta acá 🎯",
+    "Registrarme 🐔",
     APP_URL,
     FOOTER
   );
