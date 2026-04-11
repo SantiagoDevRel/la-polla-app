@@ -95,6 +95,7 @@ export default function PollaSlugPage() {
   const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
   const [invitePhone, setInvitePhone] = useState("");
+  const [inviteCountryCode, setInviteCountryCode] = useState("57");
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [approvalLoading, setApprovalLoading] = useState<string | null>(null);
@@ -590,20 +591,43 @@ export default function PollaSlugPage() {
                 </h4>
                 <p className="text-xs text-text-secondary">Envía una invitación por WhatsApp a esta polla privada.</p>
                 <div className="flex gap-2">
-                  <input
-                    type="tel"
-                    placeholder="573001234567"
-                    value={invitePhone}
-                    onChange={(e) => { setInvitePhone(e.target.value.replace(/\D/g, "")); setInviteMsg(null); }}
-                    className="flex-1 bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-1 focus:ring-gold/40 focus:border-gold/50 transition-colors"
-                  />
+                  <div className="flex flex-1 rounded-xl overflow-hidden border border-border-subtle focus-within:border-gold/50 transition-colors">
+                    <select
+                      value={inviteCountryCode}
+                      onChange={(e) => { setInviteCountryCode(e.target.value); setInviteMsg(null); }}
+                      className="bg-bg-elevated border-r border-border-subtle px-2 py-3 text-sm text-text-primary outline-none cursor-pointer shrink-0"
+                    >
+                      <option value="57">🇨🇴 +57</option>
+                      <option value="351">🇵🇹 +351</option>
+                      <option value="1">🇺🇸 +1</option>
+                      <option value="34">🇪🇸 +34</option>
+                      <option value="52">🇲🇽 +52</option>
+                      <option value="54">🇦🇷 +54</option>
+                      <option value="55">🇧🇷 +55</option>
+                      <option value="56">🇨🇱 +56</option>
+                      <option value="58">🇻🇪 +58</option>
+                      <option value="593">🇪🇨 +593</option>
+                      <option value="51">🇵🇪 +51</option>
+                      <option value="44">🇬🇧 +44</option>
+                      <option value="33">🇫🇷 +33</option>
+                      <option value="49">🇩🇪 +49</option>
+                    </select>
+                    <input
+                      type="tel"
+                      placeholder="3001234567"
+                      value={invitePhone}
+                      onChange={(e) => { setInvitePhone(e.target.value.replace(/\D/g, "")); setInviteMsg(null); }}
+                      className="flex-1 bg-bg-base px-3 py-3 text-text-primary placeholder:text-text-muted text-sm outline-none min-w-0"
+                    />
+                  </div>
                   <button
-                    disabled={inviteSending || invitePhone.length < 10}
+                    disabled={inviteSending || invitePhone.length < 7}
                     onClick={async () => {
                       setInviteSending(true);
                       setInviteMsg(null);
                       try {
-                        await axios.post(`/api/pollas/${slug}/invite`, { whatsapp_number: invitePhone });
+                        const fullNumber = `${inviteCountryCode}${invitePhone}`;
+                        await axios.post(`/api/pollas/${slug}/invite`, { whatsapp_number: fullNumber });
                         setInviteMsg({ text: "¡Invitación enviada!", type: "success" });
                         setInvitePhone("");
                       } catch (err: unknown) {
