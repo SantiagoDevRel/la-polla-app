@@ -1,6 +1,7 @@
 // app/api/pollas/[slug]/route.ts — GET de una polla por slug con participantes, partidos y predicciones del usuario
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(
   request: NextRequest,
@@ -49,8 +50,10 @@ export async function GET(
       return NextResponse.json({ error: "No tienes acceso a esta polla" }, { status: 403 });
     }
 
-    // Cargar participantes con sus puntos y rank
-    const { data: participants } = await supabase
+    // Cargar participantes aprobados con sus puntos y rank
+    // Uses admin client to bypass RLS (auth already verified above)
+    const adminSupabase = createAdminClient();
+    const { data: participants } = await adminSupabase
       .from("polla_participants")
       .select(`
         *,
@@ -62,6 +65,8 @@ export async function GET(
         )
       `)
       .eq("polla_id", polla.id)
+      .eq("status", "approved")
+      .order("rank", { ascending: true, nullsFirst: false })
       .order("total_points", { ascending: false });
 
     // Cargar partidos — por match_ids si existen, sino por torneo (legacy)
@@ -82,12 +87,33 @@ export async function GET(
       .eq("polla_id", polla.id)
       .eq("user_id", user.id);
 
+    // For admins: also fetch pending participants for approval UI
+    const currentRole = participant?.role || (polla.created_by === user.id ? "admin" : "player");
+    let pendingParticipants: typeof participants = [];
+    if (currentRole === "admin") {
+      const { data: pending } = await adminSupabase
+        .from("polla_participants")
+        .select(`
+          *,
+          users:user_id (
+            id,
+            display_name,
+            whatsapp_number,
+            avatar_url
+          )
+        `)
+        .eq("polla_id", polla.id)
+        .eq("status", "pending");
+      pendingParticipants = pending || [];
+    }
+
     return NextResponse.json({
       polla,
       participants: participants || [],
+      pendingParticipants,
       matches: matches || [],
       predictions: predictions || [],
-      currentUserRole: participant?.role || (polla.created_by === user.id ? "admin" : "player"),
+      currentUserRole: currentRole,
       currentUserStatus: participant?.status || "approved",
       currentUserId: user.id,
     });

@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(true);
 
   const handlePhoneChange = useCallback((value: string) => {
     setPhone(value);
@@ -37,10 +38,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await axios.post("/api/auth/otp", {
+      const { data: otpRes } = await axios.post("/api/auth/otp", {
         phone,
         turnstileToken,
       });
+      setIsNewUser(otpRes.newUser ?? true);
       setStep("whatsapp");
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -139,34 +141,58 @@ export default function LoginPage() {
                 style={{ width: 80, height: 80, objectFit: "cover" }}
               />
             </div>
-            <h1 className="font-display text-[28px] text-gold tracking-wide">
-              ABRE WHATSAPP
-            </h1>
-            <p className="text-text-secondary text-sm mt-2 leading-relaxed">
-              Te enviamos un codigo al abrir el chat.
-              <br />
-              Escribile al bot y recibiras tu codigo de verificacion.
-            </p>
+            {isNewUser ? (
+              <>
+                <h1 className="font-display text-[28px] text-gold tracking-wide">
+                  ABRE WHATSAPP
+                </h1>
+                <p className="text-text-secondary text-sm mt-2 leading-relaxed">
+                  Escribile al bot para recibir tu codigo de verificacion.
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="font-display text-[28px] text-gold tracking-wide">
+                  CODIGO ENVIADO
+                </h1>
+                <p className="text-text-secondary text-sm mt-2 leading-relaxed">
+                  Te enviamos el codigo por WhatsApp.
+                  <br />
+                  Revisá tu chat con La Polla 🐔
+                </p>
+              </>
+            )}
           </div>
 
-          {/* Big WhatsApp button */}
-          <a
-            href={`https://wa.me/${BOT_PHONE}?text=hola`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 bg-gold text-bg-base font-bold py-4 px-4 rounded-xl hover:brightness-110 transition-all text-lg cursor-pointer"
-            style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
-          >
-            <MessageCircle className="w-5 h-5" />
-            Escribirle al bot
-          </a>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-border-subtle" />
-            <span className="text-text-muted text-xs whitespace-nowrap">o ingresa el codigo si ya lo tienes</span>
-            <div className="flex-1 h-px bg-border-subtle" />
-          </div>
+          {isNewUser ? (
+            <>
+              {/* New user: must message bot first (WhatsApp policy) */}
+              <a
+                href={`https://wa.me/${BOT_PHONE}?text=hola`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 bg-gold text-bg-base font-bold py-4 px-4 rounded-xl hover:brightness-110 transition-all text-lg cursor-pointer"
+                style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
+              >
+                <MessageCircle className="w-5 h-5" />
+                Escribirle al bot
+              </a>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border-subtle" />
+                <span className="text-text-muted text-xs whitespace-nowrap">o ingresa el codigo si ya lo tienes</span>
+                <div className="flex-1 h-px bg-border-subtle" />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Returning user: fallback link in case they didn't receive it */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border-subtle" />
+                <span className="text-text-muted text-xs whitespace-nowrap">ingresa el codigo de 6 digitos</span>
+                <div className="flex-1 h-px bg-border-subtle" />
+              </div>
+            </>
+          )}
 
           {/* OTP input */}
           <form onSubmit={handleVerify} className="space-y-3">
@@ -200,6 +226,18 @@ export default function LoginPage() {
             >
               <ArrowLeft className="w-4 h-4" /> Cambiar numero
             </button>
+
+            {!isNewUser && (
+              <a
+                href={`https://wa.me/${BOT_PHONE}?text=hola`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full text-text-muted text-xs text-center hover:text-gold transition-colors flex items-center justify-center gap-1"
+              >
+                <MessageCircle className="w-3 h-3" />
+                No recibiste el codigo? Escribile al bot
+              </a>
+            )}
           </form>
         </div>
       )}

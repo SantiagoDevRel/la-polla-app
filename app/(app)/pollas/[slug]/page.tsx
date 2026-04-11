@@ -82,6 +82,7 @@ export default function PollaSlugPage() {
 
   const [polla, setPolla] = useState<Polla | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [pendingParticipants, setPendingParticipants] = useState<Participant[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
@@ -106,6 +107,7 @@ export default function PollaSlugPage() {
       const { data } = await axios.get(`/api/pollas/${slug}`);
       setPolla(data.polla);
       setParticipants(data.participants);
+      setPendingParticipants(data.pendingParticipants || []);
       setMatches(data.matches);
       setPredictions(data.predictions);
       setCurrentUserId(data.currentUserId);
@@ -624,11 +626,11 @@ export default function PollaSlugPage() {
               </div>
             )}
 
-            {/* Admin: Pending join requests for open pollas */}
-            {currentUserRole === "admin" && participants.filter((p) => p.status === "pending").length > 0 && (
+            {/* Admin: Pending join requests */}
+            {currentUserRole === "admin" && pendingParticipants.length > 0 && (
               <div className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
                 <h4 className="font-bold text-text-primary">Solicitudes de ingreso</h4>
-                {participants.filter((p) => p.status === "pending").map((p) => (
+                {pendingParticipants.map((p) => (
                   <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl p-3 bg-bg-elevated">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-text-primary truncate">{p.users.display_name}</p>
