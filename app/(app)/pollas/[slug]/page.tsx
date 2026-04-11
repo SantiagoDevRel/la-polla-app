@@ -2,7 +2,7 @@
 // 4 tabs: Partidos, Ranking, Pagos, Info — con marcadores Bebas Neue y inputs gold glow
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
@@ -87,10 +87,11 @@ export default function PollaSlugPage() {
   const [currentUserRole, setCurrentUserRole] = useState("");
 
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [savedId, setSavedId] = useState<string | null>(null);
+  const [savingAll, setSavingAll] = useState(false);
   const [isNonParticipant, setIsNonParticipant] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
+  const awayInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const loadData = useCallback(async () => {
     try {
@@ -118,24 +119,33 @@ export default function PollaSlugPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  async function savePred(matchId: string) {
+  // Get match IDs that have been touched and have both scores filled
+  const pendingSaveIds = Array.from(touchedMatches).filter((matchId) => {
     const d = drafts[matchId];
-    if (!d || d.home === "" || d.away === "") return;
-    setSavingId(matchId);
+    return d && d.home !== "" && d.away !== "" && !isLocked(matches.find((m) => m.id === matchId)!);
+  });
+
+  async function saveAllPreds() {
+    if (pendingSaveIds.length === 0) return;
+    setSavingAll(true);
     try {
-      await axios.post(`/api/pollas/${slug}/predictions`, {
-        matchId, predictedHome: parseInt(d.home), predictedAway: parseInt(d.away),
-      });
-      setSavedId(matchId);
-      showToast("Pronóstico guardado", "success");
-      setTimeout(() => setSavedId(null), 2000);
+      await Promise.all(
+        pendingSaveIds.map((matchId) => {
+          const d = drafts[matchId];
+          return axios.post(`/api/pollas/${slug}/predictions`, {
+            matchId, predictedHome: parseInt(d.home), predictedAway: parseInt(d.away),
+          });
+        })
+      );
+      showToast(`${pendingSaveIds.length} pronóstico${pendingSaveIds.length > 1 ? "s" : ""} guardado${pendingSaveIds.length > 1 ? "s" : ""}`, "success");
+      setTouchedMatches(new Set());
       const { data } = await axios.get(`/api/pollas/${slug}`);
       setPredictions(data.predictions);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       showToast(e.response?.data?.error || "Error guardando", "error");
     } finally {
-      setSavingId(null);
+      setSavingAll(false);
     }
   }
 
@@ -328,8 +338,6 @@ export default function PollaSlugPage() {
                 const pred = getPred(match.id);
                 const draft = drafts[match.id] || { home: pred?.predicted_home?.toString() ?? "", away: pred?.predicted_away?.toString() ?? "" };
                 const locked = isLocked(match);
-                const saving = savingId === match.id;
-                const saved = savedId === match.id;
 
                 return (
                   <motion.div key={match.id} variants={fadeUp} className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
@@ -372,7 +380,12 @@ export default function PollaSlugPage() {
                           ) : (
                             <div className="flex items-center gap-2">
                               <input type="number" min={0} max={20} disabled={locked} value={draft.home}
-                                onChange={(e) => setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, home: e.target.value } }))}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, home: val } }));
+                                  setTouchedMatches((prev) => new Set(prev).add(match.id));
+                                  if (val.length >= 1) awayInputRefs.current[match.id]?.focus();
+                                }}
                                 className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
                                   locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
                                   : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
@@ -382,7 +395,11 @@ export default function PollaSlugPage() {
                               />
                               <span className="text-text-muted font-bold">—</span>
                               <input type="number" min={0} max={20} disabled={locked} value={draft.away}
-                                onChange={(e) => setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, away: e.target.value } }))}
+                                ref={(el) => { awayInputRefs.current[match.id] = el; }}
+                                onChange={(e) => {
+                                  setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, away: e.target.value } }));
+                                  setTouchedMatches((prev) => new Set(prev).add(match.id));
+                                }}
                                 className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
                                   locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
                                   : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
@@ -413,18 +430,6 @@ export default function PollaSlugPage() {
                         </div>
                       )}
 
-                      {/* Save button */}
-                      {!locked && match.status === "scheduled" && (
-                        <button onClick={() => savePred(match.id)}
-                          disabled={saving || draft.home === "" || draft.away === ""}
-                          className={`mt-3 w-full py-2.5 rounded-xl text-sm font-semibold uppercase tracking-wide transition-all ${
-                            saved ? "bg-green-live text-bg-base" : "bg-gold text-bg-base hover:brightness-110 disabled:opacity-30"
-                          }`}
-                        >
-                          {saving ? "Guardando..." : saved ? "✅ Guardado" : pred ? "Actualizar" : "Guardar"}
-                        </button>
-                      )}
-
                       {locked && match.status === "scheduled" && (
                         <p className="mt-2 text-xs text-center text-text-muted flex items-center justify-center gap-1"><Lock className="w-3 h-3" /> CERRADO</p>
                       )}
@@ -433,6 +438,21 @@ export default function PollaSlugPage() {
                 );
               })}
               </motion.div>
+            )}
+
+            {/* Sticky bulk save button */}
+            {pendingSaveIds.length > 0 && (
+              <div className="fixed bottom-20 left-0 right-0 px-4 z-30">
+                <div className="max-w-lg mx-auto">
+                  <button
+                    onClick={saveAllPreds}
+                    disabled={savingAll}
+                    className="w-full bg-gold text-bg-base font-display text-lg tracking-wide py-3.5 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_24px_rgba(255,215,0,0.25)] cursor-pointer"
+                  >
+                    {savingAll ? "Guardando..." : `GUARDAR ${pendingSaveIds.length} PRONÓSTICO${pendingSaveIds.length > 1 ? "S" : ""}`}
+                  </button>
+                </div>
+              </div>
             )}
           </>
         )}
