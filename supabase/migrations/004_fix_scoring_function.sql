@@ -6,6 +6,9 @@
 -- updates the on_match_finished trigger to pass new params.
 -- ============================================================
 
+-- 0. Drop old 7-param overload so it doesn't linger
+DROP FUNCTION IF EXISTS calculate_prediction_points(int,int,int,int,int,int,int);
+
 -- 1. Add missing scoring columns to pollas
 ALTER TABLE pollas
   ADD COLUMN IF NOT EXISTS points_goal_diff int DEFAULT 3,
