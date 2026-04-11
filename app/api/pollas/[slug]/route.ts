@@ -34,6 +34,18 @@ export async function GET(
       .single();
 
     if (!participant && polla.created_by !== user.id) {
+      // For open pollas, return limited info so the UI can show a join button
+      if (polla.type === "open") {
+        return NextResponse.json({
+          polla,
+          participants: [],
+          matches: [],
+          predictions: [],
+          currentUserRole: "none",
+          currentUserId: user.id,
+          isNonParticipant: true,
+        });
+      }
       return NextResponse.json({ error: "No tienes acceso a esta polla" }, { status: 403 });
     }
 
