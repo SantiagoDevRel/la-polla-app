@@ -10,7 +10,8 @@ const updateSchema = z.object({
   display_name: z
     .string()
     .min(2, "El nombre debe tener al menos 2 caracteres")
-    .max(50, "El nombre debe tener máximo 50 caracteres"),
+    .max(50, "El nombre debe tener máximo 50 caracteres")
+    .optional(),
   avatar_url: z.string().max(50).optional(),
 });
 
@@ -97,8 +98,13 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const updateData: Record<string, string> = { display_name: parsed.data.display_name };
+    const updateData: Record<string, string> = {};
+    if (parsed.data.display_name) updateData.display_name = parsed.data.display_name;
     if (parsed.data.avatar_url) updateData.avatar_url = parsed.data.avatar_url;
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
+    }
 
     const { error } = await supabase
       .from("users")
