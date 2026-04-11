@@ -43,12 +43,19 @@ export async function POST(
     }
 
     // Verificar que el usuario es participante
-    const { data: participant } = await supabase
+    const { data: participant, error: participantError } = await supabase
       .from("polla_participants")
-      .select("id")
+      .select("id, status, role")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
       .single();
+
+    console.log("DEBUG participant check:", {
+      userId: user.id,
+      pollaId: polla.id,
+      participantData: participant,
+      participantError: participantError?.message || null,
+    });
 
     if (!participant) {
       return NextResponse.json({ error: "No eres participante de esta polla" }, { status: 403 });
