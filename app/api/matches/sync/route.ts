@@ -6,7 +6,7 @@ import { syncCompetition, syncAllCompetitions, COMPETITIONS } from "@/lib/footba
 
 export async function GET(request: NextRequest) {
   const secret = request.nextUrl.searchParams.get("secret") || request.headers.get("x-cron-secret");
-  const validSecret = process.env.CRON_SECRET || process.env.NEXT_PUBLIC_CRON_SECRET;
+  const validSecret = process.env.CRON_SECRET;
   if (!validSecret || secret !== validSecret) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
-  const validSecret = process.env.CRON_SECRET || process.env.NEXT_PUBLIC_CRON_SECRET;
+  const validSecret = process.env.CRON_SECRET;
   if (!validSecret || secret !== validSecret) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }

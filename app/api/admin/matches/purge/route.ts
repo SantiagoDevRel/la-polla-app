@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
-  const validSecret = process.env.CRON_SECRET || process.env.NEXT_PUBLIC_CRON_SECRET;
+  const validSecret = process.env.CRON_SECRET;
   if (!validSecret || secret !== validSecret) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
