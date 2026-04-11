@@ -67,11 +67,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if returning user (exists in public.users)
+    // DB stores phone without + prefix (e.g. "351934255581")
+    const normalizedPhone = parsed.data.phone.replace(/^\+/, "");
     const admin = createAdminClient();
     const { data: existingUser } = await admin
       .from("users")
       .select("id")
-      .eq("whatsapp_number", parsed.data.phone)
+      .eq("whatsapp_number", normalizedPhone)
       .single();
 
     // Generate OTP and save to Supabase
@@ -83,7 +85,7 @@ export async function POST(request: NextRequest) {
       try {
         const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
         await sendCTAButton(
-          parsed.data.phone,
+          normalizedPhone,
           `🔐 *Tu código de verificación*\n\n*${otpCode}*\n\nVálido por 10 minutos\nIngresa este código en la app para continuar 👇`,
           "Abrir La Polla 🐔",
           `${APP_URL}/verify`,

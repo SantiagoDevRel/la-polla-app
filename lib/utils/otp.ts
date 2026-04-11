@@ -11,6 +11,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export async function generateOTP(phoneNumber: string): Promise<string> {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
+  // Normalize: strip + prefix so phone matches DB format (e.g. "351934255581")
+  const normalizedPhone = phoneNumber.replace(/^\+/, "");
 
   const supabase = createAdminClient();
 
@@ -21,21 +23,21 @@ export async function generateOTP(phoneNumber: string): Promise<string> {
     .eq("message_type", "otp")
     .eq("status", "sent")
     .eq("otp_sent", false)
-    .like("content", `%${phoneNumber}%`);
+    .like("content", `%${normalizedPhone}%`);
 
   // Look up user by phone (may not exist yet for new users)
   const { data: user } = await supabase
     .from("users")
     .select("id")
-    .eq("whatsapp_number", phoneNumber)
+    .eq("whatsapp_number", normalizedPhone)
     .single();
 
-  // Insert new OTP record
+  // Insert new OTP record — store phone without + for consistent lookups
   await supabase.from("whatsapp_messages").insert({
     user_id: user?.id || null,
     direction: "outbound",
     message_type: "otp",
-    content: JSON.stringify({ phone: phoneNumber, code }),
+    content: JSON.stringify({ phone: normalizedPhone, code }),
     status: "sent",
     expires_at: expiresAt,
     otp_sent: false,
@@ -53,6 +55,8 @@ export async function validateOTP(
   code: string
 ): Promise<boolean> {
   const supabase = createAdminClient();
+  // Normalize: strip + prefix so phone matches stored format
+  const normalizedPhone = phoneNumber.replace(/^\+/, "");
 
   // Find a valid OTP record for this phone
   const { data: records } = await supabase
@@ -70,7 +74,7 @@ export async function validateOTP(
   const match = records.find((r) => {
     try {
       const parsed = JSON.parse(r.content);
-      return parsed.phone === phoneNumber && parsed.code === code;
+      return parsed.phone === normalizedPhone && parsed.code === code;
     } catch {
       return false;
     }
@@ -96,6 +100,8 @@ export async function findPendingOTP(
   phoneNumber: string
 ): Promise<{ id: string; code: string } | null> {
   const supabase = createAdminClient();
+  // Normalize: strip + prefix so phone matches stored format
+  const normalizedPhone = phoneNumber.replace(/^\+/, "");
 
   const { data: records } = await supabase
     .from("whatsapp_messages")
@@ -112,7 +118,7 @@ export async function findPendingOTP(
   const match = records.find((r) => {
     try {
       const parsed = JSON.parse(r.content);
-      return parsed.phone === phoneNumber;
+      return parsed.phone === normalizedPhone;
     } catch {
       return false;
     }
