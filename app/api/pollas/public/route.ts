@@ -2,6 +2,9 @@
 // No requiere autenticación — solo retorna datos no sensibles
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { TOURNAMENTS } from "@/lib/tournaments";
+
+const VALID_TOURNAMENTS = TOURNAMENTS.map((t) => t.slug);
 
 export async function GET() {
   try {
@@ -12,6 +15,7 @@ export async function GET() {
       .select("id, slug, name, description, tournament, buy_in_amount, currency, payment_mode, type, created_at")
       .eq("type", "open")
       .eq("status", "active")
+      .in("tournament", VALID_TOURNAMENTS)
       .order("created_at", { ascending: false })
       .limit(20);
 
