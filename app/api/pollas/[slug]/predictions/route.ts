@@ -34,12 +34,18 @@ export async function POST(
     // Obtener la polla por slug
     const { data: polla, error: pollaError } = await supabase
       .from("pollas")
-      .select("id")
+      .select("id, match_ids")
       .eq("slug", params.slug)
       .single();
 
     if (pollaError || !polla) {
       return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
+    }
+
+    // If polla has specific match_ids, validate the match belongs to this polla
+    const validMatchIds: string[] = polla.match_ids ?? [];
+    if (validMatchIds.length > 0 && !validMatchIds.includes(parsed.data.matchId)) {
+      return NextResponse.json({ error: "Este partido no pertenece a esta polla" }, { status: 400 });
     }
 
     // Verificar que el usuario es participante aprobado

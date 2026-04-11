@@ -1,10 +1,11 @@
 // app/api/auth/otp/route.ts — Endpoint para generar y validar códigos OTP
 // OTP is saved to Supabase. The WhatsApp bot detects it when the user messages.
 import { NextRequest, NextResponse } from "next/server";
-import { generateOTP, validateOTP } from "@/lib/utils/otp";
+import { generateOTP, validateOTP, markOTPSent } from "@/lib/utils/otp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
+import { sendCTAButton } from "@/lib/whatsapp/interactive";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -65,10 +66,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate OTP and save to Supabase (bot will deliver it when user messages)
-    await generateOTP(parsed.data.phone);
+    // Check if returning user (exists in public.users)
+    const admin = createAdminClient();
+    const { data: existingUser } = await admin
+      .from("users")
+      .select("id")
+      .eq("whatsapp_number", parsed.data.phone)
+      .single();
 
-    return NextResponse.json({ success: true });
+    // Generate OTP and save to Supabase
+    const otpCode = await generateOTP(parsed.data.phone);
+
+    // For returning users: send OTP proactively via WhatsApp
+    // (WhatsApp allows proactive messages to users who have messaged before)
+    if (existingUser) {
+      try {
+        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
+        await sendCTAButton(
+          parsed.data.phone,
+          `🔐 *Tu código de verificación*\n\n*${otpCode}*\n\nVálido por 10 minutos\nIngresa este código en la app para continuar 👇`,
+          "Abrir La Polla 🐔",
+          `${APP_URL}/verify`,
+          "La Polla Colombiana 🐥"
+        );
+        // Mark OTP as sent since we delivered it proactively
+        // Find the OTP record we just created and mark it
+        const { findPendingOTP } = await import("@/lib/utils/otp");
+        const pending = await findPendingOTP(parsed.data.phone);
+        if (pending) await markOTPSent(pending.id);
+      } catch (waErr) {
+        // Log but don't fail — user can still get OTP via bot
+        console.error("[OTP] Error sending proactive WhatsApp:", waErr);
+      }
+    }
+
+    return NextResponse.json({ success: true, newUser: !existingUser });
   } catch (error) {
     console.error("Error generando OTP:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
