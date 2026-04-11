@@ -8,7 +8,7 @@ export const POLLITO_TYPES = [
   { id: 'costeno', label: 'Costeño' },
   { id: 'gambeteador', label: 'Gambeteador' },
   { id: 'goleador', label: 'Goleador' },
-  { id: 'negro', label: 'Chocoano' },
+  { id: 'negro', label: 'El Parchado' },
   { id: 'paisa', label: 'Mexicano' },
   { id: 'pibe', label: 'El Pibe' },
   { id: 'rasta', label: 'Bob Marley' },
