@@ -110,7 +110,7 @@ export async function sendCTAButton(
       name: "cta_url",
       parameters: {
         display_text: buttonLabel,
-        url,
+        url: url.trim(),
       },
     },
   };

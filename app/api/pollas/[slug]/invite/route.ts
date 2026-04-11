@@ -13,6 +13,14 @@ const inviteSchema = z.object({
 const APP_URL =
   process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
 
+function normalizePhone(phone: string): string {
+  const cleaned = phone.replace(/[\s\-\(\)]/g, "");
+  const noPlus = cleaned.replace(/^\+/, "");
+  if (noPlus.startsWith("57")) return noPlus;
+  if (noPlus.startsWith("3") && noPlus.length === 10) return "57" + noPlus;
+  return noPlus;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } }
@@ -67,14 +75,14 @@ export async function POST(
       );
     }
 
-    const { whatsapp_number } = parsed.data;
+    const normalizedPhone = normalizePhone(parsed.data.whatsapp_number);
 
     // Check if already invited (pending)
     const { data: existingInvite } = await admin
       .from("polla_invites")
       .select("id, status")
       .eq("polla_id", polla.id)
-      .eq("whatsapp_number", whatsapp_number)
+      .eq("whatsapp_number", normalizedPhone)
       .eq("status", "pending")
       .single();
 
@@ -89,7 +97,7 @@ export async function POST(
     const { data: existingUser } = await admin
       .from("users")
       .select("id")
-      .eq("whatsapp_number", whatsapp_number)
+      .eq("whatsapp_number", normalizedPhone)
       .single();
 
     if (existingUser) {
@@ -108,6 +116,14 @@ export async function POST(
       }
     }
 
+    // Get inviter name for the WhatsApp message
+    const { data: inviterUser } = await admin
+      .from("users")
+      .select("display_name")
+      .eq("id", user.id)
+      .single();
+    const inviterName = inviterUser?.display_name || "Alguien";
+
     // Generate token and insert invite
     const token = crypto.randomUUID();
     const expiresAt = new Date(
@@ -117,7 +133,7 @@ export async function POST(
     const { error: insertError } = await admin.from("polla_invites").insert({
       polla_id: polla.id,
       invited_by: user.id,
-      whatsapp_number,
+      whatsapp_number: normalizedPhone,
       token,
       status: "pending",
       expires_at: expiresAt,
@@ -127,13 +143,24 @@ export async function POST(
 
     // Send WhatsApp invitation
     try {
-      await sendCTAButton(
-        whatsapp_number,
-        `¡Hola parce! 👋 Te invitaron a la polla *${polla.name}*.\n\nTocá el link para unirte y empezar a jugar 🐔`,
-        "Unirme a la polla",
-        `${APP_URL}/invites/${token}`,
-        "La Polla Colombiana 🐥"
-      );
+      const inviteUrl = `${APP_URL}/invites/${token}`;
+      if (existingUser) {
+        await sendCTAButton(
+          normalizedPhone,
+          `Parce, *${inviterName}* te invitó a la polla *${polla.name}* 🐣\n\nTocá el botón para entrar y poner tus pronósticos 👇`,
+          "Entrar a la polla 🏆",
+          inviteUrl,
+          "La Polla Colombiana 🐥"
+        );
+      } else {
+        await sendCTAButton(
+          normalizedPhone,
+          `Parce, *${inviterName}* te invitó a jugar La Polla 🐣\n\nRegistrate gratis y entrá directamente a la polla 👇`,
+          "Registrarme y entrar 🎯",
+          `${APP_URL}/login?invite=${token}`,
+          "La Polla Colombiana 🐥"
+        );
+      }
     } catch (waErr) {
       // Log but don't fail — invite is still valid via link
       console.error("[invite] Error sending WhatsApp:", waErr);
