@@ -88,6 +88,7 @@ export async function GET(
       matches: matches || [],
       predictions: predictions || [],
       currentUserRole: participant?.role || (polla.created_by === user.id ? "admin" : "player"),
+      currentUserStatus: participant?.status || "approved",
       currentUserId: user.id,
     });
   } catch (error) {

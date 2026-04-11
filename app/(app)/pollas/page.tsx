@@ -7,13 +7,21 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import PollaCard, { TOURNAMENT_ICONS } from "@/components/shared/PollaCard";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
-import { Plus } from "lucide-react";
+import { Plus, Mail } from "lucide-react";
 
 interface PollaData {
   id: string; name: string; slug: string; description?: string;
   tournament: string; status: string; buy_in_amount: number;
   currency: string; payment_mode: string; type: string;
   participant_count?: number;
+}
+
+interface PendingInvite {
+  id: string;
+  token: string;
+  expires_at: string;
+  polla: { id: string; name: string; slug: string; tournament: string } | null;
+  inviter: { id: string; display_name: string } | null;
 }
 
 import { getTournamentName } from "@/lib/tournaments";
@@ -23,13 +31,20 @@ type TabFilter = "active" | "finished";
 export default function MisPollasPage() {
   const router = useRouter();
   const [pollas, setPollas] = useState<PollaData[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabFilter>("active");
 
   useEffect(() => {
     async function load() {
-      try { const { data } = await axios.get("/api/pollas"); setPollas(data.pollas || []); }
-      catch { /* silently fail */ }
+      try {
+        const [pollasRes, invitesRes] = await Promise.all([
+          axios.get("/api/pollas"),
+          axios.get("/api/invites/pending").catch(() => ({ data: { invites: [] } })),
+        ]);
+        setPollas(pollasRes.data.pollas || []);
+        setPendingInvites(invitesRes.data.invites || []);
+      } catch { /* silently fail */ }
       finally { setLoading(false); }
     }
     load();
@@ -111,6 +126,37 @@ export default function MisPollasPage() {
             Terminadas
           </button>
         </div>
+
+        {/* Pending invites */}
+        {pendingInvites.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-bold text-gold flex items-center gap-1.5">
+              <Mail className="w-4 h-4" /> Te invitaron
+            </h3>
+            {pendingInvites.map((invite) => (
+              <div
+                key={invite.id}
+                className="rounded-xl p-3 bg-gold/10 border border-gold/20 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-text-primary truncate">
+                    {invite.polla?.name || "Polla"}
+                  </p>
+                  <p className="text-xs text-text-secondary truncate">
+                    {invite.inviter?.display_name ? `Invitó: ${invite.inviter.display_name}` : ""}{" "}
+                    {invite.polla?.tournament ? `· ${getTournamentName(invite.polla.tournament)}` : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push(`/invites/${invite.token}`)}
+                  className="flex-shrink-0 bg-gold text-bg-base text-xs font-semibold px-3 py-2 rounded-lg hover:brightness-110 transition-all cursor-pointer"
+                >
+                  Ver
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-8">

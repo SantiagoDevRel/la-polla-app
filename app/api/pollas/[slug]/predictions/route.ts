@@ -42,16 +42,24 @@ export async function POST(
       return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
     }
 
-    // Verificar que el usuario es participante
+    // Verificar que el usuario es participante aprobado
     const { data: participant } = await supabase
       .from("polla_participants")
-      .select("id")
+      .select("id, status")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
       .single();
 
     if (!participant) {
       return NextResponse.json({ error: "No eres participante de esta polla" }, { status: 403 });
+    }
+
+    if (participant.status === "pending") {
+      return NextResponse.json({ error: "Tu solicitud está pendiente de aprobación" }, { status: 403 });
+    }
+
+    if (participant.status === "rejected") {
+      return NextResponse.json({ error: "Tu solicitud fue rechazada" }, { status: 403 });
     }
 
     // Upsert del pronóstico — el trigger check_prediction_lock en Supabase bloquea si falta menos de 5 min

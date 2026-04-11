@@ -48,20 +48,23 @@ export async function POST(
       return NextResponse.json({ error: "Ya eres participante", polla: { slug: polla.slug } }, { status: 409 });
     }
 
-    // Insertar como participante
+    // Insertar como participante — open pollas require admin approval
     const { error: insertError } = await supabase
       .from("polla_participants")
       .insert({
         polla_id: polla.id,
         user_id: user.id,
         role: "player",
-        status: "approved",
+        status: "pending",
         paid: false,
       });
 
     if (insertError) throw insertError;
 
-    return NextResponse.json({ success: true, polla: { slug: polla.slug } }, { status: 201 });
+    return NextResponse.json(
+      { success: true, status: "pending", message: "Solicitud enviada. El admin debe aprobarte.", polla: { slug: polla.slug } },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error uniéndose a polla:", error);
     return NextResponse.json({ error: "Error al unirse" }, { status: 500 });

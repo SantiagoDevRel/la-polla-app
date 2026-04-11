@@ -27,7 +27,7 @@ interface Polla {
   admin_payment_instructions: string | null;
 }
 interface Participant {
-  id: string; user_id: string; role: string; total_points: number; rank: number;
+  id: string; user_id: string; role: string; status: string; total_points: number; rank: number;
   paid: boolean;
   users: { id: string; display_name: string; whatsapp_number: string; avatar_url: string | null };
 }
@@ -86,12 +86,17 @@ export default function PollaSlugPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserRole, setCurrentUserRole] = useState("");
+  const [currentUserStatus, setCurrentUserStatus] = useState("approved");
 
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
   const [savingAll, setSavingAll] = useState(false);
   const [isNonParticipant, setIsNonParticipant] = useState(false);
   const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [approvalLoading, setApprovalLoading] = useState<string | null>(null);
   const awayInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const homeInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -105,6 +110,7 @@ export default function PollaSlugPage() {
       setPredictions(data.predictions);
       setCurrentUserId(data.currentUserId);
       setCurrentUserRole(data.currentUserRole);
+      setCurrentUserStatus(data.currentUserStatus || "approved");
       setIsNonParticipant(data.isNonParticipant || false);
       const d: Record<string, { home: string; away: string }> = {};
       data.predictions.forEach((p: Prediction) => {
@@ -330,6 +336,18 @@ export default function PollaSlugPage() {
         {/* ── TAB PARTIDOS ── */}
         {activeTab === "partidos" && (
           <>
+            {currentUserStatus === "pending" && (
+              <div className="rounded-xl p-4 bg-gold/10 border border-gold/20 text-center mb-3">
+                <p className="text-sm text-gold font-semibold">Tu solicitud está pendiente</p>
+                <p className="text-xs text-text-secondary mt-1">El admin debe aprobarte para que puedas enviar pronósticos.</p>
+              </div>
+            )}
+            {currentUserStatus === "rejected" && (
+              <div className="rounded-xl p-4 bg-red-alert/10 border border-red-alert/20 text-center mb-3">
+                <p className="text-sm text-red-alert font-semibold">Tu solicitud fue rechazada</p>
+                <p className="text-xs text-text-secondary mt-1">El admin de esta polla rechazó tu solicitud de ingreso.</p>
+              </div>
+            )}
             {matches.length === 0 ? (
               <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
                 <p className="text-text-muted">No hay partidos cargados aun. Los partidos se actualizaran cuando el calendario sea confirmado.</p>
@@ -561,6 +579,96 @@ export default function PollaSlugPage() {
                 <div className="flex justify-between items-center"><span className="text-text-secondary">❌ Sin aciertos</span><span className="font-bold text-text-muted">0 pts</span></div>
               </div>
             </div>
+
+            {/* WhatsApp invite for admin of closed pollas */}
+            {currentUserRole === "admin" && polla.type === "closed" && (
+              <div className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
+                <h4 className="font-bold text-text-primary flex items-center gap-2">
+                  <Handshake className="w-4 h-4 text-gold" /> Invitar participante
+                </h4>
+                <p className="text-xs text-text-secondary">Envía una invitación por WhatsApp a esta polla privada.</p>
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    placeholder="573001234567"
+                    value={invitePhone}
+                    onChange={(e) => { setInvitePhone(e.target.value.replace(/\D/g, "")); setInviteMsg(null); }}
+                    className="flex-1 bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted text-sm focus:outline-none focus:ring-1 focus:ring-gold/40 focus:border-gold/50 transition-colors"
+                  />
+                  <button
+                    disabled={inviteSending || invitePhone.length < 10}
+                    onClick={async () => {
+                      setInviteSending(true);
+                      setInviteMsg(null);
+                      try {
+                        await axios.post(`/api/pollas/${slug}/invite`, { whatsapp_number: invitePhone });
+                        setInviteMsg({ text: "¡Invitación enviada!", type: "success" });
+                        setInvitePhone("");
+                      } catch (err: unknown) {
+                        const e = err as { response?: { data?: { error?: string } } };
+                        setInviteMsg({ text: e.response?.data?.error || "Error enviando", type: "error" });
+                      } finally {
+                        setInviteSending(false);
+                      }
+                    }}
+                    className="bg-gold text-bg-base font-semibold px-4 py-3 rounded-xl text-sm hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
+                  >
+                    {inviteSending ? "..." : "Enviar"}
+                  </button>
+                </div>
+                {inviteMsg && (
+                  <p className={`text-xs ${inviteMsg.type === "success" ? "text-green-live" : "text-red-alert"}`}>
+                    {inviteMsg.text}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Admin: Pending join requests for open pollas */}
+            {currentUserRole === "admin" && participants.filter((p) => p.status === "pending").length > 0 && (
+              <div className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
+                <h4 className="font-bold text-text-primary">Solicitudes de ingreso</h4>
+                {participants.filter((p) => p.status === "pending").map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl p-3 bg-bg-elevated">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-text-primary truncate">{p.users.display_name}</p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        disabled={approvalLoading === p.user_id}
+                        onClick={async () => {
+                          setApprovalLoading(p.user_id);
+                          try {
+                            await axios.patch(`/api/pollas/${slug}/participants/${p.user_id}`, { action: "approve" });
+                            showToast("Participante aprobado", "success");
+                            loadData();
+                          } catch { showToast("Error al aprobar", "error"); }
+                          finally { setApprovalLoading(null); }
+                        }}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-live/20 text-green-live hover:bg-green-live/30 disabled:opacity-40 transition-all cursor-pointer"
+                      >
+                        Aprobar
+                      </button>
+                      <button
+                        disabled={approvalLoading === p.user_id}
+                        onClick={async () => {
+                          setApprovalLoading(p.user_id);
+                          try {
+                            await axios.patch(`/api/pollas/${slug}/participants/${p.user_id}`, { action: "reject" });
+                            showToast("Solicitud rechazada", "success");
+                            loadData();
+                          } catch { showToast("Error al rechazar", "error"); }
+                          finally { setApprovalLoading(null); }
+                        }}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-alert/20 text-red-alert hover:bg-red-alert/30 disabled:opacity-40 transition-all cursor-pointer"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <button onClick={() => setShowInviteModal(true)} className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all">
               <Share2 className="w-4 h-4 inline-block mr-1" /> Invitar amigos
