@@ -22,6 +22,7 @@ interface Polla {
   id: string; slug: string; name: string; description: string;
   tournament: string; status: string; buy_in_amount: number; currency: string;
   payment_mode: string; points_exact: number; points_winner: number;
+  points_goal_diff: number; points_correct_result: number;
   points_one_team: number; created_by: string; scope: string; type: string;
   admin_payment_instructions: string | null;
 }
@@ -538,11 +539,13 @@ export default function PollaSlugPage() {
             </div>
 
             <div className="rounded-2xl p-5 bg-bg-card border border-border-subtle">
-              <h4 className="font-bold text-text-primary mb-2">Sistema de puntos</h4>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between"><span className="text-text-secondary">Marcador exacto</span><span className="font-bold text-gold">{polla.points_exact} pts</span></div>
-                <div className="flex justify-between"><span className="text-text-secondary">Resultado correcto</span><span className="font-bold text-blue-info">{polla.points_winner} pts</span></div>
-                <div className="flex justify-between"><span className="text-text-secondary">Un equipo exacto</span><span className="font-bold text-text-secondary">{polla.points_one_team} pt</span></div>
+              <h4 className="font-bold text-text-primary mb-3">Sistema de puntos</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between items-center"><span className="text-text-secondary">🎯 Marcador exacto</span><span className="font-bold text-gold">{polla.points_exact} pts</span></div>
+                <div className="flex justify-between items-center"><span className="text-text-secondary">⚽ Ganador + diferencia de gol</span><span className="font-bold text-gold">{polla.points_goal_diff ?? 3} pts</span></div>
+                <div className="flex justify-between items-center"><span className="text-text-secondary">✅ Ganador correcto</span><span className="font-bold text-gold">{polla.points_correct_result ?? 2} pts</span></div>
+                <div className="flex justify-between items-center"><span className="text-text-secondary">1️⃣ Un equipo exacto</span><span className="font-bold text-text-secondary">{polla.points_one_team} pt</span></div>
+                <div className="flex justify-between items-center"><span className="text-text-secondary">❌ Sin aciertos</span><span className="font-bold text-text-muted">0 pts</span></div>
               </div>
             </div>
 
