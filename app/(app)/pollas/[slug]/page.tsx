@@ -358,15 +358,15 @@ export default function PollaSlugPage() {
                     <div className="p-4">
                       <div className="flex items-center gap-3">
                         {/* Home */}
-                        <div className="flex-1 text-right">
+                        <div className="flex-1 min-w-0 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <p className="font-semibold text-sm text-text-primary truncate">{match.home_team}</p>
-                            <TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} />
+                            <p className="font-semibold text-sm text-text-primary truncate min-w-0">{match.home_team}</p>
+                            <span className="flex-shrink-0"><TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} /></span>
                           </div>
                         </div>
 
                         {/* Score / Input */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex-shrink-0 flex items-center gap-2">
                           {match.status === "finished" || match.status === "live" ? (
                             <div className="flex items-center gap-2 px-3">
                               <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
@@ -412,10 +412,10 @@ export default function PollaSlugPage() {
                         </div>
 
                         {/* Away */}
-                        <div className="flex-1 text-left">
+                        <div className="flex-1 min-w-0 text-left">
                           <div className="flex items-center gap-2">
-                            <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
-                            <p className="font-semibold text-sm text-text-primary truncate">{match.away_team}</p>
+                            <span className="flex-shrink-0"><TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} /></span>
+                            <p className="font-semibold text-sm text-text-primary truncate min-w-0">{match.away_team}</p>
                           </div>
                         </div>
                       </div>
