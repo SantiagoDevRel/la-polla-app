@@ -89,6 +89,8 @@ export default function PollaSlugPage() {
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [isNonParticipant, setIsNonParticipant] = useState(false);
+  const [joining, setJoining] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -100,6 +102,7 @@ export default function PollaSlugPage() {
       setPredictions(data.predictions);
       setCurrentUserId(data.currentUserId);
       setCurrentUserRole(data.currentUserRole);
+      setIsNonParticipant(data.isNonParticipant || false);
       const d: Record<string, { home: string; away: string }> = {};
       data.predictions.forEach((p: Prediction) => {
         d[p.match_id] = { home: p.predicted_home.toString(), away: p.predicted_away.toString() };
@@ -175,7 +178,78 @@ export default function PollaSlugPage() {
     );
   }
 
+  async function joinPolla() {
+    setJoining(true);
+    try {
+      await axios.post(`/api/pollas/${slug}/join`);
+      showToast("Te uniste a la polla", "success");
+      setIsNonParticipant(false);
+      loadData();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      showToast(e.response?.data?.error || "Error al unirse", "error");
+    } finally {
+      setJoining(false);
+    }
+  }
+
   const myP = participants.find((p) => p.user_id === currentUserId);
+
+  // Non-participant view for open pollas
+  if (isNonParticipant && polla.type === "open") {
+    return (
+      <div className="min-h-screen">
+        <header className="px-4 pt-4 pb-3" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
+          <div className="max-w-lg mx-auto">
+            <div className="flex items-center gap-3 mb-2">
+              <button onClick={() => router.push("/pollas")} className="text-text-secondary text-xl">←</button>
+              <h1 className="text-lg font-bold text-text-primary truncate flex-1">{polla.name}</h1>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-lg mx-auto p-4 space-y-4">
+          <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle space-y-4">
+            <Target className="w-12 h-12 text-gold mx-auto" />
+            <h2 className="font-display text-2xl text-text-primary tracking-wide">POLLA ABIERTA</h2>
+            {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-xl p-2 bg-bg-elevated">
+                <p className="text-[10px] text-text-muted">Torneo</p>
+                <p className="font-medium text-text-primary text-sm">{getTournamentBySlug(polla.tournament)?.name || polla.tournament}</p>
+              </div>
+              <div className="rounded-xl p-2 bg-bg-elevated">
+                <p className="text-[10px] text-text-muted">Buy-in</p>
+                <p className="font-medium text-text-primary text-sm">${polla.buy_in_amount?.toLocaleString("es-CO")} {polla.currency}</p>
+              </div>
+            </div>
+            <button
+              onClick={joinPolla}
+              disabled={joining}
+              className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer"
+            >
+              {joining ? "Uniéndose..." : "Unirse a la polla"}
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Non-participant view for closed pollas (should rarely reach here due to API 403)
+  if (isNonParticipant && polla.type === "closed") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="rounded-2xl p-6 text-center max-w-sm w-full bg-bg-card border border-border-subtle space-y-3">
+          <Lock className="w-10 h-10 text-text-muted mx-auto" />
+          <p className="text-text-primary font-medium">Esta polla es privada</p>
+          <p className="text-sm text-text-secondary">El admin debe invitarte para participar.</p>
+          <button onClick={() => router.push("/pollas")} className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold cursor-pointer">
+            Volver
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
     { key: "partidos", label: "Partidos", icon: <Target className="w-4 h-4" />, show: true },
