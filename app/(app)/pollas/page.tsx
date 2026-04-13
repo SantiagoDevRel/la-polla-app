@@ -10,7 +10,9 @@ import { Plus, Mail, ChevronDown, ChevronRight } from "lucide-react";
 
 interface PollaData {
   id: string; name: string; slug: string; description?: string;
-  tournament: string; status: string; buy_in_amount: number;
+  tournament: string; status: string;
+  effective_status?: string;
+  buy_in_amount: number;
   currency: string; payment_mode: string; type: string;
   participant_count?: number;
   winner?: { display_name: string; total_points: number } | null;
@@ -48,8 +50,11 @@ export default function MisPollasPage() {
     load();
   }, []);
 
-  const active = pollas.filter((p) => p.status === "active");
-  const ended = pollas.filter((p) => p.status === "ended");
+  // Use server-computed effective_status so a polla whose matches are all past
+  // shows under Finalizadas even if the auto-close trigger hasn't run.
+  const statusOf = (p: PollaData) => p.effective_status || p.status;
+  const active = pollas.filter((p) => statusOf(p) === "active");
+  const ended = pollas.filter((p) => statusOf(p) === "ended");
 
   return (
     <div className="min-h-screen">
