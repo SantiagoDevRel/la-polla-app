@@ -28,6 +28,26 @@ export default function AdminMatchesPage() {
   const [loading, setLoading] = useState<number | null>(null);
   const [purging, setPurging] = useState(false);
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
+  const [syncingWc, setSyncingWc] = useState(false);
+  const [wcResult, setWcResult] = useState<string | null>(null);
+
+  async function handleSyncWorldCup() {
+    setSyncingWc(true);
+    setWcResult(null);
+    try {
+      const res = await fetch("/api/admin/sync-worldcup", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error en sync");
+      setWcResult(
+        `${data.synced} sincronizados · ${data.skipped} saltados · ${data.errors} errores`
+      );
+    } catch (err: unknown) {
+      const e = err as Error;
+      setWcResult(`Error: ${e.message || "desconocido"}`);
+    } finally {
+      setSyncingWc(false);
+    }
+  }
 
   async function handlePurge() {
     if (!confirm("Eliminar todos los partidos anteriores al 1 enero 2026?")) return;
@@ -135,6 +155,32 @@ export default function AdminMatchesPage() {
             </p>
           </div>
         </div>
+
+        {/* Sync desde openfootball (fuente pública, ya tiene el calendario 2026) */}
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="rounded-2xl p-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 hover:shadow-[0_0_20px_rgba(255,215,0,0.08)] transition-all duration-300">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="font-bold text-text-primary">Sync Mundial 2026 (openfootball)</p>
+              <p className="text-xs text-text-muted">Fuente pública con el fixture oficial publicado</p>
+            </div>
+            <button
+              onClick={handleSyncWorldCup}
+              disabled={syncingWc}
+              className="flex items-center gap-1.5 bg-gold text-bg-base px-5 py-3 rounded-xl text-sm font-semibold
+                         hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] disabled:opacity-40 transition-all duration-200 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingWc ? "animate-spin" : ""}`} />
+              {syncingWc ? "Sync..." : "Sync"}
+            </button>
+          </div>
+          {wcResult && (
+            <div className={`rounded-lg p-3 text-sm ${
+              wcResult.startsWith("Error") ? "bg-red-dim text-red-alert" : "bg-green-dim text-green-live"
+            }`}>
+              <p>{wcResult}</p>
+            </div>
+          )}
+        </motion.div>
 
         {/* Purgar partidos antiguos */}
         <div className="rounded-xl p-4 bg-bg-card border border-border-subtle space-y-3">
