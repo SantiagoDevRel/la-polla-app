@@ -1,5 +1,6 @@
 // app/api/webhooks/wompi/route.ts — Recibe eventos de Wompi y aprueba participantes.
-// Verifica la firma: SHA256(rawBody + WOMPI_INTEGRITY_KEY).
+// Verifica x-event-checksum con WOMPI_EVENTS_KEY (distinto de WOMPI_INTEGRITY_KEY,
+// que solo firma URLs de checkout salientes).
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -18,8 +19,8 @@ interface WompiEvent {
 }
 
 export async function POST(request: NextRequest) {
-  const integrityKey = process.env.WOMPI_INTEGRITY_KEY;
-  if (!integrityKey) {
+  const eventsKey = process.env.WOMPI_EVENTS_KEY;
+  if (!eventsKey) {
     return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
   }
 
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   const expected = crypto
     .createHash("sha256")
-    .update(rawBody + integrityKey)
+    .update(rawBody + eventsKey)
     .digest("hex");
 
   if (expected !== checksum) {
