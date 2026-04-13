@@ -25,7 +25,7 @@ export async function GET() {
 
     const { data: userData } = await admin
       .from("users")
-      .select("display_name, whatsapp_number, avatar_url")
+      .select("display_name, whatsapp_number, avatar_url, is_admin")
       .eq("id", user.id)
       .single();
 

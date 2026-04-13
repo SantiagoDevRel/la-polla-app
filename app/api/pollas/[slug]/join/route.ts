@@ -20,7 +20,7 @@ export async function POST(
     // Obtener la polla
     const { data: polla, error: pollaError } = await supabase
       .from("pollas")
-      .select("id, type, status, slug")
+      .select("id, type, status, slug, payment_mode, buy_in_amount")
       .eq("slug", params.slug)
       .single();
 
@@ -48,14 +48,20 @@ export async function POST(
       return NextResponse.json({ error: "Ya eres participante", polla: { slug: polla.slug } }, { status: 409 });
     }
 
-    // Insertar como participante — open pollas require admin approval
+    // digital_pool pollas gate on payment_status instead of admin approval:
+    // status goes 'approved' immediately so the user can see the polla, and
+    // payment_status='pending' blocks predictions until the Wompi webhook flips it.
+    const isDigitalPool =
+      polla.payment_mode === "digital_pool" && polla.buy_in_amount > 0;
+
     const { error: insertError } = await supabase
       .from("polla_participants")
       .insert({
         polla_id: polla.id,
         user_id: user.id,
         role: "player",
-        status: "pending",
+        status: isDigitalPool ? "approved" : "pending",
+        payment_status: isDigitalPool ? "pending" : "approved",
         paid: false,
       });
 
