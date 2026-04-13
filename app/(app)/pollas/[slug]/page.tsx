@@ -4,6 +4,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer, fadeUp } from "@/lib/animations";
@@ -43,17 +44,17 @@ interface Prediction {
 
 type TabType = "partidos" | "ranking" | "pagos" | "info";
 
-// TeamCrest — renders flag URL as img, falls back to 3-letter abbreviation
+// TeamCrest — renders flag URL via next/image proxy, falls back to 3-letter abbreviation
 function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: string }) {
   if (flagUrl) {
     return (
-      <img
+      <Image
         src={flagUrl}
         alt={teamName}
         width={24}
         height={24}
         style={{ objectFit: "contain", borderRadius: "50%" }}
-        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
       />
     );
   }
@@ -169,6 +170,7 @@ export default function PollaSlugPage() {
   }
 
   function isLocked(m: Match) {
+    if (polla?.status === "ended") return true;
     if (m.status === "live" || m.status === "finished") return true;
     return Date.now() >= new Date(m.scheduled_at).getTime() - 5 * 60 * 1000;
   }
@@ -475,8 +477,8 @@ export default function PollaSlugPage() {
               </motion.div>
             )}
 
-            {/* Sticky bulk save button */}
-            {pendingSaveIds.length > 0 && (
+            {/* Sticky bulk save button — hidden once polla ends */}
+            {polla.status !== "ended" && pendingSaveIds.length > 0 && (
               <div className="fixed bottom-20 left-0 right-0 px-4 z-30">
                 <div className="max-w-lg mx-auto">
                   <button
@@ -494,7 +496,23 @@ export default function PollaSlugPage() {
 
         {/* ── TAB RANKING ── */}
         {activeTab === "ranking" && (
-          <div className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
+          <div className="space-y-3">
+            {polla.status === "ended" && participants[0] && (
+              <div
+                className="w-full rounded-2xl px-4 py-3 flex items-center gap-3"
+                style={{
+                  background: "#FFD700",
+                  color: "#080c10",
+                  boxShadow: "0 0 24px rgba(255,215,0,0.25)",
+                }}
+              >
+                <Trophy className="w-6 h-6 flex-shrink-0" />
+                <p className="text-sm font-bold leading-snug">
+                  {participants[0].users?.display_name || "El ganador"} ganó esta polla con {participants[0].total_points} puntos
+                </p>
+              </div>
+            )}
+            <div className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
             {participants.length === 0 ? (
               <div className="p-6 text-center text-text-muted">No hay participantes aún.</div>
             ) : (
@@ -536,6 +554,7 @@ export default function PollaSlugPage() {
                 })}
               </>
             )}
+            </div>
           </div>
         )}
 

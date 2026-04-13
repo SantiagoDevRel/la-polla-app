@@ -7,16 +7,17 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer } from "@/lib/animations";
-import { ArrowLeft, Check, ChevronRight, Info, Construction, Trophy, Banknote, Smartphone, Lock, Globe } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Smartphone, Handshake, Lock, Globe } from "lucide-react";
 import { formatCOP } from "@/lib/formatCurrency";
 import { TOURNAMENTS } from "@/lib/tournaments";
 
 // ─── Tipos ───
 
-type PaymentMode = "digital_pool" | "admin_collects";
+type PaymentMode = "digital_pool" | "admin_collects" | "pay_winner";
 type Step = 1 | 2 | 3 | 4;
 
 interface FormState {
@@ -51,19 +52,32 @@ interface MatchRow {
 const PAYMENT_MODE_OPTIONS = [
   {
     value: "admin_collects" as PaymentMode,
-    title: "Admin maneja el pozo",
+    title: "Cuota de entrada",
     icon: "banknote",
-    description: "Cada participante le envía el dinero al admin (Nequi, Bancolombia, efectivo).",
+    description: "Cada participante le paga al organizador antes de entrar a la polla.",
     tag: "Recomendado",
   },
   {
     value: "digital_pool" as PaymentMode,
-    title: "Plataforma acumula",
+    title: "Pago digital",
     icon: "smartphone",
-    description: "Cada participante paga a través de la plataforma. El pozo se libera automáticamente.",
-    tag: "Próximamente",
+    description: "Los participantes pagan en línea al unirse — el dinero se libera al ganador al final.",
+    tag: "Online",
+  },
+  {
+    value: "pay_winner" as PaymentMode,
+    title: "Pago al ganador",
+    icon: "handshake",
+    description: "Al terminar la polla, cada participante le paga directamente al ganador.",
+    tag: "Al final",
   },
 ];
+
+const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = {
+  admin_collects: "💡 Cada uno paga antes de entrar. Tú guardas el pozo.",
+  pay_winner: "💡 Al final, todos le pagan directamente al ganador.",
+  digital_pool: "💡 El pago es automático. El ganador recibe el pozo menos la comisión de la plataforma.",
+};
 
 type GroupBy = "date" | "jornada" | "phase";
 
@@ -416,7 +430,7 @@ export default function CrearPollaPage() {
                           {/* Home team */}
                           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                             {m.home_team_flag ? (
-                              <img src={m.home_team_flag} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                              <Image src={m.home_team_flag} alt={m.home_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                             ) : (
                               <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#7a8499", flexShrink: 0 }}>
                                 {m.home_team.substring(0, 3).toUpperCase()}
@@ -432,7 +446,7 @@ export default function CrearPollaPage() {
                           {/* Away team */}
                           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                             {m.away_team_flag ? (
-                              <img src={m.away_team_flag} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                              <Image src={m.away_team_flag} alt={m.away_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                             ) : (
                               <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#7a8499", flexShrink: 0 }}>
                                 {m.away_team.substring(0, 3).toUpperCase()}
@@ -552,19 +566,20 @@ export default function CrearPollaPage() {
               <div className="space-y-3">
                 {PAYMENT_MODE_OPTIONS.map((option) => {
                   const isSelected = form.paymentMode === option.value;
-                  const isDisabled = option.value === "digital_pool";
                   return (
-                    <button key={option.value} type="button" disabled={isDisabled}
-                      onClick={() => { if (!isDisabled) updateForm("paymentMode", option.value); }}
-                      className={`w-full text-left p-4 rounded-xl border transition-all ${isDisabled ? "opacity-35 cursor-not-allowed border-border-subtle bg-bg-elevated" : isSelected ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated cursor-pointer"}`}>
+                    <button key={option.value} type="button"
+                      onClick={() => updateForm("paymentMode", option.value)}
+                      className={`w-full text-left p-4 rounded-xl border transition-all ${isSelected ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated cursor-pointer"}`}>
                       <div className="flex items-start gap-3">
                         <span className="flex-shrink-0 mt-0.5">
-                          {option.icon === "banknote" ? <Banknote className="w-6 h-6" style={{ color: "#7a8499" }} /> : <Smartphone className="w-6 h-6" style={{ color: "#7a8499" }} />}
+                          {option.icon === "banknote" ? <Banknote className="w-6 h-6" style={{ color: "#7a8499" }} />
+                            : option.icon === "smartphone" ? <Smartphone className="w-6 h-6" style={{ color: "#7a8499" }} />
+                            : <Handshake className="w-6 h-6" style={{ color: "#7a8499" }} />}
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-text-primary">{option.title}</span>
-                            <span className={`text-[10px] px-3 py-1 rounded-full font-medium ${isDisabled ? "bg-bg-card-hover text-text-muted border border-border-subtle" : "bg-gold/10 text-gold border border-gold/20"}`}>{option.tag}</span>
+                            <span className="text-[10px] px-3 py-1 rounded-full font-medium bg-gold/10 text-gold border border-gold/20">{option.tag}</span>
                           </div>
                           <p className="text-sm text-text-secondary leading-snug">{option.description}</p>
                         </div>
@@ -572,6 +587,11 @@ export default function CrearPollaPage() {
                     </button>
                   );
                 })}
+              </div>
+
+              {/* Helper one-liner for selected mode */}
+              <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
+                <p className="text-xs text-text-secondary leading-snug">{PAYMENT_MODE_HINTS[form.paymentMode]}</p>
               </div>
             </div>
 
@@ -584,22 +604,12 @@ export default function CrearPollaPage() {
               </div>
             )}
 
-            {form.paymentMode === "digital_pool" && (
-              <div className="rounded-xl p-4 flex items-start gap-3 bg-bg-elevated border border-border-subtle">
-                <Construction className="w-5 h-5 text-text-muted flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-bold text-text-secondary mb-1">Próximamente</h3>
-                  <p className="text-sm text-text-muted leading-snug">El pago a través de la plataforma estará disponible pronto.</p>
-                </div>
-              </div>
-            )}
-
             {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
             <div className="flex gap-3">
               <button type="button" onClick={() => goToStep(3)} className="flex-1 font-bold py-4 rounded-xl bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 cursor-pointer">
                 <span className="flex items-center justify-center gap-1"><ArrowLeft className="w-4 h-4" /> Atrás</span>
               </button>
-              <button type="button" onClick={handleSubmit} disabled={loading || form.paymentMode === "digital_pool"}
+              <button type="button" onClick={handleSubmit} disabled={loading}
                 className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}>
                 {loading ? "Creando..." : <><span>Crear polla</span><Trophy className="w-5 h-5" /></>}

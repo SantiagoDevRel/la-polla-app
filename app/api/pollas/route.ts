@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
-// Enum de modos de pago válidos en la DB
-const paymentModes = ["admin_collects", "digital_pool"] as const;
+// Modos de pago válidos (payment_mode en la DB es varchar, no enum)
+const paymentModes = ["admin_collects", "digital_pool", "pay_winner"] as const;
 
 // Schema base para crear una polla
 const createPollaSchema = z
@@ -72,7 +72,29 @@ export async function GET() {
 
     if (error) throw error;
 
-    return NextResponse.json({ pollas });
+    // For ended pollas, attach rank=1 winner info
+    const endedIds = (pollas || []).filter((p) => p.status === "ended").map((p) => p.id);
+    let winnersByPolla: Record<string, { display_name: string; total_points: number }> = {};
+    if (endedIds.length > 0) {
+      const { data: winners } = await supabase
+        .from("polla_participants")
+        .select("polla_id, total_points, users:user_id ( display_name )")
+        .in("polla_id", endedIds)
+        .eq("rank", 1);
+      winnersByPolla = Object.fromEntries(
+        (winners || []).map((w: { polla_id: string; total_points: number; users: { display_name: string } | { display_name: string }[] | null }) => {
+          const u = Array.isArray(w.users) ? w.users[0] : w.users;
+          return [w.polla_id, { display_name: u?.display_name || "Ganador", total_points: w.total_points }];
+        })
+      );
+    }
+
+    const enriched = (pollas || []).map((p) => ({
+      ...p,
+      winner: winnersByPolla[p.id] || null,
+    }));
+
+    return NextResponse.json({ pollas: enriched });
   } catch (error) {
     console.error("Error listando pollas:", error);
     return NextResponse.json({ error: "Error al listar pollas" }, { status: 500 });

@@ -3,6 +3,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { TOURNAMENT_ICONS } from "@/components/shared/PollaCard";
 import { formatCOP } from "@/lib/formatCurrency";
 import { getPollitoByPosition } from "@/lib/pollitos";
@@ -129,7 +130,7 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                       alignItems: "center", justifyContent: "center", overflow: "hidden",
                     }}>
                       {match.home_team_flag ? (
-                        <img src={match.home_team_flag} alt="" style={{ width: 24, height: 24, objectFit: "cover", borderRadius: "50%" }} />
+                        <Image src={match.home_team_flag} alt={match.home_team} width={24} height={24} style={{ width: 24, height: 24, objectFit: "cover", borderRadius: "50%" }} />
                       ) : (
                         <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 7, color: "#7a8499", letterSpacing: "0.04em" }}>
                           {match.home_team.substring(0, 3).toUpperCase()}
@@ -163,7 +164,7 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                       alignItems: "center", justifyContent: "center", overflow: "hidden",
                     }}>
                       {match.away_team_flag ? (
-                        <img src={match.away_team_flag} alt="" style={{ width: 24, height: 24, objectFit: "cover", borderRadius: "50%" }} />
+                        <Image src={match.away_team_flag} alt={match.away_team} width={24} height={24} style={{ width: 24, height: 24, objectFit: "cover", borderRadius: "50%" }} />
                       ) : (
                         <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 7, color: "#7a8499", letterSpacing: "0.04em" }}>
                           {match.away_team.substring(0, 3).toUpperCase()}

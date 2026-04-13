@@ -13,6 +13,10 @@ interface PollaCardProps {
   visibility: "publica" | "privada";
   isActive: boolean;
   onPress: () => void;
+  // Optional — shown only for ended pollas
+  ended?: boolean;
+  winnerName?: string;
+  winnerPoints?: number;
 }
 
 // Map of known tournament icon paths in /public/tournaments/
@@ -69,6 +73,9 @@ export default function PollaCard({
   visibility,
   isActive,
   onPress,
+  ended,
+  winnerName,
+  winnerPoints,
 }: PollaCardProps) {
   return (
     <div
@@ -80,6 +87,7 @@ export default function PollaCard({
         borderRadius: 14,
         padding: "12px 14px",
         marginBottom: 8,
+        opacity: ended ? 0.6 : 1,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = "rgba(255,215,0,0.22)";
@@ -107,20 +115,26 @@ export default function PollaCard({
             {tournamentName}
           </span>
         </div>
-        {/* Right group: dot + arrow */}
+        {/* Right group: dot/label + arrow */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <span
-            className={isActive ? "dot-active-pulse" : ""}
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: isActive ? "#00e676" : "#3a4454",
-              boxShadow: isActive ? "0 0 5px rgba(0,230,118,0.6)" : "none",
-              flexShrink: 0,
-              display: "inline-block",
-            }}
-          />
+          {ended ? (
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#ff3d57", letterSpacing: "0.02em" }}>
+              Terminada
+            </span>
+          ) : (
+            <span
+              className={isActive ? "dot-active-pulse" : ""}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: isActive ? "#00e676" : "#3a4454",
+                boxShadow: isActive ? "0 0 5px rgba(0,230,118,0.6)" : "none",
+                flexShrink: 0,
+                display: "inline-block",
+              }}
+            />
+          )}
           <svg
             width={13}
             height={13}
@@ -199,6 +213,31 @@ export default function PollaCard({
           {visibility === "publica" ? "Pública" : "Privada"}
         </span>
       </div>
+
+      {/* Winner row — only on ended pollas with a known winner */}
+      {ended && winnerName && (
+        <div
+          style={{
+            marginTop: 8,
+            paddingTop: 8,
+            borderTop: "1px solid rgba(255,215,0,0.12)",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 11,
+          }}
+        >
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="#FFD700" style={{ flexShrink: 0 }}>
+            <path d="M5 16L3 5l5.5 4L12 4l3.5 5L21 5l-2 11H5zm0 2h14v2H5v-2z" />
+          </svg>
+          <span style={{ color: "#f0f4ff", fontWeight: 600 }}>{winnerName}</span>
+          {typeof winnerPoints === "number" && (
+            <span style={{ color: "#FFD700", fontWeight: 700, marginLeft: "auto" }}>
+              {winnerPoints} pts
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
