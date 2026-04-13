@@ -251,21 +251,36 @@ export async function processIncomingMessage(message: IncomingMessage) {
       return;
     }
 
-    // Check for prediction input (e.g. "2-1")
-    const predMatch = body.match(/^(\d{1,2})-(\d{1,2})$/);
-    if (predMatch) {
-      const state = getState(from);
-      if (state && state.action === "waiting_prediction") {
-        await handlePredictionInput(
+    // RULE 6 — prediction input validation when the bot is waiting for a score.
+    const state = getState(from);
+    if (state && state.action === "waiting_prediction") {
+      const trimmed = body.trim();
+      const predMatch = trimmed.match(/^(\d{1,2})-(\d{1,2})$/);
+      if (!predMatch) {
+        await sendTextMessage(
           from,
-          user,
-          state.pollaId,
-          state.matchId!,
-          parseInt(predMatch[1]),
-          parseInt(predMatch[2])
+          "Ingresá solo números parce, sin letras ni símbolos. Escribí el marcador así: *2-1* _(local primero)_"
         );
         return;
       }
+      const h = parseInt(predMatch[1], 10);
+      const a = parseInt(predMatch[2], 10);
+      if (h > 20 || a > 20) {
+        await sendTextMessage(
+          from,
+          "Eso parece mucho parce 😅 ¿Estás seguro? Escribí el marcador de nuevo (ej: *2-1*)."
+        );
+        return;
+      }
+      await handlePredictionInput(
+        from,
+        user,
+        state.pollaId,
+        state.matchId!,
+        h,
+        a
+      );
+      return;
     }
 
     // Check for join link
@@ -317,8 +332,15 @@ async function routePayload(
   user: { id: string; display_name: string },
   payload: string
 ) {
-  // Clear any existing conversation state on new button press (except during prediction flow)
-  if (!payload.startsWith("pred_next_")) {
+  // Clear conversation state on new button press, except for flow-continuation
+  // payloads that depend on the state (match selection, pagination, confirmations).
+  const keepState =
+    payload.startsWith("pred_next_") ||
+    payload.startsWith("match_") ||
+    payload.startsWith("more_") ||
+    payload === "confirm_yes" ||
+    payload === "confirm_no";
+  if (!keepState) {
     clearState(from);
   }
 
@@ -352,6 +374,16 @@ async function routePayload(
   if (payload.startsWith("pred_")) {
     const pollaId = payload.replace("pred_", "").replace("next_", "");
     await handlePronosticar(from, user.id, pollaId);
+    return;
+  }
+
+  // RULE 8 — pagination: "more_<pollaId>_<page>" advances the match list
+  if (payload.startsWith("more_")) {
+    const rest = payload.replace("more_", "");
+    const lastUnderscore = rest.lastIndexOf("_");
+    const pollaId = rest.substring(0, lastUnderscore);
+    const page = parseInt(rest.substring(lastUnderscore + 1), 10) || 0;
+    await handlePronosticar(from, user.id, pollaId, undefined, page);
     return;
   }
 

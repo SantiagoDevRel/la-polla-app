@@ -4,9 +4,11 @@
 interface ConversationState {
   action: string;
   pollaId: string;
+  pollaSlug?: string;
   matchId?: string;
   matchIndex?: number;
   totalMatches?: number;
+  page?: number;
   expires: number;
 }
 
