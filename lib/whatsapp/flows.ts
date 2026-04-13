@@ -20,6 +20,96 @@ const TRN_LABELS: Record<string, string> = {
   liga_betplay_2025: "BetPlay 2025 🇨🇴",
 };
 
+// ─── Team flag emojis ───
+// Keys are lowercased + trimmed for robust matching against openfootball /
+// football-data.org team names, which vary in whitespace, accents and
+// abbreviations (e.g. "Cape Verde Islands" vs "Cape Verde Isla").
+const TEAM_FLAG_MAP: Record<string, string> = {
+  "mexico": "🇲🇽",
+  "south africa": "🇿🇦",
+  "brazil": "🇧🇷",
+  "argentina": "🇦🇷",
+  "france": "🇫🇷",
+  "germany": "🇩🇪",
+  "spain": "🇪🇸",
+  "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "portugal": "🇵🇹",
+  "netherlands": "🇳🇱",
+  "belgium": "🇧🇪",
+  "italy": "🇮🇹",
+  "uruguay": "🇺🇾",
+  "colombia": "🇨🇴",
+  "chile": "🇨🇱",
+  "ecuador": "🇪🇨",
+  "peru": "🇵🇪",
+  "paraguay": "🇵🇾",
+  "bolivia": "🇧🇴",
+  "venezuela": "🇻🇪",
+  "usa": "🇺🇸",
+  "united states": "🇺🇸",
+  "canada": "🇨🇦",
+  "japan": "🇯🇵",
+  "south korea": "🇰🇷",
+  "korea republic": "🇰🇷",
+  "australia": "🇦🇺",
+  "morocco": "🇲🇦",
+  "senegal": "🇸🇳",
+  "nigeria": "🇳🇬",
+  "ghana": "🇬🇭",
+  "cameroon": "🇨🇲",
+  "tunisia": "🇹🇳",
+  "saudi arabia": "🇸🇦",
+  "iran": "🇮🇷",
+  "qatar": "🇶🇦",
+  "poland": "🇵🇱",
+  "croatia": "🇭🇷",
+  "denmark": "🇩🇰",
+  "switzerland": "🇨🇭",
+  "serbia": "🇷🇸",
+  "czech republic": "🇨🇿",
+  "czechia": "🇨🇿",
+  "slovakia": "🇸🇰",
+  "ukraine": "🇺🇦",
+  "hungary": "🇭🇺",
+  "turkey": "🇹🇷",
+  "romania": "🇷🇴",
+  "scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
+  "ireland": "🇮🇪",
+  "bosnia & herzegovina": "🇧🇦",
+  "bosnia-herzegovina": "🇧🇦",
+  "bosnia and herzegovina": "🇧🇦",
+  "ivory coast": "🇨🇮",
+  "cote d'ivoire": "🇨🇮",
+  "haiti": "🇭🇹",
+  "panama": "🇵🇦",
+  "costa rica": "🇨🇷",
+  "honduras": "🇭🇳",
+  "guatemala": "🇬🇹",
+  "jamaica": "🇯🇲",
+  "new zealand": "🇳🇿",
+  "indonesia": "🇮🇩",
+  "thailand": "🇹🇭",
+  "cape verde islands": "🇨🇻",
+  "cape verde isla": "🇨🇻",
+  "cape verde": "🇨🇻",
+  "curaçao": "🇨🇼",
+  "curacao": "🇨🇼",
+  "cuba": "🇨🇺",
+  "trinidad": "🇹🇹",
+  "trinidad and tobago": "🇹🇹",
+};
+
+function getTeamFlag(teamName: string): string {
+  if (!teamName) return "⚽";
+  const key = teamName.trim().toLowerCase();
+  return TEAM_FLAG_MAP[key] || "⚽";
+}
+
+function formatMatchLabel(homeTeam: string, awayTeam: string): string {
+  return `${getTeamFlag(homeTeam)} ${homeTeam} vs ${getTeamFlag(awayTeam)} ${awayTeam}`;
+}
+
 // ─── Helpers ───
 
 interface PollaRow {
@@ -345,8 +435,8 @@ export async function handlePronosticar(
       match,
       matches.indexOf(match) + 1,
       matches.length,
-      predictedMatchIds.has(match.id),
-      pollaId
+      pollaId,
+      userId
     );
   }
 
@@ -360,8 +450,8 @@ export async function handlePronosticar(
       match,
       matches.indexOf(match) + 1,
       matches.length,
-      false,
-      pollaId
+      pollaId,
+      userId
     );
   }
 
@@ -413,7 +503,9 @@ export async function handlePronosticar(
   );
 }
 
-// Helper: Show prediction input prompt for a specific match
+// Helper: Show prediction input prompt for a specific match.
+// Fetches the user's existing prediction (if any) and surfaces it so they
+// know what they're about to overwrite (+ can send "cancelar" to keep it).
 async function showPredictionPrompt(
   phone: string,
   polla: { id: string; name: string },
@@ -421,14 +513,12 @@ async function showPredictionPrompt(
     id: string;
     home_team: string;
     away_team: string;
-    home_team_flag?: string | null;
-    away_team_flag?: string | null;
     scheduled_at: string;
   },
   matchIndex: number,
   totalMatches: number,
-  alreadyPredicted: boolean,
-  pollaId: string
+  pollaId: string,
+  userId: string
 ) {
   setState(phone, {
     action: "waiting_prediction",
@@ -446,18 +536,75 @@ async function showPredictionPrompt(
     minute: "2-digit",
   });
 
-  const homeFlag = match.home_team_flag || "";
-  const awayFlag = match.away_team_flag || "";
+  const supabase = createAdminClient();
+  const { data: existing } = await supabase
+    .from("predictions")
+    .select("predicted_home, predicted_away")
+    .eq("polla_id", pollaId)
+    .eq("user_id", userId)
+    .eq("match_id", match.id)
+    .maybeSingle();
+
+  const matchLabel = formatMatchLabel(match.home_team, match.away_team);
+  const header =
+    `⚽ *${matchLabel}*\n\n` +
+    `🏆 ${polla.name} — Partido ${matchIndex}/${totalMatches}\n` +
+    `📅 ${dateStr}\n`;
+
+  if (existing) {
+    await sendTextMessage(
+      phone,
+      header +
+        `\nYa pronosticaste este partido parce.\n` +
+        `Tu pronóstico actual: *${match.home_team} ${existing.predicted_home} - ${existing.predicted_away} ${match.away_team}*\n\n` +
+        `Escribí un nuevo marcador para actualizarlo, o mandá *cancelar* para dejarlo igual.`
+    );
+    return;
+  }
 
   await sendTextMessage(
     phone,
-    `⚽ *${homeFlag} ${match.home_team} vs ${match.away_team} ${awayFlag}*\n\n` +
-      `🏆 ${polla.name} — Partido ${matchIndex}/${totalMatches}\n` +
-      `📅 ${dateStr}\n` +
-      `${alreadyPredicted ? "\n⚠️ _Ya pronosticaste este partido. Podés actualizar._\n" : ""}` +
+    header +
       `\nEscribí el resultado así:\n*2-1* _(local primero)_\n\n` +
       `_Tenés hasta ${dateStr} para predecir_ ⏰`
   );
+}
+
+// Used when the user sends "cancelar" while in waiting_prediction state.
+// Reassures them the existing prediction is untouched and sends them back
+// to the polla menu.
+export async function handleCancelPrediction(
+  phone: string,
+  userId: string,
+  pollaId: string,
+  matchId: string
+) {
+  const supabase = createAdminClient();
+
+  const { data: match } = await supabase
+    .from("matches")
+    .select("home_team, away_team")
+    .eq("id", matchId)
+    .single();
+
+  const { data: existing } = await supabase
+    .from("predictions")
+    .select("predicted_home, predicted_away")
+    .eq("polla_id", pollaId)
+    .eq("user_id", userId)
+    .eq("match_id", matchId)
+    .maybeSingle();
+
+  if (match && existing) {
+    await sendTextMessage(
+      phone,
+      `Listo parce, dejé tu pronóstico como estaba (*${match.home_team} ${existing.predicted_home} - ${existing.predicted_away} ${match.away_team}*)`
+    );
+  } else {
+    await sendTextMessage(phone, "Listo parce, cancelé.");
+  }
+
+  await handlePollaMenu(phone, userId, pollaId);
 }
 
 // ─── FLOW 5b: Receive Prediction ───
@@ -502,10 +649,12 @@ export async function handlePredictionInput(
     totalMatches: predictedAway,
   });
 
+  const homeFlag = getTeamFlag(match.home_team);
+  const awayFlag = getTeamFlag(match.away_team);
   await sendReplyButtons(
     phone,
     `¿Confirmás tu predicción? 🎯\n\n` +
-      `⚽ *${match.home_team}* *${predictedHome}* - *${predictedAway}* *${match.away_team}*`,
+      `${homeFlag} *${match.home_team}* *${predictedHome}* - *${predictedAway}* *${match.away_team}* ${awayFlag}`,
     [
       { id: "confirm_yes", title: "✅ Confirmar" },
       { id: "confirm_no", title: "❌ Cambiar" },
@@ -578,10 +727,11 @@ export async function handleConfirmPrediction(
     return;
   }
 
+  const homeFlag = getTeamFlag(match.home_team);
+  const awayFlag = getTeamFlag(match.away_team);
   await sendReplyButtons(
     phone,
-    `✅ ¡Listo parce! Pronóstico guardado 🎯\n\n` +
-      `⚽ *${match.home_team}* *${predictedHome}* - *${predictedAway}* *${match.away_team}*\n\n` +
+    `✅ ¡Listo parce! Guardé tu pronóstico: ${homeFlag} *${match.home_team}* *${predictedHome}* - *${predictedAway}* *${match.away_team}* ${awayFlag}\n\n` +
       `_Eso es, a esperar el partido_ 🐥`,
     [
       { id: `pred_next_${pollaId}`, title: "Siguiente ➡️" },
@@ -748,8 +898,8 @@ export async function handleResults(
   let text = `⚽ *Últimos resultados — ${polla.name}*\n\n`;
 
   for (const m of matches) {
-    const homeFlag = m.home_team_flag || "";
-    const awayFlag = m.away_team_flag || "";
+    const homeFlag = getTeamFlag(m.home_team);
+    const awayFlag = getTeamFlag(m.away_team);
     text += `${homeFlag} *${m.home_team}* *${m.home_score ?? "?"}* - *${m.away_score ?? "?"}* *${m.away_team}* ${awayFlag}\n`;
 
     const pred = predMap.get(m.id);
