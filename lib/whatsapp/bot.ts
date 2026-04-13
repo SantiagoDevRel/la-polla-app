@@ -21,6 +21,7 @@ import {
   handleProfile,
   handleHelpTopic,
   handleConfirmPrediction,
+  handleCancelPrediction,
 } from "./flows";
 
 // Validate required env vars on module load
@@ -255,6 +256,17 @@ export async function processIncomingMessage(message: IncomingMessage) {
     const state = getState(from);
     if (state && state.action === "waiting_prediction") {
       const trimmed = body.trim();
+      // "cancelar" escapes the update and returns to the polla menu, keeping
+      // any existing prediction intact.
+      if (trimmed.toLowerCase() === "cancelar") {
+        await handleCancelPrediction(
+          from,
+          user.id,
+          state.pollaId,
+          state.matchId!
+        );
+        return;
+      }
       const predMatch = trimmed.match(/^(\d{1,2})-(\d{1,2})$/);
       if (!predMatch) {
         await sendTextMessage(
