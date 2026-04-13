@@ -204,17 +204,17 @@ export default async function DashboardPage() {
       <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto flex items-center justify-between mb-6">
           <Link href="/dashboard" className="flex items-center gap-2" style={{ textDecoration: "none" }}>
-            <img src="/pollitos/logo_realistic.webp" alt="" style={{ width: 36, height: 36, objectFit: "contain" }} />
-            <span className="text-gold" style={{ fontSize: 18, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Outfit', sans-serif" }}>La Polla</span>
+            <img src="/pollitos/logo_realistic.webp" alt="" style={{ width: 54, height: 54, objectFit: "contain" }} />
+            <span className="text-gold" style={{ fontSize: 20, fontWeight: 700, letterSpacing: "0.08em", fontFamily: "'Outfit', sans-serif" }}>La Polla</span>
           </Link>
           <Link href="/perfil">
             <div style={{
-              width: 32, height: 32, borderRadius: "50%",
+              width: 48, height: 48, borderRadius: "50%",
               border: "1.5px solid rgba(255,215,0,0.3)", overflow: "hidden",
               display: "flex", alignItems: "center", justifyContent: "center",
               background: "#1a2540",
             }}>
-              <img src={avatarUrl} alt={firstName} style={{ width: 32, height: 32, objectFit: "cover", borderRadius: "50%" }} />
+              <img src={avatarUrl} alt={firstName} style={{ width: 48, height: 48, objectFit: "cover", borderRadius: "50%" }} />
             </div>
           </Link>
         </div>

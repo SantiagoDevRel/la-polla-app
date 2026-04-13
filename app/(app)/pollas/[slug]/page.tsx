@@ -368,9 +368,9 @@ export default function PollaSlugPage() {
           <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle space-y-4">
             <Lock className="w-10 h-10 text-gold mx-auto" />
             <div>
-              <h2 className="font-display text-2xl text-text-primary tracking-wide mb-1">PAGA PARA PRONOSTICAR</h2>
+              <h2 className="text-xl font-bold text-text-primary mb-1">Paga para pronosticar</h2>
               <p className="text-sm text-text-secondary">
-                Cuota de entrada: <span className="font-bold text-gold">${polla.buy_in_amount.toLocaleString("es-CO")} {polla.currency}</span>
+                Cuota de entrada: <span className="font-bold text-gold">${polla.buy_in_amount.toLocaleString("es-CO")}</span>
               </p>
             </div>
             <button
