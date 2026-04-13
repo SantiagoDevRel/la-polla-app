@@ -1,5 +1,4 @@
-// app/(app)/pollas/page.tsx — Mis Pollas con tabs Activas/Terminadas
-// Uses shared PollaCard, tab styles from ui-reference.html .tabsw/.tbon/.tboff
+// app/(app)/pollas/page.tsx — Mis Pollas: Activas (siempre visibles) + Finalizadas (colapsables)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,13 +6,14 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import PollaCard, { TOURNAMENT_ICONS } from "@/components/shared/PollaCard";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
-import { Plus, Mail } from "lucide-react";
+import { Plus, Mail, ChevronDown, ChevronRight } from "lucide-react";
 
 interface PollaData {
   id: string; name: string; slug: string; description?: string;
   tournament: string; status: string; buy_in_amount: number;
   currency: string; payment_mode: string; type: string;
   participant_count?: number;
+  winner?: { display_name: string; total_points: number } | null;
 }
 
 interface PendingInvite {
@@ -26,14 +26,12 @@ interface PendingInvite {
 
 import { getTournamentName } from "@/lib/tournaments";
 
-type TabFilter = "active" | "finished";
-
 export default function MisPollasPage() {
   const router = useRouter();
   const [pollas, setPollas] = useState<PollaData[]>([]);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabFilter>("active");
+  const [endedOpen, setEndedOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -50,7 +48,8 @@ export default function MisPollasPage() {
     load();
   }, []);
 
-  const filtered = pollas.filter((p) => tab === "active" ? p.status === "active" : p.status === "finished");
+  const active = pollas.filter((p) => p.status === "active");
+  const ended = pollas.filter((p) => p.status === "ended");
 
   return (
     <div className="min-h-screen">
@@ -70,63 +69,6 @@ export default function MisPollasPage() {
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-4">
-        {/* Tabs — .tabsw style */}
-        <div
-          style={{
-            display: "flex",
-            background: "#0e1420",
-            borderRadius: 10,
-            padding: 3,
-            border: "1px solid rgba(255,255,255,0.06)",
-            gap: 2,
-          }}
-        >
-          <button
-            onClick={() => setTab("active")}
-            style={{
-              flex: 1,
-              padding: 7,
-              borderRadius: 8,
-              background: tab === "active" ? "rgba(255,215,0,0.12)" : "transparent",
-              color: tab === "active" ? "#FFD700" : "#4a5568",
-              fontSize: 12,
-              fontWeight: tab === "active" ? 600 : 500,
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "'Outfit', sans-serif",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-            }}
-          >
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /></svg>
-            Activas
-          </button>
-          <button
-            onClick={() => setTab("finished")}
-            style={{
-              flex: 1,
-              padding: 7,
-              borderRadius: 8,
-              background: tab === "finished" ? "rgba(255,215,0,0.12)" : "transparent",
-              color: tab === "finished" ? "#FFD700" : "#4a5568",
-              fontSize: 12,
-              fontWeight: tab === "finished" ? 600 : 500,
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "'Outfit', sans-serif",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-            }}
-          >
-            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
-            Terminadas
-          </button>
-        </div>
-
         {/* Pending invites */}
         {pendingInvites.length > 0 && (
           <div className="space-y-2">
@@ -158,36 +100,80 @@ export default function MisPollasPage() {
           </div>
         )}
 
-        {loading ? (
-          <div className="text-center py-8">
-            <p className="text-text-muted text-sm">Cargando pollas...</p>
-          </div>
-        ) : filtered.length > 0 ? (
-          <AnimatedList className="space-y-0">
-            {filtered.map((polla) => (
-              <AnimatedItem key={polla.id}>
-                <PollaCard
-                  name={polla.name}
-                  tournamentName={getTournamentName(polla.tournament)}
-                  tournamentIconPath={TOURNAMENT_ICONS[polla.tournament] || ""}
-                  entryFee={polla.buy_in_amount}
-                  participantCount={polla.participant_count ?? 0}
-                  visibility={polla.type === "open" ? "publica" : "privada"}
-                  isActive={polla.status === "active"}
-                  onPress={() => router.push(`/pollas/${polla.slug}`)}
-                />
-              </AnimatedItem>
-            ))}
-          </AnimatedList>
-        ) : (
-          <div className="rounded-2xl p-8 text-center bg-bg-card border border-border-subtle">
-            <p className="text-text-muted text-sm">
-              {tab === "active" ? "No tenés pollas activas" : "No tenés pollas terminadas"}
-            </p>
-          </div>
+        {/* ── Activas ── */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-live dot-active-pulse" style={{ boxShadow: "0 0 5px rgba(0,230,118,0.6)" }} />
+            Mis pollas activas
+            <span className="text-text-muted font-normal">· {active.length}</span>
+          </h2>
+
+          {loading ? (
+            <div className="text-center py-6">
+              <p className="text-text-muted text-sm">Cargando pollas...</p>
+            </div>
+          ) : active.length > 0 ? (
+            <AnimatedList className="space-y-0">
+              {active.map((polla) => (
+                <AnimatedItem key={polla.id}>
+                  <PollaCard
+                    name={polla.name}
+                    tournamentName={getTournamentName(polla.tournament)}
+                    tournamentIconPath={TOURNAMENT_ICONS[polla.tournament] || ""}
+                    entryFee={polla.buy_in_amount}
+                    participantCount={polla.participant_count ?? 0}
+                    visibility={polla.type === "open" ? "publica" : "privada"}
+                    isActive
+                    onPress={() => router.push(`/pollas/${polla.slug}`)}
+                  />
+                </AnimatedItem>
+              ))}
+            </AnimatedList>
+          ) : (
+            <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
+              <p className="text-text-muted text-sm">No tenés pollas activas</p>
+            </div>
+          )}
+        </section>
+
+        {/* ── Finalizadas (colapsable) ── */}
+        {ended.length > 0 && (
+          <section className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setEndedOpen((v) => !v)}
+              className="w-full flex items-center gap-2 text-sm font-bold text-text-secondary cursor-pointer"
+            >
+              {endedOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              Finalizadas
+              <span className="text-text-muted font-normal">· {ended.length}</span>
+            </button>
+
+            {endedOpen && (
+              <AnimatedList className="space-y-0">
+                {ended.map((polla) => (
+                  <AnimatedItem key={polla.id}>
+                    <PollaCard
+                      name={polla.name}
+                      tournamentName={getTournamentName(polla.tournament)}
+                      tournamentIconPath={TOURNAMENT_ICONS[polla.tournament] || ""}
+                      entryFee={polla.buy_in_amount}
+                      participantCount={polla.participant_count ?? 0}
+                      visibility={polla.type === "open" ? "publica" : "privada"}
+                      isActive={false}
+                      ended
+                      winnerName={polla.winner?.display_name}
+                      winnerPoints={polla.winner?.total_points}
+                      onPress={() => router.push(`/pollas/${polla.slug}`)}
+                    />
+                  </AnimatedItem>
+                ))}
+              </AnimatedList>
+            )}
+          </section>
         )}
 
-        {/* Create button — full width gold */}
+        {/* Create button */}
         <button
           onClick={() => router.push("/pollas/crear")}
           style={{
