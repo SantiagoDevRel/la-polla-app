@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
 
     const { data: participants } = await adminSupabase
       .from("polla_participants")
-      .select("id, user_id")
+      .select("id, user_id, payment_status")
       .eq("polla_id", polla.id)
-      .eq("status", "pending_payment");
+      .eq("payment_status", "pending");
 
     const participant = participants?.find((p) =>
       p.user_id.replace(/-/g, "").startsWith(userIdPrefix)
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     if (participant) {
       await adminSupabase
         .from("polla_participants")
-        .update({ status: "approved", paid: true })
+        .update({ payment_status: "approved", paid: true })
         .eq("id", participant.id);
 
       await adminSupabase
@@ -86,6 +86,14 @@ export async function POST(request: NextRequest) {
           prize_pool: (polla.prize_pool || 0) + (polla.buy_in_amount || 0),
         })
         .eq("id", polla.id);
+
+      console.log(
+        `[wompi] Approved payment for polla ${slug} participant ${participant.id}`
+      );
+    } else {
+      console.warn(
+        `[wompi] No pending participant found for reference ${reference}`
+      );
     }
   }
 

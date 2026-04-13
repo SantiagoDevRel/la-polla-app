@@ -1,6 +1,7 @@
 // app/api/pollas/[slug]/predictions/route.ts — Guardar o actualizar pronóstico de un partido
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
 const predictionSchema = z.object({
@@ -48,13 +49,15 @@ export async function POST(
       return NextResponse.json({ error: "Este partido no pertenece a esta polla" }, { status: 400 });
     }
 
-    // Verificar que el usuario es participante aprobado
-    const { data: participant } = await supabase
+    // Validación del participante usa admin client para evitar que RLS oculte la fila.
+    // El INSERT del pronóstico sigue usando la sesión del usuario (auth + RLS).
+    const admin = createAdminClient();
+    const { data: participant } = await admin
       .from("polla_participants")
-      .select("id, status")
+      .select("id, status, payment_status")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (!participant) {
       return NextResponse.json({ error: "No eres participante de esta polla" }, { status: 403 });
@@ -66,6 +69,14 @@ export async function POST(
 
     if (participant.status === "rejected") {
       return NextResponse.json({ error: "Tu solicitud fue rechazada" }, { status: 403 });
+    }
+
+    // Digital-pool payment gate
+    if (participant.payment_status !== "approved") {
+      return NextResponse.json(
+        { error: "payment_required" },
+        { status: 402 }
+      );
     }
 
     // Upsert del pronóstico — el trigger check_prediction_lock en Supabase bloquea si falta menos de 5 min

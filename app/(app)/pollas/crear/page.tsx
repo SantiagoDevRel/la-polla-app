@@ -54,7 +54,7 @@ const PAYMENT_MODE_OPTIONS = [
     value: "admin_collects" as PaymentMode,
     title: "Cuota de entrada",
     icon: "banknote",
-    description: "Cada participante le paga al organizador antes de entrar a la polla.",
+    description: "Cada participante le paga al organizador (tú) antes de entrar a la polla.",
     tag: "Recomendado",
   },
   {
@@ -74,7 +74,7 @@ const PAYMENT_MODE_OPTIONS = [
 ];
 
 const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = {
-  admin_collects: "💡 Cada uno paga antes de entrar. Tú guardas el pozo.",
+  admin_collects: "💡 Cada uno te paga antes de entrar. Tú guardas el pozo.",
   pay_winner: "💡 Al final, todos le pagan directamente al ganador.",
   digital_pool: "💡 El pago es automático. El ganador recibe el pozo menos la comisión de la plataforma.",
 };
@@ -116,7 +116,14 @@ export default function CrearPollaPage() {
       setMatchesLoading(true);
       try {
         const { data } = await axios.get(`/api/matches?tournament=${form.tournament}&status=scheduled`);
-        setMatches(data.matches || []);
+        // Filter out anything already within 5 minutes of kickoff or in the past —
+        // those can't be predicted anymore, so they shouldn't be selectable.
+        const bufferMs = 5 * 60 * 1000;
+        const cutoff = Date.now() + bufferMs;
+        const upcoming = (data.matches || []).filter(
+          (m: MatchRow) => new Date(m.scheduled_at).getTime() > cutoff
+        );
+        setMatches(upcoming);
       } catch {
         setMatches([]);
       } finally {

@@ -89,6 +89,8 @@ export default function PollaSlugPage() {
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserStatus, setCurrentUserStatus] = useState("approved");
+  const [currentUserPaymentStatus, setCurrentUserPaymentStatus] = useState("approved");
+  const [payingNow, setPayingNow] = useState(false);
 
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
   const [savingAll, setSavingAll] = useState(false);
@@ -115,6 +117,7 @@ export default function PollaSlugPage() {
       setCurrentUserId(data.currentUserId);
       setCurrentUserRole(data.currentUserRole);
       setCurrentUserStatus(data.currentUserStatus || "approved");
+      setCurrentUserPaymentStatus(data.currentUserPaymentStatus || "approved");
       setIsNonParticipant(data.isNonParticipant || false);
       const d: Record<string, { home: string; away: string }> = {};
       data.predictions.forEach((p: Prediction) => {
@@ -201,6 +204,23 @@ export default function PollaSlugPage() {
     );
   }
 
+  async function startPayment() {
+    setPayingNow(true);
+    try {
+      const { data } = await axios.post(`/api/pollas/${slug}/checkout`);
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      showToast("No se pudo iniciar el pago", "error");
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      showToast(e.response?.data?.error || "Error iniciando el pago", "error");
+    } finally {
+      setPayingNow(false);
+    }
+  }
+
   async function joinPolla() {
     setJoining(true);
     try {
@@ -274,6 +294,11 @@ export default function PollaSlugPage() {
     );
   }
 
+  const paymentLocked =
+    polla.payment_mode === "digital_pool" &&
+    polla.buy_in_amount > 0 &&
+    currentUserPaymentStatus !== "approved";
+
   const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
     { key: "partidos", label: "Partidos", icon: <Target className="w-4 h-4" />, show: true },
     { key: "ranking", label: "Ranking", icon: <Trophy className="w-4 h-4" />, show: true },
@@ -339,7 +364,26 @@ export default function PollaSlugPage() {
 
       <main className="max-w-lg mx-auto p-4 space-y-3">
         {/* ── TAB PARTIDOS ── */}
-        {activeTab === "partidos" && (
+        {activeTab === "partidos" && paymentLocked && (
+          <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle space-y-4">
+            <Lock className="w-10 h-10 text-gold mx-auto" />
+            <div>
+              <h2 className="font-display text-2xl text-text-primary tracking-wide mb-1">PAGA PARA PRONOSTICAR</h2>
+              <p className="text-sm text-text-secondary">
+                Cuota de entrada: <span className="font-bold text-gold">${polla.buy_in_amount.toLocaleString("es-CO")} {polla.currency}</span>
+              </p>
+            </div>
+            <button
+              onClick={startPayment}
+              disabled={payingNow}
+              className="w-full bg-gold text-bg-base font-bold py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer"
+              style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
+            >
+              {payingNow ? "Abriendo checkout..." : "Pagar ahora"}
+            </button>
+          </div>
+        )}
+        {activeTab === "partidos" && !paymentLocked && (
           <>
             {currentUserStatus === "pending" && (
               <div className="rounded-xl p-4 bg-gold/10 border border-gold/20 text-center mb-3">
@@ -392,7 +436,7 @@ export default function PollaSlugPage() {
 
                         {/* Score / Input */}
                         <div className="flex-shrink-0 flex items-center gap-2">
-                          {match.status === "finished" || match.status === "live" ? (
+                          {match.status === "finished" || match.status === "live" || locked ? (
                             <div className="flex items-center gap-2 px-3">
                               <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
                                 {match.home_score ?? "—"}

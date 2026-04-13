@@ -72,8 +72,39 @@ export async function GET() {
 
     if (error) throw error;
 
-    // For ended pollas, attach rank=1 winner info
-    const endedIds = (pollas || []).filter((p) => p.status === "ended").map((p) => p.id);
+    // Compute effective_status: a polla is effectively ended if every match_id is finished
+    // or its scheduled_at is in the past. Handles the case where the auto-close trigger
+    // (migration 008) hasn't run or isn't applied.
+    const allMatchIds = Array.from(
+      new Set((pollas || []).flatMap((p) => (p.match_ids as string[] | null) || []))
+    );
+    const matchById = new Map<string, { status: string; scheduled_at: string }>();
+    if (allMatchIds.length > 0) {
+      const { data: matchRows } = await supabase
+        .from("matches")
+        .select("id, status, scheduled_at")
+        .in("id", allMatchIds);
+      for (const m of matchRows || []) {
+        matchById.set(m.id, { status: m.status, scheduled_at: m.scheduled_at });
+      }
+    }
+    const nowMs = Date.now();
+    const effectiveStatus = (p: { status: string; match_ids: string[] | null }): string => {
+      if (p.status === "ended") return "ended";
+      if (p.status !== "active") return p.status;
+      const ids = p.match_ids || [];
+      if (ids.length === 0) return p.status;
+      const allDone = ids.every((id) => {
+        const m = matchById.get(id);
+        if (!m) return false;
+        return m.status === "finished" || new Date(m.scheduled_at).getTime() < nowMs;
+      });
+      return allDone ? "ended" : "active";
+    };
+
+    // Winner info for any polla whose effective_status is 'ended'
+    const withEffective = (pollas || []).map((p) => ({ ...p, effective_status: effectiveStatus(p) }));
+    const endedIds = withEffective.filter((p) => p.effective_status === "ended").map((p) => p.id);
     let winnersByPolla: Record<string, { display_name: string; total_points: number }> = {};
     if (endedIds.length > 0) {
       const { data: winners } = await supabase
@@ -89,10 +120,7 @@ export async function GET() {
       );
     }
 
-    const enriched = (pollas || []).map((p) => ({
-      ...p,
-      winner: winnersByPolla[p.id] || null,
-    }));
+    const enriched = withEffective.map((p) => ({ ...p, winner: winnersByPolla[p.id] || null }));
 
     return NextResponse.json({ pollas: enriched });
   } catch (error) {
@@ -178,32 +206,54 @@ export async function POST(request: NextRequest) {
 
         if (retryError) throw retryError;
 
-        // Agregar al creador como participante admin
-        await supabase.from("polla_participants").insert({
-          polla_id: retryPolla.id,
-          user_id: user.id,
-          role: "admin",
-          status: "approved",
-          paid: true,
-        });
+        // Creator auto-join (retry path) — wrapped so failures don't 500 the creation.
+        try {
+          const { error: joinError } = await supabase.from("polla_participants").insert({
+            polla_id: retryPolla.id,
+            user_id: user.id,
+            role: "admin",
+            status: "approved",
+            payment_status: "approved",
+            paid: true,
+          });
+          if (joinError) {
+            console.error("Creator auto-join failed (retry) for polla", retryPolla.id, joinError);
+          }
+        } catch (joinEx) {
+          console.error("Creator auto-join threw (retry) for polla", retryPolla.id, joinEx);
+        }
 
         return NextResponse.json({ polla: retryPolla }, { status: 201 });
       }
       throw error;
     }
 
-    // Agregar al creador como participante admin de la polla
-    await supabase.from("polla_participants").insert({
-      polla_id: polla.id,
-      user_id: user.id,
-      role: "admin",
-      status: "approved",
-      paid: true,
-    });
+    // Creator auto-join — wrapped so participant-insert failures don't surface as
+    // "Error al crear la polla" (the polla itself is created successfully by this point).
+    try {
+      const { error: joinError } = await supabase.from("polla_participants").insert({
+        polla_id: polla.id,
+        user_id: user.id,
+        role: "admin",
+        status: "approved",
+        payment_status: "approved",
+        paid: true,
+      });
+      if (joinError) {
+        console.error("Creator auto-join failed for polla", polla.id, joinError);
+      }
+    } catch (joinEx) {
+      console.error("Creator auto-join threw for polla", polla.id, joinEx);
+    }
 
     return NextResponse.json({ polla }, { status: 201 });
   } catch (error) {
-    console.error("Error creando polla:", error);
+    const err = error as { message?: string; code?: string; details?: string };
+    console.error("Error creando polla:", {
+      message: err.message,
+      code: err.code,
+      details: err.details,
+    });
     return NextResponse.json({ error: "Error al crear la polla" }, { status: 500 });
   }
 }

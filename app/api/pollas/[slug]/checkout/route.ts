@@ -39,10 +39,11 @@ export async function POST(
 
     const admin = createAdminClient();
 
-    // Upsert participant in pending_payment (webhook flips to approved)
+    // Participant row uses status='approved' (CHECK constraint only allows pending/approved/rejected)
+    // and payment_status='pending' as the real gate. Webhook flips payment_status to 'approved'.
     const { data: existing } = await admin
       .from("polla_participants")
-      .select("id, status")
+      .select("id, status, payment_status")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -51,20 +52,22 @@ export async function POST(
       const { error: insertErr } = await admin.from("polla_participants").insert({
         polla_id: polla.id,
         user_id: user.id,
-        role: "member",
-        status: "pending_payment",
+        role: "player",
+        status: "approved",
+        payment_status: "pending",
         paid: false,
       });
       if (insertErr) {
+        console.error("Checkout participant insert failed", insertErr);
         return NextResponse.json({ error: "No se pudo registrar el participante" }, { status: 500 });
       }
-    } else if (existing.status !== "approved" && existing.status !== "pending_payment") {
+    } else if (existing.payment_status === "approved") {
+      return NextResponse.json({ error: "Ya pagaste esta polla" }, { status: 400 });
+    } else {
       await admin
         .from("polla_participants")
-        .update({ status: "pending_payment", paid: false })
+        .update({ status: "approved", payment_status: "pending", paid: false })
         .eq("id", existing.id);
-    } else if (existing.status === "approved") {
-      return NextResponse.json({ error: "Ya estás aprobado en esta polla" }, { status: 400 });
     }
 
     const reference = `${slug}-${user.id.replace(/-/g, "").substring(0, 8)}`;

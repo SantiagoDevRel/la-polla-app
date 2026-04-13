@@ -26,13 +26,14 @@ export async function GET(
       return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
     }
 
-    // Verificar que el usuario es participante o creador
-    const { data: participant } = await supabase
+    // Admin client avoids RLS on the participant self-check (auth.uid() already verified above).
+    const adminSupabase = createAdminClient();
+    const { data: participant } = await adminSupabase
       .from("polla_participants")
       .select("*")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (!participant && polla.created_by !== user.id) {
       // For open pollas, return limited info so the UI can show a join button
@@ -51,8 +52,6 @@ export async function GET(
     }
 
     // Cargar participantes aprobados con sus puntos y rank
-    // Uses admin client to bypass RLS (auth already verified above)
-    const adminSupabase = createAdminClient();
     const { data: participants } = await adminSupabase
       .from("polla_participants")
       .select(`
@@ -115,6 +114,7 @@ export async function GET(
       predictions: predictions || [],
       currentUserRole: currentRole,
       currentUserStatus: participant?.status || "approved",
+      currentUserPaymentStatus: participant?.payment_status || "approved",
       currentUserId: user.id,
     });
   } catch (error) {
