@@ -12,12 +12,85 @@ import { formatTablaWA } from "./tabla";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
 const FOOTER = "La Polla Colombiana 🐥";
+const PAGE_SIZE = 9; // leave 1 slot in the 10-row list for "Ver más partidos"
 
 const TRN_LABELS: Record<string, string> = {
   worldcup_2026: "Mundial 2026 🏆",
   champions_2025: "Champions 2024-25 ⚽",
   liga_betplay_2025: "BetPlay 2025 🇨🇴",
 };
+
+// ─── Helpers ───
+
+interface PollaRow {
+  id: string;
+  name: string;
+  slug: string;
+  tournament: string;
+  status: string;
+  type: string;
+  payment_mode: string;
+  buy_in_amount: number;
+  match_ids: string[] | null;
+}
+
+interface ParticipantRow {
+  id: string;
+  role: string;
+  status: string;
+  payment_status: string;
+  total_points: number;
+  rank: number | null;
+}
+
+/**
+ * Verify the user is an approved participant of the polla AND, for digital_pool
+ * pollas, has payment_status = 'approved'. Sends the appropriate Spanish message
+ * and returns null if any gate fails. Returns {polla, participant} on success.
+ */
+async function verifyMemberAndPolla(
+  phone: string,
+  userId: string,
+  pollaId: string
+): Promise<{ polla: PollaRow; participant: ParticipantRow } | null> {
+  const supabase = createAdminClient();
+
+  const { data: polla } = await supabase
+    .from("pollas")
+    .select("id, name, slug, tournament, status, type, payment_mode, buy_in_amount, match_ids")
+    .eq("id", pollaId)
+    .single();
+
+  if (!polla) {
+    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.");
+    return null;
+  }
+
+  const { data: participant } = await supabase
+    .from("polla_participants")
+    .select("id, role, status, payment_status, total_points, rank")
+    .eq("polla_id", pollaId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!participant || participant.status !== "approved") {
+    await sendTextMessage(phone, "No eres participante de esta polla parce.");
+    return null;
+  }
+
+  if (
+    polla.payment_mode === "digital_pool" &&
+    participant.payment_status !== "approved"
+  ) {
+    await sendTextMessage(
+      phone,
+      `Necesitás pagar la cuota primero. Entrá a la app para completar el pago: ${APP_URL}/pollas/${polla.slug}`
+    );
+    return null;
+  }
+
+  return { polla: polla as PollaRow, participant: participant as ParticipantRow };
+}
 
 // ─── FLOW 1: Main Menu ───
 
@@ -65,8 +138,9 @@ export async function handleMisPollas(phone: string, userId: string) {
 
   const { data: participations } = await supabase
     .from("polla_participants")
-    .select("polla_id, total_points, rank, role")
-    .eq("user_id", userId);
+    .select("polla_id, total_points, rank, role, status")
+    .eq("user_id", userId)
+    .eq("status", "approved");
 
   if (!participations || participations.length === 0) {
     await sendTextMessage(
@@ -145,37 +219,38 @@ export async function handlePollaMenu(
   userId: string,
   pollaId: string
 ) {
-  const supabase = createAdminClient();
-
-  const { data: polla } = await supabase
-    .from("pollas")
-    .select("id, name, tournament")
-    .eq("id", pollaId)
-    .single();
-
-  if (!polla) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.");
-    return;
-  }
-
-  const { data: participant } = await supabase
-    .from("polla_participants")
-    .select("total_points, rank")
-    .eq("polla_id", pollaId)
-    .eq("user_id", userId)
-    .single();
+  const check = await verifyMemberAndPolla(phone, userId, pollaId);
+  if (!check) return;
+  const { polla, participant } = check;
 
   const trnLabel = TRN_LABELS[polla.tournament] || polla.tournament;
+  setState(phone, { action: "browsing_polla", pollaId, pollaSlug: polla.slug });
 
-  // Save pollaId in state for match selection
-  setState(phone, { action: "browsing_polla", pollaId });
+  // RULE 4 — ended pollas are read-only (no Predecir)
+  if (polla.status === "ended") {
+    await sendReplyButtons(
+      phone,
+      `🏆 *${polla.name}*\n\n` +
+        `⚽ Torneo: ${trnLabel}\n` +
+        `📊 Tu posición final: *#${participant.rank ?? "—"}*\n` +
+        `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
+        `Esta polla ya terminó parce. Solo podés ver los resultados finales.`,
+      [
+        { id: `rank_${pollaId}`, title: "Ver Tabla 📊" },
+        { id: `results_${pollaId}`, title: "Resultados ⚽" },
+      ],
+      polla.name,
+      FOOTER
+    );
+    return;
+  }
 
   await sendReplyButtons(
     phone,
     `🏆 *${polla.name}*\n\n` +
       `⚽ Torneo: ${trnLabel}\n` +
-      `📊 Tu posición: *#${participant?.rank || "—"}*\n` +
-      `🎯 Tus puntos: *${participant?.total_points || 0}*\n\n` +
+      `📊 Tu posición: *#${participant.rank ?? "—"}*\n` +
+      `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
       `¿Qué querés hacer parce?`,
     [
       { id: `pred_${pollaId}`, title: "Predecir 🎯" },
@@ -193,32 +268,43 @@ export async function handlePronosticar(
   phone: string,
   userId: string,
   pollaId: string,
-  specificMatchId?: string
+  specificMatchId?: string,
+  page: number = 0
 ) {
-  const supabase = createAdminClient();
+  const check = await verifyMemberAndPolla(phone, userId, pollaId);
+  if (!check) return;
+  const { polla } = check;
 
-  const { data: polla } = await supabase
-    .from("pollas")
-    .select("id, name, tournament")
-    .eq("id", pollaId)
-    .single();
-
-  if (!polla) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.");
+  if (polla.status === "ended") {
+    await sendTextMessage(
+      phone,
+      "Esta polla ya terminó parce. Solo podés ver los resultados finales."
+    );
     return;
   }
 
+  const supabase = createAdminClient();
   const lockWindow = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-  const { data: matches } = await supabase
+  // RULE 8 — filter by polla.match_ids (not tournament). Legacy pollas with no
+  // match_ids fall back to the tournament-level list.
+  const useMatchIds = polla.match_ids && polla.match_ids.length > 0;
+  let matchQuery = supabase
     .from("matches")
     .select(
       "id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at"
     )
-    .eq("tournament", polla.tournament)
     .eq("status", "scheduled")
     .gt("scheduled_at", lockWindow)
     .order("scheduled_at", { ascending: true });
+
+  if (useMatchIds) {
+    matchQuery = matchQuery.in("id", polla.match_ids!);
+  } else {
+    matchQuery = matchQuery.eq("tournament", polla.tournament);
+  }
+
+  const { data: matches } = await matchQuery;
 
   if (!matches || matches.length === 0) {
     await sendReplyButtons(
@@ -234,37 +320,39 @@ export async function handlePronosticar(
     return;
   }
 
-  // Get user's existing predictions
+  // Existing predictions
   const { data: predictions } = await supabase
     .from("predictions")
     .select("match_id")
     .eq("polla_id", pollaId)
     .eq("user_id", userId);
 
-  const predictedMatchIds = new Set(
-    predictions?.map((p) => p.match_id) || []
-  );
+  const predictedMatchIds = new Set(predictions?.map((p) => p.match_id) || []);
 
-  // If specific match requested, go straight to prediction input
+  // Specific match requested — validate it's in the polla scope
   if (specificMatchId) {
     const match = matches.find((m) => m.id === specificMatchId);
-    if (match) {
-      return showPredictionPrompt(
+    if (!match) {
+      await sendTextMessage(
         phone,
-        polla,
-        match,
-        matches.indexOf(match) + 1,
-        matches.length,
-        predictedMatchIds.has(match.id),
-        pollaId
+        "Ese partido no está en esta polla parce, seleccioná uno de la lista."
       );
+      return handlePronosticar(phone, userId, pollaId, undefined, 0);
     }
+    return showPredictionPrompt(
+      phone,
+      polla,
+      match,
+      matches.indexOf(match) + 1,
+      matches.length,
+      predictedMatchIds.has(match.id),
+      pollaId
+    );
   }
 
-  // If only one unpredicted match, go straight to it
+  // Auto-advance if only one unpredicted match
   const unpredicted = matches.filter((m) => !predictedMatchIds.has(m.id));
-
-  if (unpredicted.length === 1) {
+  if (unpredicted.length === 1 && page === 0) {
     const match = unpredicted[0];
     return showPredictionPrompt(
       phone,
@@ -277,13 +365,20 @@ export async function handlePronosticar(
     );
   }
 
-  // Multiple matches: show list
+  // List view with pagination (WhatsApp lists are capped at 10 rows)
   const targetMatches = unpredicted.length > 0 ? unpredicted : matches;
+  const startIdx = page * PAGE_SIZE;
+  const pageMatches = targetMatches.slice(startIdx, startIdx + PAGE_SIZE);
+  const hasMore = startIdx + PAGE_SIZE < targetMatches.length;
 
-  // Save pollaId in state for when they pick a match
-  setState(phone, { action: "picking_match", pollaId });
+  setState(phone, {
+    action: "picking_match",
+    pollaId,
+    pollaSlug: polla.slug,
+    page,
+  });
 
-  const rows = targetMatches.slice(0, 10).map((m) => {
+  const rows = pageMatches.map((m) => {
     const dateStr = new Date(m.scheduled_at).toLocaleDateString("es-CO", {
       weekday: "short",
       month: "short",
@@ -297,9 +392,20 @@ export async function handlePronosticar(
     };
   });
 
+  if (hasMore) {
+    rows.push({
+      id: `more_${pollaId}_${page + 1}`,
+      title: "Ver más partidos →",
+      description: `Mostrar los siguientes ${Math.min(
+        PAGE_SIZE,
+        targetMatches.length - (startIdx + PAGE_SIZE)
+      )}`,
+    });
+  }
+
   await sendListMessage(
     phone,
-    `¿Cuál partido querés predecir parce? ⚽`,
+    `¿Cuál partido querés predecir parce? ⚽${page > 0 ? ` _(página ${page + 1})_` : ""}`,
     "Ver partidos",
     [{ title: "Partidos disponibles", rows }],
     `🎯 ${polla.name}`,
@@ -377,12 +483,12 @@ export async function handlePredictionInput(
     return;
   }
 
-  // Check if match is locked
+  // RULE 1 — 5min lock check before confirming
   const lockTime = new Date(match.scheduled_at).getTime() - 5 * 60 * 1000;
   if (match.status !== "scheduled" || Date.now() >= lockTime) {
     await sendTextMessage(
       phone,
-      "🔒 Uy parce, este partido ya está cerrado para pronósticos.\n\n_Pilas con los horarios la próxima vez_ ⏰"
+      "Este partido ya está cerrado parce, no se pueden cambiar pronósticos a menos de 5 minutos del inicio."
     );
     return;
   }
@@ -430,12 +536,23 @@ export async function handleConfirmPrediction(
 
   const { data: match } = await supabase
     .from("matches")
-    .select("id, home_team, away_team")
+    .select("id, home_team, away_team, scheduled_at, status")
     .eq("id", matchId)
     .single();
 
   if (!match) {
     await sendTextMessage(phone, "🤔 Parce, no encontré el partido.");
+    return;
+  }
+
+  // RULE 1 — re-check the 5min lock at confirm time. The DB trigger is the
+  // ultimate gate, but checking here avoids the generic "error guardando" UX.
+  const lockTime = new Date(match.scheduled_at).getTime() - 5 * 60 * 1000;
+  if (match.status !== "scheduled" || Date.now() >= lockTime) {
+    await sendTextMessage(
+      phone,
+      "Este partido ya está cerrado parce, no se pueden cambiar pronósticos a menos de 5 minutos del inicio."
+    );
     return;
   }
 
@@ -482,18 +599,11 @@ export async function handleLeaderboard(
   userId: string,
   pollaId: string
 ) {
+  const check = await verifyMemberAndPolla(phone, userId, pollaId);
+  if (!check) return;
+  const { polla } = check;
+
   const supabase = createAdminClient();
-
-  const { data: polla } = await supabase
-    .from("pollas")
-    .select("id, name")
-    .eq("id", pollaId)
-    .single();
-
-  if (!polla) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.");
-    return;
-  }
 
   const { data: participants } = await supabase
     .from("polla_participants")
@@ -585,29 +695,30 @@ export async function handleResults(
   userId: string,
   pollaId: string
 ) {
+  const check = await verifyMemberAndPolla(phone, userId, pollaId);
+  if (!check) return;
+  const { polla } = check;
+
   const supabase = createAdminClient();
 
-  const { data: polla } = await supabase
-    .from("pollas")
-    .select("name, tournament")
-    .eq("id", pollaId)
-    .single();
-
-  if (!polla) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.");
-    return;
-  }
-
-  // Last 5 finished matches
-  const { data: matches } = await supabase
+  // RULE 8 — last 5 finished matches scoped to polla.match_ids when set
+  const useMatchIds = polla.match_ids && polla.match_ids.length > 0;
+  let resultsQuery = supabase
     .from("matches")
     .select(
       "id, home_team, away_team, home_score, away_score, home_team_flag, away_team_flag"
     )
-    .eq("tournament", polla.tournament)
     .eq("status", "finished")
     .order("scheduled_at", { ascending: false })
     .limit(5);
+
+  if (useMatchIds) {
+    resultsQuery = resultsQuery.in("id", polla.match_ids!);
+  } else {
+    resultsQuery = resultsQuery.eq("tournament", polla.tournament);
+  }
+
+  const { data: matches } = await resultsQuery;
 
   if (!matches || matches.length === 0) {
     await sendReplyButtons(
@@ -678,7 +789,7 @@ export async function handleJoinPolla(
 
   const { data: polla } = await supabase
     .from("pollas")
-    .select("id, name, status, type")
+    .select("id, name, slug, status, type, payment_mode, buy_in_amount")
     .eq("slug", slug)
     .single();
 
@@ -698,13 +809,21 @@ export async function handleJoinPolla(
     return;
   }
 
+  if (polla.type === "closed") {
+    await sendTextMessage(
+      phone,
+      `Esa polla es privada parce, necesitás invitación del admin para entrar.`
+    );
+    return;
+  }
+
   // Check if already a member
   const { data: existing } = await supabase
     .from("polla_participants")
     .select("id")
     .eq("polla_id", polla.id)
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     await sendReplyButtons(
@@ -720,12 +839,18 @@ export async function handleJoinPolla(
     return;
   }
 
-  // Join the polla
+  // For digital_pool: pay first, then predict (payment_status=pending gates the app).
+  // For other modes: participant is pending until admin approves (matches web app flow).
+  const isDigitalPool =
+    polla.payment_mode === "digital_pool" && polla.buy_in_amount > 0;
+
   const { error } = await supabase.from("polla_participants").insert({
     polla_id: polla.id,
     user_id: user.id,
-    role: "participant",
-    status: "active",
+    role: "player",
+    status: isDigitalPool ? "approved" : "pending",
+    payment_status: isDigitalPool ? "pending" : "approved",
+    paid: false,
     total_points: 0,
   });
 
@@ -734,6 +859,18 @@ export async function handleJoinPolla(
     await sendTextMessage(
       phone,
       "❌ Uy parce, hubo un error al unirte. Intentá de nuevo."
+    );
+    return;
+  }
+
+  if (isDigitalPool) {
+    await sendCTAButton(
+      phone,
+      `🎉 ¡Listo parce! Te registré en *${polla.name}*\n\n` +
+        `Ahora pagá la cuota en la app para que tus pronósticos cuenten 👇`,
+      "Pagar y pronosticar",
+      `${APP_URL}/pollas/${polla.slug}`,
+      FOOTER
     );
     return;
   }
