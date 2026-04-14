@@ -83,17 +83,21 @@ export async function GET() {
     const allMatchIds = Array.from(
       new Set((pollas || []).flatMap((p) => (p.match_ids as string[] | null) || []))
     );
-    const matchById = new Map<string, { status: string; scheduled_at: string }>();
+    const matchById = new Map<string, { status: string }>();
     if (allMatchIds.length > 0) {
       const { data: matchRows } = await supabase
         .from("matches")
-        .select("id, status, scheduled_at")
+        .select("id, status")
         .in("id", allMatchIds);
       for (const m of matchRows || []) {
-        matchById.set(m.id, { status: m.status, scheduled_at: m.scheduled_at });
+        matchById.set(m.id, { status: m.status });
       }
     }
-    const nowMs = Date.now();
+    // A match counts as terminal only when it will never play again: 'finished'
+    // (full-time) or 'cancelled'. Do NOT flip a polla to ended just because
+    // kickoff time passed — status='scheduled' past kickoff means the sync
+    // hasn't caught up, not that the match is over.
+    const TERMINAL_MATCH_STATUSES = new Set(["finished", "cancelled"]);
     const effectiveStatus = (p: { status: string; match_ids: string[] | null }): string => {
       if (p.status === "ended") return "ended";
       if (p.status !== "active") return p.status;
@@ -102,7 +106,7 @@ export async function GET() {
       const allDone = ids.every((id) => {
         const m = matchById.get(id);
         if (!m) return false;
-        return m.status === "finished" || new Date(m.scheduled_at).getTime() < nowMs;
+        return TERMINAL_MATCH_STATUSES.has(m.status);
       });
       return allDone ? "ended" : "active";
     };
