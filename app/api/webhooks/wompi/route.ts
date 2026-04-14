@@ -49,6 +49,7 @@ function getValueAtPath(obj: unknown, path: string): string {
 
 export async function POST(request: NextRequest) {
   const eventsKey = (process.env.WOMPI_EVENTS_KEY ?? "").trim();
+
   if (!eventsKey) {
     console.error("[wompi] WOMPI_EVENTS_KEY not configured");
     return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
@@ -70,8 +71,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
+  // Wompi property paths ("transaction.id", "transaction.status", ...) resolve
+  // against event.data, NOT the event root.
   const concatenated =
-    sig.properties.map((p) => getValueAtPath(event, p)).join("") +
+    sig.properties.map((p) => getValueAtPath(event.data, p)).join("") +
     String(event.timestamp) +
     eventsKey;
 
