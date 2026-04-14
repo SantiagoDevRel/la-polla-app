@@ -504,13 +504,16 @@ export default function PollaSlugPage() {
                         </div>
                       </div>
 
-                      {/* Previous prediction + points */}
-                      {match.status === "finished" && pred && pred.visible && (
+                      {/* Previous prediction + points — always show the user's own
+                          prediction once the form is locked (locked/live/finished). */}
+                      {pred && (match.status === "finished" || match.status === "live" || locked) && (
                         <div className="mt-2 flex items-center justify-between text-xs">
                           <span className="text-text-muted">Tu pronóstico: {pred.predicted_home} - {pred.predicted_away}</span>
-                          <span className={`font-bold ${pred.points_earned > 0 ? "text-gold" : "text-text-muted"}`}>
-                            {pred.points_earned > 0 ? `+${pred.points_earned} pts` : "0 pts"}
-                          </span>
+                          {match.status === "finished" && (
+                            <span className={`font-bold ${pred.points_earned > 0 ? "text-gold" : "text-text-muted"}`}>
+                              {pred.points_earned > 0 ? `+${pred.points_earned} pts` : "0 pts"}
+                            </span>
+                          )}
                         </div>
                       )}
 
