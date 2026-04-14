@@ -3,6 +3,7 @@
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { syncCompetition } from "@/lib/football-data/sync";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { scoreAllFinishedMatches } from "@/lib/scoring";
 import { revalidatePath } from "next/cache";
 
 export async function syncMatchesAction(
@@ -14,8 +15,20 @@ export async function syncMatchesAction(
   }
 
   const result = await syncCompetition(competitionId, tournament);
+
+  // After a sync, rescore any match that's now finished. Idempotent — safe
+  // alongside the Postgres trigger, covers cases where the trigger didn't run
+  // (seeded pollas, manual score edits, etc.).
+  let scored = 0;
+  try {
+    const scoringResults = await scoreAllFinishedMatches(createAdminClient());
+    scored = scoringResults.reduce((acc, r) => acc + r.predictionsScored, 0);
+  } catch (err) {
+    console.error("[syncMatchesAction] scoring pass failed (non-fatal):", err);
+  }
+
   revalidatePath("/admin/matches");
-  return result;
+  return { ...result, scored };
 }
 
 export async function purgeMatchesAction() {
