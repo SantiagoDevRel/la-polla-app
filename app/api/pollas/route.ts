@@ -206,15 +206,19 @@ export async function POST(request: NextRequest) {
 
         if (retryError) throw retryError;
 
-        // Creator auto-join (retry path) — wrapped so failures don't 500 the creation.
+        // Creator auto-join (retry path). Digital-pool creators must pay like
+        // anyone else — they land in pending until they pay through the app.
         try {
+          const creatorPending =
+            parsed.data.paymentMode === "digital_pool" &&
+            parsed.data.buyInAmount > 0;
           const { error: joinError } = await supabase.from("polla_participants").insert({
             polla_id: retryPolla.id,
             user_id: user.id,
             role: "admin",
             status: "approved",
-            payment_status: "approved",
-            paid: true,
+            payment_status: creatorPending ? "pending" : "approved",
+            paid: !creatorPending,
           });
           if (joinError) {
             console.error("Creator auto-join failed (retry) for polla", retryPolla.id, joinError);
@@ -229,15 +233,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Creator auto-join — wrapped so participant-insert failures don't surface as
-    // "Error al crear la polla" (the polla itself is created successfully by this point).
+    // "Error al crear la polla". Digital-pool creators must pay like anyone else;
+    // for every other mode the creator starts already approved/paid.
     try {
+      const creatorPending =
+        parsed.data.paymentMode === "digital_pool" &&
+        parsed.data.buyInAmount > 0;
       const { error: joinError } = await supabase.from("polla_participants").insert({
         polla_id: polla.id,
         user_id: user.id,
         role: "admin",
         status: "approved",
-        payment_status: "approved",
-        paid: true,
+        payment_status: creatorPending ? "pending" : "approved",
+        paid: !creatorPending,
       });
       if (joinError) {
         console.error("Creator auto-join failed for polla", polla.id, joinError);
