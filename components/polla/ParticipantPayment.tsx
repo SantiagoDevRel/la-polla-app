@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import PaymentSubmitForm from "./PaymentSubmitForm";
 import AdminPaymentReview from "./AdminPaymentReview";
+import FootballLoader from "@/components/ui/FootballLoader";
 
 interface PaymentParticipant {
   id: string;
@@ -67,7 +68,8 @@ export default function ParticipantPayment({
 
   if (loading) {
     return (
-      <div className="rounded-xl p-4 text-center bg-bg-card border border-border-subtle">
+      <div className="rounded-xl p-4 text-center bg-bg-card border border-border-subtle flex flex-col items-center gap-2">
+        <FootballLoader variant="plata" />
         <p className="text-text-muted text-sm">Cargando pagos...</p>
       </div>
     );

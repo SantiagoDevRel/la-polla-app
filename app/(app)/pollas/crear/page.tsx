@@ -14,6 +14,7 @@ import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Smartphone, Handshake, Lock, Globe } from "lucide-react";
 import { formatCOP } from "@/lib/formatCurrency";
 import { TOURNAMENTS } from "@/lib/tournaments";
+import FootballLoader from "@/components/ui/FootballLoader";
 
 // ─── Tipos ───
 
@@ -408,7 +409,7 @@ export default function CrearPollaPage() {
             </div>
 
             {matchesLoading ? (
-              <div className="text-center py-8"><p className="text-text-muted text-sm">Cargando partidos...</p></div>
+              <div className="flex flex-col items-center gap-2 py-8"><FootballLoader /><p className="text-text-muted text-sm">Cargando partidos...</p></div>
             ) : matches.length === 0 ? (
               <div className="text-center py-8 rounded-2xl bg-bg-card border border-border-subtle">
                 <p className="text-text-muted text-sm">No hay partidos programados para este torneo</p>

@@ -7,6 +7,7 @@ import axios from "axios";
 import PollaCard, { TOURNAMENT_ICONS } from "@/components/shared/PollaCard";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
 import { Plus, Mail, ChevronDown, ChevronRight } from "lucide-react";
+import FootballLoader from "@/components/ui/FootballLoader";
 
 interface PollaData {
   id: string; name: string; slug: string; description?: string;
@@ -114,7 +115,8 @@ export default function MisPollasPage() {
           </h2>
 
           {loading ? (
-            <div className="text-center py-6">
+            <div className="flex flex-col items-center gap-2 py-6">
+              <FootballLoader />
               <p className="text-text-muted text-sm">Cargando pollas...</p>
             </div>
           ) : active.length > 0 ? (

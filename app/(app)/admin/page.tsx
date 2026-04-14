@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
+import FootballLoader from "@/components/ui/FootballLoader";
 
 interface AdminUser {
   id: string;
@@ -122,7 +123,7 @@ export default function AdminPage() {
 
       <main className="max-w-lg mx-auto p-4 space-y-5">
         {loading ? (
-          <p className="text-text-muted text-sm text-center py-8">Cargando…</p>
+          <div className="flex flex-col items-center gap-2 py-8"><FootballLoader /><p className="text-text-muted text-sm">Cargando…</p></div>
         ) : (
           <>
             {/* Stats */}

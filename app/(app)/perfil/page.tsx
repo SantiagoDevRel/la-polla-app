@@ -10,6 +10,7 @@ import { staggerContainer, fadeUp } from "@/lib/animations";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import UserAvatar from "@/components/ui/UserAvatar";
+import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 
 interface UserProfile {
@@ -100,7 +101,7 @@ export default function PerfilPage() {
     return "#4a5568";
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">Cargando perfil...</p></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="flex flex-col items-center gap-2"><FootballLoader /><p className="text-text-muted">Cargando perfil...</p></div></div>;
   if (!profile) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">Error cargando perfil</p></div>;
 
   const SCORING_ROWS = [

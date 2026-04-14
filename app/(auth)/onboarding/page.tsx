@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { createClient } from "@/lib/supabase/client";
 import { POLLITO_TYPES, DEFAULT_POLLITO, getPollitoBase } from "@/lib/pollitos";
+import FootballLoader from "@/components/ui/FootballLoader";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -87,7 +88,10 @@ export default function OnboardingPage() {
   if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-text-muted text-sm">Cargando...</p>
+        <div className="flex flex-col items-center gap-2">
+          <FootballLoader />
+          <p className="text-text-muted text-sm">Cargando...</p>
+        </div>
       </div>
     );
   }

@@ -16,6 +16,7 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug } from "@/lib/tournaments";
 import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake } from "lucide-react";
+import FootballLoader from "@/components/ui/FootballLoader";
 
 // ─── Tipos ───
 
@@ -181,7 +182,7 @@ export default function PollaSlugPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center animate-fade-in">
-          <div className="mb-3"><Target className="w-10 h-10 text-gold mx-auto" /></div>
+          <div className="mb-3 flex justify-center"><FootballLoader /></div>
           <p className="text-text-secondary font-medium">Cargando polla...</p>
         </div>
       </div>
