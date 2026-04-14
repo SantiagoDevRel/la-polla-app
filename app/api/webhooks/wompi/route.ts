@@ -48,7 +48,7 @@ function getValueAtPath(obj: unknown, path: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const eventsKey = process.env.WOMPI_EVENTS_KEY;
+  const eventsKey = (process.env.WOMPI_EVENTS_KEY ?? "").trim();
   if (!eventsKey) {
     console.error("[wompi] WOMPI_EVENTS_KEY not configured");
     return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
