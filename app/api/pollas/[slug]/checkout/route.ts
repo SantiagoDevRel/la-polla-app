@@ -72,8 +72,10 @@ export async function POST(
 
     const reference = `${slug}-${user.id.replace(/-/g, "").substring(0, 8)}`;
     const amountCents = polla.buy_in_amount * 100;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    const redirectUrl = `${appUrl}/pollas/${slug}?payment=result`;
+    // Wompi requires an absolute URL for redirect-url — fall back to the
+    // production host if NEXT_PUBLIC_APP_URL isn't configured.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
+    const redirectUrl = `${appUrl}/pollas/${slug}?payment=success`;
 
     const checkoutUrl = buildWompiCheckoutUrl({
       reference,
