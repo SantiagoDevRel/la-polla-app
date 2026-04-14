@@ -43,14 +43,6 @@ export async function GET(
       return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
     }
 
-    // Verificar que la polla usa modo admin_collects
-    if (polla.payment_mode !== "admin_collects") {
-      return NextResponse.json(
-        { error: "Esta polla no usa el modo de pago admin_collects" },
-        { status: 400 }
-      );
-    }
-
     // Verificar que el usuario es participante
     const { data: myParticipant } = await supabase
       .from("polla_participants")
@@ -65,8 +57,8 @@ export async function GET(
 
     const isAdmin = myParticipant.role === "admin";
 
-    // Consulta base: participantes con datos de usuario
-    let query = supabase
+    // Todos los participantes ven la lista completa — el pozo es público.
+    const { data: payments, error: paymentsError } = await supabase
       .from("polla_participants")
       .select(`
         id,
@@ -86,13 +78,6 @@ export async function GET(
       `)
       .eq("polla_id", polla.id);
 
-    // Si no es admin, solo ve su propio pago
-    if (!isAdmin) {
-      query = query.eq("user_id", user.id);
-    }
-
-    const { data: payments, error: paymentsError } = await query;
-
     if (paymentsError) throw paymentsError;
 
     return NextResponse.json({
@@ -101,6 +86,7 @@ export async function GET(
         adminPaymentInstructions: polla.admin_payment_instructions,
         buyInAmount: polla.buy_in_amount,
         currency: polla.currency,
+        paymentMode: polla.payment_mode,
       },
       isAdmin,
     });
