@@ -109,6 +109,14 @@ export default function CrearPollaPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  // Public pollas (type='open') must use digital_pool — no admin to collect from
+  // the parche of strangers that joins through the link.
+  useEffect(() => {
+    if (form.type === "open" && form.paymentMode !== "digital_pool") {
+      setForm((prev) => ({ ...prev, paymentMode: "digital_pool" }));
+    }
+  }, [form.type, form.paymentMode]);
+
   // Fetch matches when tournament changes and we're on step 2
   useEffect(() => {
     if (step !== 2) return;
@@ -582,36 +590,65 @@ export default function CrearPollaPage() {
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Modo de pago</h2>
-              <div className="space-y-3">
-                {PAYMENT_MODE_OPTIONS.map((option) => {
-                  const isSelected = form.paymentMode === option.value;
-                  return (
-                    <button key={option.value} type="button"
-                      onClick={() => updateForm("paymentMode", option.value)}
-                      className={`w-full text-left p-4 rounded-xl border transition-all ${isSelected ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated cursor-pointer"}`}>
-                      <div className="flex items-start gap-3">
-                        <span className="flex-shrink-0 mt-0.5">
-                          {option.icon === "banknote" ? <Banknote className="w-6 h-6" style={{ color: "#7a8499" }} />
-                            : option.icon === "smartphone" ? <Smartphone className="w-6 h-6" style={{ color: "#7a8499" }} />
-                            : <Handshake className="w-6 h-6" style={{ color: "#7a8499" }} />}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-bold text-text-primary">{option.title}</span>
-                            <span className="text-[10px] px-3 py-1 rounded-full font-medium bg-gold/10 text-gold border border-gold/20">{option.tag}</span>
+              {form.type === "open" ? (
+                <>
+                  {(() => {
+                    const opt = PAYMENT_MODE_OPTIONS.find((o) => o.value === "digital_pool")!;
+                    return (
+                      <div className="w-full text-left p-4 rounded-xl border border-gold/30 bg-gold/10">
+                        <div className="flex items-start gap-3">
+                          <span className="flex-shrink-0 mt-0.5">
+                            <Smartphone className="w-6 h-6" style={{ color: "#7a8499" }} />
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-bold text-text-primary">{opt.title}</span>
+                              <span className="text-[10px] px-3 py-1 rounded-full font-medium bg-gold/10 text-gold border border-gold/20">{opt.tag}</span>
+                            </div>
+                            <p className="text-sm text-text-secondary leading-snug">{opt.description}</p>
                           </div>
-                          <p className="text-sm text-text-secondary leading-snug">{option.description}</p>
                         </div>
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
+                    );
+                  })()}
+                  <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
+                    <p className="text-xs text-text-secondary leading-snug">Las pollas públicas requieren pago digital.</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {PAYMENT_MODE_OPTIONS.map((option) => {
+                      const isSelected = form.paymentMode === option.value;
+                      return (
+                        <button key={option.value} type="button"
+                          onClick={() => updateForm("paymentMode", option.value)}
+                          className={`w-full text-left p-4 rounded-xl border transition-all ${isSelected ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated cursor-pointer"}`}>
+                          <div className="flex items-start gap-3">
+                            <span className="flex-shrink-0 mt-0.5">
+                              {option.icon === "banknote" ? <Banknote className="w-6 h-6" style={{ color: "#7a8499" }} />
+                                : option.icon === "smartphone" ? <Smartphone className="w-6 h-6" style={{ color: "#7a8499" }} />
+                                : <Handshake className="w-6 h-6" style={{ color: "#7a8499" }} />}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-bold text-text-primary">{option.title}</span>
+                                <span className="text-[10px] px-3 py-1 rounded-full font-medium bg-gold/10 text-gold border border-gold/20">{option.tag}</span>
+                              </div>
+                              <p className="text-sm text-text-secondary leading-snug">{option.description}</p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-              {/* Helper one-liner for selected mode */}
-              <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
-                <p className="text-xs text-text-secondary leading-snug">{PAYMENT_MODE_HINTS[form.paymentMode]}</p>
-              </div>
+                  {/* Helper one-liner for selected mode */}
+                  <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
+                    <p className="text-xs text-text-secondary leading-snug">{PAYMENT_MODE_HINTS[form.paymentMode]}</p>
+                  </div>
+                </>
+              )}
             </div>
 
             {form.paymentMode === "admin_collects" && (
