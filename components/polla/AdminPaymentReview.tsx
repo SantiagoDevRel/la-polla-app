@@ -11,7 +11,7 @@ interface PaymentParticipant {
   id: string;
   user_id: string;
   role: string;
-  status: "pending" | "approved" | "rejected";
+  status: "approved" | "rejected";
   paid: boolean;
   paid_at: string | null;
   paid_amount: number | null;
@@ -48,15 +48,17 @@ export default function AdminPaymentReview({
     maximumFractionDigits: 0,
   }).format(buyInAmount);
 
-  // Separar pagos por estado para mostrar primero los pendientes
+  // La cola de "pendientes de aprobación" es: comprobante entregado pero
+  // admin aún no marcó pagado. Ya no usamos status='pending' (retired en
+  // migration 010). "rejected" = baneado de la polla.
   const pendingPayments = payments.filter(
-    (p) => p.role !== "admin" && p.payment_note && p.status === "pending"
+    (p) => p.role !== "admin" && p.payment_note && !p.paid && p.status !== "rejected"
   );
   const approvedPayments = payments.filter(
     (p) => p.role !== "admin" && p.paid
   );
   const waitingPayments = payments.filter(
-    (p) => p.role !== "admin" && !p.payment_note && !p.paid
+    (p) => p.role !== "admin" && !p.payment_note && !p.paid && p.status !== "rejected"
   );
   const rejectedPayments = payments.filter(
     (p) => p.role !== "admin" && p.status === "rejected"

@@ -63,10 +63,6 @@ export async function POST(
       return NextResponse.json({ error: "No eres participante de esta polla" }, { status: 403 });
     }
 
-    if (participant.status === "pending") {
-      return NextResponse.json({ error: "Tu solicitud está pendiente de aprobación" }, { status: 403 });
-    }
-
     if (participant.status === "rejected") {
       return NextResponse.json({ error: "Tu solicitud fue rechazada" }, { status: 403 });
     }

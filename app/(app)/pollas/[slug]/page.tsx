@@ -84,7 +84,6 @@ export default function PollaSlugPage() {
 
   const [polla, setPolla] = useState<Polla | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [pendingParticipants, setPendingParticipants] = useState<Participant[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
@@ -102,7 +101,6 @@ export default function PollaSlugPage() {
   const [inviteCountryCode, setInviteCountryCode] = useState("57");
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
-  const [approvalLoading, setApprovalLoading] = useState<string | null>(null);
   const awayInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const homeInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -112,7 +110,6 @@ export default function PollaSlugPage() {
       const { data } = await axios.get(`/api/pollas/${slug}`);
       setPolla(data.polla);
       setParticipants(data.participants);
-      setPendingParticipants(data.pendingParticipants || []);
       setMatches(data.matches);
       setPredictions(data.predictions);
       setCurrentUserId(data.currentUserId);
@@ -225,13 +222,20 @@ export default function PollaSlugPage() {
   async function joinPolla() {
     setJoining(true);
     try {
-      await axios.post(`/api/pollas/${slug}/join`);
+      const { data } = await axios.post<{ joined: boolean; checkoutUrl: string | null }>(
+        `/api/pollas/${slug}/join`
+      );
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
       showToast("Te uniste a la polla", "success");
       setIsNonParticipant(false);
       loadData();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      showToast(e.response?.data?.error || "Error al unirse", "error");
+      const msg = e.response?.data?.error || "Error al unirse";
+      showToast(msg === "invite_required" ? "Polla privada — necesitás invitación." : msg, "error");
     } finally {
       setJoining(false);
     }
@@ -382,16 +386,13 @@ export default function PollaSlugPage() {
             >
               {payingNow ? "Abriendo checkout..." : "Pagar ahora"}
             </button>
+            <p className="text-xs text-text-muted leading-snug">
+              ¿Ya pagaste? Puede tomar unos segundos. Recargá la página para verificar.
+            </p>
           </div>
         )}
         {activeTab === "partidos" && !paymentLocked && (
           <>
-            {currentUserStatus === "pending" && (
-              <div className="rounded-xl p-4 bg-gold/10 border border-gold/20 text-center mb-3">
-                <p className="text-sm text-gold font-semibold">Tu solicitud está pendiente</p>
-                <p className="text-xs text-text-secondary mt-1">El admin debe aprobarte para que puedas enviar pronósticos.</p>
-              </div>
-            )}
             {currentUserStatus === "rejected" && (
               <div className="rounded-xl p-4 bg-red-alert/10 border border-red-alert/20 text-center mb-3">
                 <p className="text-sm text-red-alert font-semibold">Tu solicitud fue rechazada</p>
@@ -711,52 +712,6 @@ export default function PollaSlugPage() {
                     {inviteMsg.text}
                   </p>
                 )}
-              </div>
-            )}
-
-            {/* Admin: Pending join requests */}
-            {currentUserRole === "admin" && pendingParticipants.length > 0 && (
-              <div className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
-                <h4 className="font-bold text-text-primary">Solicitudes de ingreso</h4>
-                {pendingParticipants.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl p-3 bg-bg-elevated">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-text-primary truncate">{p.users.display_name}</p>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        disabled={approvalLoading === p.user_id}
-                        onClick={async () => {
-                          setApprovalLoading(p.user_id);
-                          try {
-                            await axios.patch(`/api/pollas/${slug}/participants/${p.user_id}`, { action: "approve" });
-                            showToast("Participante aprobado", "success");
-                            loadData();
-                          } catch { showToast("Error al aprobar", "error"); }
-                          finally { setApprovalLoading(null); }
-                        }}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-live/20 text-green-live hover:bg-green-live/30 disabled:opacity-40 transition-all cursor-pointer"
-                      >
-                        Aprobar
-                      </button>
-                      <button
-                        disabled={approvalLoading === p.user_id}
-                        onClick={async () => {
-                          setApprovalLoading(p.user_id);
-                          try {
-                            await axios.patch(`/api/pollas/${slug}/participants/${p.user_id}`, { action: "reject" });
-                            showToast("Solicitud rechazada", "success");
-                            loadData();
-                          } catch { showToast("Error al rechazar", "error"); }
-                          finally { setApprovalLoading(null); }
-                        }}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-alert/20 text-red-alert hover:bg-red-alert/30 disabled:opacity-40 transition-all cursor-pointer"
-                      >
-                        Rechazar
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
             )}
 

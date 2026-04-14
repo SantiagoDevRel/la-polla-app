@@ -1,10 +1,22 @@
-// app/api/pollas/[slug]/join/route.ts — Unirse a una polla abierta
-// POST: inserta al usuario como participante con role='player'
+// app/api/pollas/[slug]/join/route.ts — Unirse a una polla.
+//
+// A partir del rediseño Dev 5, no existe estado "pending" para participantes:
+// el usuario está IN (status='approved') o OUT (sin fila).
+//
+// - Pollas abiertas (type='open'):
+//     · digital_pool + buy_in > 0 → insert approved + payment_status='pending'
+//       y devuelve checkoutUrl para mandar al usuario a Wompi.
+//     · cualquier otro modo      → insert approved + payment_status='approved'.
+// - Pollas cerradas (type='closed'):
+//     · solo se entra por token de invitación (/invites/[token]).
+//       El endpoint responde 403 con error 'invite_required'.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { buildWompiCheckoutUrl } from "@/lib/wompi/checkout";
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
   try {
@@ -17,10 +29,9 @@ export async function POST(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Obtener la polla
     const { data: polla, error: pollaError } = await supabase
       .from("pollas")
-      .select("id, type, status, slug, payment_mode, buy_in_amount")
+      .select("id, type, status, slug, payment_mode, buy_in_amount, currency")
       .eq("slug", params.slug)
       .single();
 
@@ -33,44 +44,71 @@ export async function POST(
     }
 
     if (polla.type === "closed") {
-      return NextResponse.json({ error: "Esta polla es privada" }, { status: 403 });
+      return NextResponse.json(
+        { error: "invite_required" },
+        { status: 403 }
+      );
     }
 
-    // Verificar si ya es participante
+    // Already in?
     const { data: existing } = await supabase
       .from("polla_participants")
-      .select("id")
+      .select("id, payment_status")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (existing) {
-      return NextResponse.json({ error: "Ya eres participante", polla: { slug: polla.slug } }, { status: 409 });
-    }
-
-    // digital_pool pollas gate on payment_status instead of admin approval:
-    // status goes 'approved' immediately so the user can see the polla, and
-    // payment_status='pending' blocks predictions until the Wompi webhook flips it.
     const isDigitalPool =
       polla.payment_mode === "digital_pool" && polla.buy_in_amount > 0;
 
-    const { error: insertError } = await supabase
-      .from("polla_participants")
-      .insert({
-        polla_id: polla.id,
-        user_id: user.id,
-        role: "player",
-        status: isDigitalPool ? "approved" : "pending",
-        payment_status: isDigitalPool ? "pending" : "approved",
-        paid: false,
+    const admin = createAdminClient();
+
+    if (!existing) {
+      const { error: insertError } = await admin
+        .from("polla_participants")
+        .insert({
+          polla_id: polla.id,
+          user_id: user.id,
+          role: "player",
+          status: "approved",
+          payment_status: isDigitalPool ? "pending" : "approved",
+          paid: !isDigitalPool,
+        });
+      if (insertError) {
+        console.error("[join] insert participant failed:", insertError);
+        return NextResponse.json({ error: "Error al unirse" }, { status: 500 });
+      }
+    } else if (!isDigitalPool || existing.payment_status === "approved") {
+      // Already in and either payment not required or already paid — just confirm.
+      return NextResponse.json({
+        joined: true,
+        checkoutUrl: null,
+        alreadyIn: true,
       });
+    }
 
-    if (insertError) throw insertError;
+    // If digital_pool, immediately mint a Wompi checkout URL so the frontend
+    // can redirect straight to payment.
+    let checkoutUrl: string | null = null;
+    if (isDigitalPool) {
+      try {
+        const reference = `${polla.slug}-${user.id.replace(/-/g, "").substring(0, 8)}`;
+        const amountCents = polla.buy_in_amount * 100;
+        const appUrl =
+          process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
+        const redirectUrl = `${appUrl}/pollas/${polla.slug}?payment=success`;
+        checkoutUrl = buildWompiCheckoutUrl({
+          reference,
+          amountCents,
+          currency: polla.currency || "COP",
+          redirectUrl,
+        });
+      } catch (wompiErr) {
+        console.error("[join] Wompi URL build failed:", wompiErr);
+      }
+    }
 
-    return NextResponse.json(
-      { success: true, status: "pending", message: "Solicitud enviada. El admin debe aprobarte.", polla: { slug: polla.slug } },
-      { status: 201 }
-    );
+    return NextResponse.json({ joined: true, checkoutUrl });
   } catch (error) {
     console.error("Error uniéndose a polla:", error);
     return NextResponse.json({ error: "Error al unirse" }, { status: 500 });

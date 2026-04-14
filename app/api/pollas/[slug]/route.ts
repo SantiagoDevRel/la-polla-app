@@ -86,30 +86,14 @@ export async function GET(
       .eq("polla_id", polla.id)
       .eq("user_id", user.id);
 
-    // For admins: also fetch pending participants for approval UI
     const currentRole = participant?.role || (polla.created_by === user.id ? "admin" : "player");
-    let pendingParticipants: typeof participants = [];
-    if (currentRole === "admin") {
-      const { data: pending } = await adminSupabase
-        .from("polla_participants")
-        .select(`
-          *,
-          users:user_id (
-            id,
-            display_name,
-            whatsapp_number,
-            avatar_url
-          )
-        `)
-        .eq("polla_id", polla.id)
-        .eq("status", "pending");
-      pendingParticipants = pending || [];
-    }
 
     return NextResponse.json({
       polla,
       participants: participants || [],
-      pendingParticipants,
+      // Kept for backwards-compat with any older client bundles — always empty now
+      // since 'pending' was retired in migration 010.
+      pendingParticipants: [],
       matches: matches || [],
       predictions: predictions || [],
       currentUserRole: currentRole,
