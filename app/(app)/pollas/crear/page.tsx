@@ -236,12 +236,25 @@ export default function CrearPollaPage() {
 
     setLoading(true);
     try {
-      const { data } = await axios.post("/api/pollas", {
+      const { data } = await axios.post<{
+        polla: { slug: string } | null;
+        checkoutUrl: string | null;
+        reference: string | null;
+      }>("/api/pollas", {
         ...form,
         scope: "custom",
         matchIds: Array.from(selectedMatchIds),
       });
-      router.push(`/pollas/${data.polla.slug}`);
+      // Pay-first path (digital_pool + buy_in > 0): polla isn't created yet,
+      // webhook will materialize it. Stash the reference and jump to Wompi.
+      if (data.checkoutUrl && data.reference) {
+        sessionStorage.setItem("pollaDraftReference", data.reference);
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      if (data.polla) {
+        router.push(`/pollas/${data.polla.slug}`);
+      }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setError(e.response?.data?.error || "Error al crear la polla");

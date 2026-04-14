@@ -94,11 +94,112 @@ export async function POST(request: NextRequest) {
     event.data?.transaction?.status === "APPROVED"
   ) {
     const reference = event.data.transaction.reference;
+    const adminSupabase = createAdminClient();
+
+    // ── Path A: pay-first polla creation ──
+    // References produced by POST /api/pollas for digital_pool pollas look
+    // like "draft_<8hex>_<timestamp>". Materialize the polla from polla_drafts.
+    if (reference.startsWith("draft_")) {
+      const { data: draft } = await adminSupabase
+        .from("polla_drafts")
+        .select("*")
+        .eq("reference", reference)
+        .maybeSingle();
+
+      if (!draft) {
+        console.warn(`[wompi] Draft not found for reference ${reference}`);
+        return NextResponse.json({ ok: true });
+      }
+      if (draft.completed_polla_slug) {
+        console.log(`[wompi] Draft ${reference} already materialized as ${draft.completed_polla_slug}`);
+        return NextResponse.json({ ok: true });
+      }
+      if (new Date(draft.expires_at) < new Date()) {
+        console.warn(`[wompi] Draft ${reference} expired before payment landed`);
+        return NextResponse.json({ ok: true });
+      }
+
+      const data = draft.polla_data as {
+        name: string;
+        description: string;
+        slug: string;
+        tournament: string;
+        scope: string;
+        type: string;
+        buy_in_amount: number;
+        payment_mode: string;
+        admin_payment_instructions: string | null;
+        match_ids: string[] | null;
+      };
+
+      // Retry on slug collision, mirroring the non-draft POST logic.
+      let finalSlug = data.slug;
+      let pollaId: string | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: polla, error: insertErr } = await adminSupabase
+          .from("pollas")
+          .insert({
+            name: data.name,
+            description: data.description,
+            slug: finalSlug,
+            tournament: data.tournament,
+            scope: data.scope,
+            type: data.type,
+            buy_in_amount: data.buy_in_amount,
+            currency: "COP",
+            payment_mode: data.payment_mode,
+            admin_payment_instructions: data.admin_payment_instructions,
+            match_ids: data.match_ids,
+            created_by: draft.creator_id,
+            prize_pool: data.buy_in_amount,
+          })
+          .select("id, slug")
+          .single();
+
+        if (polla) {
+          pollaId = polla.id;
+          finalSlug = polla.slug;
+          break;
+        }
+        if (insertErr?.code === "23505" && insertErr.message.includes("slug")) {
+          finalSlug = `${data.slug}-${Math.random().toString(36).substring(2, 6)}`;
+          continue;
+        }
+        console.error("[wompi] Polla insert from draft failed:", insertErr);
+        return NextResponse.json({ ok: true });
+      }
+
+      if (!pollaId) {
+        console.error(`[wompi] Could not materialize draft ${reference} after retries`);
+        return NextResponse.json({ ok: true });
+      }
+
+      // Creator is fully paid at this point — they just completed the Wompi txn.
+      await adminSupabase.from("polla_participants").insert({
+        polla_id: pollaId,
+        user_id: draft.creator_id,
+        role: "admin",
+        status: "approved",
+        payment_status: "approved",
+        paid: true,
+      });
+
+      await adminSupabase
+        .from("polla_drafts")
+        .update({
+          completed_polla_slug: finalSlug,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", draft.id);
+
+      console.log(`[wompi] Draft ${reference} → polla ${finalSlug}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Path B: existing join-payment flow (reference = "<slug>-<8hex>") ──
     const parts = reference.split("-");
     const userIdPrefix = parts[parts.length - 1];
     const slug = parts.slice(0, -1).join("-");
-
-    const adminSupabase = createAdminClient();
 
     const { data: polla } = await adminSupabase
       .from("pollas")

@@ -1,7 +1,12 @@
 // app/api/pollas/route.ts — CRUD de pollas (crear y listar pollas del usuario)
-// Soporta 2 modos de pago: admin_collects, digital_pool
+// Modos soportados: admin_collects, digital_pool, pay_winner.
+// Para digital_pool con buy_in > 0, la polla NO se crea de inmediato:
+// se guarda un draft en polla_drafts y se devuelve una URL de Wompi. El
+// webhook convierte el draft en polla real cuando el pago queda APPROVED.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { buildWompiCheckoutUrl } from "@/lib/wompi/checkout";
 import { z } from "zod";
 
 // Modos de pago válidos (payment_mode en la DB es varchar, no enum)
@@ -154,6 +159,71 @@ export async function POST(request: NextRequest) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
+
+    // ── Pay-first flow for digital_pool pollas ──
+    // Instead of inserting the polla now, stash the form data in polla_drafts
+    // and hand the user a Wompi checkout URL. The webhook materializes the
+    // polla when the transaction goes APPROVED.
+    const isPayFirst =
+      parsed.data.paymentMode === "digital_pool" && parsed.data.buyInAmount > 0;
+
+    if (isPayFirst) {
+      const reference = `draft_${user.id.replace(/-/g, "").substring(0, 8)}_${Date.now()}`;
+      const amountCents = parsed.data.buyInAmount * 100;
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
+      const redirectUrl = `${appUrl}/pollas/payment-success?reference=${reference}`;
+
+      let checkoutUrl: string;
+      try {
+        checkoutUrl = buildWompiCheckoutUrl({
+          reference,
+          amountCents,
+          currency: "COP",
+          redirectUrl,
+        });
+      } catch (wompiErr) {
+        console.error("[pollas POST] Wompi URL build failed:", wompiErr);
+        return NextResponse.json(
+          { error: "Error generando el checkout" },
+          { status: 500 }
+        );
+      }
+
+      // Everything the webhook needs to recreate the polla later.
+      const pollaData = {
+        name: parsed.data.name,
+        description: parsed.data.description || "",
+        slug,
+        tournament: parsed.data.tournament,
+        scope: parsed.data.scope,
+        type: parsed.data.type,
+        buy_in_amount: parsed.data.buyInAmount,
+        payment_mode: parsed.data.paymentMode,
+        admin_payment_instructions: null,
+        match_ids: parsed.data.matchIds || null,
+      };
+
+      const admin = createAdminClient();
+      const { error: draftError } = await admin.from("polla_drafts").insert({
+        reference,
+        creator_id: user.id,
+        polla_data: pollaData,
+        wompi_checkout_url: checkoutUrl,
+      });
+
+      if (draftError) {
+        console.error("[pollas POST] draft insert failed:", draftError);
+        return NextResponse.json(
+          { error: "No se pudo iniciar la creación de la polla" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json(
+        { checkoutUrl, reference, slug: null, polla: null },
+        { status: 202 }
+      );
+    }
 
     // Insertar la polla con los campos del modo de pago + match_ids
     const { data: polla, error } = await supabase
