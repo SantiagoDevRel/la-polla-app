@@ -14,7 +14,7 @@ interface PaymentParticipant {
   id: string;
   user_id: string;
   role: string;
-  status: "pending" | "approved" | "rejected";
+  status: "approved" | "rejected";
   paid: boolean;
   paid_at: string | null;
   paid_amount: number | null;

@@ -55,6 +55,8 @@ export default function PerfilPage() {
         const { data } = await axios.get("/api/users/me");
 
         if (data.profile) {
+          // eslint-disable-next-line no-console
+          console.log("[perfil] /api/users/me profile payload:", data.profile);
           setProfile(data.profile);
           setEditName(data.profile.display_name);
         }

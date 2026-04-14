@@ -170,14 +170,14 @@ export async function POST(
       );
     }
 
-    // Actualizar con el comprobante de pago — status queda 'pending' hasta que el admin apruebe
+    // Grabar el comprobante. status ya no se usa como cola de revisión —
+    // el admin review filtra por (payment_note != null AND paid = false).
     const { error: updateError } = await supabase
       .from("polla_participants")
       .update({
         payment_note: parsed.data.paymentNote,
         payment_proof_url: parsed.data.paymentProofUrl || null,
         paid_amount: parsed.data.paidAmount,
-        status: "pending",
       })
       .eq("id", participant.id);
 
@@ -246,15 +246,15 @@ export async function PATCH(
       );
     }
 
-    // Aprobar o rechazar el pago del participante
+    // Aprobar o rechazar el pago. El `status` del participante no se toca —
+    // reject solo limpia el comprobante para que el usuario pueda re-subirlo.
     const isApprove = parsed.data.action === "approve";
+    const updatePayload = isApprove
+      ? { paid: true, paid_at: new Date().toISOString() }
+      : { paid: false, paid_at: null, payment_note: null, payment_proof_url: null };
     const { error: updateError } = await supabase
       .from("polla_participants")
-      .update({
-        status: isApprove ? "approved" : "rejected",
-        paid: isApprove,
-        paid_at: isApprove ? new Date().toISOString() : null,
-      })
+      .update(updatePayload)
       .eq("id", parsed.data.participantId)
       .eq("polla_id", polla.id);
 

@@ -45,14 +45,25 @@ export default function UnirsePage() {
   async function handleJoin() {
     setJoining(true);
     try {
-      await axios.post(`/api/pollas/${slug}/join`);
+      const { data } = await axios.post<{ joined: boolean; checkoutUrl: string | null }>(
+        `/api/pollas/${slug}/join`
+      );
+      if (data.checkoutUrl) {
+        // Digital-pool: send straight to Wompi. The user lands back at
+        // /pollas/[slug]?payment=success once approved.
+        window.location.href = data.checkoutUrl;
+        return;
+      }
       showToast("¡Te uniste!", "success");
       router.push(`/pollas/${slug}`);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       const msg = e.response?.data?.error || "Error al unirse";
-      if (msg === "Ya eres participante") router.push(`/pollas/${slug}`);
-      else showToast(msg, "error");
+      if (msg === "invite_required") {
+        showToast("Esta polla es privada. Necesitás una invitación.", "error");
+      } else {
+        showToast(msg, "error");
+      }
     } finally { setJoining(false); }
   }
 
@@ -92,10 +103,17 @@ export default function UnirsePage() {
               <p className="text-[11px] text-text-muted">{polla.buy_in_amount > 0 ? "Entrada (COP)" : "Sin costo"}</p>
             </div>
           </div>
-          <button onClick={handleJoin} disabled={joining}
-            className="w-full bg-gold text-bg-base font-semibold py-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 text-lg">
-            {joining ? "Uniéndose..." : "Unirse a esta polla"}
-          </button>
+          {polla.type === "closed" ? (
+            <div className="rounded-xl p-4 bg-bg-elevated text-center space-y-1">
+              <p className="text-sm font-semibold text-text-primary">Esta polla es privada</p>
+              <p className="text-xs text-text-muted">Necesitás una invitación para unirte.</p>
+            </div>
+          ) : (
+            <button onClick={handleJoin} disabled={joining}
+              className="w-full bg-gold text-bg-base font-semibold py-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 text-lg">
+              {joining ? "Uniéndose..." : "Unirse a esta polla"}
+            </button>
+          )}
           <button onClick={() => router.push("/dashboard")} className="w-full text-text-muted text-sm py-2">Volver al inicio</button>
         </div>
       </div>

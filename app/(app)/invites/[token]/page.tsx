@@ -62,7 +62,9 @@ export default async function AcceptInvitePage({
     redirect(`/pollas/${polla.slug}`);
   }
 
-  // Insert participant
+  // Invite links ARE the access control — invitees land in approved, paid, and
+  // payment_approved regardless of polla.payment_mode. This matches the Dev 5
+  // spec: "the invite link IS the access control".
   const { error: insertError } = await admin
     .from("polla_participants")
     .insert({
@@ -70,7 +72,8 @@ export default async function AcceptInvitePage({
       user_id: user.id,
       role: "player",
       status: "approved",
-      paid: false,
+      payment_status: "approved",
+      paid: true,
     });
 
   if (insertError) {

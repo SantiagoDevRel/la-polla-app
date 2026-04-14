@@ -994,13 +994,15 @@ export async function handleJoinPolla(
   const isDigitalPool =
     polla.payment_mode === "digital_pool" && polla.buy_in_amount > 0;
 
+  // Post-migration-010: no more 'pending' participant status. Everyone lands
+  // as approved; digital_pool gates predictions via payment_status='pending'.
   const { error } = await supabase.from("polla_participants").insert({
     polla_id: polla.id,
     user_id: user.id,
     role: "player",
-    status: isDigitalPool ? "approved" : "pending",
+    status: "approved",
     payment_status: isDigitalPool ? "pending" : "approved",
-    paid: false,
+    paid: !isDigitalPool,
     total_points: 0,
   });
 
