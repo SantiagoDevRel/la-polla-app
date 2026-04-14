@@ -405,7 +405,7 @@ export default function PollaSlugPage() {
                 <p className="text-text-muted">No hay partidos cargados aun. Los partidos se actualizaran cuando el calendario sea confirmado.</p>
               </div>
             ) : (
-              <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3">
+              <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3 pb-28">
               {matches.map((match, matchIndex) => {
                 const pred = getPred(match.id);
                 const draft = drafts[match.id] || { home: pred?.predicted_home?.toString() ?? "", away: pred?.predicted_away?.toString() ?? "" };
@@ -507,12 +507,14 @@ export default function PollaSlugPage() {
                       {/* Previous prediction + points — always show the user's own
                           prediction once the form is locked (locked/live/finished). */}
                       {pred && (match.status === "finished" || match.status === "live" || locked) && (
-                        <div className="mt-2 flex items-center justify-between text-xs">
-                          <span className="text-text-muted">Tu pronóstico: {pred.predicted_home} - {pred.predicted_away}</span>
+                        <div className="mt-2 text-center">
+                          <p className="text-base font-medium text-white">
+                            Tu pronóstico: {pred.predicted_home} - {pred.predicted_away}
+                          </p>
                           {match.status === "finished" && (
-                            <span className={`font-bold ${pred.points_earned > 0 ? "text-gold" : "text-text-muted"}`}>
+                            <p className={`mt-1 text-xs font-bold ${pred.points_earned > 0 ? "text-gold" : "text-text-muted"}`}>
                               {pred.points_earned > 0 ? `+${pred.points_earned} pts` : "0 pts"}
-                            </span>
+                            </p>
                           )}
                         </div>
                       )}
