@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { formatCOP } from "@/lib/formatCurrency";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { Target, Info } from "lucide-react";
+import FootballLoader from "@/components/ui/FootballLoader";
 
 interface PollaInfo {
   id: string; slug: string; name: string; description: string;
@@ -67,7 +68,7 @@ export default function UnirsePage() {
     } finally { setJoining(false); }
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Target className="w-10 h-10 text-gold" /></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><FootballLoader /></div>;
 
   if (error || !polla) {
     return (

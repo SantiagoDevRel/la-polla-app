@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import PollaCard, { TOURNAMENT_ICONS } from "@/components/shared/PollaCard";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
+import FootballLoader from "@/components/ui/FootballLoader";
 
 interface PublicPolla {
   id: string; name: string; slug: string; description?: string;
@@ -173,7 +174,8 @@ export default function ExplorarPage() {
         )}
 
         {loading ? (
-          <div className="text-center py-8">
+          <div className="flex flex-col items-center gap-2 py-8">
+            <FootballLoader />
             <p className="text-text-muted text-sm">Buscando pollas...</p>
           </div>
         ) : filtered.length > 0 ? (

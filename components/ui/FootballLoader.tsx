@@ -1,12 +1,24 @@
 // components/ui/FootballLoader.tsx — Bouncing pollito loader, no external libs.
 "use client";
 
+type Variant = "esperando" | "plata";
+
 interface FootballLoaderProps {
   size?: number;
   className?: string;
+  variant?: Variant;
 }
 
-export default function FootballLoader({ size = 56, className = "" }: FootballLoaderProps) {
+const SRC: Record<Variant, string> = {
+  esperando: "/pollitos/Pollito_esperando.webp",
+  plata: "/pollitos/pollito_plata.webp",
+};
+
+export default function FootballLoader({
+  size = 80,
+  className = "",
+  variant = "esperando",
+}: FootballLoaderProps) {
   return (
     <div
       className={`inline-block ${className}`}
@@ -32,7 +44,7 @@ export default function FootballLoader({ size = 56, className = "" }: FootballLo
       `}</style>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/pollitos/logo_realistic.webp"
+        src={SRC[variant]}
         alt=""
         className="pollito-bouncer"
         draggable={false}
