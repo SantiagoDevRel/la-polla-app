@@ -76,7 +76,7 @@ const PAYMENT_MODE_OPTIONS = [
 const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = {
   admin_collects: "💡 Cada uno te paga antes de entrar. Tú guardas el pozo.",
   pay_winner: "💡 Al final, todos le pagan directamente al ganador.",
-  digital_pool: "💡 El pago es automático. El ganador recibe el pozo menos la comisión de la plataforma.",
+  digital_pool: "El pago es automático. El ganador recibe el pozo menos la comisión de la plataforma (10% del total).",
 };
 
 type GroupBy = "date" | "jornada" | "phase";
@@ -528,7 +528,6 @@ export default function CrearPollaPage() {
                     <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
                   </span>
                 </h2>
-                <p style={{ fontSize: 11, color: "#7a8499", marginTop: 4 }}>Mínimo $1.000 · por persona</p>
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {[10000, 50000, 100000].map((amount) => {
