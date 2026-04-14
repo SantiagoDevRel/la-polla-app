@@ -30,6 +30,7 @@ interface Polla {
 interface Participant {
   id: string; user_id: string; role: string; status: string; total_points: number; rank: number;
   paid: boolean;
+  payment_status: string;
   users: { id: string; display_name: string; whatsapp_number: string; avatar_url: string | null };
 }
 interface Match {
@@ -340,7 +341,7 @@ export default function PollaSlugPage() {
               <span className="text-sm font-semibold text-gold">#{myP.rank || "—"} · {myP.total_points} pts</span>
               <ScoringExplanation />
             </div>
-            <span className="text-xs text-text-secondary">{myP.paid ? "Pagado" : "Pendiente"}</span>
+            <span className="text-xs text-text-secondary">{myP.payment_status === "approved" ? "Pagado" : "Pendiente"}</span>
           </div>
         </div>
       )}
