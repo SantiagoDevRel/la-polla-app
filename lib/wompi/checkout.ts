@@ -34,7 +34,7 @@ export function buildWompiCheckoutUrl({
     "amount-in-cents": String(amountCents),
     reference,
     "signature:integrity": signature,
-    "redirect-url": redirectUrl,
+    "redirect-url": redirectUrl.replace(/[\r\n\t]/g, "").trim(),
   });
 
   return `https://checkout.wompi.co/p/?${params.toString()}`;

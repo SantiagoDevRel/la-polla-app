@@ -10,7 +10,7 @@ import {
 import { setState } from "./state";
 import { formatTablaWA } from "./tabla";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
 const FOOTER = "La Polla Colombiana 🐥";
 const PAGE_SIZE = 9; // leave 1 slot in the 10-row list for "Ver más partidos"
 

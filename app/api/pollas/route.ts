@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     if (isPayFirst) {
       const reference = `draft_${user.id.replace(/-/g, "").substring(0, 8)}_${Date.now()}`;
       const amountCents = parsed.data.buyInAmount * 100;
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
       const redirectUrl = `${appUrl}/pollas/payment-success?reference=${reference}`;
 
       let checkoutUrl: string;
