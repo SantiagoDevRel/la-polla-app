@@ -199,7 +199,7 @@ export async function processIncomingMessage(message: IncomingMessage) {
     const pendingOTP = await findPendingOTP(from);
     if (pendingOTP) {
       console.log(`[WA] Found pending OTP for ${from}, delivering...`);
-      const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
+      const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
       await sendCTAButton(
         from,
         `🔐 *Tu código de verificación*\n\n` +

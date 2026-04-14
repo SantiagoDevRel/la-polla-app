@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     // (WhatsApp allows proactive messages to users who have messaged before)
     if (existingUser) {
       try {
-        const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://la-polla.vercel.app";
+        const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
         await sendCTAButton(
           normalizedPhone,
           `🔐 *Tu código de verificación*\n\n*${otpCode}*\n\nVálido por 10 minutos\nIngresa este código en la app para continuar 👇`,
