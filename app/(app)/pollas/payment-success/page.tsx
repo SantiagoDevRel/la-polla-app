@@ -7,7 +7,8 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
-import { Target, Info } from "lucide-react";
+import { Info } from "lucide-react";
+import FootballLoader from "@/components/ui/FootballLoader";
 
 type Status = "pending" | "completed" | "expired" | "timeout" | "error";
 
@@ -77,7 +78,7 @@ function PaymentSuccessInner() {
     <div className="rounded-2xl p-8 text-center max-w-sm w-full bg-bg-card border border-border-subtle space-y-4">
       {state === "pending" && (
         <>
-          <Target className="w-12 h-12 text-gold mx-auto animate-pulse" />
+          <FootballLoader size={48} className="mx-auto" />
           <h1 className="text-lg font-bold text-text-primary">Procesando tu pago…</h1>
           <p className="text-sm text-text-secondary leading-snug">
             Confirmando con Wompi y creando tu polla. Esto tarda unos segundos.
@@ -142,7 +143,7 @@ export default function PaymentSuccessPage() {
       <Suspense
         fallback={
           <div className="rounded-2xl p-8 text-center max-w-sm w-full bg-bg-card border border-border-subtle">
-            <Target className="w-12 h-12 text-gold mx-auto animate-pulse" />
+            <FootballLoader size={48} className="mx-auto" />
             <p className="text-sm text-text-secondary mt-3">Cargando…</p>
           </div>
         }
