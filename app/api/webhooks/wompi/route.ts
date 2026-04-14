@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendWhatsAppMessage } from "@/lib/whatsapp/bot";
 
 interface WompiTransaction {
   id: string;
@@ -193,6 +194,29 @@ export async function POST(request: NextRequest) {
         .eq("id", draft.id);
 
       console.log(`[wompi] Draft ${reference} → polla ${finalSlug}`);
+
+      try {
+        const { data: creator } = await adminSupabase
+          .from("users")
+          .select("whatsapp_number")
+          .eq("id", draft.creator_id)
+          .single();
+        const whatsapp_number = creator?.whatsapp_number;
+        if (whatsapp_number) {
+          const link = `https://la-polla.vercel.app/pollas/${finalSlug}`;
+          const message =
+            `Tu polla *${data.name}* fue creada exitosamente.\n` +
+            `Comparte este link con tus amigos para que se unan:\n${link}`;
+          console.log("[wompi] Sending WA notification to:", whatsapp_number);
+          await sendWhatsAppMessage(whatsapp_number, message);
+          console.log("[wompi] WA notification sent");
+        } else {
+          console.warn(`[wompi] No whatsapp_number on creator ${draft.creator_id}, skipping notification`);
+        }
+      } catch (waErr) {
+        console.error("[wompi] WA notification failed (non-fatal):", waErr);
+      }
+
       return NextResponse.json({ ok: true });
     }
 
