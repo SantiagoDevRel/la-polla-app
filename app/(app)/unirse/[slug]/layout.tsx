@@ -17,7 +17,7 @@ export async function generateMetadata({
     const supabase = createAdminClient();
     const { data: polla } = await supabase
       .from("pollas")
-      .select("name, tournament, buy_in_amount")
+      .select("id, name, tournament, buy_in_amount")
       .eq("slug", params.slug)
       .single();
 
@@ -25,8 +25,9 @@ export async function generateMetadata({
 
     const { count } = await supabase
       .from("polla_participants")
-      .select("id", { count: "exact", head: true })
-      .eq("polla_id", params.slug);
+      .select("*", { count: "exact", head: true })
+      .eq("polla_id", polla.id)
+      .eq("status", "approved");
 
     const trnLabel = TRN[polla.tournament] || polla.tournament;
     const title = `Unite a ${polla.name} en La Polla`;

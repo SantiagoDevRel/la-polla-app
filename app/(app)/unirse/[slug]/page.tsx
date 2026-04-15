@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import { Info, Trophy } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
@@ -25,9 +25,11 @@ interface Preview {
 
 export default function UnirsePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { showToast } = useToast();
   const slug = params.slug as string;
+  const inviteToken = searchParams.get("token");
 
   const [preview, setPreview] = useState<Preview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,7 +80,9 @@ export default function UnirsePage() {
   }, [slug, router]);
 
   function goLogin() {
-    const target = `/unirse/${slug}`;
+    const target = inviteToken
+      ? `/unirse/${slug}?token=${encodeURIComponent(inviteToken)}`
+      : `/unirse/${slug}`;
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem("lp_returnTo", target);
     }
@@ -89,7 +93,8 @@ export default function UnirsePage() {
     setJoining(true);
     try {
       const { data } = await axios.post<{ joined: boolean; checkoutUrl: string | null }>(
-        `/api/pollas/${slug}/join`
+        `/api/pollas/${slug}/join`,
+        inviteToken ? { invite_token: inviteToken } : {}
       );
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
@@ -131,7 +136,11 @@ export default function UnirsePage() {
     );
   }
 
+  // A closed polla is only joinable if the URL carries an open invite token
+  // matching pollas.invite_token. Without a token we still show the private
+  // notice; with a token we let the user through (the API double-checks).
   const isClosed = preview.type === "closed";
+  const canJoinClosed = isClosed && !!inviteToken;
   const buyIn = preview.buy_in_amount;
 
   return (
@@ -182,7 +191,7 @@ export default function UnirsePage() {
             </div>
           </div>
 
-          {isClosed ? (
+          {isClosed && !canJoinClosed ? (
             <div className="rounded-xl p-4 bg-bg-elevated text-center space-y-1">
               <p className="text-sm font-semibold text-text-primary">Esta polla es privada</p>
               <p className="text-xs text-text-muted">

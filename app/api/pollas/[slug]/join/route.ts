@@ -8,8 +8,9 @@
 //       y devuelve checkoutUrl para mandar al usuario a Wompi.
 //     · cualquier otro modo      → insert approved + payment_status='approved'.
 // - Pollas cerradas (type='closed'):
-//     · solo se entra por token de invitación (/invites/[token]).
-//       El endpoint responde 403 con error 'invite_required'.
+//     · se entra por token de invitación abierto (URL ?token=xxx que coincide
+//       con pollas.invite_token) — body { invite_token: 'xxx' }.
+//     · sin token válido el endpoint responde 403 con error 'invite_required'.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -17,7 +18,7 @@ import { buildWompiCheckoutUrl } from "@/lib/wompi/checkout";
 import { notifyParticipantJoined } from "@/lib/notifications";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
   try {
@@ -30,9 +31,19 @@ export async function POST(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    let providedInviteToken: string | null = null;
+    try {
+      const body = await request.json();
+      if (body && typeof body.invite_token === "string") {
+        providedInviteToken = body.invite_token;
+      }
+    } catch {
+      // No body / not JSON — fine, just means no token provided.
+    }
+
     const { data: polla, error: pollaError } = await supabase
       .from("pollas")
-      .select("id, type, status, slug, payment_mode, buy_in_amount, currency")
+      .select("id, type, status, slug, payment_mode, buy_in_amount, currency, invite_token")
       .eq("slug", params.slug)
       .single();
 
@@ -45,10 +56,16 @@ export async function POST(
     }
 
     if (polla.type === "closed") {
-      return NextResponse.json(
-        { error: "invite_required" },
-        { status: 403 }
-      );
+      const tokenMatches =
+        !!providedInviteToken &&
+        !!polla.invite_token &&
+        providedInviteToken === polla.invite_token;
+      if (!tokenMatches) {
+        return NextResponse.json(
+          { error: "invite_required" },
+          { status: 403 }
+        );
+      }
     }
 
     // Already in?
