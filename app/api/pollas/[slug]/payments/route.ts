@@ -80,6 +80,18 @@ export async function GET(
 
     if (paymentsError) throw paymentsError;
 
+    // Predictions submitted per user — used by the Organizer panel to show
+    // "X de Y han pronosticado". Cheap aggregate.
+    const { data: preds } = await supabase
+      .from("predictions")
+      .select("user_id")
+      .eq("polla_id", polla.id);
+    const predictionsByUser: Record<string, number> = {};
+    for (const p of preds ?? []) {
+      const uid = (p as { user_id: string }).user_id;
+      predictionsByUser[uid] = (predictionsByUser[uid] ?? 0) + 1;
+    }
+
     return NextResponse.json({
       payments: payments || [],
       pollaPaymentInfo: {
@@ -89,6 +101,7 @@ export async function GET(
         paymentMode: polla.payment_mode,
       },
       isAdmin,
+      predictionsByUser,
     });
   } catch (error) {
     console.error("Error listando pagos:", error);

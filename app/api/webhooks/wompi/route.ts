@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/bot";
+import { notifyParticipantJoined } from "@/lib/notifications";
 
 interface WompiTransaction {
   id: string;
@@ -265,6 +266,7 @@ export async function POST(request: NextRequest) {
       console.log(
         `[wompi] Approved payment for polla ${slug} participant ${participant.id}`
       );
+      await notifyParticipantJoined(adminSupabase, polla.id, participant.user_id);
     } else {
       console.warn(
         `[wompi] No pending participant found for reference ${reference}`

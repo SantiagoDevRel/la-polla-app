@@ -8,6 +8,7 @@
 //   3. Scripts offline que no van por el trigger.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { calculatePoints } from "@/lib/utils/points";
+import { notifyMatchFinished, notifyRankImprovements } from "@/lib/notifications";
 
 interface MatchRow {
   id: string;
@@ -101,8 +102,12 @@ export async function scoreMatch(
     if (updErr) throw updErr;
   }
 
-  // 2) Recomputar total_points + rank por polla afectada.
+  // 2) Recomputar total_points + rank por polla afectada (con notificación
+  //    de subidas de ranking incluida).
   await recomputePollaStandings(admin, pollaIds);
+
+  // 3) Notificar a los participantes de que el partido finalizó.
+  await notifyMatchFinished(admin, matchId);
 
   return {
     matchId,
@@ -130,10 +135,17 @@ export async function recomputePollaStandings(
 
     const { data: parts, error: partsErr } = await admin
       .from("polla_participants")
-      .select("id, user_id")
+      .select("id, user_id, rank")
       .eq("polla_id", pollaId)
-      .returns<{ id: string; user_id: string }[]>();
+      .returns<{ id: string; user_id: string; rank: number | null }[]>();
     if (partsErr) throw partsErr;
+
+    // Snapshot previous ranks for rank-up notifications. Skip null/0 so
+    // brand-new participants don't trigger a "you moved up" ping.
+    const previousRanks = new Map<string, number>();
+    for (const p of parts ?? []) {
+      if (p.rank && p.rank > 0) previousRanks.set(p.id, p.rank);
+    }
 
     interface Standing { id: string; total_points: number; rank: number; }
     const sorted: Standing[] = (parts ?? [])
@@ -158,6 +170,16 @@ export async function recomputePollaStandings(
         .eq("id", row.id);
       if (upErr) throw upErr;
     }
+
+    // Map standings back to user_id for the notification.
+    const userIdById = new Map<string, string>();
+    for (const p of parts ?? []) userIdById.set(p.id, p.user_id);
+    const newStandings = sorted.map((s) => ({
+      id: s.id,
+      user_id: userIdById.get(s.id) ?? "",
+      rank: s.rank,
+    }));
+    await notifyRankImprovements(admin, pollaId, previousRanks, newStandings);
   }
 }
 

@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildWompiCheckoutUrl } from "@/lib/wompi/checkout";
+import { notifyParticipantJoined } from "@/lib/notifications";
 
 export async function POST(
   _request: NextRequest,
@@ -77,6 +78,11 @@ export async function POST(
       if (insertError) {
         console.error("[join] insert participant failed:", insertError);
         return NextResponse.json({ error: "Error al unirse" }, { status: 500 });
+      }
+      // Ping the creator. Skip for digital_pool: payment hasn't landed yet,
+      // the participant isn't really "in" until the Wompi webhook approves.
+      if (!isDigitalPool) {
+        await notifyParticipantJoined(admin, polla.id, user.id);
       }
     } else if (!isDigitalPool || existing.payment_status === "approved") {
       // Already in and either payment not required or already paid — just confirm.
