@@ -30,11 +30,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
   }
 
-  const { count } = await admin
+  // Count approved participants. Use select("*", head:true) — the safest form
+  // for PostgREST count headers; some versions don't surface the count when
+  // the projected column list is restrictive.
+  const { count, error: countError } = await admin
     .from("polla_participants")
-    .select("id", { head: true, count: "exact" })
+    .select("*", { head: true, count: "exact" })
     .eq("polla_id", polla.id)
     .eq("status", "approved");
+
+  if (countError) {
+    console.error("[pollas/preview] participant count failed:", countError);
+  }
 
   // Strip internal id from the response.
   const { id: _id, ...publicPolla } = polla;
