@@ -42,6 +42,7 @@ export async function updateSession(request: NextRequest) {
     "/verify",
     "/onboarding",
     "/api/auth",
+    "/api/pollas/preview",
     "/unirse",
     "/invites/polla",
   ];

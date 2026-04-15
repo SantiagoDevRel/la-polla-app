@@ -8,21 +8,54 @@ import { Turnstile } from "@marsidev/react-turnstile";
 import axios from "axios";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import PhoneInput from "@/components/ui/PhoneInput";
+import TournamentBadge from "@/components/shared/TournamentBadge";
+
+function fmtCOP(n: number): string {
+  return `$${n.toLocaleString("es-CO")}`;
+}
 
 type Step = "phone" | "whatsapp" | "verify";
 
 const RETURN_TO_KEY = "lp_returnTo";
 
+interface PollaPreview {
+  slug: string;
+  name: string;
+  tournament: string;
+  buy_in_amount: number;
+  type: string;
+  participantCount: number;
+}
+
 function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>("phone");
+  const [preview, setPreview] = useState<PollaPreview | null>(null);
 
   useEffect(() => {
     const rt = searchParams.get("returnTo");
     if (rt && typeof window !== "undefined") {
       window.sessionStorage.setItem(RETURN_TO_KEY, rt);
     }
+    // Decode the returnTo (or the just-stored value) and try to resolve a polla.
+    const stored = rt
+      ?? (typeof window !== "undefined"
+            ? window.sessionStorage.getItem(RETURN_TO_KEY)
+            : null);
+    if (!stored) return;
+    const slugMatch = stored.match(/^\/(?:pollas|unirse)\/([^/?#]+)/);
+    const tokenMatch = stored.match(/^\/invites\/polla\/([^/?#]+)/);
+    if (!slugMatch && !tokenMatch) return;
+    const params = new URLSearchParams(
+      slugMatch ? { slug: slugMatch[1] } : { token: tokenMatch![1] }
+    );
+    axios
+      .get<{ polla: Omit<PollaPreview, "participantCount">; participantCount: number }>(
+        `/api/pollas/preview?${params.toString()}`
+      )
+      .then(({ data }) => setPreview({ ...data.polla, participantCount: data.participantCount }))
+      .catch(() => { /* preview is optional — fail quietly */ });
   }, [searchParams]);
   const [phone, setPhone] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -92,21 +125,79 @@ function LoginInner() {
   const BOT_PHONE = "573117312391";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+    <div
+      className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(80% 60% at 50% 0%, rgba(255,215,0,0.08), transparent 60%)," +
+          "radial-gradient(60% 50% at 80% 100%, rgba(0,230,118,0.05), transparent 60%)," +
+          "#080c10",
+      }}
+    >
       {/* Step 1: Phone input */}
       {step === "phone" && (
         <div
-          className="w-full max-w-md rounded-2xl p-6 space-y-6 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
-          style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
+          className="w-full max-w-md rounded-2xl p-6 space-y-6 bg-bg-card/80 backdrop-blur-sm border border-border-subtle relative z-10"
+          style={{ boxShadow: "0 0 60px rgba(255,215,0,0.08)" }}
         >
-          <div className="text-center">
-            <h1 className="font-display text-[40px] text-gold tracking-wide">
-              La Polla
+          {/* Brand header */}
+          <div className="text-center space-y-2">
+            <div className="mx-auto" style={{ width: 80, height: 80, position: "relative" }}>
+              <div
+                style={{
+                  position: "absolute",
+                  inset: -8,
+                  borderRadius: "50%",
+                  background:
+                    "radial-gradient(circle, rgba(255,215,0,0.35) 0%, transparent 70%)",
+                  filter: "blur(8px)",
+                }}
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/pollitos/logo_realistic.webp"
+                alt="La Polla"
+                width={80}
+                height={80}
+                style={{ width: 80, height: 80, objectFit: "contain", position: "relative" }}
+              />
+            </div>
+            <h1
+              className="font-display text-5xl tracking-wide"
+              style={{ color: "#FFD700", textShadow: "0 0 24px rgba(255,215,0,0.35)" }}
+            >
+              LA POLLA
             </h1>
-            <p className="text-text-secondary mt-1">
-              Ingresa tu numero de WhatsApp para recibir tu codigo de acceso
+            <p className="text-text-muted text-sm">
+              La polla deportiva de tus amigos
             </p>
           </div>
+
+          {/* Polla preview (only when arriving from an invite/polla link) */}
+          {preview && (
+            <div className="rounded-2xl p-4 border border-gold/30 bg-gold/5 space-y-1.5 text-center">
+              <p className="text-[11px] uppercase tracking-wider text-text-muted">
+                Te invitaron a unirte a
+              </p>
+              <p className="font-display text-2xl text-text-primary tracking-wide">
+                {preview.name}
+              </p>
+              <div className="flex items-center justify-center gap-2 text-xs text-text-secondary">
+                <TournamentBadge tournamentSlug={preview.tournament} size="sm" />
+              </div>
+              <p className="text-xs text-text-secondary">
+                {preview.participantCount} participante
+                {preview.participantCount === 1 ? "" : "s"}
+                {preview.buy_in_amount > 0
+                  ? ` · ${fmtCOP(preview.buy_in_amount)} por persona`
+                  : " · gratis"}
+              </p>
+            </div>
+          )}
+
+          <p className="text-text-secondary text-sm text-center">
+            Ingresá tu número de WhatsApp para recibir tu código.
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
