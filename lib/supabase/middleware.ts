@@ -34,8 +34,17 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Rutas públicas que no requieren autenticación
-  const publicRoutes = ["/login", "/verify", "/onboarding", "/api/auth"];
+  // Rutas públicas que no requieren autenticación. /unirse and /invites/polla
+  // need to be reachable so an unauthenticated visitor sees the polla card and
+  // gets bounced through login with a returnTo.
+  const publicRoutes = [
+    "/login",
+    "/verify",
+    "/onboarding",
+    "/api/auth",
+    "/unirse",
+    "/invites/polla",
+  ];
   const isPublicRoute = publicRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   );
@@ -48,7 +57,9 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && !isPublicRoute && !isApiWebhook) {
     const url = request.nextUrl.clone();
+    const original = request.nextUrl.pathname + request.nextUrl.search;
     url.pathname = "/login";
+    url.search = `?returnTo=${encodeURIComponent(original)}`;
     return NextResponse.redirect(url);
   }
 

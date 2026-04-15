@@ -45,7 +45,11 @@ export default function OnboardingPage() {
             || /^\d{8,15}$/.test(displayName);
 
           if (!isPhoneNumber && displayName.length >= 2) {
-            router.push("/dashboard");
+            const rt = typeof window !== "undefined"
+              ? window.sessionStorage.getItem("lp_returnTo")
+              : null;
+            if (rt) window.sessionStorage.removeItem("lp_returnTo");
+            router.push(rt || "/dashboard");
             return;
           }
         }
@@ -77,7 +81,11 @@ export default function OnboardingPage() {
         display_name: name.trim(),
         avatar_url: selectedPollito,
       });
-      router.push("/dashboard");
+      const rt = typeof window !== "undefined"
+        ? window.sessionStorage.getItem("lp_returnTo")
+        : null;
+      if (rt) window.sessionStorage.removeItem("lp_returnTo");
+      router.push(rt || "/dashboard");
     } catch {
       setError("Error guardando tu perfil. Intenta de nuevo.");
     } finally {

@@ -2,8 +2,8 @@
 // User enters phone → OTP saved to DB → user opens WhatsApp → bot sends code
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Turnstile } from "@marsidev/react-turnstile";
 import axios from "axios";
 import { ArrowLeft, MessageCircle } from "lucide-react";
@@ -11,9 +11,19 @@ import PhoneInput from "@/components/ui/PhoneInput";
 
 type Step = "phone" | "whatsapp" | "verify";
 
-export default function LoginPage() {
+const RETURN_TO_KEY = "lp_returnTo";
+
+function LoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>("phone");
+
+  useEffect(() => {
+    const rt = searchParams.get("returnTo");
+    if (rt && typeof window !== "undefined") {
+      window.sessionStorage.setItem(RETURN_TO_KEY, rt);
+    }
+  }, [searchParams]);
   const [phone, setPhone] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,7 +69,17 @@ export default function LoginPage() {
 
     try {
       await axios.put("/api/auth/otp", { phone, code });
-      router.push("/onboarding");
+      // New users still need onboarding. The onboarding page consumes the
+      // returnTo from sessionStorage on success.
+      if (isNewUser) {
+        router.push("/onboarding");
+      } else {
+        const rt = typeof window !== "undefined"
+          ? window.sessionStorage.getItem(RETURN_TO_KEY)
+          : null;
+        if (rt) window.sessionStorage.removeItem(RETURN_TO_KEY);
+        router.push(rt || "/dashboard");
+      }
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
       setError(axiosError.response?.data?.error || "Codigo invalido o expirado");
@@ -242,5 +262,13 @@ export default function LoginPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <LoginInner />
+    </Suspense>
   );
 }
