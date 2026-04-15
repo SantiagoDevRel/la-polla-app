@@ -9,6 +9,7 @@ import axios from "axios";
 import { Copy, RefreshCw, UserMinus } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import FootballLoader from "@/components/ui/FootballLoader";
+import EmptyState from "@/components/ui/EmptyState";
 
 interface Participant {
   id: string;
@@ -189,7 +190,11 @@ export default function OrganizerPanel({
           Participantes <span className="text-text-muted font-normal">· {participants.length}</span>
         </h3>
         {participants.length === 0 ? (
-          <p className="text-sm text-text-muted text-center py-4">No hay participantes aún.</p>
+          <EmptyState
+            title="Aún no hay participantes"
+            subtitle="Compartí tu link de invitación arriba para que se unan."
+            size={80}
+          />
         ) : (
           <ul className="space-y-2">
             {[...participants]
