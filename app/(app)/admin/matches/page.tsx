@@ -135,7 +135,7 @@ export default function AdminMatchesPage() {
                     <p>Error: {result}</p>
                   ) : (
                     <p>
-                      {result.synced} insertados · {result.errors} errores · {result.total} total
+                      {result.synced} actualizados · {result.errors} errores · {result.total} total
                     </p>
                   )}
                 </div>

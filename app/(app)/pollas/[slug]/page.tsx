@@ -11,6 +11,7 @@ import { staggerContainer, fadeUp } from "@/lib/animations";
 import { useToast } from "@/components/ui/Toast";
 import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import OrganizerPanel from "@/components/polla/OrganizerPanel";
+import EmptyState from "@/components/ui/EmptyState";
 import InviteModal from "@/components/polla/InviteModal";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -584,7 +585,10 @@ export default function PollaSlugPage() {
             )}
             <div className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
             {participants.length === 0 ? (
-              <div className="p-6 text-center text-text-muted">No hay participantes aún.</div>
+              <EmptyState
+                title="Aún no hay participantes"
+                subtitle="Compartí el link de invitación desde la pestaña Organizar para empezar."
+              />
             ) : (
               <>
                 {matches.every((m) => m.status === "scheduled") && (

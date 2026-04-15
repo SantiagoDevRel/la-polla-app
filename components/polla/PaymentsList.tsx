@@ -6,6 +6,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
+import EmptyState from "@/components/ui/EmptyState";
 
 interface PaymentParticipant {
   id: string;
@@ -95,7 +96,11 @@ export default function PaymentsList({
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-sm text-text-muted text-center py-4">Aún no hay participantes.</p>
+        <EmptyState
+          title="Aún no hay participantes"
+          subtitle="Cuando alguien se una, vas a verlo acá."
+          size={80}
+        />
       ) : (
         <ul className="space-y-2">
           {rows.map((p) => {
