@@ -10,12 +10,13 @@ import { motion } from "framer-motion";
 import { staggerContainer, fadeUp } from "@/lib/animations";
 import { useToast } from "@/components/ui/Toast";
 import ParticipantPayment from "@/components/polla/ParticipantPayment";
+import OrganizerPanel from "@/components/polla/OrganizerPanel";
 import InviteModal from "@/components/polla/InviteModal";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import UserAvatar from "@/components/ui/UserAvatar";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug } from "@/lib/tournaments";
-import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake } from "lucide-react";
+import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 // ─── Tipos ───
@@ -44,7 +45,7 @@ interface Prediction {
   locked: boolean; visible: boolean; points_earned: number;
 }
 
-type TabType = "partidos" | "ranking" | "pagos" | "info";
+type TabType = "partidos" | "ranking" | "pagos" | "info" | "organizar";
 
 // TeamCrest — renders flag URL via next/image proxy, falls back to 3-letter abbreviation
 function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: string }) {
@@ -305,10 +306,12 @@ export default function PollaSlugPage() {
     polla.buy_in_amount > 0 &&
     currentUserPaymentStatus !== "approved";
 
+  const isOrganizer = currentUserRole === "admin";
   const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
     { key: "partidos", label: "Partidos", icon: <Target className="w-4 h-4" />, show: true },
     { key: "ranking", label: "Ranking", icon: <Trophy className="w-4 h-4" />, show: true },
-    { key: "pagos", label: "Pagos", icon: <Banknote className="w-4 h-4" />, show: polla.payment_mode === "admin_collects" },
+    { key: "pagos", label: "Pagos", icon: <Banknote className="w-4 h-4" />, show: true },
+    { key: "organizar", label: "Organizar", icon: <Settings className="w-4 h-4" />, show: isOrganizer },
     { key: "info", label: "Info", icon: <Info className="w-4 h-4" />, show: true },
   ];
 
@@ -350,6 +353,21 @@ export default function PollaSlugPage() {
           </div>
         </div>
       )}
+
+      {/* Pot band */}
+      {polla.buy_in_amount > 0 && (() => {
+        const approvedCount = participants.filter((p) => p.status === "approved").length;
+        const total = polla.buy_in_amount * approvedCount;
+        return (
+          <div className="px-4 py-1.5 bg-bg-elevated border-b border-border-subtle">
+            <div className="max-w-lg mx-auto text-center text-xs text-text-secondary">
+              Pozo: <span className="font-semibold text-text-primary">${polla.buy_in_amount.toLocaleString("es-CO")}</span> por persona
+              {" · "}
+              <span className="font-semibold text-gold">${total.toLocaleString("es-CO")}</span> total
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Tabs */}
       <div className="max-w-lg mx-auto px-4 pt-3">
@@ -612,14 +630,19 @@ export default function PollaSlugPage() {
 
         {/* ── TAB PAGOS ── */}
         {activeTab === "pagos" && (
-          polla.payment_mode === "admin_collects" ? (
-            <ParticipantPayment pollaSlug={polla.slug} currentUserId={currentUserId} currentUserRole={currentUserRole} />
-          ) : (
-            <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
-              <Handshake className="w-8 h-8 text-text-muted mx-auto" />
-              <p className="text-text-secondary mt-2">No hay pagos para esta polla</p>
-            </div>
-          )
+          <ParticipantPayment pollaSlug={polla.slug} currentUserId={currentUserId} currentUserRole={currentUserRole} />
+        )}
+
+        {/* ── TAB ORGANIZAR (admin only) ── */}
+        {activeTab === "organizar" && isOrganizer && (
+          <OrganizerPanel
+            pollaSlug={polla.slug}
+            pollaName={polla.name}
+            pollaStatus={polla.status}
+            paymentMode={polla.payment_mode}
+            buyInAmount={polla.buy_in_amount}
+            matchIds={matches.map((m) => m.id)}
+          />
         )}
 
         {/* ── TAB INFO ── */}
