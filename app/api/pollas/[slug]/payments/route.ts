@@ -43,13 +43,18 @@ export async function GET(
       return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
     }
 
-    // Verificar que el usuario es participante
-    const { data: myParticipant } = await supabase
+    // Membership: status='approved' is the only thing that counts as "in".
+    // Use the admin client to bypass the recursive RLS on polla_participants
+    // (auth.uid() was already validated above).
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const adminClient = createAdminClient();
+    const { data: myParticipant } = await adminClient
       .from("polla_participants")
-      .select("id, role")
+      .select("id, role, status")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
-      .single();
+      .eq("status", "approved")
+      .maybeSingle();
 
     if (!myParticipant) {
       return NextResponse.json({ error: "No eres participante" }, { status: 403 });
@@ -58,7 +63,7 @@ export async function GET(
     const isAdmin = myParticipant.role === "admin";
 
     // Todos los participantes ven la lista completa — el pozo es público.
-    const { data: payments, error: paymentsError } = await supabase
+    const { data: payments, error: paymentsError } = await adminClient
       .from("polla_participants")
       .select(`
         id,
@@ -76,13 +81,14 @@ export async function GET(
           whatsapp_number
         )
       `)
-      .eq("polla_id", polla.id);
+      .eq("polla_id", polla.id)
+      .neq("status", "rejected");
 
     if (paymentsError) throw paymentsError;
 
     // Predictions submitted per user — used by the Organizer panel to show
     // "X de Y han pronosticado". Cheap aggregate.
-    const { data: preds } = await supabase
+    const { data: preds } = await adminClient
       .from("predictions")
       .select("user_id")
       .eq("polla_id", polla.id);

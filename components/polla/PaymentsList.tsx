@@ -95,6 +95,12 @@ export default function PaymentsList({
         </span>
       </div>
 
+      {paymentMode === "pay_winner" && rows.length > 0 && (
+        <div className="rounded-xl px-3 py-2 bg-bg-elevated border border-border-subtle text-xs text-text-secondary text-center">
+          Pendiente hasta que haya ganador — al final, todos le pagan directamente.
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <EmptyState
           title="Aún no hay participantes"
