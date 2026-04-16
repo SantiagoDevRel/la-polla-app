@@ -14,9 +14,9 @@ import OrganizerPanel from "@/components/polla/OrganizerPanel";
 import EmptyState from "@/components/ui/EmptyState";
 import InviteModal from "@/components/polla/InviteModal";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
-import UserAvatar from "@/components/ui/UserAvatar";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug } from "@/lib/tournaments";
+import { getPollitoByPosition } from "@/lib/pollitos";
 import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
 
@@ -246,8 +246,8 @@ export default function PollaSlugPage() {
 
   const myP = participants.find((p) => p.user_id === currentUserId);
 
-  // Non-participant view for open pollas
-  if (isNonParticipant && polla.type === "open") {
+  // Non-participant view for open pollas (hide join if finalized)
+  if (isNonParticipant && polla.type === "open" && polla.status !== "ended") {
     return (
       <div className="min-h-screen">
         <header className="px-4 pt-4 pb-3" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
@@ -614,7 +614,11 @@ export default function PollaSlugPage() {
                           </span>
                         )}
                       </div>
-                      <UserAvatar avatarUrl={p.users?.avatar_url} displayName={p.users?.display_name} size="sm" />
+                      <img
+                        src={getPollitoByPosition(p.users?.avatar_url, p.rank || i + 1, participants.length)}
+                        alt={p.users?.display_name || ""}
+                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium text-sm truncate ${isMe ? "text-gold font-bold" : "text-text-primary"}`}>
                           {p.users?.display_name || "Usuario"}
@@ -725,8 +729,12 @@ export default function PollaSlugPage() {
                       setInviteMsg(null);
                       try {
                         const fullNumber = `${inviteCountryCode}${invitePhone}`;
-                        await axios.post(`/api/pollas/${slug}/invite`, { whatsapp_number: fullNumber });
-                        setInviteMsg({ text: "¡Invitación enviada!", type: "success" });
+                        const { data: res } = await axios.post(`/api/pollas/${slug}/invite`, { whatsapp_number: fullNumber });
+                        if (res.unregistered && res.shareLink) {
+                          setInviteMsg({ text: `No registrado. Compartí este link: ${res.shareLink}`, type: "success" });
+                        } else {
+                          setInviteMsg({ text: "¡Invitación enviada!", type: "success" });
+                        }
                         setInvitePhone("");
                       } catch (err: unknown) {
                         const e = err as { response?: { data?: { error?: string } } };

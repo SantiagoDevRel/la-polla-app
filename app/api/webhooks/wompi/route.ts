@@ -179,14 +179,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
-      // Creator is fully paid at this point — they just completed the Wompi txn.
+      // Creator paid the creation fee but NOT the buy-in yet. Insert as admin
+      // with pending payment so they retain organizer powers but must pay the
+      // buy-in through the normal /unirse/[slug] → Wompi join flow.
       await adminSupabase.from("polla_participants").insert({
         polla_id: pollaId,
         user_id: draft.creator_id,
         role: "admin",
         status: "approved",
-        payment_status: "approved",
-        paid: true,
+        payment_status: "pending",
+        paid: false,
       });
 
       await adminSupabase
@@ -207,10 +209,11 @@ export async function POST(request: NextRequest) {
           .single();
         const whatsapp_number = creator?.whatsapp_number;
         if (whatsapp_number) {
-          const link = `https://la-polla.vercel.app/pollas/${finalSlug}`;
+          const joinLink = `https://la-polla.vercel.app/unirse/${finalSlug}`;
           const message =
-            `Tu polla *${data.name}* fue creada exitosamente.\n` +
-            `Comparte este link con tus amigos para que se unan:\n${link}`;
+            `Tu polla *${data.name}* fue creada exitosamente.\n\n` +
+            `Ahora pagá tu entrada para participar:\n${joinLink}\n\n` +
+            `Después de pagar, compartí el link con tus amigos.`;
           console.log("[wompi] Sending WA notification to:", whatsapp_number);
           await sendWhatsAppMessage(whatsapp_number, message);
           console.log("[wompi] WA notification sent");

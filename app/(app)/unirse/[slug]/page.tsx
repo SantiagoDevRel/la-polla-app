@@ -20,6 +20,7 @@ interface Preview {
   tournament: string;
   buy_in_amount: number;
   type: string;
+  status: string;
   participantCount: number;
 }
 
@@ -51,23 +52,30 @@ export default function UnirsePage() {
         }>(`/api/pollas/preview?slug=${encodeURIComponent(slug)}`);
         setPreview({ ...data.polla, participantCount: data.participantCount });
 
-        // If signed-in and already a participant, skip straight to detail.
+        // If signed-in and already a fully-paid participant, skip to detail.
+        // Participants with pending payment stay on /unirse to complete payment.
         if (isAuthed) {
           const { data: poll } = await supabase
             .from("pollas")
-            .select("id")
+            .select("id, payment_mode, buy_in_amount")
             .eq("slug", slug)
             .maybeSingle();
           if (poll) {
             const { data: existing } = await supabase
               .from("polla_participants")
-              .select("id")
+              .select("id, payment_status")
               .eq("polla_id", poll.id)
               .eq("user_id", user!.id)
               .maybeSingle();
             if (existing) {
-              router.replace(`/pollas/${slug}`);
-              return;
+              const needsPayment =
+                poll.payment_mode === "digital_pool" &&
+                poll.buy_in_amount > 0 &&
+                existing.payment_status !== "approved";
+              if (!needsPayment) {
+                router.replace(`/pollas/${slug}`);
+                return;
+              }
             }
           }
         }
@@ -128,6 +136,25 @@ export default function UnirsePage() {
           <button
             onClick={() => router.push("/dashboard")}
             className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold"
+          >
+            Ir al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (preview.status === "ended") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="rounded-2xl p-6 text-center max-w-sm w-full bg-bg-card border border-border-subtle space-y-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/pollitos/pollito_triste.webp" alt="" className="w-20 h-20 mx-auto" />
+          <h2 className="font-display text-2xl text-text-primary tracking-wide">ESTA POLLA YA TERMINÓ</h2>
+          <p className="text-sm text-text-secondary">{preview.name} ya finalizó y no acepta nuevos participantes.</p>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="w-full bg-gold text-bg-base px-6 py-3 rounded-xl font-semibold"
           >
             Ir al inicio
           </button>
