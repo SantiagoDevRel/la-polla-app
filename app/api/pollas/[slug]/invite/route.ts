@@ -141,10 +141,10 @@ export async function POST(
 
     if (insertError) throw insertError;
 
-    // Send WhatsApp invitation
-    try {
-      const inviteUrl = `${APP_URL}/invites/${token}`;
-      if (existingUser) {
+    if (existingUser) {
+      // Registered user — send WhatsApp invite directly
+      try {
+        const inviteUrl = `${APP_URL}/invites/${token}`;
         await sendCTAButton(
           normalizedPhone,
           `Parce, *${inviterName}* te invitó a la polla *${polla.name}* 🐣\n\nTocá el botón para entrar y poner tus pronósticos 👇`,
@@ -152,21 +152,21 @@ export async function POST(
           inviteUrl,
           "La Polla Colombiana 🐥"
         );
-      } else {
-        await sendCTAButton(
-          normalizedPhone,
-          `Parce, *${inviterName}* te invitó a jugar La Polla 🐣\n\nRegistrate gratis y entrá directamente a la polla 👇`,
-          "Registrarme y entrar 🎯",
-          `${APP_URL}/login?invite=${token}`,
-          "La Polla Colombiana 🐥"
-        );
+      } catch (waErr) {
+        console.error("[invite] Error sending WhatsApp:", waErr);
       }
-    } catch (waErr) {
-      // Log but don't fail — invite is still valid via link
-      console.error("[invite] Error sending WhatsApp:", waErr);
+      return NextResponse.json({ success: true }, { status: 201 });
     }
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    // Unregistered user — Meta blocks outbound messages to numbers that
+    // haven't messaged the bot. Return a shareable link to the organizer.
+    const shareLink = `${APP_URL}/unirse/${polla.slug}?token=${token}`;
+    return NextResponse.json({
+      success: true,
+      unregistered: true,
+      shareLink,
+      message: `Este número no está registrado. Compartí este link directamente: ${shareLink}`,
+    }, { status: 201 });
   } catch (error) {
     console.error("Error creando invitación:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

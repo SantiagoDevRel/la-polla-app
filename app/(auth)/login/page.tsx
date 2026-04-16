@@ -1,5 +1,6 @@
 // app/(auth)/login/page.tsx — Login with reversed OTP flow
-// User enters phone → OTP saved to DB → user opens WhatsApp → bot sends code
+// Step 1: Phone input + "Pedir código" CTA
+// Step 2: Code input + Verify
 "use client";
 
 import { Suspense, useState, useCallback, useEffect } from "react";
@@ -14,7 +15,7 @@ function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;
 }
 
-type Step = "phone" | "whatsapp" | "verify";
+type Step = "phone" | "code";
 
 const RETURN_TO_KEY = "lp_returnTo";
 
@@ -38,7 +39,6 @@ function LoginInner() {
     if (rt && typeof window !== "undefined") {
       window.sessionStorage.setItem(RETURN_TO_KEY, rt);
     }
-    // Decode the returnTo (or the just-stored value) and try to resolve a polla.
     const stored = rt
       ?? (typeof window !== "undefined"
             ? window.sessionStorage.getItem(RETURN_TO_KEY)
@@ -55,8 +55,9 @@ function LoginInner() {
         `/api/pollas/preview?${params.toString()}`
       )
       .then(({ data }) => setPreview({ ...data.polla, participantCount: data.participantCount }))
-      .catch(() => { /* preview is optional — fail quietly */ });
+      .catch(() => {});
   }, [searchParams]);
+
   const [phone, setPhone] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,6 +69,8 @@ function LoginInner() {
   const handlePhoneChange = useCallback((value: string) => {
     setPhone(value);
   }, []);
+
+  const BOT_PHONE = "573117312391";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +89,7 @@ function LoginInner() {
         turnstileToken,
       });
       setIsNewUser(otpRes.newUser ?? true);
-      setStep("whatsapp");
+      setStep("code");
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setError(axiosErr.response?.data?.error || "Error al enviar el codigo");
@@ -102,8 +105,6 @@ function LoginInner() {
 
     try {
       await axios.put("/api/auth/otp", { phone, code });
-      // New users still need onboarding. The onboarding page consumes the
-      // returnTo from sessionStorage on success.
       if (isNewUser) {
         router.push("/onboarding");
       } else {
@@ -120,9 +121,6 @@ function LoginInner() {
       setVerifying(false);
     }
   };
-
-  // BOT_PHONE: the WhatsApp bot number without the + prefix
-  const BOT_PHONE = "573117312391";
 
   return (
     <div
@@ -195,10 +193,6 @@ function LoginInner() {
             </div>
           )}
 
-          <p className="text-text-secondary text-sm text-center">
-            Ingresá tu número de WhatsApp para recibir tu código.
-          </p>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-text-secondary mb-1.5">
@@ -221,10 +215,11 @@ function LoginInner() {
             <button
               type="submit"
               disabled={loading || !turnstileToken || !phone}
-              className="w-full bg-gold text-bg-base font-bold py-3.5 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-lg"
+              className="w-full bg-gold text-bg-base font-bold py-3.5 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-lg inline-flex items-center justify-center gap-2"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
             >
-              {loading ? "Enviando..." : "Enviar codigo"}
+              <MessageCircle className="w-5 h-5" />
+              {loading ? "Enviando..." : "Pedir código por WhatsApp"}
             </button>
           </form>
 
@@ -236,76 +231,43 @@ function LoginInner() {
         </div>
       )}
 
-      {/* Step 2: WhatsApp prompt + OTP input */}
-      {step === "whatsapp" && (
+      {/* Step 2: Code input */}
+      {step === "code" && (
         <div
           className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
           style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
         >
-          <div className="text-center">
-            <div className="mx-auto mb-3" style={{ width: 80, height: 80, borderRadius: "50%", overflow: "hidden" }}>
+          <div className="text-center space-y-2">
+            <div className="mx-auto mb-1" style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/pollitos/pollito_whatsapp_logo.webp"
                 alt="Bot La Polla"
-                width={80}
-                height={80}
-                style={{ width: 80, height: 80, objectFit: "cover" }}
+                width={64}
+                height={64}
+                style={{ width: 64, height: 64, objectFit: "cover" }}
               />
             </div>
-            {isNewUser ? (
-              <>
-                <h1 className="font-display text-[28px] text-gold tracking-wide">
-                  ABRE WHATSAPP
-                </h1>
-                <p className="text-text-secondary text-sm mt-2 leading-relaxed">
-                  Tocá el botón, enviá el mensaje y en segundos te llega el código 🔐
-                </p>
-              </>
-            ) : (
-              <>
-                <h1 className="font-display text-[28px] text-gold tracking-wide">
-                  CODIGO ENVIADO
-                </h1>
-                <p className="text-text-secondary text-sm mt-2 leading-relaxed">
-                  Te enviamos el codigo por WhatsApp.
-                  <br />
-                  Revisá tu chat con La Polla 🐔
-                </p>
-              </>
-            )}
+            <p className="text-text-secondary text-sm">
+              {isNewUser
+                ? "Abrí WhatsApp, escribile al bot y copiá el código."
+                : "Te enviamos el código por WhatsApp. Revisá tu chat con La Polla."}
+            </p>
           </div>
 
-          {isNewUser ? (
-            <>
-              {/* New user: must message bot first (WhatsApp policy) */}
-              <a
-                href={`https://wa.me/${BOT_PHONE}?text=Parce%2C%20quiero%20entrar%20a%20La%20Polla%20%F0%9F%90%A3%20%E2%80%94%20m%C3%A1ndame%20el%20c%C3%B3digo%20de%20verificaci%C3%B3n`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-2 bg-gold text-bg-base font-bold py-4 px-4 rounded-xl hover:brightness-110 transition-all text-lg cursor-pointer"
-                style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
-              >
-                <MessageCircle className="w-5 h-5" />
-                Escribirle al bot 💬
-              </a>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-border-subtle" />
-                <span className="text-text-muted text-xs whitespace-nowrap">o ingresa el codigo si ya lo tienes</span>
-                <div className="flex-1 h-px bg-border-subtle" />
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Returning user: fallback link in case they didn't receive it */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-border-subtle" />
-                <span className="text-text-muted text-xs whitespace-nowrap">ingresa el codigo de 6 digitos</span>
-                <div className="flex-1 h-px bg-border-subtle" />
-              </div>
-            </>
+          {isNewUser && (
+            <a
+              href={`https://wa.me/${BOT_PHONE}?text=Parce%2C%20quiero%20entrar%20a%20La%20Polla%20%F0%9F%90%A3%20%E2%80%94%20m%C3%A1ndame%20el%20c%C3%B3digo%20de%20verificaci%C3%B3n`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all text-base cursor-pointer text-white"
+              style={{ backgroundColor: "#25D366" }}
+            >
+              <MessageCircle className="w-5 h-5" />
+              Escribirle al bot
+            </a>
           )}
 
-          {/* OTP input */}
           <form onSubmit={handleVerify} className="space-y-3">
             <input
               type="text"
@@ -333,22 +295,10 @@ function LoginInner() {
             <button
               type="button"
               onClick={() => { setStep("phone"); setError(""); setCode(""); }}
-              className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5"
+              className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
             >
-              <ArrowLeft className="w-4 h-4" /> Cambiar numero
+              <ArrowLeft className="w-4 h-4" /> {isNewUser ? "¿No llegó? Reenviar" : "Cambiar número o reenviar"}
             </button>
-
-            {!isNewUser && (
-              <a
-                href={`https://wa.me/${BOT_PHONE}?text=Parce%2C%20quiero%20entrar%20a%20La%20Polla%20%F0%9F%90%A3%20%E2%80%94%20m%C3%A1ndame%20el%20c%C3%B3digo%20de%20verificaci%C3%B3n`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full text-text-muted text-xs text-center hover:text-gold transition-colors flex items-center justify-center gap-1"
-              >
-                <MessageCircle className="w-3 h-3" />
-                ¿No te llegó el código? Escríbele al bot 💬
-              </a>
-            )}
           </form>
         </div>
       )}

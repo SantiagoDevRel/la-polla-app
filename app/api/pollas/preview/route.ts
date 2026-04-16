@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     console.error("[pollas/preview] failed:", error);
     return NextResponse.json({ error: "Error consultando polla" }, { status: 500 });
   }
-  if (!polla || polla.status !== "active") {
+  if (!polla) {
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
   }
 

@@ -52,7 +52,8 @@ export async function POST(
     }
 
     if (polla.status !== "active") {
-      return NextResponse.json({ error: "Esta polla ya no está activa" }, { status: 400 });
+      const msg = polla.status === "ended" ? "Esta polla ya finalizó" : "Esta polla ya no está activa";
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
 
     if (polla.type === "closed") {

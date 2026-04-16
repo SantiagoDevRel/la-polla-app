@@ -38,13 +38,13 @@ export default async function DashboardPage() {
 
   const pollaIds = participantRows?.map((r) => r.polla_id) || [];
 
-  // Active pollas
+  // Active + ended pollas (ended pollas keep their final leaderboard / pollito moods)
   const { data: pollas } = pollaIds.length > 0
     ? await admin
         .from("pollas")
         .select("*")
         .in("id", pollaIds)
-        .eq("status", "active")
+        .in("status", ["active", "ended"])
         .order("created_at", { ascending: false })
         .limit(10)
     : { data: [] };

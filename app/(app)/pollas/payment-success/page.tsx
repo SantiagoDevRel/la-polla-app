@@ -48,7 +48,8 @@ function PaymentSuccessInner() {
           if (typeof window !== "undefined") {
             window.sessionStorage.removeItem("pollaDraftReference");
           }
-          router.replace(`/pollas/${data.slug}`);
+          // Organizer still needs to pay their buy-in — send to /unirse
+          router.replace(`/unirse/${data.slug}`);
           return;
         }
 
