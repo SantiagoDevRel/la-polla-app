@@ -15,7 +15,7 @@ function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;
 }
 
-type Step = "phone" | "code";
+type Step = "phone" | "waiting_for_whatsapp" | "entering_code";
 
 const RETURN_TO_KEY = "lp_returnTo";
 
@@ -88,8 +88,9 @@ function LoginInner() {
         phone,
         turnstileToken,
       });
-      setIsNewUser(otpRes.newUser ?? true);
-      setStep("code");
+      const newUser = otpRes.newUser ?? true;
+      setIsNewUser(newUser);
+      setStep(newUser ? "waiting_for_whatsapp" : "entering_code");
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setError(axiosErr.response?.data?.error || "Error al enviar el codigo");
@@ -231,42 +232,63 @@ function LoginInner() {
         </div>
       )}
 
-      {/* Step 2: Code input */}
-      {step === "code" && (
+      {/* State: waiting_for_whatsapp — new user must message the bot first */}
+      {step === "waiting_for_whatsapp" && (
+        <div
+          className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
+          style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
+        >
+          <div className="text-center space-y-3">
+            <div className="mx-auto" style={{ width: 80, height: 80 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/pollitos/pollito_whatsapp_logo.webp"
+                alt="Bot La Polla"
+                width={80}
+                height={80}
+                style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "50%" }}
+              />
+            </div>
+            <p className="text-text-secondary text-sm">
+              Abrí WhatsApp y escribile al bot para recibir tu código
+            </p>
+          </div>
+
+          <a
+            href={`https://wa.me/${BOT_PHONE}?text=Parce%2C%20quiero%20entrar%20a%20La%20Polla%20%F0%9F%90%A3%20%E2%80%94%20m%C3%A1ndame%20el%20c%C3%B3digo%20de%20verificaci%C3%B3n`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 font-bold py-4 px-4 rounded-xl hover:brightness-110 transition-all text-lg cursor-pointer text-white"
+            style={{ backgroundColor: "#25D366" }}
+          >
+            <MessageCircle className="w-5 h-5" />
+            Escribirle al bot
+          </a>
+
+          <button
+            type="button"
+            onClick={() => { setError(""); setStep("entering_code"); }}
+            className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors text-sm"
+          >
+            Ya tengo mi código &rarr;
+          </button>
+        </div>
+      )}
+
+      {/* State: entering_code — code input + verify */}
+      {step === "entering_code" && (
         <div
           className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
           style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
         >
           <div className="text-center space-y-2">
-            <div className="mx-auto mb-1" style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/pollitos/pollito_whatsapp_logo.webp"
-                alt="Bot La Polla"
-                width={64}
-                height={64}
-                style={{ width: 64, height: 64, objectFit: "cover" }}
-              />
-            </div>
+            <h2 className="font-display text-2xl text-gold tracking-wide">INGRESÁ TU CÓDIGO</h2>
             <p className="text-text-secondary text-sm">
               {isNewUser
-                ? "Abrí WhatsApp, escribile al bot y copiá el código."
-                : "Te enviamos el código por WhatsApp. Revisá tu chat con La Polla."}
+                ? "Copiá el código de 6 dígitos que te envió el bot"
+                : "Revisá tu chat con La Polla en WhatsApp"}
             </p>
           </div>
-
-          {isNewUser && (
-            <a
-              href={`https://wa.me/${BOT_PHONE}?text=Parce%2C%20quiero%20entrar%20a%20La%20Polla%20%F0%9F%90%A3%20%E2%80%94%20m%C3%A1ndame%20el%20c%C3%B3digo%20de%20verificaci%C3%B3n`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full flex items-center justify-center gap-2 font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all text-base cursor-pointer text-white"
-              style={{ backgroundColor: "#25D366" }}
-            >
-              <MessageCircle className="w-5 h-5" />
-              Escribirle al bot
-            </a>
-          )}
 
           <form onSubmit={handleVerify} className="space-y-3">
             <input
@@ -277,6 +299,7 @@ function LoginInner() {
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               className="w-full px-4 py-4 rounded-xl outline-none text-center score-font text-[36px] tracking-[0.5em] transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
               required
+              autoFocus
             />
 
             {error && (
@@ -289,16 +312,36 @@ function LoginInner() {
               className="w-full bg-gold text-bg-base font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
             >
-              {verifying ? "Verificando..." : "Verificar codigo"}
+              {verifying ? "Verificando..." : "Verificar código"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => { setStep("phone"); setError(""); setCode(""); }}
-              className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
-            >
-              <ArrowLeft className="w-4 h-4" /> {isNewUser ? "¿No llegó? Reenviar" : "Cambiar número o reenviar"}
-            </button>
+            {isNewUser ? (
+              <button
+                type="button"
+                onClick={() => { setError(""); setCode(""); setStep("waiting_for_whatsapp"); }}
+                className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
+              >
+                <ArrowLeft className="w-4 h-4" /> Volver
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setStep("phone"); setError(""); setCode(""); }}
+                className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
+              >
+                <ArrowLeft className="w-4 h-4" /> Cambiar número o reenviar
+              </button>
+            )}
+
+            {isNewUser && (
+              <button
+                type="button"
+                onClick={() => { setStep("phone"); setError(""); setCode(""); }}
+                className="w-full text-text-muted text-xs py-1 hover:text-gold transition-colors"
+              >
+                ¿No llegó? Reenviar
+              </button>
+            )}
           </form>
         </div>
       )}
