@@ -1,4 +1,4 @@
-// tailwind.config.ts — Sistema de diseño "estadio de noche" + colores legacy
+// tailwind.config.ts — Tribuna Caliente v0.1 tokens + legacy aliases (transition)
 import type { Config } from "tailwindcss";
 
 const config: Config = {
@@ -10,29 +10,46 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Nuevo sistema de diseño
-        "bg-base": "#080c10",
-        "bg-card": "#0e1420",
-        "bg-card-hover": "#152032",
-        "bg-elevated": "#192840",
-        "border-subtle": "#1a2535",
-        "border-medium": "#243448",
-        gold: "#FFD700",
-        "gold-dim": "rgba(255, 215, 0, 0.15)",
-        "green-live": "#00e676",
-        "green-dim": "rgba(0, 230, 118, 0.12)",
-        "red-alert": "#ff3d57",
-        "red-dim": "rgba(255, 61, 87, 0.12)",
-        "blue-info": "#4fc3f7",
-        "text-primary": "#eef2ff",
-        "text-secondary": "#7089aa",
-        "text-muted": "#3d5470",
-        // Card elevated for intermediate surfaces
-        "bg-card-elevated": "#192840",
+        // Tribuna Caliente canonical tokens — map to CSS variables so a theme
+        // swap only needs globals.css.
+        "bg-base": "var(--bg-base)",
+        "bg-card": "var(--bg-card)",
+        "bg-elevated": "var(--bg-elevated)",
+        "bg-subtle": "var(--bg-subtle)",
+        gold: "var(--gold)",
+        amber: "var(--amber)",
+        "amber-dim": "var(--amber-dim)",
+        turf: "var(--turf)",
+        "turf-dim": "var(--turf-dim)",
+        "red-alert": "var(--red-alert)",
+        "text-primary": "var(--text-primary)",
+        "text-secondary": "var(--text-secondary)",
+        "text-muted": "var(--text-muted)",
+        "border-subtle": "var(--border-subtle)",
+        "border-default": "var(--border-default)",
+        "border-strong": "var(--border-strong)",
+
+        // Legacy aliases — kept so existing Tailwind classes keep rendering.
+        // Drop in Phase 2 after components migrate.
+        "bg-card-hover": "var(--bg-card-hover)",
+        "bg-card-elevated": "var(--bg-card-elevated)",
+        "border-medium": "var(--border-medium)",
+        "gold-dim": "var(--gold-dim)",
+        "green-live": "var(--green-live)",
+        "green-dim": "var(--green-dim)",
+        "red-dim": "var(--red-dim)",
+        "blue-info": "var(--blue-info)",
       },
       fontFamily: {
-        sans: ["'Outfit'", "Arial", "sans-serif"],
-        display: ["'Bebas Neue'", "cursive"],
+        sans: ["var(--font-body)", "'Outfit'", "Arial", "sans-serif"],
+        display: ["var(--font-display)", "'Bebas Neue'", "sans-serif"],
+        body: ["var(--font-body)", "'Outfit'", "sans-serif"],
+      },
+      borderRadius: {
+        sm: "8px",
+        md: "12px",
+        lg: "18px",
+        xl: "24px",
       },
       keyframes: {
         "fade-in-up": {

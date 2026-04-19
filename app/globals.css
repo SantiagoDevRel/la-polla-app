@@ -1,35 +1,58 @@
-/* app/globals.css — Sistema de diseño "estadio de noche" para La Polla */
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+/* app/globals.css — Tribuna Caliente v0.1 (docs/design-system.md) */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Superficies */
-  --bg-base: #080c10;
-  --bg-card: #0e1420;
-  --bg-card-hover: #152032;
-  --bg-card-elevated: #192840;
+  /* ─── Tribuna Caliente v0.1 · canonical tokens (see docs/design-system.md §1.1) ─── */
 
-  /* Bordes */
-  --border-subtle: #1a2535;
-  --border-medium: #243448;
-  --border-gold: rgba(255, 215, 0, 0.35);
+  /* surfaces */
+  --bg-base:         #080c10;
+  --bg-card:         #0e1420;
+  --bg-elevated:     #131b2b;
+  --bg-subtle:       #0b1119;
 
-  /* Texto */
-  --text-primary: #eef2ff;
-  --text-secondary: #7089aa;
-  --text-muted: #3d5470;
+  /* brand accents */
+  --gold:            #FFD700;
+  --amber:           #FF9F1C;
+  --amber-dim:       #aa6a0c;
+  --turf:            #1FD87F;
+  --turf-dim:        #0d8a4e;
 
-  /* Acentos */
-  --gold: #FFD700;
-  --gold-dim: rgba(255, 215, 0, 0.15);
-  --green-live: #00e676;
-  --green-dim: rgba(0, 230, 118, 0.12);
-  --red-alert: #ff3d57;
-  --red-dim: rgba(255, 61, 87, 0.12);
-  --blue-info: #4fc3f7;
+  /* semantic */
+  --red-alert:       #FF3D57;
+
+  /* text */
+  --text-primary:    #F5F7FA;
+  --text-secondary:  #AEB7C7;
+  --text-muted:      #6B7689;
+
+  /* borders */
+  --border-subtle:   rgba(255, 255, 255, 0.06);
+  --border-default:  rgba(255, 255, 255, 0.10);
+  --border-strong:   rgba(255, 255, 255, 0.18);
+
+  /* radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  /* fonts (values come from next/font CSS variables set in app/layout.tsx) */
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+
+  /* ─── legacy aliases · maintained during Phase 1 transition, drop in Phase 2 ─── */
+  --bg-card-hover:    var(--bg-elevated);
+  --bg-card-elevated: var(--bg-elevated);
+  --border-medium:    var(--border-default);
+  --border-gold:      rgba(255, 215, 0, 0.35);
+  --gold-dim:         rgba(255, 215, 0, 0.15);
+  --green-live:       var(--turf);
+  --green-dim:        rgba(31, 216, 127, 0.12);
+  --red-dim:          rgba(255, 61, 87, 0.12);
+  --blue-info:        #4fc3f7;
 }
 
 * { box-sizing: border-box; }
@@ -41,7 +64,7 @@ html {
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body), 'Outfit', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -61,7 +84,7 @@ body::before {
 /* Números deportivos — Bebas Neue */
 .score-font,
 .font-display {
-  font-family: 'Bebas Neue', cursive;
+  font-family: var(--font-display), 'Bebas Neue', sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
 }

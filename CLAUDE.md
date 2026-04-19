@@ -26,82 +26,29 @@ This is a mobile-first app used during live football matches on mid-range phones
 
 ---
 
-## Aesthetic Direction
+## Design system · Tribuna Caliente v0.1
 
-**Pole**: Kinetic-sports — dark, immersive, high-contrast stadium energy
-**Feel**: You are in the VIP section of a stadium at night. Dark, premium, electric. Every number pops. Every score glows.
-**Theme**: Dark only. No light mode.
-**Reference**: Sleeper app + Sorare + FotMob dark mode + Polymarket
-**Motion personality**: Kinetic/expressive (300-500ms, spring physics, staggered entrances)
+Source of truth: `docs/design-system.md`. Read it before any UI work.
 
----
+**Core tokens:** `--bg-base #080c10` · `--bg-card #0e1420` · `--bg-elevated #131b2b` · `--gold #FFD700` (sacred, sparse) · `--amber #FF9F1C` (urgency) · `--turf #1FD87F` (live/correct) · `--red-alert #FF3D57` (wrong/destructive) · text ramp `#F5F7FA / #AEB7C7 / #6B7689`.
 
-## Typography
+**Fonts:** Bebas Neue (display, scores, section headers) + Outfit (body, labels). Both via `next/font/google`. Use `font-feature-settings: "tnum"` on any tabular number.
 
-Fonts are already installed in globals.css. Do not reinstall or change them.
+**Non-negotiable rules:**
+- Gold is a reward signal, not decoration. Max 3 gold appearances per visible screen.
+- No emoji in UI — ever. SVG icons or pollito illustration only.
+- One primary CTA per screen. One hero moment per screen.
+- Pollito lives in 8 scripted moments (see design-system.md §5). Never in transactional flows.
+- Button radius: `rounded-full`. Card radius: `rounded-lg` (18px). Hero card: `rounded-xl` (24px).
+- Weights: Outfit 400/500/600/700. No 800/900. Bebas single weight 400.
 
-| Role | Font | Use |
-|---|---|---|
-| Display | Bebas Neue | Match scores, point totals, countdown timers, leaderboard positions, section headers, step numbers |
-| Body | Outfit | Everything else: body text, labels, buttons, inputs, nav items, descriptions |
+**Before building any UI component:**
+1. Read `docs/design-system.md` §3 for the component contract
+2. Check if a shared component exists in `components/ui/` first
+3. Validate gold-count rule by eyeballing your design
+4. Run `npx tsc --noEmit` before commit
 
-**Rules:**
-- Bebas Neue: ONLY for numbers, scores, and short display headings. Never for paragraphs.
-- Outfit: default for all UI text
-- Numbers in data displays: always use `tabular-nums` (font-variant-numeric)
-- Letter spacing on Bebas Neue headings: tracking-wide or tracking-wider
-- Never use Inter, Roboto, Arial, or system fonts anywhere
-
----
-
-## Color System
-
-Colors are already defined in tailwind.config.ts. Use ONLY these tokens. Never hardcode hex values in className strings.
-
-### Background Hierarchy
-```
-bg-base:        #080c10   — deepest page background
-bg-card:        #0e1420   — card and surface backgrounds
-bg-card-hover:  #152032   — hover states on cards, active states
-bg-elevated:    #192840   — modals, drawers, elevated surfaces, input backgrounds
-```
-
-### Text Hierarchy
-```
-text-primary:   #eef2ff   — main readable text, headings, important content
-text-secondary: #7089aa   — labels, secondary info, descriptions, timestamps
-text-muted:     #3d5470   — placeholders, disabled text, subtle hints
-```
-
-### Accent Colors
-```
-gold:           #FFD700   — THE brand accent. CTAs, active nav, winner highlights, important numbers
-                           Use sparingly (max 20% of any screen). It is a highlight, not a flood.
-green-live:     #00e676   — live match indicators, success states, correct predictions, online status
-red-alert:      #ff3d57   — errors, wrong predictions, destructive actions, alerts
-```
-
-### Borders
-```
-border-subtle:  #1a2535   — default borders, dividers, card edges
-                           On hover: border-gold/20 or border-gold/30
-```
-
-### Derived Usage
-```
-Gold muted bg:    bg-gold/10          — subtle gold backgrounds (active nav pill, selected state)
-Gold glow:        shadow-[0_0_20px_rgba(255,215,0,0.15)]   — glow on important gold elements
-Green muted bg:   bg-green-live/10    — live indicator backgrounds
-Red muted bg:     bg-red-alert/10     — error state backgrounds
-Card glass:       bg-card/80 backdrop-blur-sm   — glassmorphism effect on cards
-```
-
-### Color Rules
-1. Gold appears max 20% of screen. It highlights, it does not flood.
-2. Every text element must have 4.5:1 contrast ratio against its background.
-3. Never use text-gray-*, bg-white, bg-gray-*, text-colombia-blue, or border-gray-* — these are OLD tokens, kill them all.
-4. Status colors (green-live, red-alert) should always be paired with an icon or text label, never color alone.
-5. Use opacity variants for subtle backgrounds: gold/10, gold/20, green-live/10, red-alert/10.
+**Transition note (Phase 1 → 2):** legacy tokens `bg-card-hover`, `bg-card-elevated`, `border-medium`, `gold-dim`, `green-live`, `green-dim`, `red-dim`, `blue-info` are aliased in `globals.css` and `tailwind.config.ts`. They still work but will be removed in Phase 2 once components migrate to the canonical palette.
 
 ---
 
