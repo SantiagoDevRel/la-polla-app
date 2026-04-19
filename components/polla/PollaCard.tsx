@@ -41,12 +41,16 @@ export function PollaCard({
 }: PollaCardProps) {
   const isLeader = !!userContext?.isLeader && !endedState;
   const isCarousel = variant === "carousel";
-  const pendingMatches = Math.max(0, polla.totalMatches - polla.finishedMatches);
   const hasMatchProgress = polla.totalMatches > 0;
+  const isComplete = hasMatchProgress && polla.finishedMatches >= polla.totalMatches;
+  const progressPct = hasMatchProgress
+    ? Math.round((polla.finishedMatches / polla.totalMatches) * 100)
+    : 0;
+  const hasPlayedMatches = polla.finishedMatches > 0;
 
   // Show the rank/points footer for any active polla where the user is
   // a participant. When match progress data is missing (match_ids NULL for
-  // non-'custom' scopes) we just drop the "Y por jugar" segment instead of
+  // non-'custom' scopes) we just drop the progress segment instead of
   // hiding the whole footer — otherwise rank + points disappear too.
   const showProgressFooter = !endedState && !!userContext;
   const showEndedFooter = !!endedState;
@@ -155,27 +159,44 @@ export function PollaCard({
       {showProgressFooter ? (
         <div
           className={cn(
-            "mt-3 flex items-center justify-between rounded-sm px-2 py-1.5",
+            "mt-3 relative rounded-sm px-2 pt-3 pb-1.5",
             isLeader ? "bg-gold/10 border border-gold/25" : "bg-bg-elevated border border-border-subtle",
           )}
         >
-          <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
-            {userContext!.rank ? `#${userContext!.rank}` : "Sin rank"}
-          </span>
-          <span
-            className={cn(
-              "font-display text-[14px] tracking-[0.06em] tabular-nums",
-              isLeader ? "text-gold" : "text-text-primary",
-            )}
-            style={{ fontFeatureSettings: '"tnum"' }}
-          >
-            {userContext!.totalPoints ?? 0} PTS
-          </span>
-          {hasMatchProgress ? (
+          {/* thin progress track */}
+          <div className="absolute inset-x-2 top-1 h-[3px] rounded-full bg-white/5 overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-500",
+                isLeader ? "bg-gold" : "bg-text-secondary/60",
+              )}
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
             <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
-              {pendingMatches > 0 ? `${pendingMatches} por jugar` : "Terminada"}
+              {userContext!.rank ? `#${userContext!.rank}` : "Sin rank"}
             </span>
-          ) : null}
+            {hasPlayedMatches ? (
+              <span
+                className={cn(
+                  "font-display text-[14px] tracking-[0.06em] tabular-nums",
+                  isLeader ? "text-gold" : "text-text-primary",
+                )}
+                style={{ fontFeatureSettings: '"tnum"' }}
+              >
+                {userContext!.totalPoints ?? 0} PTS
+              </span>
+            ) : null}
+            {hasMatchProgress ? (
+              <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+                {isComplete
+                  ? "Terminada"
+                  : `${polla.finishedMatches} de ${polla.totalMatches} partidos`}
+              </span>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
