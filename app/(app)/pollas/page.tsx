@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import PollaCard from "@/components/polla/PollaCard";
 import { PollitoMoment } from "@/components/pollito/PollitoMoment";
+import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
+import { useToast } from "@/components/ui/Toast";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
-import { Plus, Mail, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Mail, ChevronDown, ChevronRight, KeyRound, ArrowRight } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 interface PollaData {
@@ -54,10 +56,12 @@ function adaptPolla(raw: PollaData): React.ComponentProps<typeof PollaCard>["pol
 
 export default function MisPollasPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [pollas, setPollas] = useState<PollaData[]>([]);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [endedOpen, setEndedOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -98,6 +102,19 @@ export default function MisPollasPage() {
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-4">
+        {/* Join by code entry */}
+        <button
+          type="button"
+          onClick={() => setJoinOpen(true)}
+          className="w-full flex items-center justify-between rounded-lg border border-gold/25 bg-gold/5 px-4 py-3 hover:bg-gold/10 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-gold">
+            <KeyRound className="w-4 h-4" aria-hidden="true" />
+            ¿Tienes un código? Únete
+          </span>
+          <ArrowRight className="w-4 h-4 text-gold" aria-hidden="true" />
+        </button>
+
         {/* Pending invites */}
         {pendingInvites.length > 0 && (
           <div className="space-y-2">
@@ -238,6 +255,16 @@ export default function MisPollasPage() {
           Crear nueva polla
         </button>
       </main>
+
+      <JoinByCodeSheet
+        open={joinOpen}
+        onOpenChange={setJoinOpen}
+        onSuccess={(polla) => {
+          setJoinOpen(false);
+          showToast(`Te uniste a ${polla.name}`, "success");
+          router.push(`/pollas/${polla.slug}`);
+        }}
+      />
     </div>
   );
 }

@@ -1,5 +1,9 @@
-// components/polla/InviteModal.tsx — Modal de invitación "estadio de noche"
-// Bottom-sheet style, overlay oscuro, botones gold y verde WhatsApp
+// components/polla/InviteModal.tsx — Bottom-sheet invitation UI.
+//
+// Shows three ways to invite: the 6-char join code (copy + admin rotate),
+// a shareable link (copy + WhatsApp deep-link). The join code is primary
+// because it works without mobile paste friction; the link stays for
+// users that prefer clicking.
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,12 +15,30 @@ interface InviteModalProps {
   pollaName: string;
   isOpen: boolean;
   onClose: () => void;
+  // Initial value from the parent; the component keeps its own state so
+  // a successful rotate updates the UI without waiting on a full refetch.
+  joinCode: string | null;
+  canRotate: boolean;
 }
 
-export default function InviteModal({ pollaSlug, pollaName, isOpen, onClose }: InviteModalProps) {
+export default function InviteModal({
+  pollaSlug,
+  pollaName,
+  isOpen,
+  onClose,
+  joinCode,
+  canRotate,
+}: InviteModalProps) {
   const { showToast } = useToast();
   const [token, setToken] = useState<string | null>(null);
   const [loadingToken, setLoadingToken] = useState(false);
+  const [code, setCode] = useState<string | null>(joinCode);
+  const [rotating, setRotating] = useState(false);
+  const [confirmRotate, setConfirmRotate] = useState(false);
+
+  useEffect(() => {
+    setCode(joinCode);
+  }, [joinCode]);
 
   // Fetch (or mint) the open invite token when the modal opens. Closed pollas
   // cannot be joined without this token appended to the link.
@@ -40,14 +62,43 @@ export default function InviteModal({ pollaSlug, pollaName, isOpen, onClose }: I
   const link = token
     ? `${origin}/unirse/${pollaSlug}?token=${token}`
     : `${origin}/unirse/${pollaSlug}`;
-  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Únete a mi polla "${pollaName}": ${link}`)}`;
+  const whatsappText = code
+    ? `Únete a mi polla "${pollaName}": ${link}\nO usa el código ${code} en la app.`
+    : `Únete a mi polla "${pollaName}": ${link}`;
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(whatsappText)}`;
 
-  async function handleCopy() {
+  async function handleCopyLink() {
     try {
       await navigator.clipboard.writeText(link);
-      showToast("¡Link copiado!", "success");
+      showToast("Link copiado", "success");
     } catch {
       showToast("No se pudo copiar", "error");
+    }
+  }
+
+  async function handleCopyCode() {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      showToast("Código copiado", "success");
+    } catch {
+      showToast("No se pudo copiar", "error");
+    }
+  }
+
+  async function handleRotate() {
+    setRotating(true);
+    try {
+      const { data } = await axios.post<{ code: string }>(
+        `/api/pollas/${pollaSlug}/rotate-code`,
+      );
+      setCode(data.code);
+      setConfirmRotate(false);
+      showToast("Código rotado", "success");
+    } catch {
+      showToast("No se pudo rotar el código", "error");
+    } finally {
+      setRotating(false);
     }
   }
 
@@ -65,14 +116,72 @@ export default function InviteModal({ pollaSlug, pollaName, isOpen, onClose }: I
           Invitar amigos a {pollaName}
         </h3>
 
+        {/* Join code block */}
+        {code ? (
+          <div className="rounded-xl p-4 space-y-3 bg-gold/5 border border-gold/25">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gold text-center">
+              Código para unirse
+            </p>
+            <p
+              className="text-center font-mono text-[32px] tracking-[0.32em] text-gold"
+              style={{ fontFeatureSettings: '"tnum"' }}
+            >
+              {code}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCopyCode}
+                className="flex-1 bg-bg-elevated text-text-primary border border-border-default font-semibold py-2 rounded-lg text-sm hover:border-gold/40 transition-colors"
+              >
+                Copiar código
+              </button>
+              {canRotate ? (
+                <button
+                  onClick={() => setConfirmRotate(true)}
+                  disabled={rotating}
+                  className="flex-1 bg-transparent text-text-secondary border border-border-default font-semibold py-2 rounded-lg text-sm hover:text-red-alert hover:border-red-alert/40 transition-colors disabled:opacity-50"
+                >
+                  Rotar código
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Confirm rotate banner (admin only) */}
+        {confirmRotate ? (
+          <div className="rounded-xl p-3 bg-red-alert/10 border border-red-alert/25 space-y-2">
+            <p className="text-sm text-text-primary text-center">
+              ¿Generar un nuevo código? El actual dejará de funcionar.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmRotate(false)}
+                disabled={rotating}
+                className="flex-1 bg-bg-elevated text-text-secondary border border-border-default font-semibold py-2 rounded-lg text-sm disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleRotate}
+                disabled={rotating}
+                className="flex-1 bg-red-alert text-bg-base font-semibold py-2 rounded-lg text-sm disabled:opacity-60"
+              >
+                {rotating ? "Rotando..." : "Sí, rotar"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Link block */}
         <div className="rounded-xl p-3 text-sm break-all text-center"
           style={{ backgroundColor: "var(--bg-card-elevated)", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)" }}>
-          {loadingToken && !token ? "Generando link…" : link}
+          {loadingToken && !token ? "Generando link..." : link}
         </div>
 
         <div className="space-y-2">
           <button
-            onClick={handleCopy}
+            onClick={handleCopyLink}
             disabled={loadingToken || !token}
             className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -101,7 +210,7 @@ export default function InviteModal({ pollaSlug, pollaName, isOpen, onClose }: I
               Compartir por WhatsApp
             </button>
           )}
-          <button onClick={onClose} className="w-full text-text-muted font-medium py-2 text-sm">✕ Cerrar</button>
+          <button onClick={onClose} className="w-full text-text-muted font-medium py-2 text-sm">Cerrar</button>
         </div>
       </div>
     </div>

@@ -29,6 +29,8 @@ interface Polla {
   points_goal_diff: number; points_correct_result: number;
   points_one_team: number; created_by: string; scope: string; type: string;
   admin_payment_instructions: string | null;
+  join_code: string | null;
+  match_ids?: string[] | null;
 }
 interface Participant {
   id: string; user_id: string; role: string; status: string; total_points: number; rank: number;
@@ -776,7 +778,14 @@ export default function PollaSlugPage() {
       </main>
 
       {showInviteModal && (
-        <InviteModal pollaSlug={polla.slug} pollaName={polla.name} isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} />
+        <InviteModal
+          pollaSlug={polla.slug}
+          pollaName={polla.name}
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          joinCode={polla.join_code}
+          canRotate={currentUserRole === "admin"}
+        />
       )}
     </div>
   );
