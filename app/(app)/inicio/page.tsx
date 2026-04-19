@@ -797,10 +797,11 @@ export default async function InicioPage() {
                   top3={podiumTop3}
                   currentUserId={user.id}
                 />
-                {/* Divider + generous top padding prevents the gold CTA
-                    from visually merging with the gold #1 podium bar
-                    directly above it. */}
-                <div className="mt-8 pt-5 border-t border-border-subtle flex justify-center">
+                {/* Generous air below the bars so the gold CTA does not
+                    visually merge with the gold #1 podium bar directly
+                    above it. Clean gap (no border) reads as a distinct
+                    action zone rather than a podium footer. */}
+                <div className="mt-10 pt-2 pb-1 flex justify-center">
                   <Link
                     href={`/pollas/${featuredPolla.slug}`}
                     className="inline-flex items-center gap-2 rounded-full bg-gold text-bg-base font-display tracking-[0.06em] uppercase text-[14px] h-9 px-4 shadow-[0_8px_24px_-6px_rgba(255,215,0,0.4)] hover:-translate-y-px transition-transform"
