@@ -41,11 +41,9 @@ import {
 import { MatchHero } from "@/components/match/MatchHero";
 import { LiveChip } from "@/components/match/LiveChip";
 import PollaCard from "@/components/polla/PollaCard";
-import { EmptyStateM1 } from "@/components/inicio/EmptyStateM1";
-import {
-  PodiumLeaderboard,
-  type PodiumEntry,
-} from "@/components/leaderboard/PodiumLeaderboard";
+import { ActivePollasEmpty } from "@/components/inicio/ActivePollasEmpty";
+import { PodiumCarousel } from "@/components/inicio/PodiumCarousel";
+import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
 // ─── Local types ───────────────────────────────────────────────────────
 
@@ -340,86 +338,32 @@ function toPollaCardPolla(p: EnrichedPolla): React.ComponentProps<typeof PollaCa
   };
 }
 
-// ─── Featured polla selection ──────────────────────────────────────────
+// ─── Podium data ───────────────────────────────────────────────────────
 
-// Which rule in the featured-polla waterfall picked the polla. Returned
-// alongside the polla so the caller can log which branch won for
-// diagnostics, and for future analytics wiring.
-export type FeaturedRule = 1 | 2 | 3 | 4 | 5 | 6;
-
-// Pick the polla the podium should feature. Prefer pollas that have real
-// participant activity so the podium almost always renders meaningful
-// data. Fallbacks at the bottom cover edge cases (brand-new active polla
-// with no points yet, no pollas with any activity). Rules 5 and 6 may
-// land on a polla with no activity; the render gate in the page body
-// still hides the podium for those cases, which is the desired behavior.
+// Fetch the top three participants for a polla.
 //
-// Waterfall:
-//   1. active + user is leader + has activity (ties: newest first)
-//   2. active (any rank) + has activity (ties: newest first)
-//   3. ended + user is leader + has activity (ties: newest first)
-//   4. ended (any rank) + has activity (ties: newest first)
-//   5. active + user is leader (no activity, render gate will hide)
-//   6. most recently created polla (last resort)
-function selectFeaturedPolla(
-  pollas: EnrichedPolla[],
-): { polla: EnrichedPolla; rule: FeaturedRule } | null {
-  if (pollas.length === 0) return null;
-
-  const hasActivity = (p: EnrichedPolla) => p.max_points > 0;
-  const byNewest = (a: EnrichedPolla, b: EnrichedPolla) =>
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-
-  const active = pollas.filter((p) => p.effective_status !== "ended");
-  const ended = pollas.filter((p) => p.effective_status === "ended");
-
-  // Rule 1 - active + user is leader + has activity.
-  const r1 = active.filter((p) => p.is_leader && hasActivity(p));
-  if (r1.length > 0) return { polla: [...r1].sort(byNewest)[0], rule: 1 };
-
-  // Rule 2 - active + has activity (any rank).
-  const r2 = active.filter(hasActivity);
-  if (r2.length > 0) return { polla: [...r2].sort(byNewest)[0], rule: 2 };
-
-  // Rule 3 - ended + user is leader + has activity.
-  const r3 = ended.filter((p) => p.is_leader && hasActivity(p));
-  if (r3.length > 0) return { polla: [...r3].sort(byNewest)[0], rule: 3 };
-
-  // Rule 4 - ended + has activity (any rank).
-  const r4 = ended.filter(hasActivity);
-  if (r4.length > 0) return { polla: [...r4].sort(byNewest)[0], rule: 4 };
-
-  // Rule 5 - active + user is leader but no activity yet. Keeps the
-  // "you are in the lead" framing visible even on brand-new pollas,
-  // though the podium gate below will hide the podium for this case.
-  const r5 = active.filter((p) => p.is_leader);
-  if (r5.length > 0) return { polla: [...r5].sort(byNewest)[0], rule: 5 };
-
-  // Rule 6 - most recently created polla, no filters. Last-resort choice
-  // when nothing above matched.
-  return { polla: [...pollas].sort(byNewest)[0], rule: 6 };
-}
-
-// Fetch the top three participants for the featured polla. Uses the admin
-// client for the polla_participants read (RLS workaround) and filters by
-// the exact polla_id, so the scope is tight.
+// Sort rule (per the active-only refactor): total_points DESC, tiebreak
+// joined_at ASC. When every participant is at 0 points (brand-new polla
+// with no results yet) the ranking falls back to "first to join wins" —
+// intentional, so the podium always has a visible #1 for the pollito to
+// sit on even before any match plays.
 async function fetchPodiumTop3(pollaId: string): Promise<PodiumEntry[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("polla_participants")
     .select(
-      "user_id, total_points, rank, users:user_id ( display_name, avatar_url )",
+      "user_id, total_points, joined_at, users:user_id ( display_name, avatar_url )",
     )
     .eq("polla_id", pollaId)
     .eq("status", "approved")
-    .order("rank", { ascending: true, nullsFirst: false })
     .order("total_points", { ascending: false })
+    .order("joined_at", { ascending: true })
     .limit(3);
 
   type Row = {
     user_id: string;
     total_points: number | null;
-    rank: number | null;
+    joined_at: string | null;
     users:
       | { display_name: string | null; avatar_url: string | null }
       | { display_name: string | null; avatar_url: string | null }[]
@@ -437,6 +381,20 @@ async function fetchPodiumTop3(pollaId: string): Promise<PodiumEntry[]> {
       points: r.total_points ?? 0,
     };
   });
+}
+
+// Fetch podium top 3 for every active polla in parallel. Returns items in
+// the same order as the input array; the caller chooses which is the
+// default visible page (e.g. polla with the soonest upcoming match).
+async function fetchPodiumsForPollas(
+  pollas: EnrichedPolla[],
+): Promise<Array<{ pollaSlug: string; pollaName: string; top3: PodiumEntry[] }>> {
+  const top3s = await Promise.all(pollas.map((p) => fetchPodiumTop3(p.id)));
+  return pollas.map((p, i) => ({
+    pollaSlug: p.slug,
+    pollaName: p.name,
+    top3: top3s[i],
+  }));
 }
 
 // ─── Hero match + strip selection ──────────────────────────────────────
@@ -557,29 +515,39 @@ export default async function InicioPage() {
 
   // Enriched pollas + sort + cap.
   const allPollas = await fetchEnrichedPollas(user.id);
-  const isEmptyState = allPollas.length === 0;
   const sortedPollas = sortPollasForCarousel(allPollas);
+  // Active-only filter (Phase 3c follow-up: ended pollas do not appear on
+  // Inicio — users see them on /pollas). This is the canonical source
+  // for both the Mis Pollas carousel and the podium carousel below.
+  const activePollas = sortedPollas.filter(
+    (p) => p.effective_status !== "ended",
+  );
+  const isActiveEmpty = activePollas.length === 0;
+
   const CAROUSEL_CAP = 6;
-  const pollasForCarousel = sortedPollas.slice(0, CAROUSEL_CAP);
-  const hasOverflow = sortedPollas.length > CAROUSEL_CAP;
+  const pollasForCarousel = activePollas.slice(0, CAROUSEL_CAP);
+  const hasOverflow = activePollas.length > CAROUSEL_CAP;
 
   // Pollito character key fallback. The spec names "pibe" as the default
   // when the user has never picked a character. Must be a string key that
   // exists in /public/pollitos/pollito_{key}_{estado}.webp.
   const pollitoType: string = publicUser?.avatar_url || "pibe";
 
-  // Featured polla + podium. Podium renders only when at least one
-  // participant has total_points > 0, which is a cheap proxy for
-  // "someone has actually made predictions in this polla". The
-  // waterfall prefers pollas with activity, so this gate almost always
-  // passes; it stays as a safety net for rules 5 and 6.
-  const featured = selectFeaturedPolla(sortedPollas);
-  const featuredPolla = featured?.polla ?? null;
-  const podiumTop3 = featuredPolla
-    ? await fetchPodiumTop3(featuredPolla.id)
-    : [];
-  const podiumHasActivity = podiumTop3.some((p) => p.points > 0);
-  const showPodium = !isEmptyState && !!featuredPolla && podiumHasActivity;
+  // Podium carousel: one card per active polla, ordered by created_at via
+  // activePollas' existing sort. Default visible page = the polla with
+  // the soonest upcoming match (smallest soonest_upcoming_ms). When every
+  // active polla has Infinity (no knowable next match), the first card
+  // wins by index.
+  const podiumItems = isActiveEmpty
+    ? []
+    : await fetchPodiumsForPollas(activePollas);
+  const podiumDefaultIndex = isActiveEmpty
+    ? 0
+    : activePollas.reduce(
+        (bestIdx, p, i, arr) =>
+          p.soonest_upcoming_ms < arr[bestIdx].soonest_upcoming_ms ? i : bestIdx,
+        0,
+      );
 
   // Fetch today's live + scheduled matches from football-data.org. Run
   // both calls in parallel. We scope to the user's tournaments first, and
@@ -611,19 +579,27 @@ export default async function InicioPage() {
 
   const heroMatch = selectHeroMatch(userMatches, allMatches, now);
 
-  // Strip: remaining matches strictly within the user's own tournaments,
-  // minus the hero. If fewer than 2 cards remain, the block skips
-  // cleanly (same pattern as a hero-null day). No global fallback here;
-  // the hero waterfall still uses the global pool for rules 3 and 4,
-  // but the strip stays user-scoped per spec.
-  const stripMatches = userMatches
-    .filter((m) => !heroMatch || m.id !== heroMatch.id)
+  // Strip: LIVE matches only, with a global fallback. First try the user's
+  // active polla tournaments; if that yields zero live matches, fall back
+  // to the global pool across all synced competitions. If both are empty
+  // the strip hides cleanly. The hero match is excluded so the strip
+  // never duplicates what is already featured above.
+  const liveMatchesUser = userLive.filter(
+    (m) => !heroMatch || m.id !== heroMatch.id,
+  );
+  const liveMatchesGlobal = globalLive.filter(
+    (m) => !heroMatch || m.id !== heroMatch.id,
+  );
+  const stripMatches = (liveMatchesUser.length >= 1
+    ? liveMatchesUser
+    : liveMatchesGlobal
+  )
     .sort(
       (a, b) =>
         new Date(a.match_date).getTime() - new Date(b.match_date).getTime(),
     )
     .slice(0, 10);
-  const showStrip = !isEmptyState && stripMatches.length >= 2;
+  const showStrip = !isActiveEmpty && stripMatches.length >= 1;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0a1628] via-bg-base to-bg-base">
@@ -676,29 +652,26 @@ export default async function InicioPage() {
       <main className="pb-[110px]">
         <div className="max-w-lg mx-auto space-y-8">
           {/* Block 7 - Empty state. Replaces blocks 3/4/5/6 entirely when
-              the user has no pollas yet. M1 is the onboarding script and
-              the inline variant keeps it in-flow under the greeting. */}
-          {isEmptyState ? (
+              the user has no active pollas. Offers two paths out: create
+              a new polla, or join an existing one with a 6-char code. */}
+          {isActiveEmpty ? (
             <section className="px-4">
-              <EmptyStateM1
-                userPollitoType={pollitoType}
-                nextHref="/pollas/crear"
-              />
+              <ActivePollasEmpty userPollitoType={pollitoType} />
             </section>
           ) : null}
 
           {/* Block 3 - Today's hero match */}
-          {!isEmptyState && heroMatch ? (
+          {!isActiveEmpty && heroMatch ? (
             <section className="px-4">
               <MatchHero {...heroPropsFor(heroMatch)} />
             </section>
           ) : null}
 
-          {/* Block 4 - Live / upcoming strip */}
+          {/* Block 4 - Live strip (LIVE only, with global fallback) */}
           {showStrip ? (
             <section>
               <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary">
-                En vivo y próximos
+                En vivo
               </h2>
               <div className="overflow-x-auto hide-scrollbar">
                 <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
@@ -720,8 +693,8 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 5 - Mis pollas carousel */}
-          {!isEmptyState && pollasForCarousel.length > 0 ? (
+          {/* Block 5 - Mis pollas carousel (active-only) */}
+          {!isActiveEmpty && pollasForCarousel.length > 0 ? (
             <section>
               <div className="px-4 mb-3 flex items-center justify-between">
                 <h2 className="font-display text-[20px] tracking-[0.04em] uppercase text-text-primary">
@@ -785,34 +758,17 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 6 - Featured polla podium */}
-          {showPodium && featuredPolla ? (
-            <section className="px-4">
-              <h2 className="font-display text-[20px] tracking-[0.04em] uppercase text-text-primary mb-3">
+          {/* Block 6 - Swipeable podium carousel across all active pollas */}
+          {!isActiveEmpty && podiumItems.length > 0 ? (
+            <section>
+              <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary">
                 Podio
-                <span className="ml-2 font-body text-[12px] font-semibold tracking-[0.04em] uppercase text-text-muted">
-                  {featuredPolla.name}
-                </span>
               </h2>
-              <div className="rounded-lg border border-border-subtle bg-bg-card p-4">
-                <PodiumLeaderboard
-                  top3={podiumTop3}
-                  currentUserId={user.id}
-                />
-                {/* Generous air below the bars so the gold CTA does not
-                    visually merge with the gold #1 podium bar directly
-                    above it. Clean gap (no border) reads as a distinct
-                    action zone rather than a podium footer. */}
-                <div className="mt-10 pt-2 pb-1 flex justify-center">
-                  <Link
-                    href={`/pollas/${featuredPolla.slug}`}
-                    className="inline-flex items-center gap-2 rounded-full bg-gold text-bg-base font-display tracking-[0.06em] uppercase text-[14px] h-9 px-4 shadow-[0_8px_24px_-6px_rgba(255,215,0,0.4)] hover:-translate-y-px transition-transform"
-                  >
-                    Ver polla
-                    <ArrowRight className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
-                  </Link>
-                </div>
-              </div>
+              <PodiumCarousel
+                items={podiumItems}
+                currentUserId={user.id}
+                defaultIndex={podiumDefaultIndex}
+              />
             </section>
           ) : null}
 
