@@ -2,13 +2,15 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Home, Search, Bookmark, User, Plus } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 type NavKey = "inicio" | "explorar" | "pollas" | "perfil";
 
 export interface BottomNavProps {
-  active: NavKey;
+  active?: NavKey;
+  createHref?: string;
   onCreatePolla?: () => void;
 }
 
@@ -18,6 +20,18 @@ const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; label: string 
   { key: "pollas", href: "/pollas", Icon: Bookmark, label: "Pollas" },
   { key: "perfil", href: "/perfil", Icon: User, label: "Perfil" },
 ];
+
+function deriveActive(pathname: string | null): NavKey | undefined {
+  if (!pathname) return undefined;
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard")) return "inicio";
+  if (pathname.startsWith("/explorar")) return "explorar";
+  if (pathname.startsWith("/perfil")) return "perfil";
+  // Match /pollas and /pollas/... but NOT /pollas/crear (that's the FAB target)
+  if (pathname === "/pollas" || (pathname.startsWith("/pollas/") && !pathname.startsWith("/pollas/crear"))) {
+    return "pollas";
+  }
+  return undefined;
+}
 
 function TabItem({
   tab,
@@ -41,8 +55,18 @@ function TabItem({
   );
 }
 
-export function BottomNav({ active, onCreatePolla }: BottomNavProps) {
+export function BottomNav({ active, createHref, onCreatePolla }: BottomNavProps) {
+  const pathname = usePathname();
+  const resolvedActive = active ?? deriveActive(pathname);
   const [left, middleLeft, middleRight, right] = TABS;
+
+  const fabClass =
+    "absolute left-1/2 -translate-x-1/2 -top-6 w-[58px] h-[58px] rounded-full bg-gold flex items-center justify-center active:scale-95 transition-transform duration-150";
+  const fabStyle: React.CSSProperties = {
+    boxShadow:
+      "0 0 0 4px var(--bg-base), 0 10px 24px -6px rgba(255,215,0,0.55)",
+  };
+
   return (
     <nav
       aria-label="Navegación inferior"
@@ -51,28 +75,35 @@ export function BottomNav({ active, onCreatePolla }: BottomNavProps) {
     >
       <div className="relative h-full flex items-center px-4">
         <div className="flex-1 flex">
-          <TabItem tab={left} active={active === left.key} />
-          <TabItem tab={middleLeft} active={active === middleLeft.key} />
+          <TabItem tab={left} active={resolvedActive === left.key} />
+          <TabItem tab={middleLeft} active={resolvedActive === middleLeft.key} />
         </div>
 
-        {/* FAB */}
-        <button
-          type="button"
-          onClick={onCreatePolla}
-          aria-label="Crear polla"
-          className="absolute left-1/2 -translate-x-1/2 -top-6 w-[58px] h-[58px] rounded-full bg-gold flex items-center justify-center shadow-[0_10px_24px_-6px_rgba(255,215,0,0.55)] active:scale-95 transition-transform duration-150"
-          style={{ boxShadow: "0 0 0 4px var(--bg-base), 0 10px 24px -6px rgba(255,215,0,0.55)" }}
-        >
-          <Plus
-            className="w-7 h-7 text-bg-base"
-            strokeWidth={3}
-            aria-hidden="true"
-          />
-        </button>
+        {/* FAB — Link if createHref is provided, else button calling onCreatePolla */}
+        {createHref ? (
+          <Link
+            href={createHref}
+            aria-label="Crear polla"
+            className={fabClass}
+            style={fabStyle}
+          >
+            <Plus className="w-7 h-7 text-bg-base" strokeWidth={3} aria-hidden="true" />
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={onCreatePolla}
+            aria-label="Crear polla"
+            className={fabClass}
+            style={fabStyle}
+          >
+            <Plus className="w-7 h-7 text-bg-base" strokeWidth={3} aria-hidden="true" />
+          </button>
+        )}
 
         <div className="flex-1 flex">
-          <TabItem tab={middleRight} active={active === middleRight.key} />
-          <TabItem tab={right} active={active === right.key} />
+          <TabItem tab={middleRight} active={resolvedActive === middleRight.key} />
+          <TabItem tab={right} active={resolvedActive === right.key} />
         </div>
       </div>
     </nav>

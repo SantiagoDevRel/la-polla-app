@@ -52,3 +52,18 @@ export function getTournamentName(slug: string): string {
 export function getTournamentLogo(slug: string): string {
   return getTournamentBySlug(slug)?.logoPath || "/tournaments/champions_league.svg";
 }
+
+// Flat slug → icon-path map. Relocated from components/shared/PollaCard.tsx
+// during Phase 3a so multiple UI surfaces can import without depending on a
+// component file. Includes legacy slug aliases for backward-compat.
+export const TOURNAMENT_ICONS: Record<string, string> = {
+  champions_2025: "/tournaments/champions_league.svg",
+  worldcup_2026: "/tournaments/world_cup.svg",
+  laliga_2025: "/tournaments/la_liga.png",
+  premier_2025: "/tournaments/premier_league.webp",
+  seriea_2025: "/tournaments/seria_a.png",
+  // Legacy slugs (backward compat)
+  la_liga_2025: "/tournaments/la_liga.png",
+  premier_league: "/tournaments/premier_league.webp",
+  seria_a: "/tournaments/seria_a.png",
+};

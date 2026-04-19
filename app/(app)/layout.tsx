@@ -1,7 +1,7 @@
 // app/(app)/layout.tsx — Layout para páginas autenticadas
 // Fondo bg-base, ToastProvider global, BottomNav mobile, padding inferior para la barra
 import { ToastProvider } from "@/components/ui/Toast";
-import BottomNav from "@/components/ui/BottomNav";
+import BottomNav from "@/components/nav/BottomNav";
 
 export default function AppLayout({
   children,
@@ -10,8 +10,8 @@ export default function AppLayout({
 }) {
   return (
     <ToastProvider>
-      <div className="relative z-10 pb-[72px]">{children}</div>
-      <BottomNav />
+      <div className="relative z-10 pb-[110px]">{children}</div>
+      <BottomNav createHref="/pollas/crear" />
     </ToastProvider>
   );
 }
