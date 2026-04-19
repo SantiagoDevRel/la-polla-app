@@ -34,6 +34,7 @@ interface Participant {
   id: string; user_id: string; role: string; status: string; total_points: number; rank: number;
   paid: boolean;
   payment_status: string;
+  joined_at: string;
   users: { id: string; display_name: string; whatsapp_number: string; avatar_url: string | null };
 }
 interface Match {
@@ -596,40 +597,51 @@ export default function PollaSlugPage() {
                     El ranking se actualiza cuando terminen los partidos
                   </div>
                 )}
-                {participants.map((p, i) => {
-                  const isMe = p.user_id === currentUserId;
-                  const medalColor = i === 0 ? "#FFD700" : i === 1 ? "#C0C0C0" : i === 2 ? "#CD7F32" : null;
+                {[...participants]
+                  .sort((a, b) => {
+                    // Sort by cached rank ascending (RANK() window function
+                    // gives ties the same rank). Secondary sort by joined_at
+                    // so tied rows display in a stable "earliest joiner
+                    // first" order.
+                    const ra = a.rank ?? Number.MAX_SAFE_INTEGER;
+                    const rb = b.rank ?? Number.MAX_SAFE_INTEGER;
+                    if (ra !== rb) return ra - rb;
+                    return (a.joined_at || "").localeCompare(b.joined_at || "");
+                  })
+                  .map((p) => {
+                    const isMe = p.user_id === currentUserId;
+                    const rankLabel = p.rank ? `#${p.rank}` : "—";
+                    const rankColor =
+                      p.rank === 1
+                        ? "text-gold"
+                        : p.rank && p.rank <= 3
+                        ? "text-gold"
+                        : "text-text-muted";
 
-                  return (
-                    <div key={p.id}
-                      className={`flex items-center gap-3 px-4 py-3 border-b border-border-subtle last:border-0 ${isMe ? "bg-gold-dim" : ""}`}
-                      style={isMe ? { borderLeft: "2px solid var(--gold)" } : undefined}
-                    >
-                      <div className="w-8 text-center">
-                        {medalColor ? (
-                          <Trophy className="w-5 h-5 mx-auto" style={{ color: medalColor }} />
-                        ) : (
-                          <span className={`score-font text-[20px] ${i < 3 ? "text-gold" : "text-text-muted"}`}>
-                            {p.rank || i + 1}
-                          </span>
-                        )}
+                    return (
+                      <div key={p.id}
+                        className={`flex items-center gap-3 px-4 py-3 border-b border-border-subtle last:border-0 ${isMe ? "bg-gold-dim" : ""}`}
+                        style={isMe ? { borderLeft: "2px solid var(--gold)" } : undefined}
+                      >
+                        <span className={`score-font text-[18px] w-10 text-center tabular-nums ${rankColor}`} style={{ fontFeatureSettings: '"tnum"' }}>
+                          {rankLabel}
+                        </span>
+                        <img
+                          src={getPollitoByPosition(p.users?.avatar_url, p.rank || 999, participants.length)}
+                          alt={p.users?.display_name || ""}
+                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-medium text-sm truncate ${isMe ? "text-gold font-bold" : "text-text-primary"}`}>
+                            {p.users?.display_name || "Usuario"}
+                            {isMe && <span className="ml-1 text-xs text-gold">(tú)</span>}
+                          </p>
+                          <p className="text-xs text-text-muted">{p.paid ? "Pagado" : "Pendiente"}</p>
+                        </div>
+                        <span className="score-font text-[18px] text-text-primary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>{p.total_points}</span>
                       </div>
-                      <img
-                        src={getPollitoByPosition(p.users?.avatar_url, p.rank || i + 1, participants.length)}
-                        alt={p.users?.display_name || ""}
-                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-medium text-sm truncate ${isMe ? "text-gold font-bold" : "text-text-primary"}`}>
-                          {p.users?.display_name || "Usuario"}
-                          {isMe && <span className="ml-1 text-xs text-gold">(tú)</span>}
-                        </p>
-                        <p className="text-xs text-text-muted">{p.paid ? "Pagado" : "Pendiente"}</p>
-                      </div>
-                      <span className="score-font text-[18px] text-text-primary">{p.total_points}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </>
             )}
             </div>
