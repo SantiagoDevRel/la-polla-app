@@ -3,12 +3,17 @@
 
 interface ConversationState {
   action: string;
-  pollaId: string;
+  // Most flows pin a specific polla; join-by-code confirmation does not
+  // know the polla until the code resolves, so this is optional.
+  pollaId?: string;
   pollaSlug?: string;
   matchId?: string;
   matchIndex?: number;
   totalMatches?: number;
   page?: number;
+  // Set when action === 'waiting_join_confirm': the 6-char code the user
+  // sent bare, pending their SI/NO response.
+  joinCode?: string;
   expires: number;
 }
 

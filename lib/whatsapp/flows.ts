@@ -7,9 +7,11 @@ import {
   sendListMessage,
   sendCTAButton,
 } from "./interactive";
-import { setState } from "./state";
+import { clearState, setState } from "./state";
 import { formatTablaWA } from "./tabla";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
+import { joinByCode } from "@/lib/pollas/join";
+import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
 const FOOTER = "La Polla Colombiana 🐥";
@@ -1197,3 +1199,95 @@ export async function handleProfile(phone: string, userId: string) {
     FOOTER
   );
 }
+
+// ─── Join by code ─────────────────────────────────────────────────────
+//
+// Two entry points route here:
+//   1. "unirse CODIGO" → handleJoinByCode directly
+//   2. Bare 6-char message → handleJoinByCodeConfirm asks SI/NO first
+//
+// Both paths end up calling the shared lib/pollas/join.ts helper so the
+// bot and the web endpoint never drift on validation, rate limits, or
+// participant-row semantics.
+
+/**
+ * Sends the user a SI/NO confirmation before joining with a bare code.
+ * Saves the code in conversation state so the SI/NO reply knows which
+ * code to apply.
+ */
+export async function handleJoinByCodeConfirm(phone: string, code: string) {
+  const normalized = code.trim().toUpperCase();
+  if (!validateJoinCodeFormat(normalized)) {
+    await sendTextMessage(
+      phone,
+      "Parce, ese código no tiene el formato correcto. Deben ser 6 letras o números.",
+    );
+    return;
+  }
+  setState(phone, { action: "waiting_join_confirm", joinCode: normalized });
+  await sendReplyButtons(
+    phone,
+    `¿Querés unirte a la polla con el código *${normalized}*?`,
+    [
+      { id: "join_code_yes", title: "Sí, unirme" },
+      { id: "join_code_no", title: "No" },
+    ],
+    FOOTER,
+  );
+}
+
+/**
+ * Performs the join. Shared with the web endpoint via lib/pollas/join.ts.
+ * Translates the shared result enum into Spanish bot copy.
+ */
+export async function handleJoinByCode(
+  phone: string,
+  userId: string,
+  code: string,
+) {
+  clearState(phone);
+  const result = await joinByCode({ userId, phone, code });
+
+  if (result.ok) {
+    const inviteUrl = `${APP_URL}/pollas/${result.polla.slug}`;
+    await sendCTAButton(
+      phone,
+      `¡Te uniste a *${result.polla.name}*! 🎉\n\nMirá la polla en la app 👇`,
+      "Abrir polla 🐔",
+      inviteUrl,
+      FOOTER,
+    );
+    return;
+  }
+
+  switch (result.code) {
+    case "invalid_format":
+      await sendTextMessage(
+        phone,
+        "Parce, ese código no tiene el formato correcto. Deben ser 6 letras o números.",
+      );
+      return;
+    case "rate_limited":
+      await sendTextMessage(
+        phone,
+        "Muchos intentos seguidos parce. Esperá 10 minutos y volvés a probar.",
+      );
+      return;
+    case "not_found":
+      await sendTextMessage(
+        phone,
+        "Ese código no existe. Pedile al admin de la polla que te lo mande de nuevo.",
+      );
+      return;
+    case "not_active":
+      await sendTextMessage(
+        phone,
+        "Esa polla ya no acepta nuevos jugadores.",
+      );
+      return;
+    case "already_member":
+      await sendTextMessage(phone, "Ya sos parte de esa polla parce.");
+      return;
+  }
+}
+
