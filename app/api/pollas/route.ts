@@ -5,6 +5,10 @@
 // webhook convierte el draft en polla real cuando el pago queda APPROVED.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+// Admin client used for polla_participants queries because auth.uid()
+// propagation from SSR cookies to PostgREST is not working. Every
+// polla_participants query below MUST include an explicit user-scoped
+// filter (user.id or polla_id list scoped to user's pollas).
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildWompiCheckoutUrl } from "@/lib/wompi/checkout";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
@@ -56,6 +60,7 @@ const createPollaSchema = z
 export async function GET() {
   try {
     const supabase = createClient();
+    const admin = createAdminClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -69,15 +74,12 @@ export async function GET() {
     // `.in.()` nested inside `.or()` silently dropped the participant-only
     // pollas in practice — likely a commas-inside-parens parsing quirk when
     // the IN list contains UUIDs.
-    const { data: participantPollaIds } = await supabase
+    const { data: participantPollaIds } = await admin
       .from("polla_participants")
       .select("polla_id")
       .eq("user_id", user.id);
 
     const pollaIds = participantPollaIds?.map((p) => p.polla_id) || [];
-
-    // DEBUG: remove once Santiago verifies the fix on prod.
-    console.log("[DEBUG /api/pollas] userId:", user.id, "pollaIds:", pollaIds);
 
     const { data: createdPollas, error: errCreated } = await supabase
       .from("pollas")
@@ -145,7 +147,9 @@ export async function GET() {
     const endedIds = withEffective.filter((p) => p.effective_status === "ended").map((p) => p.id);
     let winnersByPolla: Record<string, { display_name: string; total_points: number }> = {};
     if (endedIds.length > 0) {
-      const { data: winners } = await supabase
+      // endedIds is already scoped to pollas this user belongs to (creator
+      // or participant), so admin-client use is safe.
+      const { data: winners } = await admin
         .from("polla_participants")
         .select("polla_id, total_points, users:user_id ( display_name )")
         .in("polla_id", endedIds)
@@ -160,10 +164,12 @@ export async function GET() {
 
     // Participant counts for each polla — previously missing from this
     // endpoint, so the UI silently rendered "0 participantes".
+    // allPollaIds is scoped to pollas this user belongs to, so admin-client
+    // use is safe.
     const allPollaIds = (pollas || []).map((p) => p.id);
     const participantCountByPolla: Record<string, number> = {};
     if (allPollaIds.length > 0) {
-      const { data: participantRows } = await supabase
+      const { data: participantRows } = await admin
         .from("polla_participants")
         .select("polla_id")
         .in("polla_id", allPollaIds);
@@ -175,12 +181,13 @@ export async function GET() {
 
     // User's rank + total_points in each polla (cached on polla_participants
     // by the on_match_finished trigger + lib/scoring.ts recompute path).
+    // eq(user_id) is the required user-scope guard when using admin.
     const myMembershipByPolla: Record<
       string,
       { rank: number | null; total_points: number }
     > = {};
     if (allPollaIds.length > 0) {
-      const { data: myMembership } = await supabase
+      const { data: myMembership } = await admin
         .from("polla_participants")
         .select("polla_id, rank, total_points")
         .eq("user_id", user.id)

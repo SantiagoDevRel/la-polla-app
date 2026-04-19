@@ -12,6 +12,26 @@ Visual changes ONLY. Never touch API routes, Supabase calls, middleware, auth fl
 
 ---
 
+## TODO · auth.uid() propagation audit
+
+`auth.uid()` returns NULL in PostgREST request context even when
+`supabase.auth.getUser()` succeeds. RLS on `polla_participants` silently
+returns zero rows as a result, which broke `/api/pollas` enrichment
+(participant_count, user_rank, user_total_points, is_leader) until we
+worked around it by routing those reads through `createAdminClient()`
+with explicit user-scope filters.
+
+Likely culprits to investigate in a dedicated session:
+- `lib/supabase/server.ts` — `@supabase/ssr` `createServerClient` setup
+- `middleware.ts` — cookie forwarding / session refresh
+- Next.js SSR cookie → PostgREST Authorization header path
+
+Fix is to restore RLS-scoped reads on `polla_participants` once
+`auth.uid()` propagates, so we can drop the admin-client workaround in
+`app/api/pollas/route.ts`.
+
+---
+
 ## Stack
 
 ```bash
