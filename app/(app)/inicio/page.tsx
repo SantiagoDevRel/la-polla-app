@@ -32,6 +32,7 @@ import {
   TOURNAMENTS,
 } from "@/lib/tournaments";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
+import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import {
   getLiveMatches,
   getTodayMatches,
@@ -533,6 +534,7 @@ function heroPropsFor(
 // ─── Page ──────────────────────────────────────────────────────────────
 
 export default async function InicioPage() {
+  void ensureMatchesFresh();
   // Validate session. Middleware already gates /inicio, but the explicit
   // redirect keeps the page safe if middleware order ever changes.
   const supabase = createClient();
