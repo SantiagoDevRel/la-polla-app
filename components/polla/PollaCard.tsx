@@ -42,9 +42,13 @@ export function PollaCard({
   const isLeader = !!userContext?.isLeader && !endedState;
   const isCarousel = variant === "carousel";
   const pendingMatches = Math.max(0, polla.totalMatches - polla.finishedMatches);
+  const hasMatchProgress = polla.totalMatches > 0;
 
-  const showProgressFooter =
-    !endedState && !!userContext && polla.totalMatches > 0;
+  // Show the rank/points footer for any active polla where the user is
+  // a participant. When match progress data is missing (match_ids NULL for
+  // non-'custom' scopes) we just drop the "Y por jugar" segment instead of
+  // hiding the whole footer — otherwise rank + points disappear too.
+  const showProgressFooter = !endedState && !!userContext;
   const showEndedFooter = !!endedState;
 
   return (
@@ -167,9 +171,11 @@ export function PollaCard({
           >
             {userContext!.totalPoints ?? 0} PTS
           </span>
-          <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
-            {pendingMatches > 0 ? `${pendingMatches} por jugar` : "Terminada"}
-          </span>
+          {hasMatchProgress ? (
+            <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
+              {pendingMatches > 0 ? `${pendingMatches} por jugar` : "Terminada"}
+            </span>
+          ) : null}
         </div>
       ) : null}
 

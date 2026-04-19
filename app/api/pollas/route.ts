@@ -62,7 +62,13 @@ export async function GET() {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Listar pollas donde el usuario es participante o creador
+    // Listar pollas donde el usuario es participante o creador.
+    // NOTE: we fetch both sets in two separate queries and merge in JS.
+    // The previous implementation used a single PostgREST
+    // .or(`created_by.eq.<uuid>,id.in.(<uuid>,<uuid>,...)`) filter, but the
+    // `.in.()` nested inside `.or()` silently dropped the participant-only
+    // pollas in practice — likely a commas-inside-parens parsing quirk when
+    // the IN list contains UUIDs.
     const { data: participantPollaIds } = await supabase
       .from("polla_participants")
       .select("polla_id")
@@ -70,13 +76,38 @@ export async function GET() {
 
     const pollaIds = participantPollaIds?.map((p) => p.polla_id) || [];
 
-    const { data: pollas, error } = await supabase
+    // DEBUG: remove once Santiago verifies the fix on prod.
+    console.log("[DEBUG /api/pollas] userId:", user.id, "pollaIds:", pollaIds);
+
+    const { data: createdPollas, error: errCreated } = await supabase
       .from("pollas")
       .select("*")
-      .or(`created_by.eq.${user.id}${pollaIds.length > 0 ? `,id.in.(${pollaIds.join(",")})` : ""}`)
-      .order("created_at", { ascending: false });
+      .eq("created_by", user.id);
 
-    if (error) throw error;
+    if (errCreated) throw errCreated;
+
+    let participantPollas: NonNullable<typeof createdPollas> = [];
+    if (pollaIds.length > 0) {
+      const { data: pp, error: errParticipant } = await supabase
+        .from("pollas")
+        .select("*")
+        .in("id", pollaIds);
+      if (errParticipant) {
+        console.error("[/api/pollas] participant fetch error:", errParticipant);
+      }
+      participantPollas = pp || [];
+    }
+
+    // Merge, de-dup by id (user may be both creator and participant)
+    type PollaRow = NonNullable<typeof createdPollas>[number];
+    const pollaMap = new Map<string, PollaRow>();
+    (createdPollas || []).forEach((p) => pollaMap.set(p.id, p));
+    participantPollas.forEach((p) => {
+      if (!pollaMap.has(p.id)) pollaMap.set(p.id, p);
+    });
+    const pollas = Array.from(pollaMap.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
 
     // Compute effective_status: a polla is effectively ended if every match_id is finished
     // or its scheduled_at is in the past. Handles the case where the auto-close trigger
