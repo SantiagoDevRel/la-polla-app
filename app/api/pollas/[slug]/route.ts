@@ -2,12 +2,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
   try {
+    // Lazy sync de partidos recientes (fire-and-forget, no bloquea).
+    void ensureMatchesFresh();
+
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 

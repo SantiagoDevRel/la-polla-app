@@ -69,13 +69,15 @@ function mapMatchToRow(match: FDMatch, tournament: string) {
 export async function syncCompetition(
   competitionId: number,
   tournament: string,
-  statusFilter?: string
+  statusFilter?: string,
+  dateFrom?: string,
+  dateTo?: string
 ): Promise<{ synced: number; errors: number; total: number }> {
   console.log(`[sync] Sincronizando competition=${competitionId} → tournament="${tournament}"`);
 
   let matches: FDMatch[];
   try {
-    matches = await fetchCompetitionMatches(competitionId, statusFilter);
+    matches = await fetchCompetitionMatches(competitionId, statusFilter, dateFrom, dateTo);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[sync] Error fetching competition ${competitionId}: ${msg}`);
@@ -125,6 +127,45 @@ export async function syncAllCompetitions(): Promise<
       results[comp.tournament] = await syncCompetition(comp.id, comp.tournament);
     } catch (err) {
       console.error(`[sync] Error fatal syncing ${comp.label}:`, err);
+      results[comp.tournament] = { synced: 0, errors: 1, total: 0 };
+    }
+    await rateLimitDelay();
+  }
+
+  return results;
+}
+
+/**
+ * Sync "recent" window only: partidos con fecha entre (now - hoursBack) y (now + hoursAhead).
+ * Usa el filtro dateFrom/dateTo de football-data para mantener el payload chico.
+ * Pensado para correr lazy cuando un usuario activo pide leaderboard o predicciones.
+ */
+export async function syncRecentCompetitions(
+  hoursBack = 3,
+  hoursAhead = 1
+): Promise<Record<string, { synced: number; errors: number; total: number }>> {
+  const now = new Date();
+  const from = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
+  const to = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000);
+
+  // football-data acepta dateFrom/dateTo en formato YYYY-MM-DD.
+  // Redondeamos al dia UTC para cubrir la ventana completa.
+  const fromDate = from.toISOString().slice(0, 10);
+  const toDate = to.toISOString().slice(0, 10);
+
+  const results: Record<string, { synced: number; errors: number; total: number }> = {};
+
+  for (const comp of COMPETITIONS) {
+    try {
+      results[comp.tournament] = await syncCompetition(
+        comp.id,
+        comp.tournament,
+        undefined,
+        fromDate,
+        toDate
+      );
+    } catch (err) {
+      console.error(`[sync-recent] Error fatal syncing ${comp.label}:`, err);
       results[comp.tournament] = { synced: 0, errors: 1, total: 0 };
     }
     await rateLimitDelay();

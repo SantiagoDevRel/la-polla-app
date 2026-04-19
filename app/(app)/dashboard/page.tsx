@@ -10,8 +10,12 @@ import { getLiveMatches, getTodayMatches } from "@/lib/football-api";
 import type { FootballMatch } from "@/lib/football-api";
 import { getPollitoBase } from "@/lib/pollitos";
 import { getTournamentName } from "@/lib/tournaments";
+import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 
 export default async function DashboardPage() {
+  // Lazy sync adaptativo de partidos recientes (fire-and-forget).
+  void ensureMatchesFresh();
+
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
