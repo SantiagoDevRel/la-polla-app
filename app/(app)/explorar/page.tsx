@@ -5,7 +5,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import PollaCard, { TOURNAMENT_ICONS } from "@/components/shared/PollaCard";
+import PollaCard from "@/components/polla/PollaCard";
+import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
 import FootballLoader from "@/components/ui/FootballLoader";
 
@@ -16,6 +17,20 @@ interface PublicPolla {
 }
 
 import { getTournamentName } from "@/lib/tournaments";
+
+function adaptPolla(raw: PublicPolla): React.ComponentProps<typeof PollaCard>["polla"] {
+  return {
+    id: raw.id,
+    slug: raw.slug,
+    name: raw.name,
+    competitionName: getTournamentName(raw.tournament) ?? "Desconocido",
+    competitionLogoUrl: TOURNAMENT_ICONS[raw.tournament],
+    participantCount: raw.participant_count ?? 0,
+    buyInAmount: raw.buy_in_amount ?? 0,
+    totalMatches: 0, // API does not return yet — Phase 3b scope
+    finishedMatches: 0,
+  };
+}
 
 export default function ExplorarPage() {
   const router = useRouter();
@@ -183,14 +198,8 @@ export default function ExplorarPage() {
             {filtered.map((polla) => (
               <AnimatedItem key={polla.id}>
                 <PollaCard
-                  name={polla.name}
-                  tournamentName={getTournamentName(polla.tournament)}
-                  tournamentIconPath={TOURNAMENT_ICONS[polla.tournament] || ""}
-                  entryFee={polla.buy_in_amount}
-                  participantCount={polla.participant_count}
-                  visibility={polla.type === "open" ? "publica" : "privada"}
-                  isActive={true}
-                  onPress={() => router.push(`/pollas/${polla.slug}`)}
+                  polla={adaptPolla(polla)}
+                  onTap={() => router.push(`/pollas/${polla.slug}`)}
                 />
               </AnimatedItem>
             ))}

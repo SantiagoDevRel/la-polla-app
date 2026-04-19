@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { TOURNAMENT_ICONS } from "@/components/shared/PollaCard";
+import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { formatCOP } from "@/lib/formatCurrency";
 import { getPollitoByPosition } from "@/lib/pollitos";
 

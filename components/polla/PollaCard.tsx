@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { Users, Trophy } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatCOP } from "@/lib/formatCurrency";
 
@@ -19,10 +19,14 @@ export interface PollaCardProps {
     totalMatches: number;
     finishedMatches: number;
   };
-  userContext: {
+  userContext?: {
     rank?: number;
-    totalPoints: number;
-    isLeader: boolean;
+    totalPoints?: number;
+    isLeader?: boolean;
+  };
+  endedState?: {
+    winnerName: string;
+    winnerPoints: number;
   };
   variant?: "carousel" | "grid";
   onTap?: () => void;
@@ -31,12 +35,17 @@ export interface PollaCardProps {
 export function PollaCard({
   polla,
   userContext,
+  endedState,
   variant = "grid",
   onTap,
 }: PollaCardProps) {
-  const isLeader = userContext.isLeader;
+  const isLeader = !!userContext?.isLeader && !endedState;
   const isCarousel = variant === "carousel";
   const pendingMatches = Math.max(0, polla.totalMatches - polla.finishedMatches);
+
+  const showProgressFooter =
+    !endedState && !!userContext && polla.totalMatches > 0;
+  const showEndedFooter = !!endedState;
 
   return (
     <Link
@@ -48,6 +57,7 @@ export function PollaCard({
         isLeader
           ? "border-gold/40 shadow-[0_0_30px_-10px_rgba(255,215,0,0.2)]"
           : "border-border-subtle hover:border-border-default",
+        endedState && "opacity-75",
       )}
       style={
         isLeader
@@ -114,29 +124,70 @@ export function PollaCard({
         )}
       </div>
 
-      {/* Progress footer */}
-      <div
-        className={cn(
-          "mt-3 flex items-center justify-between rounded-sm px-2 py-1.5",
-          isLeader ? "bg-gold/10 border border-gold/25" : "bg-bg-elevated border border-border-subtle",
-        )}
-      >
-        <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
-          {userContext.rank ? `#${userContext.rank}` : "Sin rank"}
-        </span>
-        <span
+      {/* Rank row — shown alongside endedState when userContext is also present */}
+      {endedState && userContext ? (
+        <div
           className={cn(
-            "font-display text-[14px] tracking-[0.06em] tabular-nums",
-            isLeader ? "text-gold" : "text-text-primary",
+            "mt-3 flex items-center justify-between rounded-sm px-2 py-1.5",
+            isLeader ? "bg-gold/10 border border-gold/25" : "bg-bg-elevated border border-border-subtle",
           )}
-          style={{ fontFeatureSettings: '"tnum"' }}
         >
-          {userContext.totalPoints} PTS
-        </span>
-        <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
-          {pendingMatches > 0 ? `${pendingMatches} por jugar` : "Terminada"}
-        </span>
-      </div>
+          <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
+            {userContext.rank ? `#${userContext.rank}` : "Sin rank"}
+          </span>
+          <span
+            className={cn(
+              "font-display text-[14px] tracking-[0.06em] tabular-nums",
+              isLeader ? "text-gold" : "text-text-primary",
+            )}
+            style={{ fontFeatureSettings: '"tnum"' }}
+          >
+            {userContext.totalPoints ?? 0} PTS
+          </span>
+        </div>
+      ) : null}
+
+      {/* Progress footer — active pollas with rank + progress data */}
+      {showProgressFooter ? (
+        <div
+          className={cn(
+            "mt-3 flex items-center justify-between rounded-sm px-2 py-1.5",
+            isLeader ? "bg-gold/10 border border-gold/25" : "bg-bg-elevated border border-border-subtle",
+          )}
+        >
+          <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
+            {userContext!.rank ? `#${userContext!.rank}` : "Sin rank"}
+          </span>
+          <span
+            className={cn(
+              "font-display text-[14px] tracking-[0.06em] tabular-nums",
+              isLeader ? "text-gold" : "text-text-primary",
+            )}
+            style={{ fontFeatureSettings: '"tnum"' }}
+          >
+            {userContext!.totalPoints ?? 0} PTS
+          </span>
+          <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
+            {pendingMatches > 0 ? `${pendingMatches} por jugar` : "Terminada"}
+          </span>
+        </div>
+      ) : null}
+
+      {/* Ended footer — winner row */}
+      {showEndedFooter ? (
+        <div className="mt-3 flex items-center gap-2 rounded-sm px-2 py-1.5 bg-bg-elevated border border-gold/20">
+          <Trophy size={14} className="text-gold flex-shrink-0" aria-hidden="true" />
+          <span className="font-body text-[12px] text-text-primary truncate flex-1">
+            {endedState!.winnerName}
+          </span>
+          <span
+            className="font-display text-[13px] tracking-[0.05em] text-gold tabular-nums"
+            style={{ fontFeatureSettings: '"tnum"' }}
+          >
+            {endedState!.winnerPoints} PTS
+          </span>
+        </div>
+      ) : null}
     </Link>
   );
 }
