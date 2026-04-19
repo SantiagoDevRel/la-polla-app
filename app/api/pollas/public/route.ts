@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { TOURNAMENTS } from "@/lib/tournaments";
+import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 
 const VALID_TOURNAMENTS = TOURNAMENTS.map((t) => t.slug);
 
@@ -12,7 +13,7 @@ export async function GET() {
 
     const { data: pollas, error } = await supabase
       .from("pollas")
-      .select("id, slug, name, description, tournament, buy_in_amount, currency, payment_mode, type, created_at")
+      .select("id, slug, name, description, tournament, buy_in_amount, currency, payment_mode, type, match_ids, created_at")
       .eq("type", "open")
       .eq("status", "active")
       .in("tournament", VALID_TOURNAMENTS)
@@ -38,11 +39,35 @@ export async function GET() {
       }
     }
 
+    // Match counts for progress footer ("Y de X partidos")
+    const allMatchIds = Array.from(
+      new Set((pollas || []).flatMap((p) => (p.match_ids as string[] | null) || []))
+    );
+    const matchById = new Map<string, { status: string }>();
+    if (allMatchIds.length > 0) {
+      const { data: matchRows } = await supabase
+        .from("matches")
+        .select("id, status")
+        .in("id", allMatchIds);
+      for (const m of matchRows || []) {
+        matchById.set(m.id, { status: m.status });
+      }
+    }
+
     return NextResponse.json({
-      pollas: (pollas || []).map((p) => ({
-        ...p,
-        participant_count: participantCounts[p.id] || 0,
-      })),
+      pollas: (pollas || []).map((p) => {
+        const matchIds = (p.match_ids as string[] | null) || [];
+        const finishedCount = matchIds.filter((id) => {
+          const m = matchById.get(id);
+          return m ? TERMINAL_MATCH_STATUSES.has(m.status) : false;
+        }).length;
+        return {
+          ...p,
+          participant_count: participantCounts[p.id] || 0,
+          total_matches: matchIds.length,
+          finished_matches: finishedCount,
+        };
+      }),
     });
   } catch (error) {
     console.error("Error listando pollas públicas:", error);

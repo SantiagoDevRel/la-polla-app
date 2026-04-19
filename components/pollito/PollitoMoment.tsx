@@ -26,6 +26,10 @@ export interface PollitoMomentProps {
   cta?: { label: string; onClick: () => void };
   // For /design previews: skip the dismissal persistence check.
   forceShow?: boolean;
+  // Override the default sheet/inline display from MOMENTS config. Useful
+  // when a moment should render inline in a specific surface even though
+  // its canonical display is sheet (e.g. empty states on Mis Pollas).
+  forceDisplay?: "sheet" | "inline";
 }
 
 const ACCENT: Record<
@@ -161,23 +165,25 @@ export function PollitoMoment({
   onDismiss,
   cta,
   forceShow = false,
+  forceDisplay,
 }: PollitoMomentProps) {
   const config = MOMENTS[moment];
+  const displayMode = forceDisplay ?? config.display;
   const accent = ACCENT[estado];
   const [hidden, setHidden] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     if (forceShow) {
-      if (config.display === "sheet") setSheetOpen(true);
+      if (displayMode === "sheet") setSheetOpen(true);
       return;
     }
     if (isDismissed(moment)) {
       setHidden(true);
       return;
     }
-    if (config.display === "sheet") setSheetOpen(true);
-  }, [moment, config.display, forceShow]);
+    if (displayMode === "sheet") setSheetOpen(true);
+  }, [moment, displayMode, forceShow]);
 
   const dialog = useMemo(() => config.dialog(vars ?? {}), [config, vars]);
 
@@ -190,7 +196,7 @@ export function PollitoMoment({
 
   if (hidden) return null;
 
-  if (config.display === "sheet") {
+  if (displayMode === "sheet") {
     return (
       <Drawer.Root
         open={sheetOpen}

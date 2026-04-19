@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import PollaCard from "@/components/polla/PollaCard";
+import { PollitoMoment } from "@/components/pollito/PollitoMoment";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
 import { Plus, Mail, ChevronDown, ChevronRight } from "lucide-react";
@@ -18,6 +19,12 @@ interface PollaData {
   currency: string; payment_mode: string; type: string;
   participant_count?: number;
   winner?: { display_name: string; total_points: number } | null;
+  // Phase 3b enrichment — from /api/pollas
+  total_matches?: number;
+  finished_matches?: number;
+  user_rank?: number | null;
+  user_total_points?: number;
+  is_leader?: boolean;
 }
 
 interface PendingInvite {
@@ -29,6 +36,7 @@ interface PendingInvite {
 }
 
 import { getTournamentName } from "@/lib/tournaments";
+import { formatPhone } from "@/lib/format-phone";
 
 function adaptPolla(raw: PollaData): React.ComponentProps<typeof PollaCard>["polla"] {
   return {
@@ -39,8 +47,8 @@ function adaptPolla(raw: PollaData): React.ComponentProps<typeof PollaCard>["pol
     competitionLogoUrl: TOURNAMENT_ICONS[raw.tournament],
     participantCount: raw.participant_count ?? 0,
     buyInAmount: raw.buy_in_amount ?? 0,
-    totalMatches: 0, // API does not return yet — Phase 3b scope
-    finishedMatches: 0,
+    totalMatches: raw.total_matches ?? 0,
+    finishedMatches: raw.finished_matches ?? 0,
   };
 }
 
@@ -106,7 +114,9 @@ export default function MisPollasPage() {
                     {invite.polla?.name || "Polla"}
                   </p>
                   <p className="text-xs text-text-secondary truncate">
-                    {invite.inviter?.display_name ? `Invitó: ${invite.inviter.display_name}` : ""}{" "}
+                    {invite.inviter?.display_name && (
+                      <>Invitó: {formatPhone(invite.inviter.display_name)}</>
+                    )}{" "}
                     {invite.polla?.tournament ? `· ${getTournamentName(invite.polla.tournament)}` : ""}
                   </p>
                 </div>
@@ -140,15 +150,31 @@ export default function MisPollasPage() {
                 <AnimatedItem key={polla.id}>
                   <PollaCard
                     polla={adaptPolla(polla)}
+                    userContext={
+                      polla.user_rank != null
+                        ? {
+                            rank: polla.user_rank,
+                            totalPoints: polla.user_total_points ?? 0,
+                            isLeader: polla.is_leader ?? false,
+                          }
+                        : undefined
+                    }
                     onTap={() => router.push(`/pollas/${polla.slug}`)}
                   />
                 </AnimatedItem>
               ))}
             </AnimatedList>
           ) : (
-            <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
-              <p className="text-text-muted text-sm">No tenés pollas activas</p>
-            </div>
+            <PollitoMoment
+              moment="M1"
+              estado="base"
+              userPollitoType="goleador"
+              forceDisplay="inline"
+              cta={{
+                label: "Crear mi primera polla",
+                onClick: () => router.push("/pollas/crear"),
+              }}
+            />
           )}
         </section>
 
