@@ -1,6 +1,21 @@
 // app/layout.tsx — Layout raíz de la aplicación La Polla App con configuración PWA
 import type { Metadata, Viewport } from "next";
+import { Bebas_Neue, Outfit } from "next/font/google";
 import "./globals.css";
+
+const bebas = Bebas_Neue({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-display",
+  display: "swap",
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "La Polla App — Polla Deportiva Colombiana",
@@ -26,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${bebas.variable} ${outfit.variable}`}>
       <body className="antialiased">
         {children}
       </body>
