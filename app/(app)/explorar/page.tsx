@@ -14,6 +14,9 @@ interface PublicPolla {
   id: string; name: string; slug: string; description?: string;
   tournament: string; buy_in_amount: number; currency: string;
   payment_mode: string; type: string; status: string; participant_count: number;
+  // Phase 3b enrichment — from /api/pollas/public
+  total_matches?: number;
+  finished_matches?: number;
 }
 
 import { getTournamentName } from "@/lib/tournaments";
@@ -27,8 +30,8 @@ function adaptPolla(raw: PublicPolla): React.ComponentProps<typeof PollaCard>["p
     competitionLogoUrl: TOURNAMENT_ICONS[raw.tournament],
     participantCount: raw.participant_count ?? 0,
     buyInAmount: raw.buy_in_amount ?? 0,
-    totalMatches: 0, // API does not return yet — Phase 3b scope
-    finishedMatches: 0,
+    totalMatches: raw.total_matches ?? 0,
+    finishedMatches: raw.finished_matches ?? 0,
   };
 }
 

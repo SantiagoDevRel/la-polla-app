@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildWompiCheckoutUrl } from "@/lib/wompi/checkout";
+import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { z } from "zod";
 
 // Modos de pago válidos (payment_mode en la DB es varchar, no enum)
@@ -93,11 +94,8 @@ export async function GET() {
         matchById.set(m.id, { status: m.status });
       }
     }
-    // A match counts as terminal only when it will never play again: 'finished'
-    // (full-time) or 'cancelled'. Do NOT flip a polla to ended just because
-    // kickoff time passed — status='scheduled' past kickoff means the sync
-    // hasn't caught up, not that the match is over.
-    const TERMINAL_MATCH_STATUSES = new Set(["finished", "cancelled"]);
+    // TERMINAL_MATCH_STATUSES lives in lib/matches/constants — shared with
+    // the public endpoint.
     const effectiveStatus = (p: { status: string; match_ids: string[] | null }): string => {
       if (p.status === "ended") return "ended";
       if (p.status !== "active") return p.status;
@@ -129,7 +127,59 @@ export async function GET() {
       );
     }
 
-    const enriched = withEffective.map((p) => ({ ...p, winner: winnersByPolla[p.id] || null }));
+    // Participant counts for each polla — previously missing from this
+    // endpoint, so the UI silently rendered "0 participantes".
+    const allPollaIds = (pollas || []).map((p) => p.id);
+    const participantCountByPolla: Record<string, number> = {};
+    if (allPollaIds.length > 0) {
+      const { data: participantRows } = await supabase
+        .from("polla_participants")
+        .select("polla_id")
+        .in("polla_id", allPollaIds);
+      for (const row of participantRows || []) {
+        participantCountByPolla[row.polla_id] =
+          (participantCountByPolla[row.polla_id] || 0) + 1;
+      }
+    }
+
+    // User's rank + total_points in each polla (cached on polla_participants
+    // by the on_match_finished trigger + lib/scoring.ts recompute path).
+    const myMembershipByPolla: Record<
+      string,
+      { rank: number | null; total_points: number }
+    > = {};
+    if (allPollaIds.length > 0) {
+      const { data: myMembership } = await supabase
+        .from("polla_participants")
+        .select("polla_id, rank, total_points")
+        .eq("user_id", user.id)
+        .in("polla_id", allPollaIds);
+      for (const m of myMembership || []) {
+        myMembershipByPolla[m.polla_id] = {
+          rank: m.rank ?? null,
+          total_points: m.total_points ?? 0,
+        };
+      }
+    }
+
+    const enriched = withEffective.map((p) => {
+      const myRow = myMembershipByPolla[p.id];
+      const matchIds = (p.match_ids as string[] | null) || [];
+      const finishedCount = matchIds.filter((id) => {
+        const m = matchById.get(id);
+        return m ? TERMINAL_MATCH_STATUSES.has(m.status) : false;
+      }).length;
+      return {
+        ...p,
+        winner: winnersByPolla[p.id] || null,
+        participant_count: participantCountByPolla[p.id] || 0,
+        total_matches: matchIds.length,
+        finished_matches: finishedCount,
+        user_rank: myRow?.rank ?? null,
+        user_total_points: myRow?.total_points ?? 0,
+        is_leader: myRow?.rank === 1,
+      };
+    });
 
     return NextResponse.json({ pollas: enriched });
   } catch (error) {
