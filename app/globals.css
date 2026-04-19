@@ -39,9 +39,9 @@
   --radius-lg: 18px;
   --radius-xl: 24px;
 
-  /* fonts (values come from next/font CSS variables set in app/layout.tsx) */
-  --font-display: 'Bebas Neue', sans-serif;
-  --font-body: 'Outfit', sans-serif;
+  /* --font-display and --font-body are defined by next/font/google on <html>
+     (see app/layout.tsx). Do NOT redefine them here — doing so overrides the
+     generated font-face alias with a literal string and breaks loading. */
 
   /* ─── legacy aliases · maintained during Phase 1 transition, drop in Phase 2 ─── */
   --bg-card-hover:    var(--bg-elevated);
