@@ -15,7 +15,7 @@ export interface BottomNavProps {
 }
 
 const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; label: string }> = [
-  { key: "inicio", href: "/dashboard", Icon: Home, label: "Inicio" },
+  { key: "inicio", href: "/inicio", Icon: Home, label: "Inicio" },
   { key: "explorar", href: "/explorar", Icon: Search, label: "Explorar" },
   { key: "pollas", href: "/pollas", Icon: Bookmark, label: "Pollas" },
   { key: "perfil", href: "/perfil", Icon: User, label: "Perfil" },
@@ -23,6 +23,10 @@ const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; label: string 
 
 function deriveActive(pathname: string | null): NavKey | undefined {
   if (!pathname) return undefined;
+  // Match /inicio as the canonical home. /dashboard also resolves here
+  // during the cutover window because it redirects to /inicio server-side,
+  // so the tab still highlights correctly for users hitting the old URL.
+  if (pathname === "/inicio" || pathname.startsWith("/inicio")) return "inicio";
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard")) return "inicio";
   if (pathname.startsWith("/explorar")) return "explorar";
   if (pathname.startsWith("/perfil")) return "perfil";

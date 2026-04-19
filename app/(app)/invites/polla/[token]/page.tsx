@@ -129,7 +129,7 @@ export default function OpenInvitePage() {
           <Info className="w-10 h-10 text-text-muted mx-auto mb-3" />
           <p className="text-text-primary font-medium mb-4">{error || "Link inválido"}</p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/inicio")}
             className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold"
           >
             Ir al inicio
@@ -189,7 +189,7 @@ export default function OpenInvitePage() {
           )}
 
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/inicio")}
             className="w-full text-text-muted text-sm py-2"
           >
             Volver al inicio

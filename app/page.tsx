@@ -1,6 +1,6 @@
-// app/page.tsx — Página raíz que redirige al dashboard o login
+// app/page.tsx — Página raíz que redirige a inicio o login
 import { redirect } from "next/navigation";
 
 export default function HomePage() {
-  redirect("/dashboard");
+  redirect("/inicio");
 }

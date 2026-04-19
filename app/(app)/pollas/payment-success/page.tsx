@@ -127,7 +127,7 @@ function PaymentSuccessInner() {
             Si ya pagaste, revisá tu WhatsApp — te enviaremos el link cuando la polla esté lista.
           </p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/inicio")}
             className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all"
           >
             Volver al inicio

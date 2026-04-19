@@ -109,7 +109,7 @@ export default function AdminPage() {
       >
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/inicio")}
             className="text-text-secondary hover:text-gold transition-colors cursor-pointer"
             aria-label="Volver"
           >

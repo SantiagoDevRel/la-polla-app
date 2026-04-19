@@ -49,7 +49,7 @@ export default function OnboardingPage() {
               ? window.sessionStorage.getItem("lp_returnTo")
               : null;
             if (rt) window.sessionStorage.removeItem("lp_returnTo");
-            router.push(rt || "/dashboard");
+            router.push(rt || "/inicio");
             return;
           }
         }
@@ -85,7 +85,7 @@ export default function OnboardingPage() {
         ? window.sessionStorage.getItem("lp_returnTo")
         : null;
       if (rt) window.sessionStorage.removeItem("lp_returnTo");
-      router.push(rt || "/dashboard");
+      router.push(rt || "/inicio");
     } catch {
       setError("Error guardando tu perfil. Intenta de nuevo.");
     } finally {

@@ -113,7 +113,7 @@ function LoginInner() {
           ? window.sessionStorage.getItem(RETURN_TO_KEY)
           : null;
         if (rt) window.sessionStorage.removeItem(RETURN_TO_KEY);
-        router.push(rt || "/dashboard");
+        router.push(rt || "/inicio");
       }
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };

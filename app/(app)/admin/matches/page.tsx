@@ -86,7 +86,7 @@ export default function AdminMatchesPage() {
         style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}
       >
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => router.push("/dashboard")} className="text-text-secondary hover:text-gold transition-colors duration-200 cursor-pointer">
+          <button onClick={() => router.push("/inicio")} className="text-text-secondary hover:text-gold transition-colors duration-200 cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-bold text-text-primary">Admin — Partidos</h1>
