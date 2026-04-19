@@ -579,19 +579,6 @@ export default async function InicioPage() {
   const podiumHasActivity = podiumTop3.some((p) => p.points > 0);
   const showPodium = !isEmptyState && !!featuredPolla && podiumHasActivity;
 
-  // DEBUG: temporary diagnostic log. Phase 3c hotfix verifies which rule
-  // the featured-polla waterfall landed on. Remove in a follow-up once
-  // Santiago confirms the podium renders for the expected polla.
-  if (featured) {
-    console.log(
-      "[/inicio] featured polla rule=%d slug=%s name=%s max_points=%d",
-      featured.rule,
-      featured.polla.slug,
-      featured.polla.name,
-      featured.polla.max_points,
-    );
-  }
-
   // Fetch today's live + scheduled matches from football-data.org. Run
   // both calls in parallel. We scope to the user's tournaments first, and
   // fall back to all tournaments only when the user has no pollas (the
@@ -810,7 +797,10 @@ export default async function InicioPage() {
                   top3={podiumTop3}
                   currentUserId={user.id}
                 />
-                <div className="mt-5 flex justify-center">
+                {/* Divider + generous top padding prevents the gold CTA
+                    from visually merging with the gold #1 podium bar
+                    directly above it. */}
+                <div className="mt-8 pt-5 border-t border-border-subtle flex justify-center">
                   <Link
                     href={`/pollas/${featuredPolla.slug}`}
                     className="inline-flex items-center gap-2 rounded-full bg-gold text-bg-base font-display tracking-[0.06em] uppercase text-[14px] h-9 px-4 shadow-[0_8px_24px_-6px_rgba(255,215,0,0.4)] hover:-translate-y-px transition-transform"
