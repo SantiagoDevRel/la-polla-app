@@ -67,6 +67,10 @@ interface EnrichedPolla {
   user_rank: number | null;
   user_total_points: number;
   is_leader: boolean;
+  // Highest total_points across all participants in this polla. Used by
+  // the featured-polla waterfall to detect "has activity" (any participant
+  // with total_points > 0 counts).
+  max_points: number;
   // Soonest upcoming kickoff within match_ids (ms since epoch). Used to
   // sort active pollas. Infinity when no upcoming match is knowable.
   soonest_upcoming_ms: number;
@@ -150,16 +154,26 @@ async function fetchEnrichedPollas(userId: string): Promise<EnrichedPolla[]> {
     }
   }
 
-  // Step 4: participant counts per polla.
+  // Step 4: participant counts + max points per polla. One query, two
+  // rollups. max_points is used by the featured-polla waterfall to gate
+  // "has activity"; a participant_count tally rides along because we have
+  // the rows in hand anyway.
   const participantCountByPolla: Record<string, number> = {};
+  const maxPointsByPolla: Record<string, number> = {};
   {
     const { data: rows } = await admin
       .from("polla_participants")
-      .select("polla_id")
+      .select("polla_id, total_points")
       .in("polla_id", allPollaIds);
-    for (const row of (rows || []) as { polla_id: string }[]) {
+    for (const row of (rows || []) as {
+      polla_id: string;
+      total_points: number | null;
+    }[]) {
       participantCountByPolla[row.polla_id] =
         (participantCountByPolla[row.polla_id] || 0) + 1;
+      const pts = row.total_points ?? 0;
+      const prev = maxPointsByPolla[row.polla_id] ?? 0;
+      if (pts > prev) maxPointsByPolla[row.polla_id] = pts;
     }
   }
 
@@ -281,6 +295,7 @@ async function fetchEnrichedPollas(userId: string): Promise<EnrichedPolla[]> {
       user_rank: my?.rank ?? null,
       user_total_points: my?.total_points ?? 0,
       is_leader: my?.rank === 1,
+      max_points: maxPointsByPolla[p.id] ?? 0,
       soonest_upcoming_ms: soonestUpcomingMs(p),
       winner: winnerByPolla[p.id] || null,
     };
@@ -326,43 +341,62 @@ function toPollaCardPolla(p: EnrichedPolla): React.ComponentProps<typeof PollaCa
 
 // ─── Featured polla selection ──────────────────────────────────────────
 
-// Pick the polla the podium should feature. Order is deliberate:
-//   1. Active polla where the user is rank 1. Ties resolve by most recent.
-//   2. Else active polla with the soonest upcoming match.
-//   3. Else most recently created polla regardless of status.
-//   4. Else null (only happens when the user has zero pollas, but the
-//      empty-state branch already owns that case).
-function selectFeaturedPolla(pollas: EnrichedPolla[]): EnrichedPolla | null {
+// Which rule in the featured-polla waterfall picked the polla. Returned
+// alongside the polla so the caller can log which branch won for
+// diagnostics, and for future analytics wiring.
+export type FeaturedRule = 1 | 2 | 3 | 4 | 5 | 6;
+
+// Pick the polla the podium should feature. Prefer pollas that have real
+// participant activity so the podium almost always renders meaningful
+// data. Fallbacks at the bottom cover edge cases (brand-new active polla
+// with no points yet, no pollas with any activity). Rules 5 and 6 may
+// land on a polla with no activity; the render gate in the page body
+// still hides the podium for those cases, which is the desired behavior.
+//
+// Waterfall:
+//   1. active + user is leader + has activity (ties: newest first)
+//   2. active (any rank) + has activity (ties: newest first)
+//   3. ended + user is leader + has activity (ties: newest first)
+//   4. ended (any rank) + has activity (ties: newest first)
+//   5. active + user is leader (no activity, render gate will hide)
+//   6. most recently created polla (last resort)
+function selectFeaturedPolla(
+  pollas: EnrichedPolla[],
+): { polla: EnrichedPolla; rule: FeaturedRule } | null {
   if (pollas.length === 0) return null;
 
+  const hasActivity = (p: EnrichedPolla) => p.max_points > 0;
+  const byNewest = (a: EnrichedPolla, b: EnrichedPolla) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+
   const active = pollas.filter((p) => p.effective_status !== "ended");
+  const ended = pollas.filter((p) => p.effective_status === "ended");
 
-  // Rule 1 - active + user is leader. Newest wins ties.
-  const leaders = active.filter((p) => p.is_leader);
-  if (leaders.length > 0) {
-    return [...leaders].sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    )[0];
-  }
+  // Rule 1 - active + user is leader + has activity.
+  const r1 = active.filter((p) => p.is_leader && hasActivity(p));
+  if (r1.length > 0) return { polla: [...r1].sort(byNewest)[0], rule: 1 };
 
-  // Rule 2 - active, soonest upcoming. created_at desc breaks ties.
-  if (active.length > 0) {
-    return [...active].sort((a, b) => {
-      if (a.soonest_upcoming_ms !== b.soonest_upcoming_ms) {
-        return a.soonest_upcoming_ms - b.soonest_upcoming_ms;
-      }
-      return (
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    })[0];
-  }
+  // Rule 2 - active + has activity (any rank).
+  const r2 = active.filter(hasActivity);
+  if (r2.length > 0) return { polla: [...r2].sort(byNewest)[0], rule: 2 };
 
-  // Rule 3 - fall back to most recent polla, active or ended.
-  return [...pollas].sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  )[0];
+  // Rule 3 - ended + user is leader + has activity.
+  const r3 = ended.filter((p) => p.is_leader && hasActivity(p));
+  if (r3.length > 0) return { polla: [...r3].sort(byNewest)[0], rule: 3 };
+
+  // Rule 4 - ended + has activity (any rank).
+  const r4 = ended.filter(hasActivity);
+  if (r4.length > 0) return { polla: [...r4].sort(byNewest)[0], rule: 4 };
+
+  // Rule 5 - active + user is leader but no activity yet. Keeps the
+  // "you are in the lead" framing visible even on brand-new pollas,
+  // though the podium gate below will hide the podium for this case.
+  const r5 = active.filter((p) => p.is_leader);
+  if (r5.length > 0) return { polla: [...r5].sort(byNewest)[0], rule: 5 };
+
+  // Rule 6 - most recently created polla, no filters. Last-resort choice
+  // when nothing above matched.
+  return { polla: [...pollas].sort(byNewest)[0], rule: 6 };
 }
 
 // Fetch the top three participants for the featured polla. Uses the admin
@@ -534,13 +568,29 @@ export default async function InicioPage() {
 
   // Featured polla + podium. Podium renders only when at least one
   // participant has total_points > 0, which is a cheap proxy for
-  // "someone has actually made predictions in this polla".
-  const featuredPolla = selectFeaturedPolla(sortedPollas);
+  // "someone has actually made predictions in this polla". The
+  // waterfall prefers pollas with activity, so this gate almost always
+  // passes; it stays as a safety net for rules 5 and 6.
+  const featured = selectFeaturedPolla(sortedPollas);
+  const featuredPolla = featured?.polla ?? null;
   const podiumTop3 = featuredPolla
     ? await fetchPodiumTop3(featuredPolla.id)
     : [];
   const podiumHasActivity = podiumTop3.some((p) => p.points > 0);
   const showPodium = !isEmptyState && !!featuredPolla && podiumHasActivity;
+
+  // DEBUG: temporary diagnostic log. Phase 3c hotfix verifies which rule
+  // the featured-polla waterfall landed on. Remove in a follow-up once
+  // Santiago confirms the podium renders for the expected polla.
+  if (featured) {
+    console.log(
+      "[/inicio] featured polla rule=%d slug=%s name=%s max_points=%d",
+      featured.rule,
+      featured.polla.slug,
+      featured.polla.name,
+      featured.polla.max_points,
+    );
+  }
 
   // Fetch today's live + scheduled matches from football-data.org. Run
   // both calls in parallel. We scope to the user's tournaments first, and
@@ -572,12 +622,12 @@ export default async function InicioPage() {
 
   const heroMatch = selectHeroMatch(userMatches, allMatches, now);
 
-  // Strip: remaining matches in the user's scope minus the hero. Fall back
-  // to the global pool if the user scope has fewer than 2 after removing
-  // the hero, so the strip is not starved on quiet days.
-  const stripBase =
-    userMatches.length >= 2 ? userMatches : allMatches;
-  const stripMatches = stripBase
+  // Strip: remaining matches strictly within the user's own tournaments,
+  // minus the hero. If fewer than 2 cards remain, the block skips
+  // cleanly (same pattern as a hero-null day). No global fallback here;
+  // the hero waterfall still uses the global pool for rules 3 and 4,
+  // but the strip stays user-scoped per spec.
+  const stripMatches = userMatches
     .filter((m) => !heroMatch || m.id !== heroMatch.id)
     .sort(
       (a, b) =>
