@@ -9,6 +9,7 @@ import {
 } from "./interactive";
 import { setState } from "./state";
 import { formatTablaWA } from "./tabla";
+import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
 const FOOTER = "La Polla Colombiana 🐥";
@@ -361,6 +362,7 @@ export async function handlePronosticar(
   specificMatchId?: string,
   page: number = 0
 ) {
+  void ensureMatchesFresh();
   const check = await verifyMemberAndPolla(phone, userId, pollaId);
   if (!check) return;
   const { polla } = check;
@@ -749,6 +751,7 @@ export async function handleLeaderboard(
   userId: string,
   pollaId: string
 ) {
+  void ensureMatchesFresh();
   const check = await verifyMemberAndPolla(phone, userId, pollaId);
   if (!check) return;
   const { polla } = check;
@@ -845,6 +848,7 @@ export async function handleResults(
   userId: string,
   pollaId: string
 ) {
+  void ensureMatchesFresh();
   const check = await verifyMemberAndPolla(phone, userId, pollaId);
   if (!check) return;
   const { polla } = check;

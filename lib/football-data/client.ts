@@ -36,12 +36,21 @@ interface FDResponse {
  */
 export async function fetchCompetitionMatches(
   competitionId: number,
-  status?: string
+  status?: string,
+  dateFrom?: string,
+  dateTo?: string
 ): Promise<FDMatch[]> {
   const params: Record<string, string> = {};
   if (status) params.status = status;
+  if (dateFrom) params.dateFrom = dateFrom;
+  if (dateTo) params.dateTo = dateTo;
 
-  console.log(`[football-data] Fetching competition ${competitionId}${status ? ` (status=${status})` : ""}...`);
+  const tag = [
+    status ? `status=${status}` : null,
+    dateFrom ? `dateFrom=${dateFrom}` : null,
+    dateTo ? `dateTo=${dateTo}` : null,
+  ].filter(Boolean).join(" ");
+  console.log(`[football-data] Fetching competition ${competitionId}${tag ? ` (${tag})` : ""}...`);
 
   try {
     const { data } = await axios.get<FDResponse>(
