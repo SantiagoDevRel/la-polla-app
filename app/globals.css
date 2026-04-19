@@ -28,6 +28,21 @@
   --text-secondary:  #AEB7C7;
   --text-muted:      #6B7689;
 
+  /* RGB triplets — used by Tailwind utilities so alpha modifiers
+     (`bg-gold/10`, `border-amber/25`, etc.) produce the expected tint.
+     Keep these in sync with the hex tokens above. */
+  --bg-base-rgb:      8 12 16;
+  --bg-card-rgb:      14 20 32;
+  --bg-elevated-rgb:  19 27 43;
+  --bg-subtle-rgb:    11 17 25;
+  --gold-rgb:         255 215 0;
+  --amber-rgb:        255 159 28;
+  --turf-rgb:         31 216 127;
+  --red-alert-rgb:    255 61 87;
+  --text-primary-rgb: 245 247 250;
+  --text-secondary-rgb: 174 183 199;
+  --text-muted-rgb:   107 118 137;
+
   /* borders */
   --border-subtle:   rgba(255, 255, 255, 0.06);
   --border-default:  rgba(255, 255, 255, 0.10);

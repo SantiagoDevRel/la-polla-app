@@ -10,21 +10,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Tribuna Caliente canonical tokens — map to CSS variables so a theme
-        // swap only needs globals.css.
-        "bg-base": "var(--bg-base)",
-        "bg-card": "var(--bg-card)",
-        "bg-elevated": "var(--bg-elevated)",
-        "bg-subtle": "var(--bg-subtle)",
-        gold: "var(--gold)",
-        amber: "var(--amber)",
+        // Tribuna Caliente canonical tokens — defined as rgb() with the
+        // <alpha-value> placeholder so Tailwind alpha modifiers (`bg-gold/10`,
+        // `border-amber/25`) produce the expected tint. RGB triplets live in
+        // globals.css `--*-rgb` variables.
+        "bg-base": "rgb(var(--bg-base-rgb) / <alpha-value>)",
+        "bg-card": "rgb(var(--bg-card-rgb) / <alpha-value>)",
+        "bg-elevated": "rgb(var(--bg-elevated-rgb) / <alpha-value>)",
+        "bg-subtle": "rgb(var(--bg-subtle-rgb) / <alpha-value>)",
+        gold: "rgb(var(--gold-rgb) / <alpha-value>)",
+        amber: "rgb(var(--amber-rgb) / <alpha-value>)",
         "amber-dim": "var(--amber-dim)",
-        turf: "var(--turf)",
+        turf: "rgb(var(--turf-rgb) / <alpha-value>)",
         "turf-dim": "var(--turf-dim)",
-        "red-alert": "var(--red-alert)",
-        "text-primary": "var(--text-primary)",
-        "text-secondary": "var(--text-secondary)",
-        "text-muted": "var(--text-muted)",
+        "red-alert": "rgb(var(--red-alert-rgb) / <alpha-value>)",
+        "text-primary": "rgb(var(--text-primary-rgb) / <alpha-value>)",
+        "text-secondary": "rgb(var(--text-secondary-rgb) / <alpha-value>)",
+        "text-muted": "rgb(var(--text-muted-rgb) / <alpha-value>)",
         "border-subtle": "var(--border-subtle)",
         "border-default": "var(--border-default)",
         "border-strong": "var(--border-strong)",
