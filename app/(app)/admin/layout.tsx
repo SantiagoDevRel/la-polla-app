@@ -12,7 +12,7 @@ export default async function AdminLayout({
   const isAdmin = await isCurrentUserAdmin();
 
   if (!isAdmin) {
-    redirect("/dashboard");
+    redirect("/inicio");
   }
 
   return <>{children}</>;

@@ -100,7 +100,7 @@ function InviteError({ message }: { message: string }) {
         </h2>
         <p className="text-sm text-text-secondary mb-6">{message}</p>
         <a
-          href="/dashboard"
+          href="/inicio"
           className="inline-block bg-gold text-bg-base font-semibold py-3 px-6 rounded-xl hover:brightness-110 transition-all"
         >
           Ir al inicio

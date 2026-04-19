@@ -134,7 +134,7 @@ export default function UnirsePage() {
           <Info className="w-10 h-10 text-text-muted mx-auto mb-3" />
           <p className="text-text-primary font-medium mb-4">{error || "Polla no encontrada"}</p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/inicio")}
             className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold"
           >
             Ir al inicio
@@ -153,7 +153,7 @@ export default function UnirsePage() {
           <h2 className="font-display text-2xl text-text-primary tracking-wide">ESTA POLLA YA TERMINÓ</h2>
           <p className="text-sm text-text-secondary">{preview.name} ya finalizó y no acepta nuevos participantes.</p>
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/inicio")}
             className="w-full bg-gold text-bg-base px-6 py-3 rounded-xl font-semibold"
           >
             Ir al inicio
@@ -250,7 +250,7 @@ export default function UnirsePage() {
           </div>
 
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/inicio")}
             className="w-full text-text-muted text-sm py-2"
           >
             Volver al inicio
