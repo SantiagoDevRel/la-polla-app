@@ -12,7 +12,10 @@ export interface ChipProps {
   className?: string;
 }
 
-const VARIANT: Record<ChipVariant, { wrap: string; dot: string; defaultPulse: boolean }> = {
+const VARIANT: Record<
+  ChipVariant,
+  { wrap: string; dot: string; defaultPulse: boolean }
+> = {
   live: {
     wrap: "bg-turf/10 text-turf border-turf/25",
     dot: "bg-turf",
@@ -53,12 +56,12 @@ export function Chip({ variant, label, withPulse, className }: ChipProps) {
       )}
     >
       {showPulse ? (
-        <span
-          aria-hidden="true"
-          className="relative inline-block w-1.5 h-1.5"
-        >
+        <span aria-hidden="true" className="relative inline-block w-1.5 h-1.5">
           <span
-            className={cn("absolute inset-0 rounded-full opacity-60 animate-ping", v.dot)}
+            className={cn(
+              "absolute inset-0 rounded-full opacity-60 animate-ping",
+              v.dot,
+            )}
           />
           <span className={cn("absolute inset-0 rounded-full", v.dot)} />
         </span>

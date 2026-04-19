@@ -135,7 +135,7 @@ function UpcomingBetSlipDemo() {
 
 export default function DesignPage() {
   return (
-    <div className="min-h-screen bg-bg-base text-text-primary p-6 max-w-4xl mx-auto pb-[140px]">
+    <div className="min-h-screen bg-bg-base text-text-primary p-6 pb-[180px] max-w-4xl mx-auto">
       <h1 className="font-display text-5xl tracking-wide mb-6">TRIBUNA CALIENTE</h1>
       <p className="text-text-secondary mb-10">Design tokens + component library · v0.1</p>
 

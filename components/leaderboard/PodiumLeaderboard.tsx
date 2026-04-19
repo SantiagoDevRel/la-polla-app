@@ -26,7 +26,9 @@ const RANK_STYLE: Record<
     avatarBorder: string;
     avatarGlow?: string;
     pointsColor: string;
-    barClass: string;
+    // Inline gradient — matches spec literally and avoids Tailwind alpha
+    // modifiers on var(--token) colors (which silently drop).
+    barGradient: string;
     barHeight: number;
   }
 > = {
@@ -35,21 +37,21 @@ const RANK_STYLE: Record<
     avatarBorder: "border-gold",
     avatarGlow: "shadow-[0_0_18px_-2px_rgba(255,215,0,0.55)]",
     pointsColor: "text-gold",
-    barClass: "bg-gradient-to-t from-gold to-amber",
+    barGradient: "linear-gradient(180deg, var(--gold) 0%, #cc9a00 100%)",
     barHeight: 64,
   },
   2: {
     avatarSize: 40,
     avatarBorder: "border-text-secondary",
     pointsColor: "text-text-secondary",
-    barClass: "bg-gradient-to-t from-text-secondary/70 to-text-secondary/40",
+    barGradient: "linear-gradient(180deg, #9da9c0 0%, #6b7689 100%)",
     barHeight: 44,
   },
   3: {
     avatarSize: 40,
     avatarBorder: "border-amber",
     pointsColor: "text-amber",
-    barClass: "bg-gradient-to-t from-amber/80 to-amber/40",
+    barGradient: "linear-gradient(180deg, var(--amber) 0%, #b56a0c 100%)",
     barHeight: 32,
   },
 };
@@ -122,11 +124,8 @@ function PodiumColumn({
         </span>
       </div>
       <div
-        className={cn(
-          "w-full rounded-t-md flex items-start justify-center pt-1",
-          s.barClass,
-        )}
-        style={{ height: s.barHeight }}
+        className="w-full rounded-t-md flex items-start justify-center pt-1"
+        style={{ height: s.barHeight, background: s.barGradient }}
       >
         <span
           className="font-display text-[20px] text-bg-base leading-none"

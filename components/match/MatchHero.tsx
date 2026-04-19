@@ -131,11 +131,8 @@ export function MatchHero({
       {/* 2. Teams row */}
       <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <div className="flex flex-col items-center gap-2">
-          <Crest team={homeTeam} />
-          <span className="font-display text-[14px] tracking-[0.06em] px-2 py-0.5 rounded-sm bg-bg-elevated text-text-secondary">
-            {homeTeam.shortCode}
-          </span>
-          <span className="font-body text-[13px] text-text-primary truncate max-w-full">
+          <Crest team={homeTeam} size={48} />
+          <span className="font-body text-[13px] text-text-primary truncate max-w-full text-center">
             {homeTeam.name}
           </span>
         </div>
@@ -146,11 +143,8 @@ export function MatchHero({
           VS
         </span>
         <div className="flex flex-col items-center gap-2">
-          <Crest team={awayTeam} />
-          <span className="font-display text-[14px] tracking-[0.06em] px-2 py-0.5 rounded-sm bg-bg-elevated text-text-secondary">
-            {awayTeam.shortCode}
-          </span>
-          <span className="font-body text-[13px] text-text-primary truncate max-w-full">
+          <Crest team={awayTeam} size={48} />
+          <span className="font-body text-[13px] text-text-primary truncate max-w-full text-center">
             {awayTeam.name}
           </span>
         </div>
