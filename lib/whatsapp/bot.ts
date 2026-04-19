@@ -17,6 +17,8 @@ import {
   handleLeaderboard,
   handleResults,
   handleJoinPolla,
+  handleJoinByCode,
+  handleJoinByCodeConfirm,
   handleHelp,
   handleProfile,
   handleHelpTopic,
@@ -254,7 +256,7 @@ export async function processIncomingMessage(message: IncomingMessage) {
 
     // RULE 6 — prediction input validation when the bot is waiting for a score.
     const state = getState(from);
-    if (state && state.action === "waiting_prediction") {
+    if (state && state.action === "waiting_prediction" && state.pollaId) {
       const trimmed = body.trim();
       // "cancelar" escapes the update and returns to the polla menu, keeping
       // any existing prediction intact.
@@ -304,6 +306,43 @@ export async function processIncomingMessage(message: IncomingMessage) {
       }
     }
 
+    // ── Join by code (TASK 3) ──
+    // 1. Explicit: "unirse CODIGO"
+    const unirseMatch = body.match(/^unirse\s+([a-z0-9]{6})$/);
+    if (unirseMatch) {
+      await handleJoinByCode(from, user.id, unirseMatch[1].toUpperCase());
+      return;
+    }
+
+    // 2. Pending confirmation from a bare-code message. SI/NO text replies
+    //    land here before the bare-6-char detection below so a user in the
+    //    confirm flow does not get re-prompted.
+    const joinState = getState(from);
+    if (joinState && joinState.action === "waiting_join_confirm" && joinState.joinCode) {
+      if (body === "si" || body === "sí" || body === "yes") {
+        const code = joinState.joinCode;
+        await handleJoinByCode(from, user.id, code);
+        return;
+      }
+      if (body === "no") {
+        clearState(from);
+        await sendTextMessage(from, "Listo parce, no te uniste. Si querés probar con otro código, mándamelo de nuevo.");
+        return;
+      }
+      // Any other text while in confirm state: fall through so the default
+      // handler can nudge the user. Clearing state is not strictly needed
+      // (10min TTL) but keeps the conversation crisp.
+    }
+
+    // 3. Bare 6-char code in the join alphabet → ask SI/NO. The lowercased
+    //    alphabet mirrors JOIN_CODE_ALPHABET (no 0/o/i/1) so ordinary words
+    //    rarely match. Remaining false positives get dismissed with "no".
+    const bareCode = body.match(/^[abcdefghjklmnpqrstuvwxyz23456789]{6}$/);
+    if (bareCode) {
+      await handleJoinByCodeConfirm(from, body.toUpperCase());
+      return;
+    }
+
     // Help keywords
     if (["ayuda", "help"].includes(body)) {
       await handleHelp(from);
@@ -351,9 +390,33 @@ async function routePayload(
     payload.startsWith("match_") ||
     payload.startsWith("more_") ||
     payload === "confirm_yes" ||
-    payload === "confirm_no";
+    payload === "confirm_no" ||
+    payload === "join_code_yes" ||
+    payload === "join_code_no";
   if (!keepState) {
     clearState(from);
+  }
+
+  // Join-by-code SI/NO (set by handleJoinByCodeConfirm).
+  if (payload === "join_code_yes") {
+    const state = getState(from);
+    if (state?.action === "waiting_join_confirm" && state.joinCode) {
+      await handleJoinByCode(from, user.id, state.joinCode);
+    } else {
+      await sendTextMessage(
+        from,
+        "Parce, se me perdió el código. Mándalo de nuevo porfa.",
+      );
+    }
+    return;
+  }
+  if (payload === "join_code_no") {
+    clearState(from);
+    await sendTextMessage(
+      from,
+      "Listo parce, no te uniste. Si querés probar con otro código, mándamelo de nuevo.",
+    );
+    return;
   }
 
   if (payload === "menu") {
@@ -428,8 +491,8 @@ async function routePayload(
   // Prediction confirmation
   if (payload === "confirm_yes") {
     const state = getState(from);
-    if (state && state.action === "confirm_prediction") {
-      await handleConfirmPrediction(from, user, state);
+    if (state && state.action === "confirm_prediction" && state.pollaId) {
+      await handleConfirmPrediction(from, user, { ...state, pollaId: state.pollaId });
     }
     return;
   }
