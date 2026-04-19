@@ -1,131 +1,144 @@
-// components/polla/PollaCard.tsx — Tarjeta de polla con diseño "estadio de noche"
-// Border-left gold si admin, bg-card con hover, badges de torneo/estado/pago
-import { formatCOP } from "@/lib/formatCurrency";
-import TournamentBadge from "@/components/shared/TournamentBadge";
-import { Users, Banknote } from "lucide-react";
+// components/polla/PollaCard.tsx — Tribuna Caliente §3.5
+"use client";
 
-interface PollaCardProps {
+import Image from "next/image";
+import Link from "next/link";
+import { Users } from "lucide-react";
+import { cn } from "@/lib/cn";
+import { formatCOP } from "@/lib/formatCurrency";
+
+export interface PollaCardProps {
   polla: {
     id: string;
-    name: string;
     slug: string;
-    description?: string;
-    tournament: string;
-    status: string;
-    buy_in_amount: number;
-    currency: string;
-    payment_mode: string;
-    type: string;
+    name: string;
+    competitionName: string;
+    competitionLogoUrl?: string;
+    participantCount: number;
+    buyInAmount: number;
+    totalMatches: number;
+    finishedMatches: number;
   };
-  participantCount?: number;
-  myPoints?: number;
-  myRank?: number;
-  isAdmin?: boolean;
+  userContext: {
+    rank?: number;
+    totalPoints: number;
+    isLeader: boolean;
+  };
+  variant?: "carousel" | "grid";
+  onTap?: () => void;
 }
 
-export default function PollaCard({
+export function PollaCard({
   polla,
-  participantCount,
-  myPoints,
-  myRank,
-  isAdmin,
+  userContext,
+  variant = "grid",
+  onTap,
 }: PollaCardProps) {
+  const isLeader = userContext.isLeader;
+  const isCarousel = variant === "carousel";
+  const pendingMatches = Math.max(0, polla.totalMatches - polla.finishedMatches);
+
   return (
-    <a
+    <Link
       href={`/pollas/${polla.slug}`}
-      className="block rounded-2xl transition-all duration-150 hover:bg-bg-card-hover"
-      style={{
-        backgroundColor: "var(--bg-card)",
-        border: "1px solid var(--border-subtle)",
-        borderLeft: isAdmin
-          ? "3px solid var(--gold)"
-          : "3px solid var(--border-medium)",
-      }}
+      onClick={onTap}
+      className={cn(
+        "relative block overflow-hidden rounded-lg border p-4 transition-transform duration-150 active:scale-[0.985]",
+        isCarousel ? "w-[210px] flex-shrink-0" : "w-full",
+        isLeader
+          ? "border-gold/40 shadow-[0_0_30px_-10px_rgba(255,215,0,0.2)]"
+          : "border-border-subtle hover:border-border-default",
+      )}
+      style={
+        isLeader
+          ? {
+              background:
+                "linear-gradient(180deg, rgba(255, 215, 0, 0.06) 0%, var(--bg-card) 100%)",
+            }
+          : { background: "var(--bg-card)" }
+      }
     >
-      <div className="p-4">
-        {/* Top row: name + tournament badge */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <h3 className="font-semibold text-[16px] text-text-primary truncate">
-                {polla.name}
-              </h3>
-              {isAdmin && (
-                <span className="text-[10px] bg-gold text-bg-base px-1.5 py-0.5 rounded font-semibold flex-shrink-0">
-                  Admin
-                </span>
-              )}
-            </div>
-            {polla.description && (
-              <p className="text-text-muted text-xs line-clamp-1">
-                {polla.description}
-              </p>
-            )}
-          </div>
-          <span className="text-text-muted text-lg flex-shrink-0">→</span>
-        </div>
+      {isLeader ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 left-0 right-0 h-[2px]"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, var(--gold), transparent)",
+          }}
+        />
+      ) : null}
 
-        {/* Badge row */}
-        <div className="flex items-center gap-2 flex-wrap mb-2">
-          <span
-            className="text-[11px] px-2 py-0.5 rounded-full font-medium"
-            style={{
-              backgroundColor: "var(--bg-card-elevated)",
-              color: "var(--text-secondary)",
-            }}
-          >
-            <TournamentBadge tournamentSlug={polla.tournament} size="sm" />
-          </span>
-          <span
-            className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
-              polla.status === "active"
-                ? "bg-green-dim text-green-live"
-                : "bg-bg-elevated text-text-muted"
-            }`}
-          >
-            {polla.status === "active" ? "Activa" : "Terminada"}
-          </span>
-        </div>
+      {/* Comp tag row */}
+      <div className="flex items-center gap-1.5">
+        {polla.competitionLogoUrl ? (
+          <Image
+            src={polla.competitionLogoUrl}
+            alt=""
+            width={14}
+            height={14}
+            className="object-contain"
+          />
+        ) : null}
+        <span className="font-body text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted truncate">
+          {polla.competitionName}
+        </span>
+      </div>
 
-        {/* Stats row */}
-        <div className="flex items-center gap-3 text-xs text-text-muted">
-          {participantCount !== undefined && (
-            <span className="flex items-center gap-1"><Users className="w-3 h-3" style={{ color: "#7a8499" }} /> {participantCount}</span>
-          )}
-          {polla.buy_in_amount > 0 && (
-            <span className="flex items-center gap-1">
-              <Banknote className="w-3 h-3" style={{ color: "#7a8499" }} /> {formatCOP(polla.buy_in_amount)}
-            </span>
-          )}
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-              polla.type === "open"
-                ? "bg-green-live/10 text-green-live"
-                : "bg-bg-elevated text-text-secondary"
-            }`}
-          >
-            {polla.type === "open" ? "Publica" : "Privada"}
-          </span>
-        </div>
+      {/* Polla name */}
+      <h3
+        className={cn(
+          "mt-1.5 font-body font-bold text-text-primary leading-[1.3]",
+          isCarousel ? "text-[16px] line-clamp-2" : "text-[18px] line-clamp-1",
+        )}
+        style={{ letterSpacing: "-0.01em" }}
+      >
+        {polla.name}
+      </h3>
 
-        {/* My rank */}
-        {myRank !== undefined && myRank !== null && (
-          <div
-            className="mt-2 rounded-lg px-3 py-1.5 flex items-center justify-between"
-            style={{
-              backgroundColor: "var(--gold-dim)",
-              border: "1px solid var(--border-gold)",
-            }}
-          >
-            <span className="text-xs font-medium text-gold">
-              Tu posición: #{myRank}
-            </span>
-            <span className="text-xs font-bold text-gold">
-              {myPoints ?? 0} pts
-            </span>
-          </div>
+      {/* Stats row */}
+      <div className="mt-3 flex items-center gap-3">
+        <span
+          className="inline-flex items-center gap-1 font-body text-[12px] text-text-secondary tabular-nums"
+          style={{ fontFeatureSettings: '"tnum"' }}
+        >
+          <Users className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
+          {polla.participantCount}
+        </span>
+        {polla.buyInAmount > 0 ? (
+          <span className="font-body text-[12px] text-text-secondary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+            {formatCOP(polla.buyInAmount)}
+          </span>
+        ) : (
+          <span className="font-body text-[12px] text-text-muted">Gratis</span>
         )}
       </div>
-    </a>
+
+      {/* Progress footer */}
+      <div
+        className={cn(
+          "mt-3 flex items-center justify-between rounded-sm px-2 py-1.5",
+          isLeader ? "bg-gold/10 border border-gold/25" : "bg-bg-elevated border border-border-subtle",
+        )}
+      >
+        <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
+          {userContext.rank ? `#${userContext.rank}` : "Sin rank"}
+        </span>
+        <span
+          className={cn(
+            "font-display text-[14px] tracking-[0.06em] tabular-nums",
+            isLeader ? "text-gold" : "text-text-primary",
+          )}
+          style={{ fontFeatureSettings: '"tnum"' }}
+        >
+          {userContext.totalPoints} PTS
+        </span>
+        <span className="font-body text-[10px] uppercase tracking-[0.08em] text-text-muted">
+          {pendingMatches > 0 ? `${pendingMatches} por jugar` : "Terminada"}
+        </span>
+      </div>
+    </Link>
   );
 }
+
+export default PollaCard;
