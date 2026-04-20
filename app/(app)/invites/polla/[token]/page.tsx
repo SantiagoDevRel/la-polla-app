@@ -98,7 +98,8 @@ export default function OpenInvitePage() {
     setJoining(true);
     try {
       const { data } = await axios.post<{ joined: boolean; checkoutUrl: string | null }>(
-        `/api/pollas/${polla.slug}/join`
+        `/api/pollas/${polla.slug}/join`,
+        { invite_token: token }
       );
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
