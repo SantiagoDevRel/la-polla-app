@@ -13,6 +13,8 @@ import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import OrganizerPanel from "@/components/polla/OrganizerPanel";
 import EmptyState from "@/components/ui/EmptyState";
 import InviteModal from "@/components/polla/InviteModal";
+import CountryCodePicker from "@/components/polla/CountryCodePicker";
+import type { CountryCode } from "libphonenumber-js";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug } from "@/lib/tournaments";
@@ -104,6 +106,7 @@ export default function PollaSlugPage() {
   const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
   const [invitePhone, setInvitePhone] = useState("");
+  const [inviteCountryIso, setInviteCountryIso] = useState<CountryCode>("CO");
   const [inviteCountryCode, setInviteCountryCode] = useState("57");
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
@@ -713,26 +716,14 @@ export default function PollaSlugPage() {
                 <p className="text-xs text-text-secondary">Envía una invitación por WhatsApp a esta polla privada.</p>
                 <div className="flex gap-2">
                   <div className="flex flex-1 rounded-xl overflow-hidden border border-border-subtle focus-within:border-gold/50 transition-colors">
-                    <select
-                      value={inviteCountryCode}
-                      onChange={(e) => { setInviteCountryCode(e.target.value); setInviteMsg(null); }}
-                      className="bg-bg-elevated border-r border-border-subtle px-2 py-3 text-sm text-text-primary outline-none cursor-pointer shrink-0"
-                    >
-                      <option value="57">🇨🇴 +57</option>
-                      <option value="351">🇵🇹 +351</option>
-                      <option value="1">🇺🇸 +1</option>
-                      <option value="34">🇪🇸 +34</option>
-                      <option value="52">🇲🇽 +52</option>
-                      <option value="54">🇦🇷 +54</option>
-                      <option value="55">🇧🇷 +55</option>
-                      <option value="56">🇨🇱 +56</option>
-                      <option value="58">🇻🇪 +58</option>
-                      <option value="593">🇪🇨 +593</option>
-                      <option value="51">🇵🇪 +51</option>
-                      <option value="44">🇬🇧 +44</option>
-                      <option value="33">🇫🇷 +33</option>
-                      <option value="49">🇩🇪 +49</option>
-                    </select>
+                    <CountryCodePicker
+                      value={inviteCountryIso}
+                      onChange={(iso, calling) => {
+                        setInviteCountryIso(iso);
+                        setInviteCountryCode(calling);
+                        setInviteMsg(null);
+                      }}
+                    />
                     <input
                       type="tel"
                       placeholder="3001234567"
