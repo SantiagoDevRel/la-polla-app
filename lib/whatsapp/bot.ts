@@ -19,6 +19,8 @@ import {
   handleJoinPolla,
   handleJoinByCode,
   handleJoinByCodeConfirm,
+  handleRotateCode,
+  handleRotateCodeConfirm,
   handleHelp,
   handleProfile,
   handleHelpTopic,
@@ -400,7 +402,10 @@ async function routePayload(
     payload === "confirm_yes" ||
     payload === "confirm_no" ||
     payload === "join_code_yes" ||
-    payload === "join_code_no";
+    payload === "join_code_no" ||
+    payload.startsWith("rotate_confirm_") ||
+    payload.startsWith("rotate_yes_") ||
+    payload === "rotate_no";
   if (!keepState) {
     clearState(from);
   }
@@ -424,6 +429,24 @@ async function routePayload(
       from,
       "Listo parce, no te uniste. Si querés probar con otro código, mándamelo de nuevo.",
     );
+    return;
+  }
+
+  // Rotate join code (admin only). Both steps re-verify role inside the
+  // handler so a forged rotate_yes_<id> payload cannot skip the confirm.
+  if (payload.startsWith("rotate_confirm_")) {
+    const pollaId = payload.replace("rotate_confirm_", "");
+    await handleRotateCodeConfirm(from, user.id, pollaId);
+    return;
+  }
+  if (payload.startsWith("rotate_yes_")) {
+    const pollaId = payload.replace("rotate_yes_", "");
+    await handleRotateCode(from, user.id, pollaId);
+    return;
+  }
+  if (payload === "rotate_no") {
+    clearState(from);
+    await sendTextMessage(from, "Listo parce, no roté nada.");
     return;
   }
 
