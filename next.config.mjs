@@ -6,6 +6,14 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
+  // Never precache state-specific flows. OTP exchange, login bootstrap,
+  // and one-time invite tokens must always hit the network so a stale SW
+  // cannot serve an expired or impersonated response.
+  buildExcludes: [
+    /^\/api\/auth\//,
+    /^\/login/,
+    /^\/invites\/polla\//,
+  ],
 });
 
 /** @type {import('next').NextConfig} */

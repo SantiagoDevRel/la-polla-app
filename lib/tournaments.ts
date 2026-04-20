@@ -60,15 +60,11 @@ export function getTournamentLogo(slug: string): string {
 
 // Flat slug → icon-path map. Relocated from components/shared/PollaCard.tsx
 // during Phase 3a so multiple UI surfaces can import without depending on a
-// component file. Includes legacy slug aliases for backward-compat.
+// component file.
 export const TOURNAMENT_ICONS: Record<string, string> = {
   champions_2025: `/tournaments/champions_league.svg?v=${LOGO_V}`,
   worldcup_2026: `/tournaments/world_cup.svg?v=${LOGO_V}`,
   laliga_2025: `/tournaments/la_liga.png?v=${LOGO_V}`,
   premier_2025: `/tournaments/premier_league.webp?v=${LOGO_V}`,
   seriea_2025: `/tournaments/seria_a.png?v=${LOGO_V}`,
-  // Legacy slugs (backward compat)
-  la_liga_2025: `/tournaments/la_liga.png?v=${LOGO_V}`,
-  premier_league: `/tournaments/premier_league.webp?v=${LOGO_V}`,
-  seria_a: `/tournaments/seria_a.png?v=${LOGO_V}`,
 };

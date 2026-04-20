@@ -8,9 +8,9 @@ const BASE_URL = "https://api.football-data.org/v4";
 const TOURNAMENT_TO_CODE: Record<string, string> = {
   worldcup_2026: "WC",
   champions_2025: "CL",
-  premier_league: "PL",
-  la_liga_2025: "PD",
-  seria_a: "SA",
+  premier_2025: "PL",
+  laliga_2025: "PD",
+  seriea_2025: "SA",
 };
 
 // Reverse map: competition code → our tournament ID
