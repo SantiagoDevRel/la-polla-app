@@ -26,15 +26,23 @@ import {
   handleCancelPrediction,
 } from "./flows";
 
-// Validate required env vars on module load
-if (!process.env.META_WA_PHONE_NUMBER_ID) {
-  console.error("[WA] META_WA_PHONE_NUMBER_ID is not set — bot will not send messages.");
-}
-if (!process.env.META_WA_ACCESS_TOKEN) {
-  console.error("[WA] META_WA_ACCESS_TOKEN is not set — bot will not send messages.");
+// Validate required env vars on module load. Hard-throw instead of
+// warn: if either is missing the Graph URL would resolve to
+// ".../v21.0/undefined/messages" and every send would fail at runtime
+// with an opaque 404. Fail-fast at boot surfaces the misconfiguration
+// immediately in the build / deploy pipeline.
+const META_WA_ACCESS_TOKEN = process.env.META_WA_ACCESS_TOKEN;
+const META_WA_PHONE_NUMBER_ID = process.env.META_WA_PHONE_NUMBER_ID;
+
+if (!META_WA_ACCESS_TOKEN || !META_WA_PHONE_NUMBER_ID) {
+  throw new Error(
+    "[whatsapp] Missing required env: META_WA_ACCESS_TOKEN and/or " +
+    "META_WA_PHONE_NUMBER_ID. Refusing to start — sends would 404 " +
+    "at runtime otherwise."
+  );
 }
 
-const WA_API_URL = `https://graph.facebook.com/v21.0/${process.env.META_WA_PHONE_NUMBER_ID}/messages`;
+const WA_API_URL = `https://graph.facebook.com/v21.0/${META_WA_PHONE_NUMBER_ID}/messages`;
 
 // ─── Types ───
 
@@ -136,7 +144,7 @@ async function callMetaAPI(to: string, payload: Record<string, unknown>) {
   try {
     const response = await axios.post(WA_API_URL, payload, {
       headers: {
-        Authorization: `Bearer ${process.env.META_WA_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${META_WA_ACCESS_TOKEN}`,
         "Content-Type": "application/json",
       },
     });
