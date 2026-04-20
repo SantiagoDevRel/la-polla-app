@@ -1,8 +1,20 @@
 // lib/whatsapp/interactive.ts — Helper functions for WhatsApp Cloud API interactive messages
 // Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/messages/interactive-reply-buttons-messages
 
+// Validate required env vars on module load. See bot.ts for the same
+// guard; keeping an independent check here so importing this helper
+// alone (without bot.ts) still fails fast on misconfiguration.
 const PHONE_NUMBER_ID = process.env.META_WA_PHONE_NUMBER_ID;
 const ACCESS_TOKEN = process.env.META_WA_ACCESS_TOKEN;
+
+if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+  throw new Error(
+    "[whatsapp] Missing required env: META_WA_ACCESS_TOKEN and/or " +
+    "META_WA_PHONE_NUMBER_ID. Refusing to start — sends would 404 " +
+    "at runtime otherwise."
+  );
+}
+
 const WA_API_URL = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`;
 
 async function sendInteractive(to: string, payload: Record<string, unknown>) {
