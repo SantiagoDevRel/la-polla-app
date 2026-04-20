@@ -1,5 +1,6 @@
 // components/polla/OrganizerPanel.tsx — Tab "Organizar" (solo admin de la polla).
-// Sección A: link de invitación abierta (token reusable, copiar/renovar).
+// Sección A.1: link de invitación abierta (token reusable, copiar/renovar).
+// Sección A.2: código de invitación de 6 chars (copiar/rotar, mirror del link).
 // Sección B: lista de participantes (toggle pago + expulsar).
 // Sección C: estado de la polla (status, pozo total, completitud de pronósticos).
 "use client";
@@ -34,6 +35,7 @@ interface OrganizerPanelProps {
   paymentMode: string;
   buyInAmount: number;
   matchIds: string[];
+  joinCode: string | null;
 }
 
 const APP_URL =
@@ -50,9 +52,11 @@ export default function OrganizerPanel({
   paymentMode,
   buyInAmount,
   matchIds,
+  joinCode,
 }: OrganizerPanelProps) {
   const { showToast } = useToast();
   const [token, setToken] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(joinCode);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [predictionsCount, setPredictionsCount] = useState(0); // unique users with at least one prediction
   const [loading, setLoading] = useState(true);
@@ -108,6 +112,31 @@ export default function OrganizerPanel({
     }
   }
 
+  async function copyCode() {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      showToast("Código copiado", "success");
+    } catch {
+      showToast("No pudimos copiar — copialo a mano", "error");
+    }
+  }
+
+  async function rotateCode() {
+    setBusy("rotate-code");
+    try {
+      const { data } = await axios.post<{ code: string }>(
+        `/api/pollas/${pollaSlug}/rotate-code`
+      );
+      setCode(data.code);
+      showToast("Código renovado", "success");
+    } catch {
+      showToast("No se pudo renovar el código", "error");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function togglePaid(p: Participant) {
     if (paymentMode !== "admin_collects" || p.role === "admin") return;
     setBusy(`pay:${p.id}`);
@@ -158,7 +187,7 @@ export default function OrganizerPanel({
 
   return (
     <div className="space-y-4">
-      {/* Section A — Invite link */}
+      {/* Section A.1 — Invite link */}
       <section className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
         <h3 className="text-sm font-bold text-text-primary">Link de invitación</h3>
         <p className="text-xs text-text-muted">
@@ -180,6 +209,38 @@ export default function OrganizerPanel({
             className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-border-subtle text-text-secondary text-sm hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${busy === "rotate" ? "animate-spin" : ""}`} /> Renovar link
+          </button>
+        </div>
+      </section>
+
+      {/* Section A.2 — Invite code (mirror of A.1 for the 6-char join code) */}
+      <section className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
+        <h3 className="text-sm font-bold text-text-primary">Código de invitación</h3>
+        <p className="text-xs text-text-muted">
+          Compártelo con tus amigos para que se unan rápido.
+        </p>
+        <div className="rounded-xl p-4 bg-bg-elevated border border-border-subtle text-center">
+          <p
+            className="font-mono text-[32px] tracking-[0.32em] text-gold select-all"
+            style={{ fontFeatureSettings: '"tnum"' }}
+          >
+            {code ?? "—"}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={copyCode}
+            disabled={!code}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-gold text-bg-base font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-50"
+          >
+            <Copy className="w-4 h-4" /> Copiar código
+          </button>
+          <button
+            onClick={rotateCode}
+            disabled={busy === "rotate-code"}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-border-subtle text-text-secondary text-sm hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${busy === "rotate-code" ? "animate-spin" : ""}`} /> Rotar código
           </button>
         </div>
       </section>

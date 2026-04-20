@@ -664,6 +664,7 @@ export default function PollaSlugPage() {
             paymentMode={polla.payment_mode}
             buyInAmount={polla.buy_in_amount}
             matchIds={matches.map((m) => m.id)}
+            joinCode={polla.join_code}
           />
         )}
 
