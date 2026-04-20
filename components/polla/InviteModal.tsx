@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { Drawer } from "vaul";
 import { useToast } from "@/components/ui/Toast";
 
 interface InviteModalProps {
@@ -56,8 +57,6 @@ export default function InviteModal({
     return () => { cancelled = true; };
   }, [isOpen, pollaSlug, token]);
 
-  if (!isOpen) return null;
-
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const link = token
     ? `${origin}/unirse/${pollaSlug}?token=${token}`
@@ -103,14 +102,21 @@ export default function InviteModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center">
-      {/* Overlay */}
-      <div className="absolute inset-0" style={{ backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)" }} onClick={onClose} />
-
-      {/* Card */}
-      <div className="relative w-full max-w-lg p-6 space-y-4 animate-slide-up safe-bottom"
-        style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-medium)", borderRadius: "24px 24px 0 0" }}>
-        <div className="w-10 h-1 rounded-full mx-auto" style={{ backgroundColor: "var(--border-medium)" }} />
+    <Drawer.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 bg-black/60 z-[55]" />
+        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border border-border-medium bg-bg-card">
+          <Drawer.Title className="sr-only">Invitar amigos a {pollaName}</Drawer.Title>
+          <Drawer.Description className="sr-only">
+            Comparte el código o el link para que otros se unan a la polla.
+          </Drawer.Description>
+          <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-border-default" />
+          <div className="w-full max-w-lg mx-auto p-6 space-y-4 safe-bottom">
 
         <h3 className="text-lg font-bold text-text-primary text-center">
           Invitar amigos a {pollaName}
@@ -219,7 +225,9 @@ export default function InviteModal({
           )}
           <button onClick={onClose} className="w-full text-text-muted font-medium py-2 text-sm">Cerrar</button>
         </div>
-      </div>
-    </div>
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
