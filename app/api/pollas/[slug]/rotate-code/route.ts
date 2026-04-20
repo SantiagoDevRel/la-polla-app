@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateUniqueJoinCode } from "@/lib/pollas/join-code";
+import { rotateJoinCode } from "@/lib/pollas/rotate-code";
 
 export const dynamic = "force-dynamic";
 
@@ -49,13 +49,12 @@ export async function POST(
     );
   }
 
-  const code = await generateUniqueJoinCode(admin);
-
-  const { error: updateErr } = await admin
-    .from("pollas")
-    .update({ join_code: code })
-    .eq("id", polla.id);
-  if (updateErr) throw updateErr;
-
-  return NextResponse.json({ code });
+  const result = await rotateJoinCode(admin, polla.id);
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: "No se pudo rotar el código, intenta de nuevo." },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({ code: result.code });
 }
