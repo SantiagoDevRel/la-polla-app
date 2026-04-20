@@ -17,7 +17,7 @@ import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug } from "@/lib/tournaments";
 import { getPollitoByPosition } from "@/lib/pollitos";
-import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings } from "lucide-react";
+import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, Goal } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 // ─── Tipos ───
@@ -317,10 +317,10 @@ export default function PollaSlugPage() {
 
   const isOrganizer = currentUserRole === "admin";
   const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
-    { key: "partidos", label: "Partidos", icon: <Target className="w-4 h-4" />, show: true },
-    { key: "ranking", label: "Ranking", icon: <Trophy className="w-4 h-4" />, show: true },
-    { key: "pagos", label: "Pagos", icon: <Banknote className="w-4 h-4" />, show: true },
-    { key: "organizar", label: "Organizar", icon: <Settings className="w-4 h-4" />, show: isOrganizer },
+    { key: "partidos", label: "Partidos", icon: <Goal className="w-4 h-4" />, show: true },
+    { key: "ranking", label: "Tabla", icon: <Trophy className="w-4 h-4" />, show: true },
+    { key: "pagos", label: "Pagos", icon: <Banknote className="w-4 h-4" />, show: polla.payment_mode !== "pay_winner" },
+    { key: "organizar", label: "Admin", icon: <Settings className="w-4 h-4" />, show: isOrganizer },
     { key: "info", label: "Info", icon: <Info className="w-4 h-4" />, show: true },
   ];
 
@@ -370,9 +370,8 @@ export default function PollaSlugPage() {
         return (
           <div className="px-4 py-1.5 bg-bg-elevated border-b border-border-subtle">
             <div className="max-w-lg mx-auto text-center text-xs text-text-secondary">
-              Pozo: <span className="font-semibold text-text-primary">${polla.buy_in_amount.toLocaleString("es-CO")}</span> por persona
-              {" · "}
-              <span className="font-semibold text-gold">${total.toLocaleString("es-CO")}</span> total
+              Pozo: <span className="font-semibold text-gold">${total.toLocaleString("es-CO")}</span> total{" "}
+              <span className="text-text-muted">(${polla.buy_in_amount.toLocaleString("es-CO")} por persona)</span>
             </div>
           </div>
         );
@@ -656,7 +655,7 @@ export default function PollaSlugPage() {
         )}
 
         {/* ── TAB PAGOS ── */}
-        {activeTab === "pagos" && (
+        {activeTab === "pagos" && polla.payment_mode !== "pay_winner" && (
           <ParticipantPayment pollaSlug={polla.slug} currentUserId={currentUserId} currentUserRole={currentUserRole} />
         )}
 

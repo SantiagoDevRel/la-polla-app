@@ -1,7 +1,7 @@
 // components/polla/ScoringExplanation.tsx — Modal que explica el sistema de puntaje
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HelpCircle, X } from "lucide-react";
 
 const TIERS = [
@@ -55,6 +55,18 @@ const TIERS = [
 export default function ScoringExplanation() {
   const [open, setOpen] = useState(false);
 
+  // Lock body scroll mientras el card está abierto. overscroll-contain en el
+  // contenedor interno ya corta el scroll chaining en navegadores modernos;
+  // este toggle sobre document.body es el respaldo para móviles más viejos.
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
   return (
     <>
       <button
@@ -66,8 +78,8 @@ export default function ScoringExplanation() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-bg-base/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-bg-card border border-border-subtle max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-bg-base/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-bg-card border border-border-subtle max-h-[85vh] overflow-y-auto overscroll-contain">
             <div className="sticky top-0 flex items-center justify-between p-4 bg-bg-card border-b border-border-subtle">
               <h2 className="font-display text-xl text-gold tracking-wide">Sistema de Puntaje</h2>
               <button onClick={() => setOpen(false)} className="text-text-muted hover:text-text-primary transition-colors cursor-pointer">

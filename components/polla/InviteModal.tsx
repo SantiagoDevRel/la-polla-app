@@ -173,10 +173,17 @@ export default function InviteModal({
           </div>
         ) : null}
 
-        {/* Link block */}
+        {/* Link block. El estado "Link no disponible" cubre el caso de
+            que la GET al invite-token resuelva sin token (error de red,
+            polla borrada en paralelo) para no dejar el botón atenuado
+            sin explicación. */}
         <div className="rounded-xl p-3 text-sm break-all text-center"
           style={{ backgroundColor: "var(--bg-card-elevated)", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)" }}>
-          {loadingToken && !token ? "Generando link..." : link}
+          {loadingToken && !token
+            ? "Generando link..."
+            : token
+              ? link
+              : "Link no disponible"}
         </div>
 
         <div className="space-y-2">
@@ -188,7 +195,7 @@ export default function InviteModal({
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
             </svg>
-            Copiar link
+            {!loadingToken && !token ? "Link no disponible" : "Copiar link"}
           </button>
           {token ? (
             <a href={whatsappUrl} target="_blank" rel="noopener noreferrer"
