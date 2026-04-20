@@ -66,16 +66,28 @@ export default function CountryCodePicker({ value, onChange }: Props) {
   const options = useMemo(() => buildOptions(), []);
   const current = options.find((o) => o.iso === value) ?? options[0];
 
+  // Strip diacritics so "Mexico" matches "México", "pucon" matches "Pucón", etc.
+  const normalize = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    // Accept "+351" and "351" alike. Collapse whitespace and diacritics.
+    const raw = query.trim().replace(/^\+/, "");
+    const q = normalize(raw);
     if (!q) return options;
     return options.filter(
       (o) =>
-        o.name.toLowerCase().includes(q) ||
+        normalize(o.name).includes(q) ||
         o.iso.toLowerCase().includes(q) ||
         o.calling.includes(q)
     );
   }, [options, query]);
+
+  useEffect(() => {
+    // Reset query every time the dropdown opens OR closes so a stale filter
+    // does not leave the list looking empty on the next open.
+    setQuery("");
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -89,9 +101,12 @@ export default function CountryCodePicker({ value, onChange }: Props) {
     }
     document.addEventListener("mousedown", onClick);
     document.addEventListener("keydown", onKey);
-    // Autofocus search on open.
-    setTimeout(() => searchRef.current?.focus(), 10);
+    // Focus the search input as soon as the element mounts. setTimeout hops
+    // past the same-tick mousedown that opened the dropdown on mobile, where
+    // tapping the trigger otherwise steals focus back from the input.
+    const t = setTimeout(() => searchRef.current?.focus(), 0);
     return () => {
+      clearTimeout(t);
       document.removeEventListener("mousedown", onClick);
       document.removeEventListener("keydown", onKey);
     };
