@@ -12,6 +12,7 @@ import { formatTablaWA } from "./tabla";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
+import { rotateJoinCode } from "@/lib/pollas/rotate-code";
 import { needsName } from "@/lib/users/needs-name";
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
@@ -340,13 +341,40 @@ export async function handlePollaMenu(
     return;
   }
 
+  const body =
+    `🏆 *${polla.name}*\n\n` +
+    `⚽ Torneo: ${trnLabel}\n` +
+    `📊 Tu posición: *#${participant.rank ?? "—"}*\n` +
+    `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
+    `¿Qué querés hacer parce?`;
+
+  // Admins see a 4-row list (reply-buttons cap at 3). Non-admins keep the
+  // existing 3-button layout so the regular path stays visually identical.
+  if (participant.role === "admin") {
+    await sendListMessage(
+      phone,
+      body,
+      "Ver opciones",
+      [
+        {
+          title: "Opciones",
+          rows: [
+            { id: `pred_${pollaId}`, title: "Predecir 🎯", description: "Poné tus pronósticos" },
+            { id: `rank_${pollaId}`, title: "Ver Tabla 📊", description: "Mirá cómo va el parche" },
+            { id: `results_${pollaId}`, title: "Resultados ⚽", description: "Últimos partidos" },
+            { id: `rotate_confirm_${pollaId}`, title: "🔄 Rotar código", description: "Genera un código nuevo" },
+          ],
+        },
+      ],
+      polla.name,
+      FOOTER,
+    );
+    return;
+  }
+
   await sendReplyButtons(
     phone,
-    `🏆 *${polla.name}*\n\n` +
-      `⚽ Torneo: ${trnLabel}\n` +
-      `📊 Tu posición: *#${participant.rank ?? "—"}*\n` +
-      `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
-      `¿Qué querés hacer parce?`,
+    body,
     [
       { id: `pred_${pollaId}`, title: "Predecir 🎯" },
       { id: `rank_${pollaId}`, title: "Ver Tabla 📊" },
@@ -1294,5 +1322,108 @@ export async function handleJoinByCode(
       await sendTextMessage(phone, "Ya sos parte de esa polla parce.");
       return;
   }
+}
+
+// ─── Rotate join code (admin only) ───────────────────────────────────
+//
+// Two-step flow: confirmation → execution. Both steps re-check the
+// polla_participants.role === "admin" gate independently so a forged
+// rotate_yes_<id> payload cannot bypass the confirm step. The admin
+// check here is byte-identical to the web route at
+// app/api/pollas/[slug]/rotate-code/route.ts.
+
+async function assertPollaAdmin(
+  phone: string,
+  userId: string,
+  pollaId: string,
+): Promise<{ polla: { id: string; name: string; slug: string } } | null> {
+  const supabase = createAdminClient();
+
+  const { data: polla } = await supabase
+    .from("pollas")
+    .select("id, name, slug")
+    .eq("id", pollaId)
+    .maybeSingle();
+  if (!polla) {
+    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.");
+    return null;
+  }
+
+  const { data: membership } = await supabase
+    .from("polla_participants")
+    .select("role")
+    .eq("polla_id", pollaId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!membership || membership.role !== "admin") {
+    await sendTextMessage(phone, "No sos admin de esta polla parce.");
+    return null;
+  }
+
+  return { polla };
+}
+
+/**
+ * Step 1 of 2: confirm the admin wants to rotate. Sends a SI/NO prompt.
+ */
+export async function handleRotateCodeConfirm(
+  phone: string,
+  userId: string,
+  pollaId: string,
+) {
+  const check = await assertPollaAdmin(phone, userId, pollaId);
+  if (!check) return;
+  const { polla } = check;
+
+  await sendReplyButtons(
+    phone,
+    `¿Rotar el código de *${polla.name}*? El código actual dejará de funcionar.`,
+    [
+      { id: `rotate_yes_${pollaId}`, title: "Sí, rotar" },
+      { id: "rotate_no", title: "No" },
+    ],
+    polla.name,
+    FOOTER,
+  );
+}
+
+/**
+ * Step 2 of 2: performs the rotation. Re-verifies admin permission
+ * (defense in depth) and calls the shared rotateJoinCode helper so the
+ * web + bot paths stay in lockstep.
+ */
+export async function handleRotateCode(
+  phone: string,
+  userId: string,
+  pollaId: string,
+) {
+  const check = await assertPollaAdmin(phone, userId, pollaId);
+  if (!check) return;
+  const { polla } = check;
+
+  const admin = createAdminClient();
+  const result = await rotateJoinCode(admin, pollaId);
+
+  if (!result.ok) {
+    await sendTextMessage(
+      phone,
+      "Uy parce, no se pudo rotar el código. Intentá de nuevo.",
+    );
+    return;
+  }
+
+  await sendTextMessage(
+    phone,
+    `✅ Listo parce. Nuevo código: *${result.code}*\n\n` +
+      `Compartilo con el parche. El anterior ya no funciona.`,
+  );
+
+  await sendCTAButton(
+    phone,
+    "O mandales el link directo 👇",
+    "Abrir polla",
+    `${APP_URL}/pollas/${polla.slug}`,
+    FOOTER,
+  );
 }
 
