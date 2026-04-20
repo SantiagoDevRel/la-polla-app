@@ -37,16 +37,16 @@ export function formatTablaWA(rows: TablaRow[], pollaName: string): string {
     return " ".repeat(len - str.length) + str;
   };
 
-  // Separate top 5 and user row
-  const top5 = rows.filter((r) => !r.isCurrentUser).slice(0, 5);
+  // Render the top 5 rows as-is so the caller keeps their real rank and
+  // medal. When the caller is outside the top 5, flows.ts appends a
+  // separate userRow (isCurrentUser=true) at the tail; in that case we
+  // drop it from the visible rows and show the "Tu posición" footer.
   const userRow = rows.find((r) => r.isCurrentUser);
-
-  // If user is in top 5, mark them
-  const isUserInTop = top5.some(
-    (r) => userRow && r.position === userRow.position
-  );
-
-  const allRows = isUserInTop || !userRow ? top5 : top5;
+  const isUserInTop =
+    userRow !== undefined && rows.slice(0, 5).some((r) => r.isCurrentUser);
+  const allRows = isUserInTop
+    ? rows.slice(0, 5)
+    : rows.filter((r) => !r.isCurrentUser).slice(0, 5);
   const maxPos = Math.max(...allRows.map((r) => r.position), 0);
   let text = `🏆 *Tabla — ${pollaName}*\n\n\`\`\`\n`;
 
