@@ -316,40 +316,36 @@ export default function OpenInvitePage() {
                     key={m.id}
                     className="rounded-lg p-3 bg-bg-elevated border border-border-subtle"
                   >
-                    <div className="flex items-center gap-2 text-sm text-text-primary">
-                      <div className="flex items-center gap-1 flex-1 min-w-0">
-                        {m.home_team_flag ? (
-                          <Image
-                            src={m.home_team_flag}
-                            alt=""
-                            width={18}
-                            height={18}
-                            className="flex-shrink-0"
-                            style={{ objectFit: "contain" }}
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).style.display = "none";
-                            }}
-                          />
-                        ) : null}
-                        <span className="truncate">{m.home_team}</span>
-                      </div>
+                    <div className="flex items-center gap-2 text-sm text-text-primary min-w-0">
+                      {m.home_team_flag ? (
+                        <Image
+                          src={m.home_team_flag}
+                          alt=""
+                          width={18}
+                          height={18}
+                          className="flex-shrink-0"
+                          style={{ objectFit: "contain" }}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : null}
+                      <span className="truncate flex-1 min-w-0">{m.home_team}</span>
                       <span className="text-text-muted text-xs shrink-0">vs</span>
-                      <div className="flex items-center gap-1 flex-1 min-w-0 justify-end">
-                        <span className="truncate text-right">{m.away_team}</span>
-                        {m.away_team_flag ? (
-                          <Image
-                            src={m.away_team_flag}
-                            alt=""
-                            width={18}
-                            height={18}
-                            className="flex-shrink-0"
-                            style={{ objectFit: "contain" }}
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).style.display = "none";
-                            }}
-                          />
-                        ) : null}
-                      </div>
+                      {m.away_team_flag ? (
+                        <Image
+                          src={m.away_team_flag}
+                          alt=""
+                          width={18}
+                          height={18}
+                          className="flex-shrink-0"
+                          style={{ objectFit: "contain" }}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : null}
+                      <span className="truncate flex-1 min-w-0">{m.away_team}</span>
                     </div>
                     <p className="text-[11px] text-text-muted mt-1">
                       {formatMatchDate(m.scheduled_at)}
