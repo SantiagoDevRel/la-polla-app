@@ -12,6 +12,7 @@ import { formatTablaWA } from "./tabla";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
+import { needsName } from "@/lib/users/needs-name";
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
 const FOOTER = "La Polla Colombiana 🐥";
@@ -188,10 +189,11 @@ async function verifyMemberAndPolla(
 // ─── FLOW 1: Main Menu ───
 
 export async function handleMainMenu(phone: string, displayName: string) {
-  const name =
-    /^\d{8,15}$/.test(displayName.replace("+", ""))
-      ? "parcero"
-      : displayName.split(" ")[0];
+  // Use the shared heuristic so the bot greeting and /onboarding redirect
+  // stay in lockstep. needsName catches missing/blank/phone-shaped names.
+  const name = needsName(displayName)
+    ? "parcero"
+    : displayName.split(" ")[0];
 
   await sendReplyButtons(
     phone,

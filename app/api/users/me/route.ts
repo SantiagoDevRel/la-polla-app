@@ -5,12 +5,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
+import {
+  DISPLAY_NAME_MAX,
+  DISPLAY_NAME_MIN,
+  isValidDisplayName,
+} from "@/lib/users/needs-name";
 
 const updateSchema = z.object({
   display_name: z
     .string()
-    .min(2, "El nombre debe tener al menos 2 caracteres")
-    .max(50, "El nombre debe tener máximo 50 caracteres")
+    .min(DISPLAY_NAME_MIN, `El nombre debe tener al menos ${DISPLAY_NAME_MIN} caracteres`)
+    .max(DISPLAY_NAME_MAX, `El nombre debe tener máximo ${DISPLAY_NAME_MAX} caracteres`)
+    .refine(
+      (v) => isValidDisplayName(v),
+      "El nombre no puede ser tu número de teléfono",
+    )
     .optional(),
   avatar_url: z.string().max(50).optional(),
 });

@@ -8,6 +8,7 @@ import axios from "axios";
 import { createClient } from "@/lib/supabase/client";
 import { POLLITO_TYPES, DEFAULT_POLLITO, getPollitoBase } from "@/lib/pollitos";
 import FootballLoader from "@/components/ui/FootballLoader";
+import { needsName } from "@/lib/users/needs-name";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -35,23 +36,13 @@ export default function OnboardingPage() {
           .eq("id", user.id)
           .single();
 
-        if (profile) {
-          const displayName = profile.display_name || "";
-          const phone = profile.whatsapp_number || "";
-          const phoneWithoutPlus = phone.replace("+", "");
-
-          const isPhoneNumber = displayName === phone
-            || displayName === phoneWithoutPlus
-            || /^\d{8,15}$/.test(displayName);
-
-          if (!isPhoneNumber && displayName.length >= 2) {
-            const rt = typeof window !== "undefined"
-              ? window.sessionStorage.getItem("lp_returnTo")
-              : null;
-            if (rt) window.sessionStorage.removeItem("lp_returnTo");
-            router.push(rt || "/inicio");
-            return;
-          }
+        if (profile && !needsName(profile.display_name)) {
+          const rt = typeof window !== "undefined"
+            ? window.sessionStorage.getItem("lp_returnTo")
+            : null;
+          if (rt) window.sessionStorage.removeItem("lp_returnTo");
+          router.push(rt || "/inicio");
+          return;
         }
       } catch {
         // If anything fails, just show the form
