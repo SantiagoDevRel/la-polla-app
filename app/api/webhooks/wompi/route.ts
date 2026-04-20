@@ -12,6 +12,7 @@ import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/bot";
 import { notifyParticipantJoined } from "@/lib/notifications";
+import { generateUniqueJoinCode } from "@/lib/pollas/join-code";
 
 interface WompiTransaction {
   id: string;
@@ -137,6 +138,17 @@ export async function POST(request: NextRequest) {
         match_ids: string[] | null;
       };
 
+      // Generar el join_code antes del insert. Si no se puede mintear un
+      // codigo unico despues de los reintentos internos, abortamos el
+      // materializado y dejamos el draft pendiente para inspeccion manual.
+      let joinCode: string;
+      try {
+        joinCode = await generateUniqueJoinCode(adminSupabase);
+      } catch (codeErr) {
+        console.error("[wompi] generateUniqueJoinCode failed:", codeErr);
+        return NextResponse.json({ ok: true });
+      }
+
       // Retry on slug collision, mirroring the non-draft POST logic.
       let finalSlug = data.slug;
       let pollaId: string | null = null;
@@ -157,6 +169,7 @@ export async function POST(request: NextRequest) {
             match_ids: data.match_ids,
             created_by: draft.creator_id,
             prize_pool: data.buy_in_amount,
+            join_code: joinCode,
           })
           .select("id, slug")
           .single();

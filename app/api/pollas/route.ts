@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildWompiCheckoutUrl } from "@/lib/wompi/checkout";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
+import { generateUniqueJoinCode } from "@/lib/pollas/join-code";
 import { z } from "zod";
 
 // Modos de pago válidos (payment_mode en la DB es varchar, no enum)
@@ -317,6 +318,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generar el código de invitación antes del insert. generateUniqueJoinCode
+    // reintenta internamente hasta 10 veces frente a colisiones en pollas.join_code.
+    // Si falla tras los reintentos se aborta la creación con un 500 explicito.
+    let joinCode: string;
+    try {
+      joinCode = await generateUniqueJoinCode(createAdminClient());
+    } catch (codeErr) {
+      console.error("[pollas POST] generateUniqueJoinCode failed:", codeErr);
+      return NextResponse.json(
+        { error: "No se pudo generar el código de invitación. Intenta de nuevo." },
+        { status: 500 }
+      );
+    }
+
     // Insertar la polla con los campos del modo de pago + match_ids
     const { data: polla, error } = await supabase
       .from("pollas")
@@ -336,12 +351,14 @@ export async function POST(request: NextRequest) {
             : null,
         match_ids: parsed.data.matchIds || null,
         created_by: user.id,
+        join_code: joinCode,
       })
       .select()
       .single();
 
     if (error) {
-      // Slug duplicado — agregar sufijo aleatorio
+      // Slug duplicado, agregar sufijo aleatorio. Reutilizamos el joinCode
+      // ya generado porque el insert fallo por el slug, no por el codigo.
       if (error.code === "23505" && error.message.includes("slug")) {
         const uniqueSlug = `${slug}-${Math.random().toString(36).substring(2, 6)}`;
         const { data: retryPolla, error: retryError } = await supabase
@@ -362,6 +379,7 @@ export async function POST(request: NextRequest) {
                 : null,
             match_ids: parsed.data.matchIds || null,
             created_by: user.id,
+            join_code: joinCode,
           })
           .select()
           .single();
