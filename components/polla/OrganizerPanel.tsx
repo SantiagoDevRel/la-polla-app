@@ -334,8 +334,8 @@ export default function OrganizerPanel({
           <div className="rounded-xl p-3 bg-bg-elevated col-span-2">
             <p className="text-[10px] text-text-muted uppercase">Pozo</p>
             <p className="font-medium text-text-primary">
-              {fmtCOP(buyInAmount)} por persona{" "}
-              <span className="text-gold font-semibold">· {fmtCOP(total)} total</span>
+              <span className="text-gold font-semibold">{fmtCOP(total)}</span> total{" "}
+              <span className="text-text-muted">({fmtCOP(buyInAmount)} por persona)</span>
             </p>
           </div>
         </div>

@@ -19,6 +19,12 @@ const nextConfig = {
         hostname: "**",
       },
     ],
+    // Permitir SVGs optimizados para los logos de torneos bajo /public/tournaments.
+    // Los archivos son estáticos y están bajo nuestro control; el CSP extra y el
+    // Content-Disposition: attachment sandbox el render como defensa adicional.
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "attachment",
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   async headers() {
     return [

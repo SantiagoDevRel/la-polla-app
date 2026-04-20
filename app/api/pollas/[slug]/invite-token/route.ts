@@ -10,7 +10,11 @@ function newToken(): string {
   return crypto.randomBytes(16).toString("hex"); // 32 chars
 }
 
-async function ensureAdmin(slug: string) {
+// Carga la polla por slug y confirma que el usuario tiene sesión. Devuelve
+// también la fila de polla_participants del caller para que los helpers
+// específicos de rol decidan si aceptan o rechazan. Los dos helpers de
+// abajo (ensureParticipant y ensureAdmin) comparten este paso base.
+async function loadContext(slug: string) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "No autorizado", status: 401 as const };
@@ -29,17 +33,36 @@ async function ensureAdmin(slug: string) {
     .eq("polla_id", polla.id)
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!part || part.role !== "admin") {
-    return { error: "Solo el admin puede gestionar el link", status: 403 as const };
+
+  return { polla, admin, part };
+}
+
+// Lectura: cualquier participante aprobado o expulsado puede leer el token.
+// Para compartir el link no se requiere ser admin, solo pertenecer a la polla.
+async function ensureParticipant(slug: string) {
+  const ctx = await loadContext(slug);
+  if ("error" in ctx) return ctx;
+  if (!ctx.part) {
+    return { error: "No sos parte de esta polla", status: 403 as const };
   }
-  return { polla, admin };
+  return { polla: ctx.polla, admin: ctx.admin };
+}
+
+// Rotación: solo admin puede invalidar el link actual y generar uno nuevo.
+async function ensureAdmin(slug: string) {
+  const ctx = await loadContext(slug);
+  if ("error" in ctx) return ctx;
+  if (!ctx.part || ctx.part.role !== "admin") {
+    return { error: "Solo el admin puede renovar el link", status: 403 as const };
+  }
+  return { polla: ctx.polla, admin: ctx.admin };
 }
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
-  const ctx = await ensureAdmin(params.slug);
+  const ctx = await ensureParticipant(params.slug);
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   let token = ctx.polla.invite_token;
