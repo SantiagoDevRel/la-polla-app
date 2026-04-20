@@ -6,7 +6,7 @@ import { generateOTP } from "@/lib/utils/otp";
 import { findPendingOTP, markOTPSent } from "@/lib/utils/otp";
 import { getOTPMessage } from "./messages";
 import { sendCTAButton } from "./interactive";
-import { getState, setState, clearState } from "./state";
+import { getState, clearState } from "./state";
 import {
   handleMainMenu,
   handleUnknownUser,
