@@ -146,6 +146,16 @@ export async function notifyMatchesClosingSoon(
 
 // ──────────────────────────────────────────────────────────────────────
 // 3. Match finished → notify everyone playing in any polla containing it.
+//
+// Dedup contract (migration 016):
+//   For every (user_id, match_id, polla_id) recipient we attempt an
+//   INSERT into match_result_notifications before sending. The PK
+//   enforces at-most-once semantics. If the insert conflicts we skip
+//   silently (do not log, it would be noisy on every admin re-sync).
+//   If the WhatsApp send fails AFTER the insert succeeded we log the
+//   error but intentionally leave the dedup row in place: under-sending
+//   on retry is recoverable (manual reach-out), duplicate blasting is
+//   not (Santiago got hit with 48 duplicate pings before this dedup).
 // ──────────────────────────────────────────────────────────────────────
 export async function notifyMatchFinished(
   admin: SupabaseClient,
@@ -176,14 +186,38 @@ export async function notifyMatchFinished(
 
       const { data: users } = await admin
         .from("users")
-        .select("whatsapp_number")
+        .select("id, whatsapp_number")
         .in("id", userIds);
-      const phones = (users ?? []).map((u) => u.whatsapp_number).filter(Boolean) as string[];
+      const recipients = (users ?? []).filter(
+        (u): u is { id: string; whatsapp_number: string } => !!u.whatsapp_number
+      );
+      if (!recipients.length) continue;
 
       const body =
         `*${m.home_team} ${m.home_score} - ${m.away_score} ${m.away_team}* — Resultados actualizados.\n` +
         `Revisa tu posición: ${pollaLink(polla.slug)}`;
-      for (const phone of phones) await send(phone, body, "finished");
+
+      for (const u of recipients) {
+        // Insert-then-send. .select() returns the inserted row(s); an empty
+        // array means ON CONFLICT fired and this recipient was already
+        // notified for this (user, match, polla) tuple.
+        const { data: inserted, error: insertErr } = await admin
+          .from("match_result_notifications")
+          .upsert(
+            { user_id: u.id, match_id: matchId, polla_id: polla.id },
+            { onConflict: "user_id,match_id,polla_id", ignoreDuplicates: true }
+          )
+          .select("user_id");
+        if (insertErr) {
+          console.error(
+            `[notify:finished] dedup insert failed for user=${u.id} match=${matchId} polla=${polla.id}:`,
+            insertErr
+          );
+          continue;
+        }
+        if (!inserted || inserted.length === 0) continue; // already notified, skip silently
+        await send(u.whatsapp_number, body, "finished");
+      }
     }
   } catch (err) {
     console.error("[notify:finished] non-fatal error:", err);
