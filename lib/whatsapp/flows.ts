@@ -320,7 +320,7 @@ export async function handlePollaMenu(
   const { polla, participant } = check;
 
   const trnLabel = TRN_LABELS[polla.tournament] || polla.tournament;
-  setState(phone, { action: "browsing_polla", pollaId });
+  await setState(phone, { action: "browsing_polla", pollaId });
 
   // RULE 4 — ended pollas are read-only (no Predecir)
   if (polla.status === "ended") {
@@ -495,7 +495,7 @@ export async function handlePronosticar(
   const pageMatches = targetMatches.slice(startIdx, startIdx + PAGE_SIZE);
   const hasMore = startIdx + PAGE_SIZE < targetMatches.length;
 
-  setState(phone, {
+  await setState(phone, {
     action: "picking_match",
     pollaId,
     page,
@@ -553,7 +553,7 @@ async function showPredictionPrompt(
   pollaId: string,
   userId: string
 ) {
-  setState(phone, {
+  await setState(phone, {
     action: "waiting_prediction",
     pollaId,
     matchId: match.id,
@@ -676,7 +676,7 @@ export async function handlePredictionInput(
   // Save state for confirmation. predictedHome/predictedAway are the
   // canonical fields; matchIndex/totalMatches stay reserved for the
   // picking_match UX counters.
-  setState(phone, {
+  await setState(phone, {
     action: "confirm_prediction",
     pollaId,
     matchId: match.id,
@@ -761,6 +761,12 @@ export async function handleConfirmPrediction(
     );
     return;
   }
+
+  // Batch 4a: explicit clear on flow completion.
+  // Placed after the successful upsert so the persisted prediction is the
+  // source of truth, and before the user-facing send so a network error on
+  // the reply-buttons call does not leave stale confirm_prediction state.
+  await clearState(phone);
 
   const homeFlag = getTeamFlag(match.home_team);
   const awayFlag = getTeamFlag(match.away_team);
@@ -1257,7 +1263,7 @@ export async function handleJoinByCodeConfirm(phone: string, code: string) {
     );
     return;
   }
-  setState(phone, { action: "waiting_join_confirm", joinCode: normalized });
+  await setState(phone, { action: "waiting_join_confirm", joinCode: normalized });
   await sendReplyButtons(
     phone,
     `¿Querés unirte a la polla con el código *${normalized}*?`,
@@ -1278,7 +1284,7 @@ export async function handleJoinByCode(
   userId: string,
   code: string,
 ) {
-  clearState(phone);
+  await clearState(phone);
   const result = await joinByCode({ userId, phone, code });
 
   if (result.ok) {
