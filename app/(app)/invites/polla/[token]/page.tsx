@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import axios from "axios";
 import { Info, Target, Lock, Globe } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
@@ -100,16 +101,20 @@ export default function OpenInvitePage() {
         setPolla(row);
 
         // Ya unido: no seguimos cargando el resto del preview.
+        // La RLS "participants_select" usa un EXISTS recursivo sobre la
+        // misma tabla y devuelve vacío para el cliente del navegador, asi
+        // que consultamos un endpoint server-side que usa admin client.
         if (isAuthed) {
-          const { data: existing } = await supabase
-            .from("polla_participants")
-            .select("id")
-            .eq("polla_id", row.id)
-            .eq("user_id", user!.id)
-            .maybeSingle();
-          if (existing) {
-            setAlreadyJoined(true);
-            return;
+          try {
+            const { data: mem } = await axios.get<{ member: boolean }>(
+              `/api/pollas/${row.slug}/membership`
+            );
+            if (mem.member) {
+              setAlreadyJoined(true);
+              return;
+            }
+          } catch (err) {
+            console.warn("[invites] membership check failed:", err);
           }
         }
 
@@ -314,13 +319,16 @@ export default function OpenInvitePage() {
                     <div className="flex items-center gap-2 text-sm text-text-primary">
                       <div className="flex items-center gap-1 flex-1 min-w-0">
                         {m.home_team_flag ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <Image
                             src={m.home_team_flag}
                             alt=""
                             width={18}
                             height={18}
                             className="flex-shrink-0"
+                            style={{ objectFit: "contain" }}
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
                           />
                         ) : null}
                         <span className="truncate">{m.home_team}</span>
@@ -329,13 +337,16 @@ export default function OpenInvitePage() {
                       <div className="flex items-center gap-1 flex-1 min-w-0 justify-end">
                         <span className="truncate text-right">{m.away_team}</span>
                         {m.away_team_flag ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <Image
                             src={m.away_team_flag}
                             alt=""
                             width={18}
                             height={18}
                             className="flex-shrink-0"
+                            style={{ objectFit: "contain" }}
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
                           />
                         ) : null}
                       </div>
