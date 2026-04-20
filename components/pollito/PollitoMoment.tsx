@@ -206,10 +206,10 @@ export function PollitoMoment({
         }}
       >
         <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 bg-black/60 z-40" />
+          <Drawer.Overlay className="fixed inset-0 bg-black/60 z-[55]" />
           <Drawer.Content
             className={cn(
-              "fixed bottom-0 left-0 right-0 z-50 rounded-t-xl border",
+              "fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border",
               accent.border,
               accent.glow,
             )}

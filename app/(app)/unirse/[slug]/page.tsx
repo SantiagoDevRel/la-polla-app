@@ -113,7 +113,12 @@ export default function UnirsePage() {
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       const msg = e.response?.data?.error || "Error al unirse";
-      showToast(msg === "invite_required" ? "Polla privada — necesitás invitación." : msg, "error");
+      showToast(
+        msg === "invite_required"
+          ? "Esta polla es privada. Necesitas un link de invitación válido del organizador."
+          : msg,
+        "error",
+      );
     } finally {
       setJoining(false);
     }

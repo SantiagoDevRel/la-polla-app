@@ -84,13 +84,9 @@ export function JoinByCodeSheet({
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-black/60 z-40" />
+        <Drawer.Overlay className="fixed inset-0 bg-black/60 z-[55]" />
         <Drawer.Content
-          className="fixed bottom-0 left-0 right-0 z-50 rounded-t-xl border border-gold/25"
-          style={{
-            background:
-              "linear-gradient(180deg, rgba(255, 215, 0, 0.04) 0%, var(--bg-card) 100%)",
-          }}
+          className="fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border border-gold/25 bg-bg-card"
         >
           <Drawer.Title className="sr-only">Únete con código</Drawer.Title>
           <Drawer.Description className="sr-only">
