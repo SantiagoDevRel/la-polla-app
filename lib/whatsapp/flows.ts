@@ -9,6 +9,7 @@ import {
 } from "./interactive";
 import { clearState, setState } from "./state";
 import { formatTablaWA } from "./tabla";
+import { shortMatchTitle } from "./format";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
@@ -510,8 +511,16 @@ export async function handlePronosticar(
     const predicted = predictedMatchIds.has(m.id);
     return {
       id: `match_${m.id}`,
-      title: `${m.home_team} vs ${m.away_team}`,
-      description: `${dateStr}${predicted ? " · ✅ Ya pronosticaste" : ""}`,
+      // Title is capped at 24 chars by WhatsApp, so we abbreviate here.
+      // Description (72 char cap) carries the full names + date so tappers
+      // see the unambiguous matchup. If that combo would overflow, fall
+      // back to the original date-only description.
+      title: shortMatchTitle(m.home_team, m.away_team),
+      description: (() => {
+        const full = `${m.home_team} vs ${m.away_team} · ${dateStr}${predicted ? " · ✅" : ""}`;
+        if (full.length <= 72) return full;
+        return `${dateStr}${predicted ? " · ✅ Ya pronosticaste" : ""}`;
+      })(),
     };
   });
 
@@ -590,7 +599,7 @@ async function showPredictionPrompt(
       header +
         `\nYa pronosticaste este partido parce.\n` +
         `Tu pronóstico actual: *${match.home_team} ${existing.predicted_home} - ${existing.predicted_away} ${match.away_team}*\n\n` +
-        `Escribí un nuevo marcador para actualizarlo, o mandá *cancelar* para dejarlo igual.`
+        `Escribí un nuevo marcador para actualizarlo (ejemplo: 2-2), o mandá *cancelar* para dejarlo igual.`
     );
     return;
   }
@@ -801,6 +810,7 @@ export async function handleLeaderboard(
     .from("polla_participants")
     .select("user_id, total_points, rank, users(display_name)")
     .eq("polla_id", pollaId)
+    .eq("status", "approved")
     .order("rank", { ascending: true })
     .limit(5);
 
