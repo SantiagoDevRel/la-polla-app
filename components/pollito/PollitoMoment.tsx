@@ -209,13 +209,10 @@ export function PollitoMoment({
           <Drawer.Overlay className="fixed inset-0 bg-black/60 z-[55]" />
           <Drawer.Content
             className={cn(
-              "fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border",
+              "fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border bg-bg-card",
               accent.border,
               accent.glow,
             )}
-            style={{
-              background: `linear-gradient(180deg, ${accent.bgTint} 0%, var(--bg-card) 100%)`,
-            }}
           >
             <Drawer.Title className="sr-only">{config.title}</Drawer.Title>
             <Drawer.Description className="sr-only">{dialog}</Drawer.Description>
@@ -238,10 +235,7 @@ export function PollitoMoment({
   // inline
   return (
     <div
-      className={cn("rounded-lg border", accent.border, accent.glow)}
-      style={{
-        background: `linear-gradient(180deg, ${accent.bgTint} 0%, var(--bg-card) 100%)`,
-      }}
+      className={cn("rounded-lg border bg-bg-card", accent.border, accent.glow)}
     >
       <MomentBody
         title={config.title}
