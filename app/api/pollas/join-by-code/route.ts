@@ -70,7 +70,13 @@ export async function POST(request: NextRequest) {
         { status: 429 },
       );
     case "not_found":
-      return NextResponse.json({ error: "Código no válido" }, { status: 404 });
+      return NextResponse.json(
+        {
+          error:
+            "Código inválido o expirado. Pedíle al organizador que te comparta el código actualizado.",
+        },
+        { status: 404 },
+      );
     case "not_active":
       return NextResponse.json(
         { error: "Esta polla ya no acepta nuevos jugadores" },

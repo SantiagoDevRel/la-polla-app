@@ -508,6 +508,13 @@ async function routePayload(
       // before any consumer reads, so removing the partial write here
       // eliminates the inconsistency without changing observable behavior.
       await handlePronosticar(from, user.id, state.pollaId, matchId);
+    } else {
+      // Batch 4b recovery: state was lost (Supabase read failure or expired). Guide user back instead of silent no-op.
+      await sendTextMessage(
+        from,
+        "Ups parce, se me perdió el hilo. ¿Cuál polla querías pronosticar?"
+      );
+      await handleMisPollas(from, user.id);
     }
     return;
   }
@@ -529,6 +536,13 @@ async function routePayload(
     const state = await getState(from);
     if (state && state.action === "confirm_prediction" && state.pollaId) {
       await handleConfirmPrediction(from, user, { ...state, pollaId: state.pollaId });
+    } else {
+      // Batch 4b recovery: state was lost (Supabase read failure or expired). Guide user back instead of silent no-op.
+      await sendTextMessage(
+        from,
+        "Parce, perdí tu pronóstico. Dale de nuevo a Predecir para volver a mandarlo."
+      );
+      await handleMisPollas(from, user.id);
     }
     return;
   }
@@ -537,6 +551,13 @@ async function routePayload(
     const state = await getState(from);
     if (state && state.pollaId) {
       await handlePronosticar(from, user.id, state.pollaId);
+    } else {
+      // Batch 4b recovery: state was lost (Supabase read failure or expired). Guide user back instead of silent no-op.
+      await sendTextMessage(
+        from,
+        "Ups, se me olvidó que ibas a cambiar. Dale a Predecir de nuevo."
+      );
+      await handleMisPollas(from, user.id);
     }
     return;
   }

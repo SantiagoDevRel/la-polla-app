@@ -94,7 +94,7 @@ export default function InviteModal({
       );
       setCode(data.code);
       setConfirmRotate(false);
-      showToast("Código rotado", "success");
+      showToast("Código renovado", "success");
     } catch {
       showToast("No se pudo rotar el código", "error");
     } finally {

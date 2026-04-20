@@ -13,7 +13,7 @@ import { syncMatchesAction, purgeMatchesAction } from "./actions";
 const LEAGUES = [
   { id: 2001, label: "Champions League", tournament: "champions_2025", active: true },
   { id: 2000, label: "Copa del Mundo 2026", tournament: "worldcup_2026", active: true },
-  { id: 2014, label: "La Liga", tournament: "la_liga_2025", active: true },
+  { id: 2014, label: "La Liga", tournament: "laliga_2025", active: true },
 ];
 
 interface SyncResult {
