@@ -838,7 +838,7 @@ export async function handleLeaderboard(
     phone,
     "_Dale clic para ver la tabla completa con todos los jugadores_ 👇",
     "Ver tabla completa 📊",
-    `${APP_URL}/polla/${polla.id}`,
+    `${APP_URL}/pollas/${polla.slug}`,
     FOOTER
   );
 }
@@ -1111,8 +1111,10 @@ export async function handleHelpTopic(
     await sendTextMessage(
       phone,
       `🎯 *¿Cómo se puntúa en La Polla?*\n\n` +
-        `*3 pts* — Resultado exacto (ej: dijiste 2-1 y fue 2-1) 🔥\n` +
-        `*1 pt* — Acertaste quién ganó o si fue empate ✅\n` +
+        `*5 pts* — Resultado exacto (ej: dijiste 2-1 y fue 2-1) 🔥\n` +
+        `*3 pts* — Le pegaste al ganador y a la diferencia de goles ⚡\n` +
+        `*2 pts* — Acertaste quién ganó ✅\n` +
+        `*1 pt* — Acertaste los goles de uno de los dos equipos 🎯\n` +
         `*0 pts* — No le pegaste 😅\n\n` +
         `_Pilas parce, cada punto cuenta para la tabla_ 📊`
     );
