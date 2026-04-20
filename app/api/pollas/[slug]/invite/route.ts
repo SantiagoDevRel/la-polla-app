@@ -160,7 +160,7 @@ export async function POST(
 
     // Unregistered user — Meta blocks outbound messages to numbers that
     // haven't messaged the bot. Return a shareable link to the organizer.
-    const shareLink = `${APP_URL}/unirse/${polla.slug}?token=${token}`;
+    const shareLink = `${APP_URL}/invites/polla/${token}`;
     return NextResponse.json({
       success: true,
       unregistered: true,
