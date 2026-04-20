@@ -1,14 +1,19 @@
 // app/(app)/invites/polla/[token]/page.tsx — Open shareable invite landing.
 // Anyone with the link can join the polla (subject to the polla's payment
 // requirements). Not tied to a specific phone number.
+//
+// A6: full pre-join preview. The page now shows organizer, participant count,
+// pot, tipo (privada/abierta), and the full match list before the Unirme CTA
+// so the invitee can decide informed.
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
-import { Info, Target } from "lucide-react";
+import { Info, Target, Lock, Globe } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
 import TournamentBadge from "@/components/shared/TournamentBadge";
+import UserAvatar from "@/components/ui/UserAvatar";
 import { formatCOP } from "@/lib/formatCurrency";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +26,38 @@ interface PollaSummary {
   tournament: string;
   buy_in_amount: number;
   type: string;
+  status: string;
+  created_by: string;
+  match_ids: string[] | null;
+}
+
+interface OrganizerSummary {
+  display_name: string;
+  avatar_url: string | null;
+}
+
+interface MatchRow {
+  id: string;
+  home_team: string;
+  away_team: string;
+  home_team_flag: string | null;
+  away_team_flag: string | null;
+  scheduled_at: string;
+}
+
+function formatMatchDate(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("es-CO", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const time = d.toLocaleTimeString("es-CO", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${date}, ${time}`;
 }
 
 export default function OpenInvitePage() {
@@ -31,7 +68,10 @@ export default function OpenInvitePage() {
 
   const [loading, setLoading] = useState(true);
   const [polla, setPolla] = useState<PollaSummary | null>(null);
+  const [organizer, setOrganizer] = useState<OrganizerSummary | null>(null);
+  const [matches, setMatches] = useState<MatchRow[]>([]);
   const [participantCount, setParticipantCount] = useState(0);
+  const [alreadyJoined, setAlreadyJoined] = useState(false);
   const [error, setError] = useState("");
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [joining, setJoining] = useState(false);
@@ -39,25 +79,27 @@ export default function OpenInvitePage() {
   useEffect(() => {
     async function load() {
       try {
-        // Auth check first — bounce to login with returnTo if needed.
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         const isAuthed = !!user;
         setAuthed(isAuthed);
 
-        // Resolve token → polla via the public anon-readable pollas row.
         const { data: row, error: rowErr } = await supabase
           .from("pollas")
-          .select("id, slug, name, description, tournament, buy_in_amount, type")
+          .select(
+            "id, slug, name, description, tournament, buy_in_amount, type, status, created_by, match_ids"
+          )
           .eq("invite_token", token)
-          .maybeSingle();
+          .maybeSingle<PollaSummary>();
         if (rowErr || !row) {
-          setError("Link inválido o expirado");
+          setError("Link inválido o expirado. Pedíle al organizador que te comparta el link actualizado.");
           return;
         }
         setPolla(row);
 
-        // If signed-in and already in the polla, send straight to the detail.
+        // Ya unido: no seguimos cargando el resto del preview.
         if (isAuthed) {
           const { data: existing } = await supabase
             .from("polla_participants")
@@ -66,17 +108,36 @@ export default function OpenInvitePage() {
             .eq("user_id", user!.id)
             .maybeSingle();
           if (existing) {
-            router.replace(`/pollas/${row.slug}`);
+            setAlreadyJoined(true);
             return;
           }
         }
 
-        const { count } = await supabase
-          .from("polla_participants")
-          .select("id", { head: true, count: "exact" })
-          .eq("polla_id", row.id)
-          .eq("status", "approved");
-        setParticipantCount(count ?? 0);
+        // Organizer, participant count y matches en paralelo.
+        const matchIds = row.match_ids ?? [];
+        const [organizerRes, countRes, matchesRes] = await Promise.all([
+          supabase
+            .from("users")
+            .select("display_name, avatar_url")
+            .eq("id", row.created_by)
+            .maybeSingle<OrganizerSummary>(),
+          supabase
+            .from("polla_participants")
+            .select("id", { head: true, count: "exact" })
+            .eq("polla_id", row.id)
+            .eq("status", "approved"),
+          matchIds.length > 0
+            ? supabase
+                .from("matches")
+                .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at")
+                .in("id", matchIds)
+                .order("scheduled_at", { ascending: true })
+                .returns<MatchRow[]>()
+            : Promise.resolve({ data: [] as MatchRow[] }),
+        ]);
+        setOrganizer(organizerRes.data ?? null);
+        setParticipantCount(countRes.count ?? 0);
+        setMatches(matchesRes.data ?? []);
       } catch {
         setError("Error cargando la invitación");
       } finally {
@@ -146,24 +207,77 @@ export default function OpenInvitePage() {
     );
   }
 
+  // Ya unido: tarjeta de confirmación corta, sin preview.
+  if (alreadyJoined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="rounded-2xl p-6 text-center max-w-sm w-full bg-bg-card border border-border-subtle">
+          <Target className="w-10 h-10 text-gold mx-auto mb-3" />
+          <h1 className="text-xl font-bold text-text-primary mb-1">
+            Ya estás en esta polla
+          </h1>
+          <p className="text-text-secondary text-sm mb-4">
+            Ya te uniste a {polla.name} antes, parce.
+          </p>
+          <button
+            onClick={() => router.push(`/pollas/${polla.slug}`)}
+            className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all"
+          >
+            Ir a la polla
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isPrivate = polla.type === "closed";
+  const isEnded = polla.status === "ended";
+  const potTotal = polla.buy_in_amount > 0 ? polla.buy_in_amount * participantCount : 0;
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="rounded-2xl max-w-sm w-full overflow-hidden bg-bg-card border border-border-subtle">
+    <div className="min-h-screen flex items-start justify-center p-4 py-8">
+      <div className="rounded-2xl max-w-md w-full overflow-hidden bg-bg-card border border-border-subtle">
         <div
           className="p-6 text-center"
           style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-card) 100%)" }}
         >
           <Target className="w-10 h-10 text-gold mx-auto mb-2" />
-          <h1 className="text-xl font-bold text-text-primary">{polla.name}</h1>
-          <p className="text-text-secondary text-sm mt-1">
+          <h1 className="text-2xl font-display uppercase tracking-[0.04em] text-text-primary">
+            {polla.name}
+          </h1>
+          <div className="mt-2 flex justify-center">
             <TournamentBadge tournamentSlug={polla.tournament} size="md" />
-          </p>
+          </div>
+          {organizer ? (
+            <div className="mt-3 flex items-center justify-center gap-2 text-text-secondary text-sm">
+              <span>Creada por</span>
+              <UserAvatar
+                avatarUrl={organizer.avatar_url}
+                displayName={organizer.display_name}
+                size="sm"
+              />
+              <span className="font-semibold text-text-primary">{organizer.display_name}</span>
+            </div>
+          ) : null}
         </div>
+
         <div className="p-6 space-y-4">
           {polla.description && (
             <p className="text-text-secondary text-sm text-center">{polla.description}</p>
           )}
+
           <div className="grid grid-cols-2 gap-3 text-center">
+            <div className="rounded-xl p-3 bg-bg-elevated flex flex-col items-center justify-center">
+              {isPrivate ? (
+                <Lock className="w-5 h-5 text-gold mb-1" aria-hidden="true" />
+              ) : (
+                <Globe className="w-5 h-5 text-gold mb-1" aria-hidden="true" />
+              )}
+              <p className="text-sm font-semibold text-text-primary">
+                {isPrivate ? "Privada" : "Abierta"}
+              </p>
+              <p className="text-[11px] text-text-muted">Tipo</p>
+            </div>
             <div className="rounded-xl p-3 bg-bg-elevated">
               <p className="score-font text-2xl text-gold">{participantCount}</p>
               <p className="text-[11px] text-text-muted">Participantes</p>
@@ -173,12 +287,74 @@ export default function OpenInvitePage() {
                 {polla.buy_in_amount > 0 ? formatCOP(polla.buy_in_amount) : "Gratis"}
               </p>
               <p className="text-[11px] text-text-muted">
-                {polla.buy_in_amount > 0 ? "Entrada (COP)" : "Sin costo"}
+                {polla.buy_in_amount > 0 ? "Buy-in" : "Sin costo"}
               </p>
             </div>
+            {polla.buy_in_amount > 0 ? (
+              <div className="rounded-xl p-3 bg-bg-elevated">
+                <p className="score-font text-2xl text-gold">{formatCOP(potTotal)}</p>
+                <p className="text-[11px] text-text-muted">Pozo</p>
+              </div>
+            ) : null}
           </div>
 
-          {authed === false ? (
+          <div>
+            <h2 className="text-sm font-semibold text-text-primary mb-2">
+              Partidos incluidos ({matches.length})
+            </h2>
+            {matches.length === 0 ? (
+              <p className="text-text-muted text-sm">Todavía no hay partidos asignados.</p>
+            ) : (
+              <ul className="space-y-2">
+                {matches.map((m) => (
+                  <li
+                    key={m.id}
+                    className="rounded-lg p-3 bg-bg-elevated border border-border-subtle"
+                  >
+                    <div className="flex items-center gap-2 text-sm text-text-primary">
+                      <div className="flex items-center gap-1 flex-1 min-w-0">
+                        {m.home_team_flag ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={m.home_team_flag}
+                            alt=""
+                            width={18}
+                            height={18}
+                            className="flex-shrink-0"
+                          />
+                        ) : null}
+                        <span className="truncate">{m.home_team}</span>
+                      </div>
+                      <span className="text-text-muted text-xs shrink-0">vs</span>
+                      <div className="flex items-center gap-1 flex-1 min-w-0 justify-end">
+                        <span className="truncate text-right">{m.away_team}</span>
+                        {m.away_team_flag ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={m.away_team_flag}
+                            alt=""
+                            width={18}
+                            height={18}
+                            className="flex-shrink-0"
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-text-muted mt-1">
+                      {formatMatchDate(m.scheduled_at)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {isEnded ? (
+            <div className="rounded-xl p-4 text-center bg-bg-elevated border border-border-subtle">
+              <p className="text-text-primary font-semibold">Esta polla ya cerró.</p>
+              <p className="text-text-secondary text-sm mt-1">No podés unirte.</p>
+            </div>
+          ) : authed === false ? (
             <button
               onClick={goLogin}
               className="w-full bg-gold text-bg-base font-semibold py-4 rounded-xl hover:brightness-110 transition-all text-lg"
@@ -191,7 +367,7 @@ export default function OpenInvitePage() {
               disabled={joining}
               className="w-full bg-gold text-bg-base font-semibold py-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 text-lg"
             >
-              {joining ? "Uniéndose..." : "Unirse a esta polla"}
+              {joining ? "Uniéndose..." : "Unirme"}
             </button>
           )}
 
