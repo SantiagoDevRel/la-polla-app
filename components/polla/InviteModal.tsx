@@ -59,8 +59,8 @@ export default function InviteModal({
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const link = token
-    ? `${origin}/unirse/${pollaSlug}?token=${token}`
-    : `${origin}/unirse/${pollaSlug}`;
+    ? `${origin}/invites/polla/${token}`
+    : `${origin}/pollas/${pollaSlug}`;
   const whatsappText = code
     ? `Únete a mi polla "${pollaName}": ${link}\nO usa el código ${code} en la app.`
     : `Únete a mi polla "${pollaName}": ${link}`;
