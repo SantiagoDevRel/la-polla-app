@@ -265,7 +265,7 @@ export async function processIncomingMessage(message: IncomingMessage) {
     }
 
     // RULE 6 — prediction input validation when the bot is waiting for a score.
-    const state = getState(from);
+    const state = await getState(from);
     if (state && state.action === "waiting_prediction" && state.pollaId) {
       const trimmed = body.trim();
       // "cancelar" escapes the update and returns to the polla menu, keeping
@@ -327,7 +327,7 @@ export async function processIncomingMessage(message: IncomingMessage) {
     // 2. Pending confirmation from a bare-code message. SI/NO text replies
     //    land here before the bare-6-char detection below so a user in the
     //    confirm flow does not get re-prompted.
-    const joinState = getState(from);
+    const joinState = await getState(from);
     if (joinState && joinState.action === "waiting_join_confirm" && joinState.joinCode) {
       if (body === "si" || body === "sí" || body === "yes") {
         const code = joinState.joinCode;
@@ -335,7 +335,7 @@ export async function processIncomingMessage(message: IncomingMessage) {
         return;
       }
       if (body === "no") {
-        clearState(from);
+        await clearState(from);
         await sendTextMessage(from, "Listo parce, no te uniste. Si querés probar con otro código, mándamelo de nuevo.");
         return;
       }
@@ -407,12 +407,12 @@ async function routePayload(
     payload.startsWith("rotate_yes_") ||
     payload === "rotate_no";
   if (!keepState) {
-    clearState(from);
+    await clearState(from);
   }
 
   // Join-by-code SI/NO (set by handleJoinByCodeConfirm).
   if (payload === "join_code_yes") {
-    const state = getState(from);
+    const state = await getState(from);
     if (state?.action === "waiting_join_confirm" && state.joinCode) {
       await handleJoinByCode(from, user.id, state.joinCode);
     } else {
@@ -424,7 +424,7 @@ async function routePayload(
     return;
   }
   if (payload === "join_code_no") {
-    clearState(from);
+    await clearState(from);
     await sendTextMessage(
       from,
       "Listo parce, no te uniste. Si querés probar con otro código, mándamelo de nuevo.",
@@ -445,7 +445,7 @@ async function routePayload(
     return;
   }
   if (payload === "rotate_no") {
-    clearState(from);
+    await clearState(from);
     await sendTextMessage(from, "Listo parce, no roté nada.");
     return;
   }
@@ -494,14 +494,19 @@ async function routePayload(
   }
 
   if (payload.startsWith("match_")) {
-    const state = getState(from);
+    const state = await getState(from);
     if (state && state.pollaId) {
       const matchId = payload.replace("match_", "");
-      setState(from, {
-        action: "waiting_prediction",
-        pollaId: state.pollaId,
-        matchId,
-      });
+      // Harmonize state shape with flows.ts:556 picker write. Batch 4a.
+      // The previous setState here wrote waiting_prediction state without
+      // matchIndex or totalMatches, producing a transient inconsistent
+      // shape flagged in docs/batch-4-audit.md Section 9 question 7. The
+      // call to handlePronosticar below immediately routes through
+      // showPredictionPrompt, which writes the complete waiting_prediction
+      // state with the counters filled in. In both downstream branches
+      // (match found and match not found) the full-shape write happens
+      // before any consumer reads, so removing the partial write here
+      // eliminates the inconsistency without changing observable behavior.
       await handlePronosticar(from, user.id, state.pollaId, matchId);
     }
     return;
@@ -521,7 +526,7 @@ async function routePayload(
 
   // Prediction confirmation
   if (payload === "confirm_yes") {
-    const state = getState(from);
+    const state = await getState(from);
     if (state && state.action === "confirm_prediction" && state.pollaId) {
       await handleConfirmPrediction(from, user, { ...state, pollaId: state.pollaId });
     }
@@ -529,7 +534,7 @@ async function routePayload(
   }
 
   if (payload === "confirm_no") {
-    const state = getState(from);
+    const state = await getState(from);
     if (state && state.pollaId) {
       await handlePronosticar(from, user.id, state.pollaId);
     }
