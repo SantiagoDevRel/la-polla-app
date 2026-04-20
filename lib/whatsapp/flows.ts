@@ -317,7 +317,7 @@ export async function handlePollaMenu(
   const { polla, participant } = check;
 
   const trnLabel = TRN_LABELS[polla.tournament] || polla.tournament;
-  setState(phone, { action: "browsing_polla", pollaId, pollaSlug: polla.slug });
+  setState(phone, { action: "browsing_polla", pollaId });
 
   // RULE 4 — ended pollas are read-only (no Predecir)
   if (polla.status === "ended") {
@@ -468,7 +468,6 @@ export async function handlePronosticar(
   setState(phone, {
     action: "picking_match",
     pollaId,
-    pollaSlug: polla.slug,
     page,
   });
 
@@ -644,13 +643,15 @@ export async function handlePredictionInput(
     return;
   }
 
-  // Save state for confirmation
+  // Save state for confirmation. predictedHome/predictedAway are the
+  // canonical fields; matchIndex/totalMatches stay reserved for the
+  // picking_match UX counters.
   setState(phone, {
     action: "confirm_prediction",
     pollaId,
     matchId: match.id,
-    matchIndex: predictedHome,
-    totalMatches: predictedAway,
+    predictedHome,
+    predictedAway,
   });
 
   const homeFlag = getTeamFlag(match.home_team);
@@ -676,14 +677,14 @@ export async function handleConfirmPrediction(
   state: {
     pollaId: string;
     matchId?: string;
-    matchIndex?: number;
-    totalMatches?: number;
+    predictedHome?: number;
+    predictedAway?: number;
   }
 ) {
   const supabase = createAdminClient();
 
-  const predictedHome = state.matchIndex!;
-  const predictedAway = state.totalMatches!;
+  const predictedHome = state.predictedHome!;
+  const predictedAway = state.predictedAway!;
   const matchId = state.matchId!;
   const pollaId = state.pollaId;
 

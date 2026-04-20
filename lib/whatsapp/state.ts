@@ -6,11 +6,17 @@ interface ConversationState {
   // Most flows pin a specific polla; join-by-code confirmation does not
   // know the polla until the code resolves, so this is optional.
   pollaId?: string;
-  pollaSlug?: string;
   matchId?: string;
+  // matchIndex / totalMatches track position in the "picking_match" UX
+  // only (which match out of how many). They are NOT repurposed for
+  // prediction scores anymore — see predictedHome/predictedAway below.
   matchIndex?: number;
   totalMatches?: number;
   page?: number;
+  // Set while action === 'confirm_prediction': the pending prediction
+  // waiting for the user's SI/NO confirmation.
+  predictedHome?: number;
+  predictedAway?: number;
   // Set when action === 'waiting_join_confirm': the 6-char code the user
   // sent bare, pending their SI/NO response.
   joinCode?: string;
