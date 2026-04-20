@@ -123,9 +123,9 @@ export function BottomNav({ active, createHref, onCreatePolla }: BottomNavProps)
       {/* FAB choice sheet */}
       <Drawer.Root open={choiceOpen} onOpenChange={setChoiceOpen}>
         <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 bg-black/60 z-40" />
+          <Drawer.Overlay className="fixed inset-0 bg-black/60 z-[55]" />
           <Drawer.Content
-            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-xl border border-border-default bg-bg-card"
+            className="fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border border-border-default bg-bg-card"
           >
             <Drawer.Title className="sr-only">Nueva polla</Drawer.Title>
             <Drawer.Description className="sr-only">

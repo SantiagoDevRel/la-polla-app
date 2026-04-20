@@ -109,7 +109,13 @@ export default function OpenInvitePage() {
       router.push(`/pollas/${polla.slug}`);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      showToast(e.response?.data?.error || "Error al unirse", "error");
+      const msg = e.response?.data?.error || "Error al unirse";
+      showToast(
+        msg === "invite_required"
+          ? "Esta polla es privada. Necesitas un link de invitación válido del organizador."
+          : msg,
+        "error",
+      );
     } finally {
       setJoining(false);
     }
