@@ -13,8 +13,7 @@ import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import OrganizerPanel from "@/components/polla/OrganizerPanel";
 import EmptyState from "@/components/ui/EmptyState";
 import InviteModal from "@/components/polla/InviteModal";
-import CountryCodePicker from "@/components/polla/CountryCodePicker";
-import type { CountryCode } from "libphonenumber-js";
+import PhoneInput from "@/components/ui/PhoneInput";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug } from "@/lib/tournaments";
@@ -105,9 +104,9 @@ export default function PollaSlugPage() {
   const [isNonParticipant, setIsNonParticipant] = useState(false);
   const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
-  const [invitePhone, setInvitePhone] = useState("");
-  const [inviteCountryIso, setInviteCountryIso] = useState<CountryCode>("CO");
-  const [inviteCountryCode, setInviteCountryCode] = useState("57");
+  // PhoneInput emits the full E.164 string (e.g. "+573001234567"). The invite
+  // API normalizes by stripping "+" server-side, so we pass it through as-is.
+  const [invitePhoneFull, setInvitePhoneFull] = useState("");
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const awayInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -714,38 +713,31 @@ export default function PollaSlugPage() {
                   <Handshake className="w-4 h-4 text-gold" /> Invitar participante
                 </h4>
                 <p className="text-xs text-text-secondary">Envía una invitación por WhatsApp a esta polla privada.</p>
-                <div className="flex gap-2">
-                  <div className="flex flex-1 rounded-xl overflow-hidden border border-border-subtle focus-within:border-gold/50 transition-colors">
-                    <CountryCodePicker
-                      value={inviteCountryIso}
-                      onChange={(iso, calling) => {
-                        setInviteCountryIso(iso);
-                        setInviteCountryCode(calling);
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1 min-w-0">
+                    <PhoneInput
+                      onChange={(val) => {
+                        setInvitePhoneFull(val);
                         setInviteMsg(null);
                       }}
                     />
-                    <input
-                      type="tel"
-                      placeholder="3001234567"
-                      value={invitePhone}
-                      onChange={(e) => { setInvitePhone(e.target.value.replace(/\D/g, "")); setInviteMsg(null); }}
-                      className="flex-1 bg-bg-base px-3 py-3 text-text-primary placeholder:text-text-muted text-sm outline-none min-w-0"
-                    />
                   </div>
                   <button
-                    disabled={inviteSending || invitePhone.length < 7}
+                    disabled={
+                      inviteSending ||
+                      invitePhoneFull.replace(/\D/g, "").length < 9
+                    }
                     onClick={async () => {
                       setInviteSending(true);
                       setInviteMsg(null);
                       try {
-                        const fullNumber = `${inviteCountryCode}${invitePhone}`;
-                        const { data: res } = await axios.post(`/api/pollas/${slug}/invite`, { whatsapp_number: fullNumber });
+                        const { data: res } = await axios.post(`/api/pollas/${slug}/invite`, { whatsapp_number: invitePhoneFull });
                         if (res.unregistered && res.shareLink) {
                           setInviteMsg({ text: `No registrado. Compartí este link: ${res.shareLink}`, type: "success" });
                         } else {
                           setInviteMsg({ text: "¡Invitación enviada!", type: "success" });
                         }
-                        setInvitePhone("");
+                        setInvitePhoneFull("");
                       } catch (err: unknown) {
                         const e = err as { response?: { data?: { error?: string } } };
                         setInviteMsg({ text: e.response?.data?.error || "Error enviando", type: "error" });
