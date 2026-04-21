@@ -680,12 +680,19 @@ export default function PollaSlugPage() {
             <div className="rounded-2xl p-5 space-y-3 bg-bg-card border border-border-subtle">
               <h3 className="font-bold text-text-primary">{polla.name}</h3>
               {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-3 gap-2 text-sm">
                 {[
                   { label: "Torneo", value: getTournamentBySlug(polla.tournament)?.name || polla.tournament },
-                  { label: "Tipo", value: polla.type === "closed" ? "Privada" : "Abierta" },
                   { label: "Participantes", value: String(participants.length) },
-                  { label: "Pago", value: polla.payment_mode === "admin_collects" ? "Admin" : "Digital" },
+                  {
+                    label: "Pago",
+                    value:
+                      polla.payment_mode === "admin_collects"
+                        ? "Pago al principio"
+                        : polla.payment_mode === "pay_winner"
+                          ? "Pago al final"
+                          : "Pago digital",
+                  },
                 ].map((item) => (
                   <div key={item.label} className="rounded-xl p-2 bg-bg-elevated">
                     <p className="text-[10px] text-text-muted">{item.label}</p>

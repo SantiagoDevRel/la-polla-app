@@ -90,8 +90,8 @@ export default function PaymentsList({
           {paymentMode === "digital_pool"
             ? "Pago digital · automático"
             : paymentMode === "admin_collects"
-              ? "Admin recoge el pago"
-              : "Pago al ganador"}
+              ? "Pago al principio"
+              : "Pago al final"}
         </span>
       </div>
 
