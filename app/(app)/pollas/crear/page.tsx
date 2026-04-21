@@ -285,16 +285,18 @@ export default function CrearPollaPage() {
             <h1 className="text-lg font-bold text-text-primary">Crear nueva polla</h1>
           </div>
 
-          {/* Stepper — 3 steps */}
-          <div className="flex items-center justify-center gap-0">
+          {/* Stepper — 3 steps. Connectors use flex-1 inside a constrained
+              max-w band so the circles span edge-to-edge instead of
+              clustering in the middle after the 4→3 collapse. */}
+          <div className="flex items-center max-w-xs mx-auto">
             {[1, 2, 3].map((s) => (
-              <div key={s} className="flex items-center">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+              <div key={s} className={`flex items-center ${s < 3 ? "flex-1" : ""}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all shrink-0 ${
                   s < step ? "bg-green-live text-bg-base" : s === step ? "bg-gold text-bg-base shadow-[0_0_12px_rgba(255,215,0,0.3)]" : "bg-bg-elevated border border-border-subtle text-text-muted"
                 }`}>
                   {s < step ? <Check className="w-3.5 h-3.5" /> : s}
                 </div>
-                {s < 3 && <div className={`w-6 h-0.5 transition-colors ${s < step ? "bg-green-live" : "bg-border-subtle"}`} />}
+                {s < 3 && <div className={`flex-1 h-0.5 transition-colors ${s < step ? "bg-green-live" : "bg-border-subtle"}`} />}
               </div>
             ))}
           </div>
