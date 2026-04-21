@@ -45,7 +45,10 @@ interface MatchRow {
   away_team_flag: string | null;
   scheduled_at: string;
   phase: string | null;
+  match_day: number | null;
 }
+
+type GroupMode = "phase" | "date" | "matchday";
 
 interface MatchGroup {
   key: string;
@@ -88,13 +91,9 @@ function formatMatchDate(iso: string): string {
   return `${date}, ${time}`;
 }
 
-// Groups matches by phase. Returns shouldShowHeaders=false when every match
-// shares the same phase (or all are null) so short pollas render as a clean
-// flat list instead of a single pointless accordion header.
-function groupMatchesByPhase(matches: MatchRow[]): {
-  groups: MatchGroup[];
-  shouldShowHeaders: boolean;
-} {
+// Groups matches by phase. Headers always render now (caller decides via
+// the toggle whether phase grouping is the active mode).
+function groupMatchesByPhase(matches: MatchRow[]): MatchGroup[] {
   const map = new Map<string, MatchRow[]>();
   for (const m of matches) {
     const key = m.phase ?? "__none__";
@@ -111,7 +110,66 @@ function groupMatchesByPhase(matches: MatchRow[]): {
   groups.sort((a, b) =>
     a.matches[0].scheduled_at.localeCompare(b.matches[0].scheduled_at)
   );
-  return { groups, shouldShowHeaders: groups.length > 1 };
+  return groups;
+}
+
+// Groups matches by calendar date (Colombia tz). Header format: "jue, 11 de jun".
+function groupMatchesByDate(matches: MatchRow[]): MatchGroup[] {
+  const keyFmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const labelFmt = new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const map = new Map<string, { label: string; matches: MatchRow[] }>();
+  for (const m of matches) {
+    const d = new Date(m.scheduled_at);
+    const key = keyFmt.format(d); // YYYY-MM-DD, stable sort key
+    const label = labelFmt.format(d);
+    if (!map.has(key)) map.set(key, { label, matches: [] });
+    map.get(key)!.matches.push(m);
+  }
+  const groups: MatchGroup[] = Array.from(map.entries()).map(
+    ([key, { label, matches: ms }]) => ({
+      key,
+      label,
+      matches: ms
+        .slice()
+        .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)),
+    })
+  );
+  groups.sort((a, b) => a.key.localeCompare(b.key));
+  return groups;
+}
+
+// Groups matches by match_day. Null values fall into a "Sin jornada" group
+// which is placed last regardless of its earliest scheduled_at.
+function groupMatchesByMatchday(matches: MatchRow[]): MatchGroup[] {
+  const map = new Map<string, MatchRow[]>();
+  for (const m of matches) {
+    const key = m.match_day != null ? `md-${m.match_day}` : "__none__";
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(m);
+  }
+  const groups: MatchGroup[] = Array.from(map.entries()).map(([key, ms]) => ({
+    key,
+    label: key === "__none__" ? "Sin jornada" : `Jornada ${key.slice(3)}`,
+    matches: ms
+      .slice()
+      .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)),
+  }));
+  groups.sort((a, b) => {
+    if (a.key === "__none__") return 1;
+    if (b.key === "__none__") return -1;
+    return a.matches[0].scheduled_at.localeCompare(b.matches[0].scheduled_at);
+  });
+  return groups;
 }
 
 function MatchRowView({ m }: { m: MatchRow }) {
@@ -171,6 +229,7 @@ export default function OpenInvitePage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [joining, setJoining] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
+  const [groupMode, setGroupMode] = useState<GroupMode>("phase");
 
   useEffect(() => {
     async function load() {
@@ -228,7 +287,7 @@ export default function OpenInvitePage() {
           matchIds.length > 0
             ? supabase
                 .from("matches")
-                .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, phase")
+                .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, phase, match_day")
                 .in("id", matchIds)
                 .order("scheduled_at", { ascending: true })
                 .returns<MatchRow[]>()
@@ -246,14 +305,26 @@ export default function OpenInvitePage() {
     load();
   }, [token, router]);
 
-  const { groups, shouldShowHeaders } = useMemo(
-    () => groupMatchesByPhase(matches),
+  const hasAnyMatchday = useMemo(
+    () => matches.some((m) => m.match_day != null),
     [matches]
   );
 
-  // Default: expand the first (earliest) phase, collapse the rest. When a
-  // polla has only one phase group, shouldShowHeaders is false so this is
-  // moot. Recomputes whenever the phase keys actually change.
+  // Fallback if the active mode loses its toggle (e.g. user picked matchday
+  // then the pill vanishes because no match_day rows remain).
+  useEffect(() => {
+    if (groupMode === "matchday" && !hasAnyMatchday) setGroupMode("phase");
+  }, [groupMode, hasAnyMatchday]);
+
+  const groups = useMemo(() => {
+    if (groupMode === "date") return groupMatchesByDate(matches);
+    if (groupMode === "matchday") return groupMatchesByMatchday(matches);
+    return groupMatchesByPhase(matches);
+  }, [matches, groupMode]);
+
+  // Default: expand the first (earliest) group, collapse the rest. Re-runs
+  // when the groups array identity changes (either matches loaded or the
+  // user flipped the toggle).
   useEffect(() => {
     if (groups.length === 0) return;
     setExpandedPhases(new Set([groups[0].key]));
@@ -411,18 +482,41 @@ export default function OpenInvitePage() {
 
         {/* Match list — the only scrolling region on the page. */}
         <div className="px-5 pt-2 pb-3 flex-1 min-h-0 flex flex-col">
-          <h2 className="text-sm font-semibold text-text-primary mb-2 shrink-0">
-            Partidos incluidos ({matches.length})
-          </h2>
+          <div className="flex items-center justify-between mb-2 shrink-0 gap-2">
+            <h2 className="text-sm font-semibold text-text-primary">
+              Partidos incluidos ({matches.length})
+            </h2>
+          </div>
+          {matches.length > 0 ? (
+            <div className="flex gap-1 mb-2 shrink-0">
+              {([
+                { val: "phase", label: "Por fase" },
+                { val: "date", label: "Por fecha" },
+                ...(hasAnyMatchday
+                  ? [{ val: "matchday", label: "Por jornada" }]
+                  : []),
+              ] as { val: GroupMode; label: string }[]).map((opt) => {
+                const active = groupMode === opt.val;
+                return (
+                  <button
+                    key={opt.val}
+                    type="button"
+                    onClick={() => setGroupMode(opt.val)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                      active
+                        ? "bg-gold text-bg-base"
+                        : "bg-transparent text-text-muted border border-border-subtle hover:text-text-primary"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
             {matches.length === 0 ? (
               <p className="text-text-muted text-sm">Todavía no hay partidos asignados.</p>
-            ) : !shouldShowHeaders ? (
-              <ul className="space-y-2">
-                {groups[0].matches.map((m) => (
-                  <MatchRowView key={m.id} m={m} />
-                ))}
-              </ul>
             ) : (
               <div className="space-y-2">
                 {groups.map((group) => {
