@@ -10,7 +10,7 @@ import Image from "next/image";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer } from "@/lib/animations";
-import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Smartphone, Handshake, Lock, Globe } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Smartphone, Handshake, Lock } from "lucide-react";
 import { formatCOP } from "@/lib/formatCurrency";
 import { TOURNAMENTS } from "@/lib/tournaments";
 import FootballLoader from "@/components/ui/FootballLoader";
@@ -93,7 +93,7 @@ export default function CrearPollaPage() {
     tournament: "champions_2025",
     type: "closed",
     buyInAmount: 10000,
-    paymentMode: "admin_collects",
+    paymentMode: "pay_winner",
     adminPaymentInstructions: "",
   });
 
@@ -253,6 +253,9 @@ export default function CrearPollaPage() {
       });
       // Pay-first path (digital_pool + buy_in > 0): polla isn't created yet,
       // webhook will materialize it. Stash the reference and jump to Wompi.
+      // Wompi flow hidden from UI as of the MVP cut. Keep for future re-enable;
+      // this branch is currently unreachable because digital_pool cannot be
+      // selected from the payment picker.
       if (data.checkoutUrl && data.reference) {
         sessionStorage.setItem("pollaDraftReference", data.reference);
         window.location.href = data.checkoutUrl;
@@ -342,17 +345,14 @@ export default function CrearPollaPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
+            {/* Tipo de polla: "Abierta" oculto del UI durante el MVP. Todas las
+                pollas nuevas quedan como "closed" (Privada). El backend aún
+                acepta type='open'; re-habilitar añadiendo la segunda opción. */}
+            <div className="rounded-2xl p-5 space-y-2 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Tipo de polla</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {[{ val: "closed" as const, label: "Privada", desc: "Solo por invitación", Icon: Lock }, { val: "open" as const, label: "Abierta", desc: "Cualquiera con el link", Icon: Globe }].map((opt) => (
-                  <button key={opt.val} type="button" onClick={() => updateForm("type", opt.val)}
-                    className={`p-4 rounded-xl border text-center transition-all cursor-pointer ${form.type === opt.val ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated"}`}>
-                    <span className="block mb-1"><opt.Icon className="w-6 h-6 mx-auto" style={{ color: "#7a8499" }} /></span>
-                    <span className="font-bold text-sm text-text-primary block">{opt.label}</span>
-                    <span className="text-xs text-text-muted">{opt.desc}</span>
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 text-text-secondary text-sm">
+                <Lock className="w-4 h-4 text-gold" aria-hidden="true" />
+                <span>Tu polla será privada, solo por invitación.</span>
               </div>
             </div>
 
@@ -589,7 +589,10 @@ export default function CrearPollaPage() {
               ) : (
                 <>
                   <div className="space-y-3">
-                    {PAYMENT_MODE_OPTIONS.map((option) => {
+                    {/* "digital_pool" oculto del UI durante el MVP (Wompi fuera).
+                        La opción permanece en PAYMENT_MODE_OPTIONS para que el
+                        backend la siga aceptando; re-habilitar quitando el filtro. */}
+                    {PAYMENT_MODE_OPTIONS.filter((o) => o.value !== "digital_pool").map((option) => {
                       const isSelected = form.paymentMode === option.value;
                       return (
                         <button key={option.value} type="button"
