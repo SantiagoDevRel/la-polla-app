@@ -7,11 +7,11 @@
 // so the invitee can decide informed.
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import axios from "axios";
-import { Info, Target } from "lucide-react";
+import { ChevronDown, Info, Target } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -44,6 +44,33 @@ interface MatchRow {
   home_team_flag: string | null;
   away_team_flag: string | null;
   scheduled_at: string;
+  phase: string | null;
+}
+
+interface MatchGroup {
+  key: string;
+  label: string;
+  matches: MatchRow[];
+}
+
+const PHASE_LABELS: Record<string, string> = {
+  group_stage: "Fase de grupos",
+  league_stage: "Fase de liga",
+  regular_season: "Temporada regular",
+  round_of_32: "Dieciseisavos",
+  round_of_16: "Octavos de final",
+  quarter_finals: "Cuartos de final",
+  semi_finals: "Semifinales",
+  third_place: "Tercer puesto",
+  final: "Final",
+  playoff: "Playoffs",
+};
+
+function formatPhaseLabel(phase: string | null): string {
+  if (!phase) return "Partidos";
+  if (PHASE_LABELS[phase]) return PHASE_LABELS[phase];
+  const spaced = phase.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 function formatMatchDate(iso: string): string {
@@ -61,6 +88,73 @@ function formatMatchDate(iso: string): string {
   return `${date}, ${time}`;
 }
 
+// Groups matches by phase. Returns shouldShowHeaders=false when every match
+// shares the same phase (or all are null) so short pollas render as a clean
+// flat list instead of a single pointless accordion header.
+function groupMatchesByPhase(matches: MatchRow[]): {
+  groups: MatchGroup[];
+  shouldShowHeaders: boolean;
+} {
+  const map = new Map<string, MatchRow[]>();
+  for (const m of matches) {
+    const key = m.phase ?? "__none__";
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(m);
+  }
+  const groups: MatchGroup[] = Array.from(map.entries()).map(([key, ms]) => ({
+    key,
+    label: formatPhaseLabel(key === "__none__" ? null : key),
+    matches: ms
+      .slice()
+      .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)),
+  }));
+  groups.sort((a, b) =>
+    a.matches[0].scheduled_at.localeCompare(b.matches[0].scheduled_at)
+  );
+  return { groups, shouldShowHeaders: groups.length > 1 };
+}
+
+function MatchRowView({ m }: { m: MatchRow }) {
+  return (
+    <li className="rounded-lg p-3 bg-bg-elevated border border-border-subtle">
+      <div className="flex items-center gap-2 text-sm text-text-primary min-w-0">
+        {m.home_team_flag ? (
+          <Image
+            src={m.home_team_flag}
+            alt=""
+            width={18}
+            height={18}
+            className="flex-shrink-0"
+            style={{ objectFit: "contain" }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : null}
+        <span className="truncate flex-1 min-w-0">{m.home_team}</span>
+        <span className="text-text-muted text-xs shrink-0">vs</span>
+        {m.away_team_flag ? (
+          <Image
+            src={m.away_team_flag}
+            alt=""
+            width={18}
+            height={18}
+            className="flex-shrink-0"
+            style={{ objectFit: "contain" }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : null}
+        <span className="truncate flex-1 min-w-0">{m.away_team}</span>
+      </div>
+      <p className="text-[11px] text-text-muted mt-1">
+        {formatMatchDate(m.scheduled_at)}
+      </p>
+    </li>
+  );
+}
+
 export default function OpenInvitePage() {
   const params = useParams();
   const router = useRouter();
@@ -76,6 +170,7 @@ export default function OpenInvitePage() {
   const [error, setError] = useState("");
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [joining, setJoining] = useState(false);
+  const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function load() {
@@ -118,7 +213,6 @@ export default function OpenInvitePage() {
           }
         }
 
-        // Organizer, participant count y matches en paralelo.
         const matchIds = row.match_ids ?? [];
         const [organizerRes, countRes, matchesRes] = await Promise.all([
           supabase
@@ -134,7 +228,7 @@ export default function OpenInvitePage() {
           matchIds.length > 0
             ? supabase
                 .from("matches")
-                .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at")
+                .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, phase")
                 .in("id", matchIds)
                 .order("scheduled_at", { ascending: true })
                 .returns<MatchRow[]>()
@@ -151,6 +245,28 @@ export default function OpenInvitePage() {
     }
     load();
   }, [token, router]);
+
+  const { groups, shouldShowHeaders } = useMemo(
+    () => groupMatchesByPhase(matches),
+    [matches]
+  );
+
+  // Default: expand the first (earliest) phase, collapse the rest. When a
+  // polla has only one phase group, shouldShowHeaders is false so this is
+  // moot. Recomputes whenever the phase keys actually change.
+  useEffect(() => {
+    if (groups.length === 0) return;
+    setExpandedPhases(new Set([groups[0].key]));
+  }, [groups]);
+
+  function togglePhase(key: string) {
+    setExpandedPhases((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function goLogin() {
     if (typeof window !== "undefined") {
@@ -239,13 +355,15 @@ export default function OpenInvitePage() {
   const potTotal = polla.buy_in_amount > 0 ? polla.buy_in_amount * participantCount : 0;
 
   return (
-    <div className="min-h-screen flex items-start justify-center p-4 py-8">
-      <div className="rounded-2xl max-w-md w-full overflow-hidden bg-bg-card border border-border-subtle">
+    // h-screen + flex column keeps the card the full viewport height so the
+    // match list can scroll internally while header/badges/CTA stay pinned.
+    <div className="h-screen flex flex-col items-center justify-start p-4">
+      <div className="rounded-2xl max-w-md w-full flex-1 flex flex-col min-h-0 overflow-hidden bg-bg-card border border-border-subtle">
         <div
-          className="p-6 text-center"
+          className="p-5 text-center shrink-0"
           style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-card) 100%)" }}
         >
-          <Target className="w-10 h-10 text-gold mx-auto mb-2" />
+          <Target className="w-9 h-9 text-gold mx-auto mb-2" />
           <h1 className="text-2xl font-display uppercase tracking-[0.04em] text-text-primary">
             {polla.name}
           </h1>
@@ -253,7 +371,7 @@ export default function OpenInvitePage() {
             <TournamentBadge tournamentSlug={polla.tournament} size="md" />
           </div>
           {organizer ? (
-            <div className="mt-3 flex items-center justify-center gap-2 text-text-secondary text-sm">
+            <div className="mt-2 flex items-center justify-center gap-2 text-text-secondary text-sm">
               <span>Creada por</span>
               <UserAvatar
                 avatarUrl={organizer.avatar_url}
@@ -265,11 +383,10 @@ export default function OpenInvitePage() {
           ) : null}
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="px-5 pt-3 pb-2 shrink-0 space-y-3">
           {polla.description && (
             <p className="text-text-secondary text-sm text-center">{polla.description}</p>
           )}
-
           <div className={`grid ${polla.buy_in_amount > 0 ? "grid-cols-3" : "grid-cols-2"} gap-3 text-center`}>
             <div className="rounded-xl p-3 bg-bg-elevated">
               <p className="score-font text-2xl text-gold">{participantCount}</p>
@@ -290,69 +407,79 @@ export default function OpenInvitePage() {
               </div>
             ) : null}
           </div>
+        </div>
 
-          <div>
-            <h2 className="text-sm font-semibold text-text-primary mb-2">
-              Partidos incluidos ({matches.length})
-            </h2>
+        {/* Match list — the only scrolling region on the page. */}
+        <div className="px-5 pt-2 pb-3 flex-1 min-h-0 flex flex-col">
+          <h2 className="text-sm font-semibold text-text-primary mb-2 shrink-0">
+            Partidos incluidos ({matches.length})
+          </h2>
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
             {matches.length === 0 ? (
               <p className="text-text-muted text-sm">Todavía no hay partidos asignados.</p>
-            ) : (
+            ) : !shouldShowHeaders ? (
               <ul className="space-y-2">
-                {matches.map((m) => (
-                  <li
-                    key={m.id}
-                    className="rounded-lg p-3 bg-bg-elevated border border-border-subtle"
-                  >
-                    <div className="flex items-center gap-2 text-sm text-text-primary min-w-0">
-                      {m.home_team_flag ? (
-                        <Image
-                          src={m.home_team_flag}
-                          alt=""
-                          width={18}
-                          height={18}
-                          className="flex-shrink-0"
-                          style={{ objectFit: "contain" }}
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      ) : null}
-                      <span className="truncate flex-1 min-w-0">{m.home_team}</span>
-                      <span className="text-text-muted text-xs shrink-0">vs</span>
-                      {m.away_team_flag ? (
-                        <Image
-                          src={m.away_team_flag}
-                          alt=""
-                          width={18}
-                          height={18}
-                          className="flex-shrink-0"
-                          style={{ objectFit: "contain" }}
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      ) : null}
-                      <span className="truncate flex-1 min-w-0">{m.away_team}</span>
-                    </div>
-                    <p className="text-[11px] text-text-muted mt-1">
-                      {formatMatchDate(m.scheduled_at)}
-                    </p>
-                  </li>
+                {groups[0].matches.map((m) => (
+                  <MatchRowView key={m.id} m={m} />
                 ))}
               </ul>
+            ) : (
+              <div className="space-y-2">
+                {groups.map((group) => {
+                  const open = expandedPhases.has(group.key);
+                  return (
+                    <div
+                      key={group.key}
+                      className="rounded-lg bg-bg-elevated/50 border border-border-subtle overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => togglePhase(group.key)}
+                        className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-text-primary hover:bg-bg-elevated transition-colors"
+                        aria-expanded={open}
+                      >
+                        <span>
+                          {group.label}{" "}
+                          <span className="text-text-muted font-normal">
+                            ({group.matches.length})
+                          </span>
+                        </span>
+                        <ChevronDown
+                          className={`w-4 h-4 text-text-muted transition-transform ${open ? "rotate-180" : ""}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      {open ? (
+                        <ul className="space-y-2 px-2 pb-2">
+                          {group.matches.map((m) => (
+                            <MatchRowView key={m.id} m={m} />
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
+        </div>
 
+        {/* Sticky CTA row. Sits at the bottom of the card with a subtle top
+            border so the scrolled list does not bleed through. Covers the
+            three runtime states: Unirme, Iniciar sesión, Esta polla cerró. */}
+        <div
+          className="shrink-0 border-t border-border-subtle p-4 bg-bg-card"
+          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+        >
           {isEnded ? (
-            <div className="rounded-xl p-4 text-center bg-bg-elevated border border-border-subtle">
+            <div className="rounded-xl p-3 text-center bg-bg-elevated border border-border-subtle">
               <p className="text-text-primary font-semibold">Esta polla ya cerró.</p>
-              <p className="text-text-secondary text-sm mt-1">No podés unirte.</p>
+              <p className="text-text-secondary text-sm mt-0.5">No podés unirte.</p>
             </div>
           ) : authed === false ? (
             <button
               onClick={goLogin}
-              className="w-full bg-gold text-bg-base font-semibold py-4 rounded-xl hover:brightness-110 transition-all text-lg"
+              className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all text-base"
             >
               Iniciar sesión y unirse
             </button>
@@ -360,15 +487,14 @@ export default function OpenInvitePage() {
             <button
               onClick={handleJoin}
               disabled={joining}
-              className="w-full bg-gold text-bg-base font-semibold py-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 text-lg"
+              className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 text-base"
             >
               {joining ? "Uniéndose..." : "Unirme"}
             </button>
           )}
-
           <button
             onClick={() => router.push("/inicio")}
-            className="w-full text-text-muted text-sm py-2"
+            className="w-full text-text-muted text-xs pt-2"
           >
             Volver al inicio
           </button>
