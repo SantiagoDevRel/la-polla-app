@@ -1,8 +1,7 @@
-// app/(app)/pollas/crear/page.tsx — Wizard de 4 pasos para crear una nueva polla
+// app/(app)/pollas/crear/page.tsx — Wizard de 3 pasos para crear una nueva polla
 // Paso 1: Info (nombre, torneo, tipo)
 // Paso 2: Partidos (selección de partidos del torneo)
-// Paso 3: Alcance (visibilidad, cuota de entrada)
-// Paso 4: Pago (modo de pago, instrucciones)
+// Paso 3: Configuración (cuota de entrada + modo de pago + instrucciones)
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -19,11 +18,10 @@ import FootballLoader from "@/components/ui/FootballLoader";
 // ─── Tipos ───
 
 type PaymentMode = "digital_pool" | "admin_collects" | "pay_winner";
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3;
 
 interface FormState {
   name: string;
-  description: string;
   tournament: string;
   type: "open" | "closed";
   buyInAmount: number;
@@ -92,7 +90,6 @@ export default function CrearPollaPage() {
   const [customBuyIn, setCustomBuyIn] = useState(false);
   const [form, setForm] = useState<FormState>({
     name: "",
-    description: "",
     tournament: "champions_2025",
     type: "closed",
     buyInAmount: 10000,
@@ -272,7 +269,7 @@ export default function CrearPollaPage() {
     }
   }
 
-  const STEP_LABELS = ["Info", "Partidos", "Alcance", "Pago"];
+  const STEP_LABELS = ["Info", "Partidos", "Configuración"];
 
   const tournamentMeta = TOURNAMENTS.find((t) => t.slug === form.tournament);
 
@@ -288,16 +285,16 @@ export default function CrearPollaPage() {
             <h1 className="text-lg font-bold text-text-primary">Crear nueva polla</h1>
           </div>
 
-          {/* Stepper — 4 steps */}
+          {/* Stepper — 3 steps */}
           <div className="flex items-center justify-center gap-0">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3].map((s) => (
               <div key={s} className="flex items-center">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                   s < step ? "bg-green-live text-bg-base" : s === step ? "bg-gold text-bg-base shadow-[0_0_12px_rgba(255,215,0,0.3)]" : "bg-bg-elevated border border-border-subtle text-text-muted"
                 }`}>
                   {s < step ? <Check className="w-3.5 h-3.5" /> : s}
                 </div>
-                {s < 4 && <div className={`w-6 h-0.5 transition-colors ${s < step ? "bg-green-live" : "bg-border-subtle"}`} />}
+                {s < 3 && <div className={`w-6 h-0.5 transition-colors ${s < step ? "bg-green-live" : "bg-border-subtle"}`} />}
               </div>
             ))}
           </div>
@@ -321,11 +318,6 @@ export default function CrearPollaPage() {
                 <label className="block text-sm font-medium text-text-secondary mb-1.5">Nombre <span className="text-red-alert">*</span></label>
                 <input type="text" value={form.name} onChange={(e) => updateForm("name", e.target.value)} placeholder="Ej: Polla Mundial Oficina"
                   className="w-full px-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Descripción (opcional)</label>
-                <textarea value={form.description} onChange={(e) => updateForm("description", e.target.value)} placeholder="Descripción..." rows={2}
-                  className="w-full px-4 py-3 rounded-xl outline-none resize-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50" />
               </div>
             </div>
 
@@ -525,10 +517,10 @@ export default function CrearPollaPage() {
           </div>
         )}
 
-        {/* ═══ PASO 3 — Alcance (cuota + visibilidad) ═══ */}
+        {/* ═══ PASO 3 — Configuración (cuota + modo de pago + instrucciones) ═══ */}
         {step === 3 && (
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
-            {/* Cuota de entrada */}
+            {/* Sección 1: Cuota de entrada */}
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <div>
                 <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
@@ -564,31 +556,7 @@ export default function CrearPollaPage() {
               )}
             </div>
 
-            {/* Summary */}
-            <div className="rounded-xl p-4 flex items-start gap-2.5 bg-bg-elevated border border-border-subtle">
-              <Info className="w-4 h-4 text-blue-info flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-text-secondary">
-                {selectedMatchIds.size} partidos seleccionados · {tournamentMeta?.name || form.tournament}
-              </p>
-            </div>
-
-            {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
-            <div className="flex gap-3">
-              <button type="button" onClick={() => goToStep(2)} className="flex-1 font-bold py-4 rounded-xl bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 cursor-pointer">
-                <span className="flex items-center justify-center gap-1"><ArrowLeft className="w-4 h-4" /> Atrás</span>
-              </button>
-              <button type="button" onClick={() => goToStep(4)}
-                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-1 cursor-pointer"
-                style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}>
-                Siguiente <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ═══ PASO 4 — Pago ═══ */}
-        {step === 4 && (
-          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
+            {/* Sección 2: Modo de pago */}
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Modo de pago</h2>
               {form.type === "open" ? (
@@ -661,9 +629,17 @@ export default function CrearPollaPage() {
               </div>
             )}
 
+            {/* Summary */}
+            <div className="rounded-xl p-4 flex items-start gap-2.5 bg-bg-elevated border border-border-subtle">
+              <Info className="w-4 h-4 text-blue-info flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-text-secondary">
+                {selectedMatchIds.size} partidos seleccionados · {tournamentMeta?.name || form.tournament}
+              </p>
+            </div>
+
             {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
             <div className="flex gap-3">
-              <button type="button" onClick={() => goToStep(3)} className="flex-1 font-bold py-4 rounded-xl bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 cursor-pointer">
+              <button type="button" onClick={() => goToStep(2)} className="flex-1 font-bold py-4 rounded-xl bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 cursor-pointer">
                 <span className="flex items-center justify-center gap-1"><ArrowLeft className="w-4 h-4" /> Atrás</span>
               </button>
               <button type="button" onClick={handleSubmit} disabled={loading}
