@@ -45,10 +45,9 @@ interface MatchRow {
   away_team_flag: string | null;
   scheduled_at: string;
   phase: string | null;
-  match_day: number | null;
 }
 
-type GroupMode = "phase" | "date" | "matchday";
+type GroupMode = "phase" | "date";
 
 interface MatchGroup {
   key: string;
@@ -145,30 +144,6 @@ function groupMatchesByDate(matches: MatchRow[]): MatchGroup[] {
     })
   );
   groups.sort((a, b) => a.key.localeCompare(b.key));
-  return groups;
-}
-
-// Groups matches by match_day. Null values fall into a "Sin jornada" group
-// which is placed last regardless of its earliest scheduled_at.
-function groupMatchesByMatchday(matches: MatchRow[]): MatchGroup[] {
-  const map = new Map<string, MatchRow[]>();
-  for (const m of matches) {
-    const key = m.match_day != null ? `md-${m.match_day}` : "__none__";
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(m);
-  }
-  const groups: MatchGroup[] = Array.from(map.entries()).map(([key, ms]) => ({
-    key,
-    label: key === "__none__" ? "Sin jornada" : `Jornada ${key.slice(3)}`,
-    matches: ms
-      .slice()
-      .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)),
-  }));
-  groups.sort((a, b) => {
-    if (a.key === "__none__") return 1;
-    if (b.key === "__none__") return -1;
-    return a.matches[0].scheduled_at.localeCompare(b.matches[0].scheduled_at);
-  });
   return groups;
 }
 
@@ -287,7 +262,7 @@ export default function OpenInvitePage() {
           matchIds.length > 0
             ? supabase
                 .from("matches")
-                .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, phase, match_day")
+                .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, phase")
                 .in("id", matchIds)
                 .order("scheduled_at", { ascending: true })
                 .returns<MatchRow[]>()
@@ -305,20 +280,8 @@ export default function OpenInvitePage() {
     load();
   }, [token, router]);
 
-  const hasAnyMatchday = useMemo(
-    () => matches.some((m) => m.match_day != null),
-    [matches]
-  );
-
-  // Fallback if the active mode loses its toggle (e.g. user picked matchday
-  // then the pill vanishes because no match_day rows remain).
-  useEffect(() => {
-    if (groupMode === "matchday" && !hasAnyMatchday) setGroupMode("phase");
-  }, [groupMode, hasAnyMatchday]);
-
   const groups = useMemo(() => {
     if (groupMode === "date") return groupMatchesByDate(matches);
-    if (groupMode === "matchday") return groupMatchesByMatchday(matches);
     return groupMatchesByPhase(matches);
   }, [matches, groupMode]);
 
@@ -492,9 +455,6 @@ export default function OpenInvitePage() {
               {([
                 { val: "phase", label: "Por fase" },
                 { val: "date", label: "Por fecha" },
-                ...(hasAnyMatchday
-                  ? [{ val: "matchday", label: "Por jornada" }]
-                  : []),
               ] as { val: GroupMode; label: string }[]).map((opt) => {
                 const active = groupMode === opt.val;
                 return (
