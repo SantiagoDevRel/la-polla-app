@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import axios from "axios";
-import { Info, Target, Lock, Globe } from "lucide-react";
+import { Info, Target } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -235,7 +235,6 @@ export default function OpenInvitePage() {
     );
   }
 
-  const isPrivate = polla.type === "closed";
   const isEnded = polla.status === "ended";
   const potTotal = polla.buy_in_amount > 0 ? polla.buy_in_amount * participantCount : 0;
 
@@ -271,18 +270,7 @@ export default function OpenInvitePage() {
             <p className="text-text-secondary text-sm text-center">{polla.description}</p>
           )}
 
-          <div className="grid grid-cols-2 gap-3 text-center">
-            <div className="rounded-xl p-3 bg-bg-elevated flex flex-col items-center justify-center">
-              {isPrivate ? (
-                <Lock className="w-5 h-5 text-gold mb-1" aria-hidden="true" />
-              ) : (
-                <Globe className="w-5 h-5 text-gold mb-1" aria-hidden="true" />
-              )}
-              <p className="text-sm font-semibold text-text-primary">
-                {isPrivate ? "Privada" : "Abierta"}
-              </p>
-              <p className="text-[11px] text-text-muted">Tipo</p>
-            </div>
+          <div className={`grid ${polla.buy_in_amount > 0 ? "grid-cols-3" : "grid-cols-2"} gap-3 text-center`}>
             <div className="rounded-xl p-3 bg-bg-elevated">
               <p className="score-font text-2xl text-gold">{participantCount}</p>
               <p className="text-[11px] text-text-muted">Participantes</p>

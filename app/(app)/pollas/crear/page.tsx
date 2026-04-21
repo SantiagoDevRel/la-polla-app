@@ -51,21 +51,21 @@ interface MatchRow {
 const PAYMENT_MODE_OPTIONS = [
   {
     value: "admin_collects" as PaymentMode,
-    title: "Cuota de entrada",
+    title: "Pago al principio",
     icon: "banknote",
     description: "Cada participante le paga al organizador (tú) antes de entrar a la polla.",
-    tag: "Recomendado",
+    tag: "",
   },
   {
     value: "digital_pool" as PaymentMode,
     title: "Pago digital",
     icon: "smartphone",
-    description: "Los participantes pagan en línea al unirse — el dinero se libera al ganador al final.",
+    description: "Los participantes pagan en línea al unirse, el dinero se libera al ganador al final.",
     tag: "Online",
   },
   {
     value: "pay_winner" as PaymentMode,
-    title: "Pago al ganador",
+    title: "Pago al final",
     icon: "handshake",
     description: "Al terminar la polla, cada participante le paga directamente al ganador.",
     tag: "Al final",
@@ -73,8 +73,8 @@ const PAYMENT_MODE_OPTIONS = [
 ];
 
 const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = {
-  admin_collects: "💡 Cada uno te paga antes de entrar. Tú guardas el pozo.",
-  pay_winner: "💡 Al final, todos le pagan directamente al ganador.",
+  admin_collects: "Cada participante le paga al organizador (tú) antes de entrar. Cada vez que alguien te pague, lo marcás como pagado para que pueda participar.",
+  pay_winner: "Al final, todos le pagan directamente al ganador.",
   digital_pool: "El pago es automático. El ganador recibe el pozo menos la comisión de la plataforma (10% del total).",
 };
 
@@ -288,26 +288,25 @@ export default function CrearPollaPage() {
             <h1 className="text-lg font-bold text-text-primary">Crear nueva polla</h1>
           </div>
 
-          {/* Stepper — 3 steps. Connectors use flex-1 inside a constrained
-              max-w band so the circles span edge-to-edge instead of
-              clustering in the middle after the 4→3 collapse. */}
-          <div className="flex items-center max-w-xs mx-auto">
-            {[1, 2, 3].map((s) => (
-              <div key={s} className={`flex items-center ${s < 3 ? "flex-1" : ""}`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all shrink-0 ${
-                  s < step ? "bg-green-live text-bg-base" : s === step ? "bg-gold text-bg-base shadow-[0_0_12px_rgba(255,215,0,0.3)]" : "bg-bg-elevated border border-border-subtle text-text-muted"
-                }`}>
-                  {s < step ? <Check className="w-3.5 h-3.5" /> : s}
+          {/* Stepper — 3 steps. Each step is a circle+label column; the
+              connector between circles is a flex-1 bar sitting at the
+              vertical center of the circle row. This keeps labels directly
+              under their circles and the circles spanning the full band. */}
+          <div className="flex items-start max-w-xs mx-auto">
+            {[1, 2, 3].map((s, i) => (
+              <div key={s} className={`flex items-start ${s < 3 ? "flex-1" : ""}`}>
+                <div className="flex flex-col items-center gap-1 shrink-0">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                    s < step ? "bg-green-live text-bg-base" : s === step ? "bg-gold text-bg-base shadow-[0_0_12px_rgba(255,215,0,0.3)]" : "bg-bg-elevated border border-border-subtle text-text-muted"
+                  }`}>
+                    {s < step ? <Check className="w-3.5 h-3.5" /> : s}
+                  </div>
+                  <span className={`text-[9px] font-medium ${s === step ? "text-gold" : s < step ? "text-green-live" : "text-text-muted"}`}>
+                    {STEP_LABELS[i]}
+                  </span>
                 </div>
-                {s < 3 && <div className={`flex-1 h-0.5 transition-colors ${s < step ? "bg-green-live" : "bg-border-subtle"}`} />}
+                {s < 3 && <div className={`flex-1 h-0.5 mt-[13px] transition-colors ${s < step ? "bg-green-live" : "bg-border-subtle"}`} />}
               </div>
-            ))}
-          </div>
-          <div className="flex justify-center gap-4 mt-1">
-            {STEP_LABELS.map((label, i) => (
-              <span key={label} className={`text-[9px] font-medium ${i + 1 === step ? "text-gold" : i + 1 < step ? "text-green-live" : "text-text-muted"}`}>
-                {label}
-              </span>
             ))}
           </div>
         </div>
@@ -352,7 +351,7 @@ export default function CrearPollaPage() {
               <h2 className="text-base font-bold text-text-primary">Tipo de polla</h2>
               <div className="flex items-center gap-2 text-text-secondary text-sm">
                 <Lock className="w-4 h-4 text-gold" aria-hidden="true" />
-                <span>Tu polla será privada, solo por invitación.</span>
+                <span>Solo personas con el link o el código de invitación podrán unirse a tu polla.</span>
               </div>
             </div>
 
@@ -607,7 +606,7 @@ export default function CrearPollaPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="font-bold text-text-primary">{option.title}</span>
-                                <span className="text-[10px] px-3 py-1 rounded-full font-medium bg-gold/10 text-gold border border-gold/20">{option.tag}</span>
+                                {option.tag && <span className="text-[10px] px-3 py-1 rounded-full font-medium bg-gold/10 text-gold border border-gold/20">{option.tag}</span>}
                               </div>
                               <p className="text-sm text-text-secondary leading-snug">{option.description}</p>
                             </div>
