@@ -13,6 +13,8 @@ import {
   handleMisPollas,
   handlePollaMenu,
   handlePronosticar,
+  handlePredictGroupMode,
+  handlePredictGroupSelect,
   handlePredictionInput,
   handleLeaderboard,
   handleResults,
@@ -443,6 +445,8 @@ async function routePayload(
     payload.startsWith("pred_next_") ||
     payload.startsWith("match_") ||
     payload.startsWith("more_") ||
+    payload.startsWith("predgrp_") ||
+    payload.startsWith("pgsel|") ||
     payload === "confirm_yes" ||
     payload === "confirm_no" ||
     payload === "join_code_yes" ||
@@ -524,6 +528,30 @@ async function routePayload(
   if (payload.startsWith("pred_")) {
     const pollaId = payload.replace("pred_", "").replace("next_", "");
     await handlePronosticar(from, user.id, pollaId);
+    return;
+  }
+
+  // Predict group-mode toggle: "Por fase" / "Por fecha" buttons.
+  if (payload.startsWith("predgrp_phase_")) {
+    const pollaId = payload.replace("predgrp_phase_", "");
+    await handlePredictGroupMode(from, user.id, pollaId, "phase");
+    return;
+  }
+  if (payload.startsWith("predgrp_date_")) {
+    const pollaId = payload.replace("predgrp_date_", "");
+    await handlePredictGroupMode(from, user.id, pollaId, "date");
+    return;
+  }
+
+  // Predict group selection: user tapped a row in the phase/date list.
+  // Payload format: "pgsel|{pollaId}|{groupKey}".
+  if (payload.startsWith("pgsel|")) {
+    const parts = payload.split("|");
+    if (parts.length >= 3) {
+      const pollaId = parts[1];
+      const groupKey = parts.slice(2).join("|");
+      await handlePredictGroupSelect(from, user.id, pollaId, groupKey);
+    }
     return;
   }
 
