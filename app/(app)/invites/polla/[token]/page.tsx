@@ -177,11 +177,15 @@ export default function OpenInvitePage() {
             .select("display_name, avatar_url")
             .eq("id", row.created_by)
             .maybeSingle<OrganizerSummary>(),
+          // Count only paid=true participants so the Participantes badge and
+          // pozo reflect committed entries (admin counts because they are
+          // always paid=true on creation).
           supabase
             .from("polla_participants")
             .select("id", { head: true, count: "exact" })
             .eq("polla_id", row.id)
-            .eq("status", "approved"),
+            .eq("status", "approved")
+            .eq("paid", true),
           matchIds.length > 0
             ? supabase
                 .from("matches")

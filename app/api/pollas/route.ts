@@ -386,8 +386,11 @@ export async function POST(request: NextRequest) {
 
         if (retryError) throw retryError;
 
-        // Creator auto-join (retry path). Digital-pool creators must pay like
-        // anyone else — they land in pending until they pay through the app.
+        // Creator auto-join (retry path).
+        // Admin is always paid=true on creation regardless of payment_mode.
+        // The participant payment gate (paid=false) only applies to invitees
+        // joining via /api/pollas/[slug]/join. The admin counts toward pozo
+        // and shows up as paid in the Pagos tab from day one.
         try {
           const creatorPending =
             parsed.data.paymentMode === "digital_pool" &&
@@ -398,7 +401,8 @@ export async function POST(request: NextRequest) {
             role: "admin",
             status: "approved",
             payment_status: creatorPending ? "pending" : "approved",
-            paid: !creatorPending,
+            paid: true,
+            paid_at: new Date().toISOString(),
           });
           if (joinError) {
             console.error("Creator auto-join failed (retry) for polla", retryPolla.id, joinError);
@@ -412,9 +416,12 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    // Creator auto-join — wrapped so participant-insert failures don't surface as
-    // "Error al crear la polla". Digital-pool creators must pay like anyone else;
-    // for every other mode the creator starts already approved/paid.
+    // Creator auto-join — wrapped so participant-insert failures don't surface
+    // as "Error al crear la polla".
+    // Admin is always paid=true on creation regardless of payment_mode. The
+    // participant payment gate (paid=false) only applies to invitees joining
+    // via /api/pollas/[slug]/join. The admin counts toward pozo and shows up
+    // as paid in the Pagos tab from day one.
     try {
       const creatorPending =
         parsed.data.paymentMode === "digital_pool" &&
@@ -425,7 +432,8 @@ export async function POST(request: NextRequest) {
         role: "admin",
         status: "approved",
         payment_status: creatorPending ? "pending" : "approved",
-        paid: !creatorPending,
+        paid: true,
+        paid_at: new Date().toISOString(),
       });
       if (joinError) {
         console.error("Creator auto-join failed for polla", polla.id, joinError);
