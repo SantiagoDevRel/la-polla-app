@@ -35,7 +35,7 @@ export async function POST(
     // Obtener la polla por slug
     const { data: polla, error: pollaError } = await supabase
       .from("pollas")
-      .select("id, match_ids")
+      .select("id, match_ids, payment_mode")
       .eq("slug", params.slug)
       .single();
 
@@ -54,7 +54,7 @@ export async function POST(
     const admin = createAdminClient();
     const { data: participant } = await admin
       .from("polla_participants")
-      .select("id, status, payment_status")
+      .select("id, status, payment_status, paid")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -72,6 +72,18 @@ export async function POST(
       return NextResponse.json(
         { error: "payment_required" },
         { status: 402 }
+      );
+    }
+
+    // admin_collects payment gate: the organizer must confirm the comprobante
+    // before the participant can predict. paid=true is the confirm signal.
+    if (polla.payment_mode === "admin_collects" && !participant.paid) {
+      return NextResponse.json(
+        {
+          error: "payment_required",
+          message: "Tu pago debe ser aprobado por el organizador antes de pronosticar.",
+        },
+        { status: 403 }
       );
     }
 
