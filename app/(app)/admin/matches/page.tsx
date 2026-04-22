@@ -9,10 +9,12 @@ import { staggerContainer, fadeUp } from "@/lib/animations";
 import { ArrowLeft, RefreshCw, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { syncMatchesAction, purgeMatchesAction } from "./actions";
 
-// Competiciones disponibles (football-data.org IDs)
+// Competiciones disponibles (football-data.org IDs).
+// Mundial 2026 (ID 2000) NO aparece en Principales: la fuente principal es
+// openfootball (botón "Sync Mundial 2026" más abajo). La variante
+// football-data.org vive en el bloque de Respaldo para evitar duplicados.
 const LEAGUES = [
   { id: 2001, label: "Champions League", tournament: "champions_2025", active: true },
-  { id: 2000, label: "Copa del Mundo 2026", tournament: "worldcup_2026", active: true },
   { id: 2014, label: "La Liga", tournament: "laliga_2025", active: true },
 ];
 
@@ -120,7 +122,7 @@ export default function AdminMatchesPage() {
           no duplica partidos existentes.
         </p>
         <div className="rounded-lg p-3 bg-blue-info/10 border border-blue-info/20 text-xs text-blue-info">
-          Solo Champions League (ID 2) y Mundial 2026 (ID 1) estan activos en produccion.
+          Principales: Champions y La Liga (football-data.org) más Mundial 2026 (openfootball). Respaldo vive en la sección colapsada de abajo.
         </div>
 
         <div>
@@ -170,22 +172,6 @@ export default function AdminMatchesPage() {
           );
         })}
         </motion.div>
-
-        <div className="rounded-xl p-4 flex items-start gap-3 bg-gold/10 border border-gold/20">
-          <AlertTriangle className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-bold text-gold mb-1">Nota sobre Copa del Mundo 2026</p>
-            <p className="text-sm text-text-secondary leading-snug">
-              Si devuelve 0 partidos, el fixture oficial aun no esta publicado.
-              Es normal hasta que la FIFA confirme el calendario completo.
-            </p>
-          </div>
-        </div>
-
-        {/* Mundial sync via football-data.org disabled, duplicates openfootball
-            data with phase=null mismatches. Re-enable only when football-data.org
-            publishes knockouts post-FIFA-draw. The /api/admin/sync-mundial
-            endpoint stays in place as a rollback path. */}
 
         {/* Mundial 2026 primary sync: openfootball source covers groups + knockouts. */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" className="rounded-2xl p-4 bg-bg-card/80 backdrop-blur-sm border border-gold/30 hover:shadow-[0_0_20px_rgba(255,215,0,0.12)] transition-all duration-300">
