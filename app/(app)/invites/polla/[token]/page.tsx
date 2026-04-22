@@ -18,6 +18,10 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import { formatCOP } from "@/lib/formatCurrency";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
+import {
+  groupMatchesByDate,
+  groupMatchesByPhase,
+} from "@/lib/matches/grouping";
 
 interface PollaSummary {
   id: string;
@@ -49,32 +53,6 @@ interface MatchRow {
 
 type GroupMode = "phase" | "date";
 
-interface MatchGroup {
-  key: string;
-  label: string;
-  matches: MatchRow[];
-}
-
-const PHASE_LABELS: Record<string, string> = {
-  group_stage: "Fase de grupos",
-  league_stage: "Fase de liga",
-  regular_season: "Temporada regular",
-  round_of_32: "Dieciseisavos",
-  round_of_16: "Octavos de final",
-  quarter_finals: "Cuartos de final",
-  semi_finals: "Semifinales",
-  third_place: "Tercer puesto",
-  final: "Final",
-  playoff: "Playoffs",
-};
-
-function formatPhaseLabel(phase: string | null): string {
-  if (!phase) return "Partidos";
-  if (PHASE_LABELS[phase]) return PHASE_LABELS[phase];
-  const spaced = phase.replace(/_/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
 function formatMatchDate(iso: string): string {
   const d = new Date(iso);
   const date = d.toLocaleDateString("es-CO", {
@@ -88,63 +66,6 @@ function formatMatchDate(iso: string): string {
     hour12: false,
   });
   return `${date}, ${time}`;
-}
-
-// Groups matches by phase. Headers always render now (caller decides via
-// the toggle whether phase grouping is the active mode).
-function groupMatchesByPhase(matches: MatchRow[]): MatchGroup[] {
-  const map = new Map<string, MatchRow[]>();
-  for (const m of matches) {
-    const key = m.phase ?? "__none__";
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(m);
-  }
-  const groups: MatchGroup[] = Array.from(map.entries()).map(([key, ms]) => ({
-    key,
-    label: formatPhaseLabel(key === "__none__" ? null : key),
-    matches: ms
-      .slice()
-      .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)),
-  }));
-  groups.sort((a, b) =>
-    a.matches[0].scheduled_at.localeCompare(b.matches[0].scheduled_at)
-  );
-  return groups;
-}
-
-// Groups matches by calendar date (Colombia tz). Header format: "jue, 11 de jun".
-function groupMatchesByDate(matches: MatchRow[]): MatchGroup[] {
-  const keyFmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const labelFmt = new Intl.DateTimeFormat("es-CO", {
-    timeZone: "America/Bogota",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-  const map = new Map<string, { label: string; matches: MatchRow[] }>();
-  for (const m of matches) {
-    const d = new Date(m.scheduled_at);
-    const key = keyFmt.format(d); // YYYY-MM-DD, stable sort key
-    const label = labelFmt.format(d);
-    if (!map.has(key)) map.set(key, { label, matches: [] });
-    map.get(key)!.matches.push(m);
-  }
-  const groups: MatchGroup[] = Array.from(map.entries()).map(
-    ([key, { label, matches: ms }]) => ({
-      key,
-      label,
-      matches: ms
-        .slice()
-        .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)),
-    })
-  );
-  groups.sort((a, b) => a.key.localeCompare(b.key));
-  return groups;
 }
 
 function MatchRowView({ m }: { m: MatchRow }) {
