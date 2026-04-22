@@ -51,12 +51,13 @@ export default function AdminPaymentReview({
   // La cola de "pendientes de aprobación" es: comprobante entregado pero
   // admin aún no marcó pagado. Ya no usamos status='pending' (retired en
   // migration 010). "rejected" = baneado de la polla.
+  // El admin siempre entra paid=true en la creación (participa pero no paga
+  // al organizador, que es él mismo). Aparece listado en Aprobados para que
+  // el conteo y el pozo cuadren.
   const pendingPayments = payments.filter(
     (p) => p.role !== "admin" && p.payment_note && !p.paid && p.status !== "rejected"
   );
-  const approvedPayments = payments.filter(
-    (p) => p.role !== "admin" && p.paid
-  );
+  const approvedPayments = payments.filter((p) => p.paid);
   const waitingPayments = payments.filter(
     (p) => p.role !== "admin" && !p.payment_note && !p.paid && p.status !== "rejected"
   );
@@ -80,8 +81,9 @@ export default function AdminPaymentReview({
     }
   }
 
-  // Resumen rápido de estado de pagos
-  const totalPlayers = payments.filter((p) => p.role !== "admin").length;
+  // Resumen rápido de estado de pagos. Incluimos al admin en Total y
+  // Aprobados porque también cuenta como jugador (el pozo lo incluye).
+  const totalPlayers = payments.length;
   const totalApproved = approvedPayments.length;
   const totalCollected = totalApproved * buyInAmount;
 
