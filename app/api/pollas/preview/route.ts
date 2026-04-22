@@ -17,7 +17,9 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   const query = admin
     .from("pollas")
-    .select("id, slug, name, description, tournament, buy_in_amount, type, status, created_by");
+    .select(
+      "id, slug, name, description, tournament, buy_in_amount, type, status, created_by, match_ids, payment_mode, admin_payment_instructions"
+    );
   const { data: polla, error } = slug
     ? await query.eq("slug", slug).maybeSingle()
     : await query.eq("invite_token", token!).maybeSingle();
@@ -61,10 +63,11 @@ export async function GET(request: NextRequest) {
       }
     : null;
 
-  // Strip internal id + created_by from the response. created_by is a
-  // UUID the caller does not need; organizer carries the display fields.
-  const { id: _id, created_by: _createdBy, ...publicPolla } = polla;
-  void _id;
+  // Strip created_by from the response. The polla id is kept because the
+  // invite preview page needs it for downstream calls (membership check,
+  // matches fetch); it is not a sensitive field since the polla is
+  // already addressable by slug and invite_token publicly.
+  const { created_by: _createdBy, ...publicPolla } = polla;
   void _createdBy;
   return NextResponse.json({
     polla: publicPolla,
