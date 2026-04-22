@@ -30,14 +30,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
   }
 
-  // Count approved participants. Use select("*", head:true) — the safest form
-  // for PostgREST count headers; some versions don't surface the count when
-  // the projected column list is restrictive.
+  // Count paid+approved participants. The invite preview uses this for the
+  // Participantes badge and the pozo math, so unpaid joiners (awaiting
+  // admin approval or Wompi confirmation) must not inflate either. Admin
+  // themselves are paid=true on creation so they count from day one.
   const { count, error: countError } = await admin
     .from("polla_participants")
     .select("*", { head: true, count: "exact" })
     .eq("polla_id", polla.id)
-    .eq("status", "approved");
+    .eq("status", "approved")
+    .eq("paid", true);
 
   if (countError) {
     console.error("[pollas/preview] participant count failed:", countError);
