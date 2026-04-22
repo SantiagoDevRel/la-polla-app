@@ -109,7 +109,10 @@ function LoginInner() {
       // Non-fatal: polling still works if the upsert races with the webhook.
     }
     if (typeof window !== "undefined") {
-      window.open(`https://wa.me/${BOT_PHONE}?text=Hola`, "_blank");
+      window.open(
+        `https://wa.me/${BOT_PHONE}?text=Hola%20parce%2C%20mandame%20el%20c%C3%B3digo%20de%20la%20polla`,
+        "_blank"
+      );
     }
     setStep("polling_for_otp");
   };
@@ -311,9 +314,9 @@ function LoginInner() {
                 style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "50%" }}
               />
             </div>
-            <h2 className="font-display text-2xl text-gold tracking-wide">ABRÍ EL CHAT CON EL BOT</h2>
+            <h2 className="font-display text-2xl text-gold tracking-wide">ABRÍ WHATSAPP CON EL BOT</h2>
             <p className="text-text-secondary text-sm leading-snug">
-              Para recibir el código de acceso, primero tenés que escribirle al bot. Tap el botón, mandá el mensaje &ldquo;Hola&rdquo; y volvé acá.
+              Para recibir el código, escribile al bot y te mandamos el código acá.
             </p>
           </div>
 
