@@ -5,7 +5,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { notifyAdminPaymentSubmitted } from "@/lib/notifications";
+import {
+  notifyAdminPaymentSubmitted,
+  notifyParticipantPaymentApproved,
+} from "@/lib/notifications";
 import { z } from "zod";
 
 // Schema para subir comprobante de pago (participante)
@@ -276,6 +279,29 @@ export async function PATCH(
       .eq("polla_id", polla.id);
 
     if (updateError) throw updateError;
+
+    // On approval, ping the participant. Skipped on reject by design: reject
+    // just clears the comprobante fields and lets the user re-submit.
+    // Re-approvals after reject dedup silently (acceptable per scope).
+    if (isApprove) {
+      try {
+        const { data: approvedRow } = await supabase
+          .from("polla_participants")
+          .select("user_id")
+          .eq("id", parsed.data.participantId)
+          .maybeSingle();
+        if (approvedRow?.user_id) {
+          const notifAdmin = createAdminClient();
+          await notifyParticipantPaymentApproved(
+            notifAdmin,
+            polla.id,
+            approvedRow.user_id
+          );
+        }
+      } catch (notifErr) {
+        console.error("[payments PATCH] notif failed:", notifErr);
+      }
+    }
 
     return NextResponse.json({
       message: isApprove ? "Pago aprobado" : "Pago rechazado",
