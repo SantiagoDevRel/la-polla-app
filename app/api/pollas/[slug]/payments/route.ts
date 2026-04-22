@@ -251,17 +251,22 @@ export async function PATCH(
       );
     }
 
-    // Verificar que quien hace la petición es admin de la polla
-    const { data: adminParticipant } = await supabase
+    // Verificar que quien hace la petición es admin de ESTA polla.
+    // Usamos admin client porque el SELECT de user-scoped sobre
+    // polla_participants devuelve vacío por la RLS "participants_select"
+    // (EXISTS recursivo), lo que hacía que Santiago, siendo el organizador,
+    // no pudiera aprobar/desmarcar pagos.
+    const adminClient = createAdminClient();
+    const { data: adminParticipant } = await adminClient
       .from("polla_participants")
       .select("role")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (!adminParticipant || adminParticipant.role !== "admin") {
       return NextResponse.json(
-        { error: "Solo el admin puede aprobar o rechazar pagos" },
+        { error: "Solo el organizador de esta polla puede hacer esto" },
         { status: 403 }
       );
     }

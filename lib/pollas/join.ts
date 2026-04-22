@@ -61,7 +61,7 @@ export async function joinByCode(
   // Lookup polla by code.
   const { data: polla, error: lookupErr } = await admin
     .from("pollas")
-    .select("id, slug, name, status")
+    .select("id, slug, name, status, payment_mode, buy_in_amount")
     .eq("join_code", normalized)
     .maybeSingle();
   if (lookupErr) throw lookupErr;
@@ -81,16 +81,22 @@ export async function joinByCode(
   if (existingErr) throw existingErr;
   if (existing) return { ok: false, code: "already_member" };
 
-  // Insert participant row. Mirrors the invite-link join semantics:
-  // approved status, role=player, paid=true (honor mode default; the
-  // payment surface handles its own flow for digital_pool pollas).
+  // paid semantics per payment mode. Mirrors the invite-link join route:
+  //   digital_pool   → paid=false until the Wompi webhook confirms.
+  //   admin_collects → paid=false until the organizer approves the comprobante.
+  //   pay_winner     → paid=true on join (nothing to collect upfront).
+  const isDigitalPool =
+    polla.payment_mode === "digital_pool" && polla.buy_in_amount > 0;
+  const isAdminCollects = polla.payment_mode === "admin_collects";
+  const initialPaid = !(isDigitalPool || isAdminCollects);
+
   const { error: insertErr } = await admin.from("polla_participants").insert({
     polla_id: polla.id,
     user_id: input.userId,
     role: "player",
     status: "approved",
-    payment_status: "approved",
-    paid: true,
+    payment_status: isDigitalPool ? "pending" : "approved",
+    paid: initialPaid,
   });
   if (insertErr) throw insertErr;
 
