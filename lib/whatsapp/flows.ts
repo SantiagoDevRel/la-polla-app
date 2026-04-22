@@ -555,6 +555,16 @@ export async function handlePronosticar(
               : `Ver más fechas (${remaining}) →`.slice(0, 24),
             description: `Mostrar los siguientes ${Math.min(GROUP_PAGE_SIZE, remaining)}`,
           });
+        } else {
+          // Last page only: offer an escape hatch to re-pick the grouping
+          // mode. If there is still a "Ver más" row we skip this to keep
+          // the 10-row WhatsApp cap; the user will see the option once
+          // they reach the final page.
+          rows.push({
+            id: `pgreset|${pollaId}`,
+            title: "🔄 Cambiar agrupación".slice(0, 24),
+            description: "Volver a elegir por fase o por fecha",
+          });
         }
 
         // Persist the page so pagination taps can increment it.
@@ -661,6 +671,18 @@ export async function handlePredictGroupMode(
     pollaId,
     predictGroupMode: mode,
   });
+  await handlePronosticar(phone, userId, pollaId);
+}
+
+// Reset grouping choice mid-flow: the user tapped "Cambiar agrupación"
+// from the group list. Clear the mode/key/page so the gate re-renders the
+// "¿Por fase o por fecha?" button message.
+export async function handlePredictGroupReset(
+  phone: string,
+  userId: string,
+  pollaId: string
+) {
+  await setState(phone, { action: "picking_group", pollaId });
   await handlePronosticar(phone, userId, pollaId);
 }
 

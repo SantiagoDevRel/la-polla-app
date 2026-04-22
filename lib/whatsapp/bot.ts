@@ -15,6 +15,7 @@ import {
   handlePronosticar,
   handlePredictGroupMode,
   handlePredictGroupPage,
+  handlePredictGroupReset,
   handlePredictGroupSelect,
   handlePredictionInput,
   handleLeaderboard,
@@ -449,6 +450,7 @@ async function routePayload(
     payload.startsWith("predgrp_") ||
     payload.startsWith("pgsel|") ||
     payload.startsWith("pgmore|") ||
+    payload.startsWith("pgreset|") ||
     payload === "confirm_yes" ||
     payload === "confirm_no" ||
     payload === "join_code_yes" ||
@@ -542,6 +544,17 @@ async function routePayload(
   if (payload.startsWith("predgrp_date_")) {
     const pollaId = payload.replace("predgrp_date_", "");
     await handlePredictGroupMode(from, user.id, pollaId, "date");
+    return;
+  }
+
+  // Predict group reset: user tapped "Cambiar agrupación" from the group
+  // list to re-pick phase vs date. Payload format: "pgreset|{pollaId}".
+  if (payload.startsWith("pgreset|")) {
+    const parts = payload.split("|");
+    if (parts.length >= 2) {
+      const pollaId = parts[1];
+      await handlePredictGroupReset(from, user.id, pollaId);
+    }
     return;
   }
 
