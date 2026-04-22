@@ -6,13 +6,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { staggerContainer, fadeUp } from "@/lib/animations";
-import { ArrowLeft, RefreshCw, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { syncMatchesAction, purgeMatchesAction } from "./actions";
 
 // Competiciones disponibles (football-data.org IDs).
 // Mundial 2026 (ID 2000) NO aparece en Principales: la fuente principal es
 // openfootball (botón "Sync Mundial 2026" más abajo). La variante
-// football-data.org vive en el bloque de Respaldo para evitar duplicados.
+// football-data.org se retiró porque duplicaba datos con phase=null.
 const LEAGUES = [
   { id: 2001, label: "Champions League", tournament: "champions_2025", active: true },
   { id: 2014, label: "La Liga", tournament: "laliga_2025", active: true },
@@ -32,29 +32,7 @@ export default function AdminMatchesPage() {
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
   const [syncingWc, setSyncingWc] = useState(false);
   const [wcResult, setWcResult] = useState<string | null>(null);
-  const [expandedBackup, setExpandedBackup] = useState(false);
-  const [syncingMundialBackup, setSyncingMundialBackup] = useState(false);
-  const [mundialBackupResult, setMundialBackupResult] = useState<string | null>(null);
-
-  async function handleSyncMundialBackup() {
-    setSyncingMundialBackup(true);
-    setMundialBackupResult(null);
-    try {
-      const res = await fetch("/api/admin/sync-mundial", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error en sync");
-      setMundialBackupResult(
-        `${data.matchesSynced} agregados o actualizados · ${data.matchesTotal} total · ${data.errors} errores`
-      );
-    } catch (err: unknown) {
-      const e = err as Error;
-      setMundialBackupResult(`Error: ${e.message || "desconocido"}`);
-    } finally {
-      setSyncingMundialBackup(false);
-    }
-  }
-
-  async function handleSyncWorldCup() {
+async function handleSyncWorldCup() {
     setSyncingWc(true);
     setWcResult(null);
     try {
@@ -122,7 +100,7 @@ export default function AdminMatchesPage() {
           no duplica partidos existentes.
         </p>
         <div className="rounded-lg p-3 bg-blue-info/10 border border-blue-info/20 text-xs text-blue-info">
-          Principales: Champions y La Liga (football-data.org) más Mundial 2026 (openfootball). Respaldo vive en la sección colapsada de abajo.
+          Principales: Champions y La Liga (football-data.org) más Mundial 2026 (openfootball).
         </div>
 
         <div>
@@ -198,60 +176,6 @@ export default function AdminMatchesPage() {
             </div>
           )}
         </motion.div>
-
-        {/* Respaldo: fallbacks gated behind a collapse to keep the main grid
-            focused. Clearly warns the operator about duplicate risk. */}
-        <div className="rounded-2xl border border-border-subtle bg-bg-card/60 backdrop-blur-sm overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setExpandedBackup((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 hover:bg-bg-elevated transition-colors"
-            aria-expanded={expandedBackup}
-          >
-            <div className="text-left">
-              <p className="text-sm font-bold text-text-primary">Respaldo (avanzado)</p>
-              <p className="text-xs text-text-muted">Fuentes alternativas por si las principales fallan</p>
-            </div>
-            {expandedBackup ? (
-              <ChevronDown className="w-4 h-4 text-text-muted" aria-hidden="true" />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-text-muted" aria-hidden="true" />
-            )}
-          </button>
-          {expandedBackup ? (
-            <div className="px-4 pb-4 space-y-3">
-              <div className="rounded-lg p-3 flex items-start gap-2 bg-gold/10 border border-gold/20">
-                <AlertTriangle className="w-4 h-4 text-gold flex-shrink-0 mt-0.5" aria-hidden="true" />
-                <p className="text-xs text-text-secondary leading-snug">
-                  Ejecutar respaldo DESPUÉS de correr el sync principal puede crear duplicados. Solo usar si la sincronización principal falló.
-                </p>
-              </div>
-              <div className="rounded-xl p-4 bg-bg-elevated border border-border-subtle">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">Mundial 2026 (football-data.org)</p>
-                    <p className="text-xs text-text-muted">Usar solo si openfootball no trae los datos. Puede crear duplicados.</p>
-                  </div>
-                  <button
-                    onClick={handleSyncMundialBackup}
-                    disabled={syncingMundialBackup}
-                    className="flex items-center gap-1.5 bg-bg-card border border-border-medium text-text-primary px-3 py-2 rounded-lg text-xs font-semibold hover:border-gold/40 hover:text-gold transition-all disabled:opacity-40 cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${syncingMundialBackup ? "animate-spin" : ""}`} />
-                    {syncingMundialBackup ? "Sync..." : "Sync"}
-                  </button>
-                </div>
-                {mundialBackupResult ? (
-                  <div className={`rounded-lg p-2 text-xs ${
-                    mundialBackupResult.startsWith("Error") ? "bg-red-dim text-red-alert" : "bg-green-dim text-green-live"
-                  }`}>
-                    <p>{mundialBackupResult}</p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-        </div>
 
         {/* Purgar partidos antiguos */}
         <div className="rounded-xl p-4 bg-bg-card border border-border-subtle space-y-3">
