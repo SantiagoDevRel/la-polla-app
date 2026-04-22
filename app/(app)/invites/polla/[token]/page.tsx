@@ -177,15 +177,19 @@ export default function OpenInvitePage() {
             .select("display_name, avatar_url")
             .eq("id", row.created_by)
             .maybeSingle<OrganizerSummary>(),
-          // Count only paid=true participants so the Participantes badge and
-          // pozo reflect committed entries (admin counts because they are
-          // always paid=true on creation).
-          supabase
-            .from("polla_participants")
-            .select("id", { head: true, count: "exact" })
-            .eq("polla_id", row.id)
-            .eq("status", "approved")
-            .eq("paid", true),
+          // Participant count goes through the server-side preview route
+          // because the polla_participants RLS policy returns zero rows for
+          // anonymous/invitee sessions (recursive EXISTS on auth.uid()).
+          // The admin client inside /api/pollas/preview bypasses that gate.
+          axios
+            .get<{ participantCount: number }>(
+              `/api/pollas/preview?token=${encodeURIComponent(token)}`
+            )
+            .then((r) => ({ count: r.data.participantCount }))
+            .catch((err) => {
+              console.warn("[invites] preview count failed:", err);
+              return { count: 0 };
+            }),
           matchIds.length > 0
             ? supabase
                 .from("matches")
