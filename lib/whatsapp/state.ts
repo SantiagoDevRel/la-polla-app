@@ -52,6 +52,9 @@ export type ConversationState = {
   // existing state row so no migration is needed.
   predictGroupMode?: "phase" | "date";
   predictGroupKey?: string;
+  // Pagination for the group-list message itself when the polla has more
+  // than 9 groups (WhatsApp lists cap at 10 rows, 1 reserved for Ver más).
+  predictGroupPage?: number;
 };
 
 // TTL in minutes. Kept at 10 to preserve the previous in-memory behavior.
