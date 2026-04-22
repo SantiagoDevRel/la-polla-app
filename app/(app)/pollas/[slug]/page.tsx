@@ -2,12 +2,10 @@
 // 4 tabs: Partidos, Ranking, Pagos, Info — con marcadores Bebas Neue y inputs gold glow
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import axios from "axios";
-import { motion } from "framer-motion";
-import { staggerContainer, fadeUp } from "@/lib/animations";
 import { useToast } from "@/components/ui/Toast";
 import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import OrganizerPanel from "@/components/polla/OrganizerPanel";
@@ -18,7 +16,11 @@ import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug } from "@/lib/tournaments";
 import { getPollitoByPosition } from "@/lib/pollitos";
-import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, Goal } from "lucide-react";
+import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, Goal, ChevronDown } from "lucide-react";
+import {
+  groupMatchesByDate,
+  groupMatchesByPhase,
+} from "@/lib/matches/grouping";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 // ─── Tipos ───
@@ -104,6 +106,59 @@ export default function PollaSlugPage() {
   const [isNonParticipant, setIsNonParticipant] = useState(false);
   const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
+  const [groupMode, setGroupMode] = useState<"phase" | "date">("phase");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  const matchGroups = useMemo(() => {
+    return groupMode === "date"
+      ? groupMatchesByDate(matches)
+      : groupMatchesByPhase(matches);
+  }, [matches, groupMode]);
+
+  // First group expanded by default; re-expand the first group whenever the
+  // user flips the toggle so they always see a populated list on mode switch.
+  useEffect(() => {
+    if (matchGroups.length === 0) return;
+    setExpandedGroups(new Set([matchGroups[0].key]));
+  }, [matchGroups]);
+
+  function toggleGroup(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function findGroupKeyForMatch(matchId: string): string | null {
+    for (const g of matchGroups) {
+      if (g.matches.some((m) => m.id === matchId)) return g.key;
+    }
+    return null;
+  }
+
+  // Focus the home input of the given match, auto-expanding its group first
+  // if it is currently collapsed. rAF ensures the group's DOM mounts before
+  // focus() fires, so the input element actually exists when we reach for it.
+  function focusHomeOfMatch(matchId: string) {
+    const existing = homeInputRefs.current[matchId];
+    if (existing) {
+      existing.focus();
+      return;
+    }
+    const key = findGroupKeyForMatch(matchId);
+    if (!key) return;
+    setExpandedGroups((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+    requestAnimationFrame(() => {
+      homeInputRefs.current[matchId]?.focus();
+    });
+  }
   // PhoneInput emits the full E.164 string (e.g. "+573001234567"). The invite
   // API normalizes by stripping "+" server-side, so we pass it through as-is.
   const [invitePhoneFull, setInvitePhoneFull] = useState("");
@@ -433,128 +488,184 @@ export default function PollaSlugPage() {
                 <p className="text-text-muted">No hay partidos cargados aun. Los partidos se actualizaran cuando el calendario sea confirmado.</p>
               </div>
             ) : (
-              <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-3 pb-28">
-              {matches.map((match, matchIndex) => {
-                const pred = getPred(match.id);
-                const draft = drafts[match.id] || { home: pred?.predicted_home?.toString() ?? "", away: pred?.predicted_away?.toString() ?? "" };
-                const locked = isLocked(match);
+              <div className="space-y-3 pb-32">
+                {/* Group-mode toggle. Drops the prior per-row motion stagger
+                    because the rows re-mount each time the user flips the
+                    toggle or expands a group, and the cascade is janky. */}
+                <div className="flex gap-1">
+                  {([
+                    { val: "phase" as const, label: "Por fase" },
+                    { val: "date" as const, label: "Por fecha" },
+                  ]).map((opt) => {
+                    const active = groupMode === opt.val;
+                    return (
+                      <button
+                        key={opt.val}
+                        type="button"
+                        onClick={() => setGroupMode(opt.val)}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                          active
+                            ? "bg-gold text-bg-base"
+                            : "bg-transparent text-text-muted border border-border-subtle hover:text-text-primary"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                return (
-                  <motion.div key={match.id} variants={fadeUp} className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
-                    {/* Status badge */}
-                    <div className={`px-4 py-1.5 text-[11px] font-bold text-center ${
-                      match.status === "live" ? "bg-green-dim text-green-live" :
-                      match.status === "finished" ? "bg-bg-elevated text-text-muted" :
-                      "text-text-secondary"
-                    }`} style={match.status === "scheduled" ? { backgroundColor: "var(--bg-card-elevated)" } : undefined}>
-                      {match.status === "live" ? (
-                        <span className="flex items-center justify-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-green-live animate-pulse-live" />
-                          EN VIVO
+                {matchGroups.map((group) => {
+                  const open = expandedGroups.has(group.key);
+                  return (
+                    <div key={group.key} className="rounded-2xl bg-bg-card border border-border-subtle overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.key)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-text-primary hover:bg-bg-elevated transition-colors"
+                        aria-expanded={open}
+                      >
+                        <span>
+                          {group.label}{" "}
+                          <span className="text-text-muted font-normal">({group.matches.length})</span>
                         </span>
-                      ) : match.status === "finished" ? "FINALIZADO" : fmtDate(match.scheduled_at)}
+                        <ChevronDown
+                          className={`w-4 h-4 text-text-muted transition-transform ${open ? "rotate-180" : ""}`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      {open ? (
+                        <div className="space-y-3 px-3 pb-3">
+                          {group.matches.map((match) => {
+                            const pred = getPred(match.id);
+                            const draft = drafts[match.id] || { home: pred?.predicted_home?.toString() ?? "", away: pred?.predicted_away?.toString() ?? "" };
+                            const locked = isLocked(match);
+
+                            return (
+                              <div key={match.id} className="rounded-2xl overflow-hidden bg-bg-elevated border border-border-subtle">
+                                {/* Status badge */}
+                                <div className={`px-4 py-1.5 text-[11px] font-bold text-center ${
+                                  match.status === "live" ? "bg-green-dim text-green-live" :
+                                  match.status === "finished" ? "bg-bg-elevated text-text-muted" :
+                                  "text-text-secondary"
+                                }`} style={match.status === "scheduled" ? { backgroundColor: "var(--bg-card-elevated)" } : undefined}>
+                                  {match.status === "live" ? (
+                                    <span className="flex items-center justify-center gap-1.5">
+                                      <span className="w-2 h-2 rounded-full bg-green-live animate-pulse-live" />
+                                      EN VIVO
+                                    </span>
+                                  ) : match.status === "finished" ? "FINALIZADO" : fmtDate(match.scheduled_at)}
+                                </div>
+
+                                <div className="p-4">
+                                  <div className="flex items-center gap-3">
+                                    {/* Home */}
+                                    <div className="flex-1 min-w-0 text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <p className="font-semibold text-sm text-text-primary truncate min-w-0">{match.home_team}</p>
+                                        <span className="flex-shrink-0"><TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} /></span>
+                                      </div>
+                                    </div>
+
+                                    {/* Score / Input */}
+                                    <div className="flex-shrink-0 flex items-center gap-2">
+                                      {match.status === "finished" || match.status === "live" || locked ? (
+                                        <div className="flex items-center gap-2 px-3">
+                                          <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
+                                            {match.home_score ?? "—"}
+                                          </span>
+                                          <span className="text-text-muted text-lg">—</span>
+                                          <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
+                                            {match.away_score ?? "—"}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2">
+                                          <input type="number" min={0} max={20} disabled={locked} value={draft.home}
+                                            ref={(el) => { homeInputRefs.current[match.id] = el; }}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, home: val } }));
+                                              setTouchedMatches((prev) => new Set(prev).add(match.id));
+                                              if (val.length >= 1) awayInputRefs.current[match.id]?.focus();
+                                            }}
+                                            className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
+                                              locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
+                                              : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
+                                            }`}
+                                            style={{ border: "2px solid" }}
+                                            placeholder="0"
+                                          />
+                                          <span className="text-text-muted font-bold">—</span>
+                                          <input type="number" min={0} max={20} disabled={locked} value={draft.away}
+                                            ref={(el) => { awayInputRefs.current[match.id] = el; }}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, away: val } }));
+                                              setTouchedMatches((prev) => new Set(prev).add(match.id));
+                                              if (val.length >= 1) {
+                                                // Advance to the next scheduled match by walking the flat
+                                                // matches array. If that match lives in a collapsed group,
+                                                // focusHomeOfMatch auto-expands the group and focuses next
+                                                // frame so the input DOM exists before focus() fires.
+                                                const fromIdx = matches.findIndex((mm) => mm.id === match.id);
+                                                for (let i = fromIdx + 1; i < matches.length; i++) {
+                                                  const nextMatch = matches[i];
+                                                  if (nextMatch.status === "scheduled") {
+                                                    focusHomeOfMatch(nextMatch.id);
+                                                    break;
+                                                  }
+                                                }
+                                              }
+                                            }}
+                                            className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
+                                              locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
+                                              : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
+                                            }`}
+                                            style={{ border: "2px solid" }}
+                                            placeholder="0"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Away */}
+                                    <div className="flex-1 min-w-0 text-left">
+                                      <div className="flex items-center gap-2">
+                                        <span className="flex-shrink-0"><TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} /></span>
+                                        <p className="font-semibold text-sm text-text-primary truncate min-w-0">{match.away_team}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Previous prediction + points. Always show the user's own
+                                      prediction once the form is locked (locked/live/finished). */}
+                                  {pred && (match.status === "finished" || match.status === "live" || locked) && (
+                                    <div className="mt-2 text-center">
+                                      <p className="text-base font-medium text-white">
+                                        Tu pronóstico: {pred.predicted_home} - {pred.predicted_away}
+                                      </p>
+                                      {match.status === "finished" && (
+                                        <p className={`mt-1 text-xs font-bold ${pred.points_earned > 0 ? "text-gold" : "text-text-muted"}`}>
+                                          {pred.points_earned > 0 ? `+${pred.points_earned} pts` : "0 pts"}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {locked && match.status === "scheduled" && (
+                                    <p className="mt-2 text-xs text-center text-text-muted flex items-center justify-center gap-1"><Lock className="w-3 h-3" /> CERRADO</p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
                     </div>
-
-                    <div className="p-4">
-                      <div className="flex items-center gap-3">
-                        {/* Home */}
-                        <div className="flex-1 min-w-0 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <p className="font-semibold text-sm text-text-primary truncate min-w-0">{match.home_team}</p>
-                            <span className="flex-shrink-0"><TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} /></span>
-                          </div>
-                        </div>
-
-                        {/* Score / Input */}
-                        <div className="flex-shrink-0 flex items-center gap-2">
-                          {match.status === "finished" || match.status === "live" || locked ? (
-                            <div className="flex items-center gap-2 px-3">
-                              <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
-                                {match.home_score ?? "—"}
-                              </span>
-                              <span className="text-text-muted text-lg">—</span>
-                              <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
-                                {match.away_score ?? "—"}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <input type="number" min={0} max={20} disabled={locked} value={draft.home}
-                                ref={(el) => { homeInputRefs.current[match.id] = el; }}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, home: val } }));
-                                  setTouchedMatches((prev) => new Set(prev).add(match.id));
-                                  if (val.length >= 1) awayInputRefs.current[match.id]?.focus();
-                                }}
-                                className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
-                                  locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
-                                  : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
-                                }`}
-                                style={{ border: "2px solid" }}
-                                placeholder="0"
-                              />
-                              <span className="text-text-muted font-bold">—</span>
-                              <input type="number" min={0} max={20} disabled={locked} value={draft.away}
-                                ref={(el) => { awayInputRefs.current[match.id] = el; }}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, away: val } }));
-                                  setTouchedMatches((prev) => new Set(prev).add(match.id));
-                                  if (val.length >= 1) {
-                                    // Jump to next game's home input
-                                    for (let i = matchIndex + 1; i < matches.length; i++) {
-                                      const nextMatch = matches[i];
-                                      if (nextMatch.status === "scheduled" && homeInputRefs.current[nextMatch.id]) {
-                                        homeInputRefs.current[nextMatch.id]?.focus();
-                                        break;
-                                      }
-                                    }
-                                  }
-                                }}
-                                className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
-                                  locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
-                                  : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
-                                }`}
-                                style={{ border: "2px solid" }}
-                                placeholder="0"
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Away */}
-                        <div className="flex-1 min-w-0 text-left">
-                          <div className="flex items-center gap-2">
-                            <span className="flex-shrink-0"><TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} /></span>
-                            <p className="font-semibold text-sm text-text-primary truncate min-w-0">{match.away_team}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Previous prediction + points — always show the user's own
-                          prediction once the form is locked (locked/live/finished). */}
-                      {pred && (match.status === "finished" || match.status === "live" || locked) && (
-                        <div className="mt-2 text-center">
-                          <p className="text-base font-medium text-white">
-                            Tu pronóstico: {pred.predicted_home} - {pred.predicted_away}
-                          </p>
-                          {match.status === "finished" && (
-                            <p className={`mt-1 text-xs font-bold ${pred.points_earned > 0 ? "text-gold" : "text-text-muted"}`}>
-                              {pred.points_earned > 0 ? `+${pred.points_earned} pts` : "0 pts"}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {locked && match.status === "scheduled" && (
-                        <p className="mt-2 text-xs text-center text-text-muted flex items-center justify-center gap-1"><Lock className="w-3 h-3" /> CERRADO</p>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-              </motion.div>
+                  );
+                })}
+              </div>
             )}
 
             {/* Sticky bulk save button — hidden once polla ends */}
