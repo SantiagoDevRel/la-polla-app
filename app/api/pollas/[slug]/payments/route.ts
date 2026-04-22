@@ -271,13 +271,16 @@ export async function PATCH(
       );
     }
 
-    // Aprobar o rechazar el pago. El `status` del participante no se toca —
-    // reject solo limpia el comprobante para que el usuario pueda re-subirlo.
+    // Aprobar o rechazar el pago. Usamos admin client: la RLS de
+    // polla_participants rechaza UPDATEs del organizador sobre la fila de
+    // otro usuario (policy EXISTS recursiva), y esto era el "Error interno"
+    // que veía el admin al tocar Marcar. auth.uid() ya se validó arriba y
+    // el role='admin' de esta polla también.
     const isApprove = parsed.data.action === "approve";
     const updatePayload = isApprove
       ? { paid: true, paid_at: new Date().toISOString() }
       : { paid: false, paid_at: null, payment_note: null, payment_proof_url: null };
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminClient
       .from("polla_participants")
       .update(updatePayload)
       .eq("id", parsed.data.participantId)
@@ -286,19 +289,18 @@ export async function PATCH(
     if (updateError) throw updateError;
 
     // On approval, ping the participant. Skipped on reject by design: reject
-    // just clears the comprobante fields and lets the user re-submit.
+    // just clears the paid flag and lets the admin re-approve.
     // Re-approvals after reject dedup silently (acceptable per scope).
     if (isApprove) {
       try {
-        const { data: approvedRow } = await supabase
+        const { data: approvedRow } = await adminClient
           .from("polla_participants")
           .select("user_id")
           .eq("id", parsed.data.participantId)
           .maybeSingle();
         if (approvedRow?.user_id) {
-          const notifAdmin = createAdminClient();
           await notifyParticipantPaymentApproved(
-            notifAdmin,
+            adminClient,
             polla.id,
             approvedRow.user_id
           );

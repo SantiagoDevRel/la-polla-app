@@ -1,14 +1,15 @@
 // components/polla/ParticipantPayment.tsx — Pestaña de Pagos.
 // Routing:
-//   admin_collects + admin  → AdminPaymentReview (revisión de comprobantes)
-//   admin_collects + player + no pagado → PaymentSubmitForm + PaymentsList
-//   admin_collects + player + pagado     → PaymentsList
-//   digital_pool / pay_winner            → PaymentsList (read-only)
+//   admin_collects + admin              → AdminPaymentReview (marcar pagos)
+//   admin_collects + player + no pagado → tarjeta "Esperando aprobación"
+//                                         + (opcional) instrucciones + PaymentsList
+//   admin_collects + player + pagado    → PaymentsList
+//   digital_pool / pay_winner           → PaymentsList (read-only)
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
-import PaymentSubmitForm from "./PaymentSubmitForm";
+import { Banknote, CreditCard } from "lucide-react";
 import AdminPaymentReview from "./AdminPaymentReview";
 import PaymentsList from "./PaymentsList";
 import FootballLoader from "@/components/ui/FootballLoader";
@@ -124,23 +125,41 @@ export default function ParticipantPayment({
     );
   }
 
-  // admin_collects + player pendiente → formulario de comprobante + lista
+  // admin_collects + player + paid=false → tarjeta informativa read-only.
+  // El pago es offline: el participante le paga al organizador por fuera
+  // de la app (Nequi, efectivo, transferencia) y el organizador marca la
+  // fila como pagada desde su panel. No hay formulario, nota, ni upload.
   const myPayment = payments.find((p) => p.user_id === currentUserId);
-  const needsSubmit =
+  const awaitingApproval =
     mode === "admin_collects" && !amIAdmin && !myPayment?.paid;
+  const instructions = pollaPaymentInfo.adminPaymentInstructions?.trim() ?? "";
 
   return (
     <div className="space-y-4">
-      {needsSubmit && (
-        <PaymentSubmitForm
-          pollaSlug={pollaSlug}
-          adminPaymentInstructions={pollaPaymentInfo.adminPaymentInstructions ?? ""}
-          buyInAmount={pollaPaymentInfo.buyInAmount}
-          currency={pollaPaymentInfo.currency}
-          currentStatus={myPayment?.status ?? null}
-          existingNote={myPayment?.payment_note ?? null}
-        />
-      )}
+      {awaitingApproval ? (
+        <>
+          <div className="rounded-2xl p-5 space-y-2 bg-bg-card border border-border-subtle">
+            <div className="flex items-center gap-2">
+              <Banknote className="w-5 h-5 text-gold" aria-hidden="true" />
+              <h3 className="font-bold text-text-primary">Esperando aprobación del organizador</h3>
+            </div>
+            <p className="text-sm text-text-secondary leading-snug">
+              Pagale al organizador por fuera de la app. Una vez que él te marque como pagado, vas a poder pronosticar.
+            </p>
+          </div>
+          {instructions ? (
+            <div className="rounded-xl p-4 space-y-2 bg-bg-elevated border border-border-subtle">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-gold" aria-hidden="true" />
+                <p className="text-sm font-semibold text-text-primary">Cómo pagar</p>
+              </div>
+              <p className="text-sm text-text-secondary whitespace-pre-wrap leading-snug">
+                {instructions}
+              </p>
+            </div>
+          ) : null}
+        </>
+      ) : null}
       <PaymentsList
         pollaSlug={pollaSlug}
         payments={payments}
