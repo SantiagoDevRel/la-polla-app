@@ -43,3 +43,6 @@ public/workbox-*.js.map
 next-env.d.ts
 
 .vercel
+
+# Design handoff bundle from claude.ai/design — reference only
+design-handoff/
