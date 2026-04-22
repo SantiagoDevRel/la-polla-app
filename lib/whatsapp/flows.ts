@@ -820,8 +820,7 @@ export async function handleLeaderboard(
     .eq("polla_id", pollaId)
     .eq("status", "approved")
     .eq("paid", true)
-    .order("rank", { ascending: true })
-    .limit(5);
+    .order("rank", { ascending: true });
 
   if (!participants || participants.length === 0) {
     await sendTextMessage(
@@ -831,72 +830,18 @@ export async function handleLeaderboard(
     return;
   }
 
-  // Get prediction counts per user
-  const userIds = participants.map((p) => p.user_id);
-  const { data: predCounts } = await supabase
-    .from("predictions")
-    .select("user_id")
-    .eq("polla_id", pollaId)
-    .in("user_id", userIds);
-
-  const predCountMap = new Map<string, number>();
-  predCounts?.forEach((p) => {
-    predCountMap.set(p.user_id, (predCountMap.get(p.user_id) || 0) + 1);
-  });
-
   const rows = participants.map((p) => ({
     position: p.rank || 0,
     name:
       (p.users as unknown as { display_name: string })?.display_name ||
       "Usuario",
     points: p.total_points || 0,
-    predictions: predCountMap.get(p.user_id) || 0,
+    predictions: 0,
     isCurrentUser: p.user_id === userId,
   }));
 
-  // Check if user is outside top 5
-  const userInTop = participants.find((p) => p.user_id === userId);
-  let userRow;
-  if (!userInTop) {
-    const { data: myP } = await supabase
-      .from("polla_participants")
-      .select("total_points, rank")
-      .eq("polla_id", pollaId)
-      .eq("user_id", userId)
-      .single();
-
-    if (myP) {
-      const { data: myUser } = await supabase
-        .from("users")
-        .select("display_name")
-        .eq("id", userId)
-        .single();
-
-      const myPredCount = predCountMap.get(userId) || 0;
-      userRow = {
-        position: myP.rank || 0,
-        name: myUser?.display_name || "Tú",
-        points: myP.total_points || 0,
-        predictions: myPredCount,
-        isCurrentUser: true,
-      };
-    }
-  }
-
-  const tablaText = formatTablaWA(
-    userRow ? [...rows, userRow] : rows,
-    polla.name
-  );
-
+  const tablaText = formatTablaWA(rows, polla.name);
   await sendTextMessage(phone, tablaText);
-
-  await sendCTAButton(
-    phone,
-    "_Dale clic para ver la tabla completa con todos los jugadores_ 👇",
-    "Ver tabla completa 📊",
-    `${APP_URL}/pollas/${polla.slug}`,
-    FOOTER
-  );
 }
 
 // ─── FLOW 7: Results ───

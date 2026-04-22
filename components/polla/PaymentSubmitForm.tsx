@@ -147,13 +147,6 @@ export default function PaymentSubmitForm({
           />
         </div>
 
-        {/* Placeholder para subir imagen — coming soon */}
-        <div className="rounded-xl p-4 text-center border border-dashed border-border-medium bg-bg-base">
-          <p className="text-sm text-text-muted">
-            📷 Subir imagen del comprobante — coming soon
-          </p>
-        </div>
-
         {error && (
           <p className="text-red-alert text-sm text-center">{error}</p>
         )}
@@ -163,8 +156,11 @@ export default function PaymentSubmitForm({
           disabled={loading || paymentNote.trim() === ""}
           className="w-full bg-gold text-bg-base font-bold py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {loading ? "Enviando..." : "Enviar comprobante"}
+          {loading ? "Enviando..." : "Marcar como pagado"}
         </button>
+        <p className="text-xs text-text-muted text-center leading-snug">
+          El organizador va a confirmar tu pago para activarte en la polla.
+        </p>
       </div>
     );
   }

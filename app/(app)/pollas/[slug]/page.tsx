@@ -55,6 +55,24 @@ interface Prediction {
 type TabType = "partidos" | "ranking" | "pagos" | "info" | "organizar";
 
 // TeamCrest — renders flag URL via next/image proxy, falls back to 3-letter abbreviation
+function PaymentPendingBanner({ onGo }: { onGo: () => void }) {
+  return (
+    <div className="rounded-xl p-3 flex items-center gap-3 bg-gold/10 border border-gold/30">
+      <Banknote className="w-5 h-5 text-gold shrink-0" aria-hidden="true" />
+      <p className="text-xs text-text-primary flex-1 leading-snug">
+        Tu pago está pendiente de aprobación. Andá a la tab Pagos para confirmar.
+      </p>
+      <button
+        type="button"
+        onClick={onGo}
+        className="text-xs font-semibold bg-gold text-bg-base px-3 py-1.5 rounded-lg hover:brightness-110 transition-all shrink-0"
+      >
+        Ir a Pagos
+      </button>
+    </div>
+  );
+}
+
 function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: string }) {
   if (flagUrl) {
     return (
@@ -99,6 +117,8 @@ export default function PollaSlugPage() {
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserStatus, setCurrentUserStatus] = useState("approved");
   const [currentUserPaymentStatus, setCurrentUserPaymentStatus] = useState("approved");
+  const [currentUserPaid, setCurrentUserPaid] = useState(true);
+  const defaultTabAppliedRef = useRef(false);
   const [payingNow, setPayingNow] = useState(false);
 
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
@@ -179,6 +199,7 @@ export default function PollaSlugPage() {
       setCurrentUserRole(data.currentUserRole);
       setCurrentUserStatus(data.currentUserStatus || "approved");
       setCurrentUserPaymentStatus(data.currentUserPaymentStatus || "approved");
+      setCurrentUserPaid(data.currentUserPaid ?? true);
       setIsNonParticipant(data.isNonParticipant || false);
       const d: Record<string, { home: string; away: string }> = {};
       data.predictions.forEach((p: Prediction) => {
@@ -194,6 +215,22 @@ export default function PollaSlugPage() {
   }, [slug]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // One-shot default-tab routing: admin_collects participants who have not
+  // been confirmed by the organizer land on Pagos first. Ref guard avoids
+  // overriding a later manual tab switch even if data re-loads.
+  useEffect(() => {
+    if (defaultTabAppliedRef.current) return;
+    if (!polla) return;
+    if (
+      polla.payment_mode === "admin_collects" &&
+      currentUserPaid === false &&
+      currentUserRole !== "admin"
+    ) {
+      setActiveTab("pagos");
+    }
+    defaultTabAppliedRef.current = true;
+  }, [polla, currentUserPaid, currentUserRole]);
 
   // Get match IDs that have been touched and have both scores filled
   const pendingSaveIds = Array.from(touchedMatches).filter((matchId) => {
@@ -373,6 +410,14 @@ export default function PollaSlugPage() {
     currentUserPaymentStatus !== "approved";
 
   const isOrganizer = currentUserRole === "admin";
+
+  // admin_collects pending: participant joined but the organizer has not
+  // approved the comprobante. Gates the Partidos tab waiting state and
+  // drives the amber banner on other tabs. Admins never see either.
+  const showPaymentPending =
+    polla.payment_mode === "admin_collects" &&
+    currentUserPaid === false &&
+    !isOrganizer;
   const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
     { key: "partidos", label: "Partidos", icon: <Goal className="w-4 h-4" />, show: true },
     { key: "ranking", label: "Tabla", icon: <Trophy className="w-4 h-4" />, show: true },
@@ -453,7 +498,24 @@ export default function PollaSlugPage() {
 
       <main className="max-w-lg mx-auto p-4 space-y-3">
         {/* ── TAB PARTIDOS ── */}
-        {activeTab === "partidos" && paymentLocked && (
+        {activeTab === "partidos" && showPaymentPending && (
+          <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle space-y-3">
+            <Banknote className="w-10 h-10 text-gold mx-auto" />
+            <div>
+              <h2 className="text-lg font-bold text-text-primary mb-1">Esperando aprobación del organizador</h2>
+              <p className="text-sm text-text-secondary">
+                Una vez confirmado tu pago, vas a poder pronosticar.
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveTab("pagos")}
+              className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all"
+            >
+              Ir a Pagos
+            </button>
+          </div>
+        )}
+        {activeTab === "partidos" && !showPaymentPending && paymentLocked && (
           <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle space-y-4">
             <Lock className="w-10 h-10 text-gold mx-auto" />
             <div>
@@ -475,7 +537,7 @@ export default function PollaSlugPage() {
             </p>
           </div>
         )}
-        {activeTab === "partidos" && !paymentLocked && (
+        {activeTab === "partidos" && !paymentLocked && !showPaymentPending && (
           <>
             {currentUserStatus === "rejected" && (
               <div className="rounded-xl p-4 bg-red-alert/10 border border-red-alert/20 text-center mb-3">
@@ -688,6 +750,7 @@ export default function PollaSlugPage() {
         {/* ── TAB RANKING ── */}
         {activeTab === "ranking" && (
           <div className="space-y-3">
+            {showPaymentPending && <PaymentPendingBanner onGo={() => setActiveTab("pagos")} />}
             {polla.status === "ended" && participants[0] && (
               <div
                 className="w-full rounded-2xl px-4 py-3 flex items-center gap-3"
@@ -793,6 +856,7 @@ export default function PollaSlugPage() {
         {/* ── TAB INFO ── */}
         {activeTab === "info" && (
           <div className="space-y-4">
+            {showPaymentPending && <PaymentPendingBanner onGo={() => setActiveTab("pagos")} />}
             <div className="rounded-2xl p-5 space-y-3 bg-bg-card border border-border-subtle">
               <h3 className="font-bold text-text-primary">{polla.name}</h3>
               {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}

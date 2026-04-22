@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import axios from "axios";
-import { ChevronDown, Info, Target } from "lucide-react";
+import { ChevronDown, CreditCard, Info, Target } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -34,6 +34,8 @@ interface PollaSummary {
   status: string;
   created_by: string;
   match_ids: string[] | null;
+  payment_mode: string;
+  admin_payment_instructions: string | null;
 }
 
 interface OrganizerSummary {
@@ -140,7 +142,7 @@ export default function OpenInvitePage() {
         const { data: row, error: rowErr } = await supabase
           .from("pollas")
           .select(
-            "id, slug, name, description, tournament, buy_in_amount, type, status, created_by, match_ids"
+            "id, slug, name, description, tournament, buy_in_amount, type, status, created_by, match_ids, payment_mode, admin_payment_instructions"
           )
           .eq("invite_token", token)
           .maybeSingle<PollaSummary>();
@@ -362,6 +364,17 @@ export default function OpenInvitePage() {
               </div>
             ) : null}
           </div>
+          {polla.payment_mode === "admin_collects" && polla.admin_payment_instructions ? (
+            <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
+              <div className="flex items-center gap-2 mb-1.5">
+                <CreditCard className="w-4 h-4 text-gold" aria-hidden="true" />
+                <p className="text-sm font-semibold text-text-primary">Cómo pagar</p>
+              </div>
+              <p className="text-xs text-text-secondary whitespace-pre-wrap leading-snug">
+                {polla.admin_payment_instructions}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {/* Match list — the only scrolling region on the page. */}
