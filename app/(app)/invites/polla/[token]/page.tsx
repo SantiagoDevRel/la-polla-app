@@ -32,7 +32,6 @@ interface PollaSummary {
   buy_in_amount: number;
   type: string;
   status: string;
-  created_by: string;
   match_ids: string[] | null;
   payment_mode: string;
   admin_payment_instructions: string | null;
@@ -139,17 +138,28 @@ export default function OpenInvitePage() {
         const isAuthed = !!user;
         setAuthed(isAuthed);
 
-        const { data: row, error: rowErr } = await supabase
-          .from("pollas")
-          .select(
-            "id, slug, name, description, tournament, buy_in_amount, type, status, created_by, match_ids, payment_mode, admin_payment_instructions"
-          )
-          .eq("invite_token", token)
-          .maybeSingle<PollaSummary>();
-        if (rowErr || !row) {
+        // Polla + participant count + organizer fetch all go through the
+        // preview API (admin client). The pollas_select_active RLS policy
+        // filters by status='active' for anon visitors, so a direct client
+        // read would silently 404 for ended pollas and the user would see
+        // "Link inválido" instead of the "Esta polla ya cerró" state.
+        let previewData: {
+          polla: PollaSummary;
+          participantCount: number;
+          organizer: OrganizerSummary | null;
+        } | null = null;
+        try {
+          const { data } = await axios.get<{
+            polla: PollaSummary;
+            participantCount: number;
+            organizer: OrganizerSummary | null;
+          }>(`/api/pollas/preview?token=${encodeURIComponent(token)}`);
+          previewData = data;
+        } catch {
           setError("Link inválido o expirado. Pedíle al organizador que te comparta el link actualizado.");
           return;
         }
+        const row = previewData.polla;
         setPolla(row);
 
         // Ya unido: no seguimos cargando el resto del preview.
@@ -171,36 +181,19 @@ export default function OpenInvitePage() {
         }
 
         const matchIds = row.match_ids ?? [];
-        // Participant count + organizer both come from the server-side
-        // preview route. polla_participants RLS returns zero rows for
-        // anonymous sessions (recursive EXISTS), and users_select_own RLS
-        // blocks organizer SELECTs for anyone but the organizer themselves.
-        // The admin client inside /api/pollas/preview bypasses both.
-        const [previewRes, matchesRes] = await Promise.all([
-          axios
-            .get<{
-              participantCount: number;
-              organizer: OrganizerSummary | null;
-            }>(`/api/pollas/preview?token=${encodeURIComponent(token)}`)
-            .then((r) => ({
-              count: r.data.participantCount,
-              organizer: r.data.organizer,
-            }))
-            .catch((err) => {
-              console.warn("[invites] preview fetch failed:", err);
-              return { count: 0, organizer: null as OrganizerSummary | null };
-            }),
-          matchIds.length > 0
-            ? supabase
-                .from("matches")
-                .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, phase")
-                .in("id", matchIds)
-                .order("scheduled_at", { ascending: true })
-                .returns<MatchRow[]>()
-            : Promise.resolve({ data: [] as MatchRow[] }),
-        ]);
-        setOrganizer(previewRes.organizer ?? null);
-        setParticipantCount(previewRes.count ?? 0);
+        // previewData already has organizer + participantCount from the
+        // single admin-client fetch above. Only matches need a separate
+        // query (matches_select_all policy allows anon reads).
+        const matchesRes = matchIds.length > 0
+          ? await supabase
+              .from("matches")
+              .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, phase")
+              .in("id", matchIds)
+              .order("scheduled_at", { ascending: true })
+              .returns<MatchRow[]>()
+          : { data: [] as MatchRow[] };
+        setOrganizer(previewData.organizer);
+        setParticipantCount(previewData.participantCount);
         setMatches(matchesRes.data ?? []);
       } catch {
         setError("Error cargando la invitación");
