@@ -45,7 +45,7 @@ interface Participant {
 interface Match {
   id: string; home_team: string; away_team: string; home_team_flag: string;
   away_team_flag: string; scheduled_at: string; status: string;
-  home_score: number | null; away_score: number | null; phase: string;
+  home_score: number | null; away_score: number | null; phase: string | null;
 }
 interface Prediction {
   id: string; match_id: string; predicted_home: number; predicted_away: number;
