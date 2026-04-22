@@ -205,6 +205,50 @@ export async function processIncomingMessage(message: IncomingMessage) {
     "[unknown]";
   await logMessage(from, "inbound", type, inboundContent);
 
+  // 0a. Bot-first login gate: if this phone tapped "Abrir WhatsApp" in the
+  // login page, a row exists in login_pending_sessions. On any inbound
+  // message from that phone we generate + deliver the OTP here, mark the
+  // session code_sent=true, and return. The frontend is polling and will
+  // advance to the code-entry step once it sees code_sent.
+  try {
+    const normalizedPhone = from.replace(/^\+/, "");
+    const adminForGate = createAdminClient();
+    const { data: pendingSession } = await adminForGate
+      .from("login_pending_sessions")
+      .select("phone, expires_at, code_sent")
+      .eq("phone", normalizedPhone)
+      .maybeSingle();
+    if (
+      pendingSession &&
+      !pendingSession.code_sent &&
+      new Date(pendingSession.expires_at).getTime() > Date.now()
+    ) {
+      const code = await generateOTP(from);
+      const APP_URL =
+        (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
+      await sendCTAButton(
+        from,
+        `🔐 *Tu código de verificación*\n\n` +
+          `*${code}*\n\n` +
+          `Válido por 10 minutos\n` +
+          `Ingresa este código en la app para continuar 👇`,
+        "Abrir La Polla 🐔",
+        `${APP_URL}/login`,
+        "La Polla Colombiana 🐥"
+      );
+      const justCreated = await findPendingOTP(from);
+      if (justCreated) await markOTPSent(justCreated.id);
+      await adminForGate
+        .from("login_pending_sessions")
+        .update({ code_sent: true, code_sent_at: new Date().toISOString() })
+        .eq("phone", normalizedPhone);
+      return;
+    }
+  } catch (err) {
+    console.error("[WA] login-gate OTP send failed:", err);
+    // Fall through to the legacy pending-OTP path rather than stranding the user.
+  }
+
   // 0. Check for pending OTP BEFORE normal routing
   // This allows new users (not yet in DB) to receive their OTP
   try {
