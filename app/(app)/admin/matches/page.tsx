@@ -33,6 +33,7 @@ export default function AdminMatchesPage() {
   const [syncingWc, setSyncingWc] = useState(false);
   const [wcResult, setWcResult] = useState<string | null>(null);
 async function handleSyncWorldCup() {
+    if (!confirm("¿Seguro que querés sincronizar Copa del Mundo 2026?")) return;
     setSyncingWc(true);
     setWcResult(null);
     try {
@@ -65,6 +66,9 @@ async function handleSyncWorldCup() {
   }
 
   async function handleSync(competitionId: number, tournament: string) {
+    const league = LEAGUES.find((l) => l.id === competitionId);
+    const label = league?.label ?? "este torneo";
+    if (!confirm(`¿Seguro que querés sincronizar ${label}?`)) return;
     setLoading(competitionId);
     try {
       const result = await syncMatchesAction(competitionId, tournament);
