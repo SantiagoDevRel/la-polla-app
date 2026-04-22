@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   const query = admin
     .from("pollas")
-    .select("id, slug, name, description, tournament, buy_in_amount, type, status");
+    .select("id, slug, name, description, tournament, buy_in_amount, type, status, created_by");
   const { data: polla, error } = slug
     ? await query.eq("slug", slug).maybeSingle()
     : await query.eq("invite_token", token!).maybeSingle();
@@ -45,11 +45,30 @@ export async function GET(request: NextRequest) {
     console.error("[pollas/preview] participant count failed:", countError);
   }
 
-  // Strip internal id from the response.
-  const { id: _id, ...publicPolla } = polla;
+  // Organizer display name + avatar. The client cannot read this directly
+  // for logged-out visitors because users_select_own RLS restricts SELECTs
+  // to the caller's own row. We expose ONLY display_name and avatar_url
+  // (no email, no phone) via admin client to keep the preview complete.
+  const { data: organizerRow } = await admin
+    .from("users")
+    .select("display_name, avatar_url")
+    .eq("id", polla.created_by)
+    .maybeSingle();
+  const organizer = organizerRow
+    ? {
+        display_name: organizerRow.display_name ?? null,
+        avatar_url: organizerRow.avatar_url ?? null,
+      }
+    : null;
+
+  // Strip internal id + created_by from the response. created_by is a
+  // UUID the caller does not need; organizer carries the display fields.
+  const { id: _id, created_by: _createdBy, ...publicPolla } = polla;
   void _id;
+  void _createdBy;
   return NextResponse.json({
     polla: publicPolla,
     participantCount: count ?? 0,
+    organizer,
   });
 }

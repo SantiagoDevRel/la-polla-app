@@ -171,24 +171,24 @@ export default function OpenInvitePage() {
         }
 
         const matchIds = row.match_ids ?? [];
-        const [organizerRes, countRes, matchesRes] = await Promise.all([
-          supabase
-            .from("users")
-            .select("display_name, avatar_url")
-            .eq("id", row.created_by)
-            .maybeSingle<OrganizerSummary>(),
-          // Participant count goes through the server-side preview route
-          // because the polla_participants RLS policy returns zero rows for
-          // anonymous/invitee sessions (recursive EXISTS on auth.uid()).
-          // The admin client inside /api/pollas/preview bypasses that gate.
+        // Participant count + organizer both come from the server-side
+        // preview route. polla_participants RLS returns zero rows for
+        // anonymous sessions (recursive EXISTS), and users_select_own RLS
+        // blocks organizer SELECTs for anyone but the organizer themselves.
+        // The admin client inside /api/pollas/preview bypasses both.
+        const [previewRes, matchesRes] = await Promise.all([
           axios
-            .get<{ participantCount: number }>(
-              `/api/pollas/preview?token=${encodeURIComponent(token)}`
-            )
-            .then((r) => ({ count: r.data.participantCount }))
+            .get<{
+              participantCount: number;
+              organizer: OrganizerSummary | null;
+            }>(`/api/pollas/preview?token=${encodeURIComponent(token)}`)
+            .then((r) => ({
+              count: r.data.participantCount,
+              organizer: r.data.organizer,
+            }))
             .catch((err) => {
-              console.warn("[invites] preview count failed:", err);
-              return { count: 0 };
+              console.warn("[invites] preview fetch failed:", err);
+              return { count: 0, organizer: null as OrganizerSummary | null };
             }),
           matchIds.length > 0
             ? supabase
@@ -199,8 +199,8 @@ export default function OpenInvitePage() {
                 .returns<MatchRow[]>()
             : Promise.resolve({ data: [] as MatchRow[] }),
         ]);
-        setOrganizer(organizerRes.data ?? null);
-        setParticipantCount(countRes.count ?? 0);
+        setOrganizer(previewRes.organizer ?? null);
+        setParticipantCount(previewRes.count ?? 0);
         setMatches(matchesRes.data ?? []);
       } catch {
         setError("Error cargando la invitación");
