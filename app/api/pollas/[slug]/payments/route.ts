@@ -4,6 +4,8 @@
 // GET: Lista pagos pendientes/aprobados/rechazados (admin ve todos, participante ve los suyos)
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyAdminPaymentSubmitted } from "@/lib/notifications";
 import { z } from "zod";
 
 // Schema para subir comprobante de pago (participante)
@@ -187,6 +189,16 @@ export async function POST(
       .eq("id", participant.id);
 
     if (updateError) throw updateError;
+
+    // Fire-and-log WhatsApp ping to the organizer. Non-fatal: if the notif
+    // fails (outside 24h service window, already deduped, etc.) the POST
+    // still succeeds and the row is safely persisted.
+    try {
+      const notifAdmin = createAdminClient();
+      await notifyAdminPaymentSubmitted(notifAdmin, polla.id, user.id);
+    } catch (notifErr) {
+      console.error("[payments POST] notif failed:", notifErr);
+    }
 
     return NextResponse.json({ message: "Comprobante enviado" }, { status: 200 });
   } catch (error) {

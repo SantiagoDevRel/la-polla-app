@@ -5,7 +5,9 @@
 //   - Is safe to call from a webhook / server action.
 //
 // Triggers:
-//   1) notifyParticipantJoined  — creator gets pinged when someone joins.
+//   1) notifyParticipantJoined      — creator gets pinged when someone joins.
+//   5) notifyAdminPaymentSubmitted  — admin gets pinged when a participant marks "ya pagué".
+//   6) notifyParticipantPaymentApproved — participant gets pinged when admin approves.
 //   2) notifyMatchClosingSoon   — all participants 10 min before kickoff.
 //   3) notifyMatchFinished      — all participants when a match scores.
 //   4) notifyRankImprovement    — individual participant when rank improves.
@@ -268,5 +270,113 @@ export async function notifyRankImprovements(
     }
   } catch (err) {
     console.error("[notify:rank-up] non-fatal error:", err);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// 5. Participant marked "ya pagué" → ping the organizer so they can approve.
+//    Dedup via payment_submitted_notifications (participant_id, polla_id).
+// ──────────────────────────────────────────────────────────────────────
+export async function notifyAdminPaymentSubmitted(
+  admin: SupabaseClient,
+  pollaId: string,
+  participantUserId: string
+): Promise<void> {
+  try {
+    const { data: participant } = await admin
+      .from("polla_participants")
+      .select("id")
+      .eq("polla_id", pollaId)
+      .eq("user_id", participantUserId)
+      .maybeSingle();
+    if (!participant) return;
+
+    const { data: inserted } = await admin
+      .from("payment_submitted_notifications")
+      .upsert(
+        { participant_id: participant.id, polla_id: pollaId },
+        { onConflict: "participant_id,polla_id", ignoreDuplicates: true }
+      )
+      .select("participant_id");
+    if (!inserted || inserted.length === 0) return; // already notified
+
+    const { data: polla } = await admin
+      .from("pollas")
+      .select("name, slug, created_by")
+      .eq("id", pollaId)
+      .maybeSingle();
+    if (!polla) return;
+
+    const { data: adminUser } = await admin
+      .from("users")
+      .select("whatsapp_number")
+      .eq("id", polla.created_by)
+      .maybeSingle();
+    if (!adminUser?.whatsapp_number) return;
+
+    const { data: payer } = await admin
+      .from("users")
+      .select("display_name, whatsapp_number")
+      .eq("id", participantUserId)
+      .maybeSingle();
+    const payerName =
+      payer?.display_name?.trim() || payer?.whatsapp_number || "Un participante";
+
+    const body =
+      `💸 *${payerName}* marcó como pagado en *${polla.name}*.\n` +
+      `Andá a Pagos para aprobar: ${pollaLink(polla.slug)}`;
+    await send(adminUser.whatsapp_number, body, "payment-submitted");
+  } catch (err) {
+    console.error("[notify:payment-submitted] non-fatal error:", err);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// 6. Admin approved a payment → ping the participant so they know they can
+//    start pronosticando. Dedup via payment_approved_notifications.
+// ──────────────────────────────────────────────────────────────────────
+export async function notifyParticipantPaymentApproved(
+  admin: SupabaseClient,
+  pollaId: string,
+  participantUserId: string
+): Promise<void> {
+  try {
+    const { data: participant } = await admin
+      .from("polla_participants")
+      .select("id")
+      .eq("polla_id", pollaId)
+      .eq("user_id", participantUserId)
+      .maybeSingle();
+    if (!participant) return;
+
+    const { data: inserted } = await admin
+      .from("payment_approved_notifications")
+      .upsert(
+        { participant_id: participant.id, polla_id: pollaId },
+        { onConflict: "participant_id,polla_id", ignoreDuplicates: true }
+      )
+      .select("participant_id");
+    if (!inserted || inserted.length === 0) return; // already notified
+
+    const { data: polla } = await admin
+      .from("pollas")
+      .select("name, slug")
+      .eq("id", pollaId)
+      .maybeSingle();
+    if (!polla) return;
+
+    const { data: userRow } = await admin
+      .from("users")
+      .select("whatsapp_number")
+      .eq("id", participantUserId)
+      .maybeSingle();
+    if (!userRow?.whatsapp_number) return;
+
+    const body =
+      `✅ Tu pago en *${polla.name}* fue aprobado.\n` +
+      `Ya podés pronosticar: ${pollaLink(polla.slug)}`;
+    await send(userRow.whatsapp_number, body, "payment-approved");
+  } catch (err) {
+    console.error("[notify:payment-approved] non-fatal error:", err);
   }
 }
