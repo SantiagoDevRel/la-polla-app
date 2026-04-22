@@ -68,7 +68,7 @@ const PAYMENT_MODE_OPTIONS = [
     title: "Pago al final",
     icon: "handshake",
     description: "Al terminar la polla, cada participante le paga directamente al ganador.",
-    tag: "Al final",
+    tag: "",
   },
 ];
 
