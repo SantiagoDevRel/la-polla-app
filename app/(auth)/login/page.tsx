@@ -96,18 +96,13 @@ function LoginInner() {
     setStep("waiting_for_whatsapp");
   };
 
-  // Tap on "Abrir WhatsApp": register the phone as waiting, open the deep
-  // link in a new tab, and transition to the polling step. The bot webhook
-  // will generate + send the OTP once the user messages the bot; the poll
-  // endpoint sees code_sent=true and we advance to the code-entry step.
-  const handleOpenWhatsApp = async () => {
+  // Tap on "Abrir WhatsApp": open the deep link SYNCHRONOUSLY first so iOS
+  // Safari keeps the user-activation gesture alive. Any await before
+  // window.open drops the gesture and Safari silently blocks the popup. The
+  // /login-wait POST fires in the background, non-awaited. The frontend
+  // polls for code_sent regardless of when the insert lands.
+  const handleOpenWhatsApp = () => {
     setError("");
-    try {
-      await axios.post("/api/auth/login-wait", { phone });
-    } catch (err) {
-      console.warn("[login] login-wait register failed:", err);
-      // Non-fatal: polling still works if the upsert races with the webhook.
-    }
     if (typeof window !== "undefined") {
       window.open(
         `https://wa.me/${BOT_PHONE}?text=Hola%20parce%2C%20mandame%20el%20c%C3%B3digo%20de%20la%20polla`,
@@ -115,6 +110,13 @@ function LoginInner() {
       );
     }
     setStep("polling_for_otp");
+    // Fire-and-forget: if the POST fails the pending row never gets written
+    // and polling will time out after 5 min. Acceptable fallback, user can
+    // retry the button. We do NOT await because the await would break the
+    // Safari user-activation chain above.
+    axios.post("/api/auth/login-wait", { phone }).catch((err) => {
+      console.error("[login] login-wait failed:", err);
+    });
   };
 
   const handleVerify = async (e: React.FormEvent) => {
