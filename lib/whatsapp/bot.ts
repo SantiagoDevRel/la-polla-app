@@ -14,6 +14,7 @@ import {
   handlePollaMenu,
   handlePronosticar,
   handlePredictGroupMode,
+  handlePredictGroupPage,
   handlePredictGroupSelect,
   handlePredictionInput,
   handleLeaderboard,
@@ -447,6 +448,7 @@ async function routePayload(
     payload.startsWith("more_") ||
     payload.startsWith("predgrp_") ||
     payload.startsWith("pgsel|") ||
+    payload.startsWith("pgmore|") ||
     payload === "confirm_yes" ||
     payload === "confirm_no" ||
     payload === "join_code_yes" ||
@@ -540,6 +542,18 @@ async function routePayload(
   if (payload.startsWith("predgrp_date_")) {
     const pollaId = payload.replace("predgrp_date_", "");
     await handlePredictGroupMode(from, user.id, pollaId, "date");
+    return;
+  }
+
+  // Predict group-list pagination: "Ver más fases/fechas" row.
+  // Payload format: "pgmore|{pollaId}|{page}".
+  if (payload.startsWith("pgmore|")) {
+    const parts = payload.split("|");
+    if (parts.length >= 3) {
+      const pollaId = parts[1];
+      const page = parseInt(parts[2], 10) || 0;
+      await handlePredictGroupPage(from, user.id, pollaId, page);
+    }
     return;
   }
 

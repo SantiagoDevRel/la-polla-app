@@ -535,16 +535,41 @@ export async function handlePronosticar(
       // If the chosen mode only produces a single group, skip the selector
       // and fall through to the flat list with every match visible.
       if (groups.length > 1) {
-        const rows = groups.slice(0, 10).map((g) => ({
+        const GROUP_PAGE_SIZE = 9; // 1 slot reserved for "Ver más"
+        const groupPage = existingState?.predictGroupPage ?? 0;
+        const groupStart = groupPage * GROUP_PAGE_SIZE;
+        const pageGroups = groups.slice(groupStart, groupStart + GROUP_PAGE_SIZE);
+        const hasMoreGroups = groupStart + GROUP_PAGE_SIZE < groups.length;
+
+        const rows: { id: string; title: string; description: string }[] = pageGroups.map((g) => ({
           id: `pgsel|${pollaId}|${g.key}`,
           title: `${g.label} (${g.matches.length})`.slice(0, 24),
           description: g.matches.length === 1 ? "1 partido" : `${g.matches.length} partidos`,
         }));
+        if (hasMoreGroups) {
+          const remaining = groups.length - (groupStart + GROUP_PAGE_SIZE);
+          rows.push({
+            id: `pgmore|${pollaId}|${groupPage + 1}`,
+            title: stateMode === "phase"
+              ? `Ver más fases (${remaining}) →`.slice(0, 24)
+              : `Ver más fechas (${remaining}) →`.slice(0, 24),
+            description: `Mostrar los siguientes ${Math.min(GROUP_PAGE_SIZE, remaining)}`,
+          });
+        }
+
+        // Persist the page so pagination taps can increment it.
+        await setState(phone, {
+          action: "picking_group",
+          pollaId,
+          predictGroupMode: stateMode,
+          predictGroupPage: groupPage,
+        });
+
         await sendListMessage(
           phone,
           stateMode === "phase"
-            ? "¿Qué fase querés pronosticar?"
-            : "¿Qué fecha querés pronosticar?",
+            ? `¿Qué fase querés pronosticar?${groupPage > 0 ? ` _(página ${groupPage + 1})_` : ""}`
+            : `¿Qué fecha querés pronosticar?${groupPage > 0 ? ` _(página ${groupPage + 1})_` : ""}`,
           "Ver grupos",
           [{ title: "Grupos", rows }],
           `🎯 ${polla.name}`,
@@ -635,6 +660,26 @@ export async function handlePredictGroupMode(
     action: "picking_group",
     pollaId,
     predictGroupMode: mode,
+  });
+  await handlePronosticar(phone, userId, pollaId);
+}
+
+// Group-list pagination: the user tapped "Ver más fases/fechas" on the
+// group selector. Bump the page index in state and re-enter
+// handlePronosticar so the gate renders the next slice.
+export async function handlePredictGroupPage(
+  phone: string,
+  userId: string,
+  pollaId: string,
+  page: number
+) {
+  const current = await getState(phone);
+  const mode = current?.predictGroupMode ?? "phase";
+  await setState(phone, {
+    action: "picking_group",
+    pollaId,
+    predictGroupMode: mode,
+    predictGroupPage: page,
   });
   await handlePronosticar(phone, userId, pollaId);
 }
