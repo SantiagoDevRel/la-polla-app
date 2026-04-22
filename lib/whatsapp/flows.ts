@@ -19,7 +19,6 @@ import {
 import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
 import { rotateJoinCode } from "@/lib/pollas/rotate-code";
-import { needsName } from "@/lib/users/needs-name";
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
 const FOOTER = "La Polla Colombiana 🐥";
@@ -203,24 +202,29 @@ async function verifyMemberAndPolla(
 
 // ─── FLOW 1: Main Menu ───
 
-export async function handleMainMenu(phone: string, displayName: string) {
-  // Use the shared heuristic so the bot greeting and /onboarding redirect
-  // stay in lockstep. needsName catches missing/blank/phone-shaped names.
-  const name = needsName(displayName)
-    ? "parcero"
-    : displayName.split(" ")[0];
-
-  await sendReplyButtons(
-    phone,
-    `Hey ${name} qué vamos a hacer hoy parce?`,
-    [
-      { id: "menu_mis_pollas", title: "Mis Pollas 🏆" },
-      { id: "menu_predecir", title: "Predecir ⚽" },
-      { id: "menu_tabla", title: "Ver Tabla 📊" },
-    ],
-    "La Polla 🐥",
-    FOOTER
-  );
+// Entry point UX: go straight to the list of the user's pollas. The old
+// top-level three-button menu (Mis Pollas / Pronosticar / Ver Tabla) was
+// redundant because every path eventually required picking a polla, so
+// we short-circuit to the polla list. Signature preserved for existing
+// call sites; displayName is no longer used here.
+export async function handleMainMenu(
+  phone: string,
+  _displayName: string,
+  userId?: string
+) {
+  void _displayName;
+  if (userId) {
+    await handleMisPollas(phone, userId);
+    return;
+  }
+  const supabase = createAdminClient();
+  const { data: user } = await supabase
+    .from("users")
+    .select("id")
+    .eq("whatsapp_number", phone)
+    .maybeSingle();
+  if (!user?.id) return;
+  await handleMisPollas(phone, user.id);
 }
 
 // ─── FLOW 2: Unknown User ───
@@ -228,16 +232,7 @@ export async function handleMainMenu(phone: string, displayName: string) {
 export async function handleUnknownUser(phone: string) {
   await sendTextMessage(
     phone,
-    `¡Hola parce! 👋 Bienvenido a La Polla 🐔\n\n` +
-      `Todavía no tenés cuenta, pero eso se arregla en 30 segundos.\n` +
-      `Tocá el botón de abajo y armá tu cuenta para empezar a jugar 👇`
-  );
-  await sendCTAButton(
-    phone,
-    "¡Listo parce! Creá tu cuenta acá 🎯",
-    "Registrarme 🐔",
-    APP_URL,
-    FOOTER
+    "No te encuentro en La Polla 🐣. Registrate en la-polla.vercel.app y volvé a escribirme cuando tengas tu cuenta."
   );
 }
 
@@ -255,14 +250,7 @@ export async function handleMisPollas(phone: string, userId: string) {
   if (!participations || participations.length === 0) {
     await sendTextMessage(
       phone,
-      "😅 Parce, no estás en ninguna polla todavía.\n\n_Unite a una o creá una nueva desde la web_"
-    );
-    await sendCTAButton(
-      phone,
-      "Dale, creá tu polla y armá el parche 🐥",
-      "Ir a La Polla",
-      APP_URL,
-      FOOTER
+      "Todavía no estás en ninguna polla 🐣. Creá una en la-polla.vercel.app o pedile a un amigo el link de invitación."
     );
     return;
   }
@@ -336,7 +324,7 @@ export async function handlePollaMenu(
   const trnLabel = TRN_LABELS[polla.tournament] || polla.tournament;
   await setState(phone, { action: "browsing_polla", pollaId });
 
-  // RULE 4 — ended pollas are read-only (no Predecir)
+  // RULE 4 — ended pollas are read-only (no Pronosticar)
   if (polla.status === "ended") {
     await sendReplyButtons(
       phone,
@@ -373,10 +361,10 @@ export async function handlePollaMenu(
         {
           title: "Opciones",
           rows: [
-            { id: `pred_${pollaId}`, title: "Predecir 🎯", description: "Poné tus pronósticos" },
+            { id: `pred_${pollaId}`, title: "Pronosticar 🎯", description: "Poné tus pronósticos" },
             { id: `rank_${pollaId}`, title: "Ver Tabla 📊", description: "Mirá cómo va el parche" },
             { id: `results_${pollaId}`, title: "Resultados ⚽", description: "Últimos partidos" },
-            { id: `rotate_confirm_${pollaId}`, title: "🔄 Rotar código", description: "Genera un código nuevo" },
+            { id: `rotate_confirm_${pollaId}`, title: "Generar nuevo código", description: "Genera un código de invitación nuevo" },
           ],
         },
       ],
@@ -390,7 +378,7 @@ export async function handlePollaMenu(
     phone,
     body,
     [
-      { id: `pred_${pollaId}`, title: "Predecir 🎯" },
+      { id: `pred_${pollaId}`, title: "Pronosticar 🎯" },
       { id: `rank_${pollaId}`, title: "Ver Tabla 📊" },
       { id: `results_${pollaId}`, title: "Resultados ⚽" },
     ],
@@ -1105,7 +1093,7 @@ export async function handleJoinPolla(
       phone,
       `¡Parce, ya sos parte de *${polla.name}*! 🐥\n\n_Dale, poné tus pronósticos_`,
       [
-        { id: `pred_${polla.id}`, title: "Predecir 🎯" },
+        { id: `pred_${polla.id}`, title: "Pronosticar 🎯" },
         { id: `rank_${polla.id}`, title: "Ver Tabla 📊" },
       ],
       polla.name,
@@ -1157,7 +1145,7 @@ export async function handleJoinPolla(
     `🎉 ¡Listo parce! Ya sos parte de *${polla.name}*\n\n` +
       `Eso es, ahora poné tus pronósticos y demostrá quién sabe de fútbol 🐥⚽`,
     [
-      { id: `pred_${polla.id}`, title: "Predecir 🎯" },
+      { id: `pred_${polla.id}`, title: "Pronosticar 🎯" },
       { id: "menu", title: "🏠 Menú" },
     ],
     "¡Te uniste! 🎉",
@@ -1465,7 +1453,7 @@ export async function handleRotateCodeConfirm(
 
   await sendReplyButtons(
     phone,
-    `¿Rotar el código de *${polla.name}*? El código actual dejará de funcionar.`,
+    `¿Generar un nuevo código de invitación para *${polla.name}*? El código actual dejará de funcionar.`,
     [
       { id: `rotate_yes_${pollaId}`, title: "Sí, rotar" },
       { id: "rotate_no", title: "No" },
