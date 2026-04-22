@@ -7,10 +7,15 @@ import {
   sendListMessage,
   sendCTAButton,
 } from "./interactive";
-import { clearState, setState } from "./state";
+import { clearState, getState, setState } from "./state";
 import { formatTablaWA } from "./tabla";
 import { shortMatchTitle } from "./format";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
+import {
+  groupMatchesByDate,
+  groupMatchesByPhase,
+  type GroupableMatch,
+} from "@/lib/matches/grouping";
 import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
 import { rotateJoinCode } from "@/lib/pollas/rotate-code";
@@ -425,7 +430,7 @@ export async function handlePronosticar(
   let matchQuery = supabase
     .from("matches")
     .select(
-      "id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at"
+      "id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, phase"
     )
     .eq("status", "scheduled")
     .gt("scheduled_at", lockWindow)
@@ -498,8 +503,81 @@ export async function handlePronosticar(
     );
   }
 
-  // List view with pagination (WhatsApp lists are capped at 10 rows)
-  const targetMatches = unpredicted.length > 0 ? unpredicted : matches;
+  // Grouping gate. When the polla spans multiple phases OR multiple dates
+  // we route the user through an interactive toggle + group selector before
+  // showing the paginated match list. State carries the current choice so
+  // pagination ("Ver más") stays inside the selected group.
+  const baseMatches = unpredicted.length > 0 ? unpredicted : matches;
+  const uniquePhases = new Set(
+    baseMatches.map((m) => (m as { phase: string | null }).phase ?? "__none__")
+  );
+  const uniqueDateKeys = new Set(
+    baseMatches.map((m) =>
+      new Date(m.scheduled_at).toISOString().slice(0, 10)
+    )
+  );
+  const groupingUseful = uniquePhases.size > 1 || uniqueDateKeys.size > 1;
+  const existingState = await getState(phone);
+  const stateMode = existingState?.predictGroupMode ?? null;
+  const stateKey = existingState?.predictGroupKey ?? null;
+
+  let targetMatches = baseMatches;
+  if (groupingUseful && page === 0 && !specificMatchId) {
+    if (!stateMode) {
+      // Ask the user how to group. setState parks them in picking_group so
+      // any stray text ends up ignored instead of interpreted as a score.
+      await setState(phone, { action: "picking_group", pollaId });
+      await sendReplyButtons(
+        phone,
+        "¿Cómo querés ver los partidos parce?",
+        [
+          { id: `predgrp_phase_${pollaId}`, title: "Por fase" },
+          { id: `predgrp_date_${pollaId}`, title: "Por fecha" },
+        ],
+        `🎯 ${polla.name}`,
+        FOOTER
+      );
+      return;
+    }
+    if (!stateKey) {
+      const groups =
+        stateMode === "phase"
+          ? groupMatchesByPhase(baseMatches as GroupableMatch[])
+          : groupMatchesByDate(baseMatches as GroupableMatch[]);
+      // If the chosen mode only produces a single group, skip the selector
+      // and fall through to the flat list with every match visible.
+      if (groups.length > 1) {
+        const rows = groups.slice(0, 10).map((g) => ({
+          id: `pgsel|${pollaId}|${g.key}`,
+          title: `${g.label} (${g.matches.length})`.slice(0, 24),
+          description: g.matches.length === 1 ? "1 partido" : `${g.matches.length} partidos`,
+        }));
+        await sendListMessage(
+          phone,
+          stateMode === "phase"
+            ? "¿Qué fase querés pronosticar?"
+            : "¿Qué fecha querés pronosticar?",
+          "Ver grupos",
+          [{ title: "Grupos", rows }],
+          `🎯 ${polla.name}`,
+          FOOTER
+        );
+        return;
+      }
+    } else {
+      // Filter matches to the selected group.
+      const groups =
+        stateMode === "phase"
+          ? groupMatchesByPhase(baseMatches as GroupableMatch[])
+          : groupMatchesByDate(baseMatches as GroupableMatch[]);
+      const chosen = groups.find((g) => g.key === stateKey);
+      if (chosen) {
+        targetMatches = chosen.matches as typeof baseMatches;
+      }
+    }
+  }
+
+  // List view with pagination (WhatsApp lists are capped at 10 rows).
   const startIdx = page * PAGE_SIZE;
   const pageMatches = targetMatches.slice(startIdx, startIdx + PAGE_SIZE);
   const hasMore = startIdx + PAGE_SIZE < targetMatches.length;
@@ -508,6 +586,8 @@ export async function handlePronosticar(
     action: "picking_match",
     pollaId,
     page,
+    ...(stateMode ? { predictGroupMode: stateMode } : {}),
+    ...(stateKey ? { predictGroupKey: stateKey } : {}),
   });
 
   const rows = pageMatches.map((m) => {
@@ -551,6 +631,44 @@ export async function handlePronosticar(
     `🎯 ${polla.name}`,
     FOOTER
   );
+}
+
+// Group-mode picker: the user tapped "Por fase" or "Por fecha" from the
+// toggle. Persist the choice and re-enter handlePronosticar so the gate
+// above advances to the group list (or skips straight to the flat list
+// when only one group exists).
+export async function handlePredictGroupMode(
+  phone: string,
+  userId: string,
+  pollaId: string,
+  mode: "phase" | "date"
+) {
+  await setState(phone, {
+    action: "picking_group",
+    pollaId,
+    predictGroupMode: mode,
+  });
+  await handlePronosticar(phone, userId, pollaId);
+}
+
+// Group selection: the user tapped a row in the group list. Persist the
+// key and re-enter handlePronosticar; the gate reads the state and filters
+// matches to the chosen group before rendering the paginated list.
+export async function handlePredictGroupSelect(
+  phone: string,
+  userId: string,
+  pollaId: string,
+  groupKey: string
+) {
+  const current = await getState(phone);
+  const mode = current?.predictGroupMode ?? "phase";
+  await setState(phone, {
+    action: "picking_match",
+    pollaId,
+    predictGroupMode: mode,
+    predictGroupKey: groupKey,
+  });
+  await handlePronosticar(phone, userId, pollaId);
 }
 
 // Helper: Show prediction input prompt for a specific match.

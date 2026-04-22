@@ -30,6 +30,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ConversationAction =
   | "browsing_polla"
+  | "picking_group"
   | "picking_match"
   | "waiting_prediction"
   | "confirm_prediction"
@@ -45,6 +46,12 @@ export type ConversationState = {
   predictedHome?: number;
   predictedAway?: number;
   joinCode?: string;
+  // Predict flow grouping. The bot asks "¿Por fase o por fecha?" and then
+  // lists the groups. Both fields are set when the user picks a group and
+  // cleared when the prediction flow exits. Stored as JSON keys on the
+  // existing state row so no migration is needed.
+  predictGroupMode?: "phase" | "date";
+  predictGroupKey?: string;
 };
 
 // TTL in minutes. Kept at 10 to preserve the previous in-memory behavior.
