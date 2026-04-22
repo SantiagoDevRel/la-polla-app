@@ -72,7 +72,12 @@ function LoginInner() {
 
   const BOT_PHONE = "573117312391";
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Phone submit no longer sends the OTP directly. We first park the user on
+  // the bot-gate screen so they open the WhatsApp chat with the bot and
+  // (re)open the 24h service window. OTP is sent after they tap "Ya le
+  // escribí al bot". Without this gate Meta silently rejects free-text
+  // messages outside the window and users never see the code.
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -80,17 +85,24 @@ function LoginInner() {
       setError("Ingresa un numero de telefono valido");
       return;
     }
+    if (!turnstileToken) {
+      setError("Completá la verificación anti-bot");
+      return;
+    }
 
+    setStep("waiting_for_whatsapp");
+  };
+
+  const handleSendOtp = async () => {
+    setError("");
     setLoading(true);
-
     try {
       const { data: otpRes } = await axios.post("/api/auth/otp", {
         phone,
         turnstileToken,
       });
-      const newUser = otpRes.newUser ?? true;
-      setIsNewUser(newUser);
-      setStep(newUser ? "waiting_for_whatsapp" : "entering_code");
+      setIsNewUser(otpRes.newUser ?? true);
+      setStep("entering_code");
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setError(axiosErr.response?.data?.error || "Error al enviar el codigo");
@@ -215,12 +227,12 @@ function LoginInner() {
 
             <button
               type="submit"
-              disabled={loading || !turnstileToken || !phone}
+              disabled={!turnstileToken || !phone}
               className="w-full bg-gold text-bg-base font-bold py-3.5 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-lg inline-flex items-center justify-center gap-2"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
             >
               <MessageCircle className="w-5 h-5" />
-              {loading ? "Enviando..." : "Pedir código por WhatsApp"}
+              Continuar
             </button>
           </form>
 
@@ -232,7 +244,9 @@ function LoginInner() {
         </div>
       )}
 
-      {/* State: waiting_for_whatsapp — new user must message the bot first */}
+      {/* State: waiting_for_whatsapp — bot-chat gate before OTP send.
+          User must open the WhatsApp chat with the bot and send "Hola" so
+          Meta's 24h service window opens; only then do we send the OTP. */}
       {step === "waiting_for_whatsapp" && (
         <div
           className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
@@ -249,28 +263,43 @@ function LoginInner() {
                 style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "50%" }}
               />
             </div>
-            <p className="text-text-secondary text-sm">
-              Abrí WhatsApp y escribile al bot para recibir tu código
+            <h2 className="font-display text-2xl text-gold tracking-wide">ABRÍ EL CHAT CON EL BOT</h2>
+            <p className="text-text-secondary text-sm leading-snug">
+              Para recibir el código de acceso, primero tenés que escribirle al bot. Tap el botón, mandá el mensaje &ldquo;Hola&rdquo; y volvé acá.
             </p>
           </div>
 
           <a
-            href={`https://wa.me/${BOT_PHONE}?text=Parce%2C%20quiero%20entrar%20a%20La%20Polla%20%F0%9F%90%A3%20%E2%80%94%20m%C3%A1ndame%20el%20c%C3%B3digo%20de%20verificaci%C3%B3n`}
+            href={`https://wa.me/${BOT_PHONE}?text=Hola`}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full flex items-center justify-center gap-2 font-bold py-4 px-4 rounded-xl hover:brightness-110 transition-all text-lg cursor-pointer text-white"
             style={{ backgroundColor: "#25D366" }}
           >
             <MessageCircle className="w-5 h-5" />
-            Escribirle al bot
+            Abrir WhatsApp
           </a>
+
+          {error && (
+            <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">{error}</p>
+          )}
 
           <button
             type="button"
-            onClick={() => { setError(""); setStep("entering_code"); }}
-            className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors text-sm"
+            onClick={handleSendOtp}
+            disabled={loading}
+            className="w-full bg-gold text-bg-base font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base"
+            style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
           >
-            Ya tengo mi código &rarr;
+            {loading ? "Enviando..." : "Ya le escribí al bot, mandame el código"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setError(""); setStep("phone"); }}
+            className="w-full text-text-muted font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
+          >
+            <ArrowLeft className="w-4 h-4" /> Cambiar número
           </button>
         </div>
       )}
