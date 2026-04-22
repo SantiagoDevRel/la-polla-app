@@ -68,6 +68,8 @@ function LoginInner() {
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [isNewUser] = useState(true);
+  const [pollingElapsed, setPollingElapsed] = useState(0);
+  const [pollingTimedOut, setPollingTimedOut] = useState(false);
 
   const handlePhoneChange = useCallback((value: string) => {
     setPhone(value);
@@ -147,12 +149,16 @@ function LoginInner() {
   // Poll login_pending_sessions every 3 seconds while the user messages the
   // bot. Advance to the code-entry step as soon as the webhook flips
   // code_sent=true, or surface an error on expiry (~15 min TTL) or hard
-  // frontend timeout at 5 min.
+  // frontend timeout at 5 min. After ~20 seconds without a result we also
+  // surface a helper block with a retry button so iOS users who lost the
+  // WhatsApp handoff can re-trigger the deep link.
   useEffect(() => {
     if (step !== "polling_for_otp") return;
     let cancelled = false;
     const startedAt = Date.now();
     const TIMEOUT_MS = 5 * 60 * 1000;
+    setPollingElapsed(0);
+    setPollingTimedOut(false);
 
     async function tick() {
       if (cancelled) return;
@@ -173,10 +179,11 @@ function LoginInner() {
       } catch (err) {
         console.warn("[login] poll failed:", err);
       }
-      if (Date.now() - startedAt > TIMEOUT_MS) {
+      const elapsed = Date.now() - startedAt;
+      setPollingElapsed(elapsed);
+      if (elapsed > TIMEOUT_MS) {
         if (!cancelled) {
-          setError("No recibimos tu mensaje al bot. Volvé a intentar.");
-          setStep("waiting_for_whatsapp");
+          setPollingTimedOut(true);
         }
         return;
       }
@@ -187,6 +194,24 @@ function LoginInner() {
       cancelled = true;
     };
   }, [step, phone]);
+
+  // Synchronous re-trigger of the WhatsApp deep link. Must stay sync for
+  // iOS Safari user-activation (same reason as handleOpenWhatsApp).
+  const handleReopenWhatsApp = () => {
+    setError("");
+    if (typeof window !== "undefined") {
+      window.open(
+        `https://wa.me/${BOT_PHONE}?text=Hola%20parce%2C%20mandame%20el%20c%C3%B3digo%20de%20la%20polla`,
+        "_blank"
+      );
+    }
+    // Re-trigger the polling loop by bouncing step.
+    setStep("waiting_for_whatsapp");
+    setTimeout(() => setStep("polling_for_otp"), 0);
+    axios.post("/api/auth/login-wait", { phone }).catch((err) => {
+      console.error("[login] login-wait retry failed:", err);
+    });
+  };
 
   return (
     <div
@@ -359,16 +384,56 @@ function LoginInner() {
         >
           <div className="text-center space-y-3">
             <div className="mx-auto flex items-center justify-center" style={{ width: 80, height: 80 }}>
-              <div
-                className="w-12 h-12 rounded-full border-4 border-gold/30 border-t-gold animate-spin"
-                aria-hidden="true"
-              />
+              {pollingTimedOut ? (
+                <MessageCircle className="w-10 h-10 text-gold" aria-hidden="true" />
+              ) : (
+                <div
+                  className="w-12 h-12 rounded-full border-4 border-gold/30 border-t-gold animate-spin"
+                  aria-hidden="true"
+                />
+              )}
             </div>
-            <h2 className="font-display text-2xl text-gold tracking-wide">ESPERANDO TU MENSAJE AL BOT...</h2>
+            <h2 className="font-display text-2xl text-gold tracking-wide">
+              {pollingTimedOut ? "TARDÓ MUCHO" : "ESPERANDO TU MENSAJE AL BOT..."}
+            </h2>
             <p className="text-text-secondary text-sm leading-snug">
-              Apenas le escribas al bot, te mandamos el código acá.
+              {pollingTimedOut
+                ? "Mandá un mensaje al bot por WhatsApp y volvé a intentar."
+                : "Apenas le escribas al bot, te mandamos el código acá."}
             </p>
           </div>
+
+          {/* Helper block kicks in around 20 seconds so users who lost the
+              WhatsApp handoff (iOS app-switch, closed tab, etc.) get a
+              visible way to retry instead of staring at a spinner. */}
+          {!pollingTimedOut && pollingElapsed >= 20_000 ? (
+            <div className="rounded-xl p-3 space-y-3 bg-bg-elevated border border-border-subtle">
+              <p className="text-xs text-text-secondary leading-snug">
+                ¿No te llegó? Asegurate de mandarle al menos un mensaje al bot. Puede ser &ldquo;Hola&rdquo; o cualquier cosa.
+              </p>
+              <button
+                type="button"
+                onClick={handleReopenWhatsApp}
+                className="w-full flex items-center justify-center gap-2 font-semibold py-2.5 px-3 rounded-lg transition-all text-sm text-white"
+                style={{ backgroundColor: "#25D366" }}
+              >
+                <MessageCircle className="w-4 h-4" />
+                Volver a abrir WhatsApp
+              </button>
+            </div>
+          ) : null}
+
+          {pollingTimedOut ? (
+            <button
+              type="button"
+              onClick={handleReopenWhatsApp}
+              className="w-full flex items-center justify-center gap-2 font-bold py-3.5 px-4 rounded-xl transition-all text-base text-white"
+              style={{ backgroundColor: "#25D366" }}
+            >
+              <MessageCircle className="w-5 h-5" />
+              Volver a abrir WhatsApp
+            </button>
+          ) : null}
 
           {error && (
             <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">{error}</p>
@@ -379,7 +444,7 @@ function LoginInner() {
             onClick={() => { setError(""); setStep("phone"); }}
             className="w-full text-text-muted font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
           >
-            <ArrowLeft className="w-4 h-4" /> Cancelar y volver
+            <ArrowLeft className="w-4 h-4" /> Cambiar número
           </button>
         </div>
       )}
