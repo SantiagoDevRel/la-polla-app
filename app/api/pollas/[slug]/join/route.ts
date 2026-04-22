@@ -79,6 +79,14 @@ export async function POST(
 
     const isDigitalPool =
       polla.payment_mode === "digital_pool" && polla.buy_in_amount > 0;
+    const isAdminCollects = polla.payment_mode === "admin_collects";
+
+    // paid semantics per payment mode, decided explicitly so future readers
+    // see the intent instead of a cryptic boolean:
+    //   digital_pool   → paid=false until the Wompi webhook confirms.
+    //   admin_collects → paid=false until the organizer approves the comprobante.
+    //   pay_winner     → paid=true on join (nothing to collect upfront).
+    const initialPaid = !(isDigitalPool || isAdminCollects);
 
     const admin = createAdminClient();
 
@@ -91,15 +99,16 @@ export async function POST(
           role: "player",
           status: "approved",
           payment_status: isDigitalPool ? "pending" : "approved",
-          paid: !isDigitalPool,
+          paid: initialPaid,
         });
       if (insertError) {
         console.error("[join] insert participant failed:", insertError);
         return NextResponse.json({ error: "Error al unirse" }, { status: 500 });
       }
-      // Ping the creator. Skip for digital_pool: payment hasn't landed yet,
-      // the participant isn't really "in" until the Wompi webhook approves.
-      if (!isDigitalPool) {
+      // Ping the creator. Skip for digital_pool (Wompi webhook will finalize
+      // the join) and for admin_collects (the Phase 2C payment-submitted
+      // notification is the meaningful event for the organizer).
+      if (!isDigitalPool && !isAdminCollects) {
         await notifyParticipantJoined(admin, polla.id, user.id);
       }
     } else if (!isDigitalPool || existing.payment_status === "approved") {

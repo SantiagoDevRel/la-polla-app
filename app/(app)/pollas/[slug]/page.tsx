@@ -716,7 +716,12 @@ export default function PollaSlugPage() {
                     El ranking se actualiza cuando terminen los partidos
                   </div>
                 )}
-                {[...participants]
+                {/* Leaderboard excludes paid=false rows: admin_collects
+                    participants awaiting approval, and digital_pool joiners
+                    whose Wompi webhook has not landed yet. Those rows still
+                    show up in the Pagos tab for admin review. */}
+                {participants
+                  .filter((p) => p.paid)
                   .sort((a, b) => {
                     // Sort by cached rank ascending (RANK() window function
                     // gives ties the same rank). Secondary sort by joined_at

@@ -164,7 +164,7 @@ async function verifyMemberAndPolla(
 
   const { data: participant } = await supabase
     .from("polla_participants")
-    .select("id, role, status, payment_status, total_points, rank")
+    .select("id, role, status, payment_status, paid, total_points, rank")
     .eq("polla_id", pollaId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -181,6 +181,14 @@ async function verifyMemberAndPolla(
     await sendTextMessage(
       phone,
       `Necesitás pagar la cuota primero. Entrá a la app para completar el pago: ${APP_URL}/pollas/${polla.slug}`
+    );
+    return null;
+  }
+
+  if (polla.payment_mode === "admin_collects" && !participant.paid) {
+    await sendTextMessage(
+      phone,
+      "Tu pago aún no ha sido aprobado por el organizador. Esperá a que confirme y volvé a intentar."
     );
     return null;
   }
@@ -811,6 +819,7 @@ export async function handleLeaderboard(
     .select("user_id, total_points, rank, users(display_name)")
     .eq("polla_id", pollaId)
     .eq("status", "approved")
+    .eq("paid", true)
     .order("rank", { ascending: true })
     .limit(5);
 
