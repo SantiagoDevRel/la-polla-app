@@ -9,24 +9,30 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import { Drawer } from "vaul";
-import { Home, Search, Bookmark, User, Plus, KeyRound } from "lucide-react";
+import { Home, Bell, Bookmark, User, Plus, KeyRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/components/ui/Toast";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
+import { DEFAULT_POLLITO, getPollitoByPosition } from "@/lib/pollitos";
 
-type NavKey = "inicio" | "explorar" | "pollas" | "perfil";
+type NavKey = "inicio" | "avisos" | "pollas" | "perfil";
 
 export interface BottomNavProps {
   active?: NavKey;
   createHref?: string;
   onCreatePolla?: () => void;
+  /** Count of unread avisos; shows a red badge on the Avisos tab when > 0. */
+  notifUnread?: number;
+  /** User's pollito type (from users.avatar_url). Drives the FAB face. */
+  fabPollito?: string;
 }
 
 const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; label: string }> = [
   { key: "inicio", href: "/inicio", Icon: Home, label: "Inicio" },
-  { key: "explorar", href: "/explorar", Icon: Search, label: "Explorar" },
   { key: "pollas", href: "/pollas", Icon: Bookmark, label: "Pollas" },
+  { key: "avisos", href: "/avisos", Icon: Bell, label: "Avisos" },
   { key: "perfil", href: "/perfil", Icon: User, label: "Perfil" },
 ];
 
@@ -37,7 +43,7 @@ function deriveActive(pathname: string | null): NavKey | undefined {
   // so the tab still highlights correctly for users hitting the old URL.
   if (pathname === "/inicio" || pathname.startsWith("/inicio")) return "inicio";
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard")) return "inicio";
-  if (pathname.startsWith("/explorar")) return "explorar";
+  if (pathname.startsWith("/avisos")) return "avisos";
   if (pathname.startsWith("/perfil")) return "perfil";
   // Match /pollas and /pollas/... but NOT /pollas/crear (that's the FAB target)
   if (pathname === "/pollas" || (pathname.startsWith("/pollas/") && !pathname.startsWith("/pollas/crear"))) {
@@ -49,26 +55,40 @@ function deriveActive(pathname: string | null): NavKey | undefined {
 function TabItem({
   tab,
   active,
+  badge,
 }: {
   tab: (typeof TABS)[number];
   active: boolean;
+  badge?: number;
 }) {
   const { Icon, label, href } = tab;
+  const showBadge = typeof badge === "number" && badge > 0;
+  const badgeLabel = showBadge ? (badge! > 9 ? "9+" : String(badge)) : null;
   return (
     <Link
       href={href}
       className={cn(
-        "flex flex-col items-center justify-center flex-1 min-h-[44px] gap-0.5",
+        "flex flex-col items-center justify-center flex-1 min-h-[44px] gap-0.5 relative",
         active ? "text-gold" : "text-text-muted",
       )}
     >
-      <Icon className="w-[22px] h-[22px]" strokeWidth={2} aria-hidden="true" />
+      <span className="relative">
+        <Icon className="w-[22px] h-[22px]" strokeWidth={2} aria-hidden="true" />
+        {showBadge && (
+          <span
+            className="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-[3px] rounded-full bg-red-alert text-white text-[9px] font-bold leading-[14px] text-center border-[2px] border-bg-base"
+            aria-label={`${badge} sin leer`}
+          >
+            {badgeLabel}
+          </span>
+        )}
+      </span>
       <span className="font-body text-[10px] font-semibold">{label}</span>
     </Link>
   );
 }
 
-export function BottomNav({ active, createHref, onCreatePolla }: BottomNavProps) {
+export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0, fabPollito = DEFAULT_POLLITO }: BottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast();
@@ -110,11 +130,26 @@ export function BottomNav({ active, createHref, onCreatePolla }: BottomNavProps)
             className={fabClass}
             style={fabStyle}
           >
-            <Plus className="w-7 h-7 text-bg-base" strokeWidth={3} aria-hidden="true" />
+            <span className="relative w-[46px] h-[46px] rounded-full overflow-hidden bg-bg-base/10">
+              <Image
+                src={getPollitoByPosition(fabPollito, 1, 1)}
+                alt=""
+                fill
+                sizes="46px"
+                className="object-cover"
+                priority
+              />
+            </span>
+            <span
+              className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px] rounded-full bg-turf border-[2px] border-bg-base flex items-center justify-center"
+              aria-hidden="true"
+            >
+              <Plus className="w-3 h-3 text-bg-base" strokeWidth={3.5} />
+            </span>
           </button>
 
           <div className="flex-1 flex">
-            <TabItem tab={middleRight} active={resolvedActive === middleRight.key} />
+            <TabItem tab={middleRight} active={resolvedActive === middleRight.key} badge={notifUnread} />
             <TabItem tab={right} active={resolvedActive === right.key} />
           </div>
         </div>
