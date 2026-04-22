@@ -103,6 +103,7 @@ export async function GET(
       currentUserRole: currentRole,
       currentUserStatus: participant?.status || "approved",
       currentUserPaymentStatus: participant?.payment_status || "approved",
+      currentUserPaid: participant?.paid ?? true,
       currentUserId: user.id,
     });
   } catch (error) {

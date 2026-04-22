@@ -8,9 +8,14 @@ interface TablaRow {
   isCurrentUser?: boolean;
 }
 
+// WhatsApp text messages cap at 4096 chars. Leave headroom for header + code
+// fence + truncation footer; keep a hard per-row cap so a pathological polla
+// with hundreds of paid participants still fits.
+const MAX_ROWS = 60;
+
 /**
- * Returns formatted string ready to send in WhatsApp triple-backtick block.
- * Max 5 rows shown + current user if outside top 5.
+ * Returns a single formatted string with the FULL leaderboard inline.
+ * Caller is responsible for passing only eligible rows (paid, approved, etc).
  */
 export function formatTablaWA(rows: TablaRow[], pollaName: string): string {
   const getMedal = (pos: number, isLast: boolean, isCurrent: boolean) => {
@@ -37,25 +42,15 @@ export function formatTablaWA(rows: TablaRow[], pollaName: string): string {
     return " ".repeat(len - str.length) + str;
   };
 
-  // Render the top 5 rows as-is so the caller keeps their real rank and
-  // medal. When the caller is outside the top 5, flows.ts appends a
-  // separate userRow (isCurrentUser=true) at the tail; in that case we
-  // drop it from the visible rows and show the "Tu posición" footer.
-  const userRow = rows.find((r) => r.isCurrentUser);
-  const isUserInTop =
-    userRow !== undefined && rows.slice(0, 5).some((r) => r.isCurrentUser);
-  const allRows = isUserInTop
-    ? rows.slice(0, 5)
-    : rows.filter((r) => !r.isCurrentUser).slice(0, 5);
-  const maxPos = Math.max(...allRows.map((r) => r.position), 0);
+  const totalRows = rows.length;
+  const visibleRows = rows.slice(0, MAX_ROWS);
+  const maxPos = Math.max(...visibleRows.map((r) => r.position), 0);
   let text = `🏆 *Tabla — ${pollaName}*\n\n\`\`\`\n`;
 
-  for (let i = 0; i < allRows.length; i++) {
-    const r = allRows[i];
-    const isLast = i === allRows.length - 1 && maxPos > 3;
-    const isCurrent =
-      userRow !== undefined && r.position === userRow.position;
-    const medal = getMedal(r.position, isLast, isCurrent);
+  for (let i = 0; i < visibleRows.length; i++) {
+    const r = visibleRows[i];
+    const isLast = i === visibleRows.length - 1 && maxPos > 3;
+    const medal = getMedal(r.position, isLast, !!r.isCurrentUser);
     const name = padRight(truncName(r.name, 12), 12);
     const pts = padLeft(`${r.points}`, 3);
     text += `${medal} ${name} ${pts} pts\n`;
@@ -63,9 +58,8 @@ export function formatTablaWA(rows: TablaRow[], pollaName: string): string {
 
   text += `\`\`\``;
 
-  // Add user position if outside top 5
-  if (userRow && !isUserInTop) {
-    text += `\n\n👤 Tu posición: *#${userRow.position}* con *${userRow.points} pts*`;
+  if (totalRows > visibleRows.length) {
+    text += `\n\n_y ${totalRows - visibleRows.length} más_`;
   }
 
   return text;
