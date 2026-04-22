@@ -240,7 +240,7 @@ export default function OrganizerPanel({
             disabled={busy === "rotate-code"}
             className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-border-subtle text-text-secondary text-sm hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${busy === "rotate-code" ? "animate-spin" : ""}`} /> Rotar código
+            <RefreshCw className={`w-4 h-4 ${busy === "rotate-code" ? "animate-spin" : ""}`} /> Generar nuevo código de invitación
           </button>
         </div>
       </section>

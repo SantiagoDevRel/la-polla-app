@@ -612,7 +612,7 @@ async function routePayload(
       // Batch 4b recovery: state was lost (Supabase read failure or expired). Guide user back instead of silent no-op.
       await sendTextMessage(
         from,
-        "Parce, perdí tu pronóstico. Dale de nuevo a Predecir para volver a mandarlo."
+        "Parce, perdí tu pronóstico. Dale de nuevo a Pronosticar para volver a mandarlo."
       );
       await handleMisPollas(from, user.id);
     }
@@ -627,7 +627,7 @@ async function routePayload(
       // Batch 4b recovery: state was lost (Supabase read failure or expired). Guide user back instead of silent no-op.
       await sendTextMessage(
         from,
-        "Ups, se me olvidó que ibas a cambiar. Dale a Predecir de nuevo."
+        "Ups, se me olvidó que ibas a cambiar. Dale a Pronosticar de nuevo."
       );
       await handleMisPollas(from, user.id);
     }

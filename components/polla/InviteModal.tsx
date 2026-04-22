@@ -147,7 +147,7 @@ export default function InviteModal({
                   disabled={rotating}
                   className="flex-1 bg-transparent text-text-secondary border border-border-default font-semibold py-2 rounded-lg text-sm hover:text-red-alert hover:border-red-alert/40 transition-colors disabled:opacity-50"
                 >
-                  Rotar código
+                  Generar nuevo código de invitación
                 </button>
               ) : null}
             </div>
