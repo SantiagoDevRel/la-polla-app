@@ -207,7 +207,14 @@ export async function PUT(request: NextRequest) {
 
     console.log("[AUTH] Sesión creada:", session.user?.id);
 
-    return NextResponse.json({ status: "Verificado", phone });
+    // Expose newUser so the frontend can route to /onboarding vs /inicio.
+    // In the bot-first flow the POST /api/auth/otp step is skipped, so the
+    // frontend no longer learns newUser from there.
+    return NextResponse.json({
+      status: "Verificado",
+      phone,
+      newUser: !!newUser?.user,
+    });
   } catch (error) {
     console.error("Error validando OTP:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
