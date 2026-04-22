@@ -30,6 +30,26 @@ export default function AdminMatchesPage() {
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
   const [syncingWc, setSyncingWc] = useState(false);
   const [wcResult, setWcResult] = useState<string | null>(null);
+  const [syncingMundial, setSyncingMundial] = useState(false);
+  const [mundialResult, setMundialResult] = useState<string | null>(null);
+
+  async function handleSyncMundial() {
+    setSyncingMundial(true);
+    setMundialResult(null);
+    try {
+      const res = await fetch("/api/admin/sync-mundial", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error en sync");
+      setMundialResult(
+        `${data.matchesSynced} agregados o actualizados · ${data.matchesTotal} total · ${data.errors} errores`
+      );
+    } catch (err: unknown) {
+      const e = err as Error;
+      setMundialResult(`Error: ${e.message || "desconocido"}`);
+    } finally {
+      setSyncingMundial(false);
+    }
+  }
 
   async function handleSyncWorldCup() {
     setSyncingWc(true);
@@ -155,6 +175,33 @@ export default function AdminMatchesPage() {
             </p>
           </div>
         </div>
+
+        {/* Sync Mundial desde football-data.org: ejecutar después del sorteo
+            de FIFA cuando se publiquen los octavos en adelante. */}
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="rounded-2xl p-4 bg-bg-card/80 backdrop-blur-sm border border-gold/30 hover:shadow-[0_0_20px_rgba(255,215,0,0.12)] transition-all duration-300">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="font-bold text-text-primary">Sync Mundial 2026 (incluye knockouts)</p>
+              <p className="text-xs text-text-muted">Ejecutar después del sorteo de FIFA cuando los partidos de octavos en adelante se publiquen</p>
+            </div>
+            <button
+              onClick={handleSyncMundial}
+              disabled={syncingMundial}
+              className="flex items-center gap-1.5 bg-gold text-bg-base px-5 py-3 rounded-xl text-sm font-semibold
+                         hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] disabled:opacity-40 transition-all duration-200 cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingMundial ? "animate-spin" : ""}`} />
+              {syncingMundial ? "Sync..." : "Sync"}
+            </button>
+          </div>
+          {mundialResult && (
+            <div className={`rounded-lg p-3 text-sm ${
+              mundialResult.startsWith("Error") ? "bg-red-dim text-red-alert" : "bg-green-dim text-green-live"
+            }`}>
+              <p>{mundialResult}</p>
+            </div>
+          )}
+        </motion.div>
 
         {/* Sync desde openfootball (fuente pública, ya tiene el calendario 2026) */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" className="rounded-2xl p-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 hover:shadow-[0_0_20px_rgba(255,215,0,0.08)] transition-all duration-300">
