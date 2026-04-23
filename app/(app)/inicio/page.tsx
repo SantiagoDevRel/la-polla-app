@@ -25,19 +25,24 @@
 // explicit user-scope filter.
 
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPollitoBase } from "@/lib/pollitos";
+import {
+  getTournamentName,
+  TOURNAMENT_ICONS,
+} from "@/lib/tournaments";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { getLiveMatches } from "@/lib/football-api";
+import { MatchHero } from "@/components/match/MatchHero";
 import { LiveChip } from "@/components/match/LiveChip";
 import { ActivePollasEmpty } from "@/components/inicio/ActivePollasEmpty";
 import { PodiumCarousel } from "@/components/inicio/PodiumCarousel";
 import { GreetingHero } from "@/components/inicio/GreetingHero";
 import { RivalChip } from "@/components/inicio/RivalChip";
+import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
 // ─── Local types ───────────────────────────────────────────────────────
@@ -498,12 +503,70 @@ function pickRankCallout(activePollas: EnrichedPolla[]): { rank: number; pollaNa
 
 // Strip common prefixes/articles from a team name and take the first word
 // to get a 3-letter code fallback ("FC Barcelona" → "BAR",
-// "RC Celta de Vigo" → "CEL"). Used by the Próximos chips since our
-// matches table does not store a TLA column.
+// "RC Celta de Vigo" → "CEL"). Used as the shortCode for MatchHero
+// crests since our matches table does not store a TLA column.
 function teamShortCode(name: string): string {
   const cleaned = name.replace(/^(FC |CF |RC |Real |Club |Atlético |Athletic |AC |SC |Deportivo |CD )/i, "");
   const first = cleaned.split(/\s+/)[0] || cleaned;
   return first.slice(0, 3).toUpperCase();
+}
+
+// Quick-pick preset pool. Each hero card samples four per render so
+// the row of suggested scores never feels static across reloads.
+const QUICK_PICK_POOL: ReadonlyArray<{ home: number; away: number }> = [
+  { home: 0, away: 0 },
+  { home: 1, away: 0 },
+  { home: 0, away: 1 },
+  { home: 2, away: 1 },
+  { home: 1, away: 2 },
+  { home: 1, away: 1 },
+  { home: 2, away: 2 },
+  { home: 3, away: 2 },
+  { home: 2, away: 3 },
+  { home: 3, away: 3 },
+];
+
+function sampleQuickPickPresets(n = 4): Array<{ home: number; away: number }> {
+  const pool = [...QUICK_PICK_POOL];
+  const out: Array<{ home: number; away: number }> = [];
+  while (out.length < n && pool.length > 0) {
+    const idx = Math.floor(Math.random() * pool.length);
+    out.push(pool.splice(idx, 1)[0]);
+  }
+  return out;
+}
+
+function heroPropsFromDb(m: {
+  home_team: string;
+  away_team: string;
+  home_team_flag: string | null;
+  away_team_flag: string | null;
+  scheduled_at: string;
+  status: string;
+  tournament: string;
+}): React.ComponentProps<typeof MatchHero> {
+  const kickoffAt = new Date(m.scheduled_at);
+  const lockAt = m.status === "scheduled"
+    ? new Date(kickoffAt.getTime() - 5 * 60 * 1000)
+    : undefined;
+  return {
+    competition: {
+      name: getTournamentName(m.tournament) ?? m.tournament,
+      logoUrl: TOURNAMENT_ICONS[m.tournament],
+    },
+    kickoffAt,
+    homeTeam: {
+      name: m.home_team,
+      shortCode: teamShortCode(m.home_team),
+      crestUrl: m.home_team_flag ?? undefined,
+    },
+    awayTeam: {
+      name: m.away_team,
+      shortCode: teamShortCode(m.away_team),
+      crestUrl: m.away_team_flag ?? undefined,
+    },
+    lockAt,
+  };
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────
@@ -765,6 +828,22 @@ export default async function InicioPage() {
                     const inMyPolla = uuid ? stripMatchInUserPolla.has(uuid) : false;
                     const predictionStatus =
                       !myPred && inMyPolla ? ("pending" as const) : undefined;
+                    // Fallback minute: football-data's free tier sometimes
+                    // omits the `minute` field even for IN_PLAY matches.
+                    // If so, compute a rough elapsed from kickoff so the
+                    // chip still reads "VIVO · 32'" instead of just
+                    // "VIVO". Live games max at ~95' regular time; we
+                    // cap at 120 so extra time still looks sane.
+                    let displayMinute = m.elapsed ?? undefined;
+                    if (
+                      displayMinute === undefined &&
+                      m.status === "live" &&
+                      m.match_date
+                    ) {
+                      const diffMs = Date.now() - new Date(m.match_date).getTime();
+                      const diffMin = Math.max(0, Math.floor(diffMs / 60000));
+                      if (diffMin <= 120) displayMinute = diffMin;
+                    }
                     return (
                       <div key={m.id} className="snap-start">
                         <LiveChip
@@ -773,7 +852,7 @@ export default async function InicioPage() {
                           awayCode={m.away_team_tla}
                           homeScore={m.status === "live" ? m.home_score ?? undefined : undefined}
                           awayScore={m.status === "live" ? m.away_score ?? undefined : undefined}
-                          minute={m.elapsed ?? undefined}
+                          minute={displayMinute}
                           kickoffAt={m.status !== "live" ? new Date(m.match_date) : undefined}
                           myPrediction={myPred}
                           predictionStatus={predictionStatus}
@@ -786,10 +865,12 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 4 - Próximos strip: today + tomorrow, only the
-              user's polla matches. Chips tap through to
-              /pollas/{slug}?tab=partidos so the full score form sits
-              there, not here. Hidden when no eligible matches. */}
+          {/* Block 4 - Próximos strip: one full MatchHero + QuickPick
+              card per scheduled match inside the user's pollas with
+              kickoff today or tomorrow. Horizontal scroll, one card
+              per "page", so users swipe left-right through every
+              prediction they still owe. Cap 15 cards — more than that
+              and they should use the polla Partidos tab. */}
           {!isActiveEmpty && upcomingStripMatches.length > 0 ? (
             <section>
               <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary flex items-center gap-2">
@@ -800,28 +881,28 @@ export default async function InicioPage() {
                 <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
                   {upcomingStripMatches.map((m) => {
                     const polla = pollaForMatch(m.id);
-                    const href = polla ? `/pollas/${polla.slug}?tab=partidos` : undefined;
                     const myPred = upcomingPredByMatch.get(m.id);
-                    const predictionStatus = !myPred ? ("pending" as const) : undefined;
-                    const chip = (
-                      <LiveChip
-                        kind="upcoming"
-                        homeCode={teamShortCode(m.home_team)}
-                        awayCode={teamShortCode(m.away_team)}
-                        kickoffAt={new Date(m.scheduled_at)}
-                        myPrediction={myPred}
-                        predictionStatus={predictionStatus}
-                      />
-                    );
                     return (
-                      <div key={m.id} className="snap-start">
-                        {href ? (
-                          <Link href={href} className="block">
-                            {chip}
-                          </Link>
-                        ) : (
-                          chip
-                        )}
+                      <div
+                        key={m.id}
+                        className="snap-center shrink-0 w-[88vw] max-w-[420px]"
+                      >
+                        <MatchHero
+                          {...heroPropsFromDb(m)}
+                          myPrediction={myPred ?? undefined}
+                          quickPickSlot={
+                            polla ? (
+                              <QuickPickStrip
+                                pollaSlug={polla.slug}
+                                pollaName={polla.name}
+                                matchId={m.id}
+                                initialPrediction={myPred ?? undefined}
+                                presets={sampleQuickPickPresets(4)}
+                                locked={false}
+                              />
+                            ) : undefined
+                          }
+                        />
                       </div>
                     );
                   })}
