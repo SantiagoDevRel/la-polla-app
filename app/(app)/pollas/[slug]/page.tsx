@@ -67,6 +67,7 @@ interface Match {
   away_team_flag: string; scheduled_at: string; status: string;
   home_score: number | null; away_score: number | null; phase: string | null;
   match_day: number | null;
+  elapsed: number | null;
 }
 interface Prediction {
   id: string; match_id: string; predicted_home: number; predicted_away: number;
@@ -282,7 +283,7 @@ function MatchRow({
           {isLive ? (
             <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
               <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
-              En vivo
+              En vivo{match.elapsed != null ? ` · ${match.elapsed}'` : ""}
             </span>
           ) : isFinished ? (
             <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-bg-elevated border border-border-subtle text-text-primary/70 text-[10px] font-bold uppercase tracking-[0.08em]">

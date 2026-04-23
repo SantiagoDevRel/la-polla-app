@@ -16,6 +16,7 @@ export interface FDMatch {
   status: string; // SCHEDULED, TIMED, IN_PLAY, PAUSED, FINISHED, POSTPONED, CANCELLED, SUSPENDED, AWARDED
   matchday: number | null;
   stage: string; // GROUP_STAGE, ROUND_OF_16, QUARTER_FINALS, etc.
+  minute?: number | null; // Current in-play minute (IN_PLAY / PAUSED only).
   homeTeam: { id: number; name: string; crest: string };
   awayTeam: { id: number; name: string; crest: string };
   score: {
