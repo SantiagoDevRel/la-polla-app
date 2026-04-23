@@ -313,7 +313,7 @@ export default function DesignPage() {
             awayCode="BAR"
             homeScore={2}
             awayScore={1}
-            minute={67}
+            minuteLabel="67'"
             myPrediction={{ home: 2, away: 1 }}
             predictionStatus="correct"
           />
