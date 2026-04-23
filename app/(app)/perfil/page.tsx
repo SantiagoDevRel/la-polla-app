@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import UserAvatar from "@/components/ui/UserAvatar";
 import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
+import { Info, ChevronDown } from "lucide-react";
 
 interface UserProfile {
   display_name: string;
@@ -45,6 +46,7 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [expandedScoringRow, setExpandedScoringRow] = useState<number | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -104,12 +106,52 @@ export default function PerfilPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="flex flex-col items-center gap-2"><FootballLoader /><p className="text-text-muted">Cargando perfil...</p></div></div>;
   if (!profile) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">Error cargando perfil</p></div>;
 
-  const SCORING_ROWS = [
-    { label: "Resultado exacto", pts: "5 pts", color: "#FFD700" },
-    { label: "Ganador + diferencia", pts: "3 pts", color: "#f0f4ff" },
-    { label: "Ganador correcto", pts: "2 pts", color: "#f0f4ff" },
-    { label: "Goles de un equipo", pts: "1 pt", color: "#f0f4ff" },
-    { label: "Sin aciertos", pts: "0 pts", color: "#4a5568" },
+  const SCORING_ROWS: Array<{
+    label: string;
+    pts: string;
+    color: string;
+    explanation: string;
+    example: { pred: string; result: string };
+  }> = [
+    {
+      label: "Resultado exacto",
+      pts: "5 pts",
+      color: "#FFD700",
+      explanation: "Le clavaste al marcador exacto del partido.",
+      example: { pred: "2-1", result: "2-1" },
+    },
+    {
+      label: "Ganador + diferencia",
+      pts: "3 pts",
+      color: "#f0f4ff",
+      explanation:
+        "Acertaste quién gana Y la misma diferencia de goles, pero no el marcador exacto.",
+      example: { pred: "3-2", result: "2-1" },
+    },
+    {
+      label: "Ganador correcto",
+      pts: "2 pts",
+      color: "#f0f4ff",
+      explanation:
+        "Acertaste quién gana el partido, pero no la diferencia de goles.",
+      example: { pred: "3-0", result: "2-1" },
+    },
+    {
+      label: "Goles de un equipo",
+      pts: "1 pt",
+      color: "#f0f4ff",
+      explanation:
+        "Acertaste los goles de al menos uno de los dos equipos, así el otro resultado esté mal.",
+      example: { pred: "2-3", result: "2-1" },
+    },
+    {
+      label: "Sin aciertos",
+      pts: "0 pts",
+      color: "#4a5568",
+      explanation:
+        "No le achuntaste a nada: ni al ganador, ni a la diferencia, ni a los goles de ninguno.",
+      example: { pred: "0-0", result: "2-1" },
+    },
   ];
 
   return (
@@ -264,21 +306,108 @@ export default function PerfilPage() {
             </svg>
             ¿Cómo se puntúa?
           </div>
-          {SCORING_ROWS.map((row, i) => (
-            <div
-              key={row.label}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "7px 0",
-                borderBottom: i < SCORING_ROWS.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-              }}
-            >
-              <span style={{ fontSize: 12, color: "#f0f4ff" }}>{row.label}</span>
-              <span className="font-display" style={{ fontSize: 18, color: row.color, letterSpacing: "0.05em" }}>{row.pts}</span>
-            </div>
-          ))}
+          {SCORING_ROWS.map((row, i) => {
+            const isExpanded = expandedScoringRow === i;
+            return (
+              <div
+                key={row.label}
+                style={{
+                  borderBottom: i < SCORING_ROWS.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setExpandedScoringRow(isExpanded ? null : i)}
+                  aria-expanded={isExpanded}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "9px 0",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "inherit",
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#f0f4ff" }}>
+                    {row.label}
+                    <Info className="w-3.5 h-3.5" style={{ color: "#AEB7C7" }} aria-hidden="true" />
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span className="font-display" style={{ fontSize: 18, color: row.color, letterSpacing: "0.05em" }}>
+                      {row.pts}
+                    </span>
+                    <ChevronDown
+                      className="w-3.5 h-3.5 transition-transform"
+                      style={{
+                        color: "#AEB7C7",
+                        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                      }}
+                      aria-hidden="true"
+                    />
+                  </span>
+                </button>
+                {isExpanded ? (
+                  <div
+                    style={{
+                      paddingBottom: 10,
+                      paddingLeft: 2,
+                      paddingRight: 2,
+                      fontSize: 11.5,
+                      lineHeight: 1.5,
+                      color: "#d8dee8",
+                    }}
+                  >
+                    <p style={{ marginBottom: 8 }}>{row.explanation}</p>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "#AEB7C7" }}>
+                          Tu pronóstico
+                        </div>
+                        <div className="font-display" style={{ fontSize: 18, color: "#f0f4ff", letterSpacing: "0.05em" }}>
+                          {row.example.pred}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 10, color: "#AEB7C7" }}>→</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "#AEB7C7" }}>
+                          Resultado
+                        </div>
+                        <div className="font-display" style={{ fontSize: 18, color: "#f0f4ff", letterSpacing: "0.05em" }}>
+                          {row.example.result}
+                        </div>
+                      </div>
+                      <div
+                        className="font-display"
+                        style={{
+                          fontSize: 20,
+                          color: row.color,
+                          letterSpacing: "0.05em",
+                          paddingLeft: 6,
+                          borderLeft: "1px solid rgba(255,255,255,0.1)",
+                        }}
+                      >
+                        {row.pts}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
 
         {/* Panel de administración — only for admin users */}
