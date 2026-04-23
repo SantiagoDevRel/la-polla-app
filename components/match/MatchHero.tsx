@@ -20,6 +20,12 @@ export interface MatchHeroProps {
   pollaAverage?: { home: number; away: number };
   lockAt?: Date;
   onTap?: () => void;
+  /**
+   * Optional slot rendered in place of the default "Tu pred / Promedio
+   * polla" bubbles. Inicio uses this to inline the quick-pick strip so
+   * picking a score never leaves the hero card.
+   */
+  quickPickSlot?: React.ReactNode;
 }
 
 function formatKickoff(date: Date): string {
@@ -69,6 +75,7 @@ export function MatchHero({
   pollaAverage,
   lockAt,
   onTap,
+  quickPickSlot,
 }: MatchHeroProps) {
   const [now, setNow] = useState<Date>(() => new Date());
 
@@ -150,37 +157,43 @@ export function MatchHero({
         </div>
       </div>
 
-      {/* 3. Preds strip */}
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-md bg-bg-elevated border border-gold/20 px-3 py-2.5">
-          <p className="font-body text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted">
-            Tu pred
-          </p>
-          {myPrediction ? (
+      {/* 3. Quick-pick slot (falls back to the legacy preds strip when
+          the caller does not supply one). Inicio inlines its own picker
+          here so the entire pronóstico flow stays inside the hero card. */}
+      {quickPickSlot ? (
+        <div className="mt-5">{quickPickSlot}</div>
+      ) : (
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-md bg-bg-elevated border border-gold/20 px-3 py-2.5">
+            <p className="font-body text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted">
+              Tu pred
+            </p>
+            {myPrediction ? (
+              <p
+                className="font-display text-[22px] leading-none text-gold mt-1"
+                style={{ fontFeatureSettings: '"tnum"' }}
+              >
+                {myPrediction.home} — {myPrediction.away}
+              </p>
+            ) : (
+              <p className="font-display text-[16px] leading-none text-gold mt-1 tracking-[0.06em]">
+                PRONOSTICÁ
+              </p>
+            )}
+          </div>
+          <div className="rounded-md bg-bg-elevated border border-border-subtle px-3 py-2.5">
+            <p className="font-body text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted">
+              Promedio polla
+            </p>
             <p
-              className="font-display text-[22px] leading-none text-gold mt-1"
+              className="font-display text-[22px] leading-none text-text-secondary mt-1"
               style={{ fontFeatureSettings: '"tnum"' }}
             >
-              {myPrediction.home} — {myPrediction.away}
+              {pollaAverage ? `${pollaAverage.home} — ${pollaAverage.away}` : "—"}
             </p>
-          ) : (
-            <p className="font-display text-[16px] leading-none text-gold mt-1 tracking-[0.06em]">
-              PRONOSTICÁ
-            </p>
-          )}
+          </div>
         </div>
-        <div className="rounded-md bg-bg-elevated border border-border-subtle px-3 py-2.5">
-          <p className="font-body text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted">
-            Promedio polla
-          </p>
-          <p
-            className="font-display text-[22px] leading-none text-text-secondary mt-1"
-            style={{ fontFeatureSettings: '"tnum"' }}
-          >
-            {pollaAverage ? `${pollaAverage.home} — ${pollaAverage.away}` : "—"}
-          </p>
-        </div>
-      </div>
+      )}
 
       {/* 4. Countdown strip */}
       {showCountdown && countdown ? (

@@ -29,7 +29,6 @@ import { getPollitoBase } from "@/lib/pollitos";
 import {
   getTournamentName,
   TOURNAMENT_ICONS,
-  TOURNAMENTS,
 } from "@/lib/tournaments";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
@@ -43,6 +42,9 @@ import { LiveChip } from "@/components/match/LiveChip";
 import PollaCard from "@/components/polla/PollaCard";
 import { ActivePollasEmpty } from "@/components/inicio/ActivePollasEmpty";
 import { PodiumCarousel } from "@/components/inicio/PodiumCarousel";
+import { GreetingHero } from "@/components/inicio/GreetingHero";
+import { RivalChip } from "@/components/inicio/RivalChip";
+import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
 // ─── Local types ───────────────────────────────────────────────────────
@@ -489,6 +491,179 @@ function heroPropsFor(
   };
 }
 
+// ─── Rival lookup ──────────────────────────────────────────────────────
+
+interface RivalPayload {
+  pollaSlug: string;
+  pollaName: string;
+  rivalName: string;
+  rivalPollitoType: string | null;
+  userPoints: number;
+  rivalPoints: number;
+  mode: "chasing" | "behind";
+}
+
+// Pick the polla most likely to produce an interesting rival story for
+// the user: the one where the user has the best rank (ties break by
+// smallest gap to the adjacent participant). When the user is rank 1 we
+// pull rank 2 as the rival (they are chasing us). Otherwise we pull the
+// rank directly above and directly below and pick whichever gap is
+// smaller. Returns null when there is no neighbour to compare against.
+async function findRivalForUser(
+  userId: string,
+  activePollas: EnrichedPolla[],
+): Promise<RivalPayload | null> {
+  const ranked = activePollas.filter((p) => p.user_rank != null && p.participant_count > 1);
+  if (ranked.length === 0) return null;
+  // Prefer the polla where the user is best-ranked; tie-break by most
+  // total points so higher-stakes leagues win when ranks are equal.
+  ranked.sort((a, b) => {
+    const ra = a.user_rank ?? 99999;
+    const rb = b.user_rank ?? 99999;
+    if (ra !== rb) return ra - rb;
+    return b.user_total_points - a.user_total_points;
+  });
+  const target = ranked[0];
+  const userRank = target.user_rank!;
+  const candidateRanks = userRank === 1 ? [2] : [userRank - 1, userRank + 1];
+
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("polla_participants")
+    .select("rank, total_points, users:user_id ( display_name, avatar_url )")
+    .eq("polla_id", target.id)
+    .in("rank", candidateRanks);
+
+  type NeighbourRow = {
+    rank: number | null;
+    total_points: number | null;
+    users:
+      | { display_name: string | null; avatar_url: string | null }
+      | { display_name: string | null; avatar_url: string | null }[]
+      | null;
+  };
+
+  const rows = (data || []) as NeighbourRow[];
+  if (rows.length === 0) return null;
+
+  const userPoints = target.user_total_points;
+
+  // Choose the neighbour with the smallest point gap to the user. In the
+  // rank-1 case there is only one candidate so this is a no-op.
+  let best: { row: NeighbourRow; gap: number } | null = null;
+  for (const row of rows) {
+    const gap = Math.abs((row.total_points ?? 0) - userPoints);
+    if (!best || gap < best.gap) best = { row, gap };
+  }
+  if (!best) return null;
+
+  const u = Array.isArray(best.row.users) ? best.row.users[0] : best.row.users;
+  if (!u) return null;
+  const rivalPoints = best.row.total_points ?? 0;
+  const rivalRank = best.row.rank ?? 0;
+  // "chasing" when the user is ahead of the rival (user leads), "behind"
+  // when the rival is ahead. Ties default to "chasing" so the framing
+  // stays positive.
+  const mode: "chasing" | "behind" = rivalRank > userRank ? "chasing" : "behind";
+
+  const displayName = u.display_name || "Tu rival";
+  const firstName = displayName.split(" ")[0];
+
+  return {
+    pollaSlug: target.slug,
+    pollaName: target.name,
+    rivalName: firstName,
+    rivalPollitoType: u.avatar_url ?? null,
+    userPoints,
+    rivalPoints,
+    mode,
+  };
+}
+
+// Pick the best rank callout for the greeting bubble. Prefers rank 1 in
+// any polla (most pride); falls back to the overall best rank the user
+// holds. Returns null when the user has no ranked memberships.
+function pickRankCallout(activePollas: EnrichedPolla[]): { rank: number; pollaName: string } | null {
+  const ranked = activePollas.filter((p) => p.user_rank != null);
+  if (ranked.length === 0) return null;
+  ranked.sort((a, b) => (a.user_rank ?? 99999) - (b.user_rank ?? 99999));
+  const top = ranked[0];
+  return { rank: top.user_rank!, pollaName: top.name };
+}
+
+// ─── Quick-pick preset pool ────────────────────────────────────────────
+
+// Pool of plausible scoreline presets. Inicio samples 4 of these per
+// render so the quick-pick row never feels static. Chosen to balance
+// common low-scoring draws with realistic wins in both directions.
+const QUICK_PICK_POOL: ReadonlyArray<{ home: number; away: number }> = [
+  { home: 0, away: 0 },
+  { home: 1, away: 0 },
+  { home: 0, away: 1 },
+  { home: 2, away: 1 },
+  { home: 1, away: 2 },
+  { home: 1, away: 1 },
+  { home: 2, away: 2 },
+  { home: 3, away: 2 },
+  { home: 2, away: 3 },
+  { home: 3, away: 3 },
+];
+
+function sampleQuickPickPresets(n = 4): Array<{ home: number; away: number }> {
+  const pool = [...QUICK_PICK_POOL];
+  const out: Array<{ home: number; away: number }> = [];
+  while (out.length < n && pool.length > 0) {
+    const idx = Math.floor(Math.random() * pool.length);
+    out.push(pool.splice(idx, 1)[0]);
+  }
+  return out;
+}
+
+// ─── DB hero match → MatchHero props ───────────────────────────────────
+
+// Strip common prefixes/articles from a team name and take the first word
+// to get a 3-letter code fallback ("FC Barcelona" → "BAR",
+// "RC Celta de Vigo" → "CEL"). Used only when we have a DB match but no
+// shortCode column — safe approximation for display.
+function teamShortCode(name: string): string {
+  const cleaned = name.replace(/^(FC |CF |RC |Real |Club |Atlético |Athletic |AC |SC |Deportivo |CD )/i, "");
+  const first = cleaned.split(/\s+/)[0] || cleaned;
+  return first.slice(0, 3).toUpperCase();
+}
+
+function heroPropsFromDb(m: {
+  home_team: string;
+  away_team: string;
+  home_team_flag: string | null;
+  away_team_flag: string | null;
+  scheduled_at: string;
+  status: string;
+  tournament: string;
+}): React.ComponentProps<typeof MatchHero> {
+  const kickoffAt = new Date(m.scheduled_at);
+  const lockAt = m.status === "scheduled"
+    ? new Date(kickoffAt.getTime() - 5 * 60 * 1000)
+    : undefined;
+  return {
+    competition: {
+      name: getTournamentName(m.tournament) ?? m.tournament,
+      logoUrl: TOURNAMENT_ICONS[m.tournament],
+    },
+    kickoffAt,
+    homeTeam: {
+      name: m.home_team,
+      shortCode: teamShortCode(m.home_team),
+      crestUrl: m.home_team_flag ?? undefined,
+    },
+    awayTeam: {
+      name: m.away_team,
+      shortCode: teamShortCode(m.away_team),
+      crestUrl: m.away_team_flag ?? undefined,
+    },
+    lockAt,
+  };
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────
 
 export default async function InicioPage() {
@@ -533,6 +708,16 @@ export default async function InicioPage() {
   // exists in /public/pollitos/pollito_{key}_{estado}.webp.
   const pollitoType: string = publicUser?.avatar_url || "pibe";
 
+  // Derive the greeting's rank callout + an optional rival row from data
+  // already fetched above. The rival lookup makes one tiny extra query
+  // (adjacent ranks in the user's best polla); the callout is pure.
+  const rankCallout = pickRankCallout(activePollas);
+  const rival = isActiveEmpty ? null : await findRivalForUser(user.id, activePollas);
+  // Quick-pick target: the active polla that actually contains the hero
+  // match in its match_ids. Only then does a preset button have somewhere
+  // to post to; otherwise we hide the strip entirely.
+  let quickPickInitial: { home: number; away: number } | null = null;
+
   // Podium carousel: one card per active polla, ordered by created_at via
   // activePollas' existing sort. Default visible page = the polla with
   // the soonest upcoming match (smallest soonest_upcoming_ms). When every
@@ -549,51 +734,88 @@ export default async function InicioPage() {
         0,
       );
 
-  // Fetch today's live + scheduled matches from football-data.org. Run
-  // both calls in parallel. We scope to the user's tournaments first, and
-  // fall back to all tournaments only when the user has no pollas (the
-  // empty-state branch already owns that path, so this is defensive).
   const userTournaments = Array.from(
     new Set(sortedPollas.map((p) => p.tournament)),
   );
-  const heroScopeTournaments =
-    userTournaments.length > 0
-      ? userTournaments
-      : TOURNAMENTS.map((t) => t.slug);
 
-  const [userLive, userToday, globalLive, globalToday] = await Promise.all([
-    userTournaments.length > 0 ? getLiveMatches(userTournaments) : Promise.resolve([]),
-    userTournaments.length > 0 ? getTodayMatches(userTournaments) : Promise.resolve([]),
-    // Global fallback lists cover hero rules 3 and 4.
-    getLiveMatches(heroScopeTournaments),
-    getTodayMatches(heroScopeTournaments),
-  ]);
-
-  const now = Date.now();
-  const userMatches = mergeMatchesUnique(userLive, userToday).filter((m) =>
-    isHeroEligible(m, now),
-  );
-  const allMatches = mergeMatchesUnique(globalLive, globalToday).filter((m) =>
-    isHeroEligible(m, now),
+  // Hero match = the soonest live-or-upcoming match across every active
+  // polla's match_ids, read straight from our matches table. This is why
+  // the hero is never empty as long as at least one scheduled match
+  // exists in the user's pollas — even if it is months away.
+  const allUserMatchIds = Array.from(
+    new Set(activePollas.flatMap((p) => p.match_ids || [])),
   );
 
-  const heroMatch = selectHeroMatch(userMatches, allMatches, now);
+  type HeroRow = {
+    id: string;
+    home_team: string;
+    away_team: string;
+    home_team_flag: string | null;
+    away_team_flag: string | null;
+    scheduled_at: string;
+    status: string;
+    tournament: string;
+  };
 
-  // Strip: LIVE matches only, with a global fallback. First try the user's
-  // active polla tournaments; if that yields zero live matches, fall back
-  // to the global pool across all synced competitions. If both are empty
-  // the strip hides cleanly. The hero match is excluded so the strip
-  // never duplicates what is already featured above.
+  let heroDbMatch: HeroRow | null = null;
+  if (allUserMatchIds.length > 0) {
+    // Only matches the user can actually predict on: status=scheduled AND
+    // kickoff is more than the 5-minute lock window in the future. Live
+    // and finished matches are intentionally skipped so the hero card is
+    // always actionable. Live scores belong in the strip below, not here.
+    const lockCutoff = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const { data: rows } = await admin
+      .from("matches")
+      .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, status, tournament")
+      .in("id", allUserMatchIds)
+      .eq("status", "scheduled")
+      .gt("scheduled_at", lockCutoff)
+      .order("scheduled_at", { ascending: true })
+      .limit(1);
+    heroDbMatch = ((rows || []) as HeroRow[])[0] ?? null;
+  }
+
+  const heroPolla: EnrichedPolla | null = heroDbMatch
+    ? activePollas.find((p) => (p.match_ids || []).includes(heroDbMatch!.id)) ?? null
+    : null;
+
+  if (heroDbMatch && heroPolla) {
+    const { data: existingPred } = await admin
+      .from("predictions")
+      .select("predicted_home, predicted_away")
+      .eq("polla_id", heroPolla.id)
+      .eq("user_id", user.id)
+      .eq("match_id", heroDbMatch.id)
+      .maybeSingle();
+    if (existingPred) {
+      quickPickInitial = {
+        home: existingPred.predicted_home,
+        away: existingPred.predicted_away,
+      };
+    }
+  }
+
+  // Live strip keeps using football-data for real-time live updates of
+  // the user's tournaments (separate concern from the hero selector).
+  const userLive = userTournaments.length > 0 ? await getLiveMatches(userTournaments) : [];
+
+  // Strip: LIVE matches the user can actually play (their tournaments
+  // only — no global fallback). The hero match is excluded so the strip
+  // never duplicates what is already featured above. Football-data ids
+  // are compared against external ids pulled from our matches table.
+  let heroExternalId: string | null = null;
+  if (heroDbMatch) {
+    const { data: ext } = await admin
+      .from("matches")
+      .select("external_id")
+      .eq("id", heroDbMatch.id)
+      .maybeSingle();
+    heroExternalId = (ext?.external_id as string | null | undefined) ?? null;
+  }
   const liveMatchesUser = userLive.filter(
-    (m) => !heroMatch || m.id !== heroMatch.id,
+    (m) => !heroExternalId || m.id !== heroExternalId,
   );
-  const liveMatchesGlobal = globalLive.filter(
-    (m) => !heroMatch || m.id !== heroMatch.id,
-  );
-  const stripMatches = (liveMatchesUser.length >= 1
-    ? liveMatchesUser
-    : liveMatchesGlobal
-  )
+  const stripMatches = liveMatchesUser
     .sort(
       (a, b) =>
         new Date(a.match_date).getTime() - new Date(b.match_date).getTime(),
@@ -636,18 +858,12 @@ export default async function InicioPage() {
         </div>
       </header>
 
-      {/* Block 2 - Greeting */}
-      <section className="px-4 pb-8">
-        <div className="max-w-lg mx-auto">
-          <p className="font-body text-[12px] text-text-muted">Hola,</p>
-          <h1 className="font-display text-[40px] leading-none tracking-[0.02em] text-gold">
-            {firstName}
-          </h1>
-          <p className="font-body text-[13px] text-text-secondary mt-2">
-            ¿Listo pa&apos; pronosticar?
-          </p>
-        </div>
-      </section>
+      {/* Block 2 - Talking-pollito greeting */}
+      <GreetingHero
+        firstName={firstName}
+        pollitoType={pollitoType}
+        rankCallout={rankCallout}
+      />
 
       <main className="pb-[110px]">
         <div className="max-w-lg mx-auto space-y-8">
@@ -660,11 +876,44 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 3 - Today's hero match */}
-          {!isActiveEmpty && heroMatch ? (
+          {/* Block 3 - Soonest hero match w/ inline quick-pick */}
+          {!isActiveEmpty && heroDbMatch ? (
             <section className="px-4">
-              <MatchHero {...heroPropsFor(heroMatch)} />
+              <MatchHero
+                {...heroPropsFromDb(heroDbMatch)}
+                myPrediction={quickPickInitial ?? undefined}
+                quickPickSlot={
+                  heroPolla ? (
+                    <QuickPickStrip
+                      pollaSlug={heroPolla.slug}
+                      pollaName={heroPolla.name}
+                      matchId={heroDbMatch.id}
+                      initialPrediction={quickPickInitial ?? undefined}
+                      presets={sampleQuickPickPresets(4)}
+                      locked={
+                        heroDbMatch.status === "live" ||
+                        heroDbMatch.status === "finished" ||
+                        new Date(heroDbMatch.scheduled_at).getTime() - Date.now() <
+                          5 * 60 * 1000
+                      }
+                    />
+                  ) : undefined
+                }
+              />
             </section>
+          ) : null}
+
+          {/* Block 3b - Rival callout (only when we have a neighbour) */}
+          {rival ? (
+            <RivalChip
+              pollaHref={`/pollas/${rival.pollaSlug}`}
+              pollaName={rival.pollaName}
+              rivalName={rival.rivalName}
+              rivalPollitoType={rival.rivalPollitoType}
+              userPoints={rival.userPoints}
+              rivalPoints={rival.rivalPoints}
+              mode={rival.mode}
+            />
           ) : null}
 
           {/* Block 4 - Live strip (LIVE only, with global fallback) */}
