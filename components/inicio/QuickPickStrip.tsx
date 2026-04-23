@@ -130,7 +130,7 @@ export function QuickPickStrip({
       ) : (
         <>
           <p className="font-body text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted text-center mb-2">
-            {savedPred ? "Cambiá tu pronóstico" : "Pronóstico rápido"} · {pollaName}
+            {savedPred ? "Cambiá tu pronóstico rápido" : "Pronóstico rápido"} · {pollaName}
           </p>
 
           <div className="flex gap-1.5 justify-center mb-2.5">

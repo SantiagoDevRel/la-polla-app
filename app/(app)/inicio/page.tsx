@@ -8,12 +8,12 @@
 //
 // Render order (mobile-first, single column, max-w-lg):
 //   1. Header (logo + wordmark left, user pollito avatar right)
-//   2. Greeting (Hola + firstName + sub)
-//   3. Today's hero match (MatchHero), optional
+//   2. Greeting (Hola + firstName + rank callout)
+//   3. Today's hero match (MatchHero) + inline quick-pick
+//   3b. Rival chip (nearest-neighbour callout), optional
 //   4. Live/upcoming strip (horizontal scroll of LiveChip), optional
-//   5. Mis pollas carousel (PollaCard horizontal scroll), capped at 6 + tail
-//   6. Featured polla podium (PodiumLeaderboard), optional
-//   7. Empty state (PollitoMoment M1 inline) replaces 3-6 when user has zero pollas
+//   5. Podium carousel across active pollas (swipe between pollas)
+//   6. Empty state (ActivePollasEmpty) replaces 3-5 when user has zero pollas
 //
 // Known workaround: uses createAdminClient() for polla_participants reads
 // because auth.uid() does not propagate from the SSR cookie session to
@@ -22,7 +22,6 @@
 
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPollitoBase } from "@/lib/pollitos";
@@ -35,7 +34,6 @@ import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { getLiveMatches } from "@/lib/football-api";
 import { MatchHero } from "@/components/match/MatchHero";
 import { LiveChip } from "@/components/match/LiveChip";
-import PollaCard from "@/components/polla/PollaCard";
 import { ActivePollasEmpty } from "@/components/inicio/ActivePollasEmpty";
 import { PodiumCarousel } from "@/components/inicio/PodiumCarousel";
 import { GreetingHero } from "@/components/inicio/GreetingHero";
@@ -320,22 +318,6 @@ function sortPollasForCarousel(pollas: EnrichedPolla[]): EnrichedPolla[] {
   return [...active, ...ended];
 }
 
-// ─── Adapter: EnrichedPolla → PollaCard props ──────────────────────────
-
-function toPollaCardPolla(p: EnrichedPolla): React.ComponentProps<typeof PollaCard>["polla"] {
-  return {
-    id: p.id,
-    slug: p.slug,
-    name: p.name,
-    competitionName: getTournamentName(p.tournament) ?? "Desconocido",
-    competitionLogoUrl: TOURNAMENT_ICONS[p.tournament],
-    participantCount: p.participant_count,
-    buyInAmount: p.buy_in_amount ?? 0,
-    totalMatches: p.total_matches,
-    finishedMatches: p.finished_matches,
-  };
-}
-
 // ─── Podium data ───────────────────────────────────────────────────────
 
 // Fetch the top three participants for a polla.
@@ -597,15 +579,11 @@ export default async function InicioPage() {
   const sortedPollas = sortPollasForCarousel(allPollas);
   // Active-only filter (Phase 3c follow-up: ended pollas do not appear on
   // Inicio — users see them on /pollas). This is the canonical source
-  // for both the Mis Pollas carousel and the podium carousel below.
+  // feeding the podium carousel below.
   const activePollas = sortedPollas.filter(
     (p) => p.effective_status !== "ended",
   );
   const isActiveEmpty = activePollas.length === 0;
-
-  const CAROUSEL_CAP = 6;
-  const pollasForCarousel = activePollas.slice(0, CAROUSEL_CAP);
-  const hasOverflow = activePollas.length > CAROUSEL_CAP;
 
   // Pollito character key fallback. The spec names "pibe" as the default
   // when the user has never picked a character. Must be a string key that
@@ -846,72 +824,10 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 5 - Mis pollas carousel (active-only) */}
-          {!isActiveEmpty && pollasForCarousel.length > 0 ? (
-            <section>
-              <div className="px-4 mb-3 flex items-center justify-between">
-                <h2 className="font-display text-[20px] tracking-[0.04em] uppercase text-text-primary">
-                  Mis Pollas
-                </h2>
-                <Link
-                  href="/pollas"
-                  className="font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary hover:text-gold transition-colors"
-                >
-                  Ver todas
-                </Link>
-              </div>
-
-              {/* Horizontal scroll strip. 16px gap between cards per §4.2. */}
-              <div className="overflow-x-auto hide-scrollbar">
-                <div className="flex gap-4 px-4 pb-1">
-                  {pollasForCarousel.map((p) => (
-                    <PollaCard
-                      key={p.id}
-                      variant="carousel"
-                      polla={toPollaCardPolla(p)}
-                      userContext={
-                        p.user_rank != null
-                          ? {
-                              rank: p.user_rank,
-                              totalPoints: p.user_total_points,
-                              isLeader: p.is_leader,
-                            }
-                          : undefined
-                      }
-                      endedState={
-                        p.effective_status === "ended" && p.winner
-                          ? {
-                              winnerName: p.winner.winner_name,
-                              winnerPoints: p.winner.winner_points,
-                            }
-                          : undefined
-                      }
-                    />
-                  ))}
-
-                  {/* Tail "ver todas" tile - styled to match the carousel's
-                      210px card width and radius. Shown only when we had to
-                      truncate the list. */}
-                  {hasOverflow ? (
-                    <Link
-                      href="/pollas"
-                      className="w-[210px] flex-shrink-0 rounded-lg border border-dashed border-border-default p-4 flex flex-col items-center justify-center gap-2 bg-bg-card/50 text-text-secondary hover:text-gold hover:border-gold/40 transition-colors"
-                    >
-                      <ArrowRight className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
-                      <span className="font-display text-[14px] tracking-[0.06em] uppercase">
-                        Ver todas
-                      </span>
-                      <span className="font-body text-[11px] text-text-muted">
-                        {sortedPollas.length} pollas
-                      </span>
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
-            </section>
-          ) : null}
-
-          {/* Block 6 - Swipeable podium carousel across all active pollas */}
+          {/* Block 5 - Swipeable podium carousel across all active pollas.
+              The dedicated "Mis Pollas" carousel was removed — users who
+              want the full list tap the Pollas tab; Podio already surfaces
+              each active polla with rank context. */}
           {!isActiveEmpty && podiumItems.length > 0 ? (
             <section>
               <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary">
