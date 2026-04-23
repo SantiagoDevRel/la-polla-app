@@ -91,10 +91,10 @@ export function PodiumCarousel({
               }}
               className="snap-center shrink-0 w-full px-4"
             >
-              <h3 className="font-display text-[16px] tracking-[0.08em] uppercase text-text-muted mb-2 text-center">
+              <h3 className="font-display text-[16px] tracking-[0.08em] uppercase text-text-primary mb-2 text-center">
                 {item.pollaName}
               </h3>
-              <div className="rounded-lg border border-border-subtle bg-bg-card p-4">
+              <div className="rounded-lg border border-border-subtle bg-bg-card/65 backdrop-blur-sm p-4">
                 <PodiumLeaderboard
                   top3={item.top3}
                   currentUserId={currentUserId}

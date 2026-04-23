@@ -122,7 +122,7 @@ export default function PerfilPage() {
 
       <main className="max-w-lg mx-auto px-4 space-y-6 -mt-1">
         {/* Avatar + name */}
-        <div className="rounded-2xl p-6 flex flex-col items-center bg-bg-card/75 backdrop-blur-sm border border-border-subtle">
+        <div className="rounded-2xl p-6 flex flex-col items-center bg-bg-card/65 backdrop-blur-sm border border-border-subtle">
           <button
             type="button"
             onClick={() => setShowAvatarPicker(!showAvatarPicker)}
@@ -207,7 +207,7 @@ export default function PerfilPage() {
             { value: String(stats.predictionsCount), label: "Pronósticos" },
             { value: stats.bestRank ? `${stats.bestRank}°` : "—", label: "Mejor pos." },
           ].map((s) => (
-            <motion.div key={s.label} variants={fadeUp} className="rounded-xl p-3 text-center bg-bg-card/75 backdrop-blur-sm border border-border-subtle">
+            <motion.div key={s.label} variants={fadeUp} className="rounded-xl p-3 text-center bg-bg-card/65 backdrop-blur-sm border border-border-subtle">
               <p className="font-display text-gold" style={{ fontSize: 26, lineHeight: 1, letterSpacing: "0.05em" }}>{s.value}</p>
               <p className="text-[10px] text-text-muted mt-1">{s.label}</p>
             </motion.div>
