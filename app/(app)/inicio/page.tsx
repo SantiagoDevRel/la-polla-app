@@ -32,11 +32,7 @@ import {
 } from "@/lib/tournaments";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
-import {
-  getLiveMatches,
-  getTodayMatches,
-  type FootballMatch,
-} from "@/lib/football-api";
+import { getLiveMatches } from "@/lib/football-api";
 import { MatchHero } from "@/components/match/MatchHero";
 import { LiveChip } from "@/components/match/LiveChip";
 import PollaCard from "@/components/polla/PollaCard";
@@ -397,98 +393,6 @@ async function fetchPodiumsForPollas(
     pollaName: p.name,
     top3: top3s[i],
   }));
-}
-
-// ─── Hero match + strip selection ──────────────────────────────────────
-
-// Deduplicate matches by id, preferring the first occurrence. getLiveMatches
-// and getTodayMatches overlap when a match kicks off today and is currently
-// live, so we merge with a seen-set.
-function mergeMatchesUnique(...lists: FootballMatch[][]): FootballMatch[] {
-  const seen = new Set<string>();
-  const out: FootballMatch[] = [];
-  for (const list of lists) {
-    for (const m of list) {
-      if (seen.has(m.id)) continue;
-      seen.add(m.id);
-      out.push(m);
-    }
-  }
-  return out;
-}
-
-// Returns true when the match is within the "today + next 24h" window
-// relevant to the Inicio hero + strip. Live matches are always eligible;
-// scheduled matches must kick off within 24h of now.
-function isHeroEligible(m: FootballMatch, nowMs: number): boolean {
-  if (m.status === "live") return true;
-  if (m.status !== "scheduled") return false;
-  const t = new Date(m.match_date).getTime();
-  if (Number.isNaN(t)) return false;
-  return t >= nowMs && t <= nowMs + 24 * 60 * 60 * 1000;
-}
-
-// Pick the hero match following the spec's 5-step waterfall. Returns null
-// if no eligible match exists.
-function selectHeroMatch(
-  userMatches: FootballMatch[],
-  allMatches: FootballMatch[],
-  nowMs: number,
-): FootballMatch | null {
-  const byKickoffAsc = (a: FootballMatch, b: FootballMatch) =>
-    new Date(a.match_date).getTime() - new Date(b.match_date).getTime();
-
-  // Rule 1 - live match in user tournaments.
-  const userLive = userMatches.filter((m) => m.status === "live");
-  if (userLive.length > 0) return userLive.sort(byKickoffAsc)[0];
-
-  // Rule 2 - upcoming (next 24h) in user tournaments, soonest first.
-  const userUpcoming = userMatches.filter(
-    (m) => m.status === "scheduled" && isHeroEligible(m, nowMs),
-  );
-  if (userUpcoming.length > 0) return userUpcoming.sort(byKickoffAsc)[0];
-
-  // Rule 3 - any live match across all tournaments.
-  const anyLive = allMatches.filter((m) => m.status === "live");
-  if (anyLive.length > 0) return anyLive.sort(byKickoffAsc)[0];
-
-  // Rule 4 - any upcoming match within 24h across all tournaments.
-  const anyUpcoming = allMatches.filter(
-    (m) => m.status === "scheduled" && isHeroEligible(m, nowMs),
-  );
-  if (anyUpcoming.length > 0) return anyUpcoming.sort(byKickoffAsc)[0];
-
-  return null;
-}
-
-// Convert a FootballMatch into MatchHero's Date-based props. Lock is
-// approximated as 5 minutes before kickoff, matching the app's business
-// rule for when predictions close.
-function heroPropsFor(
-  m: FootballMatch,
-): React.ComponentProps<typeof MatchHero> {
-  const kickoffAt = new Date(m.match_date);
-  const lockAt = m.status === "scheduled"
-    ? new Date(kickoffAt.getTime() - 5 * 60 * 1000)
-    : undefined;
-  return {
-    competition: {
-      name: getTournamentName(m.tournament) ?? m.tournament,
-      logoUrl: TOURNAMENT_ICONS[m.tournament],
-    },
-    kickoffAt,
-    homeTeam: {
-      name: m.home_team,
-      shortCode: m.home_team_tla,
-      crestUrl: m.home_team_flag ?? undefined,
-    },
-    awayTeam: {
-      name: m.away_team,
-      shortCode: m.away_team_tla,
-      crestUrl: m.away_team_flag ?? undefined,
-    },
-    lockAt,
-  };
 }
 
 // ─── Rival lookup ──────────────────────────────────────────────────────
