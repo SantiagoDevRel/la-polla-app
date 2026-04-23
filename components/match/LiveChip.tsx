@@ -61,19 +61,24 @@ export function LiveChip(props: LiveChipProps) {
     <div
       className={cn(
         "flex-shrink-0 min-w-[150px] rounded-md px-3 py-2 flex flex-col gap-1.5 border",
-        isLive ? "border-turf/40 bg-turf/[0.06]" : "border-border-subtle bg-bg-card",
+        // Red accents for live rows so Inicio matches the Partidos tab's
+        // language ("live == red"). Previously used turf/green which
+        // fought against the Partidos pill and read inconsistent.
+        isLive ? "border-red-alert/40 bg-red-alert/[0.06]" : "border-border-subtle bg-bg-card",
       )}
     >
-      {/* Top row: status */}
+      {/* Top row: status. Minute surfaces as "VIVO · 34'" when the
+          football-data payload carries a numeric minute. Scheduled
+          rows show their formatted kickoff instead. */}
       <div className="flex items-center gap-1.5">
         {isLive ? (
           <>
             <span aria-hidden="true" className="relative inline-block w-1.5 h-1.5">
-              <span className="absolute inset-0 rounded-full bg-turf animate-ping opacity-60" />
-              <span className="absolute inset-0 rounded-full bg-turf" />
+              <span className="absolute inset-0 rounded-full bg-red-alert animate-ping opacity-60" />
+              <span className="absolute inset-0 rounded-full bg-red-alert" />
             </span>
-            <span className="font-display text-[11px] tracking-[0.06em] uppercase text-turf">
-              Vivo {typeof minute === "number" ? `${minute}'` : ""}
+            <span className="font-display text-[11px] tracking-[0.06em] uppercase text-red-alert">
+              Vivo{typeof minute === "number" ? ` · ${minute}'` : ""}
             </span>
           </>
         ) : (
@@ -90,7 +95,7 @@ export function LiveChip(props: LiveChipProps) {
         </span>
         {isLive ? (
           <span
-            className="font-display text-[18px] tracking-[0.04em] text-turf tabular-nums"
+            className="font-display text-[18px] tracking-[0.04em] text-gold tabular-nums"
             style={{ fontFeatureSettings: '"tnum"' }}
           >
             {homeScore ?? 0} — {awayScore ?? 0}
