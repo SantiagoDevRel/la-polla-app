@@ -108,24 +108,26 @@ export function LiveChip(props: LiveChipProps) {
         </span>
       </div>
 
-      {/* Prediction footer */}
-      {predictionStatus ? (
+      {/* Prediction footer.
+           • myPrediction → "Tu pred: H-A" (+ "vas bien" on correct)
+           • predictionStatus 'pending' AND no pred → "Falta pronóstico"
+           • otherwise nothing so chips outside the user's pollas stay quiet */}
+      {myPrediction || predictionStatus === "pending" ? (
         <div className="border-t border-dashed border-border-subtle pt-1.5">
           <span
             className={cn(
               "font-body text-[11px]",
               predictionStatus === "correct" && "text-turf",
               predictionStatus === "wrong" && "text-red-alert",
-              predictionStatus === "pending" && "text-text-muted",
+              !predictionStatus && myPrediction && "text-text-primary",
+              predictionStatus === "pending" && !myPrediction && "text-amber",
             )}
           >
-            {predictionStatus === "pending"
-              ? "Falta pronóstico"
-              : myPrediction
+            {myPrediction
               ? `Tu pred: ${myPrediction.home}-${myPrediction.away}${
                   predictionStatus === "correct" ? " · vas bien" : ""
                 }`
-              : ""}
+              : "Falta pronóstico"}
           </span>
         </div>
       ) : null}
