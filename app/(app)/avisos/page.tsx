@@ -20,6 +20,16 @@ export default async function AvisosPage() {
 
   const admin = createAdminClient();
 
+  const { data: viewerRow } = await admin
+    .from("users")
+    .select("display_name, avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const viewerName =
+    (viewerRow?.display_name || "").split(" ")[0] || "Vos";
+  const viewerPollito = viewerRow?.avatar_url ?? null;
+
   const { data: notifRows } = await admin
     .from("notifications")
     .select(
@@ -69,7 +79,11 @@ export default async function AvisosPage() {
 
   return (
     <main className="min-h-[100dvh] px-4 pt-8 pb-24">
-      <AvisosList initialItems={items} initialUnread={unread} />
+      <AvisosList
+        initialItems={items}
+        initialUnread={unread}
+        viewer={{ name: viewerName, pollito: viewerPollito }}
+      />
     </main>
   );
 }
