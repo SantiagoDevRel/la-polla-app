@@ -65,6 +65,7 @@ export function SplashScreen() {
         preload="auto"
         poster="/videos/nuevo-background-poster.webp"
         className="absolute inset-0 w-full h-full object-cover"
+        style={{ transform: "scale(1.18) translateY(-7%)" }}
       >
         <source src="/videos/nuevo-background.webm" type="video/webm" />
         <source src="/videos/nuevo-background-lite.mp4" type="video/mp4" />

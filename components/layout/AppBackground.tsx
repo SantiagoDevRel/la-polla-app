@@ -43,6 +43,9 @@ export function AppBackground({
     >
       {/* Loop video. Hidden under prefers-reduced-motion (Tailwind
           "motion-reduce" variant) so the static poster below takes over. */}
+      {/* Zoom the video ~18% and shift up 7% so the cinematic black
+          bar on the top of the source clip gets pushed outside the
+          viewport. overflow-hidden on the parent clips it cleanly. */}
       <video
         autoPlay
         muted
@@ -51,6 +54,7 @@ export function AppBackground({
         preload="metadata"
         poster="/videos/nuevo-background-poster.webp"
         className="absolute inset-0 w-full h-full object-cover motion-reduce:hidden"
+        style={{ transform: "scale(1.18) translateY(-7%)" }}
       >
         <source src="/videos/nuevo-background.webm" type="video/webm" />
         <source src="/videos/nuevo-background-lite.mp4" type="video/mp4" />
@@ -65,6 +69,7 @@ export function AppBackground({
         src="/videos/nuevo-background-poster.webp"
         alt=""
         className="absolute inset-0 w-full h-full object-cover hidden motion-reduce:block"
+        style={{ transform: "scale(1.18) translateY(-7%)" }}
       />
 
       {/* Black overlay — keeps every surface legible over the moving
