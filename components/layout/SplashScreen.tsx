@@ -87,12 +87,12 @@ export function SplashScreen() {
         muted
         playsInline
         preload="auto"
-        poster="/la-polla-background-poster.webp"
+        poster="/videos/la-polla-background-poster.webp"
         className="absolute inset-0 w-full h-full object-cover"
         key={pathname /* restart video each replay */}
       >
-        <source src="/la-polla-background.webm" type="video/webm" />
-        <source src="/la-polla-background-lite.mp4" type="video/mp4" />
+        <source src="/videos/la-polla-background.webm" type="video/webm" />
+        <source src="/videos/la-polla-background-lite.mp4" type="video/mp4" />
       </video>
       {/* Wordmark positioned to match the /inicio header exactly: same
           top offset (pt-4 + small pollito image block), same font size,
