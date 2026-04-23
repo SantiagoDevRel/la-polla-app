@@ -721,6 +721,51 @@ export default async function InicioPage() {
     .slice(0, 10);
   const showStrip = !isActiveEmpty && stripMatches.length >= 1;
 
+  // Enrich each live strip entry with the user's prediction context so
+  // LiveChip can show "Tu pred: X-Y" or "Falta pronóstico" in its
+  // footer. One roundtrip per load:
+  //   1. external_id → DB UUID for every strip match
+  //   2. predictions for this user on those UUIDs
+  //   3. which of those UUIDs actually belong to one of the user's
+  //      active pollas (otherwise we cannot say "Falta pronóstico" —
+  //      the user is not supposed to predict this match at all)
+  const stripExternalToUuid = new Map<string, string>();
+  const stripPredByMatchUuid = new Map<string, { home: number; away: number }>();
+  const stripMatchInUserPolla = new Set<string>();
+  if (stripMatches.length > 0) {
+    const { data: dbRows } = await admin
+      .from("matches")
+      .select("id, external_id")
+      .in("external_id", stripMatches.map((m) => m.id));
+    for (const row of (dbRows || []) as Array<{ id: string; external_id: string }>) {
+      stripExternalToUuid.set(row.external_id, row.id);
+    }
+    const uuids = Array.from(stripExternalToUuid.values());
+    if (uuids.length > 0) {
+      const { data: preds } = await admin
+        .from("predictions")
+        .select("match_id, predicted_home, predicted_away")
+        .eq("user_id", user.id)
+        .in("match_id", uuids);
+      for (const p of (preds || []) as Array<{
+        match_id: string;
+        predicted_home: number;
+        predicted_away: number;
+      }>) {
+        stripPredByMatchUuid.set(p.match_id, {
+          home: p.predicted_home,
+          away: p.predicted_away,
+        });
+      }
+      const pollaMatchIds = new Set(
+        activePollas.flatMap((p) => p.match_ids || []),
+      );
+      for (const uuid of uuids) {
+        if (pollaMatchIds.has(uuid)) stripMatchInUserPolla.add(uuid);
+      }
+    }
+  }
+
   return (
     <div className="min-h-screen">
       {/* Block 1 - Centered wordmark header. Profile access moved to
@@ -783,19 +828,28 @@ export default async function InicioPage() {
               </h2>
               <div className="overflow-x-auto hide-scrollbar">
                 <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
-                  {stripMatches.map((m) => (
-                    <div key={m.id} className="snap-start">
-                      <LiveChip
-                        kind={m.status === "live" ? "live" : "upcoming"}
-                        homeCode={m.home_team_tla}
-                        awayCode={m.away_team_tla}
-                        homeScore={m.status === "live" ? m.home_score ?? undefined : undefined}
-                        awayScore={m.status === "live" ? m.away_score ?? undefined : undefined}
-                        minute={m.elapsed ?? undefined}
-                        kickoffAt={m.status !== "live" ? new Date(m.match_date) : undefined}
-                      />
-                    </div>
-                  ))}
+                  {stripMatches.map((m) => {
+                    const uuid = stripExternalToUuid.get(m.id);
+                    const myPred = uuid ? stripPredByMatchUuid.get(uuid) : undefined;
+                    const inMyPolla = uuid ? stripMatchInUserPolla.has(uuid) : false;
+                    const predictionStatus =
+                      !myPred && inMyPolla ? ("pending" as const) : undefined;
+                    return (
+                      <div key={m.id} className="snap-start">
+                        <LiveChip
+                          kind={m.status === "live" ? "live" : "upcoming"}
+                          homeCode={m.home_team_tla}
+                          awayCode={m.away_team_tla}
+                          homeScore={m.status === "live" ? m.home_score ?? undefined : undefined}
+                          awayScore={m.status === "live" ? m.away_score ?? undefined : undefined}
+                          minute={m.elapsed ?? undefined}
+                          kickoffAt={m.status !== "live" ? new Date(m.match_date) : undefined}
+                          myPrediction={myPred}
+                          predictionStatus={predictionStatus}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </section>
