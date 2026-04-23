@@ -16,11 +16,8 @@ import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug } from "@/lib/tournaments";
 import { getPollitoByPosition } from "@/lib/pollitos";
-import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, Goal, ChevronDown } from "lucide-react";
-import {
-  groupMatchesByDate,
-  groupMatchesByPhase,
-} from "@/lib/matches/grouping";
+import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, Goal, ChevronDown, Clock } from "lucide-react";
+import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 // ─── Tipos ───
@@ -98,6 +95,217 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
   );
 }
 
+// Shared single-line formatter for the match-row kickoff pill. "mar 23 ·
+// 19:30" — same locale-aware output the old fmtDate helper produced,
+// extracted so MatchRow can live at module scope without needing
+// closure over the component state.
+function formatKickoffShort(iso: string): string {
+  return new Intl.DateTimeFormat("es-CO", {
+    day: "2-digit",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+function pointsTierClasses(points: number): string {
+  if (points >= 5) return "bg-gold/15 text-gold border-gold/30";
+  if (points >= 3) return "bg-turf/15 text-turf border-turf/30";
+  if (points >= 2) return "bg-[#4fc3f7]/15 text-[#4fc3f7] border-[#4fc3f7]/30";
+  if (points >= 1) return "bg-bg-elevated text-text-primary border-border-subtle";
+  return "bg-bg-elevated text-text-primary/50 border-border-subtle";
+}
+
+function matchStatusAccent(m: Match, pointsEarned: number | null): string {
+  if (m.status === "live") return "#FF3D57";
+  if (m.status === "finished" && (pointsEarned ?? 0) >= 3) return "#1FD87F";
+  if (m.status === "finished") return "rgba(255,255,255,0.08)";
+  if (m.status === "cancelled" || m.status === "awarded") return "rgba(255,255,255,0.08)";
+  return "#FFD700";
+}
+
+interface MatchRowProps {
+  match: Match;
+  pred: Prediction | undefined;
+  draft: { home: string; away: string } | undefined;
+  editable: boolean;
+  touched: boolean;
+  onDraftChange: (side: "home" | "away", val: string) => void;
+  onJumpNext: () => void;
+  homeRef: ((el: HTMLInputElement | null) => void) | null;
+  awayRef: ((el: HTMLInputElement | null) => void) | null;
+}
+
+function MatchRow({
+  match,
+  pred,
+  draft,
+  editable,
+  touched,
+  onDraftChange,
+  onJumpNext,
+  homeRef,
+  awayRef,
+}: MatchRowProps) {
+  const isLive = match.status === "live";
+  const isFinished = match.status === "finished";
+  const pointsEarned = pred?.points_earned ?? null;
+  const accent = matchStatusAccent(match, pointsEarned);
+  const effectiveDraft = draft ?? {
+    home: pred?.predicted_home?.toString() ?? "",
+    away: pred?.predicted_away?.toString() ?? "",
+  };
+
+  return (
+    <div
+      className="relative rounded-lg overflow-hidden flex"
+      style={{
+        backgroundColor: "rgba(14, 20, 32, 0.4)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        border: "1px solid var(--border-subtle)",
+      }}
+    >
+      {/* Left-edge status accent */}
+      <div
+        className={isLive ? "animate-pulse" : ""}
+        style={{ width: 3, background: accent, flexShrink: 0 }}
+      />
+      <div className="flex-1 min-w-0 p-3">
+        {/* Phase label + kickoff pill */}
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60 truncate">
+            {match.phase ?? ""}
+          </span>
+          {isLive ? (
+            <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
+              En vivo
+            </span>
+          ) : isFinished ? (
+            <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-bg-elevated border border-border-subtle text-text-primary/70 text-[10px] font-bold uppercase tracking-[0.08em]">
+              Final
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-gold/10 border border-gold/30 text-gold text-[10px] font-bold uppercase tracking-[0.08em]">
+              {formatKickoffShort(match.scheduled_at)}
+            </span>
+          )}
+        </div>
+
+        {/* Teams + score / inputs */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0 text-right">
+            <div className="flex items-center justify-end gap-2">
+              <p className="font-semibold text-[13px] text-text-primary truncate min-w-0">
+                {match.home_team}
+              </p>
+              <span className="flex-shrink-0">
+                <TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} />
+              </span>
+            </div>
+          </div>
+
+          <div className="flex-shrink-0 flex items-center gap-2">
+            {!editable ? (
+              <div className="flex items-center gap-1.5 px-1.5">
+                <span
+                  className={`score-font leading-none ${
+                    isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
+                  }`}
+                  style={{ fontFeatureSettings: '"tnum"' }}
+                >
+                  {match.home_score ?? "—"}
+                </span>
+                <span className="text-text-primary/40 text-lg">—</span>
+                <span
+                  className={`score-font leading-none ${
+                    isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
+                  }`}
+                  style={{ fontFeatureSettings: '"tnum"' }}
+                >
+                  {match.away_score ?? "—"}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={effectiveDraft.home}
+                  ref={homeRef ?? undefined}
+                  onChange={(e) => onDraftChange("home", e.target.value)}
+                  placeholder="0"
+                  className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
+                    touched
+                      ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
+                      : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
+                  }`}
+                  style={{ border: "2px solid" }}
+                />
+                <span className="text-text-primary/40 font-bold">—</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={effectiveDraft.away}
+                  ref={awayRef ?? undefined}
+                  onChange={(e) => {
+                    onDraftChange("away", e.target.value);
+                    if (e.target.value.length >= 1) onJumpNext();
+                  }}
+                  placeholder="0"
+                  className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
+                    touched
+                      ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
+                      : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
+                  }`}
+                  style={{ border: "2px solid" }}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0 text-left">
+            <div className="flex items-center gap-2">
+              <span className="flex-shrink-0">
+                <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
+              </span>
+              <p className="font-semibold text-[13px] text-text-primary truncate min-w-0">
+                {match.away_team}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Locked-but-predicted (live-section rows) */}
+        {isLive && pred ? (
+          <div className="mt-2 text-center">
+            <p className="text-[11px] text-text-primary/70">
+              Tu pronóstico · {pred.predicted_home}-{pred.predicted_away}
+            </p>
+          </div>
+        ) : null}
+
+        {/* Finished-match tier-coloured chip */}
+        {isFinished && pred ? (
+          <div className="mt-3 flex justify-center">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-bold uppercase tracking-[0.08em] ${pointsTierClasses(
+                pointsEarned ?? 0,
+              )}`}
+            >
+              Tu {pred.predicted_home}-{pred.predicted_away} ·{" "}
+              {(pointsEarned ?? 0) > 0 ? `+${pointsEarned}` : "0"} pts
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function PollaSlugPage() {
   const params = useParams();
   const router = useRouter();
@@ -135,58 +343,46 @@ export default function PollaSlugPage() {
   const [isNonParticipant, setIsNonParticipant] = useState(false);
   const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
-  const [groupMode, setGroupMode] = useState<"phase" | "date">("date");
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [finishedOpen, setFinishedOpen] = useState(false);
 
-  const matchGroups = useMemo(() => {
-    return groupMode === "date"
-      ? groupMatchesByDate(matches)
-      : groupMatchesByPhase(matches);
-  }, [matches, groupMode]);
+  // Status-grouped partitions driving the Partidos tab. Timeline order:
+  // Finalizados (collapsed history) → En vivo (locked display) →
+  // Próximos (editable with auto-jump). Locked scheduled matches (kickoff
+  // within 5 min) render alongside live in the En vivo section because
+  // both share the "can no longer predict" behavior.
+  const upcomingMatches = useMemo(
+    () => matches.filter((m) => m.status === "scheduled" && !isLocked(m)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [matches, polla?.status],
+  );
+  const liveMatches = useMemo(
+    () =>
+      matches.filter(
+        (m) =>
+          m.status === "live" ||
+          (m.status === "scheduled" && isLocked(m)),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [matches, polla?.status],
+  );
+  const finishedMatches = useMemo(
+    () => matches.filter((m) => TERMINAL_MATCH_STATUSES.has(m.status)),
+    [matches],
+  );
 
-  // First group expanded by default; re-expand the first group whenever the
-  // user flips the toggle so they always see a populated list on mode switch.
-  useEffect(() => {
-    if (matchGroups.length === 0) return;
-    setExpandedGroups(new Set([matchGroups[0].key]));
-  }, [matchGroups]);
-
-  function toggleGroup(key: string) {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  function findGroupKeyForMatch(matchId: string): string | null {
-    for (const g of matchGroups) {
-      if (g.matches.some((m) => m.id === matchId)) return g.key;
+  // Focus the home input of the next upcoming match (after `fromId`). Used
+  // by the auto-jump on the away-input's second digit. Only walks the
+  // upcoming list so focus never lands on a live / finished row.
+  function focusNextUpcomingHome(fromId: string) {
+    const idx = upcomingMatches.findIndex((m) => m.id === fromId);
+    for (let i = idx + 1; i < upcomingMatches.length; i++) {
+      const next = upcomingMatches[i];
+      const el = homeInputRefs.current[next.id];
+      if (el) {
+        el.focus();
+        return;
+      }
     }
-    return null;
-  }
-
-  // Focus the home input of the given match, auto-expanding its group first
-  // if it is currently collapsed. rAF ensures the group's DOM mounts before
-  // focus() fires, so the input element actually exists when we reach for it.
-  function focusHomeOfMatch(matchId: string) {
-    const existing = homeInputRefs.current[matchId];
-    if (existing) {
-      existing.focus();
-      return;
-    }
-    const key = findGroupKeyForMatch(matchId);
-    if (!key) return;
-    setExpandedGroups((prev) => {
-      if (prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
-    requestAnimationFrame(() => {
-      homeInputRefs.current[matchId]?.focus();
-    });
   }
   // PhoneInput emits the full E.164 string (e.g. "+573001234567"). The invite
   // API normalizes by stripping "+" server-side, so we pass it through as-is.
@@ -272,12 +468,6 @@ export default function PollaSlugPage() {
   }
 
   function getPred(matchId: string) { return predictions.find((p) => p.match_id === matchId); }
-
-  function fmtDate(d: string) {
-    return new Date(d).toLocaleDateString("es-CO", {
-      weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-    });
-  }
 
   function isLocked(m: Match) {
     if (polla?.status === "ended") return true;
@@ -546,187 +736,111 @@ export default function PollaSlugPage() {
               </div>
             )}
             {matches.length === 0 ? (
-              <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
-                <p className="text-text-muted">No hay partidos cargados aun. Los partidos se actualizaran cuando el calendario sea confirmado.</p>
+              <div className="lp-card p-6 text-center" style={{ backgroundColor: "rgba(14, 20, 32, 0.4)" }}>
+                <p className="text-text-primary">No hay partidos cargados aun. Los partidos se actualizaran cuando el calendario sea confirmado.</p>
               </div>
             ) : (
-              <div className="space-y-3 pb-32">
-                {/* Group-mode toggle. Drops the prior per-row motion stagger
-                    because the rows re-mount each time the user flips the
-                    toggle or expands a group, and the cascade is janky. */}
-                <div className="flex gap-1">
-                  {([
-                    { val: "date" as const, label: "Por fecha" },
-                    { val: "phase" as const, label: "Por fase" },
-                  ]).map((opt) => {
-                    const active = groupMode === opt.val;
-                    return (
-                      <button
-                        key={opt.val}
-                        type="button"
-                        onClick={() => setGroupMode(opt.val)}
-                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                          active
-                            ? "bg-gold text-bg-base"
-                            : "bg-transparent text-text-muted border border-border-subtle hover:text-text-primary"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="space-y-4 pb-32">
+                {/* ── Finalizados — collapsed by default, optional history ── */}
+                {finishedMatches.length > 0 && (
+                  <div className="lp-card overflow-hidden" style={{ backgroundColor: "rgba(14, 20, 32, 0.4)" }}>
+                    <button
+                      type="button"
+                      onClick={() => setFinishedOpen((v) => !v)}
+                      className="w-full flex items-center justify-between px-4 py-3"
+                      aria-expanded={finishedOpen}
+                    >
+                      <span className="lp-section-title flex items-center gap-2" style={{ fontSize: 14 }}>
+                        <Lock className="w-3.5 h-3.5 text-text-primary/60" />
+                        Finalizados
+                        <span className="text-text-primary/60 font-normal">· {finishedMatches.length}</span>
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-text-primary/70 transition-transform ${finishedOpen ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    {finishedOpen && (
+                      <div className="space-y-3 px-3 pb-3">
+                        {finishedMatches.map((match) => (
+                          <MatchRow
+                            key={match.id}
+                            match={match}
+                            pred={getPred(match.id)}
+                            draft={drafts[match.id]}
+                            editable={false}
+                            touched={touchedMatches.has(match.id)}
+                            onDraftChange={() => { /* not editable */ }}
+                            onJumpNext={() => { /* not editable */ }}
+                            homeRef={null}
+                            awayRef={null}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {matchGroups.map((group) => {
-                  const open = expandedGroups.has(group.key);
-                  return (
-                    <div key={group.key} className="rounded-2xl bg-bg-card border border-border-subtle overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(group.key)}
-                        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-text-primary hover:bg-bg-elevated transition-colors"
-                        aria-expanded={open}
-                      >
-                        <span>
-                          {group.label}{" "}
-                          <span className="text-text-muted font-normal">({group.matches.length})</span>
-                        </span>
-                        <ChevronDown
-                          className={`w-4 h-4 text-text-muted transition-transform ${open ? "rotate-180" : ""}`}
-                          aria-hidden="true"
+                {/* ── En vivo — live + locked-scheduled; non-editable display ── */}
+                {liveMatches.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="lp-section-title flex items-center gap-2 px-1" style={{ fontSize: 14 }}>
+                      <span className="w-2 h-2 rounded-full bg-red-alert animate-pulse" />
+                      En vivo
+                      <span className="text-text-primary/60 font-normal">· {liveMatches.length}</span>
+                    </h3>
+                    <div className="space-y-3">
+                      {liveMatches.map((match) => (
+                        <MatchRow
+                          key={match.id}
+                          match={match}
+                          pred={getPred(match.id)}
+                          draft={drafts[match.id]}
+                          editable={false}
+                          touched={touchedMatches.has(match.id)}
+                          onDraftChange={() => { /* not editable */ }}
+                          onJumpNext={() => { /* not editable */ }}
+                          homeRef={null}
+                          awayRef={null}
                         />
-                      </button>
-                      {open ? (
-                        <div className="space-y-3 px-3 pb-3">
-                          {group.matches.map((match) => {
-                            const pred = getPred(match.id);
-                            const draft = drafts[match.id] || { home: pred?.predicted_home?.toString() ?? "", away: pred?.predicted_away?.toString() ?? "" };
-                            const locked = isLocked(match);
-
-                            return (
-                              <div key={match.id} className="rounded-2xl overflow-hidden bg-bg-elevated border border-border-subtle">
-                                {/* Status badge */}
-                                <div className={`px-4 py-1.5 text-[11px] font-bold text-center ${
-                                  match.status === "live" ? "bg-green-dim text-green-live" :
-                                  match.status === "finished" ? "bg-bg-elevated text-text-muted" :
-                                  "text-text-secondary"
-                                }`} style={match.status === "scheduled" ? { backgroundColor: "var(--bg-card-elevated)" } : undefined}>
-                                  {match.status === "live" ? (
-                                    <span className="flex items-center justify-center gap-1.5">
-                                      <span className="w-2 h-2 rounded-full bg-green-live animate-pulse-live" />
-                                      EN VIVO
-                                    </span>
-                                  ) : match.status === "finished" ? "FINALIZADO" : fmtDate(match.scheduled_at)}
-                                </div>
-
-                                <div className="p-4">
-                                  <div className="flex items-center gap-3">
-                                    {/* Home */}
-                                    <div className="flex-1 min-w-0 text-right">
-                                      <div className="flex items-center justify-end gap-2">
-                                        <p className="font-semibold text-sm text-text-primary truncate min-w-0">{match.home_team}</p>
-                                        <span className="flex-shrink-0"><TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} /></span>
-                                      </div>
-                                    </div>
-
-                                    {/* Score / Input */}
-                                    <div className="flex-shrink-0 flex items-center gap-2">
-                                      {match.status === "finished" || match.status === "live" || locked ? (
-                                        <div className="flex items-center gap-2 px-3">
-                                          <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
-                                            {match.home_score ?? "—"}
-                                          </span>
-                                          <span className="text-text-muted text-lg">—</span>
-                                          <span className={`score-font ${match.status === "live" ? "text-gold text-[48px]" : "text-text-primary text-[40px]"}`}>
-                                            {match.away_score ?? "—"}
-                                          </span>
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center gap-2">
-                                          <input type="number" min={0} max={20} disabled={locked} value={draft.home}
-                                            ref={(el) => { homeInputRefs.current[match.id] = el; }}
-                                            onChange={(e) => {
-                                              const val = e.target.value;
-                                              setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, home: val } }));
-                                              setTouchedMatches((prev) => new Set(prev).add(match.id));
-                                              if (val.length >= 1) awayInputRefs.current[match.id]?.focus();
-                                            }}
-                                            className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
-                                              locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
-                                              : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
-                                            }`}
-                                            style={{ border: "2px solid" }}
-                                            placeholder="0"
-                                          />
-                                          <span className="text-text-muted font-bold">—</span>
-                                          <input type="number" min={0} max={20} disabled={locked} value={draft.away}
-                                            ref={(el) => { awayInputRefs.current[match.id] = el; }}
-                                            onChange={(e) => {
-                                              const val = e.target.value;
-                                              setDrafts((prev) => ({ ...prev, [match.id]: { ...draft, away: val } }));
-                                              setTouchedMatches((prev) => new Set(prev).add(match.id));
-                                              if (val.length >= 1) {
-                                                // Advance to the next scheduled match by walking the flat
-                                                // matches array. If that match lives in a collapsed group,
-                                                // focusHomeOfMatch auto-expands the group and focuses next
-                                                // frame so the input DOM exists before focus() fires.
-                                                const fromIdx = matches.findIndex((mm) => mm.id === match.id);
-                                                for (let i = fromIdx + 1; i < matches.length; i++) {
-                                                  const nextMatch = matches[i];
-                                                  if (nextMatch.status === "scheduled") {
-                                                    focusHomeOfMatch(nextMatch.id);
-                                                    break;
-                                                  }
-                                                }
-                                              }
-                                            }}
-                                            className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-xl outline-none transition-all ${
-                                              locked ? "bg-bg-elevated border-border-subtle text-text-muted cursor-not-allowed"
-                                              : "bg-bg-elevated border-border-medium text-text-primary focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
-                                            }`}
-                                            style={{ border: "2px solid" }}
-                                            placeholder="0"
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Away */}
-                                    <div className="flex-1 min-w-0 text-left">
-                                      <div className="flex items-center gap-2">
-                                        <span className="flex-shrink-0"><TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} /></span>
-                                        <p className="font-semibold text-sm text-text-primary truncate min-w-0">{match.away_team}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Previous prediction + points. Always show the user's own
-                                      prediction once the form is locked (locked/live/finished). */}
-                                  {pred && (match.status === "finished" || match.status === "live" || locked) && (
-                                    <div className="mt-2 text-center">
-                                      <p className="text-base font-medium text-white">
-                                        Tu pronóstico: {pred.predicted_home} - {pred.predicted_away}
-                                      </p>
-                                      {match.status === "finished" && (
-                                        <p className={`mt-1 text-xs font-bold ${pred.points_earned > 0 ? "text-gold" : "text-text-muted"}`}>
-                                          {pred.points_earned > 0 ? `+${pred.points_earned} pts` : "0 pts"}
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {locked && match.status === "scheduled" && (
-                                    <p className="mt-2 text-xs text-center text-text-muted flex items-center justify-center gap-1"><Lock className="w-3 h-3" /> CERRADO</p>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
+                      ))}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                {/* ── Próximos — editable inputs with auto-jump between them ── */}
+                {upcomingMatches.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="lp-section-title flex items-center gap-2 px-1" style={{ fontSize: 14 }}>
+                      <Clock className="w-3.5 h-3.5 text-gold" />
+                      Próximos
+                      <span className="text-text-primary/60 font-normal">· {upcomingMatches.length}</span>
+                    </h3>
+                    <div className="space-y-3">
+                      {upcomingMatches.map((match) => (
+                        <MatchRow
+                          key={match.id}
+                          match={match}
+                          pred={getPred(match.id)}
+                          draft={drafts[match.id]}
+                          editable={true}
+                          touched={touchedMatches.has(match.id)}
+                          onDraftChange={(side, val) => {
+                            const cur = drafts[match.id] ?? { home: "", away: "" };
+                            setDrafts((prev) => ({ ...prev, [match.id]: { ...cur, [side]: val } }));
+                            setTouchedMatches((prev) => new Set(prev).add(match.id));
+                            if (side === "home" && val.length >= 1) {
+                              awayInputRefs.current[match.id]?.focus();
+                            }
+                          }}
+                          onJumpNext={() => focusNextUpcomingHome(match.id)}
+                          homeRef={(el) => { homeInputRefs.current[match.id] = el; }}
+                          awayRef={(el) => { awayInputRefs.current[match.id] = el; }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
