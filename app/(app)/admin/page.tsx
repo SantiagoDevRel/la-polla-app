@@ -105,7 +105,7 @@ export default function AdminPage() {
     >
       <header
         className="px-4 pt-4 pb-4"
-        style={{ background: "linear-gradient(180deg, #0a1628 0%, #080c10 100%)" }}
+       
       >
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button

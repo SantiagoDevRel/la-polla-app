@@ -215,10 +215,8 @@ function Aviso({
   const content = (
     <div
       className={
-        "flex items-start gap-3 p-3 rounded-lg border backdrop-blur-sm transition-colors " +
-        (unread
-          ? "bg-bg-card/70 border-gold/25"
-          : "bg-bg-card/60 border-border-subtle")
+        "flex items-start gap-3 p-3 transition-colors " +
+        (unread ? "lp-card-hero" : "lp-card")
       }
     >
       {/* Icon well. Moment events render the Pixa poster frame, rank_down

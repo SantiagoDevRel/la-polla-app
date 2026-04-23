@@ -114,7 +114,7 @@ export default function PerfilPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="px-4 pt-4 pb-6" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
+      <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto">
           <h1 className="text-xl font-bold text-text-primary text-center">Mi Perfil</h1>
         </div>
@@ -122,7 +122,7 @@ export default function PerfilPage() {
 
       <main className="max-w-lg mx-auto px-4 space-y-6 -mt-1">
         {/* Avatar + name */}
-        <div className="rounded-2xl p-6 flex flex-col items-center bg-bg-card/65 backdrop-blur-sm border border-border-subtle">
+        <div className="lp-card p-6 flex flex-col items-center">
           <button
             type="button"
             onClick={() => setShowAvatarPicker(!showAvatarPicker)}
@@ -207,7 +207,7 @@ export default function PerfilPage() {
             { value: String(stats.predictionsCount), label: "Pronósticos" },
             { value: stats.bestRank ? `${stats.bestRank}°` : "—", label: "Mejor pos." },
           ].map((s) => (
-            <motion.div key={s.label} variants={fadeUp} className="rounded-xl p-3 text-center bg-bg-card/65 backdrop-blur-sm border border-border-subtle">
+            <motion.div key={s.label} variants={fadeUp} className="lp-card p-3 text-center">
               <p className="font-display text-gold" style={{ fontSize: 26, lineHeight: 1, letterSpacing: "0.05em" }}>{s.value}</p>
               <p className="text-[10px] text-text-muted mt-1">{s.label}</p>
             </motion.div>
@@ -216,14 +216,7 @@ export default function PerfilPage() {
 
         {/* Actividad reciente */}
         {activity.length > 0 && (
-          <div style={{
-            background: "rgba(14, 20, 32, 0.65)",
-            backdropFilter: "blur(4px)",
-            WebkitBackdropFilter: "blur(4px)",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: 14,
-            padding: 14,
-          }}>
+          <div className="lp-card" style={{ padding: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#f0f4ff", marginBottom: 10, display: "flex", alignItems: "center", gap: 5 }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />

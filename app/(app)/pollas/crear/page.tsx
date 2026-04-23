@@ -279,7 +279,7 @@ export default function CrearPollaPage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="px-4 pt-4 pb-5" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
+      <header className="px-4 pt-4 pb-5">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-4">
             <button onClick={() => (step === 1 ? router.back() : goToStep((step - 1) as Step))} className="text-text-secondary hover:text-gold transition-colors">
