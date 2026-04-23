@@ -67,18 +67,10 @@ export function PollaCard({
           : "border-border-subtle hover:border-border-default",
         endedState && "opacity-75",
       )}
-      style={
-        isLeader
-          ? {
-              background:
-                "linear-gradient(180deg, rgba(255, 215, 0, 0.08) 0%, rgba(14, 20, 32, 0.94) 100%)",
-              backdropFilter: "blur(4px)",
-            }
-          : {
-              background: "rgba(14, 20, 32, 0.94)",
-              backdropFilter: "blur(4px)",
-            }
-      }
+      style={{
+        backgroundColor: "rgba(14, 20, 32, 0.88)",
+        backdropFilter: "blur(4px)",
+      }}
     >
       {isLeader ? (
         <span

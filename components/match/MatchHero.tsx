@@ -98,8 +98,8 @@ export function MatchHero({
         "transition-transform duration-150 active:scale-[0.985]",
       )}
       style={{
-        background:
-          "linear-gradient(180deg, rgba(255, 215, 0, 0.06) 0%, rgba(14, 20, 32, 0.82) 50%)",
+        backgroundColor: "rgba(14, 20, 32, 0.78)",
+        backdropFilter: "blur(4px)",
       }}
     >
       {/* top-right gold glow */}
@@ -118,7 +118,7 @@ export function MatchHero({
 
       {/* 1. Meta strip */}
       <div className="flex items-center justify-between relative">
-        <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-bg-elevated border border-border-subtle font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-secondary">
+        <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-bg-elevated/80 border border-border-subtle font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-primary">
           {competition.logoUrl ? (
             <Image
               src={competition.logoUrl}
@@ -130,7 +130,7 @@ export function MatchHero({
           ) : null}
           {competition.name}
         </span>
-        <span className="font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-muted">
+        <span className="font-body text-[11px] font-semibold uppercase tracking-[0.08em] text-text-primary">
           {formatKickoff(kickoffAt)}
         </span>
       </div>

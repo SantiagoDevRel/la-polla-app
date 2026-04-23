@@ -94,26 +94,32 @@ export function SplashScreen() {
         <source src="/la-polla-background.webm" type="video/webm" />
         <source src="/la-polla-background-lite.mp4" type="video/mp4" />
       </video>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div
-          className="font-display"
+      {/* Wordmark positioned to match the /inicio header exactly: same
+          top offset (pt-4 + small pollito image block), same font size,
+          so when the splash fades out the text stays in place visually
+          and the app reveals underneath without the title jumping. */}
+      <div className="absolute top-4 left-0 right-0 flex items-center justify-center gap-3 px-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/pollitos/pollito_pibe_lider.webp"
+          alt=""
+          width={52}
+          height={52}
+          style={{ objectFit: "contain" }}
+        />
+        <span
+          className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px]"
           style={{
-            fontSize: 48,
-            letterSpacing: "0.04em",
-            display: "flex",
-            gap: "8px",
-            WebkitTextStroke: "1.5px #000",
-            textShadow: "0 4px 14px rgba(0,0,0,0.55)",
+            fontSize: 22,
+            WebkitTextStroke: "1px #000",
+            textShadow: "0 2px 6px rgba(0,0,0,0.55)",
             paintOrder: "stroke fill",
           }}
         >
           <span style={{ color: "#FFD700" }}>LA</span>
           <span style={{ color: "#2F6DF4" }}>POLLA</span>
           <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
-        </div>
-        <div className="mt-3 text-[11px] uppercase tracking-[0.24em] text-text-secondary">
-          La polla deportiva de tus amigos
-        </div>
+        </span>
       </div>
       <div
         className="absolute inset-0"

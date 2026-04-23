@@ -21,7 +21,6 @@
 // explicit user-scope filter.
 
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPollitoBase } from "@/lib/pollitos";
@@ -572,7 +571,6 @@ export default async function InicioPage() {
 
   const displayName = publicUser?.display_name || user.phone || "Usuario";
   const firstName = displayName.split(" ")[0];
-  const avatarSrc = getPollitoBase(publicUser?.avatar_url);
 
   // Enriched pollas + sort + cap.
   const allPollas = await fetchEnrichedPollas(user.id);
@@ -707,46 +705,32 @@ export default async function InicioPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Block 1 - Header strip */}
+      {/* Block 1 - Centered wordmark header. Profile access moved to
+          the BottomNav FAB (pollito face) so the header stays focused
+          on brand. Pibe pollito stands in as the logo per spec. */}
       <header className="px-4 pt-4 pb-4">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
-          <Link href="/inicio" className="flex items-center gap-2 no-underline">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/pollitos/logo_realistic.webp"
-              alt=""
-              width={54}
-              height={54}
-              style={{ objectFit: "contain" }}
-            />
-            <span
-              className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[4px]"
-              style={{
-                fontSize: 22,
-                WebkitTextStroke: "1px #000",
-                textShadow: "0 2px 4px rgba(0,0,0,0.4)",
-                paintOrder: "stroke fill",
-              }}
-            >
-              <span style={{ color: "#FFD700" }}>LA</span>
-              <span style={{ color: "#2F6DF4" }}>POLLA</span>
-              <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
-            </span>
-          </Link>
-          <Link
-            href="/perfil"
-            aria-label="Mi perfil"
-            className="w-12 h-12 rounded-full overflow-hidden border border-gold/30 bg-bg-elevated flex items-center justify-center"
+        <div className="max-w-lg mx-auto flex items-center justify-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/pollitos/pollito_pibe_lider.webp"
+            alt=""
+            width={52}
+            height={52}
+            style={{ objectFit: "contain" }}
+          />
+          <span
+            className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px]"
+            style={{
+              fontSize: 22,
+              WebkitTextStroke: "1px #000",
+              textShadow: "0 2px 6px rgba(0,0,0,0.55)",
+              paintOrder: "stroke fill",
+            }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={avatarSrc}
-              alt={firstName}
-              width={48}
-              height={48}
-              style={{ objectFit: "cover", width: 48, height: 48 }}
-            />
-          </Link>
+            <span style={{ color: "#FFD700" }}>LA</span>
+            <span style={{ color: "#2F6DF4" }}>POLLA</span>
+            <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
+          </span>
         </div>
       </header>
 
