@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trophy, Lock, Clock } from "lucide-react";
+import { ArrowLeft, Trophy, Lock, Clock, ChevronDown } from "lucide-react";
 
 // ─── Sample data ──────────────────────────────────────────────────────
 
@@ -339,6 +339,215 @@ function VariantTinted({ m }: { m: SampleMatch }) {
   );
 }
 
+// ─── Variant 7 — Polished current UI (visual-only) ───────────────────
+//
+// Same structure the Partidos tab ships today (grouped accordion,
+// full list of match rows, score inputs side-by-side, auto-jump to
+// next row). Only visual polish layered on:
+//   • Group container → .lp-card translucency
+//   • Group header → .lp-section-title typography
+//   • Left-edge status accent bar per match row (3px)
+//   • Kickoff time as a compact pill top-right instead of full bar
+//   • Score inputs with rounded-[14px] + gold focus glow +
+//     amber "unsaved touched" border
+//   • Finished-match single pill "TU 2-1 · +5 PTS" with tier colour
+function VariantPolishedCurrent() {
+  const [open, setOpen] = useState(true);
+  const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+
+  function updateDraft(id: string, side: "home" | "away", v: string) {
+    setDrafts((p) => ({
+      ...p,
+      [id]: { ...(p[id] ?? { home: "", away: "" }), [side]: v },
+    }));
+    setTouched((p) => new Set(p).add(id));
+  }
+
+  function statusAccent(m: SampleMatch): string {
+    if (m.status === "live") return "#FF3D57";
+    if (m.status === "finished" && (m.pointsEarned ?? 0) >= 3) return "#1FD87F";
+    if (m.status === "finished") return "rgba(255,255,255,0.08)";
+    if (m.status === "locked") return "rgba(255,255,255,0.08)";
+    return "#FFD700";
+  }
+
+  function pointsTierClasses(points: number): string {
+    if (points >= 5) return "bg-gold/15 text-gold border-gold/30";
+    if (points >= 3) return "bg-turf/15 text-turf border-turf/30";
+    if (points >= 2) return "bg-[#4fc3f7]/15 text-[#4fc3f7] border-[#4fc3f7]/30";
+    if (points >= 1) return "bg-bg-elevated text-text-primary border-border-subtle";
+    return "bg-bg-elevated text-text-primary/50 border-border-subtle";
+  }
+
+  return (
+    <div className="lp-card overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3"
+        aria-expanded={open}
+      >
+        <span className="lp-section-title" style={{ fontSize: 16 }}>
+          23 DE ABRIL <span className="text-text-primary/60 font-normal">· 3</span>
+        </span>
+        <ChevronDown
+          className={`w-4 h-4 text-text-primary/70 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="space-y-3 px-3 pb-3">
+          {MATCHES.map((m) => {
+            const isFinished = m.status === "finished";
+            const isLive = m.status === "live";
+            const isTouched = touched.has(m.id);
+            const draft = drafts[m.id] ?? {
+              home: m.userPrediction?.home?.toString() ?? "",
+              away: m.userPrediction?.away?.toString() ?? "",
+            };
+            return (
+              <div
+                key={m.id}
+                className="relative rounded-lg overflow-hidden flex"
+                style={{
+                  backgroundColor: "rgba(14, 20, 32, 0.55)",
+                  border: "1px solid var(--border-subtle)",
+                }}
+              >
+                {/* Left status accent bar (3px). Colors: live=red
+                    pulsing, upcoming=gold, finished-with-points=green,
+                    finished/locked=muted. */}
+                <div
+                  className={isLive ? "animate-pulse" : ""}
+                  style={{
+                    width: 3,
+                    background: statusAccent(m),
+                    flexShrink: 0,
+                  }}
+                />
+
+                <div className="flex-1 min-w-0 p-3">
+                  {/* Kickoff pill top-right */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60">
+                      {m.phase}
+                    </span>
+                    {isLive ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
+                        En vivo · {m.elapsed}&apos;
+                      </span>
+                    ) : isFinished ? (
+                      <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-bg-elevated border border-border-subtle text-text-primary/70 text-[10px] font-bold uppercase tracking-[0.08em]">
+                        Final
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-gold/10 border border-gold/30 text-gold text-[10px] font-bold uppercase tracking-[0.08em]">
+                        {formatKickoff(m.date)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Row — home | score | away */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <p className="font-semibold text-[13px] text-text-primary truncate">
+                          {m.homeTeam}
+                        </p>
+                        <Crest src={m.homeCrest} code={m.homeCode} size={36} />
+                      </div>
+                    </div>
+
+                    <div className="flex-shrink-0 flex items-center gap-2">
+                      {isFinished || isLive ? (
+                        <div className="flex items-center gap-1.5 px-1.5">
+                          <span
+                            className={`font-display leading-none ${
+                              isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
+                            }`}
+                            style={{ fontFeatureSettings: '"tnum"' }}
+                          >
+                            {m.homeScore ?? "—"}
+                          </span>
+                          <span className="text-text-primary/40 text-lg">—</span>
+                          <span
+                            className={`font-display leading-none ${
+                              isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
+                            }`}
+                            style={{ fontFeatureSettings: '"tnum"' }}
+                          >
+                            {m.awayScore ?? "—"}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={0}
+                            max={20}
+                            value={draft.home}
+                            onChange={(e) => updateDraft(m.id, "home", e.target.value)}
+                            placeholder="0"
+                            className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
+                              isTouched
+                                ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
+                                : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
+                            }`}
+                            style={{ border: "2px solid" }}
+                          />
+                          <span className="text-text-primary/40 font-bold">—</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={20}
+                            value={draft.away}
+                            onChange={(e) => updateDraft(m.id, "away", e.target.value)}
+                            placeholder="0"
+                            className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
+                              isTouched
+                                ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
+                                : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
+                            }`}
+                            style={{ border: "2px solid" }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-2">
+                        <Crest src={m.awayCrest} code={m.awayCode} size={36} />
+                        <p className="font-semibold text-[13px] text-text-primary truncate">
+                          {m.awayTeam}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Finished-match chip: tier-coloured single pill */}
+                  {isFinished && m.userPrediction ? (
+                    <div className="mt-3 flex justify-center">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-bold uppercase tracking-[0.08em] ${pointsTierClasses(
+                          m.pointsEarned ?? 0,
+                        )}`}
+                      >
+                        Tu {m.userPrediction.home}-{m.userPrediction.away} ·{" "}
+                        {(m.pointsEarned ?? 0) > 0 ? `+${m.pointsEarned}` : "0"} pts
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Variant 6 — Vertical timeline ───────────────────────────────────
 function VariantTimeline() {
   const groups: Record<string, SampleMatch[]> = {
@@ -414,6 +623,13 @@ const VARIANTS: { key: string; label: string; description: string; render: () =>
     label: "6 — Vertical timeline",
     description: "Left-rail timeline nodes with match rows on each.",
     render: () => <VariantTimeline />,
+  },
+  {
+    key: "polished",
+    label: "7 — Polished current UI (visual-only, RECOMMENDED)",
+    description:
+      "Same accordion + all-scores-at-once + auto-jump UX you have today. Six layered polish changes: lp-card group, lp-section-title header, 3px status accent, kickoff pill, gold/amber input glow, tier-coloured finished chip.",
+    render: () => <VariantPolishedCurrent />,
   },
 ];
 
