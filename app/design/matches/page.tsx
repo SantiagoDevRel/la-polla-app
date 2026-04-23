@@ -49,6 +49,34 @@ const MATCHES: SampleMatch[] = [
     userPrediction: { home: 2, away: 1 },
   },
   {
+    id: "m1b",
+    homeTeam: "Rayo Vallecano",
+    homeCode: "RAY",
+    homeCrest: "https://crests.football-data.org/87.png",
+    homeColor: "#e53935",
+    awayTeam: "RCD Espanyol",
+    awayCode: "ESP",
+    awayCrest: "https://crests.football-data.org/80.png",
+    awayColor: "#005bac",
+    phase: "Jornada 33",
+    date: new Date(NOW + 26 * 60 * 60 * 1000),
+    status: "scheduled",
+  },
+  {
+    id: "m1c",
+    homeTeam: "Real Oviedo",
+    homeCode: "OVI",
+    homeCrest: "https://crests.football-data.org/1048.png",
+    homeColor: "#002f87",
+    awayTeam: "Villarreal CF",
+    awayCode: "VIL",
+    awayCrest: "https://crests.football-data.org/94.png",
+    awayColor: "#ffde17",
+    phase: "Jornada 33",
+    date: new Date(NOW + 28 * 60 * 60 * 1000),
+    status: "scheduled",
+  },
+  {
     id: "m2",
     homeTeam: "Real Madrid",
     homeCode: "RMA",
@@ -341,20 +369,30 @@ function VariantTinted({ m }: { m: SampleMatch }) {
 
 // ─── Variant 7 — Polished current UI (visual-only) ───────────────────
 //
-// Same structure the Partidos tab ships today (grouped accordion,
-// full list of match rows, score inputs side-by-side, auto-jump to
-// next row). Only visual polish layered on:
-//   • Group container → .lp-card translucency
-//   • Group header → .lp-section-title typography
-//   • Left-edge status accent bar per match row (3px)
-//   • Kickoff time as a compact pill top-right instead of full bar
-//   • Score inputs with rounded-[14px] + gold focus glow +
-//     amber "unsaved touched" border
-//   • Finished-match single pill "TU 2-1 · +5 PTS" with tier colour
+// Structure re-ordered into three status-driven sections that read as
+// a natural timeline: past → present → future.
+//
+//   • Finalizados   — collapsed by default. Tap the header to expand
+//                      and browse history with tier-coloured points.
+//   • En vivo       — always visible, locked display (no editing).
+//   • Próximos      — always visible, editable inputs with auto-jump
+//                      between upcoming matches only.
+//
+// Visual polish identical across sections: .lp-card container,
+// .lp-section-title headers, 3px left-edge status accent bar,
+// compact kickoff pill top-right, gold/amber input glow, tier-
+// coloured finished chip. Auto-jump only moves between scheduled
+// rows so live/finished never steal focus mid-typing.
 function VariantPolishedCurrent() {
-  const [open, setOpen] = useState(true);
+  const [finishedOpen, setFinishedOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
   const [touched, setTouched] = useState<Set<string>>(new Set());
+  const awayInputRefs = useState(() => new Map<string, HTMLInputElement | null>())[0];
+  const homeInputRefs = useState(() => new Map<string, HTMLInputElement | null>())[0];
+
+  const upcoming = MATCHES.filter((m) => m.status === "scheduled");
+  const live = MATCHES.filter((m) => m.status === "live");
+  const finished = MATCHES.filter((m) => m.status === "finished");
 
   function updateDraft(id: string, side: "home" | "away", v: string) {
     setDrafts((p) => ({
@@ -364,11 +402,23 @@ function VariantPolishedCurrent() {
     setTouched((p) => new Set(p).add(id));
   }
 
+  function jumpToNextUpcoming(fromId: string) {
+    const idx = upcoming.findIndex((m) => m.id === fromId);
+    for (let i = idx + 1; i < upcoming.length; i++) {
+      const next = upcoming[i];
+      const el = homeInputRefs.get(next.id);
+      if (el) {
+        el.focus();
+        el.select();
+        return;
+      }
+    }
+  }
+
   function statusAccent(m: SampleMatch): string {
     if (m.status === "live") return "#FF3D57";
     if (m.status === "finished" && (m.pointsEarned ?? 0) >= 3) return "#1FD87F";
     if (m.status === "finished") return "rgba(255,255,255,0.08)";
-    if (m.status === "locked") return "rgba(255,255,255,0.08)";
     return "#FFD700";
   }
 
@@ -380,168 +430,214 @@ function VariantPolishedCurrent() {
     return "bg-bg-elevated text-text-primary/50 border-border-subtle";
   }
 
-  return (
-    <div className="lp-card overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3"
-        aria-expanded={open}
+  function MatchRow({ m, editable }: { m: SampleMatch; editable: boolean }) {
+    const isFinished = m.status === "finished";
+    const isLive = m.status === "live";
+    const isTouched = touched.has(m.id);
+    const draft = drafts[m.id] ?? {
+      home: m.userPrediction?.home?.toString() ?? "",
+      away: m.userPrediction?.away?.toString() ?? "",
+    };
+
+    return (
+      <div
+        className="relative rounded-lg overflow-hidden flex"
+        style={{
+          backgroundColor: "rgba(14, 20, 32, 0.55)",
+          border: "1px solid var(--border-subtle)",
+        }}
       >
-        <span className="lp-section-title" style={{ fontSize: 16 }}>
-          23 DE ABRIL <span className="text-text-primary/60 font-normal">· 3</span>
-        </span>
-        <ChevronDown
-          className={`w-4 h-4 text-text-primary/70 transition-transform ${open ? "rotate-180" : ""}`}
+        {/* 3px left-edge status accent */}
+        <div
+          className={isLive ? "animate-pulse" : ""}
+          style={{ width: 3, background: statusAccent(m), flexShrink: 0 }}
         />
-      </button>
-      {open && (
-        <div className="space-y-3 px-3 pb-3">
-          {MATCHES.map((m) => {
-            const isFinished = m.status === "finished";
-            const isLive = m.status === "live";
-            const isTouched = touched.has(m.id);
-            const draft = drafts[m.id] ?? {
-              home: m.userPrediction?.home?.toString() ?? "",
-              away: m.userPrediction?.away?.toString() ?? "",
-            };
-            return (
-              <div
-                key={m.id}
-                className="relative rounded-lg overflow-hidden flex"
-                style={{
-                  backgroundColor: "rgba(14, 20, 32, 0.55)",
-                  border: "1px solid var(--border-subtle)",
-                }}
-              >
-                {/* Left status accent bar (3px). Colors: live=red
-                    pulsing, upcoming=gold, finished-with-points=green,
-                    finished/locked=muted. */}
-                <div
-                  className={isLive ? "animate-pulse" : ""}
-                  style={{
-                    width: 3,
-                    background: statusAccent(m),
-                    flexShrink: 0,
-                  }}
-                />
+        <div className="flex-1 min-w-0 p-3">
+          {/* Kickoff pill top-right */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60">
+              {m.phase}
+            </span>
+            {isLive ? (
+              <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
+                En vivo · {m.elapsed}&apos;
+              </span>
+            ) : isFinished ? (
+              <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-bg-elevated border border-border-subtle text-text-primary/70 text-[10px] font-bold uppercase tracking-[0.08em]">
+                Final
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-gold/10 border border-gold/30 text-gold text-[10px] font-bold uppercase tracking-[0.08em]">
+                {formatKickoff(m.date)}
+              </span>
+            )}
+          </div>
 
-                <div className="flex-1 min-w-0 p-3">
-                  {/* Kickoff pill top-right */}
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60">
-                      {m.phase}
-                    </span>
-                    {isLive ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
-                        En vivo · {m.elapsed}&apos;
-                      </span>
-                    ) : isFinished ? (
-                      <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-bg-elevated border border-border-subtle text-text-primary/70 text-[10px] font-bold uppercase tracking-[0.08em]">
-                        Final
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-gold/10 border border-gold/30 text-gold text-[10px] font-bold uppercase tracking-[0.08em]">
-                        {formatKickoff(m.date)}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Row — home | score | away */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <p className="font-semibold text-[13px] text-text-primary truncate">
-                          {m.homeTeam}
-                        </p>
-                        <Crest src={m.homeCrest} code={m.homeCode} size={36} />
-                      </div>
-                    </div>
-
-                    <div className="flex-shrink-0 flex items-center gap-2">
-                      {isFinished || isLive ? (
-                        <div className="flex items-center gap-1.5 px-1.5">
-                          <span
-                            className={`font-display leading-none ${
-                              isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
-                            }`}
-                            style={{ fontFeatureSettings: '"tnum"' }}
-                          >
-                            {m.homeScore ?? "—"}
-                          </span>
-                          <span className="text-text-primary/40 text-lg">—</span>
-                          <span
-                            className={`font-display leading-none ${
-                              isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
-                            }`}
-                            style={{ fontFeatureSettings: '"tnum"' }}
-                          >
-                            {m.awayScore ?? "—"}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min={0}
-                            max={20}
-                            value={draft.home}
-                            onChange={(e) => updateDraft(m.id, "home", e.target.value)}
-                            placeholder="0"
-                            className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
-                              isTouched
-                                ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
-                                : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
-                            }`}
-                            style={{ border: "2px solid" }}
-                          />
-                          <span className="text-text-primary/40 font-bold">—</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={20}
-                            value={draft.away}
-                            onChange={(e) => updateDraft(m.id, "away", e.target.value)}
-                            placeholder="0"
-                            className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
-                              isTouched
-                                ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
-                                : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
-                            }`}
-                            style={{ border: "2px solid" }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="flex items-center gap-2">
-                        <Crest src={m.awayCrest} code={m.awayCode} size={36} />
-                        <p className="font-semibold text-[13px] text-text-primary truncate">
-                          {m.awayTeam}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Finished-match chip: tier-coloured single pill */}
-                  {isFinished && m.userPrediction ? (
-                    <div className="mt-3 flex justify-center">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-bold uppercase tracking-[0.08em] ${pointsTierClasses(
-                          m.pointsEarned ?? 0,
-                        )}`}
-                      >
-                        Tu {m.userPrediction.home}-{m.userPrediction.away} ·{" "}
-                        {(m.pointsEarned ?? 0) > 0 ? `+${m.pointsEarned}` : "0"} pts
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0 text-right">
+              <div className="flex items-center justify-end gap-2">
+                <p className="font-semibold text-[13px] text-text-primary truncate">
+                  {m.homeTeam}
+                </p>
+                <Crest src={m.homeCrest} code={m.homeCode} size={36} />
               </div>
-            );
-          })}
+            </div>
+
+            <div className="flex-shrink-0 flex items-center gap-2">
+              {!editable ? (
+                <div className="flex items-center gap-1.5 px-1.5">
+                  <span
+                    className={`font-display leading-none ${
+                      isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
+                    }`}
+                    style={{ fontFeatureSettings: '"tnum"' }}
+                  >
+                    {m.homeScore ?? "—"}
+                  </span>
+                  <span className="text-text-primary/40 text-lg">—</span>
+                  <span
+                    className={`font-display leading-none ${
+                      isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
+                    }`}
+                    style={{ fontFeatureSettings: '"tnum"' }}
+                  >
+                    {m.awayScore ?? "—"}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={(el) => { homeInputRefs.set(m.id, el); }}
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={draft.home}
+                    onChange={(e) => {
+                      updateDraft(m.id, "home", e.target.value);
+                      if (e.target.value.length >= 1) {
+                        awayInputRefs.get(m.id)?.focus();
+                      }
+                    }}
+                    placeholder="0"
+                    className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
+                      isTouched
+                        ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
+                        : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
+                    }`}
+                    style={{ border: "2px solid" }}
+                  />
+                  <span className="text-text-primary/40 font-bold">—</span>
+                  <input
+                    ref={(el) => { awayInputRefs.set(m.id, el); }}
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={draft.away}
+                    onChange={(e) => {
+                      updateDraft(m.id, "away", e.target.value);
+                      if (e.target.value.length >= 1) {
+                        jumpToNextUpcoming(m.id);
+                      }
+                    }}
+                    placeholder="0"
+                    className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
+                      isTouched
+                        ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
+                        : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
+                    }`}
+                    style={{ border: "2px solid" }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0 text-left">
+              <div className="flex items-center gap-2">
+                <Crest src={m.awayCrest} code={m.awayCode} size={36} />
+                <p className="font-semibold text-[13px] text-text-primary truncate">
+                  {m.awayTeam}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Locked-but-predicted line for live rows */}
+          {isLive && m.userPrediction ? (
+            <div className="mt-2 text-center">
+              <p className="text-[11px] text-text-primary/70">
+                Tu pronóstico · {m.userPrediction.home}-{m.userPrediction.away}
+              </p>
+            </div>
+          ) : null}
+
+          {isFinished && m.userPrediction ? (
+            <div className="mt-3 flex justify-center">
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-bold uppercase tracking-[0.08em] ${pointsTierClasses(
+                  m.pointsEarned ?? 0,
+                )}`}
+              >
+                Tu {m.userPrediction.home}-{m.userPrediction.away} ·{" "}
+                {(m.pointsEarned ?? 0) > 0 ? `+${m.pointsEarned}` : "0"} pts
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Finalizados — collapsed by default */}
+      {finished.length > 0 && (
+        <div className="lp-card overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setFinishedOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3"
+            aria-expanded={finishedOpen}
+          >
+            <span className="lp-section-title flex items-center gap-2" style={{ fontSize: 14 }}>
+              <Lock className="w-3.5 h-3.5 text-text-primary/60" /> Finalizados
+              <span className="text-text-primary/60 font-normal">· {finished.length}</span>
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 text-text-primary/70 transition-transform ${finishedOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {finishedOpen && (
+            <div className="space-y-3 px-3 pb-3">
+              {finished.map((m) => <MatchRow key={m.id} m={m} editable={false} />)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* En vivo — always visible, locked display */}
+      {live.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="lp-section-title flex items-center gap-2 px-1" style={{ fontSize: 14 }}>
+            <span className="w-2 h-2 rounded-full bg-red-alert animate-pulse" /> En vivo
+            <span className="text-text-primary/60 font-normal">· {live.length}</span>
+          </h3>
+          <div className="space-y-3">
+            {live.map((m) => <MatchRow key={m.id} m={m} editable={false} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Próximos — editable with auto-jump */}
+      {upcoming.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="lp-section-title flex items-center gap-2 px-1" style={{ fontSize: 14 }}>
+            <Clock className="w-3.5 h-3.5 text-gold" /> Próximos
+            <span className="text-text-primary/60 font-normal">· {upcoming.length}</span>
+          </h3>
+          <div className="space-y-3">
+            {upcoming.map((m) => <MatchRow key={m.id} m={m} editable={true} />)}
+          </div>
         </div>
       )}
     </div>
@@ -626,9 +722,9 @@ const VARIANTS: { key: string; label: string; description: string; render: () =>
   },
   {
     key: "polished",
-    label: "7 — Polished current UI (visual-only, RECOMMENDED)",
+    label: "7 — Polished + timeline ordering (RECOMMENDED)",
     description:
-      "Same accordion + all-scores-at-once + auto-jump UX you have today. Six layered polish changes: lp-card group, lp-section-title header, 3px status accent, kickoff pill, gold/amber input glow, tier-coloured finished chip.",
+      "Three status-driven sections stacked past → present → future: Finalizados (collapsed, optional), En vivo (locked display), Próximos (editable with auto-jump between upcoming rows only). All the visual polish from variant 7 applied. Drops the por-fecha/por-fase toggle in favour of status grouping.",
     render: () => <VariantPolishedCurrent />,
   },
 ];
