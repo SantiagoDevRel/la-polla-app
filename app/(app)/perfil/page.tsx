@@ -115,7 +115,7 @@ export default function PerfilPage() {
 
       <main className="max-w-lg mx-auto px-4 space-y-6 -mt-1">
         {/* Avatar + name */}
-        <div className="lp-card p-6 flex flex-col items-center">
+        <div className="flex flex-col items-center">
           <button
             type="button"
             onClick={() => setShowAvatarPicker(!showAvatarPicker)}
