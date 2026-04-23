@@ -797,10 +797,13 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 3b - Rival callout (only when we have a neighbour) */}
+          {/* Block 3b - Rival callout (only when we have a neighbour).
+              Deep-links straight to the ranking tab so the user lands on
+              the leaderboard where the rival actually lives, not the
+              default Partidos view. */}
           {rival ? (
             <RivalChip
-              pollaHref={`/pollas/${rival.pollaSlug}`}
+              pollaHref={`/pollas/${rival.pollaSlug}?tab=ranking`}
               pollaName={rival.pollaName}
               rivalName={rival.rivalName}
               rivalPollitoType={rival.rivalPollitoType}
