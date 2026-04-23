@@ -9,13 +9,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import Image from "next/image";
 import { Drawer } from "vaul";
 import { Home, Bell, Bookmark, User, Plus, KeyRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/components/ui/Toast";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
-import { DEFAULT_POLLITO, getPollitoByPosition } from "@/lib/pollitos";
 
 type NavKey = "inicio" | "avisos" | "pollas" | "perfil";
 
@@ -25,8 +23,6 @@ export interface BottomNavProps {
   onCreatePolla?: () => void;
   /** Count of unread avisos; shows a red badge on the Avisos tab when > 0. */
   notifUnread?: number;
-  /** User's pollito type (from users.avatar_url). Drives the FAB face. */
-  fabPollito?: string;
 }
 
 const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; label: string }> = [
@@ -88,7 +84,7 @@ function TabItem({
   );
 }
 
-export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0, fabPollito = DEFAULT_POLLITO }: BottomNavProps) {
+export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }: BottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast();
@@ -130,22 +126,7 @@ export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0, 
             className={fabClass}
             style={fabStyle}
           >
-            <span className="relative w-[46px] h-[46px] rounded-full overflow-hidden bg-bg-base/10">
-              <Image
-                src={getPollitoByPosition(fabPollito, 1, 1)}
-                alt=""
-                fill
-                sizes="46px"
-                className="object-cover"
-                priority
-              />
-            </span>
-            <span
-              className="absolute -bottom-0.5 -right-0.5 w-[20px] h-[20px] rounded-full bg-turf border-[2px] border-bg-base flex items-center justify-center"
-              aria-hidden="true"
-            >
-              <Plus className="w-3 h-3 text-bg-base" strokeWidth={3.5} />
-            </span>
+            <Plus className="w-7 h-7 text-bg-base" strokeWidth={3} aria-hidden="true" />
           </button>
 
           <div className="flex-1 flex">
