@@ -1,38 +1,57 @@
-// components/layout/SplashScreen.tsx — First-visit splash
+// components/layout/SplashScreen.tsx — Stadium splash screen
 //
-// Plays the stadium loop once per session over a fullscreen black layer,
-// then cross-fades into the app after ~3 seconds. Session-scoped via
-// sessionStorage so internal navigations do not replay it. Respects
-// prefers-reduced-motion by bailing instantly (no splash, no fade).
+// Plays the stadium loop over a fullscreen layer with the LA POLLA
+// wordmark, then cross-fades into the app. Fires:
+//   - On the very first navigation of a session (anywhere in the app).
+//   - Every time the user navigates INTO /inicio or /perfil from another
+//     route. Staying on the route does not replay (pathname has to
+//     change).
 //
-// Mounts inside the root <body> so it paints above every layout. While
-// visible it blocks pointer events on the underlying app so taps during
-// the splash do not register on buttons below.
+// Respects prefers-reduced-motion by bailing instantly (no splash, no
+// fade). Blocks pointer events while visible so taps during playback
+// never reach underlying UI.
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
-const SEEN_KEY = "lp_splash_seen_v1";
-const TOTAL_MS = 3200; // total on-screen time
-const FADE_MS = 500;   // fade-out duration at the tail
+const TOTAL_MS = 3200;
+const FADE_MS = 500;
+const REPLAY_ROUTES = ["/inicio", "/perfil"];
+
+type Phase = "idle" | "playing" | "fading";
+
+function shouldReplayOn(path: string | null): boolean {
+  if (!path) return false;
+  return REPLAY_ROUTES.some((r) => path === r || path.startsWith(`${r}/`));
+}
 
 export function SplashScreen() {
-  const [phase, setPhase] = useState<"pending" | "playing" | "fading" | "done">(
-    "pending",
-  );
+  const pathname = usePathname();
+  const prevPath = useRef<string | null>(null);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [mediaOk, setMediaOk] = useState(true);
+
+  // Check prefers-reduced-motion once. Users who opted out skip the
+  // splash entirely (no flash, no fade).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setMediaOk(!window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }, []);
 
   useEffect(() => {
-    // Respect reduced-motion preferences first.
-    const reduce =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!mediaOk) {
+      prevPath.current = pathname;
+      return;
+    }
 
-    const alreadySeen =
-      typeof window !== "undefined" && sessionStorage.getItem(SEEN_KEY) === "1";
+    const firstMount = prevPath.current === null;
+    const enteringReplayRoute =
+      prevPath.current !== pathname && shouldReplayOn(pathname);
 
-    if (reduce || alreadySeen) {
-      setPhase("done");
+    if (!firstMount && !enteringReplayRoute) {
+      prevPath.current = pathname;
       return;
     }
 
@@ -42,20 +61,17 @@ export function SplashScreen() {
       TOTAL_MS - FADE_MS,
     );
     const doneTimer = window.setTimeout(() => {
-      setPhase("done");
-      try {
-        sessionStorage.setItem(SEEN_KEY, "1");
-      } catch {
-        /* storage unavailable; splash will replay on next mount */
-      }
+      setPhase("idle");
     }, TOTAL_MS);
+
+    prevPath.current = pathname;
     return () => {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(doneTimer);
     };
-  }, []);
+  }, [pathname, mediaOk]);
 
-  if (phase === "done" || phase === "pending") return null;
+  if (phase === "idle") return null;
 
   return (
     <div
@@ -73,27 +89,32 @@ export function SplashScreen() {
         preload="auto"
         poster="/la-polla-background-poster.webp"
         className="absolute inset-0 w-full h-full object-cover"
+        key={pathname /* restart video each replay */}
       >
         <source src="/la-polla-background.webm" type="video/webm" />
         <source src="/la-polla-background-lite.mp4" type="video/mp4" />
       </video>
-      {/* Wordmark centred on top of the looping footage */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <div
-          className="font-display text-gold"
+          className="font-display"
           style={{
-            fontSize: 52,
-            letterSpacing: "0.14em",
-            textShadow: "0 0 30px rgba(255,215,0,0.45)",
+            fontSize: 48,
+            letterSpacing: "0.04em",
+            display: "flex",
+            gap: "8px",
+            WebkitTextStroke: "1.5px #000",
+            textShadow: "0 4px 14px rgba(0,0,0,0.55)",
+            paintOrder: "stroke fill",
           }}
         >
-          LA POLLA
+          <span style={{ color: "#FFD700" }}>LA</span>
+          <span style={{ color: "#2F6DF4" }}>POLLA</span>
+          <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
         </div>
-        <div className="mt-2 text-[11px] uppercase tracking-[0.24em] text-text-secondary">
+        <div className="mt-3 text-[11px] uppercase tracking-[0.24em] text-text-secondary">
           La polla deportiva de tus amigos
         </div>
       </div>
-      {/* Subtle vignette so edges feel intentional, not raw video */}
       <div
         className="absolute inset-0"
         style={{

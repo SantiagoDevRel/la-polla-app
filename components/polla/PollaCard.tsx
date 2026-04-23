@@ -71,9 +71,13 @@ export function PollaCard({
         isLeader
           ? {
               background:
-                "linear-gradient(180deg, rgba(255, 215, 0, 0.06) 0%, var(--bg-card) 100%)",
+                "linear-gradient(180deg, rgba(255, 215, 0, 0.08) 0%, rgba(14, 20, 32, 0.94) 100%)",
+              backdropFilter: "blur(4px)",
             }
-          : { background: "var(--bg-card)" }
+          : {
+              background: "rgba(14, 20, 32, 0.94)",
+              backdropFilter: "blur(4px)",
+            }
       }
     >
       {isLeader ? (

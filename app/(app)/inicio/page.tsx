@@ -719,8 +719,18 @@ export default async function InicioPage() {
               height={54}
               style={{ objectFit: "contain" }}
             />
-            <span className="font-body text-gold text-[20px] font-bold tracking-[0.08em]">
-              La Polla
+            <span
+              className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[4px]"
+              style={{
+                fontSize: 22,
+                WebkitTextStroke: "1px #000",
+                textShadow: "0 2px 4px rgba(0,0,0,0.4)",
+                paintOrder: "stroke fill",
+              }}
+            >
+              <span style={{ color: "#FFD700" }}>LA</span>
+              <span style={{ color: "#2F6DF4" }}>POLLA</span>
+              <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
             </span>
           </Link>
           <Link

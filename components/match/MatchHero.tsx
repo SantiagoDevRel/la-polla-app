@@ -99,7 +99,7 @@ export function MatchHero({
       )}
       style={{
         background:
-          "linear-gradient(180deg, rgba(255, 215, 0, 0.06) 0%, var(--bg-card) 50%)",
+          "linear-gradient(180deg, rgba(255, 215, 0, 0.06) 0%, rgba(14, 20, 32, 0.82) 50%)",
       }}
     >
       {/* top-right gold glow */}
