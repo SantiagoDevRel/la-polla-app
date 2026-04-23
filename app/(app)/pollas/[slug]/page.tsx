@@ -14,7 +14,7 @@ import InviteModal from "@/components/polla/InviteModal";
 import PhoneInput from "@/components/ui/PhoneInput";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import TournamentBadge from "@/components/shared/TournamentBadge";
-import { getTournamentBySlug } from "@/lib/tournaments";
+import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { getPollitoByPosition } from "@/lib/pollitos";
 import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, Goal, ChevronDown, Clock } from "lucide-react";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
@@ -108,6 +108,69 @@ function formatKickoffShort(iso: string): string {
   }).format(new Date(iso));
 }
 
+// Group date key (YYYY-MM-DD in the user's local timezone) used to bucket
+// upcoming matches by kickoff day. Local timezone matters so a match at
+// 19:30 CO time on Apr 24 never sneaks into the Apr 25 bucket just
+// because UTC rolls over.
+function dateKey(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Human-friendly date header, e.g. "HOY · MIÉ 23 ABR" or "JUEVES 24 ABR".
+function formatDateHeader(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  const isTomorrow = d.toDateString() === tomorrow.toDateString();
+  const base = new Intl.DateTimeFormat("es-CO", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  }).format(d);
+  const pretty = base.replace(/\./g, "").toUpperCase();
+  if (sameDay) return `HOY · ${pretty}`;
+  if (isTomorrow) return `MAÑANA · ${pretty}`;
+  return pretty;
+}
+
+// Spanish labels for the phase column. When the match sits in a league
+// format (regular_season / league_stage) the tournament name — with its
+// own logo — replaces the phase label so "regular_season" never leaks
+// into the UI.
+const PHASE_ES: Record<string, string> = {
+  group_stage: "Fase de grupos",
+  round_of_32: "16avos",
+  round_of_16: "Octavos",
+  quarter_finals: "Cuartos",
+  semi_finals: "Semifinales",
+  final: "Final",
+  third_place: "Tercer puesto",
+  playoff: "Repechaje",
+};
+
+function isLeagueFormatPhase(phase: string | null | undefined): boolean {
+  if (!phase) return false;
+  const p = phase.toLowerCase();
+  return p === "regular_season" || p === "league_stage";
+}
+
+function phaseLabel(phase: string | null | undefined, tournamentSlug: string): string {
+  if (!phase || isLeagueFormatPhase(phase)) {
+    return getTournamentName(tournamentSlug) ?? "Liga";
+  }
+  const normalised = phase.toLowerCase();
+  return (
+    PHASE_ES[normalised] ??
+    phase.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
 function pointsTierClasses(points: number): string {
   if (points >= 5) return "bg-gold/15 text-gold border-gold/30";
   if (points >= 3) return "bg-turf/15 text-turf border-turf/30";
@@ -134,6 +197,10 @@ interface MatchRowProps {
   onJumpNext: () => void;
   homeRef: ((el: HTMLInputElement | null) => void) | null;
   awayRef: ((el: HTMLInputElement | null) => void) | null;
+  /** Polla's tournament slug. Drives the league-format phase label
+   *  fallback so regular_season rows surface the tournament name +
+   *  logo instead of raw enum text. */
+  tournamentSlug: string;
 }
 
 function MatchRow({
@@ -146,6 +213,7 @@ function MatchRow({
   onJumpNext,
   homeRef,
   awayRef,
+  tournamentSlug,
 }: MatchRowProps) {
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
@@ -172,10 +240,21 @@ function MatchRow({
         style={{ width: 3, background: accent, flexShrink: 0 }}
       />
       <div className="flex-1 min-w-0 p-3">
-        {/* Phase label + kickoff pill */}
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60 truncate">
-            {match.phase ?? ""}
+        {/* Phase label + kickoff pill. League-format matches get the
+            tournament logo + name; knockout phases get the Spanish
+            phase translation. */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] text-text-primary/70 truncate">
+            {isLeagueFormatPhase(match.phase) && TOURNAMENT_ICONS[tournamentSlug] ? (
+              <Image
+                src={TOURNAMENT_ICONS[tournamentSlug]!}
+                alt=""
+                width={12}
+                height={12}
+                className="object-contain flex-shrink-0"
+              />
+            ) : null}
+            <span className="truncate">{phaseLabel(match.phase, tournamentSlug)}</span>
           </span>
           {isLive ? (
             <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
@@ -344,6 +423,10 @@ export default function PollaSlugPage() {
   const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
   const [finishedOpen, setFinishedOpen] = useState(false);
+  // Which upcoming-date groups are currently expanded. Defaults to the
+  // earliest date on load so the next action is always visible; users
+  // can collapse days they do not care about and expand the rest.
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
   // Status-grouped partitions driving the Partidos tab. Timeline order:
   // Finalizados (collapsed history) → En vivo (locked display) →
@@ -370,9 +453,47 @@ export default function PollaSlugPage() {
     [matches],
   );
 
-  // Focus the home input of the next upcoming match (after `fromId`). Used
-  // by the auto-jump on the away-input's second digit. Only walks the
-  // upcoming list so focus never lands on a live / finished row.
+  // Upcoming matches bucketed by local calendar date, in chronological
+  // order. Each group gets a collapsible header in the Próximos section.
+  const upcomingByDate = useMemo(() => {
+    const bucketMap = new Map<string, Match[]>();
+    for (const m of upcomingMatches) {
+      const key = dateKey(m.scheduled_at);
+      const list = bucketMap.get(key);
+      if (list) list.push(m);
+      else bucketMap.set(key, [m]);
+    }
+    return Array.from(bucketMap.entries()).map(([key, list]) => ({
+      key,
+      matches: list,
+    }));
+  }, [upcomingMatches]);
+
+  // Auto-expand the first upcoming date on mount / when the list
+  // changes. Preserves any user toggles on later dates by only touching
+  // the set when it is currently empty or missing the earliest date.
+  useEffect(() => {
+    if (upcomingByDate.length === 0) return;
+    setExpandedDates((prev) => {
+      if (prev.size > 0) return prev;
+      return new Set([upcomingByDate[0].key]);
+    });
+  }, [upcomingByDate]);
+
+  function toggleDate(key: string) {
+    setExpandedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  // Focus the home input of the next upcoming match (after `fromId`).
+  // Only walks the upcoming list so focus never lands on a live /
+  // finished row. If the target match lives in a collapsed date group,
+  // expand it first and defer focus to the next frame so the input DOM
+  // exists when focus() fires.
   function focusNextUpcomingHome(fromId: string) {
     const idx = upcomingMatches.findIndex((m) => m.id === fromId);
     for (let i = idx + 1; i < upcomingMatches.length; i++) {
@@ -382,6 +503,17 @@ export default function PollaSlugPage() {
         el.focus();
         return;
       }
+      const nextKey = dateKey(next.scheduled_at);
+      setExpandedDates((prev) => {
+        if (prev.has(nextKey)) return prev;
+        const updated = new Set(prev);
+        updated.add(nextKey);
+        return updated;
+      });
+      requestAnimationFrame(() => {
+        homeInputRefs.current[next.id]?.focus();
+      });
+      return;
     }
   }
   // PhoneInput emits the full E.164 string (e.g. "+573001234567"). The invite
@@ -740,14 +872,16 @@ export default function PollaSlugPage() {
                 <p className="text-text-primary">No hay partidos cargados aun. Los partidos se actualizaran cuando el calendario sea confirmado.</p>
               </div>
             ) : (
-              <div className="space-y-4 pb-32">
-                {/* ── Finalizados — collapsed by default, optional history ── */}
+              <div className="space-y-5 pb-32">
+                {/* ── Finalizados — plain collapsible header, match cards
+                    render directly below without a surrounding card so
+                    we avoid the "card-in-card" look. ── */}
                 {finishedMatches.length > 0 && (
-                  <div className="lp-card overflow-hidden" style={{ backgroundColor: "rgba(14, 20, 32, 0.4)" }}>
+                  <div className="space-y-2">
                     <button
                       type="button"
                       onClick={() => setFinishedOpen((v) => !v)}
-                      className="w-full flex items-center justify-between px-4 py-3"
+                      className="w-full flex items-center justify-between px-1 py-1"
                       aria-expanded={finishedOpen}
                     >
                       <span className="lp-section-title flex items-center gap-2" style={{ fontSize: 14 }}>
@@ -761,7 +895,7 @@ export default function PollaSlugPage() {
                       />
                     </button>
                     {finishedOpen && (
-                      <div className="space-y-3 px-3 pb-3">
+                      <div className="space-y-3">
                         {finishedMatches.map((match) => (
                           <MatchRow
                             key={match.id}
@@ -774,6 +908,7 @@ export default function PollaSlugPage() {
                             onJumpNext={() => { /* not editable */ }}
                             homeRef={null}
                             awayRef={null}
+                            tournamentSlug={polla.tournament}
                           />
                         ))}
                       </div>
@@ -802,43 +937,73 @@ export default function PollaSlugPage() {
                           onJumpNext={() => { /* not editable */ }}
                           homeRef={null}
                           awayRef={null}
+                          tournamentSlug={polla.tournament}
                         />
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* ── Próximos — editable inputs with auto-jump between them ── */}
+                {/* ── Próximos — grouped by kickoff day; each day is a
+                    plain collapsible (no surrounding card). First day
+                    expanded by default. Auto-jump across days works
+                    because focusNextUpcomingHome auto-expands the
+                    target group when it is collapsed. ── */}
                 {upcomingMatches.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <h3 className="lp-section-title flex items-center gap-2 px-1" style={{ fontSize: 14 }}>
                       <Clock className="w-3.5 h-3.5 text-gold" />
                       Próximos
                       <span className="text-text-primary/60 font-normal">· {upcomingMatches.length}</span>
                     </h3>
-                    <div className="space-y-3">
-                      {upcomingMatches.map((match) => (
-                        <MatchRow
-                          key={match.id}
-                          match={match}
-                          pred={getPred(match.id)}
-                          draft={drafts[match.id]}
-                          editable={true}
-                          touched={touchedMatches.has(match.id)}
-                          onDraftChange={(side, val) => {
-                            const cur = drafts[match.id] ?? { home: "", away: "" };
-                            setDrafts((prev) => ({ ...prev, [match.id]: { ...cur, [side]: val } }));
-                            setTouchedMatches((prev) => new Set(prev).add(match.id));
-                            if (side === "home" && val.length >= 1) {
-                              awayInputRefs.current[match.id]?.focus();
-                            }
-                          }}
-                          onJumpNext={() => focusNextUpcomingHome(match.id)}
-                          homeRef={(el) => { homeInputRefs.current[match.id] = el; }}
-                          awayRef={(el) => { awayInputRefs.current[match.id] = el; }}
-                        />
-                      ))}
-                    </div>
+                    {upcomingByDate.map((group) => {
+                      const open = expandedDates.has(group.key);
+                      return (
+                        <div key={group.key} className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleDate(group.key)}
+                            className="w-full flex items-center justify-between px-1 py-1"
+                            aria-expanded={open}
+                          >
+                            <span className="text-[11px] font-bold tracking-[0.08em] uppercase text-text-primary/80">
+                              {formatDateHeader(group.matches[0].scheduled_at)}
+                              <span className="text-text-primary/50 font-normal ml-1.5">· {group.matches.length}</span>
+                            </span>
+                            <ChevronDown
+                              className={`w-4 h-4 text-text-primary/70 transition-transform ${open ? "rotate-180" : ""}`}
+                              aria-hidden="true"
+                            />
+                          </button>
+                          {open && (
+                            <div className="space-y-3">
+                              {group.matches.map((match) => (
+                                <MatchRow
+                                  key={match.id}
+                                  match={match}
+                                  pred={getPred(match.id)}
+                                  draft={drafts[match.id]}
+                                  editable={true}
+                                  touched={touchedMatches.has(match.id)}
+                                  onDraftChange={(side, val) => {
+                                    const cur = drafts[match.id] ?? { home: "", away: "" };
+                                    setDrafts((prev) => ({ ...prev, [match.id]: { ...cur, [side]: val } }));
+                                    setTouchedMatches((prev) => new Set(prev).add(match.id));
+                                    if (side === "home" && val.length >= 1) {
+                                      awayInputRefs.current[match.id]?.focus();
+                                    }
+                                  }}
+                                  onJumpNext={() => focusNextUpcomingHome(match.id)}
+                                  homeRef={(el) => { homeInputRefs.current[match.id] = el; }}
+                                  awayRef={(el) => { awayInputRefs.current[match.id] = el; }}
+                                  tournamentSlug={polla.tournament}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
