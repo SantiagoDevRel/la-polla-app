@@ -63,6 +63,9 @@ function mapMatchToRow(match: FDMatch, tournament: string) {
     home_score: match.score?.fullTime?.home ?? null,
     away_score: match.score?.fullTime?.away ?? null,
     status: mapStatus(match.status),
+    // Current minute while the match is live. football-data serves
+    // this at the top level on IN_PLAY / PAUSED states; null otherwise.
+    elapsed: match.minute ?? null,
   };
 }
 
