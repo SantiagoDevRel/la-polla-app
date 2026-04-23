@@ -469,14 +469,19 @@ export default function PollaSlugPage() {
     }));
   }, [upcomingMatches]);
 
-  // Auto-expand the first upcoming date on mount / when the list
-  // changes. Preserves any user toggles on later dates by only touching
-  // the set when it is currently empty or missing the earliest date.
+  // Default state: only TODAY's upcoming-date group starts expanded so
+  // people who open the polla can see the matches they need to
+  // predict right now. Everything else starts collapsed, including
+  // tomorrow and beyond. Users manually expand the days they care
+  // about. Preserves prior toggles by only touching the set while
+  // it is still empty.
   useEffect(() => {
     if (upcomingByDate.length === 0) return;
     setExpandedDates((prev) => {
       if (prev.size > 0) return prev;
-      return new Set([upcomingByDate[0].key]);
+      const todayKey = dateKey(new Date().toISOString());
+      const todayGroup = upcomingByDate.find((g) => g.key === todayKey);
+      return todayGroup ? new Set([todayKey]) : new Set();
     });
   }, [upcomingByDate]);
 
