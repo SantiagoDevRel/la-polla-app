@@ -60,17 +60,11 @@ export function PollaCard({
       href={`/pollas/${polla.slug}`}
       onClick={onTap}
       className={cn(
-        "relative block overflow-hidden rounded-lg border p-4 transition-transform duration-150 active:scale-[0.985]",
+        "relative block overflow-hidden p-4 transition-transform duration-150 active:scale-[0.985]",
+        isLeader ? "lp-card-hero" : "lp-card",
         isCarousel ? "w-[210px] flex-shrink-0" : "w-full",
-        isLeader
-          ? "border-gold/40 shadow-[0_0_30px_-10px_rgba(255,215,0,0.2)]"
-          : "border-border-subtle hover:border-border-default",
         endedState && "opacity-75",
       )}
-      style={{
-        backgroundColor: "rgba(14, 20, 32, 0.88)",
-        backdropFilter: "blur(4px)",
-      }}
     >
       {isLeader ? (
         <span

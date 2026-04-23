@@ -93,14 +93,9 @@ export function MatchHero({
     <Wrapper
       onClick={onTap}
       className={cn(
-        "relative block w-full overflow-hidden text-left",
-        "rounded-xl border border-gold/25 p-5",
+        "lp-card-hero relative block w-full overflow-hidden text-left p-5",
         "transition-transform duration-150 active:scale-[0.985]",
       )}
-      style={{
-        backgroundColor: "rgba(14, 20, 32, 0.78)",
-        backdropFilter: "blur(4px)",
-      }}
     >
       {/* top-right gold glow */}
       <span

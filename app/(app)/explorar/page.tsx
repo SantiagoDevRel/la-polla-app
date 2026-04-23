@@ -73,7 +73,7 @@ export default function ExplorarPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="px-4 pt-4 pb-4" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
+      <header className="px-4 pt-4 pb-4">
         <div className="max-w-lg mx-auto">
           <h1 className="text-xl font-bold text-text-primary mb-3 flex items-center gap-2">
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2">

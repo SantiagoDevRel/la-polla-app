@@ -352,7 +352,7 @@ export default function PollaSlugPage() {
   if (isNonParticipant && polla.type === "open" && polla.status !== "ended") {
     return (
       <div className="min-h-screen">
-        <header className="px-4 pt-4 pb-3" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
+        <header className="px-4 pt-4 pb-3">
           <div className="max-w-lg mx-auto">
             <div className="flex items-center gap-3 mb-2">
               <button onClick={() => router.push("/pollas")} className="text-text-secondary text-xl">←</button>
@@ -429,7 +429,7 @@ export default function PollaSlugPage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="px-4 pt-4 pb-3" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
+      <header className="px-4 pt-4 pb-3">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-2">
             <button onClick={() => router.push("/pollas")} className="text-text-secondary text-xl">←</button>

@@ -150,5 +150,49 @@ body {
   }
 }
 
+@layer components {
+  /* ── Card design tokens ────────────────────────────────────────────
+     Single source of truth for every card surface in the app. Collapses
+     the previous 8+ ad-hoc opacity/blur/radius combinations into three
+     variants so "it's a card" reads the same everywhere. Pair with a
+     padding class (p-3 compact / p-4 default / p-5 hero) at the call
+     site — padding is context, not identity, so it stays out of here.
+
+     lp-card       → baseline surface (most cards)
+     lp-card-hero  → accented surface for the one hero moment per screen
+                     (MatchHero on Inicio, PollaCard when isLeader)
+     ghost         → no class at all; just render plain content over
+                     the ambient background (e.g. PodiumCarousel). */
+  .lp-card {
+    background-color: rgba(14, 20, 32, 0.72);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+  }
+  .lp-card-hero {
+    background-color: rgba(14, 20, 32, 0.72);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 215, 0, 0.28);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 60px -28px rgba(255, 215, 0, 0.32);
+  }
+
+  /* Section title. Canonical style for "MIS POLLAS", "PODIO", "AVISOS",
+     etc. Replace every ad-hoc <h2 className="font-display text-[20px]">
+     with <h2 className="lp-section-title">. Pages may still override
+     size locally with text-[Npx] after this class if they really need
+     to (e.g. Avisos top header). */
+  .lp-section-title {
+    font-family: var(--font-display), 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+}
+
 .hide-scrollbar { scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }

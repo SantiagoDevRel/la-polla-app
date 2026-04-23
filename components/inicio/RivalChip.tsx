@@ -54,7 +54,7 @@ export function RivalChip({
     <section className="px-4 pb-6">
       <Link
         href={pollaHref}
-        className="max-w-lg mx-auto flex items-center gap-3 rounded-[14px] p-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/30 transition-colors"
+        className="lp-card max-w-lg mx-auto flex items-center gap-3 p-3 hover:border-gold/30 transition-colors"
         aria-label={`Rival en ${pollaName}: ${rivalName}`}
       >
         <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-bg-elevated">

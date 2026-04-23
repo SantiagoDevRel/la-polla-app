@@ -319,7 +319,7 @@ export default function OpenInvitePage() {
       <div className="rounded-2xl max-w-md w-full flex-1 flex flex-col min-h-0 overflow-hidden bg-bg-card border border-border-subtle">
         <div
           className="p-5 text-center shrink-0"
-          style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-card) 100%)" }}
+         
         >
           <Target className="w-9 h-9 text-gold mx-auto mb-2" />
           <h1 className="text-2xl font-display uppercase tracking-[0.04em] text-text-primary">
