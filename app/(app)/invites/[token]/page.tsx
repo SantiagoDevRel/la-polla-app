@@ -93,7 +93,7 @@ export default async function AcceptInvitePage({
 function InviteError({ message }: { message: string }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="rounded-2xl p-8 text-center bg-bg-card border border-border-subtle max-w-sm w-full">
+      <div className="rounded-2xl p-8 text-center lp-card max-w-sm w-full">
         <p className="text-4xl mb-4">😕</p>
         <h2 className="text-lg font-bold text-text-primary mb-2">
           Invitación inválida

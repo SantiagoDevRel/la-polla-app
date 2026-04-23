@@ -83,7 +83,7 @@ export default function PaymentsList({
   }
 
   return (
-    <div className="rounded-2xl p-4 bg-bg-card border border-border-subtle space-y-3">
+    <div className="rounded-2xl p-4 lp-card space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-text-primary">Pagos</h3>
         <span className="text-[11px] text-text-muted">

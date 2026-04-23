@@ -77,7 +77,7 @@ export default function ParticipantPayment({
 
   if (loading) {
     return (
-      <div className="rounded-xl p-4 text-center bg-bg-card border border-border-subtle flex flex-col items-center gap-2">
+      <div className="rounded-xl p-4 text-center lp-card flex flex-col items-center gap-2">
         <FootballLoader variant="plata" />
         <p className="text-text-muted text-sm">Cargando pagos...</p>
       </div>
@@ -86,7 +86,7 @@ export default function ParticipantPayment({
 
   if (error || !pollaPaymentInfo) {
     return (
-      <div className="rounded-xl p-4 text-center bg-bg-card border border-border-subtle space-y-2">
+      <div className="rounded-xl p-4 text-center lp-card space-y-2">
         <p className="text-sm font-medium text-text-primary">No pudimos cargar los pagos</p>
         <p className="text-xs text-text-muted">{error || "Intentá de nuevo."}</p>
         <button
@@ -138,7 +138,7 @@ export default function ParticipantPayment({
     <div className="space-y-4">
       {awaitingApproval ? (
         <>
-          <div className="rounded-2xl p-5 space-y-2 bg-bg-card border border-border-subtle">
+          <div className="rounded-2xl p-5 space-y-2 lp-card">
             <div className="flex items-center gap-2">
               <Banknote className="w-5 h-5 text-gold" aria-hidden="true" />
               <h3 className="font-bold text-text-primary">Esperando aprobación del organizador</h3>

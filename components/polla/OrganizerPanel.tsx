@@ -174,7 +174,7 @@ export default function OrganizerPanel({
 
   if (loading) {
     return (
-      <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle flex flex-col items-center gap-2">
+      <div className="rounded-2xl p-6 text-center lp-card flex flex-col items-center gap-2">
         <FootballLoader />
         <p className="text-text-muted text-sm">Cargando panel del organizador…</p>
       </div>
@@ -188,7 +188,7 @@ export default function OrganizerPanel({
   return (
     <div className="space-y-4">
       {/* Section A.1 — Invite link */}
-      <section className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
+      <section className="rounded-2xl p-5 lp-card space-y-3">
         <h3 className="text-sm font-bold text-text-primary">Link de invitación</h3>
         <p className="text-xs text-text-muted">
           Cualquier persona con este link puede unirse a tu polla.
@@ -214,7 +214,7 @@ export default function OrganizerPanel({
       </section>
 
       {/* Section A.2 — Invite code (mirror of A.1 for the 6-char join code) */}
-      <section className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
+      <section className="rounded-2xl p-5 lp-card space-y-3">
         <h3 className="text-sm font-bold text-text-primary">Código de invitación</h3>
         <p className="text-xs text-text-muted">
           Compártelo con tus amigos para que se unan rápido.
@@ -246,7 +246,7 @@ export default function OrganizerPanel({
       </section>
 
       {/* Section B — Participants */}
-      <section className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
+      <section className="rounded-2xl p-5 lp-card space-y-3">
         <h3 className="text-sm font-bold text-text-primary">
           Participantes <span className="text-text-muted font-normal">· {participants.length}</span>
         </h3>
@@ -316,7 +316,7 @@ export default function OrganizerPanel({
       </section>
 
       {/* Section C — Polla status */}
-      <section className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
+      <section className="rounded-2xl p-5 lp-card space-y-3">
         <h3 className="text-sm font-bold text-text-primary">Estado de la polla</h3>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-xl p-3 bg-bg-elevated">

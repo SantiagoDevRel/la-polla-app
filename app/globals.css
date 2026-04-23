@@ -164,14 +164,18 @@ body {
      ghost         → no class at all; just render plain content over
                      the ambient background (e.g. PodiumCarousel). */
   .lp-card {
-    background-color: rgba(14, 20, 32, 0.72);
+    /* Opacity matched to the Partidos MatchRow so every card surface
+       in the app breathes the same amount of stadium video through.
+       0.5 is the compromise between Partidos' 0.4 "airy" feel and the
+       readability budget of text-heavy surfaces (Tabla, Pagos, Info). */
+    background-color: rgba(14, 20, 32, 0.5);
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
   }
   .lp-card-hero {
-    background-color: rgba(14, 20, 32, 0.72);
+    background-color: rgba(14, 20, 32, 0.5);
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 215, 0, 0.28);

@@ -225,15 +225,7 @@ function MatchRow({
   };
 
   return (
-    <div
-      className="relative rounded-lg overflow-hidden flex"
-      style={{
-        backgroundColor: "rgba(14, 20, 32, 0.4)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
-        border: "1px solid var(--border-subtle)",
-      }}
-    >
+    <div className="lp-card relative overflow-hidden flex">
       {/* Left-edge status accent */}
       <div
         className={isLive ? "animate-pulse" : ""}
@@ -627,7 +619,7 @@ export default function PollaSlugPage() {
   if (error || !polla) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="rounded-2xl p-6 text-center max-w-sm w-full bg-bg-card border border-border-subtle">
+        <div className="rounded-2xl p-6 text-center max-w-sm w-full lp-card">
           <div className="mb-3"><Info className="w-10 h-10 text-text-muted mx-auto" /></div>
           <p className="text-text-primary font-medium mb-4">{error || "Polla no encontrada"}</p>
           <button onClick={() => router.push("/inicio")} className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold">
@@ -695,7 +687,7 @@ export default function PollaSlugPage() {
           </div>
         </header>
         <main className="max-w-lg mx-auto p-4 space-y-4">
-          <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle space-y-4">
+          <div className="rounded-2xl p-6 text-center lp-card space-y-4">
             <Target className="w-12 h-12 text-gold mx-auto" />
             <h2 className="font-display text-2xl text-text-primary tracking-wide">POLLA ABIERTA</h2>
             {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
@@ -726,7 +718,7 @@ export default function PollaSlugPage() {
   if (isNonParticipant && polla.type === "closed") {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="rounded-2xl p-6 text-center max-w-sm w-full bg-bg-card border border-border-subtle space-y-3">
+        <div className="rounded-2xl p-6 text-center max-w-sm w-full lp-card space-y-3">
           <Lock className="w-10 h-10 text-text-muted mx-auto" />
           <p className="text-text-primary font-medium">Esta polla es privada</p>
           <p className="text-sm text-text-secondary">El admin debe invitarte para participar.</p>
@@ -826,7 +818,7 @@ export default function PollaSlugPage() {
       <main className="max-w-lg mx-auto p-4 space-y-3">
         {/* ── TAB PARTIDOS ── */}
         {activeTab === "partidos" && showPaymentPending && (
-          <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle space-y-3">
+          <div className="rounded-2xl p-6 text-center lp-card space-y-3">
             <Banknote className="w-10 h-10 text-gold mx-auto" />
             <div>
               <h2 className="text-lg font-bold text-text-primary mb-1">Esperando aprobación del organizador</h2>
@@ -843,7 +835,7 @@ export default function PollaSlugPage() {
           </div>
         )}
         {activeTab === "partidos" && !showPaymentPending && paymentLocked && (
-          <div className="rounded-2xl p-6 text-center bg-bg-card border border-border-subtle space-y-4">
+          <div className="rounded-2xl p-6 text-center lp-card space-y-4">
             <Lock className="w-10 h-10 text-gold mx-auto" />
             <div>
               <h2 className="text-xl font-bold text-text-primary mb-1">Paga para pronosticar</h2>
@@ -1050,7 +1042,7 @@ export default function PollaSlugPage() {
                 </p>
               </div>
             )}
-            <div className="rounded-2xl overflow-hidden bg-bg-card border border-border-subtle">
+            <div className="rounded-2xl overflow-hidden lp-card">
             {participants.length === 0 ? (
               <EmptyState
                 title="Aún no hay participantes"
@@ -1141,7 +1133,7 @@ export default function PollaSlugPage() {
         {activeTab === "info" && (
           <div className="space-y-4">
             {showPaymentPending && <PaymentPendingBanner onGo={() => setActiveTab("pagos")} />}
-            <div className="rounded-2xl p-5 space-y-3 bg-bg-card border border-border-subtle">
+            <div className="rounded-2xl p-5 space-y-3 lp-card">
               <h3 className="font-bold text-text-primary">{polla.name}</h3>
               {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
               <div className="grid grid-cols-3 gap-2 text-sm">
@@ -1166,7 +1158,7 @@ export default function PollaSlugPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl p-5 bg-bg-card border border-border-subtle">
+            <div className="rounded-2xl p-5 lp-card">
               <h4 className="font-bold text-text-primary mb-3">Sistema de puntos</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center"><span className="text-text-secondary">🎯 Marcador exacto</span><span className="font-bold text-gold">{polla.points_exact} pts</span></div>
@@ -1179,7 +1171,7 @@ export default function PollaSlugPage() {
 
             {/* WhatsApp invite for admin of closed pollas */}
             {currentUserRole === "admin" && polla.type === "closed" && (
-              <div className="rounded-2xl p-5 bg-bg-card border border-border-subtle space-y-3">
+              <div className="rounded-2xl p-5 lp-card space-y-3">
                 <h4 className="font-bold text-text-primary flex items-center gap-2">
                   <Handshake className="w-4 h-4 text-gold" /> Invitar participante
                 </h4>

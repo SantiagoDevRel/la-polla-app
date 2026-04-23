@@ -193,7 +193,7 @@ export default function VerifyPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl p-6 text-center bg-bg-card border border-border-subtle">
+          <div className="w-full max-w-md rounded-2xl p-6 text-center lp-card">
             <p className="text-text-muted">Cargando...</p>
           </div>
         </div>
