@@ -355,8 +355,6 @@ export default function PollaSlugPage() {
     }
   }
 
-  const myP = participants.find((p) => p.user_id === currentUserId);
-
   // Non-participant view for open pollas (hide join if finalized)
   if (isNonParticipant && polla.type === "open" && polla.status !== "ended") {
     return (
