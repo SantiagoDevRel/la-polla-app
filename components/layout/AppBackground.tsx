@@ -31,7 +31,7 @@ export interface AppBackgroundProps {
 
 export function AppBackground({
   className,
-  overlayOpacity = 0.6,
+  overlayOpacity = 0.78,
 }: AppBackgroundProps) {
   return (
     <div
