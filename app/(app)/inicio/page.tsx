@@ -398,7 +398,7 @@ async function findRivalForUser(
   userId: string,
   activePollas: EnrichedPolla[],
 ): Promise<RivalPayload | null> {
-  const ranked = activePollas.filter((p) => p.user_rank != null && p.participant_count > 1);
+  const ranked = activePollas.filter((p) => p.user_rank != null);
   if (ranked.length === 0) return null;
   // Prefer the polla where the user is best-ranked; tie-break by most
   // total points so higher-stakes leagues win when ranks are equal.
@@ -408,61 +408,79 @@ async function findRivalForUser(
     if (ra !== rb) return ra - rb;
     return b.user_total_points - a.user_total_points;
   });
-  const target = ranked[0];
-  const userRank = target.user_rank!;
-  const candidateRanks = userRank === 1 ? [2] : [userRank - 1, userRank + 1];
 
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("polla_participants")
-    .select("rank, total_points, users:user_id ( display_name, avatar_url )")
-    .eq("polla_id", target.id)
-    .in("rank", candidateRanks);
 
   type NeighbourRow = {
     rank: number | null;
     total_points: number | null;
+    paid: boolean | null;
     users:
       | { display_name: string | null; avatar_url: string | null }
       | { display_name: string | null; avatar_url: string | null }[]
       | null;
   };
 
-  const rows = (data || []) as NeighbourRow[];
-  if (rows.length === 0) return null;
+  // Walk the ranked list; return the first polla that has a real,
+  // eligible neighbour. "Eligible" = status approved, and for
+  // admin_collects pollas also paid=true (unpaid participants cannot
+  // predict yet and should not appear as rivals). Previously the lookup
+  // only inspected the user's top-ranked polla and trusted the raw
+  // participant_count; admin_collects pollas with a single paid player
+  // slipped through and produced phantom rivals.
+  for (const target of ranked) {
+    const userRank = target.user_rank!;
+    const candidateRanks = userRank === 1 ? [2] : [userRank - 1, userRank + 1];
 
-  const userPoints = target.user_total_points;
+    const { data: pollaRow } = await admin
+      .from("pollas")
+      .select("payment_mode")
+      .eq("id", target.id)
+      .maybeSingle();
+    const requirePaid = pollaRow?.payment_mode === "admin_collects";
 
-  // Choose the neighbour with the smallest point gap to the user. In the
-  // rank-1 case there is only one candidate so this is a no-op.
-  let best: { row: NeighbourRow; gap: number } | null = null;
-  for (const row of rows) {
-    const gap = Math.abs((row.total_points ?? 0) - userPoints);
-    if (!best || gap < best.gap) best = { row, gap };
+    let query = admin
+      .from("polla_participants")
+      .select("rank, total_points, paid, users:user_id ( display_name, avatar_url )")
+      .eq("polla_id", target.id)
+      .eq("status", "approved")
+      .in("rank", candidateRanks);
+    if (requirePaid) {
+      query = query.eq("paid", true);
+    }
+
+    const { data } = await query;
+    const rows = (data || []) as NeighbourRow[];
+    if (rows.length === 0) continue;
+
+    const userPoints = target.user_total_points;
+    let best: { row: NeighbourRow; gap: number } | null = null;
+    for (const row of rows) {
+      const gap = Math.abs((row.total_points ?? 0) - userPoints);
+      if (!best || gap < best.gap) best = { row, gap };
+    }
+    if (!best) continue;
+
+    const u = Array.isArray(best.row.users) ? best.row.users[0] : best.row.users;
+    if (!u) continue;
+    const rivalPoints = best.row.total_points ?? 0;
+    const rivalRank = best.row.rank ?? 0;
+    const mode: "chasing" | "behind" = rivalRank > userRank ? "chasing" : "behind";
+    const displayName = u.display_name || "Tu rival";
+    const firstName = displayName.split(" ")[0];
+
+    return {
+      pollaSlug: target.slug,
+      pollaName: target.name,
+      rivalName: firstName,
+      rivalPollitoType: u.avatar_url ?? null,
+      userPoints,
+      rivalPoints,
+      mode,
+    };
   }
-  if (!best) return null;
 
-  const u = Array.isArray(best.row.users) ? best.row.users[0] : best.row.users;
-  if (!u) return null;
-  const rivalPoints = best.row.total_points ?? 0;
-  const rivalRank = best.row.rank ?? 0;
-  // "chasing" when the user is ahead of the rival (user leads), "behind"
-  // when the rival is ahead. Ties default to "chasing" so the framing
-  // stays positive.
-  const mode: "chasing" | "behind" = rivalRank > userRank ? "chasing" : "behind";
-
-  const displayName = u.display_name || "Tu rival";
-  const firstName = displayName.split(" ")[0];
-
-  return {
-    pollaSlug: target.slug,
-    pollaName: target.name,
-    rivalName: firstName,
-    rivalPollitoType: u.avatar_url ?? null,
-    userPoints,
-    rivalPoints,
-    mode,
-  };
+  return null;
 }
 
 // Pick the best rank callout for the greeting bubble. Prefers rank 1 in
