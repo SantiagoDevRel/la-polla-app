@@ -208,7 +208,7 @@ export default function ExplorarPage() {
             ))}
           </AnimatedList>
         ) : (
-          <div className="rounded-2xl p-8 text-center bg-bg-card border border-border-subtle">
+          <div className="rounded-2xl p-8 text-center lp-card">
             <p className="text-text-muted text-sm mb-4">
               {search ? "No hay pollas que coincidan" : "No hay pollas abiertas"}
             </p>

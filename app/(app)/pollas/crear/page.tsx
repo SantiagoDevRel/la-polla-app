@@ -404,7 +404,7 @@ export default function CrearPollaPage() {
             {matchesLoading ? (
               <div className="flex flex-col items-center gap-2 py-8"><FootballLoader /><p className="text-text-muted text-sm">Cargando partidos...</p></div>
             ) : matches.length === 0 ? (
-              <div className="text-center py-8 rounded-2xl bg-bg-card border border-border-subtle">
+              <div className="text-center py-8 lp-card">
                 <p className="text-text-muted text-sm">No hay partidos programados para este torneo</p>
               </div>
             ) : (

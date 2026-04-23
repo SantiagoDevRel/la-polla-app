@@ -119,7 +119,7 @@ export default function AdminPaymentReview({
             {unpaid.map((p) => (
               <div
                 key={p.id}
-                className="rounded-xl p-3 flex items-center justify-between bg-bg-card border border-border-subtle gap-3"
+                className="rounded-xl p-3 flex items-center justify-between lp-card gap-3"
               >
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-sm text-text-primary truncate">

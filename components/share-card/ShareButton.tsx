@@ -158,7 +158,7 @@ export function ShareButton({ payload, className, label = "Compartir" }: ShareBu
           onClick={closePreview}
         >
           <div
-            className="relative max-w-[380px] w-full rounded-2xl bg-bg-card border border-border-subtle p-4 flex flex-col gap-3"
+            className="relative max-w-[380px] w-full lp-card p-4 flex flex-col gap-3"
             onClick={(ev) => ev.stopPropagation()}
           >
             <button

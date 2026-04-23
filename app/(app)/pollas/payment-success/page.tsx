@@ -76,7 +76,7 @@ function PaymentSuccessInner() {
   }, [router, searchParams]);
 
   return (
-    <div className="rounded-2xl p-8 text-center max-w-sm w-full bg-bg-card border border-border-subtle space-y-4">
+    <div className="rounded-2xl p-8 text-center max-w-sm w-full lp-card space-y-4">
       {state === "pending" && (
         <>
           <FootballLoader variant="plata" className="mx-auto" />
@@ -143,7 +143,7 @@ export default function PaymentSuccessPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <Suspense
         fallback={
-          <div className="rounded-2xl p-8 text-center max-w-sm w-full bg-bg-card border border-border-subtle">
+          <div className="rounded-2xl p-8 text-center max-w-sm w-full lp-card">
             <FootballLoader variant="plata" className="mx-auto" />
             <p className="text-sm text-text-secondary mt-3">Cargando…</p>
           </div>

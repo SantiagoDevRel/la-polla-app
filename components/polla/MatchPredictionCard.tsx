@@ -26,7 +26,7 @@ export default function MatchPredictionCard({
   };
 
   return (
-    <div className="rounded-xl p-4 bg-bg-card border border-border-subtle">
+    <div className="rounded-xl p-4 lp-card">
       <p className="text-xs text-text-muted text-center mb-3">{date}</p>
       <div className="flex items-center justify-between gap-2">
         <div className="flex-1 text-right">

@@ -182,7 +182,7 @@ async function handleSyncWorldCup() {
         </motion.div>
 
         {/* Purgar partidos antiguos */}
-        <div className="rounded-xl p-4 bg-bg-card border border-border-subtle space-y-3">
+        <div className="rounded-xl p-4 lp-card space-y-3">
           <p className="text-sm font-bold text-text-primary">Mantenimiento</p>
           <button
             onClick={handlePurge}

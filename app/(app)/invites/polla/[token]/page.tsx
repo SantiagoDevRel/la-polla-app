@@ -272,7 +272,7 @@ export default function OpenInvitePage() {
   if (error || !polla) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="rounded-2xl p-6 text-center max-w-sm w-full bg-bg-card border border-border-subtle">
+        <div className="rounded-2xl p-6 text-center max-w-sm w-full lp-card">
           <Info className="w-10 h-10 text-text-muted mx-auto mb-3" />
           <p className="text-text-primary font-medium mb-4">{error || "Link inválido"}</p>
           <button
@@ -290,7 +290,7 @@ export default function OpenInvitePage() {
   if (alreadyJoined) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="rounded-2xl p-6 text-center max-w-sm w-full bg-bg-card border border-border-subtle">
+        <div className="rounded-2xl p-6 text-center max-w-sm w-full lp-card">
           <Target className="w-10 h-10 text-gold mx-auto mb-3" />
           <h1 className="text-xl font-bold text-text-primary mb-1">
             Ya estás en esta polla
@@ -316,7 +316,7 @@ export default function OpenInvitePage() {
     // h-screen + flex column keeps the card the full viewport height so the
     // match list can scroll internally while header/badges/CTA stay pinned.
     <div className="h-screen flex flex-col items-center justify-start p-4">
-      <div className="rounded-2xl max-w-md w-full flex-1 flex flex-col min-h-0 overflow-hidden bg-bg-card border border-border-subtle">
+      <div className="rounded-2xl max-w-md w-full flex-1 flex flex-col min-h-0 overflow-hidden lp-card">
         <div
           className="p-5 text-center shrink-0"
          

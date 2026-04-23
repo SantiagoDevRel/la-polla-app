@@ -91,7 +91,7 @@ export default function ScoringExplanation({
 
       {open && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-bg-base/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-bg-card border border-border-subtle max-h-[85vh] overflow-y-auto overscroll-contain">
+          <div className="w-full max-w-md lp-card max-h-[85vh] overflow-y-auto overscroll-contain">
             <div className="sticky top-0 flex items-center justify-between p-4 bg-bg-card border-b border-border-subtle">
               <h2 className="font-display text-xl text-gold tracking-wide">Sistema de Puntaje</h2>
               <button onClick={() => setOpen(false)} className="text-text-muted hover:text-text-primary transition-colors cursor-pointer">

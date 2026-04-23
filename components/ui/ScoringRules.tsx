@@ -61,7 +61,7 @@ export function ScoringRules({ compact = false }: ScoringRulesProps) {
           <div
             key={i}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-md bg-bg-card border border-border-subtle",
+              "flex items-center gap-3 px-3 py-2.5 lp-card",
               row.color,
             )}
           >

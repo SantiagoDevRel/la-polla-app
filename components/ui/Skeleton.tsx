@@ -18,7 +18,7 @@ export function Skeleton({ className = "", width, height }: SkeletonProps) {
 
 export function SkeletonCard() {
   return (
-    <div className="rounded-2xl p-4 bg-bg-card border border-border-subtle space-y-3">
+    <div className="rounded-2xl p-4 lp-card space-y-3">
       <div className="flex items-center gap-3">
         <Skeleton className="flex-1" height="16px" />
         <Skeleton width="60px" height="16px" />
