@@ -162,7 +162,7 @@ export default function MisPollasPage() {
               <p className="text-text-muted text-sm">Cargando pollas...</p>
             </div>
           ) : active.length > 0 ? (
-            <AnimatedList className="space-y-0">
+            <AnimatedList className="space-y-3">
               {active.map((polla) => (
                 <AnimatedItem key={polla.id}>
                   <PollaCard
@@ -209,7 +209,7 @@ export default function MisPollasPage() {
             </button>
 
             {endedOpen && (
-              <AnimatedList className="space-y-0">
+              <AnimatedList className="space-y-3">
                 {ended.map((polla) => (
                   <AnimatedItem key={polla.id}>
                     <PollaCard

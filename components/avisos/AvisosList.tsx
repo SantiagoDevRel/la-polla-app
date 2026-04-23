@@ -246,10 +246,10 @@ function Aviso({
   const content = (
     <div
       className={
-        "flex items-start gap-3 p-3 rounded-lg border transition-colors " +
+        "flex items-start gap-3 p-3 rounded-lg border backdrop-blur-sm transition-colors " +
         (unread
-          ? "bg-bg-card border-gold/25"
-          : "bg-bg-card border-border-subtle")
+          ? "bg-bg-card/70 border-gold/25"
+          : "bg-bg-card/60 border-border-subtle")
       }
     >
       {/* Icon well — or rival pollito for rank_down */}
