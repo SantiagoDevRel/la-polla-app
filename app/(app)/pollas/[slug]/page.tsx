@@ -66,6 +66,7 @@ interface Match {
   id: string; home_team: string; away_team: string; home_team_flag: string;
   away_team_flag: string; scheduled_at: string; status: string;
   home_score: number | null; away_score: number | null; phase: string | null;
+  match_day: number | null;
 }
 interface Prediction {
   id: string; match_id: string; predicted_home: number; predicted_away: number;
@@ -183,8 +184,15 @@ function isLeagueFormatPhase(phase: string | null | undefined): boolean {
   return p === "regular_season" || p === "league_stage";
 }
 
-function phaseLabel(phase: string | null | undefined, tournamentSlug: string): string {
+function phaseLabel(
+  phase: string | null | undefined,
+  tournamentSlug: string,
+  matchDay: number | null | undefined,
+): string {
+  // League-format matches carry a match_day number (jornada). Surface it
+  // so the user sees "Jornada 33" instead of just the tournament name.
   if (!phase || isLeagueFormatPhase(phase)) {
+    if (matchDay) return `Jornada ${matchDay}`;
     return getTournamentName(tournamentSlug) ?? "Liga";
   }
   const normalised = phase.toLowerCase();
@@ -269,7 +277,7 @@ function MatchRow({
                 className="object-contain flex-shrink-0"
               />
             ) : null}
-            <span className="truncate">{phaseLabel(match.phase, tournamentSlug)}</span>
+            <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day)}</span>
           </span>
           {isLive ? (
             <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
