@@ -1,45 +1,75 @@
-// app/(app)/avisos/page.tsx — Avisos placeholder
+// app/(app)/avisos/page.tsx — Real Avisos feed
 //
-// Real implementation lands in PR 4 (notifications table + triggers + feed).
-// For now this is a stub so the BottomNav tab does not 404. No data access,
-// no business logic — just static copy + pollito illustration.
+// Server component. Loads the authenticated user's notifications via the
+// admin client (auth.uid()=NULL workaround) and hands off to AvisosList
+// for tabs + optimistic mark-as-read. Metadata keeps this dynamic so
+// unread counts never stale between /inicio round-trips.
 
-import Image from "next/image";
-import { Bell } from "lucide-react";
-import { getPollitoBase, DEFAULT_POLLITO } from "@/lib/pollitos";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { AvisosList, type AvisoItem } from "@/components/avisos/AvisosList";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Avisos · La Polla" };
 
-export default function AvisosPage() {
-  return (
-    <main className="min-h-[100dvh] px-5 pt-10 pb-24 flex flex-col">
-      <header className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-full bg-bg-elevated border border-border-subtle grid place-items-center">
-          <Bell className="w-5 h-5 text-gold" strokeWidth={2} aria-hidden="true" />
-        </div>
-        <h1 className="font-display text-[26px] tracking-[0.06em] uppercase text-text-primary leading-none">
-          Avisos
-        </h1>
-      </header>
+export default async function AvisosPage() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-      <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
-        <div className="relative w-32 h-32">
-          <Image
-            src={getPollitoBase(DEFAULT_POLLITO)}
-            alt=""
-            fill
-            sizes="128px"
-            className="object-contain"
-          />
-        </div>
-        <h2 className="font-display text-[22px] tracking-[0.04em] uppercase text-text-primary leading-none">
-          Muy pronto
-        </h2>
-        <p className="text-text-secondary text-[14px] max-w-[260px]">
-          Aquí vas a ver cuando un parcero se te acerque, cuando le clavés un
-          resultado o cuando arranque una polla nueva.
-        </p>
-      </div>
+  const admin = createAdminClient();
+
+  const { data: notifRows } = await admin
+    .from("notifications")
+    .select(
+      "id, type, title, body, polla_id, match_id, actor_user_id, metadata, read_at, created_at",
+    )
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  const rows = (notifRows || []) as Array<
+    Omit<AvisoItem, "polla" | "actor">
+  >;
+
+  const pollaIds = Array.from(
+    new Set(rows.map((n) => n.polla_id).filter(Boolean) as string[]),
+  );
+  const actorIds = Array.from(
+    new Set(rows.map((n) => n.actor_user_id).filter(Boolean) as string[]),
+  );
+
+  const [pollasRes, usersRes, unreadRes] = await Promise.all([
+    pollaIds.length > 0
+      ? admin.from("pollas").select("id, slug, name").in("id", pollaIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; slug: string; name: string }> }),
+    actorIds.length > 0
+      ? admin.from("users").select("id, display_name, avatar_url").in("id", actorIds)
+      : Promise.resolve({
+          data: [] as Array<{ id: string; display_name: string | null; avatar_url: string | null }>,
+        }),
+    admin
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .is("read_at", null),
+  ]);
+
+  const pollasById = new Map((pollasRes.data || []).map((p) => [p.id, p]));
+  const usersById = new Map((usersRes.data || []).map((u) => [u.id, u]));
+
+  const items: AvisoItem[] = rows.map((n) => ({
+    ...n,
+    polla: n.polla_id ? pollasById.get(n.polla_id) ?? null : null,
+    actor: n.actor_user_id ? usersById.get(n.actor_user_id) ?? null : null,
+  }));
+
+  const unread = unreadRes.count ?? 0;
+
+  return (
+    <main className="min-h-[100dvh] px-4 pt-8 pb-24">
+      <AvisosList initialItems={items} initialUnread={unread} />
     </main>
   );
 }
