@@ -25,6 +25,7 @@ import {
   Check,
 } from "lucide-react";
 import { getPollitoBase } from "@/lib/pollitos";
+import { ShareButton, type SharePayload } from "@/components/share-card/ShareButton";
 
 type NotificationType =
   | "rank_up"
@@ -81,9 +82,62 @@ function timeAgo(iso: string): string {
 export interface AvisosListProps {
   initialItems: AvisoItem[];
   initialUnread: number;
+  /** Current user's context so ShareButton can personalise card copy. */
+  viewer: { name: string; pollito: string | null };
 }
 
-export function AvisosList({ initialItems, initialUnread }: AvisosListProps) {
+function sharePayloadFor(item: AvisoItem, viewer: { name: string; pollito: string | null }): SharePayload | null {
+  const polla = item.polla?.name ?? "Tu polla";
+  if (item.type === "rank_up") {
+    const rank = Number(
+      (item.metadata as { to_rank?: number } | null)?.to_rank ?? 1,
+    );
+    return {
+      type: "subiste",
+      name: viewer.name,
+      polla,
+      rank,
+      pollito: viewer.pollito,
+    };
+  }
+  if (item.type === "perfect_pick") {
+    const md = (item.metadata ?? {}) as {
+      score_home?: number;
+      score_away?: number;
+    };
+    // Body text is already "Home X-Y Away · Polla" — split the first
+    // token for display names. Best-effort; safe fallback below.
+    const match = (item.body || "").match(/^(.+)\s(\d+)-(\d+)\s(.+?)\s·/);
+    return {
+      type: "clavada",
+      name: viewer.name,
+      polla,
+      homeTeam: match?.[1] ?? "Local",
+      awayTeam: match?.[4] ?? "Visitante",
+      home: md.score_home ?? Number(match?.[2] ?? 0),
+      away: md.score_away ?? Number(match?.[3] ?? 0),
+      pollito: viewer.pollito,
+    };
+  }
+  if (item.type === "rank_down") {
+    const md = (item.metadata ?? {}) as { from_rank?: number; to_rank?: number };
+    const gap = Math.max(1, (md.to_rank ?? 2) - (md.from_rank ?? 1));
+    const rivalFirstName =
+      (item.actor?.display_name ?? "Rival").split(" ")[0] || "Rival";
+    return {
+      type: "rival",
+      name: viewer.name,
+      polla,
+      rival: rivalFirstName,
+      gap,
+      pollito: viewer.pollito,
+      rivalPollito: item.actor?.avatar_url ?? null,
+    };
+  }
+  return null;
+}
+
+export function AvisosList({ initialItems, initialUnread, viewer }: AvisosListProps) {
   const router = useRouter();
   const [items, setItems] = useState<AvisoItem[]>(initialItems);
   const [unread, setUnread] = useState<number>(initialUnread);
@@ -163,7 +217,12 @@ export function AvisosList({ initialItems, initialUnread }: AvisosListProps) {
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((n) => (
-            <Aviso key={n.id} item={n} onMarkRead={markRead} />
+            <Aviso
+              key={n.id}
+              item={n}
+              onMarkRead={markRead}
+              sharePayload={sharePayloadFor(n, viewer)}
+            />
           ))}
         </ul>
       )}
@@ -174,9 +233,11 @@ export function AvisosList({ initialItems, initialUnread }: AvisosListProps) {
 function Aviso({
   item,
   onMarkRead,
+  sharePayload,
 }: {
   item: AvisoItem;
   onMarkRead: (id: string) => void;
+  sharePayload: SharePayload | null;
 }) {
   const visual = TYPE_VISUALS[item.type];
   const unread = !item.read_at;
@@ -228,6 +289,11 @@ function Aviso({
           <p className="font-body text-[11.5px] text-text-secondary mt-0.5 leading-snug">
             {item.body}
           </p>
+        ) : null}
+        {sharePayload ? (
+          <div className="mt-1.5">
+            <ShareButton payload={sharePayload} />
+          </div>
         ) : null}
       </div>
 
