@@ -280,12 +280,24 @@ function MatchRow({
             ) : null}
             <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day)}</span>
           </span>
-          {isLive ? (
-            <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
-              En vivo{match.elapsed != null ? ` · ${match.elapsed}'` : ""}
-            </span>
-          ) : isFinished ? (
+          {isLive ? (() => {
+            // Football-data's free tier sometimes omits the minute even
+            // for IN_PLAY matches. When our elapsed column is null,
+            // fall back to now − scheduled_at so the pill never just
+            // says "EN VIVO" with no clock.
+            let liveMinute: number | null = match.elapsed;
+            if (liveMinute == null && match.scheduled_at) {
+              const diffMs = Date.now() - new Date(match.scheduled_at).getTime();
+              const diffMin = Math.max(0, Math.floor(diffMs / 60000));
+              if (diffMin <= 120) liveMinute = diffMin;
+            }
+            return (
+              <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
+                En vivo{liveMinute != null ? ` · ${liveMinute}'` : ""}
+              </span>
+            );
+          })() : isFinished ? (
             <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-bg-elevated border border-border-subtle text-text-primary/70 text-[10px] font-bold uppercase tracking-[0.08em]">
               Final
             </span>
