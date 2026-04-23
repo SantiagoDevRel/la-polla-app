@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
@@ -101,12 +101,21 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
 export default function PollaSlugPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
   const slug = params.slug as string;
 
+  // Honor ?tab= on entry so deep-links from Inicio (RivalChip) land
+  // directly on Tabla/Pagos/etc instead of the default Partidos view.
+  const initialTab: TabType = (() => {
+    const raw = searchParams.get("tab");
+    const allowed: TabType[] = ["partidos", "ranking", "pagos", "info", "organizar"];
+    return (allowed as string[]).includes(raw ?? "") ? (raw as TabType) : "partidos";
+  })();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<TabType>("partidos");
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   const [polla, setPolla] = useState<Polla | null>(null);
