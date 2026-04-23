@@ -135,7 +135,7 @@ export default function PollaSlugPage() {
   const [isNonParticipant, setIsNonParticipant] = useState(false);
   const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
-  const [groupMode, setGroupMode] = useState<"phase" | "date">("phase");
+  const [groupMode, setGroupMode] = useState<"phase" | "date">("date");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const matchGroups = useMemo(() => {
@@ -461,28 +461,21 @@ export default function PollaSlugPage() {
         </div>
       </header>
 
-      {/* Position band */}
-      {myP && (
-        <div className="px-4 py-1.5" style={{ backgroundColor: "var(--gold-dim)" }}>
-          <div className="max-w-lg mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gold">#{myP.rank || "—"} · {myP.total_points} pts</span>
-              <ScoringExplanation />
-            </div>
-            <span className="text-xs text-text-secondary">{myP.payment_status === "approved" ? "Pagado" : "Pendiente"}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Pot band */}
+      {/* Pot band — single-line summary of the pot + a compact scoring
+          helper icon. The previous rank/points/payment-status band was
+          redundant with the ranking tab and crowded the header; the
+          pot + (i) is the only context strip now. */}
       {polla.buy_in_amount > 0 && (() => {
         const approvedCount = participants.filter((p) => p.status === "approved").length;
         const total = polla.buy_in_amount * approvedCount;
         return (
           <div className="px-4 py-1.5 bg-bg-elevated border-b border-border-subtle">
-            <div className="max-w-lg mx-auto text-center text-xs text-text-secondary">
-              Pozo: <span className="font-semibold text-gold">${total.toLocaleString("es-CO")}</span> total{" "}
-              <span className="text-text-muted">(${polla.buy_in_amount.toLocaleString("es-CO")} por persona)</span>
+            <div className="max-w-lg mx-auto text-center text-xs text-text-primary flex items-center justify-center gap-1.5">
+              <span>
+                Pozo: <span className="font-semibold text-gold">${total.toLocaleString("es-CO")}</span> total{" "}
+                <span className="text-text-primary/70">(${polla.buy_in_amount.toLocaleString("es-CO")} por persona)</span>
+              </span>
+              <ScoringExplanation compact />
             </div>
           </div>
         );
@@ -565,8 +558,8 @@ export default function PollaSlugPage() {
                     toggle or expands a group, and the cascade is janky. */}
                 <div className="flex gap-1">
                   {([
-                    { val: "phase" as const, label: "Por fase" },
                     { val: "date" as const, label: "Por fecha" },
+                    { val: "phase" as const, label: "Por fase" },
                   ]).map((opt) => {
                     const active = groupMode === opt.val;
                     return (
