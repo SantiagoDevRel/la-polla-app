@@ -12,6 +12,20 @@ export async function ensureMatchesFresh(): Promise<void> {
   try {
     const admin = createAdminClient();
 
+    // Heal any "stale live" matches first. football-data.org sometimes
+    // lags several hours before flipping a match to FINISHED; without
+    // this, /inicio can keep claiming a match is live long after the
+    // final whistle. Cheap UPDATE — no network cost, runs every call.
+    // The matches_prevent_status_regress trigger ensures this cannot be
+    // undone by a later sync that still reports IN_PLAY.
+    const healed = await admin.rpc("flip_stale_live_matches");
+    if (healed.error) {
+      console.warn(
+        "[ensureMatchesFresh] flip_stale_live_matches failed:",
+        healed.error.message,
+      );
+    }
+
     const { data, error } = await admin.rpc("check_and_reserve_match_sync");
     if (error) {
       console.warn("[ensureMatchesFresh] rpc error:", error.message);
