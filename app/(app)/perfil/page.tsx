@@ -116,7 +116,7 @@ export default function PerfilPage() {
     <div className="min-h-screen">
       <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto">
-          <h1 className="text-xl font-bold text-text-primary text-center">Mi Perfil</h1>
+          <h1 className="lp-section-title text-center" style={{ fontSize: 22 }}>Mi Perfil</h1>
         </div>
       </header>
 

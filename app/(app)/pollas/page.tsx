@@ -91,7 +91,7 @@ export default function MisPollasPage() {
           <button onClick={() => router.push("/inicio")} className="text-text-secondary text-xl">
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#F5F7FA" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
           </button>
-          <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
+          <h1 className="lp-section-title flex items-center gap-2" style={{ fontSize: 22 }}>
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2">
               <path d="M6 9H4.5a2.5 2.5 0 010-5H6" /><path d="M18 9h1.5a2.5 2.5 0 000-5H18" />
               <path d="M4 22h16" /><path d="M18 2H6v7a6 6 0 0012 0V2z" />
@@ -150,10 +150,10 @@ export default function MisPollasPage() {
 
         {/* ── Activas ── */}
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+          <h2 className="lp-section-title flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-green-live dot-active-pulse" style={{ boxShadow: "0 0 5px rgba(0,230,118,0.6)" }} />
             Mis pollas activas
-            <span className="text-text-muted font-normal">· {active.length}</span>
+            <span className="text-text-primary font-normal">· {active.length}</span>
           </h2>
 
           {loading ? (

@@ -1,59 +1,32 @@
-// components/layout/SplashScreen.tsx — Stadium splash screen
+// components/layout/SplashScreen.tsx — First-visit splash
 //
-// Plays the stadium loop over a fullscreen layer with the LA POLLA
-// wordmark, then cross-fades into the app. Fires:
-//   - On the very first navigation of a session (anywhere in the app).
-//   - Every time the user navigates INTO /inicio or /perfil from another
-//     route. Staying on the route does not replay (pathname has to
-//     change).
-//
-// Respects prefers-reduced-motion by bailing instantly (no splash, no
-// fade). Blocks pointer events while visible so taps during playback
-// never reach underlying UI.
+// Plays the stadium loop once per session with the LA POLLA wordmark,
+// then cross-fades into the app. Session-scoped via sessionStorage so
+// internal navigations (Inicio → Perfil → Pollas) never replay it —
+// the app should feel fast after the first entry. Reduced-motion users
+// skip it entirely. During actual page loading the per-route
+// loading.tsx takes over and paints the pollito loader over the
+// ambient video instead.
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
+const SEEN_KEY = "lp_splash_seen_v2";
 const TOTAL_MS = 3200;
 const FADE_MS = 500;
-const REPLAY_ROUTES = ["/inicio", "/perfil"];
 
 type Phase = "idle" | "playing" | "fading";
 
-function shouldReplayOn(path: string | null): boolean {
-  if (!path) return false;
-  return REPLAY_ROUTES.some((r) => path === r || path.startsWith(`${r}/`));
-}
-
 export function SplashScreen() {
-  const pathname = usePathname();
-  const prevPath = useRef<string | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
-  const [mediaOk, setMediaOk] = useState(true);
 
-  // Check prefers-reduced-motion once. Users who opted out skip the
-  // splash entirely (no flash, no fade).
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setMediaOk(!window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  }, []);
 
-  useEffect(() => {
-    if (!mediaOk) {
-      prevPath.current = pathname;
-      return;
-    }
-
-    const firstMount = prevPath.current === null;
-    const enteringReplayRoute =
-      prevPath.current !== pathname && shouldReplayOn(pathname);
-
-    if (!firstMount && !enteringReplayRoute) {
-      prevPath.current = pathname;
-      return;
-    }
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const alreadySeen = sessionStorage.getItem(SEEN_KEY) === "1";
+    if (reduce || alreadySeen) return;
 
     setPhase("playing");
     const fadeTimer = window.setTimeout(
@@ -62,14 +35,17 @@ export function SplashScreen() {
     );
     const doneTimer = window.setTimeout(() => {
       setPhase("idle");
+      try {
+        sessionStorage.setItem(SEEN_KEY, "1");
+      } catch {
+        /* storage unavailable; splash plays again next mount */
+      }
     }, TOTAL_MS);
-
-    prevPath.current = pathname;
     return () => {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(doneTimer);
     };
-  }, [pathname, mediaOk]);
+  }, []);
 
   if (phase === "idle") return null;
 
@@ -89,15 +65,10 @@ export function SplashScreen() {
         preload="auto"
         poster="/videos/la-polla-background-poster.webp"
         className="absolute inset-0 w-full h-full object-cover"
-        key={pathname /* restart video each replay */}
       >
         <source src="/videos/la-polla-background.webm" type="video/webm" />
         <source src="/videos/la-polla-background-lite.mp4" type="video/mp4" />
       </video>
-      {/* Wordmark positioned to match the /inicio header exactly: same
-          top offset (pt-4 + small pollito image block), same font size,
-          so when the splash fades out the text stays in place visually
-          and the app reveals underneath without the title jumping. */}
       <div className="absolute top-4 left-0 right-0 flex items-center justify-center gap-3 px-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
