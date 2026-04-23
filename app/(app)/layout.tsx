@@ -11,6 +11,7 @@
 // nav keeps working even when auth/DB hiccups during dev.
 import { ToastProvider } from "@/components/ui/Toast";
 import BottomNav from "@/components/nav/BottomNav";
+import { AppBackground } from "@/components/layout/AppBackground";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -48,6 +49,7 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
+      <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">
         {children}
       </div>
