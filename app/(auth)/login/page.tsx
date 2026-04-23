@@ -6,6 +6,7 @@
 import { Suspense, useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Turnstile } from "@marsidev/react-turnstile";
+import { motion } from "framer-motion";
 import axios from "axios";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import PhoneInput from "@/components/ui/PhoneInput";
@@ -231,7 +232,12 @@ function LoginInner() {
         >
           {/* Brand header */}
           <div className="text-center space-y-2">
-            <div className="mx-auto" style={{ width: 80, height: 80, position: "relative" }}>
+            <motion.div
+              className="mx-auto"
+              style={{ width: 80, height: 80, position: "relative" }}
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            >
               <div
                 style={{
                   position: "absolute",
@@ -250,7 +256,7 @@ function LoginInner() {
                 height={80}
                 style={{ width: 80, height: 80, objectFit: "contain", position: "relative" }}
               />
-            </div>
+            </motion.div>
             <h1
               className="font-display text-5xl tracking-wide"
               style={{ color: "#FFD700", textShadow: "0 0 24px rgba(255,215,0,0.35)" }}

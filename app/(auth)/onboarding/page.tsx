@@ -5,10 +5,32 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { POLLITO_TYPES, DEFAULT_POLLITO, getPollitoBase } from "@/lib/pollitos";
+import {
+  POLLITO_TYPES,
+  DEFAULT_POLLITO,
+  getPollitoBase,
+  getPollitoByPosition,
+} from "@/lib/pollitos";
 import FootballLoader from "@/components/ui/FootballLoader";
 import { needsName } from "@/lib/users/needs-name";
+
+function StepDots({ total, current }: { total: number; current: number }) {
+  return (
+    <div className="flex gap-1 mb-3" aria-label={`Paso ${current} de ${total}`}>
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          className={
+            "flex-1 h-[3px] rounded-full " +
+            (i < current ? "bg-gold" : "bg-[rgba(255,255,255,0.08)]")
+          }
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -106,11 +128,17 @@ export default function OnboardingPage() {
             boxShadow: "0 0 60px rgba(255,215,0,0.05)",
           }}
         >
+          <StepDots total={2} current={1} />
           <div className="text-center">
-            <img
+            <div className="text-[10px] font-bold tracking-[0.14em] text-text-muted uppercase">
+              Paso 1 de 2
+            </div>
+            <motion.img
               src={getPollitoBase(DEFAULT_POLLITO)}
-              alt="Pollito"
-              style={{ width: 64, height: 64, objectFit: "contain", margin: "0 auto 12px" }}
+              alt=""
+              style={{ width: 72, height: 72, objectFit: "contain", margin: "8px auto 8px" }}
+              animate={{ y: [0, -3, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
             />
             <h1 className="font-display text-gold" style={{ fontSize: 28, letterSpacing: "0.1em" }}>
               ¿Cómo te llamas?
@@ -175,22 +203,76 @@ export default function OnboardingPage() {
 
       {step === 2 && (
         <div
-          className="w-full max-w-md rounded-2xl p-5 space-y-5"
+          className="w-full max-w-md rounded-2xl p-5 space-y-4"
           style={{
             background: "#0e1420",
             border: "1px solid rgba(255,255,255,0.06)",
             boxShadow: "0 0 60px rgba(255,215,0,0.05)",
-            maxHeight: "85vh",
+            maxHeight: "90vh",
             overflowY: "auto",
           }}
         >
+          <StepDots total={2} current={2} />
           <div className="text-center">
-            <h1 className="font-display text-gold" style={{ fontSize: 28, letterSpacing: "0.1em" }}>
-              Elige tu pollito
+            <div className="text-[10px] font-bold tracking-[0.14em] text-text-muted uppercase">
+              Paso 2 de 2
+            </div>
+            <h1
+              className="font-display text-gold mt-1"
+              style={{ fontSize: 28, letterSpacing: "0.06em", lineHeight: 1 }}
+            >
+              ELEGÍ TU POLLITO
             </h1>
             <p style={{ color: "#7a8499", fontSize: 13, marginTop: 4 }}>
               Tu avatar en todas las pollas
             </p>
+          </div>
+
+          {/* Breathing hero pollito with radial glow — mirrors the design
+              spec; always shows the current selection in its lider pose so
+              users get instant visual feedback on tap. */}
+          <div
+            className="mx-auto flex items-center justify-center"
+            style={{
+              width: 140,
+              height: 140,
+              position: "relative",
+            }}
+          >
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                background:
+                  "radial-gradient(circle, rgba(255,215,0,0.28) 0%, transparent 70%)",
+                filter: "blur(6px)",
+              }}
+            />
+            <motion.img
+              key={selectedPollito}
+              src={getPollitoByPosition(selectedPollito, 1, 1)}
+              alt=""
+              style={{
+                width: 120,
+                height: 120,
+                objectFit: "contain",
+                position: "relative",
+              }}
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+              initial={{ opacity: 0.6, scale: 0.96 }}
+              onAnimationStart={undefined}
+            />
+          </div>
+          <div className="text-center">
+            <div
+              className="font-display text-gold"
+              style={{ fontSize: 18, letterSpacing: "0.08em" }}
+            >
+              {(POLLITO_TYPES.find((p) => p.id === selectedPollito)?.label || "").toUpperCase()}
+            </div>
           </div>
 
           {/* Pollito grid */}
@@ -279,7 +361,7 @@ export default function OnboardingPage() {
                 boxShadow: "0 0 20px rgba(255,215,0,0.15)",
               }}
             >
-              {loading ? "Guardando..." : "¡Listo!"}
+              {loading ? "Guardando..." : "¡DALE, LISTO!"}
             </button>
           </div>
         </div>
