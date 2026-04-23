@@ -770,7 +770,38 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 3 - Soonest hero match w/ inline quick-pick */}
+          {/* Block 3 - Live strip (LIVE matches in user's tournaments).
+              Moved above the hero card so in-play action leads; when
+              something is actually live it steals the user's eye before
+              they see the next-match quick-pick. Hides cleanly when the
+              list is empty. */}
+          {showStrip ? (
+            <section>
+              <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-alert animate-pulse" aria-hidden="true" />
+                En vivo
+              </h2>
+              <div className="overflow-x-auto hide-scrollbar">
+                <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
+                  {stripMatches.map((m) => (
+                    <div key={m.id} className="snap-start">
+                      <LiveChip
+                        kind={m.status === "live" ? "live" : "upcoming"}
+                        homeCode={m.home_team_tla}
+                        awayCode={m.away_team_tla}
+                        homeScore={m.status === "live" ? m.home_score ?? undefined : undefined}
+                        awayScore={m.status === "live" ? m.away_score ?? undefined : undefined}
+                        minute={m.elapsed ?? undefined}
+                        kickoffAt={m.status !== "live" ? new Date(m.match_date) : undefined}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {/* Block 4 - Soonest hero match w/ inline quick-pick */}
           {!isActiveEmpty && heroDbMatch ? (
             <section className="px-4">
               <MatchHero
@@ -797,7 +828,7 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 3b - Rival callout (only when we have a neighbour).
+          {/* Block 4b - Rival callout (only when we have a neighbour).
               Deep-links straight to the ranking tab so the user lands on
               the leaderboard where the rival actually lives, not the
               default Partidos view. */}
@@ -811,32 +842,6 @@ export default async function InicioPage() {
               rivalPoints={rival.rivalPoints}
               mode={rival.mode}
             />
-          ) : null}
-
-          {/* Block 4 - Live strip (LIVE only, with global fallback) */}
-          {showStrip ? (
-            <section>
-              <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary">
-                En vivo
-              </h2>
-              <div className="overflow-x-auto hide-scrollbar">
-                <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
-                  {stripMatches.map((m) => (
-                    <div key={m.id} className="snap-start">
-                      <LiveChip
-                        kind={m.status === "live" ? "live" : "upcoming"}
-                        homeCode={m.home_team_tla}
-                        awayCode={m.away_team_tla}
-                        homeScore={m.status === "live" ? m.home_score ?? undefined : undefined}
-                        awayScore={m.status === "live" ? m.away_score ?? undefined : undefined}
-                        minute={m.elapsed ?? undefined}
-                        kickoffAt={m.status !== "live" ? new Date(m.match_date) : undefined}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
           ) : null}
 
           {/* Block 5 - Swipeable podium carousel across all active pollas.
