@@ -77,6 +77,9 @@ html {
 }
 
 body {
+  /* Colour kept so any area AppBackground does not cover still paints
+     dark (e.g. during the first paint frame before the video-bearing
+     layer is mounted). AppBackground (fixed, -z-10) layers on top. */
   background-color: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-body), 'Outfit', sans-serif;
@@ -84,17 +87,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Textura sutil de puntos — da profundidad */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.015) 1px, transparent 0);
-  background-size: 24px 24px;
-  pointer-events: none;
-  z-index: 0;
-}
+/* Dot-grid texture used to sit here at z-index:0 (above AppBackground's
+   -z-10 layer). Removed so the video loop shows through cleanly —
+   AppBackground already ships its own noise grain at mix-blend overlay
+   for OLED-banding protection. */
 
 /* Números deportivos — Bebas Neue */
 .score-font,
@@ -128,26 +124,8 @@ body::before {
   50% { opacity: 0.4; transform: scale(1.5); }
 }
 
-/* ─── Ambient stadium background (components/layout/AppBackground.tsx) ───
-   Two slow-drifting fog layers + two spotlight pans combine to give the
-   whole app a lived-in "stadium at night" feel without any video or JS.
-   Respected automatically by the prefers-reduced-motion block below. */
-@keyframes fog-drift-a {
-  0%, 100% { transform: translate3d(-4%, 0, 0) scale(1.15); }
-  50%      { transform: translate3d(6%, 2%, 0) scale(1.25); }
-}
-@keyframes fog-drift-b {
-  0%, 100% { transform: translate3d(6%, 3%, 0) scale(1.2); }
-  50%      { transform: translate3d(-4%, -2%, 0) scale(1.1); }
-}
-@keyframes spotlight-pan-a {
-  0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.55; }
-  50%      { transform: translate3d(8%, -2%, 0); opacity: 0.8; }
-}
-@keyframes spotlight-pan-b {
-  0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.35; }
-  50%      { transform: translate3d(-6%, 3%, 0); opacity: 0.55; }
-}
+/* AppBackground now uses a video loop + poster; the former CSS
+   spotlight/fog keyframes were retired with the rewrite. */
 
 .animate-pulse-live { animation: pulse-live 1.5s ease-in-out infinite; }
 .dot-active-pulse { animation: dotPulse 2s infinite; }

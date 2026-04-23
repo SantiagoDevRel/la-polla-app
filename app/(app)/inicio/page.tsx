@@ -706,7 +706,7 @@ export default async function InicioPage() {
   const showStrip = !isActiveEmpty && stripMatches.length >= 1;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0a1628] via-bg-base to-bg-base">
+    <div className="min-h-screen">
       {/* Block 1 - Header strip */}
       <header className="px-4 pt-4 pb-4">
         <div className="max-w-lg mx-auto flex items-center justify-between">

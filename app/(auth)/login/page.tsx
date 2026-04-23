@@ -215,15 +215,7 @@ function LoginInner() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden"
-      style={{
-        background:
-          "radial-gradient(80% 60% at 50% 0%, rgba(255,215,0,0.08), transparent 60%)," +
-          "radial-gradient(60% 50% at 80% 100%, rgba(0,230,118,0.05), transparent 60%)," +
-          "#080c10",
-      }}
-    >
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Step 1: Phone input */}
       {step === "phone" && (
         <div
