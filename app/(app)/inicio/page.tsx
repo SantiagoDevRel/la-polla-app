@@ -7,12 +7,16 @@
 // and redirect /dashboard here.
 //
 // Render order (mobile-first, single column, max-w-lg):
-//   1. Header (logo + wordmark left, user pollito avatar right)
+//   1. Centered tricolor header (LA POLLA COLOMBIANA + pollito pibe)
 //   2. Greeting (Hola + firstName + rank callout)
-//   3. Today's hero match (MatchHero) + inline quick-pick
-//   3b. Rival chip (nearest-neighbour callout), optional
-//   4. Live/upcoming strip (horizontal scroll of LiveChip), optional
-//   5. Podium carousel across active pollas (swipe between pollas)
+//   3. En vivo strip — horizontal scroll of LiveChips, live matches
+//      in user's tournaments, each with optional "Pronóstico: X-Y"
+//      or "Falta pronóstico" footer
+//   4. Próximos strip — scheduled matches inside user's pollas with
+//      kickoff today or tomorrow, capped at 15, tap-through to
+//      /pollas/{slug}?tab=partidos
+//   4b. Rival chip — nearest neighbour in user's top-ranked polla
+//   5. Podium carousel across active pollas
 //   6. Empty state (ActivePollasEmpty) replaces 3-5 when user has zero pollas
 //
 // Known workaround: uses createAdminClient() for polla_participants reads
@@ -21,23 +25,19 @@
 // explicit user-scope filter.
 
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPollitoBase } from "@/lib/pollitos";
-import {
-  getTournamentName,
-  TOURNAMENT_ICONS,
-} from "@/lib/tournaments";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { getLiveMatches } from "@/lib/football-api";
-import { MatchHero } from "@/components/match/MatchHero";
 import { LiveChip } from "@/components/match/LiveChip";
 import { ActivePollasEmpty } from "@/components/inicio/ActivePollasEmpty";
 import { PodiumCarousel } from "@/components/inicio/PodiumCarousel";
 import { GreetingHero } from "@/components/inicio/GreetingHero";
 import { RivalChip } from "@/components/inicio/RivalChip";
-import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
 // ─── Local types ───────────────────────────────────────────────────────
@@ -496,75 +496,14 @@ function pickRankCallout(activePollas: EnrichedPolla[]): { rank: number; pollaNa
 
 // ─── Quick-pick preset pool ────────────────────────────────────────────
 
-// Pool of plausible scoreline presets. Inicio samples 4 of these per
-// render so the quick-pick row never feels static. Chosen to balance
-// common low-scoring draws with realistic wins in both directions.
-const QUICK_PICK_POOL: ReadonlyArray<{ home: number; away: number }> = [
-  { home: 0, away: 0 },
-  { home: 1, away: 0 },
-  { home: 0, away: 1 },
-  { home: 2, away: 1 },
-  { home: 1, away: 2 },
-  { home: 1, away: 1 },
-  { home: 2, away: 2 },
-  { home: 3, away: 2 },
-  { home: 2, away: 3 },
-  { home: 3, away: 3 },
-];
-
-function sampleQuickPickPresets(n = 4): Array<{ home: number; away: number }> {
-  const pool = [...QUICK_PICK_POOL];
-  const out: Array<{ home: number; away: number }> = [];
-  while (out.length < n && pool.length > 0) {
-    const idx = Math.floor(Math.random() * pool.length);
-    out.push(pool.splice(idx, 1)[0]);
-  }
-  return out;
-}
-
-// ─── DB hero match → MatchHero props ───────────────────────────────────
-
 // Strip common prefixes/articles from a team name and take the first word
 // to get a 3-letter code fallback ("FC Barcelona" → "BAR",
-// "RC Celta de Vigo" → "CEL"). Used only when we have a DB match but no
-// shortCode column — safe approximation for display.
+// "RC Celta de Vigo" → "CEL"). Used by the Próximos chips since our
+// matches table does not store a TLA column.
 function teamShortCode(name: string): string {
   const cleaned = name.replace(/^(FC |CF |RC |Real |Club |Atlético |Athletic |AC |SC |Deportivo |CD )/i, "");
   const first = cleaned.split(/\s+/)[0] || cleaned;
   return first.slice(0, 3).toUpperCase();
-}
-
-function heroPropsFromDb(m: {
-  home_team: string;
-  away_team: string;
-  home_team_flag: string | null;
-  away_team_flag: string | null;
-  scheduled_at: string;
-  status: string;
-  tournament: string;
-}): React.ComponentProps<typeof MatchHero> {
-  const kickoffAt = new Date(m.scheduled_at);
-  const lockAt = m.status === "scheduled"
-    ? new Date(kickoffAt.getTime() - 5 * 60 * 1000)
-    : undefined;
-  return {
-    competition: {
-      name: getTournamentName(m.tournament) ?? m.tournament,
-      logoUrl: TOURNAMENT_ICONS[m.tournament],
-    },
-    kickoffAt,
-    homeTeam: {
-      name: m.home_team,
-      shortCode: teamShortCode(m.home_team),
-      crestUrl: m.home_team_flag ?? undefined,
-    },
-    awayTeam: {
-      name: m.away_team,
-      shortCode: teamShortCode(m.away_team),
-      crestUrl: m.away_team_flag ?? undefined,
-    },
-    lockAt,
-  };
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────
@@ -611,11 +550,6 @@ export default async function InicioPage() {
   // (adjacent ranks in the user's best polla); the callout is pure.
   const rankCallout = pickRankCallout(activePollas);
   const rival = isActiveEmpty ? null : await findRivalForUser(user.id, activePollas);
-  // Quick-pick target: the active polla that actually contains the hero
-  // match in its match_ids. Only then does a preset button have somewhere
-  // to post to; otherwise we hide the strip entirely.
-  let quickPickInitial: { home: number; away: number } | null = null;
-
   // Podium carousel: one card per active polla, ordered by created_at via
   // activePollas' existing sort. Default visible page = the polla with
   // the soonest upcoming match (smallest soonest_upcoming_ms). When every
@@ -655,65 +589,62 @@ export default async function InicioPage() {
     tournament: string;
   };
 
-  let heroDbMatch: HeroRow | null = null;
+  // Próximos strip scope: scheduled matches inside the user's pollas,
+  // kickoff between (now + 5 min) and end-of-tomorrow, in chronological
+  // order. Capped at 15 so the horizontal scroll is fast but every
+  // actionable kickoff for today/tomorrow is surfaced. Dropping the
+  // previous "hero" selector — Inicio no longer single-features one
+  // match inline; the full score input lives in the polla Partidos
+  // tab where bulk fills + auto-jump already work.
+  let upcomingStripMatches: HeroRow[] = [];
   if (allUserMatchIds.length > 0) {
-    // Only matches the user can actually predict on: status=scheduled AND
-    // kickoff is more than the 5-minute lock window in the future. Live
-    // and finished matches are intentionally skipped so the hero card is
-    // always actionable. Live scores belong in the strip below, not here.
     const lockCutoff = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const tomorrowEnd = new Date();
+    tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+    tomorrowEnd.setHours(23, 59, 59, 999);
     const { data: rows } = await admin
       .from("matches")
       .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, status, tournament")
       .in("id", allUserMatchIds)
       .eq("status", "scheduled")
       .gt("scheduled_at", lockCutoff)
+      .lt("scheduled_at", tomorrowEnd.toISOString())
       .order("scheduled_at", { ascending: true })
-      .limit(1);
-    heroDbMatch = ((rows || []) as HeroRow[])[0] ?? null;
+      .limit(15);
+    upcomingStripMatches = ((rows || []) as HeroRow[]);
   }
 
-  const heroPolla: EnrichedPolla | null = heroDbMatch
-    ? activePollas.find((p) => (p.match_ids || []).includes(heroDbMatch!.id)) ?? null
-    : null;
-
-  if (heroDbMatch && heroPolla) {
-    const { data: existingPred } = await admin
+  // Prediction map for the upcoming strip so each chip can surface
+  // "Tu pred: X-Y" or "Falta pronóstico".
+  const upcomingPredByMatch = new Map<string, { home: number; away: number }>();
+  if (upcomingStripMatches.length > 0) {
+    const { data: preds } = await admin
       .from("predictions")
-      .select("predicted_home, predicted_away")
-      .eq("polla_id", heroPolla.id)
+      .select("match_id, predicted_home, predicted_away")
       .eq("user_id", user.id)
-      .eq("match_id", heroDbMatch.id)
-      .maybeSingle();
-    if (existingPred) {
-      quickPickInitial = {
-        home: existingPred.predicted_home,
-        away: existingPred.predicted_away,
-      };
+      .in("match_id", upcomingStripMatches.map((m) => m.id));
+    for (const p of (preds || []) as Array<{
+      match_id: string;
+      predicted_home: number;
+      predicted_away: number;
+    }>) {
+      upcomingPredByMatch.set(p.match_id, {
+        home: p.predicted_home,
+        away: p.predicted_away,
+      });
     }
   }
 
-  // Live strip keeps using football-data for real-time live updates of
-  // the user's tournaments (separate concern from the hero selector).
-  const userLive = userTournaments.length > 0 ? await getLiveMatches(userTournaments) : [];
-
-  // Strip: LIVE matches the user can actually play (their tournaments
-  // only — no global fallback). The hero match is excluded so the strip
-  // never duplicates what is already featured above. Football-data ids
-  // are compared against external ids pulled from our matches table.
-  let heroExternalId: string | null = null;
-  if (heroDbMatch) {
-    const { data: ext } = await admin
-      .from("matches")
-      .select("external_id")
-      .eq("id", heroDbMatch.id)
-      .maybeSingle();
-    heroExternalId = (ext?.external_id as string | null | undefined) ?? null;
+  // Polla slug resolver for chip tap-through (→ /pollas/{slug}?tab=partidos).
+  function pollaForMatch(matchId: string): EnrichedPolla | null {
+    return (
+      activePollas.find((p) => (p.match_ids || []).includes(matchId)) ?? null
+    );
   }
-  const liveMatchesUser = userLive.filter(
-    (m) => !heroExternalId || m.id !== heroExternalId,
-  );
-  const stripMatches = liveMatchesUser
+
+  // Live strip uses football-data for real-time scores/minutes.
+  const userLive = userTournaments.length > 0 ? await getLiveMatches(userTournaments) : [];
+  const stripMatches = userLive
     .sort(
       (a, b) =>
         new Date(a.match_date).getTime() - new Date(b.match_date).getTime(),
@@ -855,30 +786,47 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 4 - Soonest hero match w/ inline quick-pick */}
-          {!isActiveEmpty && heroDbMatch ? (
-            <section className="px-4">
-              <MatchHero
-                {...heroPropsFromDb(heroDbMatch)}
-                myPrediction={quickPickInitial ?? undefined}
-                quickPickSlot={
-                  heroPolla ? (
-                    <QuickPickStrip
-                      pollaSlug={heroPolla.slug}
-                      pollaName={heroPolla.name}
-                      matchId={heroDbMatch.id}
-                      initialPrediction={quickPickInitial ?? undefined}
-                      presets={sampleQuickPickPresets(4)}
-                      locked={
-                        heroDbMatch.status === "live" ||
-                        heroDbMatch.status === "finished" ||
-                        new Date(heroDbMatch.scheduled_at).getTime() - Date.now() <
-                          5 * 60 * 1000
-                      }
-                    />
-                  ) : undefined
-                }
-              />
+          {/* Block 4 - Próximos strip: today + tomorrow, only the
+              user's polla matches. Chips tap through to
+              /pollas/{slug}?tab=partidos so the full score form sits
+              there, not here. Hidden when no eligible matches. */}
+          {!isActiveEmpty && upcomingStripMatches.length > 0 ? (
+            <section>
+              <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gold" aria-hidden="true" />
+                Próximos
+              </h2>
+              <div className="overflow-x-auto hide-scrollbar">
+                <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
+                  {upcomingStripMatches.map((m) => {
+                    const polla = pollaForMatch(m.id);
+                    const href = polla ? `/pollas/${polla.slug}?tab=partidos` : undefined;
+                    const myPred = upcomingPredByMatch.get(m.id);
+                    const predictionStatus = !myPred ? ("pending" as const) : undefined;
+                    const chip = (
+                      <LiveChip
+                        kind="upcoming"
+                        homeCode={teamShortCode(m.home_team)}
+                        awayCode={teamShortCode(m.away_team)}
+                        kickoffAt={new Date(m.scheduled_at)}
+                        myPrediction={myPred}
+                        predictionStatus={predictionStatus}
+                      />
+                    );
+                    return (
+                      <div key={m.id} className="snap-start">
+                        {href ? (
+                          <Link href={href} className="block">
+                            {chip}
+                          </Link>
+                        ) : (
+                          chip
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </section>
           ) : null}
 

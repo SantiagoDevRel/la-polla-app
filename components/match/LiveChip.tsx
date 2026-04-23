@@ -124,7 +124,7 @@ export function LiveChip(props: LiveChipProps) {
             )}
           >
             {myPrediction
-              ? `Tu pred: ${myPrediction.home}-${myPrediction.away}${
+              ? `Pronóstico: ${myPrediction.home}-${myPrediction.away}${
                   predictionStatus === "correct" ? " · vas bien" : ""
                 }`
               : "Falta pronóstico"}
