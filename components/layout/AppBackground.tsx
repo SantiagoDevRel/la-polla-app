@@ -49,11 +49,11 @@ export function AppBackground({
         loop
         playsInline
         preload="metadata"
-        poster="/videos/la-polla-background-poster.webp"
+        poster="/videos/nuevo-background-poster.webp"
         className="absolute inset-0 w-full h-full object-cover motion-reduce:hidden"
       >
-        <source src="/videos/la-polla-background.webm" type="video/webm" />
-        <source src="/videos/la-polla-background-lite.mp4" type="video/mp4" />
+        <source src="/videos/nuevo-background.webm" type="video/webm" />
+        <source src="/videos/nuevo-background-lite.mp4" type="video/mp4" />
       </video>
 
       {/* Static fallback image for users who opted out of motion. Hidden
@@ -62,7 +62,7 @@ export function AppBackground({
           instead of falling back to a flat color. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/videos/la-polla-background-poster.webp"
+        src="/videos/nuevo-background-poster.webp"
         alt=""
         className="absolute inset-0 w-full h-full object-cover hidden motion-reduce:block"
       />
