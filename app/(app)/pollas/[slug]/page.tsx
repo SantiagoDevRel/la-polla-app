@@ -17,7 +17,7 @@ import InlineScoringGuide from "@/components/polla/InlineScoringGuide";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { getPollitoByPosition } from "@/lib/pollitos";
-import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock } from "lucide-react";
+import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock } from "lucide-react";
 
 // Soccer-pitch icon for the Partidos tab — lucide's `Goal` glyph
 // reads as a flag/post at small sizes, so we render a miniature
