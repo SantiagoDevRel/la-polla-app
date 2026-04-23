@@ -115,7 +115,7 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                       </>
                     )}
                   </div>
-                  <div style={{ fontSize: 9, color: "#7a8499" }}>
+                  <div style={{ fontSize: 9, color: "#F5F7FA" }}>
                     {match.elapsed ? `${match.elapsed}'` : ""}
                   </div>
                 </div>
@@ -132,7 +132,7 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                       {match.home_team_flag ? (
                         <Image src={match.home_team_flag} alt={match.home_team} width={24} height={24} style={{ width: 24, height: 24, objectFit: "cover", borderRadius: "50%" }} />
                       ) : (
-                        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 7, color: "#7a8499", letterSpacing: "0.04em" }}>
+                        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 7, color: "#F5F7FA", letterSpacing: "0.04em" }}>
                           {match.home_team.substring(0, 3).toUpperCase()}
                         </span>
                       )}
@@ -146,7 +146,7 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                     <div style={{
                       fontFamily: "'Bebas Neue', sans-serif", fontSize: 26,
-                      color: isFinished ? "#7a8499" : "#f0f4ff",
+                      color: isFinished ? "#F5F7FA" : "#f0f4ff",
                       letterSpacing: "0.04em", lineHeight: 1,
                       display: "flex", alignItems: "center", gap: 2,
                     }}>
@@ -166,7 +166,7 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                       {match.away_team_flag ? (
                         <Image src={match.away_team_flag} alt={match.away_team} width={24} height={24} style={{ width: 24, height: 24, objectFit: "cover", borderRadius: "50%" }} />
                       ) : (
-                        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 7, color: "#7a8499", letterSpacing: "0.04em" }}>
+                        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 7, color: "#F5F7FA", letterSpacing: "0.04em" }}>
                           {match.away_team.substring(0, 3).toUpperCase()}
                         </span>
                       )}
@@ -269,11 +269,11 @@ function PollaSelectorWithLeaderboard({
               >
                 {/* Top: tournament + dot */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#7a8499", fontWeight: 500 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#F5F7FA", fontWeight: 500 }}>
                     {TOURNAMENT_ICONS[polla.tournament] ? (
                       <img src={TOURNAMENT_ICONS[polla.tournament]} alt="" style={{ width: 10, height: 10, objectFit: "contain", flexShrink: 0 }} />
                     ) : (
-                      <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#7a8499" strokeWidth="2" style={{ flexShrink: 0 }}>
+                      <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#F5F7FA" strokeWidth="2" style={{ flexShrink: 0 }}>
                         <path d="M6 9H4.5a2.5 2.5 0 010-5H6" /><path d="M18 9h1.5a2.5 2.5 0 000-5H18" />
                         <path d="M4 22h16" /><path d="M18 2H6v7a6 6 0 0012 0V2z" />
                       </svg>
@@ -298,7 +298,7 @@ function PollaSelectorWithLeaderboard({
                   {polla.name}
                 </div>
                 {/* Meta */}
-                <div style={{ fontSize: 10, color: "#7a8499", marginTop: 2 }}>
+                <div style={{ fontSize: 10, color: "#F5F7FA", marginTop: 2 }}>
                   <span style={{ color: "#FFD700", fontWeight: 600 }}>{polla.participantCount}</span> jugadores · <span style={{ color: "#FFD700", fontWeight: 600 }}>{formatCOP(polla.entryFee)}</span>
                 </div>
               </button>
@@ -342,7 +342,7 @@ function PollaSelectorWithLeaderboard({
           marginBottom: 10,
         }}>
           <div style={{
-            fontSize: 11, fontWeight: 600, color: "#7a8499",
+            fontSize: 11, fontWeight: 600, color: "#F5F7FA",
             marginBottom: 6, paddingBottom: 6,
             borderBottom: "1px solid rgba(255,255,255,0.05)",
           }}>
@@ -381,7 +381,7 @@ function PollaSelectorWithLeaderboard({
               <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: "#FFD700", letterSpacing: "0.05em" }}>
                 {entry.totalPoints}
               </span>
-              <span style={{ fontSize: 9, color: "#7a8499" }}>pts</span>
+              <span style={{ fontSize: 9, color: "#F5F7FA" }}>pts</span>
             </div>
           ))}
         </div>

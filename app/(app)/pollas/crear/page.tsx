@@ -371,7 +371,7 @@ export default function CrearPollaPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-text-primary">Selecciona los partidos</h2>
-                <p style={{ fontSize: 12, color: selectedMatchIds.size > 0 ? "#FFD700" : "#7a8499", fontWeight: selectedMatchIds.size > 0 ? 600 : 400 }}>
+                <p style={{ fontSize: 12, color: selectedMatchIds.size > 0 ? "#FFD700" : "#F5F7FA", fontWeight: selectedMatchIds.size > 0 ? 600 : 400 }}>
                   {selectedMatchIds.size > 0 ? `${selectedMatchIds.size} partidos seleccionados` : "Ningún partido seleccionado"}
                 </p>
               </div>
@@ -393,10 +393,10 @@ export default function CrearPollaPage() {
 
             {/* Quick actions */}
             <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={selectAll} style={{ fontSize: 11, color: "#7a8499", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline" }}>
+              <button onClick={selectAll} style={{ fontSize: 11, color: "#F5F7FA", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline" }}>
                 Seleccionar todo
               </button>
-              <button onClick={deselectAll} style={{ fontSize: 11, color: "#7a8499", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline" }}>
+              <button onClick={deselectAll} style={{ fontSize: 11, color: "#F5F7FA", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline" }}>
                 Deseleccionar todo
               </button>
             </div>
@@ -454,7 +454,7 @@ export default function CrearPollaPage() {
                             {m.home_team_flag ? (
                               <Image src={m.home_team_flag} alt={m.home_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                             ) : (
-                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#7a8499", flexShrink: 0 }}>
+                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#F5F7FA", flexShrink: 0 }}>
                                 {m.home_team.substring(0, 3).toUpperCase()}
                               </div>
                             )}
@@ -470,7 +470,7 @@ export default function CrearPollaPage() {
                             {m.away_team_flag ? (
                               <Image src={m.away_team_flag} alt={m.away_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                             ) : (
-                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#7a8499", flexShrink: 0 }}>
+                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#F5F7FA", flexShrink: 0 }}>
                                 {m.away_team.substring(0, 3).toUpperCase()}
                               </div>
                             )}
@@ -480,7 +480,7 @@ export default function CrearPollaPage() {
                           </div>
 
                           {/* Time */}
-                          <span style={{ fontSize: 10, color: "#7a8499", flexShrink: 0, minWidth: 36, textAlign: "right" }}>{time}</span>
+                          <span style={{ fontSize: 10, color: "#F5F7FA", flexShrink: 0, minWidth: 36, textAlign: "right" }}>{time}</span>
                         </div>
                       );
                     })}
@@ -499,7 +499,7 @@ export default function CrearPollaPage() {
               </span>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => goToStep(1)} style={{
-                  padding: "8px 14px", borderRadius: 10, background: "#131d2e", color: "#7a8499", border: "1px solid rgba(255,255,255,0.08)",
+                  padding: "8px 14px", borderRadius: 10, background: "#131d2e", color: "#F5F7FA", border: "1px solid rgba(255,255,255,0.08)",
                   fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit', sans-serif",
                 }}>
                   Atrás
@@ -537,14 +537,14 @@ export default function CrearPollaPage() {
                   return (
                     <button key={amount} type="button" onClick={() => { updateForm("buyInAmount", amount); setCustomBuyIn(false); }}
                       style={{ background: isSel ? "rgba(255,215,0,0.1)" : "#131d2e", border: isSel ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 8, padding: "6px 10px", color: isSel ? "#FFD700" : "#7a8499", fontSize: 12, fontWeight: isSel ? 700 : 500, cursor: "pointer", fontFamily: "'Outfit', sans-serif" }}>
+                        borderRadius: 8, padding: "6px 10px", color: isSel ? "#FFD700" : "#F5F7FA", fontSize: 12, fontWeight: isSel ? 700 : 500, cursor: "pointer", fontFamily: "'Outfit', sans-serif" }}>
                       {formatCOP(amount)}
                     </button>
                   );
                 })}
                 <button type="button" onClick={() => { setCustomBuyIn(true); updateForm("buyInAmount", 0); }}
                   style={{ background: customBuyIn ? "rgba(255,215,0,0.1)" : "#131d2e", border: customBuyIn ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 8, padding: "6px 10px", color: customBuyIn ? "#FFD700" : "#7a8499", fontSize: 12, fontWeight: customBuyIn ? 700 : 500, cursor: "pointer", fontFamily: "'Outfit', sans-serif" }}>
+                    borderRadius: 8, padding: "6px 10px", color: customBuyIn ? "#FFD700" : "#F5F7FA", fontSize: 12, fontWeight: customBuyIn ? 700 : 500, cursor: "pointer", fontFamily: "'Outfit', sans-serif" }}>
                   Otro valor
                 </button>
               </div>
@@ -568,7 +568,7 @@ export default function CrearPollaPage() {
                       <div className="w-full text-left p-4 rounded-xl border border-gold/30 bg-gold/10">
                         <div className="flex items-start gap-3">
                           <span className="flex-shrink-0 mt-0.5">
-                            <Smartphone className="w-6 h-6" style={{ color: "#7a8499" }} />
+                            <Smartphone className="w-6 h-6" style={{ color: "#F5F7FA" }} />
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
@@ -599,9 +599,9 @@ export default function CrearPollaPage() {
                           className={`w-full text-left p-4 rounded-xl border transition-all ${isSelected ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated cursor-pointer"}`}>
                           <div className="flex items-start gap-3">
                             <span className="flex-shrink-0 mt-0.5">
-                              {option.icon === "banknote" ? <Banknote className="w-6 h-6" style={{ color: "#7a8499" }} />
-                                : option.icon === "smartphone" ? <Smartphone className="w-6 h-6" style={{ color: "#7a8499" }} />
-                                : <Handshake className="w-6 h-6" style={{ color: "#7a8499" }} />}
+                              {option.icon === "banknote" ? <Banknote className="w-6 h-6" style={{ color: "#F5F7FA" }} />
+                                : option.icon === "smartphone" ? <Smartphone className="w-6 h-6" style={{ color: "#F5F7FA" }} />
+                                : <Handshake className="w-6 h-6" style={{ color: "#F5F7FA" }} />}
                             </span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
