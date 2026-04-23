@@ -41,6 +41,7 @@ function PitchIcon({ className }: { className?: string }) {
   );
 }
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
+import { computeLiveMinute, formatLiveMinute } from "@/lib/matches/live-minute";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 // ─── Tipos ───
@@ -281,20 +282,18 @@ function MatchRow({
             <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day)}</span>
           </span>
           {isLive ? (() => {
-            // Football-data's free tier sometimes omits the minute even
-            // for IN_PLAY matches. When our elapsed column is null,
-            // fall back to now − scheduled_at so the pill never just
-            // says "EN VIVO" with no clock.
-            let liveMinute: number | null = match.elapsed;
-            if (liveMinute == null && match.scheduled_at) {
-              const diffMs = Date.now() - new Date(match.scheduled_at).getTime();
-              const diffMin = Math.max(0, Math.floor(diffMs / 60000));
-              if (diffMin <= 120) liveMinute = diffMin;
-            }
+            // Always compute locally — football-data's minute is
+            // unreliable and our elapsed column mirrors it. The helper
+            // deducts a 15-minute halftime allowance so the clock
+            // aligns with broadcast time, and returns "90+" for
+            // stoppage.
+            const minuteLabel = formatLiveMinute(
+              computeLiveMinute(match.scheduled_at),
+            );
             return (
               <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
-                En vivo{liveMinute != null ? ` · ${liveMinute}'` : ""}
+                En vivo{minuteLabel ? ` · ${minuteLabel}` : ""}
               </span>
             );
           })() : isFinished ? (

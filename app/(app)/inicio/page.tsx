@@ -35,6 +35,7 @@ import {
 } from "@/lib/tournaments";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
+import { computeLiveMinute, formatLiveMinute } from "@/lib/matches/live-minute";
 import { getLiveMatches } from "@/lib/football-api";
 import { MatchHero } from "@/components/match/MatchHero";
 import { LiveChip } from "@/components/match/LiveChip";
@@ -828,22 +829,14 @@ export default async function InicioPage() {
                     const inMyPolla = uuid ? stripMatchInUserPolla.has(uuid) : false;
                     const predictionStatus =
                       !myPred && inMyPolla ? ("pending" as const) : undefined;
-                    // Fallback minute: football-data's free tier sometimes
-                    // omits the `minute` field even for IN_PLAY matches.
-                    // If so, compute a rough elapsed from kickoff so the
-                    // chip still reads "VIVO · 32'" instead of just
-                    // "VIVO". Live games max at ~95' regular time; we
-                    // cap at 120 so extra time still looks sane.
-                    let displayMinute = m.elapsed ?? undefined;
-                    if (
-                      displayMinute === undefined &&
-                      m.status === "live" &&
-                      m.match_date
-                    ) {
-                      const diffMs = Date.now() - new Date(m.match_date).getTime();
-                      const diffMin = Math.max(0, Math.floor(diffMs / 60000));
-                      if (diffMin <= 120) displayMinute = diffMin;
-                    }
+                    // Always compute the minute locally from kickoff +
+                    // halftime allowance so the clock aligns with
+                    // broadcast timing. Football-data's minute field is
+                    // unreliable on the free tier.
+                    const minuteLabel =
+                      m.status === "live"
+                        ? formatLiveMinute(computeLiveMinute(m.match_date)) ?? undefined
+                        : undefined;
                     return (
                       <div key={m.id} className="snap-start">
                         <LiveChip
@@ -852,7 +845,7 @@ export default async function InicioPage() {
                           awayCode={m.away_team_tla}
                           homeScore={m.status === "live" ? m.home_score ?? undefined : undefined}
                           awayScore={m.status === "live" ? m.away_score ?? undefined : undefined}
-                          minute={displayMinute}
+                          minuteLabel={minuteLabel}
                           kickoffAt={m.status !== "live" ? new Date(m.match_date) : undefined}
                           myPrediction={myPred}
                           predictionStatus={predictionStatus}

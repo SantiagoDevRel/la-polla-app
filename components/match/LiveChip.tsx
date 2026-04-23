@@ -9,7 +9,10 @@ export interface LiveChipProps {
   awayCode: string;
   homeScore?: number;
   awayScore?: number;
-  minute?: number;
+  /** Pre-formatted minute label, e.g. "34'" or "90+'". Pass exactly
+   *  what should render; the chip no longer does the formatting
+   *  itself so callers can share one helper (lib/matches/live-minute). */
+  minuteLabel?: string;
   kickoffAt?: Date;
   myPrediction?: { home: number; away: number };
   predictionStatus?: "correct" | "wrong" | "pending";
@@ -49,7 +52,7 @@ export function LiveChip(props: LiveChipProps) {
     awayCode,
     homeScore,
     awayScore,
-    minute,
+    minuteLabel,
     kickoffAt,
     myPrediction,
     predictionStatus,
@@ -78,7 +81,7 @@ export function LiveChip(props: LiveChipProps) {
               <span className="absolute inset-0 rounded-full bg-red-alert" />
             </span>
             <span className="font-display text-[11px] tracking-[0.06em] uppercase text-red-alert">
-              Vivo{typeof minute === "number" ? ` · ${minute}'` : ""}
+              Vivo{minuteLabel ? ` · ${minuteLabel}` : ""}
             </span>
           </>
         ) : (
