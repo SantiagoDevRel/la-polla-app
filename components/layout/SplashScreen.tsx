@@ -63,11 +63,11 @@ export function SplashScreen() {
         muted
         playsInline
         preload="auto"
-        poster="/videos/la-polla-background-poster.webp"
+        poster="/videos/nuevo-background-poster.webp"
         className="absolute inset-0 w-full h-full object-cover"
       >
-        <source src="/videos/la-polla-background.webm" type="video/webm" />
-        <source src="/videos/la-polla-background-lite.mp4" type="video/mp4" />
+        <source src="/videos/nuevo-background.webm" type="video/webm" />
+        <source src="/videos/nuevo-background-lite.mp4" type="video/mp4" />
       </video>
       <div className="absolute top-4 left-0 right-0 flex items-center justify-center gap-3 px-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
