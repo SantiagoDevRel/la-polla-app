@@ -52,7 +52,14 @@ const TIERS = [
   },
 ];
 
-export default function ScoringExplanation() {
+export default function ScoringExplanation({
+  compact = false,
+}: {
+  /** When true, renders a bare icon button (no "Cómo se puntúa?" label).
+   *  Used in the polla detail pot band so the helper coexists with the
+   *  pot copy without fighting for space. */
+  compact?: boolean;
+} = {}) {
   const [open, setOpen] = useState(false);
 
   // Lock body scroll mientras el card está abierto. overscroll-contain en el
@@ -71,10 +78,15 @@ export default function ScoringExplanation() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 text-xs text-text-secondary hover:text-gold transition-colors cursor-pointer"
+        aria-label="Cómo se puntúa"
+        className={
+          compact
+            ? "inline-flex items-center justify-center w-5 h-5 rounded-full text-text-primary hover:text-gold transition-colors cursor-pointer"
+            : "flex items-center gap-1.5 text-xs text-text-primary hover:text-gold transition-colors cursor-pointer"
+        }
       >
         <HelpCircle className="w-4 h-4" />
-        Como se puntua?
+        {compact ? null : "Cómo se puntúa?"}
       </button>
 
       {open && (
