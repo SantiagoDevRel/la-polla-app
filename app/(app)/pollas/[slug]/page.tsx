@@ -13,10 +13,33 @@ import EmptyState from "@/components/ui/EmptyState";
 import InviteModal from "@/components/polla/InviteModal";
 import PhoneInput from "@/components/ui/PhoneInput";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
+import InlineScoringGuide from "@/components/polla/InlineScoringGuide";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { getPollitoByPosition } from "@/lib/pollitos";
-import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, Goal, ChevronDown, Clock } from "lucide-react";
+import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock } from "lucide-react";
+
+// Soccer-pitch icon for the Partidos tab — lucide's `Goal` glyph
+// reads as a flag/post at small sizes, so we render a miniature
+// soccer field (outer rect, halfway line, centre circle) instead.
+function PitchIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2.5" y="5" width="19" height="14" rx="1.5" />
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <circle cx="12" cy="12" r="2.5" />
+    </svg>
+  );
+}
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import FootballLoader from "@/components/ui/FootballLoader";
 
@@ -745,7 +768,7 @@ export default function PollaSlugPage() {
     currentUserPaid === false &&
     !isOrganizer;
   const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
-    { key: "partidos", label: "Partidos", icon: <Goal className="w-4 h-4" />, show: true },
+    { key: "partidos", label: "Partidos", icon: <PitchIcon className="w-4 h-4" />, show: true },
     { key: "ranking", label: "Tabla", icon: <Trophy className="w-4 h-4" />, show: true },
     { key: "pagos", label: "Pagos", icon: <Banknote className="w-4 h-4" />, show: polla.payment_mode !== "pay_winner" },
     { key: "organizar", label: "Admin", icon: <Settings className="w-4 h-4" />, show: isOrganizer },
@@ -1160,13 +1183,14 @@ export default function PollaSlugPage() {
 
             <div className="rounded-2xl p-5 lp-card">
               <h4 className="font-bold text-text-primary mb-3">Sistema de puntos</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center"><span className="text-text-secondary">🎯 Marcador exacto</span><span className="font-bold text-gold">{polla.points_exact} pts</span></div>
-                <div className="flex justify-between items-center"><span className="text-text-secondary">⚽ Ganador + diferencia de gol</span><span className="font-bold text-gold">{polla.points_goal_diff ?? 3} pts</span></div>
-                <div className="flex justify-between items-center"><span className="text-text-secondary">✅ Ganador correcto</span><span className="font-bold text-gold">{polla.points_correct_result ?? 2} pts</span></div>
-                <div className="flex justify-between items-center"><span className="text-text-secondary">1️⃣ Un equipo exacto</span><span className="font-bold text-text-secondary">{polla.points_one_team} pt</span></div>
-                <div className="flex justify-between items-center"><span className="text-text-secondary">❌ Sin aciertos</span><span className="font-bold text-text-muted">0 pts</span></div>
-              </div>
+              <InlineScoringGuide
+                points={{
+                  exact: polla.points_exact,
+                  goalDiff: polla.points_goal_diff ?? 3,
+                  winner: polla.points_correct_result ?? 2,
+                  oneTeam: polla.points_one_team,
+                }}
+              />
             </div>
 
             {/* WhatsApp invite for admin of closed pollas */}

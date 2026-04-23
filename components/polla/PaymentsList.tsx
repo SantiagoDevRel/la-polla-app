@@ -82,11 +82,19 @@ export default function PaymentsList({
     }
   }
 
+  // Flat header row (no surrounding card) + one .lp-card per participant.
+  // Previously the whole list sat inside an outer lp-card, so every row
+  // rendered as a card-inside-a-card. Now the section reads as a single
+  // stack of participant cards, matching the Finalizados/Próximos
+  // pattern in Partidos.
   return (
-    <div className="rounded-2xl p-4 lp-card space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-text-primary">Pagos</h3>
-        <span className="text-[11px] text-text-muted">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="lp-section-title" style={{ fontSize: 14 }}>
+          Pagos
+          <span className="text-text-primary/60 font-normal ml-1.5">· {rows.length}</span>
+        </h3>
+        <span className="text-[11px] text-text-primary/70">
           {paymentMode === "digital_pool"
             ? "Pago digital · automático"
             : paymentMode === "admin_collects"
@@ -96,7 +104,7 @@ export default function PaymentsList({
       </div>
 
       {paymentMode === "pay_winner" && rows.length > 0 && (
-        <div className="rounded-xl px-3 py-2 bg-bg-elevated border border-border-subtle text-xs text-text-secondary text-center">
+        <div className="lp-card px-3 py-2 text-xs text-text-primary/80 text-center">
           Pendiente hasta que haya ganador — al final, todos le pagan directamente.
         </div>
       )}
@@ -116,7 +124,7 @@ export default function PaymentsList({
             return (
               <li
                 key={p.id}
-                className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 bg-bg-elevated border border-border-subtle"
+                className="lp-card flex items-center justify-between gap-3 px-3 py-2.5"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-text-primary truncate">
