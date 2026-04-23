@@ -91,7 +91,7 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
       width: 24, height: 24, borderRadius: "50%",
       background: "#1a2540", display: "flex",
       alignItems: "center", justifyContent: "center",
-      fontSize: 8, fontWeight: 700, color: "#7a8499",
+      fontSize: 8, fontWeight: 700, color: "#F5F7FA",
     }}>
       {teamName.slice(0, 3).toUpperCase()}
     </span>
@@ -487,7 +487,7 @@ export default function PollaSlugPage() {
               className={`flex-shrink-0 px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
                 activeTab === t.key ? "text-gold border-gold" : "text-text-muted border-transparent hover:text-text-secondary"
               }`}
-              style={{ color: activeTab === t.key ? "#FFD700" : "#7a8499" }}
+              style={{ color: activeTab === t.key ? "#FFD700" : "#F5F7FA" }}
             >
               {t.icon}
               {t.label}

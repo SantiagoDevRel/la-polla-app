@@ -162,7 +162,7 @@ export default function PerfilPage() {
                       }}
                     >
                       <img src={getPollitoBase(p.id)} alt={p.label} style={{ width: 40, height: 40, objectFit: "contain" }} />
-                      <span style={{ fontSize: 8, color: isSelected ? "#FFD700" : "#7a8499", fontWeight: isSelected ? 600 : 400, textAlign: "center", lineHeight: 1.2 }}>
+                      <span style={{ fontSize: 8, color: isSelected ? "#FFD700" : "#F5F7FA", fontWeight: isSelected ? 600 : 400, textAlign: "center", lineHeight: 1.2 }}>
                         {p.label}
                       </span>
                     </button>
@@ -193,7 +193,7 @@ export default function PerfilPage() {
             </button>
           )}
           <p className="text-text-secondary text-sm mt-1 flex items-center gap-1">
-            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#7a8499" strokeWidth="2">
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#F5F7FA" strokeWidth="2">
               <rect x="5" y="2" width="14" height="20" rx="2" /><circle cx="12" cy="17" r="1" />
             </svg>
             {profile.whatsapp_number}
@@ -217,7 +217,9 @@ export default function PerfilPage() {
         {/* Actividad reciente */}
         {activity.length > 0 && (
           <div style={{
-            background: "#0e1420",
+            background: "rgba(14, 20, 32, 0.65)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
             border: "1px solid rgba(255,255,255,0.06)",
             borderRadius: 14,
             padding: 14,
@@ -241,13 +243,13 @@ export default function PerfilPage() {
               >
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "#f0f4ff" }}>{item.matchName}</div>
-                  <div style={{ fontSize: 10, color: "#7a8499", marginTop: 1 }}>{item.pollaName}</div>
+                  <div style={{ fontSize: 10, color: "#F5F7FA", marginTop: 1 }}>{item.pollaName}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div className="font-display" style={{ fontSize: 20, color: pointsColor(item.pointsEarned), letterSpacing: "0.05em" }}>
                     +{item.pointsEarned}
                   </div>
-                  <div style={{ fontSize: 9, color: "#7a8499" }}>pts</div>
+                  <div style={{ fontSize: 9, color: "#F5F7FA" }}>pts</div>
                 </div>
               </div>
             ))}
@@ -256,7 +258,9 @@ export default function PerfilPage() {
 
         {/* ¿Cómo se puntúa? */}
         <div style={{
-          background: "#0e1420",
+          background: "rgba(14, 20, 32, 0.65)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
           border: "1px solid rgba(255,255,255,0.06)",
           borderRadius: 14,
           padding: 14,

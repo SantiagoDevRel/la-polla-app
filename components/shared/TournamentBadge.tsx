@@ -24,7 +24,7 @@ function FallbackTrophy({ size }: { size: number }) {
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke="#7a8499"
+      stroke="#F5F7FA"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"

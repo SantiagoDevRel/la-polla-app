@@ -23,10 +23,13 @@
   /* semantic */
   --red-alert:       #FF3D57;
 
-  /* text */
+  /* text — all tiers forced to off-white for readability over the
+     looping stadium video. Previous greys (#AEB7C7, #6B7689) washed
+     out against the moving background; hierarchy is now carried by
+     font weight + size instead of colour intensity. */
   --text-primary:    #F5F7FA;
-  --text-secondary:  #AEB7C7;
-  --text-muted:      #6B7689;
+  --text-secondary:  #F5F7FA;
+  --text-muted:      #F5F7FA;
 
   /* RGB triplets — used by Tailwind utilities so alpha modifiers
      (`bg-gold/10`, `border-amber/25`, etc.) produce the expected tint.
@@ -40,8 +43,8 @@
   --turf-rgb:         31 216 127;
   --red-alert-rgb:    255 61 87;
   --text-primary-rgb: 245 247 250;
-  --text-secondary-rgb: 174 183 199;
-  --text-muted-rgb:   107 118 137;
+  --text-secondary-rgb: 245 247 250;
+  --text-muted-rgb:   245 247 250;
 
   /* borders */
   --border-subtle:   rgba(255, 255, 255, 0.06);

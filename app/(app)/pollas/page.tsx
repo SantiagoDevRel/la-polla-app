@@ -89,7 +89,7 @@ export default function MisPollasPage() {
       <header className="px-4 pt-4 pb-3" style={{ background: "linear-gradient(180deg, #0a1628 0%, var(--bg-base) 100%)" }}>
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button onClick={() => router.push("/inicio")} className="text-text-secondary text-xl">
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#7a8499" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#F5F7FA" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
           </button>
           <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2">

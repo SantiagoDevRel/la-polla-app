@@ -143,7 +143,7 @@ export default function OnboardingPage() {
             <h1 className="font-display text-gold" style={{ fontSize: 28, letterSpacing: "0.1em" }}>
               ¿Cómo te llamas?
             </h1>
-            <p style={{ color: "#7a8499", fontSize: 13, marginTop: 4 }}>
+            <p style={{ color: "#F5F7FA", fontSize: 13, marginTop: 4 }}>
               Los demás participantes verán este nombre
             </p>
           </div>
@@ -223,7 +223,7 @@ export default function OnboardingPage() {
             >
               ELEGÍ TU POLLITO
             </h1>
-            <p style={{ color: "#7a8499", fontSize: 13, marginTop: 4 }}>
+            <p style={{ color: "#F5F7FA", fontSize: 13, marginTop: 4 }}>
               Tu avatar en todas las pollas
             </p>
           </div>
@@ -304,7 +304,7 @@ export default function OnboardingPage() {
                   />
                   <span style={{
                     fontSize: 9,
-                    color: isSelected ? "#FFD700" : "#7a8499",
+                    color: isSelected ? "#FFD700" : "#F5F7FA",
                     fontWeight: isSelected ? 600 : 400,
                     fontFamily: "'Outfit', sans-serif",
                     textAlign: "center",
@@ -330,7 +330,7 @@ export default function OnboardingPage() {
               style={{
                 flex: 1,
                 background: "#131d2e",
-                color: "#7a8499",
+                color: "#F5F7FA",
                 fontWeight: 600,
                 padding: "12px",
                 borderRadius: 11,
