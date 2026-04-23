@@ -17,24 +17,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-async function getNavContext(): Promise<{ pollito?: string; unread: number }> {
+async function getNavContext(): Promise<{ unread: number }> {
   try {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { unread: 0 };
     const admin = createAdminClient();
-    const [userRow, unreadCount] = await Promise.all([
-      admin.from("users").select("avatar_url").eq("id", user.id).maybeSingle(),
-      admin
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .is("read_at", null),
-    ]);
-    return {
-      pollito: userRow.data?.avatar_url ?? undefined,
-      unread: unreadCount.count ?? 0,
-    };
+    const { count } = await admin
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .is("read_at", null);
+    return { unread: count ?? 0 };
   } catch {
     return { unread: 0 };
   }
@@ -45,7 +39,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { pollito, unread } = await getNavContext();
+  const { unread } = await getNavContext();
 
   return (
     <ToastProvider>
@@ -53,11 +47,7 @@ export default async function AppLayout({
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">
         {children}
       </div>
-      <BottomNav
-        createHref="/pollas/crear"
-        fabPollito={pollito}
-        notifUnread={unread}
-      />
+      <BottomNav createHref="/pollas/crear" notifUnread={unread} />
     </ToastProvider>
   );
 }
