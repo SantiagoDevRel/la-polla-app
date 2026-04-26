@@ -268,6 +268,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
+    // Inserts go through the admin client because auth.uid() does not
+    // propagate from the SSR cookie session into the PostgREST request
+    // (see TODO in CLAUDE.md). Without this every INSERT silently fails
+    // the with_check `auth.uid() = created_by` and bubbles up as
+    // "Error al crear la polla". We scope the inserts explicitly with
+    // user.id from the verified session so we keep the same security
+    // guarantee RLS would have given us.
+    const admin = createAdminClient();
+
     const body = await request.json();
     const parsed = createPollaSchema.safeParse(body);
 
@@ -289,7 +298,7 @@ export async function POST(request: NextRequest) {
     // Si falla tras los reintentos se aborta la creación con un 500 explicito.
     let joinCode: string;
     try {
-      joinCode = await generateUniqueJoinCode(createAdminClient());
+      joinCode = await generateUniqueJoinCode(admin);
     } catch (codeErr) {
       console.error("[pollas POST] generateUniqueJoinCode failed:", codeErr);
       return NextResponse.json(
@@ -299,7 +308,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insertar la polla con los campos del modo de pago + match_ids
-    const { data: polla, error } = await supabase
+    const { data: polla, error } = await admin
       .from("pollas")
       .insert({
         name: parsed.data.name,
@@ -328,7 +337,7 @@ export async function POST(request: NextRequest) {
       // ya generado porque el insert fallo por el slug, no por el codigo.
       if (error.code === "23505" && error.message.includes("slug")) {
         const uniqueSlug = `${slug}-${Math.random().toString(36).substring(2, 6)}`;
-        const { data: retryPolla, error: retryError } = await supabase
+        const { data: retryPolla, error: retryError } = await admin
           .from("pollas")
           .insert({
             name: parsed.data.name,
@@ -347,6 +356,7 @@ export async function POST(request: NextRequest) {
             match_ids: parsed.data.matchIds || null,
             created_by: user.id,
             join_code: joinCode,
+            prize_distribution: parsed.data.prizeDistribution ?? null,
           })
           .select()
           .single();
@@ -359,7 +369,7 @@ export async function POST(request: NextRequest) {
         // joining via /api/pollas/[slug]/join. The admin counts toward pozo
         // and shows up as paid in the Pagos tab from day one.
         try {
-          const { error: joinError } = await supabase.from("polla_participants").insert({
+          const { error: joinError } = await admin.from("polla_participants").insert({
             polla_id: retryPolla.id,
             user_id: user.id,
             role: "admin",
@@ -387,7 +397,7 @@ export async function POST(request: NextRequest) {
     // via /api/pollas/[slug]/join. The admin counts toward pozo and shows up
     // as paid in the Pagos tab from day one.
     try {
-      const { error: joinError } = await supabase.from("polla_participants").insert({
+      const { error: joinError } = await admin.from("polla_participants").insert({
         polla_id: polla.id,
         user_id: user.id,
         role: "admin",
