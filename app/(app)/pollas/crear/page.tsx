@@ -86,10 +86,21 @@ export default function CrearPollaPage() {
     name: "",
     tournament: "champions_2025",
     type: "closed",
-    buyInAmount: 10000,
+    // 0 = vacío. El input formatea "" cuando es 0 y muestra el placeholder
+    // "10000" en gris para sugerir el mínimo sin pre-llenarlo.
+    buyInAmount: 0,
     paymentMode: "pay_winner",
     adminPaymentInstructions: "",
   });
+
+  // Scroll-to-top entre pasos. Sin esto el browser preserva la posición
+  // del scroll del paso anterior y el usuario aparece a la mitad de la
+  // pantalla nueva.
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    }
+  }, [step]);
 
   // Match selection state
   const [matches, setMatches] = useState<MatchRow[]>([]);
@@ -328,12 +339,6 @@ export default function CrearPollaPage() {
               </div>
             </div>
 
-            {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
-            <button type="button" onClick={() => goToStep(2)}
-              className="w-full bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all text-lg flex items-center justify-center gap-2 cursor-pointer"
-              style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}>
-              Siguiente <ChevronRight className="w-5 h-5" />
-            </button>
           </motion.div>
         )}
 
@@ -462,35 +467,6 @@ export default function CrearPollaPage() {
               })
             )}
 
-            {/* Sticky bottom bar — sits 12px ABOVE the BottomNav (which is
-                at bottom:14 + h:76 = 90px from the screen bottom). Using
-                bottom:104 leaves a small visible gap so the bar never
-                tucks under the nav. */}
-            <div style={{
-              position: "fixed", bottom: 104, left: 0, right: 0, background: "#080c10", borderTop: "1px solid #1a2540", padding: "12px 16px",
-              display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 40,
-            }}>
-              <span style={{ fontSize: 12, color: selectedMatchIds.size > 0 ? "#f0f4ff" : "#4a5568" }}>
-                {selectedMatchIds.size > 0 ? `${selectedMatchIds.size} partidos` : "Ningún partido"}
-              </span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => goToStep(1)} style={{
-                  padding: "8px 14px", borderRadius: 10, background: "#131d2e", color: "#F5F7FA", border: "1px solid rgba(255,255,255,0.08)",
-                  fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit', sans-serif",
-                }}>
-                  Atrás
-                </button>
-                <button onClick={() => goToStep(3)} disabled={selectedMatchIds.size === 0} style={{
-                  padding: "8px 18px", borderRadius: 10, background: selectedMatchIds.size > 0 ? "#FFD700" : "rgba(255,215,0,0.3)", color: "#080c10",
-                  fontSize: 13, fontWeight: 700, cursor: selectedMatchIds.size > 0 ? "pointer" : "default", fontFamily: "'Outfit', sans-serif",
-                  opacity: selectedMatchIds.size === 0 ? 0.4 : 1, border: "none",
-                }}>
-                  Continuar →
-                </button>
-              </div>
-            </div>
-
-            {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
           </div>
         )}
 
@@ -522,7 +498,7 @@ export default function CrearPollaPage() {
                     updateForm("buyInAmount", digits ? parseInt(digits, 10) : 0);
                   }}
                   placeholder="10000"
-                  className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
+                  className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted/40 focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
                 />
               </div>
             </div>
@@ -601,20 +577,77 @@ export default function CrearPollaPage() {
               </p>
             </div>
 
-            {error && <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-3">{error}</p>}
-            <div className="flex gap-3">
-              <button type="button" onClick={() => goToStep(2)} className="flex-1 font-bold py-4 rounded-xl bg-bg-card text-text-secondary border border-border-subtle hover:border-gold/30 cursor-pointer">
-                <span className="flex items-center justify-center gap-1"><ArrowLeft className="w-4 h-4" /> Atrás</span>
-              </button>
-              <button type="button" onClick={handleSubmit} disabled={loading}
-                className="flex-1 bg-gold text-bg-base font-bold py-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
-                style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}>
-                {loading ? "Creando..." : <><span>Crear polla</span><Trophy className="w-5 h-5" /></>}
-              </button>
-            </div>
           </motion.div>
         )}
       </main>
+
+      {/* Sticky wizard footer — visible en los 3 pasos. Reemplaza la
+          BottomNav (que se auto-oculta en /pollas/crear). Cancelar
+          siempre vuelve a /pollas; Atrás aparece desde el paso 2; el
+          botón principal cambia de "Continuar →" a "Crear polla 🏆"
+          en el paso final. */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: "#080c10",
+          borderTop: "1px solid #1a2540",
+          padding: "12px 16px env(safe-area-inset-bottom, 12px)",
+          zIndex: 40,
+        }}
+      >
+        {error && (
+          <div className="max-w-lg mx-auto mb-2">
+            <p className="text-red-alert text-xs text-center bg-red-dim rounded-lg py-1.5 px-3">{error}</p>
+          </div>
+        )}
+        <div className="max-w-lg mx-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/pollas")}
+            className="px-4 py-2.5 rounded-xl text-text-muted hover:text-text-primary text-sm font-medium transition-colors"
+          >
+            Cancelar
+          </button>
+          {step > 1 && (
+            <button
+              type="button"
+              onClick={() => goToStep((step - 1) as Step)}
+              className="px-4 py-2.5 rounded-xl bg-bg-elevated text-text-secondary border border-border-subtle hover:border-gold/30 text-sm font-semibold inline-flex items-center gap-1"
+            >
+              <ArrowLeft className="w-4 h-4" /> Atrás
+            </button>
+          )}
+          <div className="flex-1" />
+          {step < 3 ? (
+            <button
+              type="button"
+              onClick={() => goToStep((step + 1) as Step)}
+              disabled={step === 2 && selectedMatchIds.size === 0}
+              className="px-5 py-2.5 rounded-xl bg-gold text-bg-base font-bold text-sm inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ boxShadow: "0 0 16px rgba(255,215,0,0.18)" }}
+            >
+              Continuar <ChevronRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading}
+              className="px-5 py-2.5 rounded-xl bg-gold text-bg-base font-bold text-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ boxShadow: "0 0 20px rgba(255,215,0,0.25)" }}
+            >
+              {loading ? "Creando..." : (
+                <>
+                  Crear polla <Trophy className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

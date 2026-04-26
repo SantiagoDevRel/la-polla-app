@@ -91,6 +91,12 @@ export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }
   const resolvedActive = active ?? deriveActive(pathname);
   const [left, middleLeft, middleRight, right] = TABS;
 
+  // Hide the entire navbar inside flows that need full-screen focus
+  // (currently only the create-polla wizard). The wizard renders its
+  // own sticky Cancelar/Atrás/Continuar bar at the bottom, so the
+  // BottomNav would just collide with it.
+  const hideNav = pathname?.startsWith("/pollas/crear") ?? false;
+
   // Tapping the FAB opens the small choice sheet. That sheet hands off
   // either to createHref (or the onCreatePolla callback, if no href) or
   // to the join-by-code sheet.
@@ -109,6 +115,8 @@ export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }
   const fabStyle: React.CSSProperties = {
     boxShadow: "0 4px 16px -4px rgba(255,215,0,0.45)",
   };
+
+  if (hideNav) return null;
 
   return (
     <>
