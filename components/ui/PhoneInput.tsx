@@ -169,8 +169,8 @@ export default function PhoneInput({ onChange }: PhoneInputProps) {
           type="tel"
           value={localNumber}
           onChange={(e) => setLocalNumber(e.target.value.replace(/\D/g, ""))}
-          placeholder="3117312391"
-          className="flex-1 px-3 py-3 outline-none text-lg min-w-0 bg-bg-base text-text-primary placeholder:text-text-muted"
+          placeholder="311 731 2391"
+          className="flex-1 px-3 py-3 outline-none text-lg min-w-0 bg-bg-base text-text-primary placeholder:text-text-muted/50"
           required
         />
       </div>

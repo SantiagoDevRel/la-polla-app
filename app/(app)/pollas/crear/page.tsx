@@ -14,6 +14,9 @@ import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Handshake, Lock
 import { formatCOP } from "@/lib/formatCurrency";
 import { TOURNAMENTS } from "@/lib/tournaments";
 import FootballLoader from "@/components/ui/FootballLoader";
+import PrizeDistributionForm, {
+  type PrizeDistribution,
+} from "@/components/polla/PrizeDistributionForm";
 
 // ─── Tipos ───
 
@@ -80,6 +83,7 @@ export default function CrearPollaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [customBuyIn, setCustomBuyIn] = useState(false);
+  const [prizeDistribution, setPrizeDistribution] = useState<PrizeDistribution | null>(null);
   const [form, setForm] = useState<FormState>({
     name: "",
     tournament: "champions_2025",
@@ -232,6 +236,7 @@ export default function CrearPollaPage() {
         ...form,
         scope: "custom",
         matchIds: Array.from(selectedMatchIds),
+        prizeDistribution: prizeDistribution ?? undefined,
       });
       if (data.polla) {
         router.push(`/pollas/${data.polla.slug}`);
@@ -573,6 +578,27 @@ export default function CrearPollaPage() {
                   className="w-full px-4 py-3 rounded-xl outline-none resize-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50" />
               </div>
             )}
+
+            {/* Sección 3: Premios (opcional) */}
+            <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-gold" />
+                <h2 className="text-base font-bold text-text-primary">Premios</h2>
+                <span className="text-[10px] uppercase tracking-wide text-text-muted ml-auto">
+                  Opcional
+                </span>
+              </div>
+              <p className="text-xs text-text-muted">
+                Definí cómo se reparten los premios entre los puestos. Podés modificarlo después
+                desde el panel del organizador.
+              </p>
+              <PrizeDistributionForm
+                pot={0}
+                initial={prizeDistribution}
+                onChange={setPrizeDistribution}
+                optional
+              />
+            </div>
 
             {/* Summary */}
             <div className="rounded-xl p-4 flex items-start gap-2.5 bg-bg-elevated border border-border-subtle">
