@@ -22,7 +22,7 @@ const createPollaSchema = z
     description: z.string().optional(),
     tournament: z.string().min(1, "El torneo es requerido"),
     scope: z.enum(["full", "group_stage", "knockouts", "custom"]).default("full"),
-    type: z.enum(["open", "closed"]).default("closed"),
+    type: z.literal("closed").default("closed"),
     buyInAmount: z.number().min(0, "El valor de entrada no puede ser negativo"),
     paymentMode: z.enum(paymentModes),
     matchIds: z.array(z.string()).optional(),

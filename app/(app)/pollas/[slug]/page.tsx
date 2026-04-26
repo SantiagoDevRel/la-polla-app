@@ -17,7 +17,7 @@ import InlineScoringGuide from "@/components/polla/InlineScoringGuide";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { getPollitoByPosition } from "@/lib/pollitos";
-import { Target, Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock } from "lucide-react";
+import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock } from "lucide-react";
 
 // Soccer-pitch icon for the Partidos tab — lucide's `Goal` glyph
 // reads as a flag/post at small sizes, so we render a miniature
@@ -456,8 +456,6 @@ export default function PollaSlugPage() {
 
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
   const [savingAll, setSavingAll] = useState(false);
-  const [isNonParticipant, setIsNonParticipant] = useState(false);
-  const [joining, setJoining] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
   const [finishedOpen, setFinishedOpen] = useState(false);
   // Which upcoming-date groups are currently expanded. Defaults to the
@@ -578,7 +576,6 @@ export default function PollaSlugPage() {
       setCurrentUserRole(data.currentUserRole);
       setCurrentUserStatus(data.currentUserStatus || "approved");
       setCurrentUserPaid(data.currentUserPaid ?? true);
-      setIsNonParticipant(data.isNonParticipant || false);
       const d: Record<string, { home: string; away: string }> = {};
       data.predictions.forEach((p: Prediction) => {
         d[p.match_id] = { home: p.predicted_home.toString(), away: p.predicted_away.toString() };
@@ -667,83 +664,6 @@ export default function PollaSlugPage() {
           <div className="mb-3"><Info className="w-10 h-10 text-text-muted mx-auto" /></div>
           <p className="text-text-primary font-medium mb-4">{error || "Polla no encontrada"}</p>
           <button onClick={() => router.push("/inicio")} className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold">
-            Volver
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  async function joinPolla() {
-    setJoining(true);
-    try {
-      await axios.post<{ joined: boolean }>(`/api/pollas/${slug}/join`);
-      showToast("Te uniste a la polla", "success");
-      setIsNonParticipant(false);
-      loadData();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      const msg = e.response?.data?.error || "Error al unirse";
-      showToast(
-        msg === "invite_required"
-          ? "Esta polla es privada. Necesitas un link de invitación válido del organizador."
-          : msg,
-        "error",
-      );
-    } finally {
-      setJoining(false);
-    }
-  }
-
-  // Non-participant view for open pollas (hide join if finalized)
-  if (isNonParticipant && polla.type === "open" && polla.status !== "ended") {
-    return (
-      <div className="min-h-screen">
-        <header className="px-4 pt-4 pb-3">
-          <div className="max-w-lg mx-auto">
-            <div className="flex items-center gap-3 mb-2">
-              <button onClick={() => router.push("/pollas")} className="text-text-secondary text-xl">←</button>
-              <h1 className="text-lg font-bold text-text-primary truncate flex-1">{polla.name}</h1>
-            </div>
-          </div>
-        </header>
-        <main className="max-w-lg mx-auto p-4 space-y-4">
-          <div className="rounded-2xl p-6 text-center lp-card space-y-4">
-            <Target className="w-12 h-12 text-gold mx-auto" />
-            <h2 className="font-display text-2xl text-text-primary tracking-wide">POLLA ABIERTA</h2>
-            {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-xl p-2 bg-bg-elevated">
-                <p className="text-[10px] text-text-muted">Torneo</p>
-                <p className="font-medium text-text-primary text-sm">{getTournamentBySlug(polla.tournament)?.name || polla.tournament}</p>
-              </div>
-              <div className="rounded-xl p-2 bg-bg-elevated">
-                <p className="text-[10px] text-text-muted">Buy-in</p>
-                <p className="font-medium text-text-primary text-sm">${polla.buy_in_amount?.toLocaleString("es-CO")} {polla.currency}</p>
-              </div>
-            </div>
-            <button
-              onClick={joinPolla}
-              disabled={joining}
-              className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer"
-            >
-              {joining ? "Uniéndose..." : "Unirse a la polla"}
-            </button>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Non-participant view for closed pollas (should rarely reach here due to API 403)
-  if (isNonParticipant && polla.type === "closed") {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="rounded-2xl p-6 text-center max-w-sm w-full lp-card space-y-3">
-          <Lock className="w-10 h-10 text-text-muted mx-auto" />
-          <p className="text-text-primary font-medium">Esta polla es privada</p>
-          <p className="text-sm text-text-secondary">El admin debe invitarte para participar.</p>
-          <button onClick={() => router.push("/pollas")} className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold cursor-pointer">
             Volver
           </button>
         </div>
@@ -1164,8 +1084,8 @@ export default function PollaSlugPage() {
               />
             </div>
 
-            {/* WhatsApp invite for admin of closed pollas */}
-            {currentUserRole === "admin" && polla.type === "closed" && (
+            {/* WhatsApp invite for the admin to share the polla */}
+            {currentUserRole === "admin" && (
               <div className="rounded-2xl p-5 lp-card space-y-3">
                 <h4 className="font-bold text-text-primary flex items-center gap-2">
                   <Handshake className="w-4 h-4 text-gold" /> Invitar participante

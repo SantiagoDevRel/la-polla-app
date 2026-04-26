@@ -1,19 +1,17 @@
-// next.config.mjs — Configuración de Next.js con soporte PWA via next-pwa
-import withPWAInit from "next-pwa";
+// next.config.mjs — Configuración de Next.js + PWA via @serwist/next.
+// Reemplaza next-pwa (abandonado desde 2023). Serwist es el sucesor
+// mantenido del mismo modelo Workbox; las reglas de cache viven en
+// app/sw.ts en lugar de inferirse del config.
+import withSerwistInit from "@serwist/next";
 
-const withPWA = withPWAInit({
-  dest: "public",
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  // No SW en development — el rebuild constante deja entradas precache
+  // huérfanas y empezás a debuggear cosas que no son tuyas.
   disable: process.env.NODE_ENV === "development",
-  register: true,
-  skipWaiting: true,
-  // Never precache state-specific flows. OTP exchange, login bootstrap,
-  // and one-time invite tokens must always hit the network so a stale SW
-  // cannot serve an expired or impersonated response.
-  buildExcludes: [
-    /^\/api\/auth\//,
-    /^\/login/,
-    /^\/invites\/polla\//,
-  ],
+  // Reload de pestañas que estaban cargadas cuando vuelve la conexión.
+  reloadOnOnline: true,
 });
 
 /** @type {import('next').NextConfig} */
@@ -86,4 +84,4 @@ const nextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+export default withSerwist(nextConfig);

@@ -1,13 +1,11 @@
 // app/api/pollas/[slug]/join/route.ts — Unirse a una polla.
 //
-// A partir del rediseño Dev 5, no existe estado "pending" para participantes:
-// el usuario está IN (status='approved') o OUT (sin fila).
+// Todas las pollas son privadas (type='closed'). Para entrar:
+//   · invite_token en el body — corresponde a pollas.invite_token (link
+//     compartido por el organizador). Sin token válido → 403 invite_required.
+//   · alternativa: /api/pollas/join-by-code (código de 6 caracteres).
 //
-// - Pollas abiertas (type='open'): insert approved.
-// - Pollas cerradas (type='closed'):
-//     · se entra por token de invitación abierto (URL ?token=xxx que coincide
-//       con pollas.invite_token) — body { invite_token: 'xxx' }.
-//     · sin token válido el endpoint responde 403 con error 'invite_required'.
+// No existe estado "pending" — el usuario está IN (status='approved') o OUT.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -52,17 +50,16 @@ export async function POST(
       return NextResponse.json({ error: msg }, { status: 400 });
     }
 
-    if (polla.type === "closed") {
-      const tokenMatches =
-        !!providedInviteToken &&
-        !!polla.invite_token &&
-        providedInviteToken === polla.invite_token;
-      if (!tokenMatches) {
-        return NextResponse.json(
-          { error: "invite_required" },
-          { status: 403 }
-        );
-      }
+    // Toda polla es privada — siempre se requiere invite_token válido.
+    const tokenMatches =
+      !!providedInviteToken &&
+      !!polla.invite_token &&
+      providedInviteToken === polla.invite_token;
+    if (!tokenMatches) {
+      return NextResponse.json(
+        { error: "invite_required" },
+        { status: 403 }
+      );
     }
 
     // Already in?

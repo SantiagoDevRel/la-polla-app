@@ -1128,15 +1128,7 @@ export async function handleJoinPolla(
     return;
   }
 
-  if (polla.type === "closed") {
-    await sendTextMessage(
-      phone,
-      `Esa polla es privada parce, necesitás invitación del admin para entrar.`
-    );
-    return;
-  }
-
-  // Check if already a member
+  // Check if already a member — entrega directa al menú de la polla.
   const { data: existing } = await supabase
     .from("polla_participants")
     .select("id")
@@ -1158,39 +1150,12 @@ export async function handleJoinPolla(
     return;
   }
 
-  const isAdminCollects = polla.payment_mode === "admin_collects";
-
-  // Post-migration-010: no more 'pending' participant status. Everyone lands
-  // as approved. paid=false for admin_collects until the organizer approves.
-  const { error } = await supabase.from("polla_participants").insert({
-    polla_id: polla.id,
-    user_id: user.id,
-    role: "player",
-    status: "approved",
-    payment_status: "approved",
-    paid: !isAdminCollects,
-    total_points: 0,
-  });
-
-  if (error) {
-    console.error("[WA] Error joining polla:", error);
-    await sendTextMessage(
-      phone,
-      "❌ Uy parce, hubo un error al unirte. Intentá de nuevo."
-    );
-    return;
-  }
-
-  await sendReplyButtons(
+  // Toda polla es privada — el link por sí solo no alcanza. El user necesita
+  // el código de 6 caracteres del admin (lo manda aquí y handleJoinByCode
+  // lo procesa).
+  await sendTextMessage(
     phone,
-    `🎉 ¡Listo parce! Ya sos parte de *${polla.name}*\n\n` +
-      `Eso es, ahora poné tus pronósticos y demostrá quién sabe de fútbol 🐥⚽`,
-    [
-      { id: `pred_${polla.id}`, title: "Pronosticar 🎯" },
-      { id: "menu", title: "🏠 Menú" },
-    ],
-    "¡Te uniste! 🎉",
-    FOOTER
+    `Esa polla es privada parce 🔒\n\nPedile al admin el código de 6 caracteres y mandámelo aquí.`,
   );
 }
 
