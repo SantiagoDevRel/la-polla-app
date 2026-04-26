@@ -9,7 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getTournamentBySlug } from "@/lib/tournaments";
 
 const APP_URL =
-  (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
+  (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
 const FALLBACK_OG_IMAGE = `${APP_URL}/pollitos/logo_realistic.webp`;
 
 export async function generateMetadata({

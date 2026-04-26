@@ -11,7 +11,7 @@ const inviteSchema = z.object({
 });
 
 const APP_URL =
-  (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
+  (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
 
 function normalizePhone(phone: string): string {
   const cleaned = phone.replace(/[\s\-\(\)]/g, "");

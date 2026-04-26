@@ -42,7 +42,7 @@ interface OrganizerPanelProps {
 }
 
 const APP_URL =
-  typeof window !== "undefined" ? window.location.origin : "https://la-polla.vercel.app";
+  typeof window !== "undefined" ? window.location.origin : "https://lapollacolombiana.com";
 
 function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;

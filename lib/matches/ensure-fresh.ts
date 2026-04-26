@@ -52,7 +52,7 @@ export async function ensureMatchesFresh(): Promise<void> {
     }
 
     const base =
-      (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
+      (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
 
     // Kick the sync. Errors are swallowed so a Promise.race never
     // rejects — we always either resolve on the sync's success or

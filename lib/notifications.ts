@@ -16,7 +16,7 @@ import { sendWhatsAppMessage } from "@/lib/whatsapp/bot";
 import { redactPhone } from "@/lib/log";
 
 const APP_URL =
-  (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
+  (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
 
 function pollaLink(slug: string): string {
   return `${APP_URL}/pollas/${slug}`;

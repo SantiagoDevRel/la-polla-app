@@ -232,7 +232,7 @@ export async function processIncomingMessage(message: IncomingMessage) {
     ) {
       const code = await generateOTP(from);
       const APP_URL =
-        (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
+        (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
       await sendCTAButton(
         from,
         `🔐 *Tu código de verificación*\n\n` +
@@ -262,7 +262,7 @@ export async function processIncomingMessage(message: IncomingMessage) {
     const pendingOTP = await findPendingOTP(from);
     if (pendingOTP) {
       console.log(`[WA] Found pending OTP for ${redactPhone(from)}, delivering...`);
-      const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
+      const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
       await sendCTAButton(
         from,
         `🔐 *Tu código de verificación*\n\n` +
