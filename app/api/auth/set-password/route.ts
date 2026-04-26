@@ -76,7 +76,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { error: authErr } = await admin.auth.admin.updateUserById(user.id, {
+    // Self-initiated password change. Using the user-scoped client
+    // (`supabase`) instead of `admin.auth.admin.updateUserById` keeps
+    // the current session alive — Supabase only revokes sessions when
+    // the change comes from the admin API (anti-hijacking guard). With
+    // updateUser the JWT cookie remains valid and the user stays logged
+    // in after the redirect to /onboarding.
+    const { error: authErr } = await supabase.auth.updateUser({
       password: parsed.data.password,
     });
     if (authErr) {
