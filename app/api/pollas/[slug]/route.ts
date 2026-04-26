@@ -25,8 +25,14 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Cargar la polla por slug
-    const { data: polla, error: pollaError } = await supabase
+    // Same auth.uid() RLS workaround as the rest of the codebase: read
+    // through the admin client and gate access ourselves. The
+    // pollas_select_active policy filters on auth.uid() which is NULL in
+    // the PostgREST request context, so the user-scoped client returns
+    // null and the page renders "Polla no encontrada" right after
+    // creation.
+    const adminSupabase = createAdminClient();
+    const { data: polla, error: pollaError } = await adminSupabase
       .from("pollas")
       .select(POLLA_COLUMNS)
       .eq("slug", params.slug)
@@ -36,8 +42,6 @@ export async function GET(
       return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
     }
 
-    // Admin client avoids RLS on the participant self-check (auth.uid() already verified above).
-    const adminSupabase = createAdminClient();
     const { data: participant } = await adminSupabase
       .from("polla_participants")
       .select(POLLA_PARTICIPANT_COLUMNS)
@@ -77,8 +81,10 @@ export async function GET(
 
     const { data: matches } = await matchQuery.order("scheduled_at", { ascending: true });
 
-    // Cargar predicciones del usuario en esta polla
-    const { data: predictions } = await supabase
+    // Cargar predicciones del usuario en esta polla. Mismo motivo que la
+    // polla: predictions_select gatea por auth.uid() = user_id y
+    // PostgREST recibe NULL, así que via cliente user-scoped sale vacío.
+    const { data: predictions } = await adminSupabase
       .from("predictions")
       .select(PREDICTION_COLUMNS)
       .eq("polla_id", polla.id)
