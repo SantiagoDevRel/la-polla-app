@@ -47,7 +47,10 @@ export default async function AppLayout({
       <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">
         <BrandHeader />
-        {children}
+        {/* Pequeño respiro entre el header sticky y el contenido de la
+            página. Antes el "Hola santi" del inicio (y otros titulares)
+            quedaban pegados al header. */}
+        <div className="pt-3">{children}</div>
       </div>
       <BottomNav createHref="/pollas/crear" notifUnread={unread} />
     </ToastProvider>
