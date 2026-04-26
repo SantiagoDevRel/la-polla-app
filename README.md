@@ -69,7 +69,7 @@ Login exclusivo por WhatsApp OTP. Sin contraseñas. El usuario ingresa su númer
 Una polla es un grupo de pronósticos. El creador configura:
 - Torneo (Mundial 2026, Liga BetPlay, etc.)
 - Alcance (torneo completo, fase de grupos, eliminatorias, partidos custom)
-- Modo de pago: `honor` / `admin_collects` / `digital_pool`
+- Modo de pago: `admin_collects` / `pay_winner`
 - Monto de entrada (opcional, en COP)
 - Privada o abierta
 
@@ -83,10 +83,9 @@ Una polla es un grupo de pronósticos. El creador configura:
 Calculado automáticamente por trigger en Supabase cuando el partido pasa a `finished`. El ranking se actualiza en tiempo real dentro de cada polla.
 
 ### Modos de pago
-La plataforma NO procesa dinero real en v1. Solo trackea el estado de pago.
-- `honor`: sin pago upfront, cada participante le paga al ganador directamente al final
+La plataforma NO procesa dinero real. Solo trackea el estado de pago.
 - `admin_collects`: el admin recoge físicamente y distribuye, la plataforma solo muestra quién pagó
-- `digital_pool`: el admin declara el monto total, la plataforma muestra instrucciones de pago
+- `pay_winner`: sin pago upfront, cada participante le paga al ganador directamente al final
 
 ---
 

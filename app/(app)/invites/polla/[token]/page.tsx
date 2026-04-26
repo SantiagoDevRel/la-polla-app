@@ -237,14 +237,10 @@ export default function OpenInvitePage() {
     if (!polla) return;
     setJoining(true);
     try {
-      const { data } = await axios.post<{ joined: boolean; checkoutUrl: string | null }>(
+      await axios.post<{ joined: boolean }>(
         `/api/pollas/${polla.slug}/join`,
         { invite_token: token }
       );
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-        return;
-      }
       showToast("¡Te uniste!", "success");
       router.push(`/pollas/${polla.slug}`);
     } catch (err: unknown) {

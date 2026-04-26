@@ -1,5 +1,5 @@
 // components/polla/PaymentsList.tsx — Lista unificada de pagos.
-// - digital_pool / pay_winner: read-only, muestra estado de cada participante.
+// - pay_winner: read-only, muestra estado de cada participante.
 // - admin_collects + isAdmin: toggle para marcar/desmarcar pagado manualmente.
 "use client";
 
@@ -95,11 +95,7 @@ export default function PaymentsList({
           <span className="text-text-primary/60 font-normal ml-1.5">· {rows.length}</span>
         </h3>
         <span className="text-[11px] text-text-primary/70">
-          {paymentMode === "digital_pool"
-            ? "Pago digital · automático"
-            : paymentMode === "admin_collects"
-              ? "Pago al principio"
-              : "Pago al final"}
+          {paymentMode === "admin_collects" ? "Pago al principio" : "Pago al final"}
         </span>
       </div>
 

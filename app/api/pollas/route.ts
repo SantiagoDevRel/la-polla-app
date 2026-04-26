@@ -1,8 +1,5 @@
 // app/api/pollas/route.ts — CRUD de pollas (crear y listar pollas del usuario)
-// Modos soportados: admin_collects, digital_pool, pay_winner.
-// Para digital_pool con buy_in > 0, la polla NO se crea de inmediato:
-// se guarda un draft en polla_drafts y se devuelve una URL de Wompi. El
-// webhook convierte el draft en polla real cuando el pago queda APPROVED.
+// Modos soportados: admin_collects, pay_winner.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 // Admin client used for polla_participants queries because auth.uid()
@@ -10,13 +7,12 @@ import { createClient } from "@/lib/supabase/server";
 // polla_participants query below MUST include an explicit user-scoped
 // filter (user.id or polla_id list scoped to user's pollas).
 import { createAdminClient } from "@/lib/supabase/admin";
-import { buildWompiCheckoutUrl } from "@/lib/wompi/checkout";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { generateUniqueJoinCode } from "@/lib/pollas/join-code";
 import { z } from "zod";
 
 // Modos de pago válidos (payment_mode en la DB es varchar, no enum)
-const paymentModes = ["admin_collects", "digital_pool", "pay_winner"] as const;
+const paymentModes = ["admin_collects", "pay_winner"] as const;
 
 // Schema base para crear una polla
 const createPollaSchema = z
@@ -253,71 +249,6 @@ export async function POST(request: NextRequest) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
-    // ── Pay-first flow for digital_pool pollas ──
-    // Instead of inserting the polla now, stash the form data in polla_drafts
-    // and hand the user a Wompi checkout URL. The webhook materializes the
-    // polla when the transaction goes APPROVED.
-    const isPayFirst =
-      parsed.data.paymentMode === "digital_pool" && parsed.data.buyInAmount > 0;
-
-    if (isPayFirst) {
-      const reference = `draft_${user.id.replace(/-/g, "").substring(0, 8)}_${Date.now()}`;
-      const amountCents = parsed.data.buyInAmount * 100;
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
-      const redirectUrl = `${appUrl}/pollas/payment-success?reference=${reference}`;
-
-      let checkoutUrl: string;
-      try {
-        checkoutUrl = buildWompiCheckoutUrl({
-          reference,
-          amountCents,
-          currency: "COP",
-          redirectUrl,
-        });
-      } catch (wompiErr) {
-        console.error("[pollas POST] Wompi URL build failed:", wompiErr);
-        return NextResponse.json(
-          { error: "Error generando el checkout" },
-          { status: 500 }
-        );
-      }
-
-      // Everything the webhook needs to recreate the polla later.
-      const pollaData = {
-        name: parsed.data.name,
-        description: parsed.data.description || "",
-        slug,
-        tournament: parsed.data.tournament,
-        scope: parsed.data.scope,
-        type: parsed.data.type,
-        buy_in_amount: parsed.data.buyInAmount,
-        payment_mode: parsed.data.paymentMode,
-        admin_payment_instructions: null,
-        match_ids: parsed.data.matchIds || null,
-      };
-
-      const admin = createAdminClient();
-      const { error: draftError } = await admin.from("polla_drafts").insert({
-        reference,
-        creator_id: user.id,
-        polla_data: pollaData,
-        wompi_checkout_url: checkoutUrl,
-      });
-
-      if (draftError) {
-        console.error("[pollas POST] draft insert failed:", draftError);
-        return NextResponse.json(
-          { error: "No se pudo iniciar la creación de la polla" },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json(
-        { checkoutUrl, reference, slug: null, polla: null },
-        { status: 202 }
-      );
-    }
-
     // Generar el código de invitación antes del insert. generateUniqueJoinCode
     // reintenta internamente hasta 10 veces frente a colisiones en pollas.join_code.
     // Si falla tras los reintentos se aborta la creación con un 500 explicito.
@@ -392,15 +323,12 @@ export async function POST(request: NextRequest) {
         // joining via /api/pollas/[slug]/join. The admin counts toward pozo
         // and shows up as paid in the Pagos tab from day one.
         try {
-          const creatorPending =
-            parsed.data.paymentMode === "digital_pool" &&
-            parsed.data.buyInAmount > 0;
           const { error: joinError } = await supabase.from("polla_participants").insert({
             polla_id: retryPolla.id,
             user_id: user.id,
             role: "admin",
             status: "approved",
-            payment_status: creatorPending ? "pending" : "approved",
+            payment_status: "approved",
             paid: true,
             paid_at: new Date().toISOString(),
           });
@@ -423,15 +351,12 @@ export async function POST(request: NextRequest) {
     // via /api/pollas/[slug]/join. The admin counts toward pozo and shows up
     // as paid in the Pagos tab from day one.
     try {
-      const creatorPending =
-        parsed.data.paymentMode === "digital_pool" &&
-        parsed.data.buyInAmount > 0;
       const { error: joinError } = await supabase.from("polla_participants").insert({
         polla_id: polla.id,
         user_id: user.id,
         role: "admin",
         status: "approved",
-        payment_status: creatorPending ? "pending" : "approved",
+        payment_status: "approved",
         paid: true,
         paid_at: new Date().toISOString(),
       });

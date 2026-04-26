@@ -67,14 +67,6 @@ export async function POST(
       return NextResponse.json({ error: "Tu solicitud fue rechazada" }, { status: 403 });
     }
 
-    // Digital-pool payment gate
-    if (participant.payment_status !== "approved") {
-      return NextResponse.json(
-        { error: "payment_required" },
-        { status: 402 }
-      );
-    }
-
     // admin_collects payment gate: the organizer must confirm the comprobante
     // before the participant can predict. paid=true is the confirm signal.
     if (polla.payment_mode === "admin_collects" && !participant.paid) {
