@@ -42,9 +42,19 @@ function VerifyForm() {
     setLoading(true);
 
     try {
-      await axios.put("/api/auth/otp", { phone, code });
+      const { data } = await axios.put<{
+        newUser: boolean;
+        needsPassword: boolean;
+      }>("/api/auth/otp", { phone, code });
       if (typeof window !== "undefined") {
         localStorage.removeItem("la_polla_verify_phone");
+      }
+      // Every OTP success now lands on /set-password — the OTP route just
+      // rotated the user's password to a temp value. Middleware enforces
+      // the redirect anyway; we push directly so the URL bar updates clean.
+      if (data?.needsPassword) {
+        router.push("/set-password");
+        return;
       }
       const rt = typeof window !== "undefined"
         ? window.sessionStorage.getItem(RETURN_TO_KEY)
