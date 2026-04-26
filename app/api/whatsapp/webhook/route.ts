@@ -1,6 +1,7 @@
 // app/api/whatsapp/webhook/route.ts — Webhook para recibir mensajes entrantes de Meta Cloud API (WhatsApp)
 import { NextRequest, NextResponse } from "next/server";
 import { processIncomingMessage, type IncomingMessage } from "@/lib/whatsapp/bot";
+import { redactPhone } from "@/lib/log";
 import { createHmac, timingSafeEqual } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -83,7 +84,12 @@ export async function POST(request: NextRequest) {
     const message = value?.messages?.[0];
 
     if (message) {
-      console.log("[Webhook POST] message from:", message.from, "type:", message.type);
+      console.log(
+        "[Webhook POST] message from:",
+        redactPhone(message.from),
+        "type:",
+        message.type,
+      );
       await processIncomingMessage({
         from: message.from,
         type: message.type,

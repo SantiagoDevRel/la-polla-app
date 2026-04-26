@@ -29,6 +29,6 @@ export async function ensureDevUser() {
   if (error) {
     console.error("[DEV] Error insertando usuario de prueba:", error.message);
   } else {
-    console.log("[DEV] Usuario de prueba creado:", DEV_USER.whatsapp_number);
+    console.log("[DEV] Usuario de prueba creado");
   }
 }

@@ -4,6 +4,8 @@ import axios from "axios";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateOTP } from "@/lib/utils/otp";
 import { findPendingOTP, markOTPSent } from "@/lib/utils/otp";
+import { redactPhone } from "@/lib/log";
+import { looksLikeMenuIntent } from "./menu-intent";
 import { getOTPMessage } from "./messages";
 import { sendCTAButton } from "./interactive";
 import { getState, clearState } from "./state";
@@ -193,41 +195,14 @@ async function logMessage(
   }
 }
 
-// ─── Menu intent detection ───
-// Returns true when an inbound free-text message looks like a greeting or
-// an explicit "show me the menu" request. The list intentionally covers
-// the WhatsApp bubble's default pre-text ("hola parce, muestrame el menu
-// porfa") plus the most common Colombian openers, so users rarely fall
-// into the fallback "no entendí bien" branch on their first message.
-function looksLikeMenuIntent(body: string): boolean {
-  const t = body.trim().toLowerCase();
-  if (!t) return false;
-  // Exact one- or two-word greetings.
-  const exactGreetings = new Set([
-    "hola", "ola", "hi", "hey", "ey", "ola parce",
-    "buenas", "buenas tardes", "buenos dias", "buenos días", "buenas noches",
-    "menu", "menú", "inicio", "start",
-    "que mas", "qué más", "que mas parce", "qué más parce",
-    "parce", "parcero",
-  ]);
-  if (exactGreetings.has(t)) return true;
-  // "menu" or "menú" anywhere as a whole word.
-  if (/\bmen[uú]\b/.test(t)) return true;
-  // Starts with a common opener — covers "hola parce, muéstrame…",
-  // "buenas, hazme el menú", "ey parce", etc.
-  if (/^(hola|ola|hey|buenas|parce|que\s*m[aá]s|qu[eé]\s*onda)\b/.test(t)) return true;
-  // Explicit "muéstrame el menú" / "mostrame el menu" phrasing.
-  if (/(mu[eé]stra(me)?|mostr(a|á)me|d[aá]me)\s+(el\s+)?men[uú]/.test(t)) return true;
-  return false;
-}
-
 // ─── Message Processing & Routing ───
 
 export async function processIncomingMessage(message: IncomingMessage) {
   const { from, type, text, interactive } = message;
 
-  // Log raw phone number for debugging (Colombian numbers start with 57)
-  console.log(`[WA] Incoming from: ${from} | type: ${type}`);
+  // Phone is PII; we log the redacted form (country prefix + last 3) so
+  // we can still correlate without leaking the full number into Vercel logs.
+  console.log(`[WA] Incoming from: ${redactPhone(from)} | type: ${type}`);
 
   // Log inbound message
   const inboundContent =
@@ -286,7 +261,7 @@ export async function processIncomingMessage(message: IncomingMessage) {
   try {
     const pendingOTP = await findPendingOTP(from);
     if (pendingOTP) {
-      console.log(`[WA] Found pending OTP for ${from}, delivering...`);
+      console.log(`[WA] Found pending OTP for ${redactPhone(from)}, delivering...`);
       const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
       await sendCTAButton(
         from,

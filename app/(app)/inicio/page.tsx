@@ -34,6 +34,7 @@ import {
   TOURNAMENT_ICONS,
 } from "@/lib/tournaments";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
+import { POLLA_COLUMNS_LITE } from "@/lib/db/columns";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { computeLiveMinute, formatLiveMinute } from "@/lib/matches/live-minute";
 import { getLiveMatches } from "@/lib/football-api";
@@ -109,9 +110,9 @@ async function fetchEnrichedPollas(userId: string): Promise<EnrichedPolla[]> {
   // A single PostgREST .or() with .in.() silently drops the IN branch when
   // the list contains UUIDs, so we keep the two-query merge from Phase 3b.
   const [createdRes, participantRes] = await Promise.all([
-    admin.from("pollas").select("*").eq("created_by", userId),
+    admin.from("pollas").select(POLLA_COLUMNS_LITE).eq("created_by", userId),
     participantIds.length > 0
-      ? admin.from("pollas").select("*").in("id", participantIds)
+      ? admin.from("pollas").select(POLLA_COLUMNS_LITE).in("id", participantIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
