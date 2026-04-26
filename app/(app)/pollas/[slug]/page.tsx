@@ -55,6 +55,10 @@ interface Polla {
   admin_payment_instructions: string | null;
   join_code: string | null;
   match_ids?: string[] | null;
+  prize_distribution: {
+    mode: "percentage" | "cop";
+    prizes: { position: number; value: number }[];
+  } | null;
 }
 interface Participant {
   id: string; user_id: string; role: string; status: string; total_points: number; rank: number;
@@ -1115,6 +1119,7 @@ export default function PollaSlugPage() {
             buyInAmount={polla.buy_in_amount}
             matchIds={matches.map((m) => m.id)}
             joinCode={polla.join_code}
+            prizeDistribution={polla.prize_distribution ?? null}
           />
         )}
 
