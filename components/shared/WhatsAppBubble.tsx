@@ -19,7 +19,8 @@ interface WhatsAppBubbleProps {
   className?: string;
 }
 
-const DEFAULT_PRETEXT = "hola parce, muestrame el menu porfa";
+const DEFAULT_PRETEXT =
+  "Hola parce! muestrame el menu de la polla colombia porfa";
 
 export default function WhatsAppBubble({
   prefilledText = DEFAULT_PRETEXT,

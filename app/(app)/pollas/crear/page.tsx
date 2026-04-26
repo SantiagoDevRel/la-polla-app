@@ -11,7 +11,6 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Handshake, Lock } from "lucide-react";
-import { formatCOP } from "@/lib/formatCurrency";
 import { TOURNAMENTS } from "@/lib/tournaments";
 import FootballLoader from "@/components/ui/FootballLoader";
 import PrizeDistributionForm, {
@@ -82,7 +81,6 @@ export default function CrearPollaPage() {
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [customBuyIn, setCustomBuyIn] = useState(false);
   const [prizeDistribution, setPrizeDistribution] = useState<PrizeDistribution | null>(null);
   const [form, setForm] = useState<FormState>({
     name: "",
@@ -509,30 +507,24 @@ export default function CrearPollaPage() {
                   </span>
                 </h2>
               </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {[10000, 50000, 100000].map((amount) => {
-                  const isSel = form.buyInAmount === amount && !customBuyIn;
-                  return (
-                    <button key={amount} type="button" onClick={() => { updateForm("buyInAmount", amount); setCustomBuyIn(false); }}
-                      style={{ background: isSel ? "rgba(255,215,0,0.1)" : "#131d2e", border: isSel ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 8, padding: "6px 10px", color: isSel ? "#FFD700" : "#F5F7FA", fontSize: 12, fontWeight: isSel ? 700 : 500, cursor: "pointer", fontFamily: "'Outfit', sans-serif" }}>
-                      {formatCOP(amount)}
-                    </button>
-                  );
-                })}
-                <button type="button" onClick={() => { setCustomBuyIn(true); updateForm("buyInAmount", 0); }}
-                  style={{ background: customBuyIn ? "rgba(255,215,0,0.1)" : "#131d2e", border: customBuyIn ? "1px solid rgba(255,215,0,0.3)" : "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 8, padding: "6px 10px", color: customBuyIn ? "#FFD700" : "#F5F7FA", fontSize: 12, fontWeight: customBuyIn ? 700 : 500, cursor: "pointer", fontFamily: "'Outfit', sans-serif" }}>
-                  Otro valor
-                </button>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">$</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={form.buyInAmount > 0 ? form.buyInAmount.toLocaleString("es-CO") : ""}
+                  onChange={(e) => {
+                    // Strip non-digits so the user can paste "10.000" or
+                    // "10,000" and we still get a clean number. Limit to
+                    // 9 digits so nobody types a billion-peso polla.
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 9);
+                    updateForm("buyInAmount", digits ? parseInt(digits, 10) : 0);
+                  }}
+                  placeholder="10000"
+                  className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
+                />
               </div>
-              {customBuyIn && (
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">$</span>
-                  <input type="number" min={1000} step={1000} value={form.buyInAmount || ""} onChange={(e) => updateForm("buyInAmount", parseInt(e.target.value) || 0)} placeholder="10000"
-                    className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50" />
-                </div>
-              )}
             </div>
 
             {/* Sección 2: Modo de pago */}

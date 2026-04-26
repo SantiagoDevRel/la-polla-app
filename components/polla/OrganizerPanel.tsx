@@ -11,8 +11,6 @@ import { Copy, RefreshCw, UserMinus } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import FootballLoader from "@/components/ui/FootballLoader";
 import EmptyState from "@/components/ui/EmptyState";
-import PrizeDistributionEditor from "@/components/polla/PrizeDistributionEditor";
-import type { PrizeDistribution } from "@/components/polla/PrizeDistributionForm";
 
 interface Participant {
   id: string;
@@ -38,7 +36,6 @@ interface OrganizerPanelProps {
   buyInAmount: number;
   matchIds: string[];
   joinCode: string | null;
-  prizeDistribution: PrizeDistribution | null;
 }
 
 const APP_URL =
@@ -56,7 +53,6 @@ export default function OrganizerPanel({
   buyInAmount,
   matchIds,
   joinCode,
-  prizeDistribution,
 }: OrganizerPanelProps) {
   const { showToast } = useToast();
   const [token, setToken] = useState<string | null>(null);
@@ -318,13 +314,6 @@ export default function OrganizerPanel({
           </ul>
         )}
       </section>
-
-      {/* Section B.5 — Prize distribution */}
-      <PrizeDistributionEditor
-        pollaSlug={pollaSlug}
-        pot={total}
-        initial={prizeDistribution}
-      />
 
       {/* Section C — Polla status */}
       <section className="rounded-2xl p-5 lp-card space-y-3">

@@ -99,13 +99,13 @@ export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }
 
   const effectiveCreateHref = createHref ?? "/pollas/crear";
 
-  // FAB sits FULLY INSIDE the navbar (centered vertically) instead of
-  // protruding above it. The old `-top-6` overflow was eating into the
-  // page content above the nav and tapping over the sticky CTAs of
-  // /pollas/crear and /pollas/[slug]. Slightly smaller diameter + softer
-  // glow keeps the visual hierarchy without the protruding pill.
+  // FAB sits FULLY INSIDE the navbar, centered vertically. We reserve a
+  // 64px slot in the middle of the row (`w-16`) so the FAB doesn't crash
+  // visually with the Pollas/Avisos tabs to either side. With a 48px
+  // FAB and 8px breathing room on each side it sits cleanly between
+  // the two flex groups.
   const fabClass =
-    "absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[52px] h-[52px] rounded-full bg-gold flex items-center justify-center active:scale-95 transition-transform duration-150";
+    "absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full bg-gold flex items-center justify-center active:scale-95 transition-transform duration-150";
   const fabStyle: React.CSSProperties = {
     boxShadow: "0 4px 16px -4px rgba(255,215,0,0.45)",
   };
@@ -123,6 +123,10 @@ export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }
             <TabItem tab={middleLeft} active={resolvedActive === middleLeft.key} />
           </div>
 
+          {/* Reserved center slot — 64px wide. Stops the FAB from sitting
+              on top of the Pollas/Avisos tabs. */}
+          <div className="w-16 flex-shrink-0" aria-hidden="true" />
+
           <button
             type="button"
             onClick={(e) => {
@@ -139,7 +143,7 @@ export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }
             className={fabClass}
             style={fabStyle}
           >
-            <Plus className="w-7 h-7 text-bg-base" strokeWidth={3} aria-hidden="true" />
+            <Plus className="w-6 h-6 text-bg-base" strokeWidth={3} aria-hidden="true" />
           </button>
 
           <div className="flex-1 flex">

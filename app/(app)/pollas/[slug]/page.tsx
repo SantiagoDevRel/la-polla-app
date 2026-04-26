@@ -9,6 +9,8 @@ import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
 import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import OrganizerPanel from "@/components/polla/OrganizerPanel";
+import PrizeDistributionEditor from "@/components/polla/PrizeDistributionEditor";
+import PrizeDistributionView from "@/components/polla/PrizeDistributionView";
 import EmptyState from "@/components/ui/EmptyState";
 import InviteModal from "@/components/polla/InviteModal";
 import PhoneInput from "@/components/ui/PhoneInput";
@@ -1023,6 +1025,28 @@ export default function PollaSlugPage() {
               </>
             )}
             </div>
+
+            {/* Prize distribution lives inside Tabla so all participants
+                can see what's at stake. Admins get the editor in-place;
+                everyone else sees the read-only view. The pot is computed
+                the same way as the header pot band: buy_in × approved
+                participants. */}
+            {(() => {
+              const approvedCount = participants.filter((p) => p.status === "approved").length;
+              const pot = polla.buy_in_amount * approvedCount;
+              return isOrganizer ? (
+                <PrizeDistributionEditor
+                  pollaSlug={polla.slug}
+                  pot={pot}
+                  initial={polla.prize_distribution ?? null}
+                />
+              ) : (
+                <PrizeDistributionView
+                  pot={pot}
+                  distribution={polla.prize_distribution ?? null}
+                />
+              );
+            })()}
           </div>
         )}
 
@@ -1041,7 +1065,6 @@ export default function PollaSlugPage() {
             buyInAmount={polla.buy_in_amount}
             matchIds={matches.map((m) => m.id)}
             joinCode={polla.join_code}
-            prizeDistribution={polla.prize_distribution ?? null}
           />
         )}
 

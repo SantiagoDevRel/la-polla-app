@@ -12,6 +12,7 @@
 import { ToastProvider } from "@/components/ui/Toast";
 import BottomNav from "@/components/nav/BottomNav";
 import { AppBackground } from "@/components/layout/AppBackground";
+import BrandHeader from "@/components/layout/BrandHeader";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -45,6 +46,7 @@ export default async function AppLayout({
     <ToastProvider>
       <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">
+        <BrandHeader />
         {children}
       </div>
       <BottomNav createHref="/pollas/crear" notifUnread={unread} />
