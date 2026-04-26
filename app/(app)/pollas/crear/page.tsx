@@ -26,7 +26,7 @@ type Step = 1 | 2 | 3;
 interface FormState {
   name: string;
   tournament: string;
-  type: "open" | "closed";
+  type: "closed";
   buyInAmount: number;
   paymentMode: PaymentMode;
   adminPaymentInstructions: string;
@@ -321,9 +321,7 @@ export default function CrearPollaPage() {
               </div>
             </div>
 
-            {/* Tipo de polla: "Abierta" oculto del UI durante el MVP. Todas las
-                pollas nuevas quedan como "closed" (Privada). El backend aún
-                acepta type='open'; re-habilitar añadiendo la segunda opción. */}
+            {/* Tipo de polla: privada (closed) es el único modo soportado. */}
             <div className="rounded-2xl p-5 space-y-2 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Tipo de polla</h2>
               <div className="flex items-center gap-2 text-text-secondary text-sm">
