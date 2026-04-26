@@ -43,7 +43,6 @@ import { LiveChip } from "@/components/match/LiveChip";
 import { ActivePollasEmpty } from "@/components/inicio/ActivePollasEmpty";
 import { PodiumCarousel } from "@/components/inicio/PodiumCarousel";
 import { GreetingHero } from "@/components/inicio/GreetingHero";
-import WhatsAppBubble from "@/components/shared/WhatsAppBubble";
 import { RivalChip } from "@/components/inicio/RivalChip";
 import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
@@ -765,40 +764,10 @@ export default async function InicioPage() {
 
   return (
     <div className="min-h-screen">
-      {/* Block 1 - Wordmark header with a WhatsApp bubble pinned right.
-          The bubble is the always-visible entry to the bot menu so users
-          who prefer chatting (predicting, ranking, etc.) can jump there
-          without going through the login bot flow. Profile access lives
-          in the BottomNav FAB; this header stays brand-focused. */}
-      <header className="px-4 pt-4 pb-4">
-        <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/pollitos/pollito_pibe_lider.webp"
-              alt=""
-              width={52}
-              height={52}
-              style={{ objectFit: "contain" }}
-            />
-            <span
-              className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px]"
-              style={{
-                fontSize: 22,
-                WebkitTextStroke: "1px #000",
-                textShadow: "0 2px 6px rgba(0,0,0,0.55)",
-                paintOrder: "stroke fill",
-              }}
-            >
-              <span style={{ color: "#FFD700" }}>LA</span>
-              <span style={{ color: "#2F6DF4" }}>POLLA</span>
-              <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
-            </span>
-          </div>
-          <WhatsAppBubble size={36} />
-        </div>
-      </header>
-
+      {/* Block 1 - Talking-pollito greeting. The branded wordmark header
+          with the WhatsApp bubble lives in app/(app)/layout.tsx now so it
+          persists across every authenticated page; this page picks up
+          where the layout left off with the personalised greeting. */}
       {/* Block 2 - Talking-pollito greeting */}
       <GreetingHero
         firstName={firstName}
