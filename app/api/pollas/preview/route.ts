@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
 
   // Count paid+approved participants. The invite preview uses this for the
   // Participantes badge and the pozo math, so unpaid joiners (awaiting
-  // admin approval or Wompi confirmation) must not inflate either. Admin
-  // themselves are paid=true on creation so they count from day one.
+  // admin approval) must not inflate either. Admin themselves are paid=true
+  // on creation so they count from day one.
   const { count, error: countError } = await admin
     .from("polla_participants")
     .select("*", { head: true, count: "exact" })

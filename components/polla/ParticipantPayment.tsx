@@ -4,7 +4,7 @@
 //   admin_collects + player + no pagado → tarjeta "Esperando aprobación"
 //                                         + (opcional) instrucciones + PaymentsList
 //   admin_collects + player + pagado    → PaymentsList
-//   digital_pool / pay_winner           → PaymentsList (read-only)
+//   pay_winner                          → PaymentsList (read-only)
 "use client";
 
 import { useEffect, useState, useCallback } from "react";

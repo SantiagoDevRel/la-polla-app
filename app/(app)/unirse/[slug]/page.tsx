@@ -3,9 +3,7 @@
 // The shareable invite landing lives at /invites/polla/[token] now. We keep
 // this route alive because older links sent over WhatsApp/email still point
 // here. If the old URL carries ?token=X, we bounce to the new canonical
-// invite page. Without a token we fall through to the polla detail so the
-// post-payment redirects and wompi webhook links that still hit /unirse/
-// without a token keep working.
+// invite page. Without a token we fall through to the polla detail.
 import { redirect } from "next/navigation";
 
 export default function UnirseLegacyRedirect({

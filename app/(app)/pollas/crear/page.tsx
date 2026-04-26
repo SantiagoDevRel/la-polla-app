@@ -10,14 +10,14 @@ import Image from "next/image";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { staggerContainer } from "@/lib/animations";
-import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Smartphone, Handshake, Lock } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Handshake, Lock } from "lucide-react";
 import { formatCOP } from "@/lib/formatCurrency";
 import { TOURNAMENTS } from "@/lib/tournaments";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 // ─── Tipos ───
 
-type PaymentMode = "digital_pool" | "admin_collects" | "pay_winner";
+type PaymentMode = "admin_collects" | "pay_winner";
 type Step = 1 | 2 | 3;
 
 interface FormState {
@@ -57,13 +57,6 @@ const PAYMENT_MODE_OPTIONS = [
     tag: "",
   },
   {
-    value: "digital_pool" as PaymentMode,
-    title: "Pago digital",
-    icon: "smartphone",
-    description: "Los participantes pagan en línea al unirse, el dinero se libera al ganador al final.",
-    tag: "Online",
-  },
-  {
     value: "pay_winner" as PaymentMode,
     title: "Pago al final",
     icon: "handshake",
@@ -75,7 +68,6 @@ const PAYMENT_MODE_OPTIONS = [
 const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = {
   admin_collects: "Cada participante le paga al organizador (tú) antes de entrar. Cada vez que alguien te pague, lo marcás como pagado para que pueda participar.",
   pay_winner: "Al final, todos le pagan directamente al ganador.",
-  digital_pool: "El pago es automático. El ganador recibe el pozo menos la comisión de la plataforma (10% del total).",
 };
 
 type GroupBy = "date" | "jornada" | "phase";
@@ -106,14 +98,6 @@ export default function CrearPollaPage() {
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
-
-  // Public pollas (type='open') must use digital_pool — no admin to collect from
-  // the parche of strangers that joins through the link.
-  useEffect(() => {
-    if (form.type === "open" && form.paymentMode !== "digital_pool") {
-      setForm((prev) => ({ ...prev, paymentMode: "digital_pool" }));
-    }
-  }, [form.type, form.paymentMode]);
 
   // Fetch matches when tournament changes and we're on step 2
   useEffect(() => {
@@ -244,23 +228,11 @@ export default function CrearPollaPage() {
     try {
       const { data } = await axios.post<{
         polla: { slug: string } | null;
-        checkoutUrl: string | null;
-        reference: string | null;
       }>("/api/pollas", {
         ...form,
         scope: "custom",
         matchIds: Array.from(selectedMatchIds),
       });
-      // Pay-first path (digital_pool + buy_in > 0): polla isn't created yet,
-      // webhook will materialize it. Stash the reference and jump to Wompi.
-      // Wompi flow hidden from UI as of the MVP cut. Keep for future re-enable;
-      // this branch is currently unreachable because digital_pool cannot be
-      // selected from the payment picker.
-      if (data.checkoutUrl && data.reference) {
-        sessionStorage.setItem("pollaDraftReference", data.reference);
-        window.location.href = data.checkoutUrl;
-        return;
-      }
       if (data.polla) {
         router.push(`/pollas/${data.polla.slug}`);
       }
@@ -560,38 +532,9 @@ export default function CrearPollaPage() {
             {/* Sección 2: Modo de pago */}
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">Modo de pago</h2>
-              {form.type === "open" ? (
-                <>
-                  {(() => {
-                    const opt = PAYMENT_MODE_OPTIONS.find((o) => o.value === "digital_pool")!;
-                    return (
-                      <div className="w-full text-left p-4 rounded-xl border border-gold/30 bg-gold/10">
-                        <div className="flex items-start gap-3">
-                          <span className="flex-shrink-0 mt-0.5">
-                            <Smartphone className="w-6 h-6" style={{ color: "#F5F7FA" }} />
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-bold text-text-primary">{opt.title}</span>
-                              <span className="text-[10px] px-3 py-1 rounded-full font-medium bg-gold/10 text-gold border border-gold/20">{opt.tag}</span>
-                            </div>
-                            <p className="text-sm text-text-secondary leading-snug">{opt.description}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
-                    <p className="text-xs text-text-secondary leading-snug">Las pollas públicas requieren pago digital.</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    {/* "digital_pool" oculto del UI durante el MVP (Wompi fuera).
-                        La opción permanece en PAYMENT_MODE_OPTIONS para que el
-                        backend la siga aceptando; re-habilitar quitando el filtro. */}
-                    {PAYMENT_MODE_OPTIONS.filter((o) => o.value !== "digital_pool").map((option) => {
+              <>
+                <div className="space-y-3">
+                  {PAYMENT_MODE_OPTIONS.map((option) => {
                       const isSelected = form.paymentMode === option.value;
                       return (
                         <button key={option.value} type="button"
@@ -600,7 +543,6 @@ export default function CrearPollaPage() {
                           <div className="flex items-start gap-3">
                             <span className="flex-shrink-0 mt-0.5">
                               {option.icon === "banknote" ? <Banknote className="w-6 h-6" style={{ color: "#F5F7FA" }} />
-                                : option.icon === "smartphone" ? <Smartphone className="w-6 h-6" style={{ color: "#F5F7FA" }} />
                                 : <Handshake className="w-6 h-6" style={{ color: "#F5F7FA" }} />}
                             </span>
                             <div className="flex-1 min-w-0">
@@ -620,8 +562,7 @@ export default function CrearPollaPage() {
                   <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
                     <p className="text-xs text-text-secondary leading-snug">{PAYMENT_MODE_HINTS[form.paymentMode]}</p>
                   </div>
-                </>
-              )}
+              </>
             </div>
 
             {form.paymentMode === "admin_collects" && (

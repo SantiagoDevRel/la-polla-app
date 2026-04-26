@@ -134,10 +134,9 @@ export async function recomputePollaStandings(
     }
 
     // Universal paid=true filter for standings. For pay_winner every row is
-    // paid=true by default so this is a no-op; for digital_pool paid=true
-    // means Wompi confirmed; for admin_collects paid=true means the
-    // organizer approved the comprobante. Unpaid rows must never appear in
-    // the leaderboard because they have not really joined yet.
+    // paid=true by default so this is a no-op; for admin_collects paid=true
+    // means the organizer approved the comprobante. Unpaid rows must never
+    // appear in the leaderboard because they have not really joined yet.
     const { data: parts, error: partsErr } = await admin
       .from("polla_participants")
       .select("id, user_id, rank")

@@ -144,8 +144,8 @@ interface ParticipantRow {
 }
 
 /**
- * Verify the user is an approved participant of the polla AND, for digital_pool
- * pollas, has payment_status = 'approved'. Sends the appropriate Spanish message
+ * Verify the user is an approved participant of the polla AND, for
+ * admin_collects pollas, has paid=true. Sends the appropriate Spanish message
  * and returns null if any gate fails. Returns {polla, participant} on success.
  */
 async function verifyMemberAndPolla(
@@ -175,17 +175,6 @@ async function verifyMemberAndPolla(
 
   if (!participant || participant.status !== "approved") {
     await sendTextMessage(phone, "No eres participante de esta polla parce.");
-    return null;
-  }
-
-  if (
-    polla.payment_mode === "digital_pool" &&
-    participant.payment_status !== "approved"
-  ) {
-    await sendTextMessage(
-      phone,
-      `Necesitás pagar la cuota primero. Entrá a la app para completar el pago: ${APP_URL}/pollas/${polla.slug}`
-    );
     return null;
   }
 
@@ -1169,20 +1158,17 @@ export async function handleJoinPolla(
     return;
   }
 
-  // For digital_pool: pay first, then predict (payment_status=pending gates the app).
-  // For other modes: participant is pending until admin approves (matches web app flow).
-  const isDigitalPool =
-    polla.payment_mode === "digital_pool" && polla.buy_in_amount > 0;
+  const isAdminCollects = polla.payment_mode === "admin_collects";
 
   // Post-migration-010: no more 'pending' participant status. Everyone lands
-  // as approved; digital_pool gates predictions via payment_status='pending'.
+  // as approved. paid=false for admin_collects until the organizer approves.
   const { error } = await supabase.from("polla_participants").insert({
     polla_id: polla.id,
     user_id: user.id,
     role: "player",
     status: "approved",
-    payment_status: isDigitalPool ? "pending" : "approved",
-    paid: !isDigitalPool,
+    payment_status: "approved",
+    paid: !isAdminCollects,
     total_points: 0,
   });
 
@@ -1191,18 +1177,6 @@ export async function handleJoinPolla(
     await sendTextMessage(
       phone,
       "❌ Uy parce, hubo un error al unirte. Intentá de nuevo."
-    );
-    return;
-  }
-
-  if (isDigitalPool) {
-    await sendCTAButton(
-      phone,
-      `🎉 ¡Listo parce! Te registré en *${polla.name}*\n\n` +
-        `Ahora pagá la cuota en la app para que tus pronósticos cuenten 👇`,
-      "Pagar y pronosticar",
-      `${APP_URL}/pollas/${polla.slug}`,
-      FOOTER
     );
     return;
   }

@@ -82,20 +82,17 @@ export async function joinByCode(
   if (existing) return { ok: false, code: "already_member" };
 
   // paid semantics per payment mode. Mirrors the invite-link join route:
-  //   digital_pool   → paid=false until the Wompi webhook confirms.
   //   admin_collects → paid=false until the organizer approves the comprobante.
   //   pay_winner     → paid=true on join (nothing to collect upfront).
-  const isDigitalPool =
-    polla.payment_mode === "digital_pool" && polla.buy_in_amount > 0;
   const isAdminCollects = polla.payment_mode === "admin_collects";
-  const initialPaid = !(isDigitalPool || isAdminCollects);
+  const initialPaid = !isAdminCollects;
 
   const { error: insertErr } = await admin.from("polla_participants").insert({
     polla_id: polla.id,
     user_id: input.userId,
     role: "player",
     status: "approved",
-    payment_status: isDigitalPool ? "pending" : "approved",
+    payment_status: "approved",
     paid: initialPaid,
   });
   if (insertErr) throw insertErr;
