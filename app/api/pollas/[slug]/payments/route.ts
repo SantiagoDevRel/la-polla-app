@@ -37,8 +37,11 @@ export async function GET(
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Obtener la polla por slug
-    const { data: polla, error: pollaError } = await supabase
+    // pollas SELECT via admin: auth.uid() is NULL in PostgREST so the
+    // user-scoped client returns "Polla no encontrada" for participants
+    // who are not the creator. Session is already validated above.
+    const adminClient = createAdminClient();
+    const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
       .select("id, payment_mode, admin_payment_instructions, buy_in_amount, currency")
       .eq("slug", params.slug)
@@ -49,10 +52,7 @@ export async function GET(
     }
 
     // Membership: status='approved' is the only thing that counts as "in".
-    // Use the admin client to bypass the recursive RLS on polla_participants
-    // (auth.uid() was already validated above).
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const adminClient = createAdminClient();
+    // Same admin-client path as the rest of this route.
     const { data: myParticipant } = await adminClient
       .from("polla_participants")
       .select("id, role, status")
@@ -143,8 +143,12 @@ export async function POST(
       );
     }
 
-    // Obtener la polla
-    const { data: polla, error: pollaError } = await supabase
+    // pollas + polla_participants reads/writes via admin to dodge the
+    // auth.uid()-NULL silence. Session validated above; we still scope
+    // every operation to (polla_id, user.id) explicitly.
+    const adminClient = createAdminClient();
+
+    const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
       .select("id, payment_mode")
       .eq("slug", params.slug)
@@ -162,7 +166,7 @@ export async function POST(
     }
 
     // Verificar que es participante
-    const { data: participant, error: partError } = await supabase
+    const { data: participant, error: partError } = await adminClient
       .from("polla_participants")
       .select("id, paid, status")
       .eq("polla_id", polla.id)
@@ -182,14 +186,17 @@ export async function POST(
 
     // Grabar el comprobante. status ya no se usa como cola de revisión —
     // el admin review filtra por (payment_note != null AND paid = false).
-    const { error: updateError } = await supabase
+    // .eq("user_id", user.id) defense-in-depth además del id, por si la
+    // RLS algún día se restablece pero auth.uid() sigue NULL.
+    const { error: updateError } = await adminClient
       .from("polla_participants")
       .update({
         payment_note: parsed.data.paymentNote,
         payment_proof_url: parsed.data.paymentProofUrl || null,
         paid_amount: parsed.data.paidAmount,
       })
-      .eq("id", participant.id);
+      .eq("id", participant.id)
+      .eq("user_id", user.id);
 
     if (updateError) throw updateError;
 
@@ -233,8 +240,10 @@ export async function PATCH(
       );
     }
 
-    // Obtener la polla
-    const { data: polla, error: pollaError } = await supabase
+    // pollas + polla_participants via admin (auth.uid() NULL workaround).
+    const adminClient = createAdminClient();
+
+    const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
       .select("id, payment_mode")
       .eq("slug", params.slug)
@@ -252,11 +261,6 @@ export async function PATCH(
     }
 
     // Verificar que quien hace la petición es admin de ESTA polla.
-    // Usamos admin client porque el SELECT de user-scoped sobre
-    // polla_participants devuelve vacío por la RLS "participants_select"
-    // (EXISTS recursivo), lo que hacía que Santiago, siendo el organizador,
-    // no pudiera aprobar/desmarcar pagos.
-    const adminClient = createAdminClient();
     const { data: adminParticipant } = await adminClient
       .from("polla_participants")
       .select("role")

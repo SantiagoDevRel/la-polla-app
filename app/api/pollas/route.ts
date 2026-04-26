@@ -113,7 +113,13 @@ export async function GET() {
 
     const pollaIds = participantPollaIds?.map((p) => p.polla_id) || [];
 
-    const { data: createdPollas, error: errCreated } = await supabase
+    // Same auth.uid() workaround as the rest of the codebase: pollas
+    // SELECT via PostgREST silently returns empty for the user-scoped
+    // client because the policy checks auth.uid() which is NULL. Both
+    // queries below are explicitly user-scoped (created_by = user.id;
+    // pollaIds derived from this user's polla_participants rows), so
+    // we keep the access guarantee that RLS would have given us.
+    const { data: createdPollas, error: errCreated } = await admin
       .from("pollas")
       .select(POLLA_COLUMNS)
       .eq("created_by", user.id);
@@ -122,7 +128,7 @@ export async function GET() {
 
     let participantPollas: NonNullable<typeof createdPollas> = [];
     if (pollaIds.length > 0) {
-      const { data: pp, error: errParticipant } = await supabase
+      const { data: pp, error: errParticipant } = await admin
         .from("pollas")
         .select(POLLA_COLUMNS)
         .in("id", pollaIds);

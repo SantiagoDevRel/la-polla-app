@@ -115,7 +115,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
     }
 
-    const { error } = await supabase
+    // Admin client porque users_update_own gatea por auth.uid() = id, y
+    // auth.uid() llega NULL al PostgREST. Sin esto, el UPDATE no afecta
+    // ninguna fila (silencioso) y la UI confirma "guardado" pero el
+    // perfil no cambia. .eq("id", user.id) sigue siendo el scope:
+    // user.id viene del session getUser() validado arriba.
+    const admin = createAdminClient();
+    const { error } = await admin
       .from("users")
       .update(updateData)
       .eq("id", user.id);
