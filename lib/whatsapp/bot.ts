@@ -193,6 +193,34 @@ async function logMessage(
   }
 }
 
+// ─── Menu intent detection ───
+// Returns true when an inbound free-text message looks like a greeting or
+// an explicit "show me the menu" request. The list intentionally covers
+// the WhatsApp bubble's default pre-text ("hola parce, muestrame el menu
+// porfa") plus the most common Colombian openers, so users rarely fall
+// into the fallback "no entendí bien" branch on their first message.
+function looksLikeMenuIntent(body: string): boolean {
+  const t = body.trim().toLowerCase();
+  if (!t) return false;
+  // Exact one- or two-word greetings.
+  const exactGreetings = new Set([
+    "hola", "ola", "hi", "hey", "ey", "ola parce",
+    "buenas", "buenas tardes", "buenos dias", "buenos días", "buenas noches",
+    "menu", "menú", "inicio", "start",
+    "que mas", "qué más", "que mas parce", "qué más parce",
+    "parce", "parcero",
+  ]);
+  if (exactGreetings.has(t)) return true;
+  // "menu" or "menú" anywhere as a whole word.
+  if (/\bmen[uú]\b/.test(t)) return true;
+  // Starts with a common opener — covers "hola parce, muéstrame…",
+  // "buenas, hazme el menú", "ey parce", etc.
+  if (/^(hola|ola|hey|buenas|parce|que\s*m[aá]s|qu[eé]\s*onda)\b/.test(t)) return true;
+  // Explicit "muéstrame el menú" / "mostrame el menu" phrasing.
+  if (/(mu[eé]stra(me)?|mostr(a|á)me|d[aá]me)\s+(el\s+)?men[uú]/.test(t)) return true;
+  return false;
+}
+
 // ─── Message Processing & Routing ───
 
 export async function processIncomingMessage(message: IncomingMessage) {
@@ -413,8 +441,11 @@ export async function processIncomingMessage(message: IncomingMessage) {
       return;
     }
 
-    // Menu keywords
-    if (["hola", "hi", "inicio", "menu", "menú"].includes(body)) {
+    // Menu intent — broad match. We treat almost any conversational opener
+    // as "show me the menu" because users don't always type the exact word.
+    // The bubble in the app pre-fills "hola parce, muestrame el menu porfa"
+    // for example; that should surface the menu, not the fallback.
+    if (looksLikeMenuIntent(body)) {
       await handleMainMenu(from, user.display_name);
       return;
     }

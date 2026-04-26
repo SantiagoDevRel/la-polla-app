@@ -1,16 +1,21 @@
-// app/(auth)/login/page.tsx — Login with reversed OTP flow
-// Step 1: Phone input + "Pedir código" CTA
-// Step 2: Code input + Verify
+// app/(auth)/login/page.tsx — Phone gateway. Routes to:
+//   - /login/password when the phone has a custom password (fast path)
+//   - the bot-OTP flow otherwise (registration or forgot-password)
+//
+// ?forgot=1 forces the OTP flow regardless of password state, used by the
+// "Olvidé mi contraseña" link from /login/password.
 "use client";
 
-import { Suspense, useState, useCallback, useEffect } from "react";
+import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Turnstile } from "@marsidev/react-turnstile";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { motion } from "framer-motion";
 import axios from "axios";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import PhoneInput from "@/components/ui/PhoneInput";
 import TournamentBadge from "@/components/shared/TournamentBadge";
+import { BOT_PHONE, botDeepLink } from "@/lib/whatsapp/bot-phone";
+import { normalizePhone } from "@/lib/auth/phone";
 
 function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;
@@ -36,59 +41,63 @@ interface PollaPreview {
 function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const forgotMode = searchParams.get("forgot") === "1";
+  const phoneFromParams = searchParams.get("phone") ?? "";
+
   const [step, setStep] = useState<Step>("phone");
   const [preview, setPreview] = useState<PollaPreview | null>(null);
+  const [phone, setPhone] = useState(phoneFromParams);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileError, setTurnstileError] = useState(false);
+  const [error, setError] = useState("");
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [pollingElapsed, setPollingElapsed] = useState(0);
+  const [pollingTimedOut, setPollingTimedOut] = useState(false);
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   useEffect(() => {
     const rt = searchParams.get("returnTo");
     if (rt && typeof window !== "undefined") {
       window.sessionStorage.setItem(RETURN_TO_KEY, rt);
     }
-    const stored = rt
-      ?? (typeof window !== "undefined"
-            ? window.sessionStorage.getItem(RETURN_TO_KEY)
-            : null);
+    const stored =
+      rt ??
+      (typeof window !== "undefined"
+        ? window.sessionStorage.getItem(RETURN_TO_KEY)
+        : null);
     if (!stored) return;
     const slugMatch = stored.match(/^\/(?:pollas|unirse)\/([^/?#]+)/);
     const tokenMatch = stored.match(/^\/invites\/polla\/([^/?#]+)/);
     if (!slugMatch && !tokenMatch) return;
     const params = new URLSearchParams(
-      slugMatch ? { slug: slugMatch[1] } : { token: tokenMatch![1] }
+      slugMatch ? { slug: slugMatch[1] } : { token: tokenMatch![1] },
     );
     axios
-      .get<{ polla: Omit<PollaPreview, "participantCount">; participantCount: number }>(
-        `/api/pollas/preview?${params.toString()}`
+      .get<{
+        polla: Omit<PollaPreview, "participantCount">;
+        participantCount: number;
+      }>(`/api/pollas/preview?${params.toString()}`)
+      .then(({ data }) =>
+        setPreview({ ...data.polla, participantCount: data.participantCount }),
       )
-      .then(({ data }) => setPreview({ ...data.polla, participantCount: data.participantCount }))
       .catch(() => {});
   }, [searchParams]);
-
-  const [phone, setPhone] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [error, setError] = useState("");
-  const [code, setCode] = useState("");
-  const [verifying, setVerifying] = useState(false);
-  const [isNewUser] = useState(true);
-  const [pollingElapsed, setPollingElapsed] = useState(0);
-  const [pollingTimedOut, setPollingTimedOut] = useState(false);
 
   const handlePhoneChange = useCallback((value: string) => {
     setPhone(value);
   }, []);
 
-  const BOT_PHONE = "573117312391";
-
-  // Phone submit no longer sends the OTP directly. We first park the user on
-  // the bot-gate screen so they open the WhatsApp chat with the bot and
-  // (re)open the 24h service window. OTP is sent after they tap "Ya le
-  // escribí al bot". Without this gate Meta silently rejects free-text
-  // messages outside the window and users never see the code.
-  const handleSubmit = (e: React.FormEvent) => {
+  // Phone submit: validate phone + Turnstile, then either route to the
+  // password page (fast path for returning users) or start the bot OTP
+  // flow. forgotMode skips the password fast-path so the user can reset.
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (!phone || phone.length < 10) {
-      setError("Ingresa un numero de telefono valido");
+      setError("Ingresá un número de teléfono válido");
       return;
     }
     if (!turnstileToken) {
@@ -96,27 +105,52 @@ function LoginInner() {
       return;
     }
 
-    setStep("waiting_for_whatsapp");
+    setChecking(true);
+    try {
+      if (!forgotMode) {
+        const { data } = await axios.post<{
+          exists: boolean;
+          hasCustomPassword: boolean;
+        }>("/api/auth/check-phone", {
+          phone,
+          turnstileToken,
+        });
+
+        if (data.exists && data.hasCustomPassword) {
+          router.push(
+            `/login/password?phone=${encodeURIComponent(normalizePhone(phone))}`,
+          );
+          return;
+        }
+      }
+
+      // No password yet (new user, mid-registration, or forgot-password): go
+      // through the bot-first OTP flow.
+      setStep("waiting_for_whatsapp");
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(
+        e.response?.data?.error ??
+          "No pudimos verificar el número. Intentá de nuevo.",
+      );
+      // Reset Turnstile so user can re-verify; the token may be consumed.
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
+    } finally {
+      setChecking(false);
+    }
   };
 
-  // Tap on "Abrir WhatsApp": open the deep link SYNCHRONOUSLY first so iOS
-  // Safari keeps the user-activation gesture alive. Any await before
-  // window.open drops the gesture and Safari silently blocks the popup. The
-  // /login-wait POST fires in the background, non-awaited. The frontend
-  // polls for code_sent regardless of when the insert lands.
+  // Sync open of WhatsApp deep link — must stay sync for iOS user-activation.
   const handleOpenWhatsApp = () => {
     setError("");
     if (typeof window !== "undefined") {
       window.open(
-        `https://wa.me/${BOT_PHONE}?text=Hola%20parce%2C%20mandame%20el%20c%C3%B3digo%20de%20la%20polla`,
-        "_blank"
+        botDeepLink("Hola parce, mandame el código de la polla"),
+        "_blank",
       );
     }
     setStep("polling_for_otp");
-    // Fire-and-forget: if the POST fails the pending row never gets written
-    // and polling will time out after 5 min. Acceptable fallback, user can
-    // retry the button. We do NOT await because the await would break the
-    // Safari user-activation chain above.
     axios.post("/api/auth/login-wait", { phone }).catch((err) => {
       console.error("[login] login-wait failed:", err);
     });
@@ -128,31 +162,38 @@ function LoginInner() {
     setVerifying(true);
 
     try {
-      const { data: verifyRes } = await axios.put("/api/auth/otp", { phone, code });
-      const newUser = verifyRes?.newUser ?? isNewUser;
-      if (newUser) {
+      const { data: verifyRes } = await axios.put<{
+        newUser: boolean;
+        needsPassword: boolean;
+      }>("/api/auth/otp", { phone, code });
+
+      // After OTP success, the user always lands on /set-password — the
+      // OTP route rotated their password to a temp value the user does
+      // not know. The middleware enforces this redirect on every other
+      // route, but we also push directly so the URL bar updates cleanly.
+      if (verifyRes?.needsPassword) {
+        router.push("/set-password");
+      } else if (verifyRes?.newUser) {
         router.push("/onboarding");
       } else {
-        const rt = typeof window !== "undefined"
-          ? window.sessionStorage.getItem(RETURN_TO_KEY)
-          : null;
+        const rt =
+          typeof window !== "undefined"
+            ? window.sessionStorage.getItem(RETURN_TO_KEY)
+            : null;
         if (rt) window.sessionStorage.removeItem(RETURN_TO_KEY);
         router.push(rt || "/inicio");
       }
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { error?: string } } };
-      setError(axiosError.response?.data?.error || "Codigo invalido o expirado");
+      setError(
+        axiosError.response?.data?.error || "Código inválido o expirado",
+      );
     } finally {
       setVerifying(false);
     }
   };
 
-  // Poll login_pending_sessions every 3 seconds while the user messages the
-  // bot. Advance to the code-entry step as soon as the webhook flips
-  // code_sent=true, or surface an error on expiry (~15 min TTL) or hard
-  // frontend timeout at 5 min. After ~20 seconds without a result we also
-  // surface a helper block with a retry button so iOS users who lost the
-  // WhatsApp handoff can re-trigger the deep link.
+  // Polling loop while user messages the bot. Same TTL behavior as before.
   useEffect(() => {
     if (step !== "polling_for_otp") return;
     let cancelled = false;
@@ -165,7 +206,7 @@ function LoginInner() {
       if (cancelled) return;
       try {
         const { data } = await axios.get<{ status: string }>(
-          `/api/auth/login-poll?phone=${encodeURIComponent(phone)}`
+          `/api/auth/login-poll?phone=${encodeURIComponent(phone)}`,
         );
         if (cancelled) return;
         if (data.status === "code_sent") {
@@ -196,23 +237,27 @@ function LoginInner() {
     };
   }, [step, phone]);
 
-  // Synchronous re-trigger of the WhatsApp deep link. Must stay sync for
-  // iOS Safari user-activation (same reason as handleOpenWhatsApp).
   const handleReopenWhatsApp = () => {
     setError("");
     if (typeof window !== "undefined") {
       window.open(
-        `https://wa.me/${BOT_PHONE}?text=Hola%20parce%2C%20mandame%20el%20c%C3%B3digo%20de%20la%20polla`,
-        "_blank"
+        botDeepLink("Hola parce, mandame el código de la polla"),
+        "_blank",
       );
     }
-    // Re-trigger the polling loop by bouncing step.
     setStep("waiting_for_whatsapp");
     setTimeout(() => setStep("polling_for_otp"), 0);
     axios.post("/api/auth/login-wait", { phone }).catch((err) => {
       console.error("[login] login-wait retry failed:", err);
     });
   };
+
+  // Turnstile site key. When unset (dev), we render a placeholder so the
+  // CTA isn't permanently disabled; the server still skips verification
+  // when CLOUDFLARE_TURNSTILE_SECRET_KEY is unset (see lib/auth/turnstile).
+  const turnstileSiteKey =
+    process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "";
+  const turnstileConfigured = turnstileSiteKey.length > 0;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -222,7 +267,6 @@ function LoginInner() {
           className="w-full max-w-md rounded-2xl p-6 space-y-6 bg-bg-card/80 backdrop-blur-sm border border-border-subtle relative z-10"
           style={{ boxShadow: "0 0 60px rgba(255,215,0,0.08)" }}
         >
-          {/* Brand header */}
           <div className="text-center space-y-2">
             <motion.div
               className="mx-auto"
@@ -246,21 +290,30 @@ function LoginInner() {
                 alt="La Polla"
                 width={80}
                 height={80}
-                style={{ width: 80, height: 80, objectFit: "contain", position: "relative" }}
+                style={{
+                  width: 80,
+                  height: 80,
+                  objectFit: "contain",
+                  position: "relative",
+                }}
               />
             </motion.div>
             <h1
               className="font-display text-5xl tracking-wide"
-              style={{ color: "#FFD700", textShadow: "0 0 24px rgba(255,215,0,0.35)" }}
+              style={{
+                color: "#FFD700",
+                textShadow: "0 0 24px rgba(255,215,0,0.35)",
+              }}
             >
               LA POLLA
             </h1>
             <p className="text-text-muted text-sm">
-              La polla deportiva de tus amigos
+              {forgotMode
+                ? "Recuperá tu contraseña con un código de WhatsApp"
+                : "La polla deportiva de tus amigos"}
             </p>
           </div>
 
-          {/* Polla preview (only when arriving from an invite/polla link) */}
           {preview && (
             <div className="rounded-2xl p-4 border border-gold/30 bg-gold/5 space-y-1.5 text-center">
               <p className="text-[11px] uppercase tracking-wider text-text-muted">
@@ -284,45 +337,71 @@ function LoginInner() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-text-secondary mb-1.5">
-                Numero de WhatsApp
+              <label
+                htmlFor="phone"
+                className="block text-sm font-medium text-text-secondary mb-1.5"
+              >
+                Número de WhatsApp
               </label>
               <PhoneInput onChange={handlePhoneChange} />
             </div>
 
-            <div className="flex justify-center">
-              <Turnstile
-                siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || ""}
-                onSuccess={setTurnstileToken}
-              />
-            </div>
+            {turnstileConfigured ? (
+              <div className="flex flex-col items-center gap-2">
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={turnstileSiteKey}
+                  options={{ theme: "dark", retry: "auto", refreshExpired: "auto" }}
+                  onSuccess={(token) => {
+                    setTurnstileToken(token);
+                    setTurnstileError(false);
+                  }}
+                  onError={() => {
+                    setTurnstileError(true);
+                    setTurnstileToken("");
+                  }}
+                  onExpire={() => {
+                    setTurnstileToken("");
+                  }}
+                />
+                {turnstileError && (
+                  <p className="text-xs text-red-alert text-center">
+                    No se pudo cargar la verificación. Recargá la página o
+                    revisá tu conexión.
+                  </p>
+                )}
+              </div>
+            ) : null}
 
             {error && (
-              <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">{error}</p>
+              <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
+                {error}
+              </p>
             )}
 
             <button
               type="submit"
-              disabled={!turnstileToken || !phone}
+              disabled={
+                checking ||
+                !phone ||
+                (turnstileConfigured && !turnstileToken)
+              }
               className="w-full bg-gold text-bg-base font-bold py-3.5 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-lg inline-flex items-center justify-center gap-2"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
             >
               <MessageCircle className="w-5 h-5" />
-              Continuar
+              {checking ? "Verificando..." : "Continuar"}
             </button>
           </form>
 
           <div className="border-t border-border-subtle pt-4">
             <p className="text-center text-sm text-text-muted">
-              Al continuar, aceptas nuestros terminos y condiciones
+              Al continuar, aceptas nuestros términos y condiciones
             </p>
           </div>
         </div>
       )}
 
-      {/* State: waiting_for_whatsapp — bot-chat gate before OTP send.
-          User must open the WhatsApp chat with the bot and send "Hola" so
-          Meta's 24h service window opens; only then do we send the OTP. */}
       {step === "waiting_for_whatsapp" && (
         <div
           className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
@@ -336,12 +415,21 @@ function LoginInner() {
                 alt="Bot La Polla"
                 width={80}
                 height={80}
-                style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "50%" }}
+                style={{
+                  width: 80,
+                  height: 80,
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                }}
               />
             </div>
-            <h2 className="font-display text-2xl text-gold tracking-wide">ABRÍ WHATSAPP CON EL BOT</h2>
+            <h2 className="font-display text-2xl text-gold tracking-wide">
+              ABRÍ WHATSAPP CON EL BOT
+            </h2>
             <p className="text-text-secondary text-sm leading-snug">
-              Para recibir el código, escribile al bot y te mandamos el código acá.
+              {forgotMode
+                ? "Para recuperar tu contraseña, escribile al bot y te mandamos un código."
+                : "Para recibir el código, escribile al bot y te mandamos el código acá."}
             </p>
           </div>
 
@@ -356,16 +444,22 @@ function LoginInner() {
           </button>
 
           <p className="text-xs text-text-muted text-center leading-snug">
-            Después de escribirle al bot, volvé acá y esperá el código.
+            Después de escribirle al bot ({BOT_PHONE}), volvé acá y esperá el
+            código.
           </p>
 
           {error && (
-            <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">{error}</p>
+            <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
+              {error}
+            </p>
           )}
 
           <button
             type="button"
-            onClick={() => { setError(""); setStep("phone"); }}
+            onClick={() => {
+              setError("");
+              setStep("phone");
+            }}
             className="w-full text-text-muted font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
           >
             <ArrowLeft className="w-4 h-4" /> Cambiar número
@@ -373,15 +467,16 @@ function LoginInner() {
         </div>
       )}
 
-      {/* State: polling_for_otp — waiting for the bot webhook to flip
-          code_sent=true on login_pending_sessions. */}
       {step === "polling_for_otp" && (
         <div
           className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
           style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
         >
           <div className="text-center space-y-3">
-            <div className="mx-auto flex items-center justify-center" style={{ width: 80, height: 80 }}>
+            <div
+              className="mx-auto flex items-center justify-center"
+              style={{ width: 80, height: 80 }}
+            >
               {pollingTimedOut ? (
                 <MessageCircle className="w-10 h-10 text-gold" aria-hidden="true" />
               ) : (
@@ -401,13 +496,11 @@ function LoginInner() {
             </p>
           </div>
 
-          {/* Helper block kicks in around 20 seconds so users who lost the
-              WhatsApp handoff (iOS app-switch, closed tab, etc.) get a
-              visible way to retry instead of staring at a spinner. */}
           {!pollingTimedOut && pollingElapsed >= 20_000 ? (
             <div className="rounded-xl p-3 space-y-3 bg-bg-elevated border border-border-subtle">
               <p className="text-xs text-text-secondary leading-snug">
-                ¿No te llegó? Asegurate de mandarle al menos un mensaje al bot. Puede ser &ldquo;Hola&rdquo; o cualquier cosa.
+                ¿No te llegó? Asegurate de mandarle al menos un mensaje al bot.
+                Puede ser &ldquo;Hola&rdquo; o cualquier cosa.
               </p>
               <button
                 type="button"
@@ -434,12 +527,17 @@ function LoginInner() {
           ) : null}
 
           {error && (
-            <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">{error}</p>
+            <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
+              {error}
+            </p>
           )}
 
           <button
             type="button"
-            onClick={() => { setError(""); setStep("phone"); }}
+            onClick={() => {
+              setError("");
+              setStep("phone");
+            }}
             className="w-full text-text-muted font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
           >
             <ArrowLeft className="w-4 h-4" /> Cambiar número
@@ -447,18 +545,17 @@ function LoginInner() {
         </div>
       )}
 
-      {/* State: entering_code — code input + verify */}
       {step === "entering_code" && (
         <div
           className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
           style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
         >
           <div className="text-center space-y-2">
-            <h2 className="font-display text-2xl text-gold tracking-wide">INGRESÁ TU CÓDIGO</h2>
+            <h2 className="font-display text-2xl text-gold tracking-wide">
+              INGRESÁ TU CÓDIGO
+            </h2>
             <p className="text-text-secondary text-sm">
-              {isNewUser
-                ? "Copiá el código de 6 dígitos que te envió el bot"
-                : "Revisá tu chat con La Polla en WhatsApp"}
+              Copiá el código de 6 dígitos que te envió el bot
             </p>
           </div>
 
@@ -466,6 +563,7 @@ function LoginInner() {
             <input
               type="text"
               maxLength={6}
+              inputMode="numeric"
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
@@ -475,7 +573,9 @@ function LoginInner() {
             />
 
             {error && (
-              <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">{error}</p>
+              <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
+                {error}
+              </p>
             )}
 
             <button
@@ -487,33 +587,29 @@ function LoginInner() {
               {verifying ? "Verificando..." : "Verificar código"}
             </button>
 
-            {isNewUser ? (
-              <button
-                type="button"
-                onClick={() => { setError(""); setCode(""); setStep("waiting_for_whatsapp"); }}
-                className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
-              >
-                <ArrowLeft className="w-4 h-4" /> Volver
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => { setStep("phone"); setError(""); setCode(""); }}
-                className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
-              >
-                <ArrowLeft className="w-4 h-4" /> Cambiar número o reenviar
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setCode("");
+                setStep("waiting_for_whatsapp");
+              }}
+              className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
+            >
+              <ArrowLeft className="w-4 h-4" /> Volver
+            </button>
 
-            {isNewUser && (
-              <button
-                type="button"
-                onClick={() => { setStep("phone"); setError(""); setCode(""); }}
-                className="w-full text-text-muted text-xs py-1 hover:text-gold transition-colors"
-              >
-                ¿No llegó? Reenviar
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setStep("phone");
+                setError("");
+                setCode("");
+              }}
+              className="w-full text-text-muted text-xs py-1 hover:text-gold transition-colors"
+            >
+              ¿No llegó? Reenviar
+            </button>
           </form>
         </div>
       )}

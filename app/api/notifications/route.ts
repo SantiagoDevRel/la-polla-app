@@ -23,6 +23,7 @@ const NOTIFICATION_TYPES = [
   "last_place",
   "polla_finished",
   "polla_started",
+  "login_event",
 ] as const;
 
 type NotificationType = (typeof NOTIFICATION_TYPES)[number];

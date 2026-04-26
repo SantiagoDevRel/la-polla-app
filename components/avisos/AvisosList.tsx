@@ -14,7 +14,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Trophy, Flag, Bell, Check } from "lucide-react";
+import { Trophy, Flag, Bell, Check, LogIn } from "lucide-react";
 import { getPollitoBase } from "@/lib/pollitos";
 
 type NotificationType =
@@ -23,7 +23,8 @@ type NotificationType =
   | "perfect_pick"
   | "last_place"
   | "polla_finished"
-  | "polla_started";
+  | "polla_started"
+  | "login_event";
 
 export interface AvisoItem {
   id: string;
@@ -102,6 +103,12 @@ const TYPE_VISUALS: Record<NotificationType, TypeVisual> = {
     tint: "bg-bg-elevated",
     ring: "border-border-subtle",
     iconColor: "text-text-primary",
+  },
+  login_event: {
+    Icon: LogIn,
+    tint: "bg-bg-elevated",
+    ring: "border-border-subtle",
+    iconColor: "text-text-secondary",
   },
 };
 
