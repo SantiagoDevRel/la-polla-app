@@ -20,7 +20,7 @@ import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
 import { rotateJoinCode } from "@/lib/pollas/rotate-code";
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
 const FOOTER = "La Polla Colombiana 🐥";
 const PAGE_SIZE = 9; // leave 1 slot in the 10-row list for "Ver más partidos"
 
@@ -221,7 +221,7 @@ export async function handleMainMenu(
 export async function handleUnknownUser(phone: string) {
   await sendTextMessage(
     phone,
-    "No te encuentro en La Polla 🐣. Registrate en la-polla.vercel.app y volvé a escribirme cuando tengas tu cuenta."
+    "No te encuentro en La Polla 🐣. Registrate en lapollacolombiana.com y volvé a escribirme cuando tengas tu cuenta."
   );
 }
 
@@ -239,7 +239,7 @@ export async function handleMisPollas(phone: string, userId: string) {
   if (!participations || participations.length === 0) {
     await sendTextMessage(
       phone,
-      "Todavía no estás en ninguna polla 🐣. Creá una en la-polla.vercel.app o pedile a un amigo el link de invitación."
+      "Todavía no estás en ninguna polla 🐣. Creá una en lapollacolombiana.com o pedile a un amigo el link de invitación."
     );
     return;
   }
