@@ -367,11 +367,11 @@ export default function CrearPollaPage() {
             </div>
 
             {/* Quick actions */}
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={selectAll} style={{ fontSize: 11, color: "#F5F7FA", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline" }}>
+            <div style={{ display: "flex", gap: 12, paddingTop: 4 }}>
+              <button onClick={selectAll} style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline", textUnderlineOffset: 3 }}>
                 Seleccionar todo
               </button>
-              <button onClick={deselectAll} style={{ fontSize: 11, color: "#F5F7FA", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline" }}>
+              <button onClick={deselectAll} style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline", textUnderlineOffset: 3 }}>
                 Deseleccionar todo
               </button>
             </div>
@@ -464,9 +464,12 @@ export default function CrearPollaPage() {
               })
             )}
 
-            {/* Sticky bottom bar */}
+            {/* Sticky bottom bar — sits 12px ABOVE the BottomNav (which is
+                at bottom:14 + h:76 = 90px from the screen bottom). Using
+                bottom:104 leaves a small visible gap so the bar never
+                tucks under the nav. */}
             <div style={{
-              position: "fixed", bottom: 68, left: 0, right: 0, background: "#080c10", borderTop: "1px solid #1a2540", padding: "12px 16px",
+              position: "fixed", bottom: 104, left: 0, right: 0, background: "#080c10", borderTop: "1px solid #1a2540", padding: "12px 16px",
               display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 40,
             }}>
               <span style={{ fontSize: 12, color: selectedMatchIds.size > 0 ? "#f0f4ff" : "#4a5568" }}>

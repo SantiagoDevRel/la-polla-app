@@ -47,8 +47,27 @@ function buildInitialRows(initial: PrizeDistribution | null): { mode: PrizeMode;
       rows: initial.prizes.map((p) => ({ position: p.position, value: String(p.value) })),
     };
   }
-  // Default: una sola fila vacía. El admin elige todo (placeholder ???).
-  return { mode: "percentage", rows: [{ position: 1, value: "" }] };
+  // Default: 3 puestos vacíos. El placeholder por puesto sugiere
+  // winner-takes-all (100/0/0) sin guardar valores reales — el admin
+  // decide cuánto poner.
+  return {
+    mode: "percentage",
+    rows: [
+      { position: 1, value: "" },
+      { position: 2, value: "" },
+      { position: 3, value: "" },
+    ],
+  };
+}
+
+// Placeholder hint por puesto. En % sugerimos winner-takes-all
+// (100/0/0); en COP no asumimos un pozo, así que un genérico "0".
+function placeholderFor(mode: PrizeMode, position: number): string {
+  if (mode === "percentage") {
+    if (position === 1) return "100";
+    return "0";
+  }
+  return "0";
 }
 
 export default function PrizeDistributionForm({ pot, initial, onChange, optional = false }: Props) {
@@ -168,8 +187,8 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
                   inputMode={mode === "percentage" ? "decimal" : "numeric"}
                   value={row.value}
                   onChange={(e) => updateValue(idx, e.target.value)}
-                  placeholder="???"
-                  className="flex-1 min-w-0 bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
+                  placeholder={placeholderFor(mode, row.position)}
+                  className="flex-1 min-w-0 bg-bg-base border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/40 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
                 />
                 <span className="text-text-muted text-sm w-8">
                   {mode === "percentage" ? "%" : "COP"}

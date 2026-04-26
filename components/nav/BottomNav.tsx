@@ -99,11 +99,15 @@ export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }
 
   const effectiveCreateHref = createHref ?? "/pollas/crear";
 
+  // FAB sits FULLY INSIDE the navbar (centered vertically) instead of
+  // protruding above it. The old `-top-6` overflow was eating into the
+  // page content above the nav and tapping over the sticky CTAs of
+  // /pollas/crear and /pollas/[slug]. Slightly smaller diameter + softer
+  // glow keeps the visual hierarchy without the protruding pill.
   const fabClass =
-    "absolute left-1/2 -translate-x-1/2 -top-6 w-[58px] h-[58px] rounded-full bg-gold flex items-center justify-center active:scale-95 transition-transform duration-150";
+    "absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[52px] h-[52px] rounded-full bg-gold flex items-center justify-center active:scale-95 transition-transform duration-150";
   const fabStyle: React.CSSProperties = {
-    boxShadow:
-      "0 0 0 4px var(--bg-base), 0 10px 24px -6px rgba(255,215,0,0.55)",
+    boxShadow: "0 4px 16px -4px rgba(255,215,0,0.45)",
   };
 
   return (

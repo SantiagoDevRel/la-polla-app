@@ -920,9 +920,11 @@ export default function PollaSlugPage() {
               </div>
             )}
 
-            {/* Sticky bulk save button — hidden once polla ends */}
+            {/* Sticky bulk save button — hidden once polla ends. Uses
+                bottom-26 (104px) so it sits above the BottomNav (90px tall
+                + 14px from screen bottom) instead of tucking under it. */}
             {polla.status !== "ended" && pendingSaveIds.length > 0 && (
-              <div className="fixed bottom-20 left-0 right-0 px-4 z-30">
+              <div className="fixed bottom-[104px] left-0 right-0 px-4 z-30">
                 <div className="max-w-lg mx-auto">
                   <button
                     onClick={saveAllPreds}
