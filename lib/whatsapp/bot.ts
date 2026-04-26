@@ -233,14 +233,17 @@ export async function processIncomingMessage(message: IncomingMessage) {
       const code = await generateOTP(from);
       const APP_URL =
         (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
+      const verifyUrl = `${APP_URL}/verify?code=${encodeURIComponent(
+        code,
+      )}&phone=${encodeURIComponent(normalizedPhone)}`;
       await sendCTAButton(
         from,
         `🔐 *Tu código de verificación*\n\n` +
           `*${code}*\n\n` +
           `Válido por 10 minutos\n` +
-          `Ingresa este código en la app para continuar 👇`,
-        "Abrir La Polla 🐔",
-        `${APP_URL}/login`,
+          `Tocá el botón para entrar — el código se rellena solo 👇`,
+        "Entrar a La Polla 🐔",
+        verifyUrl,
         "La Polla Colombiana 🐥"
       );
       const justCreated = await findPendingOTP(from);
@@ -263,14 +266,17 @@ export async function processIncomingMessage(message: IncomingMessage) {
     if (pendingOTP) {
       console.log(`[WA] Found pending OTP for ${redactPhone(from)}, delivering...`);
       const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
+      const verifyUrl = `${APP_URL}/verify?code=${encodeURIComponent(
+        pendingOTP.code,
+      )}&phone=${encodeURIComponent(from)}`;
       await sendCTAButton(
         from,
         `🔐 *Tu código de verificación*\n\n` +
           `*${pendingOTP.code}*\n\n` +
           `Válido por 10 minutos\n` +
-          `Ingresa este código en la app para continuar 👇`,
-        "Abrir La Polla 🐔",
-        `${APP_URL}/verify`,
+          `Tocá el botón para entrar — el código se rellena solo 👇`,
+        "Entrar a La Polla 🐔",
+        verifyUrl,
         "La Polla Colombiana 🐥"
       );
       await markOTPSent(pendingOTP.id);

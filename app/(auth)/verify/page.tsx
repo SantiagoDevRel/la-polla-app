@@ -17,11 +17,24 @@ function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phoneFromParams = searchParams.get("phone") || "";
+  // Code can arrive prefilled from the WhatsApp bot's CTA button
+  // (?code=XXXXXX). Sanitize to digits-only and trim to 6 chars so a
+  // tampered URL never breaks the input.
+  const codeFromParams = (searchParams.get("code") || "")
+    .replace(/\D/g, "")
+    .slice(0, 6);
   const [phone, setPhone] = useState(phoneFromParams);
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(codeFromParams);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState<VerifyStep>("waiting_for_whatsapp");
+  // If we already have phone + code from the URL, skip the
+  // "waiting_for_whatsapp" interstitial — the user clearly arrived from
+  // the WA button. Otherwise show the default flow.
+  const [step, setStep] = useState<VerifyStep>(
+    codeFromParams && (phoneFromParams || typeof window === "undefined")
+      ? "entering_code"
+      : "waiting_for_whatsapp",
+  );
 
   useEffect(() => {
     if (!phone) {
