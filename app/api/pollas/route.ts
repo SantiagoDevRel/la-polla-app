@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { generateUniqueJoinCode } from "@/lib/pollas/join-code";
+import { POLLA_COLUMNS } from "@/lib/db/columns";
 import { z } from "zod";
 
 // Modos de pago válidos (payment_mode en la DB es varchar, no enum)
@@ -27,6 +28,21 @@ const createPollaSchema = z
     matchIds: z.array(z.string()).optional(),
     // Solo requerido cuando paymentMode === 'admin_collects'
     adminPaymentInstructions: z.string().optional(),
+    // Distribución de premios opcional al crear; el organizador puede
+    // editarla luego desde el panel admin.
+    prizeDistribution: z
+      .object({
+        mode: z.enum(["percentage", "cop"]),
+        prizes: z
+          .array(
+            z.object({
+              position: z.number().int().min(1),
+              value: z.number().positive(),
+            }),
+          )
+          .min(1),
+      })
+      .optional(),
   })
   // Validación condicional: si el modo es admin_collects, las instrucciones son obligatorias
   .refine(
@@ -50,6 +66,25 @@ const createPollaSchema = z
     {
       message: "El valor minimo es $1.000",
       path: ["buyInAmount"],
+    }
+  )
+  // Validación: si hay prizeDistribution con modo porcentaje, suma <= 100;
+  // posiciones únicas en cualquier modo.
+  .refine(
+    (data) => {
+      const pd = data.prizeDistribution;
+      if (!pd) return true;
+      const positions = pd.prizes.map((p) => p.position);
+      if (new Set(positions).size !== positions.length) return false;
+      if (pd.mode === "percentage") {
+        const sum = pd.prizes.reduce((acc, p) => acc + p.value, 0);
+        if (sum > 100.0001) return false;
+      }
+      return true;
+    },
+    {
+      message: "Distribución de premios inválida (revisá posiciones y porcentajes).",
+      path: ["prizeDistribution"],
     }
   );
 
@@ -80,7 +115,7 @@ export async function GET() {
 
     const { data: createdPollas, error: errCreated } = await supabase
       .from("pollas")
-      .select("*")
+      .select(POLLA_COLUMNS)
       .eq("created_by", user.id);
 
     if (errCreated) throw errCreated;
@@ -89,7 +124,7 @@ export async function GET() {
     if (pollaIds.length > 0) {
       const { data: pp, error: errParticipant } = await supabase
         .from("pollas")
-        .select("*")
+        .select(POLLA_COLUMNS)
         .in("id", pollaIds);
       if (errParticipant) {
         console.error("[/api/pollas] participant fetch error:", errParticipant);
@@ -283,6 +318,7 @@ export async function POST(request: NextRequest) {
         match_ids: parsed.data.matchIds || null,
         created_by: user.id,
         join_code: joinCode,
+        prize_distribution: parsed.data.prizeDistribution ?? null,
       })
       .select()
       .single();

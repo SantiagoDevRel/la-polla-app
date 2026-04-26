@@ -3,6 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
+import {
+  POLLA_COLUMNS,
+  POLLA_PARTICIPANT_COLUMNS,
+  MATCH_COLUMNS,
+  PREDICTION_COLUMNS,
+} from "@/lib/db/columns";
 
 export async function GET(
   request: NextRequest,
@@ -22,7 +28,7 @@ export async function GET(
     // Cargar la polla por slug
     const { data: polla, error: pollaError } = await supabase
       .from("pollas")
-      .select("*")
+      .select(POLLA_COLUMNS)
       .eq("slug", params.slug)
       .single();
 
@@ -34,7 +40,7 @@ export async function GET(
     const adminSupabase = createAdminClient();
     const { data: participant } = await adminSupabase
       .from("polla_participants")
-      .select("*")
+      .select(POLLA_PARTICIPANT_COLUMNS)
       .eq("polla_id", polla.id)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -73,7 +79,7 @@ export async function GET(
       .order("total_points", { ascending: false });
 
     // Cargar partidos — por match_ids si existen, sino por torneo (legacy)
-    let matchQuery = supabase.from("matches").select("*");
+    let matchQuery = supabase.from("matches").select(MATCH_COLUMNS);
 
     if (polla.match_ids && polla.match_ids.length > 0) {
       matchQuery = matchQuery.in("id", polla.match_ids);
@@ -86,7 +92,7 @@ export async function GET(
     // Cargar predicciones del usuario en esta polla
     const { data: predictions } = await supabase
       .from("predictions")
-      .select("*")
+      .select(PREDICTION_COLUMNS)
       .eq("polla_id", polla.id)
       .eq("user_id", user.id);
 

@@ -13,6 +13,7 @@
 //   4) notifyRankImprovement    — individual participant when rank improves.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/bot";
+import { redactPhone } from "@/lib/log";
 
 const APP_URL =
   (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://la-polla.vercel.app";
@@ -29,9 +30,9 @@ async function send(phone: string | null | undefined, body: string, tag: string)
   if (!phone) return;
   try {
     await sendWhatsAppMessage(phone, body);
-    console.log(`[notify:${tag}] → ${phone}`);
+    console.log(`[notify:${tag}] → ${redactPhone(phone)}`);
   } catch (err) {
-    console.error(`[notify:${tag}] failed for ${phone}:`, err);
+    console.error(`[notify:${tag}] failed for ${redactPhone(phone)}:`, err);
   }
 }
 
