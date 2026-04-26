@@ -125,7 +125,16 @@ export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }
 
           <button
             type="button"
-            onClick={() => setChoiceOpen(true)}
+            onClick={(e) => {
+              // Blur first: Vaul drawers slap aria-hidden on background
+              // elements (including this nav) when they open. If the FAB
+              // keeps focus, React warns ("Blocked aria-hidden on an
+              // element because its descendant retained focus") and on
+              // some browsers the focus trap leaves the button in a
+              // limbo state where subsequent clicks no-op.
+              e.currentTarget.blur();
+              setChoiceOpen(true);
+            }}
             aria-label="Crear o unirme a una polla"
             className={fabClass}
             style={fabStyle}
