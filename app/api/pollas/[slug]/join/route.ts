@@ -35,7 +35,13 @@ export async function POST(
       // No body / not JSON — fine, just means no token provided.
     }
 
-    const { data: polla, error: pollaError } = await supabase
+    // pollas/polla_participants reads go through the admin client because
+    // auth.uid() returns NULL in the PostgREST request context (TODO in
+    // CLAUDE.md). The session is already validated above; the invite
+    // token is what gates write access here, not RLS.
+    const admin = createAdminClient();
+
+    const { data: polla, error: pollaError } = await admin
       .from("pollas")
       .select("id, type, status, slug, payment_mode, buy_in_amount, currency, invite_token")
       .eq("slug", params.slug)
@@ -63,7 +69,7 @@ export async function POST(
     }
 
     // Already in?
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from("polla_participants")
       .select("id")
       .eq("polla_id", polla.id)
@@ -77,9 +83,8 @@ export async function POST(
     //   pay_winner     → paid=true on join (nothing to collect upfront).
     const initialPaid = !isAdminCollects;
 
-    const admin = createAdminClient();
-
     if (!existing) {
+
       const { error: insertError } = await admin
         .from("polla_participants")
         .insert({

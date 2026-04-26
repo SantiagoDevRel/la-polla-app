@@ -32,8 +32,11 @@ export async function POST(
       );
     }
 
-    // Obtener la polla por slug
-    const { data: polla, error: pollaError } = await supabase
+    // pollas SELECT via admin: auth.uid() NULL en PostgREST hace que un
+    // participante (no creator) vea "Polla no encontrada" al intentar
+    // pronosticar. Sesión validada arriba.
+    const admin = createAdminClient();
+    const { data: polla, error: pollaError } = await admin
       .from("pollas")
       .select("id, match_ids, payment_mode")
       .eq("slug", params.slug)
@@ -49,9 +52,7 @@ export async function POST(
       return NextResponse.json({ error: "Este partido no pertenece a esta polla" }, { status: 400 });
     }
 
-    // Validación del participante usa admin client para evitar que RLS oculte la fila.
-    // El INSERT del pronóstico sigue usando la sesión del usuario (auth + RLS).
-    const admin = createAdminClient();
+    // Validación del participante también via admin (mismo motivo).
     const { data: participant } = await admin
       .from("polla_participants")
       .select("id, status, payment_status, paid")
@@ -79,9 +80,13 @@ export async function POST(
       );
     }
 
-    // Upsert del pronóstico — el trigger check_prediction_lock en Supabase bloquea si falta menos de 5 min
-    // "upsert" significa insertar si no existe, actualizar si ya existe (basado en la constraint UNIQUE)
-    const { data: prediction, error: predError } = await supabase
+    // Upsert del pronóstico — el trigger check_prediction_lock en
+    // Supabase bloquea si falta menos de 5 min. Verificado: el trigger
+    // no usa auth.uid(), solo lee matches.scheduled_at, así que correr
+    // el upsert via admin no debilita la lógica anti-tarde. Usamos
+    // admin porque predictions_insert/update gatean por auth.uid() =
+    // user_id que es NULL en PostgREST.
+    const { data: prediction, error: predError } = await admin
       .from("predictions")
       .upsert(
         {
