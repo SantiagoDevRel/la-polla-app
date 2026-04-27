@@ -41,11 +41,11 @@ const COPY_BANK: Record<ShareMoment, readonly string[]> = {
   ],
   rival: [
     "Papá, te toca responder",
-    "Respondé si podés",
+    "Responde si puedes",
     "Tu movida, parce",
     "La polla no se juega sola",
-    "Aguantá el reto",
-    "Vení por mí",
+    "Aguanta el reto",
+    "Ven por mí",
   ],
   ultimo: [
     "Alguien tenía que ser último",
@@ -75,9 +75,9 @@ const COPY_BANK: Record<ShareMoment, readonly string[]> = {
     "Voy con todo",
     "Esta no se me va",
     "Marcador cantado",
-    "Apostá conmigo",
+    "Apuesta conmigo",
     "Ya quedó escrito",
-    "Anotá y decime",
+    "Anota y dime",
   ],
 };
 

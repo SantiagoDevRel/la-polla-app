@@ -156,7 +156,7 @@ export default function OpenInvitePage() {
           }>(`/api/pollas/preview?token=${encodeURIComponent(token)}`);
           previewData = data;
         } catch {
-          setError("Link inválido o expirado. Pedíle al organizador que te comparta el link actualizado.");
+          setError("Link inválido o expirado. Pídele al organizador que te comparta el link actualizado.");
           return;
         }
         const row = previewData.polla;
@@ -459,7 +459,7 @@ export default function OpenInvitePage() {
           {isEnded ? (
             <div className="rounded-xl p-3 text-center bg-bg-elevated border border-border-subtle">
               <p className="text-text-primary font-semibold">Esta polla ya cerró.</p>
-              <p className="text-text-secondary text-sm mt-0.5">No podés unirte.</p>
+              <p className="text-text-secondary text-sm mt-0.5">No puedes unirte.</p>
             </div>
           ) : authed === false ? (
             <button

@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     if (limit.blocked) {
       return NextResponse.json(
         {
-          error: "Demasiados intentos fallidos. Esperá 15 minutos.",
+          error: "Demasiados intentos fallidos. Espera 15 minutos.",
           retryAfter: limit.retryAfter,
         },
         { status: 429 },

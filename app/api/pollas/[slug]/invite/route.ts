@@ -147,7 +147,7 @@ export async function POST(
         const inviteUrl = `${APP_URL}/invites/${token}`;
         await sendCTAButton(
           normalizedPhone,
-          `Parce, *${inviterName}* te invitó a la polla *${polla.name}* 🐣\n\nTocá el botón para entrar y poner tus pronósticos 👇`,
+          `Parce, *${inviterName}* te invitó a la polla *${polla.name}* 🐣\n\nToca el botón para entrar y poner tus pronósticos 👇`,
           "Entrar a la polla 🏆",
           inviteUrl,
           "La Polla Colombiana 🐥"
@@ -165,7 +165,7 @@ export async function POST(
       success: true,
       unregistered: true,
       shareLink,
-      message: `Este número no está registrado. Compartí este link directamente: ${shareLink}`,
+      message: `Este número no está registrado. Comparte este link directamente: ${shareLink}`,
     }, { status: 201 });
   } catch (error) {
     console.error("Error creando invitación:", error);

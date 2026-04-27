@@ -136,7 +136,7 @@ async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
   if (limit.blocked) {
     await sendTextMessage(
       fromRaw,
-      "Muchos intentos. Esperá unos minutos y probá de nuevo. 🙏",
+      "Muchos intentos. Espera unos minutos e inténtalo de nuevo. 🙏",
     );
     return;
   }
@@ -157,7 +157,7 @@ async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
     console.error("[wa-webhook] insert magic token failed:", insertErr);
     await sendTextMessage(
       fromRaw,
-      "Algo falló del lado nuestro. Probá de nuevo en un minuto.",
+      "Algo falló del lado nuestro. Inténtalo de nuevo en un minuto.",
     );
     return;
   }
@@ -167,7 +167,7 @@ async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
   await sendCTAButton(
     fromRaw,
     `¡Listo, parce! Te logueo a *La Polla* como *${e164}*.\n\n` +
-      "El link de abajo sirve por 10 minutos y solo lo podés usar una vez 🐔",
+      "El link de abajo sirve por 10 minutos y solo lo puedes usar una vez 🐔",
     "Entrar a La Polla",
     url,
     "La Polla Colombiana 🐥",

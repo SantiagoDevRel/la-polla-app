@@ -65,7 +65,7 @@ export default function PrizeDistributionEditor({ pollaSlug, pot, initial }: Pro
         <div className="flex-1">
           <h3 className="text-sm font-bold text-text-primary">Premios</h3>
           <p className="text-xs text-text-muted mt-0.5">
-            Definí cuántos puestos premiás y cuánto se lleva cada uno.
+            Define cuántos puestos premias y cuánto se lleva cada uno.
           </p>
         </div>
       </div>

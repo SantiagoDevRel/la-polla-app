@@ -89,7 +89,7 @@ function PaymentPendingBanner({ onGo }: { onGo: () => void }) {
     <div className="rounded-xl p-3 flex items-center gap-3 bg-gold/10 border border-gold/30">
       <Banknote className="w-5 h-5 text-gold shrink-0" aria-hidden="true" />
       <p className="text-xs text-text-primary flex-1 leading-snug">
-        Tu pago está pendiente de aprobación. Andá a la tab Pagos para confirmar.
+        Tu pago está pendiente de aprobación. Ve a la tab Pagos para confirmar.
       </p>
       <button
         type="button"
@@ -964,7 +964,7 @@ export default function PollaSlugPage() {
             {participants.length === 0 ? (
               <EmptyState
                 title="Aún no hay participantes"
-                subtitle="Compartí el link de invitación desde la pestaña Organizar para empezar."
+                subtitle="Comparte el link de invitación desde la pestaña Organizar para empezar."
               />
             ) : (
               <>
@@ -1136,7 +1136,7 @@ export default function PollaSlugPage() {
                       try {
                         const { data: res } = await axios.post(`/api/pollas/${slug}/invite`, { whatsapp_number: invitePhoneFull });
                         if (res.unregistered && res.shareLink) {
-                          setInviteMsg({ text: `No registrado. Compartí este link: ${res.shareLink}`, type: "success" });
+                          setInviteMsg({ text: `No registrado. Comparte este link: ${res.shareLink}`, type: "success" });
                         } else {
                           setInviteMsg({ text: "¡Invitación enviada!", type: "success" });
                         }

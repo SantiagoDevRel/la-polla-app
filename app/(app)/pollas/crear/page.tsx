@@ -68,7 +68,7 @@ const PAYMENT_MODE_OPTIONS = [
 ];
 
 const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = {
-  admin_collects: "Cada participante le paga al organizador (tú) antes de entrar. Cada vez que alguien te pague, lo marcás como pagado para que pueda participar.",
+  admin_collects: "Cada participante le paga al organizador (tú) antes de entrar. Cada vez que alguien te pague, lo marcas como pagado para que pueda participar.",
   pay_winner: "Al final, todos le pagan directamente al ganador.",
 };
 
@@ -558,7 +558,7 @@ export default function CrearPollaPage() {
                 </span>
               </div>
               <p className="text-xs text-text-muted">
-                Definí cómo se reparten los premios entre los puestos. Podés modificarlo después
+                Define cómo se reparten los premios entre los puestos. Puedes modificarlo después
                 desde el panel del organizador.
               </p>
               <PrizeDistributionForm

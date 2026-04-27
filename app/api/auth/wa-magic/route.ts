@@ -70,7 +70,7 @@ function errorPage(message: string, status = 400) {
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token")?.trim();
   if (!token || !/^[a-f0-9]{32,128}$/i.test(token)) {
-    return errorPage("El link es inválido. Pedí uno nuevo desde /login.");
+    return errorPage("El link es inválido. Pide uno nuevo desde /login.");
   }
 
   const admin = createAdminClient();
@@ -86,9 +86,9 @@ export async function GET(request: NextRequest) {
 
   if (!row) return errorPage("Link no reconocido.");
   if (row.consumed_at)
-    return errorPage("Este link ya se usó. Pedí uno nuevo desde /login.");
+    return errorPage("Este link ya se usó. Pide uno nuevo desde /login.");
   if (new Date(row.expires_at).getTime() < Date.now())
-    return errorPage("Este link expiró. Pedí uno nuevo desde /login.");
+    return errorPage("Este link expiró. Pide uno nuevo desde /login.");
 
   const phoneNormalized = normalizePhone(row.phone_number);
   const phoneE164 = `+${phoneNormalized}`;
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
     .select("token")
     .maybeSingle();
   if (!claimed)
-    return errorPage("Este link ya se usó. Pedí uno nuevo desde /login.");
+    return errorPage("Este link ya se usó. Pide uno nuevo desde /login.");
 
   // Resolve the auth.users.id for this phone authoritatively. The RPC
   // (migration 026) reads auth.users directly via SECURITY DEFINER and
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     );
     if (rpcErr) {
       console.error("[wa-magic] find_auth_user_id_by_phone failed:", rpcErr);
-      return errorPage("No pudimos firmar tu sesión. Probá de nuevo.", 500);
+      return errorPage("No pudimos firmar tu sesión. Inténtalo de nuevo.", 500);
     }
     if (typeof rpcId === "string" && rpcId.length > 0) authUserId = rpcId;
   }
@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
         authUserId = retryId;
       } else {
         console.error("[wa-magic] createUser failed and recheck miss:", createErr);
-        return errorPage("No pudimos crear tu cuenta. Probá de nuevo.", 500);
+        return errorPage("No pudimos crear tu cuenta. Inténtalo de nuevo.", 500);
       }
     } else {
       authUserId = created.user.id;
@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
 
   if (linkErr || !emailOtp) {
     console.error("[wa-magic] generateLink failed:", linkErr);
-    return errorPage("No pudimos firmar tu sesión. Probá de nuevo.", 500);
+    return errorPage("No pudimos firmar tu sesión. Inténtalo de nuevo.", 500);
   }
 
   const supabase = createServerSupabase();
@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
   });
   if (verifyErr) {
     console.error("[wa-magic] verifyOtp failed:", verifyErr);
-    return errorPage("No pudimos firmar tu sesión. Probá de nuevo.", 500);
+    return errorPage("No pudimos firmar tu sesión. Inténtalo de nuevo.", 500);
   }
 
   // Mirror the SMS-OTP flow: also stamp public.users with the phone

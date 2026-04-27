@@ -88,7 +88,7 @@ export function QuickPickStrip({
       showToast(`Apuntado ${selected.home}-${selected.away} en ${pollaName}`, "success");
       router.refresh();
     } catch {
-      showToast("Error de red. Probá de nuevo.", "error");
+      showToast("Error de red. Inténtalo de nuevo.", "error");
     } finally {
       setSaving(false);
     }
@@ -130,7 +130,7 @@ export function QuickPickStrip({
       ) : (
         <>
           <p className="font-body text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted text-center mb-2">
-            {savedPred ? "Cambiá tu pronóstico rápido" : "Pronóstico rápido"} · {pollaName}
+            {savedPred ? "Cambia tu pronóstico rápido" : "Pronóstico rápido"} · {pollaName}
           </p>
 
           <div className="flex gap-1.5 justify-center mb-2.5">
@@ -169,7 +169,7 @@ export function QuickPickStrip({
                 ? `Ya apuntaste ${savedPred?.home}-${savedPred?.away}`
                 : selected
                   ? `Apuntar ${selected.home}-${selected.away}`
-                  : "Elegí un marcador"}
+                  : "Elige un marcador"}
           </button>
         </>
       )}
