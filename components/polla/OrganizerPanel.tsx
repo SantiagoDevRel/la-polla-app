@@ -253,7 +253,7 @@ export default function OrganizerPanel({
         {participants.length === 0 ? (
           <EmptyState
             title="Aún no hay participantes"
-            subtitle="Compartí tu link de invitación arriba para que se unan."
+            subtitle="Comparte tu link de invitación arriba para que se unan."
             size={80}
           />
         ) : (

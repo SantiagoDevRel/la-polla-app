@@ -101,7 +101,7 @@ function LoginInner() {
     // Smallest plausible E.164 is "+CCNNNNNNN" (~9 chars total). Twilio
     // Verify itself will reject anything malformed.
     if (!phone.startsWith("+") || phone.replace(/\D/g, "").length < 8) {
-      setError("Ingresá un número válido con código de país");
+      setError("Ingresa un número válido con código de país");
       return;
     }
     setSending(true);
@@ -116,9 +116,9 @@ function LoginInner() {
       if (authErr) {
         const msg = (authErr.message || "").toLowerCase();
         if (msg.includes("phone signups") || msg.includes("provider")) {
-          setError("Login por celular no está activado. Contactá soporte.");
+          setError("Login por celular no está activado. Contacta a soporte.");
         } else if (msg.includes("rate") || msg.includes("limit")) {
-          setError("Muchos intentos. Esperá un minuto y reintentá.");
+          setError("Muchos intentos. Espera un minuto e inténtalo de nuevo.");
         } else {
           setError(authErr.message || "No pudimos enviar el código");
         }
@@ -308,7 +308,7 @@ function LoginInner() {
           </form>
 
           <p className="text-[10px] text-text-muted/70 text-center pt-1">
-            Al continuar, aceptás nuestros términos y condiciones
+            Al continuar, aceptas nuestros términos y condiciones
           </p>
         </div>
       )}
@@ -317,7 +317,7 @@ function LoginInner() {
         <div className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
           <div className="text-center space-y-2">
             <h2 className="font-display text-2xl text-gold tracking-wide">
-              INGRESÁ TU CÓDIGO
+              INGRESA TU CÓDIGO
             </h2>
             <p className="text-text-secondary text-sm">
               Enviado a{" "}
@@ -400,7 +400,7 @@ function LoginInner() {
               rel="noopener noreferrer"
               className="text-xs text-text-muted hover:text-gold transition-colors inline-flex items-center gap-1"
             >
-              ¿No te llegó? <span className="underline">Probá con WhatsApp</span>
+              ¿No te llegó? <span className="underline">Prueba con WhatsApp</span>
             </a>
           </div>
         </div>

@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Código inválido o expirado. Pedíle al organizador que te comparta el código actualizado.",
+            "Código inválido o expirado. Pídele al organizador que te comparta el código actualizado.",
         },
         { status: 404 },
       );

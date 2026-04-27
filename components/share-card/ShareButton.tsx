@@ -110,7 +110,7 @@ export function ShareButton({ payload, className, label = "Compartir" }: ShareBu
       setPreviewUrl(objectUrl);
     } catch (err) {
       console.warn("[share-card] share failed", err);
-      alert("No se pudo generar la imagen. Probá de nuevo.");
+      alert("No se pudo generar la imagen. Inténtalo de nuevo.");
     } finally {
       setBusy(false);
     }

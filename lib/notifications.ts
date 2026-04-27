@@ -325,7 +325,7 @@ export async function notifyAdminPaymentSubmitted(
 
     const body =
       `💸 *${payerName}* marcó como pagado en *${polla.name}*.\n` +
-      `Andá a Pagos para aprobar: ${pollaLink(polla.slug)}`;
+      `Ve a Pagos para aprobar: ${pollaLink(polla.slug)}`;
     await send(adminUser.whatsapp_number, body, "payment-submitted");
   } catch (err) {
     console.error("[notify:payment-submitted] non-fatal error:", err);
@@ -375,7 +375,7 @@ export async function notifyParticipantPaymentApproved(
 
     const body =
       `✅ Tu pago en *${polla.name}* fue aprobado.\n` +
-      `Ya podés pronosticar: ${pollaLink(polla.slug)}`;
+      `Ya puedes pronosticar: ${pollaLink(polla.slug)}`;
     await send(userRow.whatsapp_number, body, "payment-approved");
   } catch (err) {
     console.error("[notify:payment-approved] non-fatal error:", err);

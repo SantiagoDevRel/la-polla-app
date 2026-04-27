@@ -59,9 +59,9 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
         // Inline error: el toast queda tapado por el modal (z-index), por
         // eso lo mostramos dentro del propio modal mientras siga abierto.
         if (res.status === 401) {
-          setError("Tenés que iniciar sesión para reportar.");
+          setError("Tienes que iniciar sesión para reportar.");
         } else {
-          setError("No pudimos enviar tu reporte. Probá de nuevo.");
+          setError("No pudimos enviar tu reporte. Inténtalo de nuevo.");
         }
         return;
       }
@@ -73,7 +73,7 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
         "success",
       );
     } catch {
-      setError("Error de red. Probá de nuevo.");
+      setError("Error de red. Inténtalo de nuevo.");
     } finally {
       setSubmitting(false);
     }
