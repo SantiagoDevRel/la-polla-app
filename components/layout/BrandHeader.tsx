@@ -7,6 +7,7 @@
 "use client";
 
 import WhatsAppBubble from "@/components/shared/WhatsAppBubble";
+import ReportProblemBubble from "@/components/shared/ReportProblemBubble";
 
 export default function BrandHeader() {
   return (
@@ -42,7 +43,10 @@ export default function BrandHeader() {
             <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
           </span>
         </div>
-        <WhatsAppBubble size={34} />
+        <div className="flex items-center gap-2">
+          <ReportProblemBubble size={34} />
+          <WhatsAppBubble size={34} />
+        </div>
       </div>
     </header>
   );
