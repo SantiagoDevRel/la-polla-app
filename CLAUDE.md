@@ -431,30 +431,48 @@ All UI (crear polla, explorar, etc.) should only show these two. Admin page keep
 
 ---
 
-## WhatsApp Bot Architecture
+## WhatsApp Bot Architecture (post-2026-04-27)
+
+The conversational bot was retired in commit `6210413` — the app is the
+menu now. Only two inbound intents remain.
+
+### Inbound flow (webhook)
+- **Magic-link intent**: tight match on `"quiero entrar a la polla"`
+  (the exact phrase `/login` pre-fills as SMS-fallback). Generates a
+  `wa_magic_tokens` row, replies with a CTA button to
+  `/api/auth/wa-magic?token=…` (10-min TTL, single use). Rate-limited
+  via the `generate` bucket.
+- **Menu intent (everything else)**: greetings, "menú", any text the
+  app's `WhatsAppBubble` pre-fills, stickers, audio, and the catch-all
+  fallback all reply with a CTA button to `/inicio`. The reply mentions
+  the magic-link phrase so users who came hunting for SMS recovery
+  still find the path.
 
 ### Files
-- `lib/whatsapp/bot.ts` — Message sending (Meta API via axios), routing, processing. Env vars: `META_WA_PHONE_NUMBER_ID`, `META_WA_ACCESS_TOKEN`
-- `lib/whatsapp/flows.ts` — All conversation flows. Colombian parcero Spanish tone. Uses interactive messages via `interactive.ts`
-- `lib/whatsapp/interactive.ts` — `sendReplyButtons`, `sendListMessage`, `sendCTAButton` (Meta Cloud API via fetch)
-- `lib/whatsapp/tabla.ts` — `formatTablaWA()` monospace leaderboard formatter
-- `lib/whatsapp/state.ts` — In-memory conversation state with 10min TTL
-- `lib/whatsapp/messages.ts` — OTP message template
-- `app/api/whatsapp/webhook/route.ts` — Meta webhook handler (signature-verified via META_WA_APP_SECRET)
-- `app/api/whatsapp/test-send/route.ts` — Dev-only test endpoint
+- `lib/whatsapp/bot.ts` — Outbound send helpers: `sendTextMessage`,
+  `sendButtonMessage`, `sendListMessage`. Used by invites + notifications.
+- `lib/whatsapp/interactive.ts` — `sendReplyButtons`, `sendListMessage`,
+  `sendCTAButton` (Meta Cloud API via fetch).
+- `lib/whatsapp/menu-intent.ts` — `looksLikeMenuIntent(text)` helper
+  (used by the webhook for log granularity; tested in `menu-intent.test.ts`).
+- `lib/whatsapp/bot-phone.ts` — `BOT_PHONE` + `botDeepLink(prefilled)`.
+- `lib/whatsapp/tabla.ts` — `formatTablaWA()` monospace leaderboard
+  formatter (used by outbound notifications).
+- `app/api/whatsapp/webhook/route.ts` — Meta webhook handler (signature
+  via `META_WA_APP_SECRET`).
+
+### Env vars
+- `META_WA_ACCESS_TOKEN`, `META_WA_PHONE_NUMBER_ID` — outbound sends.
+- `META_WA_APP_SECRET` — inbound HMAC signature verification.
+- `META_WA_WEBHOOK_VERIFY_TOKEN` — Meta subscription handshake.
+- `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` — bot's E.164 number (no plus) for
+  the bubble + login deep links. Falls back to `573117312391`.
 
 ### Tone Rules (non-negotiable)
 - Colombian parcero Spanish: "parce", "listo", "eso es", "pilas", "bacano"
 - Emojis: 🐔 brand, ⚽ matches, 🏆 leaderboard, 💰 buy-in, 🎯 predictions, 📊 standings
 - Footer: "🐔 La Polla Colombiana"
 - Never formal language. Never "estimado usuario"
-
-### Button ID → Route mapping
-Main menu: `menu_mis_pollas`, `menu_predecir`, `menu_tabla`
-Polla menu: `pred_{id}`, `rank_{id}`, `results_{id}`
-Confirmation: `confirm_yes`, `confirm_no`
-Navigation: `menu`, `polla_{id}`, `match_{id}`
-Help: `menu_ayuda`, `help_puntaje`, `help_crear`, `menu_perfil`
 
 ---
 
