@@ -111,3 +111,74 @@ export async function GET(
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
+
+// Hard-delete the polla and every dependent row (participants,
+// predictions, notifications, invites). All FKs to public.pollas have
+// ON DELETE CASCADE, so a single DELETE on pollas is atomic.
+//
+// Auth: must be authenticated AND have role='admin' on
+// polla_participants for this polla. The check mirrors rotate-code so
+// both endpoints stay in lockstep on what "admin of this polla" means.
+// We do NOT fall back to pollas.created_by — the participant row is
+// the authoritative source (admins can transfer ownership in the
+// future without needing a parallel column rename).
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { slug: string } },
+) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const admin = createAdminClient();
+
+  const { data: polla, error: pollaErr } = await admin
+    .from("pollas")
+    .select("id, name")
+    .eq("slug", params.slug)
+    .maybeSingle();
+  if (pollaErr) {
+    console.error("[pollas DELETE] lookup failed:", pollaErr);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+  if (!polla) {
+    return NextResponse.json(
+      { error: "Polla no encontrada" },
+      { status: 404 },
+    );
+  }
+
+  const { data: membership } = await admin
+    .from("polla_participants")
+    .select("role")
+    .eq("polla_id", polla.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership || membership.role !== "admin") {
+    return NextResponse.json(
+      { error: "Solo el admin de la polla puede borrarla" },
+      { status: 403 },
+    );
+  }
+
+  const { error: delErr } = await admin
+    .from("pollas")
+    .delete()
+    .eq("id", polla.id);
+  if (delErr) {
+    console.error("[pollas DELETE] delete failed:", delErr);
+    return NextResponse.json(
+      { error: "No se pudo borrar la polla" },
+      { status: 500 },
+    );
+  }
+
+  console.log(
+    `[pollas DELETE] polla "${polla.name}" (id=${polla.id}) deleted by user ${user.id}`,
+  );
+  return NextResponse.json({ ok: true });
+}
