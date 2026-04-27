@@ -50,6 +50,15 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createClient();
+    // Defensive: clear any existing session BEFORE verifying. Users
+    // legitimately have multiple accounts (one per phone), and if they
+    // come into /login already logged into account A and then submit
+    // an OTP for account B, the cookie swap doesn't always happen
+    // cleanly when there's a live session on the request. Signing
+    // out first guarantees verifyOtp writes a fresh session and B
+    // takes over.
+    await supabase.auth.signOut().catch(() => {});
+
     const { data, error } = await supabase.auth.verifyOtp({
       phone: phoneE164,
       token: code,

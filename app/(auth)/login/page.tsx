@@ -48,6 +48,16 @@ function LoginInner() {
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PollaPreview | null>(null);
 
+  // Visiting /login means "I want to start fresh" — even if the user
+  // already has a session for another account (legitimate: same person
+  // can have a +57 account and a +351 account). Sign out on mount so
+  // the channel buttons below always create a brand-new session, and
+  // the user can't accidentally end up in the OLD account just because
+  // /inicio happened to render first.
+  useEffect(() => {
+    void supabase.auth.signOut().catch(() => {});
+  }, [supabase]);
+
   // Capturar returnTo + cargar preview de polla si viene de invite link.
   useEffect(() => {
     const rt = searchParams.get("returnTo");

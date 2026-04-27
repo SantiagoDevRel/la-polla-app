@@ -175,11 +175,6 @@ export default function PhoneInput({ onChange }: PhoneInputProps) {
         />
       </div>
 
-      {/* Hint */}
-      <p className="text-xs text-text-muted mt-1">
-        Número sin código de país
-      </p>
-
       {/* Dropdown de países */}
       {open && (
         <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl max-h-72 flex flex-col overflow-hidden bg-bg-card border border-border-medium"

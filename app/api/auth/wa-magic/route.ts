@@ -194,6 +194,11 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = createServerSupabase();
+  // Defensive: signOut before verify. Same reason as in
+  // /api/auth/verify-otp — a user with a live session on a different
+  // account would otherwise risk the cookie swap not landing.
+  await supabase.auth.signOut().catch(() => {});
+
   const { error: verifyErr } = await supabase.auth.verifyOtp({
     email: syntheticEmail,
     token: emailOtp,
