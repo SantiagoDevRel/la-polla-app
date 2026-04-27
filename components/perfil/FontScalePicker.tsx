@@ -12,10 +12,13 @@ import {
   type FontScale,
 } from "@/lib/font-scale";
 
+// Labels are real percentages so the buttons look like the standard
+// "zoom out / 100% / zoom in" trio users expect. Numbers match the
+// multipliers in lib/font-scale.ts.
 const OPTIONS: { value: FontScale; label: string; size: number }[] = [
-  { value: "sm", label: "A", size: 14 },
-  { value: "md", label: "A", size: 18 },
-  { value: "lg", label: "A", size: 22 },
+  { value: "sm", label: "−50%", size: 13 },
+  { value: "md", label: "100%", size: 13 },
+  { value: "lg", label: "+60%", size: 13 },
 ];
 
 export default function FontScalePicker() {
@@ -85,12 +88,6 @@ export default function FontScalePicker() {
               }}
             >
               {opt.label}
-              {opt.value === "sm" && (
-                <span style={{ fontSize: 10, marginLeft: 2 }}>−</span>
-              )}
-              {opt.value === "lg" && (
-                <span style={{ fontSize: 10, marginLeft: 2 }}>+</span>
-              )}
             </button>
           );
         })}
