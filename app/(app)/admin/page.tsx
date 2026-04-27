@@ -31,6 +31,42 @@ interface Summary {
   pollas: AdminPolla[];
 }
 
+interface TwilioUsage {
+  configured: boolean;
+  message?: string;
+  error?: string;
+  currency?: string;
+  monthly_budget_usd?: number;
+  pct_of_budget?: number;
+  this_month?: {
+    total_cost: number;
+    sms: { count: number; cost: number };
+    verify: { count: number; cost: number };
+    period: { start: string; end: string };
+  };
+  all_time?: {
+    sms: { count: number; cost: number };
+    verify: { count: number; cost: number };
+  };
+}
+
+interface Analytics {
+  totals: {
+    users: number;
+    logins_7d: number;
+    logins_30d: number;
+    active_users_7d: number;
+    active_users_30d: number;
+    new_users_14d: number;
+  };
+  series: { day: string; logins: number; signups: number }[];
+  top_cities: { key: string; count: number }[];
+  top_countries: { key: string; count: number }[];
+  top_devices: { key: string; count: number }[];
+  methods: { otp: number; password: number };
+  logins_by_hour: number[];
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("es-CO", {
     day: "numeric",
@@ -39,20 +75,31 @@ function formatDate(iso: string): string {
   });
 }
 
+function formatUSD(n: number): string {
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const { showToast } = useToast();
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [twilio, setTwilio] = useState<TwilioUsage | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get<Summary>("/api/admin/summary");
-      setSummary(data);
-    } catch {
-      showToast("No se pudo cargar el panel", "error");
+      const [summaryRes, twilioRes, analyticsRes] = await Promise.allSettled([
+        axios.get<Summary>("/api/admin/summary"),
+        axios.get<TwilioUsage>("/api/admin/twilio-usage"),
+        axios.get<Analytics>("/api/admin/analytics"),
+      ]);
+      if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
+      else showToast("No se pudo cargar el panel", "error");
+      if (twilioRes.status === "fulfilled") setTwilio(twilioRes.value.data);
+      if (analyticsRes.status === "fulfilled") setAnalytics(analyticsRes.value.data);
     } finally {
       setLoading(false);
     }
@@ -146,6 +193,212 @@ export default function AdminPage() {
                 </div>
               ))}
             </section>
+
+            {/* Twilio usage */}
+            <section
+              className="rounded-2xl p-4 space-y-3"
+              style={{ background: "#0e1420", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-text-primary">Twilio · costo SMS</h2>
+                {twilio?.configured && twilio.this_month && (
+                  <span className="text-[10px] text-text-muted">
+                    {twilio.this_month.period.start} → {twilio.this_month.period.end}
+                  </span>
+                )}
+              </div>
+
+              {!twilio ? (
+                <p className="text-xs text-text-muted">Cargando…</p>
+              ) : !twilio.configured ? (
+                <p className="text-xs text-text-muted">{twilio.message ?? "Twilio no configurado"}</p>
+              ) : twilio.error ? (
+                <p className="text-xs text-red-alert">Error: {twilio.error}</p>
+              ) : twilio.this_month ? (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Mes actual</p>
+                      <p className="font-display mt-0.5" style={{ fontSize: 22, color: "#FFD700" }}>
+                        {formatUSD(twilio.this_month.total_cost)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Verifies mes</p>
+                      <p className="font-display mt-0.5" style={{ fontSize: 22, color: "#FFD700" }}>
+                        {twilio.this_month.verify.count}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">SMS mes</p>
+                      <p className="font-display mt-0.5" style={{ fontSize: 22, color: "#FFD700" }}>
+                        {twilio.this_month.sms.count}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Budget bar */}
+                  {twilio.monthly_budget_usd && twilio.monthly_budget_usd > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] text-text-muted">
+                        <span>Presupuesto mensual {formatUSD(twilio.monthly_budget_usd)}</span>
+                        <span>{twilio.pct_of_budget ?? 0}%</span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                        <div
+                          className="h-full transition-all"
+                          style={{
+                            width: `${Math.min(100, twilio.pct_of_budget ?? 0)}%`,
+                            background:
+                              (twilio.pct_of_budget ?? 0) >= 80
+                                ? "#ff3d57"
+                                : (twilio.pct_of_budget ?? 0) >= 50
+                                  ? "#FFA500"
+                                  : "#22c55e",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {twilio.all_time && (
+                    <p className="text-[11px] text-text-muted">
+                      All-time:{" "}
+                      {twilio.all_time.verify.count + twilio.all_time.sms.count} mensajes ·{" "}
+                      {formatUSD(
+                        twilio.all_time.verify.cost + twilio.all_time.sms.cost,
+                      )}
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </section>
+
+            {/* Activity overview */}
+            <section
+              className="rounded-2xl p-4 space-y-3"
+              style={{ background: "#0e1420", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <h2 className="text-sm font-bold text-text-primary">Actividad de usuarios</h2>
+              {!analytics ? (
+                <p className="text-xs text-text-muted">Cargando…</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: "Activos 7d", value: analytics.totals.active_users_7d },
+                      { label: "Activos 30d", value: analytics.totals.active_users_30d },
+                      { label: "Nuevos 14d", value: analytics.totals.new_users_14d },
+                    ].map((s) => (
+                      <div key={s.label}>
+                        <p className="text-[10px] uppercase tracking-wide text-text-muted">{s.label}</p>
+                        <p className="font-display mt-0.5" style={{ fontSize: 22, color: "#FFD700" }}>
+                          {s.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Logins 7d", value: analytics.totals.logins_7d },
+                      { label: "Logins 30d", value: analytics.totals.logins_30d },
+                    ].map((s) => (
+                      <div key={s.label}>
+                        <p className="text-[10px] uppercase tracking-wide text-text-muted">{s.label}</p>
+                        <p className="font-display mt-0.5" style={{ fontSize: 18, color: "#FFD700" }}>
+                          {s.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 14-day signups + logins bar chart */}
+                  <div className="pt-2">
+                    <p className="text-[10px] uppercase tracking-wide text-text-muted mb-2">
+                      Últimos 14 días — logins (gold) · signups (verde)
+                    </p>
+                    <div className="flex items-end gap-1 h-20">
+                      {analytics.series.map((d) => {
+                        const max = Math.max(
+                          1,
+                          ...analytics.series.map((x) => Math.max(x.logins, x.signups)),
+                        );
+                        const lh = (d.logins / max) * 100;
+                        const sh = (d.signups / max) * 100;
+                        return (
+                          <div
+                            key={d.day}
+                            className="flex-1 flex flex-col-reverse items-center gap-0.5"
+                            title={`${d.day} · ${d.logins} logins · ${d.signups} signups`}
+                          >
+                            <div
+                              className="w-full rounded-t-sm"
+                              style={{ height: `${Math.max(2, lh)}%`, background: "#FFD700" }}
+                            />
+                            {d.signups > 0 && (
+                              <div
+                                className="w-full rounded-t-sm"
+                                style={{ height: `${Math.max(2, sh)}%`, background: "#22c55e" }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
+
+            {/* Geo + device breakdown */}
+            {analytics && (analytics.top_cities.length > 0 || analytics.top_countries.length > 0 || analytics.top_devices.length > 0) && (
+              <section
+                className="rounded-2xl p-4 space-y-4"
+                style={{ background: "#0e1420", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <h2 className="text-sm font-bold text-text-primary">Ubicación y dispositivos (30d)</h2>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {[
+                    { title: "Ciudades", rows: analytics.top_cities },
+                    { title: "Países", rows: analytics.top_countries },
+                    { title: "Dispositivos", rows: analytics.top_devices },
+                  ].map((block) => block.rows.length > 0 && (
+                    <div key={block.title}>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted mb-1.5">{block.title}</p>
+                      <div className="space-y-1">
+                        {block.rows.slice(0, 5).map((r) => {
+                          const max = Math.max(...block.rows.map((x) => x.count));
+                          const pct = (r.count / max) * 100;
+                          return (
+                            <div key={r.key} className="flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-text-primary truncate">{r.key}</span>
+                                  <span className="text-text-muted ml-2">{r.count}</span>
+                                </div>
+                                <div className="h-1 rounded-full overflow-hidden mt-1" style={{ background: "rgba(255,255,255,0.06)" }}>
+                                  <div className="h-full" style={{ width: `${pct}%`, background: "#FFD700" }} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Login method breakdown */}
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-text-muted mb-1.5">Método de login</p>
+                  <div className="flex gap-3 text-xs">
+                    <span className="text-text-secondary">SMS/OTP: <span className="text-gold font-bold">{analytics.methods.otp}</span></span>
+                    <span className="text-text-secondary">Password: <span className="text-gold font-bold">{analytics.methods.password}</span></span>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* Sincronización */}
             <section
