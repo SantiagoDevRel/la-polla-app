@@ -1,26 +1,26 @@
-// app/(auth)/login/page.tsx — Phone + SMS OTP login. Two steps:
-//   1) phone: user enters number + Turnstile, server triggers Twilio Verify
-//      via Supabase signInWithOtp.
-//   2) code: user enters 6-digit code, server verifies via Supabase
-//      verifyOtp. On success, session cookies are set and we redirect.
+// app/(auth)/login/page.tsx — Login con SMS OTP via Twilio Verify (orquestado
+// por Supabase Phone Auth). Mismo patrón que los-del-sur-app:
+//   • Send OTP corre client-side (no hay sesión todavía, signInWithOtp directo)
+//   • Verify OTP corre server-side (/api/auth/verify-otp) para que las cookies
+//     queden persistidas via Set-Cookie HttpOnly — fix del bug iOS Safari.
+// 2 pasos (input → otp). Sin contraseña, sin Turnstile, sin WhatsApp bot.
 "use client";
 
-import { Suspense, useState, useCallback, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
+import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import axios from "axios";
-import { ArrowLeft, MessageSquare } from "lucide-react";
-import PhoneInput from "@/components/ui/PhoneInput";
+import { createClient } from "@/lib/supabase/client";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 
 function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;
 }
 
-type Step = "phone" | "code";
-
 const RETURN_TO_KEY = "lp_returnTo";
+
+type Step = "input" | "otp";
 
 interface PollaPreview {
   slug: string;
@@ -32,21 +32,18 @@ interface PollaPreview {
 }
 
 function LoginInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const phoneFromParams = searchParams.get("phone") ?? "";
+  const supabase = useMemo(() => createClient(), []);
 
-  const [step, setStep] = useState<Step>("phone");
-  const [preview, setPreview] = useState<PollaPreview | null>(null);
-  const [phone, setPhone] = useState(phoneFromParams);
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [turnstileError, setTurnstileError] = useState(false);
-  const [error, setError] = useState("");
-  const [code, setCode] = useState("");
+  const [step, setStep] = useState<Step>("input");
+  const [numero, setNumero] = useState("");
+  const [otp, setOtp] = useState("");
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const turnstileRef = useRef<TurnstileInstance>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PollaPreview | null>(null);
 
+  // Capturar returnTo + cargar preview de polla si viene de invite link.
   useEffect(() => {
     const rt = searchParams.get("returnTo");
     if (rt && typeof window !== "undefined") {
@@ -75,88 +72,94 @@ function LoginInner() {
       .catch(() => {});
   }, [searchParams]);
 
-  const handlePhoneChange = useCallback((value: string) => {
-    setPhone(value);
-  }, []);
+  // E.164: +57 + número limpio. Aceptamos solo Colombia desde la UI.
+  function buildPhone(): string {
+    const cleaned = numero.replace(/\D/g, "");
+    return `+57${cleaned}`;
+  }
 
-  const handleSendCode = async (e: React.FormEvent) => {
+  async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-
-    if (!phone || phone.length < 10) {
-      setError("Ingresá un número de teléfono válido");
+    setError(null);
+    const cleaned = numero.replace(/\D/g, "");
+    if (cleaned.length < 10) {
+      setError("Ingresá un número válido de 10 dígitos");
       return;
     }
-    if (!turnstileToken) {
-      setError("Completá la verificación anti-bot");
-      return;
-    }
-
     setSending(true);
     try {
-      await axios.post("/api/auth/otp", { phone, turnstileToken });
-      setStep("code");
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      setError(
-        e.response?.data?.error ??
-          "No pudimos enviar el código. Intentá de nuevo.",
-      );
-      // Reset Turnstile so user can re-verify; the token may be consumed.
-      turnstileRef.current?.reset();
-      setTurnstileToken("");
+      const phone = buildPhone();
+      // Client-side: no hay sesión todavía, no necesitamos cookies.
+      // Mismo patrón que los-del-sur-app — el server-side intermediate
+      // creaba quirks raros con rate-limit.
+      const { error: authErr } = await supabase.auth.signInWithOtp({
+        phone,
+        options: { channel: "sms" },
+      });
+      if (authErr) {
+        const msg = (authErr.message || "").toLowerCase();
+        if (msg.includes("phone signups") || msg.includes("provider")) {
+          setError("Login por celular no está activado. Contactá soporte.");
+        } else if (msg.includes("rate") || msg.includes("limit")) {
+          setError("Muchos intentos. Esperá un minuto y reintentá.");
+        } else {
+          setError(authErr.message || "No pudimos enviar el código");
+        }
+        return;
+      }
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de red");
     } finally {
       setSending(false);
     }
-  };
+  }
 
-  const handleVerify = async (e: React.FormEvent) => {
+  async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
+    setError(null);
+    if (otp.length !== 6) {
+      setError("El código tiene 6 dígitos");
+      return;
+    }
     setVerifying(true);
-
     try {
-      const { data } = await axios.put<{ newUser: boolean }>(
-        "/api/auth/otp",
-        { phone, code },
-      );
-
-      if (data?.newUser) {
-        router.push("/onboarding");
+      const phone = buildPhone();
+      // Server-side: persiste cookies via Set-Cookie HttpOnly (crítico
+      // para iOS Safari, donde verifyOtp en el browser deja la sesión
+      // en memory pero pierde cookies y al navegar parece no logueado).
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, token: otp }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setError(body?.error ?? "Código inválido o vencido");
         return;
       }
+      const body = (await res.json()) as { newUser?: boolean };
       const rt =
         typeof window !== "undefined"
           ? window.sessionStorage.getItem(RETURN_TO_KEY)
           : null;
       if (rt) window.sessionStorage.removeItem(RETURN_TO_KEY);
-      router.push(rt || "/inicio");
-    } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { error?: string } } };
-      setError(
-        axiosError.response?.data?.error || "Código inválido o expirado",
-      );
+      // Hard redirect para asegurar que las cookies se apliquen al
+      // siguiente request (router.push a veces las pierde en middleware).
+      window.location.href = body?.newUser ? "/onboarding" : rt || "/inicio";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de red");
     } finally {
       setVerifying(false);
     }
-  };
-
-  const handleResend = async () => {
-    setError("");
-    setCode("");
-    setStep("phone");
-  };
-
-  // Turnstile site key. When unset (dev), we render a placeholder so the
-  // CTA isn't permanently disabled; the server still skips verification
-  // when CLOUDFLARE_TURNSTILE_SECRET_KEY is unset (see lib/auth/turnstile).
-  const turnstileSiteKey =
-    process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "";
-  const turnstileConfigured = turnstileSiteKey.length > 0;
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {step === "phone" && (
+      {step === "input" && (
         <div
           className="w-full max-w-md rounded-2xl p-6 space-y-6 bg-bg-card/80 backdrop-blur-sm border border-border-subtle relative z-10"
           style={{ boxShadow: "0 0 60px rgba(255,215,0,0.08)" }}
@@ -215,7 +218,10 @@ function LoginInner() {
                 {preview.name}
               </p>
               <div className="flex items-center justify-center gap-2 text-xs text-text-secondary">
-                <TournamentBadge tournamentSlug={preview.tournament} size="sm" />
+                <TournamentBadge
+                  tournamentSlug={preview.tournament}
+                  size="sm"
+                />
               </div>
               <p className="text-xs text-text-secondary">
                 {preview.participantCount} participante
@@ -227,7 +233,7 @@ function LoginInner() {
             </div>
           )}
 
-          <form onSubmit={handleSendCode} className="space-y-4">
+          <form onSubmit={handleSendOtp} className="space-y-4">
             <div>
               <label
                 htmlFor="phone"
@@ -235,38 +241,32 @@ function LoginInner() {
               >
                 Tu número de celular
               </label>
-              <PhoneInput onChange={handlePhoneChange} />
+              <div className="flex gap-2">
+                <div
+                  className="h-12 shrink-0 px-3 rounded-xl flex items-center justify-center text-text-primary font-semibold text-sm border"
+                  style={{
+                    background: "rgba(255,255,255,0.04)",
+                    borderColor: "rgba(255,255,255,0.1)",
+                  }}
+                >
+                  🇨🇴 +57
+                </div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  placeholder="3001234567"
+                  value={numero}
+                  onChange={(e) => setNumero(e.target.value)}
+                  required
+                  disabled={sending}
+                  className="h-12 w-full rounded-xl px-3 text-base font-semibold tracking-wide bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50 outline-none disabled:opacity-50"
+                />
+              </div>
               <p className="text-xs text-text-muted mt-1.5">
-                Te enviamos un código por SMS al toque.
+                Te mandamos un código de 6 dígitos por SMS.
               </p>
             </div>
-
-            {turnstileConfigured ? (
-              <div className="flex flex-col items-center gap-2">
-                <Turnstile
-                  ref={turnstileRef}
-                  siteKey={turnstileSiteKey}
-                  options={{ theme: "dark", retry: "auto", refreshExpired: "auto" }}
-                  onSuccess={(token) => {
-                    setTurnstileToken(token);
-                    setTurnstileError(false);
-                  }}
-                  onError={() => {
-                    setTurnstileError(true);
-                    setTurnstileToken("");
-                  }}
-                  onExpire={() => {
-                    setTurnstileToken("");
-                  }}
-                />
-                {turnstileError && (
-                  <p className="text-xs text-red-alert text-center">
-                    No se pudo cargar la verificación. Recargá la página o
-                    revisá tu conexión.
-                  </p>
-                )}
-              </div>
-            ) : null}
 
             {error && (
               <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
@@ -276,16 +276,21 @@ function LoginInner() {
 
             <button
               type="submit"
-              disabled={
-                sending ||
-                !phone ||
-                (turnstileConfigured && !turnstileToken)
-              }
+              disabled={sending || numero.replace(/\D/g, "").length < 10}
               className="w-full bg-gold text-bg-base font-bold py-3.5 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-lg inline-flex items-center justify-center gap-2"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
             >
-              <MessageSquare className="w-5 h-5" />
-              {sending ? "Enviando código..." : "Enviame el código"}
+              {sending ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="w-5 h-5" />
+                  Enviame el código
+                </>
+              )}
             </button>
           </form>
 
@@ -297,7 +302,7 @@ function LoginInner() {
         </div>
       )}
 
-      {step === "code" && (
+      {step === "otp" && (
         <div
           className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
           style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
@@ -307,23 +312,37 @@ function LoginInner() {
               INGRESÁ TU CÓDIGO
             </h2>
             <p className="text-text-secondary text-sm">
-              Te mandamos un SMS con un código de 6 dígitos al{" "}
-              <span className="text-text-primary">+{phone}</span>
+              Te mandamos un SMS con un código de 6 dígitos a{" "}
+              <span className="text-text-primary font-semibold">
+                {buildPhone()}
+              </span>
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                setStep("input");
+                setOtp("");
+                setError(null);
+              }}
+              className="text-xs text-gold/70 hover:text-gold transition-colors"
+            >
+              ← Cambiar número
+            </button>
           </div>
 
-          <form onSubmit={handleVerify} className="space-y-3">
+          <form onSubmit={handleVerifyOtp} className="space-y-3">
             <input
               type="text"
               maxLength={6}
               inputMode="numeric"
               autoComplete="one-time-code"
               placeholder="000000"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
               className="w-full px-4 py-4 rounded-xl outline-none text-center score-font text-[36px] tracking-[0.5em] transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
               required
               autoFocus
+              disabled={verifying}
             />
 
             {error && (
@@ -334,19 +353,30 @@ function LoginInner() {
 
             <button
               type="submit"
-              disabled={verifying || code.length !== 6}
-              className="w-full bg-gold text-bg-base font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base"
+              disabled={verifying || otp.length !== 6}
+              className="w-full bg-gold text-bg-base font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base inline-flex items-center justify-center gap-2"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
             >
-              {verifying ? "Verificando..." : "Verificar código"}
+              {verifying ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Verificando...
+                </>
+              ) : (
+                "Verificar código"
+              )}
             </button>
 
             <button
               type="button"
-              onClick={handleResend}
+              onClick={() => {
+                setStep("input");
+                setOtp("");
+                setError(null);
+              }}
               className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
             >
-              <ArrowLeft className="w-4 h-4" /> Cambiar número o reenviar
+              <ArrowLeft className="w-4 h-4" /> Reenviar código o cambiar número
             </button>
           </form>
         </div>

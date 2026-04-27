@@ -26,8 +26,6 @@ interface TwilioUsageResponse {
   usage_records: TwilioUsageRecord[];
 }
 
-const VERIFY_CATEGORIES = ["verify", "verify-totalprice"] as const;
-
 export async function GET() {
   if (!(await isCurrentUserAdmin())) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
