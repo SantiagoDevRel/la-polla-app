@@ -9,9 +9,6 @@ const LIMITS = {
   // Join-by-code: 5 attempts per phone per 10 minutes. Tighter than verify
   // so brute-forcing the 32^6 code space is not feasible.
   join_code: { maxAttempts: 5, windowMinutes: 10 },
-  // Phone+password login (matches /api/auth/login-password). Mismo presupuesto
-  // que `verify`: 5 intentos por teléfono cada 15 minutos.
-  password: { maxAttempts: 5, windowMinutes: 15 },
 } as const;
 
 type AttemptType = keyof typeof LIMITS;
