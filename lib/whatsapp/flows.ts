@@ -236,9 +236,12 @@ export async function handleMisPollas(phone: string, userId: string) {
     .eq("status", "approved");
 
   if (!participations || participations.length === 0) {
-    await sendTextMessage(
+    await sendCTAButton(
       phone,
-      "Todavía no estás en ninguna polla 🐣. Creá una en lapollacolombiana.com o pedile a un amigo el link de invitación."
+      "Todavía no estás en ninguna polla 🐣\n\nCreá una vos mismo o pedile a un amigo el link de invitación.",
+      "Crear mi polla",
+      `${APP_URL}/pollas/crear`,
+      FOOTER,
     );
     return;
   }
@@ -403,7 +406,7 @@ async function sendInviteFriendCTA(
 
   const code = full?.join_code ?? null;
   const inviteText =
-    `Te invito a *${polla.name}* en La Polla 🐔` +
+    `Te invito a *${polla.name}* en La Polla 🐥` +
     (code ? `\n\nCódigo: *${code}*` : "") +
     `\n\nEntrá acá: ${APP_URL}/unirse/${polla.slug}`;
   const shareUrl = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
@@ -1409,7 +1412,7 @@ export async function handleJoinByCode(
     await sendCTAButton(
       phone,
       `¡Te uniste a *${result.polla.name}*! 🎉\n\nMirá la polla en la app 👇`,
-      "Abrir polla 🐔",
+      "Abrir polla 🐥",
       inviteUrl,
       FOOTER,
     );
