@@ -23,10 +23,8 @@ export const metadata: Metadata = {
   description:
     "La mejor polla deportiva de Colombia. Creá tu polla, invitá a tus parceros y ganá prediciendo resultados de fútbol.",
   manifest: "/manifest.json",
-  icons: {
-    icon: "/pollitos/logo_realistic.webp",
-    apple: "/pollitos/logo_realistic.webp",
-  },
+  // Icons resolved via Next.js file convention: app/icon.png and
+  // app/apple-icon.png. No explicit metadata.icons needed.
 };
 
 export const viewport: Viewport = {
