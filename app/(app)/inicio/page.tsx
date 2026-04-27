@@ -793,7 +793,7 @@ export default async function InicioPage() {
               list is empty. */}
           {showStrip ? (
             <section>
-              <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary flex items-center gap-2">
+              <h2 className="lp-section-title px-4 mb-3 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-alert animate-pulse" aria-hidden="true" />
                 En vivo
               </h2>
@@ -814,7 +814,7 @@ export default async function InicioPage() {
                         ? formatLiveMinute(computeLiveMinute(m.match_date)) ?? undefined
                         : undefined;
                     return (
-                      <div key={m.id} className="snap-start">
+                      <div key={m.id} className="snap-center">
                         <LiveChip
                           kind={m.status === "live" ? "live" : "upcoming"}
                           homeCode={m.home_team_tla}
@@ -842,7 +842,7 @@ export default async function InicioPage() {
               and they should use the polla Partidos tab. */}
           {!isActiveEmpty && upcomingStripMatches.length > 0 ? (
             <section>
-              <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary flex items-center gap-2">
+              <h2 className="lp-section-title px-4 mb-3 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-gold" aria-hidden="true" />
                 Próximos
               </h2>
@@ -902,7 +902,7 @@ export default async function InicioPage() {
               each active polla with rank context. */}
           {!isActiveEmpty && podiumItems.length > 0 ? (
             <section>
-              <h2 className="px-4 mb-3 font-display text-[20px] tracking-[0.04em] uppercase text-text-primary">
+              <h2 className="lp-section-title px-4 mb-3">
                 Podio
               </h2>
               <PodiumCarousel

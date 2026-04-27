@@ -177,10 +177,7 @@ function LoginInner() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {step === "input" && (
-        <div
-          className="w-full max-w-md rounded-2xl p-6 space-y-6 bg-bg-card/80 backdrop-blur-sm border border-border-subtle relative z-10"
-          style={{ boxShadow: "0 0 60px rgba(255,215,0,0.08)" }}
-        >
+        <div className="w-full max-w-md rounded-2xl p-6 space-y-6 bg-bg-card/80 backdrop-blur-sm border border-border-subtle relative z-10">
           <div className="text-center space-y-2">
             <motion.div
               className="mx-auto"
@@ -188,16 +185,6 @@ function LoginInner() {
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
             >
-              <div
-                style={{
-                  position: "absolute",
-                  inset: -8,
-                  borderRadius: "50%",
-                  background:
-                    "radial-gradient(circle, rgba(255,215,0,0.35) 0%, transparent 70%)",
-                  filter: "blur(8px)",
-                }}
-              />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/pollitos/logo_realistic.webp"
@@ -327,10 +314,7 @@ function LoginInner() {
       )}
 
       {step === "otp" && (
-        <div
-          className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
-          style={{ boxShadow: "0 0 60px rgba(255,215,0,0.05)" }}
-        >
+        <div className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
           <div className="text-center space-y-2">
             <h2 className="font-display text-2xl text-gold tracking-wide">
               INGRESÁ TU CÓDIGO
@@ -363,7 +347,7 @@ function LoginInner() {
               placeholder="000000"
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-              className="w-full px-4 py-4 rounded-xl outline-none text-center score-font text-[36px] tracking-[0.5em] transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
+              className="w-full px-4 py-4 rounded-xl outline-none text-center score-font text-[36px] tracking-[0.5em] [text-indent:0.5em] transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
               required
               autoFocus
               disabled={verifying}

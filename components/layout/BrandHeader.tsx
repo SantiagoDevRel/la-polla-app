@@ -33,9 +33,7 @@ export default function BrandHeader() {
             className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px]"
             style={{
               fontSize: 20,
-              WebkitTextStroke: "1px #000",
               textShadow: "0 2px 6px rgba(0,0,0,0.55)",
-              paintOrder: "stroke fill",
             }}
           >
             <span style={{ color: "#FFD700" }}>LA</span>

@@ -97,10 +97,10 @@ export default function PerfilPage() {
     } catch { showToast("Error actualizando pollito", "error"); } finally { setSavingAvatar(false); }
   }
 
-  function pointsColor(pts: number): string {
-    if (pts >= 5) return "#00e676";
-    if (pts >= 2) return "#FFD700";
-    return "#4a5568";
+  function pointsColorClass(pts: number): string {
+    if (pts >= 5) return "text-turf";
+    if (pts >= 2) return "text-gold";
+    return "text-text-muted";
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="flex flex-col items-center gap-2"><FootballLoader /><p className="text-text-muted">Cargando perfil...</p></div></div>;
@@ -110,7 +110,7 @@ export default function PerfilPage() {
     <div className="min-h-screen">
       <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto">
-          <h1 className="lp-section-title text-center" style={{ fontSize: 22 }}>Mi Perfil</h1>
+          <h1 className="lp-section-title text-center text-[22px]">Mi Perfil</h1>
         </div>
       </header>
 
@@ -139,7 +139,7 @@ export default function PerfilPage() {
           {showAvatarPicker && (
             <div className="w-full mb-4 rounded-xl p-3 bg-bg-elevated border border-border-subtle">
               <p className="text-xs text-text-secondary text-center mb-3">Elige tu pollito</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+              <div className="grid grid-cols-4 gap-1.5 justify-items-center">
                 {POLLITO_TYPES.map((p) => {
                   const isSelected = profile.avatar_url === p.id;
                   return (
@@ -148,15 +148,14 @@ export default function PerfilPage() {
                       type="button"
                       disabled={savingAvatar}
                       onClick={() => handleAvatarChange(p.id)}
-                      className="cursor-pointer flex flex-col items-center gap-1 rounded-xl p-2 transition-all"
-                      style={{
-                        background: isSelected ? "rgba(255,215,0,0.08)" : "#131d2e",
-                        border: isSelected ? "2px solid #FFD700" : "2px solid rgba(255,255,255,0.06)",
-                        opacity: savingAvatar ? 0.5 : 1,
-                      }}
+                      className={`w-full min-h-[60px] cursor-pointer flex flex-col items-center gap-1 rounded-lg p-2 border-2 transition-all ${
+                        isSelected
+                          ? "bg-gold/10 border-gold"
+                          : "bg-bg-elevated border-white/5"
+                      } ${savingAvatar ? "opacity-50" : ""}`}
                     >
-                      <img src={getPollitoBase(p.id)} alt={p.label} style={{ width: 40, height: 40, objectFit: "contain" }} />
-                      <span style={{ fontSize: 8, color: isSelected ? "#FFD700" : "#F5F7FA", fontWeight: isSelected ? 600 : 400, textAlign: "center", lineHeight: 1.2 }}>
+                      <img src={getPollitoBase(p.id)} alt={p.label} width={40} height={40} className="object-contain" />
+                      <span className={`text-[8px] text-center leading-tight ${isSelected ? "text-gold font-semibold" : "text-text-primary"}`}>
                         {p.label}
                       </span>
                     </button>
@@ -178,16 +177,16 @@ export default function PerfilPage() {
                 className="text-text-muted text-sm">✕</button>
             </div>
           ) : (
-            <button onClick={() => setIsEditing(true)} className="text-lg font-bold text-text-primary hover:text-gold transition-colors flex items-center gap-2">
-              {profile.display_name}
-              <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}>
-                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-bg-elevated/50 transition-colors text-text-primary"
+            >
+              <span className="text-lg font-bold">{profile.display_name}</span>
+              <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">Editar</span>
             </button>
           )}
           <p className="text-text-secondary text-sm mt-1 flex items-center gap-1">
-            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#F5F7FA" strokeWidth="2">
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="5" y="2" width="14" height="20" rx="2" /><circle cx="12" cy="17" r="1" />
             </svg>
             {profile.whatsapp_number}
@@ -202,7 +201,7 @@ export default function PerfilPage() {
             { value: stats.bestRank ? `${stats.bestRank}°` : "—", label: "Mejor pos." },
           ].map((s) => (
             <motion.div key={s.label} variants={fadeUp} className="lp-card p-3 text-center">
-              <p className="font-display text-gold" style={{ fontSize: 26, lineHeight: 1, letterSpacing: "0.05em" }}>{s.value}</p>
+              <p className="font-display text-gold text-[26px] leading-none">{s.value}</p>
               <p className="text-[10px] text-text-muted mt-1">{s.label}</p>
             </motion.div>
           ))}
@@ -215,9 +214,9 @@ export default function PerfilPage() {
 
         {/* Actividad reciente */}
         {activity.length > 0 && (
-          <div className="lp-card" style={{ padding: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#f0f4ff", marginBottom: 10, display: "flex", alignItems: "center", gap: 5 }}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2">
+          <div className="lp-card p-3.5">
+            <div className="text-[13px] font-bold text-text-primary mb-2.5 flex items-center gap-1.5">
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
               </svg>
               Actividad reciente
@@ -225,23 +224,19 @@ export default function PerfilPage() {
             {activity.map((item, i) => (
               <div
                 key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "8px 0",
-                  borderBottom: i < activity.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-                }}
+                className={`flex items-center justify-between py-2 ${
+                  i < activity.length - 1 ? "border-b border-white/5" : ""
+                }`}
               >
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#f0f4ff" }}>{item.matchName}</div>
-                  <div style={{ fontSize: 10, color: "#F5F7FA", marginTop: 1 }}>{item.pollaName}</div>
+                  <div className="text-xs font-semibold text-text-primary">{item.matchName}</div>
+                  <div className="text-[10px] text-text-secondary mt-0.5">{item.pollaName}</div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div className="font-display" style={{ fontSize: 20, color: pointsColor(item.pointsEarned), letterSpacing: "0.05em" }}>
+                <div className="text-right">
+                  <div className={`font-display text-[20px] ${pointsColorClass(item.pointsEarned)}`}>
                     +{item.pointsEarned}
                   </div>
-                  <div style={{ fontSize: 9, color: "#F5F7FA" }}>pts</div>
+                  <div className="text-[9px] text-text-muted">pts</div>
                 </div>
               </div>
             ))}
@@ -249,9 +244,9 @@ export default function PerfilPage() {
         )}
 
         {/* ¿Cómo se puntúa? — shared with the polla-detail Info tab */}
-        <div className="lp-card" style={{ padding: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#f0f4ff", marginBottom: 10, display: "flex", alignItems: "center", gap: 5 }}>
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2">
+        <div className="lp-card p-3.5">
+          <div className="text-[13px] font-bold text-text-primary mb-2.5 flex items-center gap-1.5">
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold">
               <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
             </svg>
             ¿Cómo se puntúa?
@@ -280,7 +275,7 @@ export default function PerfilPage() {
           Cerrar sesión
         </button>
 
-        <div style={{ height: 16 }} />
+        <div className="h-4" />
       </main>
     </div>
   );

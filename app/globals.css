@@ -23,13 +23,14 @@
   /* semantic */
   --red-alert:       #FF3D57;
 
-  /* text — all tiers forced to off-white for readability over the
-     looping stadium video. Previous greys (#AEB7C7, #6B7689) washed
-     out against the moving background; hierarchy is now carried by
-     font weight + size instead of colour intensity. */
+  /* text — three-tier hierarchy restored. Primary stays at full
+     readability over the stadium video; secondary/muted are still
+     bright enough to pass against the darkest video frames but
+     drop just enough to give labels and meta-text a distinct voice
+     instead of every line shouting the same volume. */
   --text-primary:    #F5F7FA;
-  --text-secondary:  #F5F7FA;
-  --text-muted:      #F5F7FA;
+  --text-secondary:  #D1D7E0;
+  --text-muted:      #A8AFBC;
 
   /* RGB triplets — used by Tailwind utilities so alpha modifiers
      (`bg-gold/10`, `border-amber/25`, etc.) produce the expected tint.
@@ -43,8 +44,8 @@
   --turf-rgb:         31 216 127;
   --red-alert-rgb:    255 61 87;
   --text-primary-rgb: 245 247 250;
-  --text-secondary-rgb: 245 247 250;
-  --text-muted-rgb:   245 247 250;
+  --text-secondary-rgb: 209 215 224;
+  --text-muted-rgb:   168 175 188;
 
   /* borders */
   --border-subtle:   rgba(255, 255, 255, 0.06);
@@ -200,3 +201,18 @@ body {
 
 .hide-scrollbar { scrollbar-width: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Global focus ring — gold on dark backgrounds. Browser default
+   ring is hard to see against the stadium video; this gives every
+   interactive element a consistent keyboard-accessible affordance
+   without affecting mouse/touch users (focus-visible only). */
+:focus-visible {
+  outline: 2px solid rgba(255, 215, 0, 0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgba(255, 215, 0, 0.6);
+  outline-offset: 2px;
+}
