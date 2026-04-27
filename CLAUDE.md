@@ -12,23 +12,78 @@ Visual changes ONLY. Never touch API routes, Supabase calls, middleware, auth fl
 
 ---
 
-## TODO · auth.uid() propagation audit
+## TODO · auth.uid() propagation audit (still open)
 
-`auth.uid()` returns NULL in PostgREST request context even when
-`supabase.auth.getUser()` succeeds. RLS on `polla_participants` silently
-returns zero rows as a result, which broke `/api/pollas` enrichment
-(participant_count, user_rank, user_total_points, is_leader) until we
-worked around it by routing those reads through `createAdminClient()`
-with explicit user-scope filters.
+`auth.uid()` returns NULL in the PostgREST request context even when
+`supabase.auth.getUser()` succeeds in Next.js Server Components and
+Route Handlers. RLS policies that reference `auth.uid()` therefore
+return zero rows, which historically broke participant reads, polla
+listings, etc.
 
-Likely culprits to investigate in a dedicated session:
-- `lib/supabase/server.ts` — `@supabase/ssr` `createServerClient` setup
-- `middleware.ts` — cookie forwarding / session refresh
-- Next.js SSR cookie → PostgREST Authorization header path
+**Current workaround (shipped, 46+ files)**: every authenticated read
+that depends on RLS uses `createAdminClient()` (service-role key,
+bypasses RLS) and **must** include explicit user-scope filters
+(`.eq("user_id", user.id)`). The session is still validated server-side
+via `supabase.auth.getUser()` before the admin call. Defense-in-depth
+relies on the manual filters because RLS is effectively off for these
+queries.
 
-Fix is to restore RLS-scoped reads on `polla_participants` once
-`auth.uid()` propagates, so we can drop the admin-client workaround in
-`app/api/pollas/route.ts`.
+**Cost of leaving it**: every new authenticated route has to remember
+the manual filter. If forgotten, that route leaks data. The dependency
+on the service-role key is also wider than ideal.
+
+**Investigation handoff**: see `docs/auth-uid-handoff.md` for the full
+debugging plan, hypotheses, and acceptance criteria. ~2-4h focused
+session, designed to be picked up cold.
+
+---
+
+## Auth model (current — 2026-04)
+
+- First sign-in: phone → Cloudflare Turnstile (server-validated) → OTP
+  via WhatsApp bot (`login_pending_sessions` row). After OTP success,
+  user lands on `/set-password` and **must** pick a 4+ char password.
+- Subsequent logins: phone → password (no bot, no Turnstile). Rate-
+  limited 5/15min via `otp_rate_limits` with `attempt_type='password'`.
+- Forgot password: link from `/login/password` re-enters the OTP flow,
+  which on success rotates the auth password to a temp value and forces
+  `/set-password` again.
+- `users.has_custom_password` BOOLEAN gates middleware: any
+  authenticated user with `false` is redirected to `/set-password` from
+  every HTML route (API + auth pages exempt).
+- Login events recorded as `notifications` rows of type `'login_event'`
+  with device label (User-Agent parse) + city/country (`x-vercel-ip-*`).
+  Visible in `/avisos`.
+- The old HMAC-derived password (HMAC-SHA256 of phone keyed off
+  `SUPABASE_SERVICE_ROLE_KEY`) is gone. The OTP route now generates a
+  random 32-byte temp password the user never sees.
+
+Files: `app/(auth)/{login,login/password,set-password,verify,onboarding}/page.tsx`,
+`app/api/auth/{check-phone,login-password,set-password,otp,login-poll,login-wait}/route.ts`,
+`lib/auth/{phone,turnstile,login-event,user-agent,rate-limit}.ts`,
+`lib/supabase/middleware.ts` (gating logic).
+
+---
+
+## Hard rules (post-cleanup, 2026-04)
+
+- **No `digital_pool` payment mode**. Removed end-to-end (Wompi gone).
+  Only `admin_collects` (organizer collects) and `pay_winner` (pay the
+  winner at the end) ship.
+- **No public pollas** (`type='open'`). Every polla is `type='closed'`.
+  The Zod schema enforces `z.literal("closed")` at the API layer.
+- **No `select("*")`** on tables with user-relevant data. Use the
+  explicit lists in `lib/db/columns.ts` (`POLLA_COLUMNS`,
+  `POLLA_PARTICIPANT_COLUMNS`, `MATCH_COLUMNS`, `PREDICTION_COLUMNS`).
+  Defense-in-depth against accidentally leaking a future sensitive
+  column.
+- **No raw phone/user_id in logs**. Use `redactPhone`, `redactId`,
+  `redactText` from `lib/log.ts` so Vercel runtime logs stay clean of
+  PII.
+- **NetworkOnly for `/api/auth/*`, `/api/admin/*`, `/login`, `/verify`,
+  `/set-password`, `/onboarding`, `/invites/polla/*`** in the service
+  worker (`app/sw.ts`). The SW must never serve a stale auth-sensitive
+  page.
 
 ---
 
