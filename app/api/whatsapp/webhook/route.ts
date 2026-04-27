@@ -142,14 +142,10 @@ async function handleMessage(msg: IncomingTextBody, request: NextRequest) {
 async function replyWithMenu(to: string) {
   await sendCTAButton(
     to,
-    "¡Qué más, parce! 🐔\n\n" +
-      "Acá te pongo en bandeja todo lo de *La Polla*: tus pollas, predicciones, " +
-      "tabla en vivo y resultados. Todo se maneja desde la app — abrila y listo.\n\n" +
-      "¿No te llega el SMS para entrar? Escribime *Hola parce! 🐥 quiero entrar a la polla* " +
-      "y te paso un link mágico 🔑",
+    "¡Qué más, parce! 🐥",
     "Abrir La Polla",
     `${APP_URL}/inicio`,
-    "🐔 La Polla Colombiana",
+    "La Polla Colombiana 🐥",
   );
 }
 
