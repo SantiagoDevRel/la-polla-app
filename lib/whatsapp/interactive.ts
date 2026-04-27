@@ -1,27 +1,31 @@
 // lib/whatsapp/interactive.ts — Helper functions for WhatsApp Cloud API interactive messages
 // Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/messages/interactive-reply-buttons-messages
 
-// Validate required env vars on module load. See bot.ts for the same
-// guard; keeping an independent check here so importing this helper
-// alone (without bot.ts) still fails fast on misconfiguration.
-const PHONE_NUMBER_ID = process.env.META_WA_PHONE_NUMBER_ID;
-const ACCESS_TOKEN = process.env.META_WA_ACCESS_TOKEN;
-
-if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
-  throw new Error(
-    "[whatsapp] Missing required env: META_WA_ACCESS_TOKEN and/or " +
-    "META_WA_PHONE_NUMBER_ID. Refusing to start — sends would 404 " +
-    "at runtime otherwise."
-  );
+// Resolve env at call time, not module-load. Module-level throws break
+// Vercel's build "collect page data" pass when any preview env scope
+// lacks META_WA_*. Defer the check so unrelated builds stay green.
+function getWhatsAppConfig(): { token: string; url: string } {
+  const token = process.env.META_WA_ACCESS_TOKEN;
+  const phoneNumberId = process.env.META_WA_PHONE_NUMBER_ID;
+  if (!token || !phoneNumberId) {
+    throw new Error(
+      "[whatsapp] Missing required env: META_WA_ACCESS_TOKEN and/or " +
+      "META_WA_PHONE_NUMBER_ID. Refusing to send — sends would 404 " +
+      "at runtime otherwise.",
+    );
+  }
+  return {
+    token,
+    url: `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+  };
 }
 
-const WA_API_URL = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`;
-
 async function sendInteractive(to: string, payload: Record<string, unknown>) {
-  const res = await fetch(WA_API_URL, {
+  const { token, url } = getWhatsAppConfig();
+  const res = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${ACCESS_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
