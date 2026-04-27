@@ -1,15 +1,20 @@
 // app/api/whatsapp/webhook/route.ts — Inbound WhatsApp webhook.
 //
-// Two intents are handled:
-//   1. Menu intent (greetings, "menú", the WhatsAppBubble pre-text):
-//      reply with a friendly note + CTA button that opens the app —
-//      the conversational bot was retired, the app itself is the menu.
-//   2. Login intent ("quiero entrar a la polla", etc.): SMS-OTP
-//      fallback. Generate a one-time magic token and reply with a
-//      CTA button that signs them in via `/api/auth/wa-magic?token=…`.
+// Two distinct paths share the same hook:
+//   1. Magic-link (SMS-OTP fallback): the user came from /login by
+//      tapping the WhatsApp button. The pre-text is a tight phrase
+//      ("hola parce ... quiero entrar a la polla"); when we see it
+//      we generate a one-time token and reply with a CTA that signs
+//      them in via /api/auth/wa-magic?token=…
+//   2. Conversational bot (everything else): a known user gets routed
+//      through lib/whatsapp/router.ts (state-machine + flows.ts) so
+//      the bot can show pollas, take predictions, render the table,
+//      etc. Unknown users get an onboarding nudge inside the router.
 //
-// Anything we don't recognize gets the menu reply so the bot never
-// goes silent and users always have a path forward.
+// The split lives here (not inside the router) because the magic-link
+// path needs to work for users who don't have a row in public.users yet
+// — they're still onboarding. Asking the router to special-case that
+// would couple two unrelated flows.
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
@@ -18,7 +23,10 @@ import { sendTextMessage } from "@/lib/whatsapp/bot";
 import { sendCTAButton } from "@/lib/whatsapp/interactive";
 import { normalizePhone } from "@/lib/auth/phone";
 import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
-import { looksLikeMenuIntent } from "@/lib/whatsapp/menu-intent";
+import {
+  processIncomingMessage,
+  type IncomingMessage,
+} from "@/lib/whatsapp/router";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,6 +35,12 @@ const MAGIC_TOKEN_TTL_MIN = 10;
 const APP_URL =
   (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() ||
   "https://lapollacolombiana.com";
+
+// Tight match: the exact phrase /login pre-fills as the SMS-fallback
+// button. Generic words like "login" or "entrar" don't qualify on
+// purpose — those should reach the conversational bot, not generate a
+// magic link.
+const LOGIN_KEYWORDS = ["quiero entrar a la polla"];
 
 // ─── Meta subscription verification (GET) ───
 
@@ -45,14 +59,6 @@ export async function GET(request: NextRequest) {
 
 // ─── Inbound message delivery (POST) ───
 
-interface IncomingTextBody {
-  text?: string;
-  type: string;
-  from: string;
-  interactiveButtonId?: string | null;
-  interactiveButtonTitle?: string | null;
-}
-
 export async function POST(request: NextRequest) {
   // Read raw body BEFORE parsing — HMAC must run over original bytes.
   const raw = await request.text();
@@ -68,36 +74,21 @@ export async function POST(request: NextRequest) {
     return new NextResponse("bad json", { status: 400 });
   }
 
-  // Top-level guard. Meta sends pings + unrelated events through the
-  // same hook; only "whatsapp_business_account" carries messages.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const obj = body as any;
   if (obj?.object !== "whatsapp_business_account") {
     return NextResponse.json({ status: "ok" });
   }
 
-  // Drill into the first message in the payload (Meta only ever sends
-  // one per webhook call for incoming messages, batches are status
-  // updates which we ignore).
   const change = obj?.entry?.[0]?.changes?.[0]?.value;
   const message = change?.messages?.[0];
 
   if (!message) {
-    // Status update / delivery receipt — acknowledge and move on so
-    // Meta doesn't retry.
     return NextResponse.json({ status: "ok" });
   }
 
-  const incoming: IncomingTextBody = {
-    type: message.type,
-    from: message.from,
-    text: message.text?.body?.trim() ?? "",
-    interactiveButtonId: message.interactive?.button_reply?.id ?? null,
-    interactiveButtonTitle: message.interactive?.button_reply?.title ?? null,
-  };
-
   try {
-    await handleMessage(incoming, request);
+    await dispatch(message, request);
   } catch (err) {
     console.error("[wa-webhook] handle failed:", err);
     // Still 200 — Meta retries on non-2xx, which would compound any
@@ -107,46 +98,31 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ status: "ok" });
 }
 
-// ─── Routing ───
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function dispatch(message: any, request: NextRequest): Promise<void> {
+  const from: string = message.from;
+  const type: string = message.type;
+  const textBody: string = (message.text?.body ?? "").trim();
 
-// Tight match: only the exact phrase the /login page pre-fills as the
-// SMS-fallback button. Everything else falls through to the menu so
-// generic words like "login" or "entrar" don't accidentally generate
-// magic links for users who just wanted to chat with the bot.
-const LOGIN_KEYWORDS = ["quiero entrar a la polla"];
-
-async function handleMessage(msg: IncomingTextBody, request: NextRequest) {
-  const text = (msg.text ?? "").toLowerCase();
-  const isLoginIntent =
-    msg.type === "text" &&
-    LOGIN_KEYWORDS.some((kw) => text.includes(kw));
-
-  if (isLoginIntent) {
-    await replyWithMagicLink(msg.from, request);
-    return;
+  // 1. Magic-link path — tight phrase match on free text only. Keep it
+  //    in front of the router so users without a public.users row (mid-
+  //    onboarding) can still recover via SMS fallback.
+  if (type === "text" && textBody) {
+    const lower = textBody.toLowerCase();
+    if (LOGIN_KEYWORDS.some((kw) => lower.includes(kw))) {
+      await replyWithMagicLink(from, request);
+      return;
+    }
   }
 
-  // Catch-all: greetings, "menú", stickers, anything else → menu reply.
-  // We log whether it was a recognized menu intent for observability,
-  // but the response is the same — a discoverable bot beats a silent one.
-  const isMenuIntent =
-    msg.type === "text" && looksLikeMenuIntent(msg.text ?? "");
-  console.log(
-    `[wa-webhook] menu reply (intent=${isMenuIntent ? "menu" : "fallback"})`,
-  );
-  await replyWithMenu(msg.from);
-}
-
-// ─── Menu reply ───
-
-async function replyWithMenu(to: string) {
-  await sendCTAButton(
-    to,
-    "¡Qué más, parce! 🐥",
-    "Abrir La Polla",
-    `${APP_URL}/inicio`,
-    "La Polla Colombiana 🐥",
-  );
+  // 2. Conversational bot — hand off to the router.
+  const incoming: IncomingMessage = {
+    from,
+    type,
+    text: message.text,
+    interactive: message.interactive,
+  };
+  await processIncomingMessage(incoming);
 }
 
 // ─── Magic-link generation ───
@@ -154,9 +130,6 @@ async function replyWithMenu(to: string) {
 async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
   const phoneNormalized = normalizePhone(fromRaw);
 
-  // Cap how often a single number can ask for a magic link. Reuses
-  // the existing rate-limit infra (5 generates per hour) — this
-  // covers both abuse and accidental retap loops.
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
   const limit = await checkAndRecordAttempt(phoneNormalized, "generate", ip);
@@ -190,13 +163,6 @@ async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
   }
 
   const url = `${APP_URL}/api/auth/wa-magic?token=${token}`;
-
-  // Show the resolved phone in the bot's reply so the user verifies
-  // the account they're about to enter BEFORE tapping the button.
-  // Important UX guard: the typed phone in the /login form is ignored
-  // when they click the WhatsApp button — only the WA sender's number
-  // counts. Surfacing the number here is where it has the most impact
-  // (they're looking at WhatsApp at this exact moment).
   const e164 = `+${phoneNormalized}`;
   await sendCTAButton(
     fromRaw,
@@ -213,9 +179,6 @@ async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
 function verifySignature(request: NextRequest, raw: string): boolean {
   const secret = process.env.META_WA_APP_SECRET;
   if (!secret) {
-    // Dev affordance: allow unsigned in environments without the
-    // secret. Same behavior the old webhook had — log loudly so we
-    // don't ship to prod with this hole open.
     console.warn(
       "[wa-webhook] META_WA_APP_SECRET unset — skipping signature check",
     );
