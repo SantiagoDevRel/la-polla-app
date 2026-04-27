@@ -37,10 +37,15 @@ interface PaymentsListProps {
 function displayLabel(p: PaymentParticipant): string {
   const name = p.users?.display_name?.trim();
   if (name) return name;
-  const phone = p.users?.whatsapp_number;
-  return phone ? phone : "Participante";
+  // Onboarding now requires a real name, but legacy rows or rows mid-
+  // creation may still be missing one. Show a neutral placeholder
+  // instead of the phone — phones are PII and never appear publicly.
+  return "Participante";
 }
 
+// Phone sub-label is only ever rendered to the polla admin (organizer).
+// For everyone else we return null so we never leak PII in the public
+// participant list.
 function phoneLabel(p: PaymentParticipant): string | null {
   const name = p.users?.display_name?.trim();
   if (!name) return null;
@@ -115,7 +120,9 @@ export default function PaymentsList({
         <ul className="space-y-2">
           {rows.map((p) => {
             const isMe = p.user_id === currentUserId;
-            const sub = phoneLabel(p);
+            // Only the organizer (isAdmin) sees the phone number; everyone
+            // else only ever sees the display name.
+            const sub = isAdmin ? phoneLabel(p) : null;
             const busy = togglingId === p.id;
             return (
               <li

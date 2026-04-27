@@ -54,17 +54,26 @@ export default function OnboardingPage() {
 
         const { data: profile } = await supabase
           .from("users")
-          .select("display_name, whatsapp_number")
+          .select("display_name, whatsapp_number, avatar_url")
           .eq("id", user.id)
           .single();
 
-        if (profile && !needsName(profile.display_name)) {
+        const nameOk = profile && !needsName(profile.display_name);
+        const pollitoOk = !!profile?.avatar_url;
+
+        if (nameOk && pollitoOk) {
           const rt = typeof window !== "undefined"
             ? window.sessionStorage.getItem("lp_returnTo")
             : null;
           if (rt) window.sessionStorage.removeItem("lp_returnTo");
           router.push(rt || "/inicio");
           return;
+        }
+
+        // Pre-fill what we already have and jump to the missing step.
+        if (nameOk) {
+          setName(profile!.display_name as string);
+          setStep(2);
         }
       } catch {
         // If anything fails, just show the form

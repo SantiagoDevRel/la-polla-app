@@ -40,28 +40,35 @@ session, designed to be picked up cold.
 
 ## Auth model (current — 2026-04)
 
-- First sign-in: phone → Cloudflare Turnstile (server-validated) → OTP
-  via WhatsApp bot (`login_pending_sessions` row). After OTP success,
-  user lands on `/set-password` and **must** pick a 4+ char password.
-- Subsequent logins: phone → password (no bot, no Turnstile). Rate-
-  limited 5/15min via `otp_rate_limits` with `attempt_type='password'`.
-- Forgot password: link from `/login/password` re-enters the OTP flow,
-  which on success rotates the auth password to a temp value and forces
-  `/set-password` again.
-- `users.has_custom_password` BOOLEAN gates middleware: any
-  authenticated user with `false` is redirected to `/set-password` from
-  every HTML route (API + auth pages exempt).
+- Login: phone (any country, E.164 via `components/ui/PhoneInput`) →
+  Twilio Verify SMS OTP via Supabase Phone Auth. No password, no
+  Turnstile, no WhatsApp OTP path. The login page (`app/(auth)/login/
+  page.tsx`) calls `signInWithOtp` client-side and then verifies the
+  code server-side at `/api/auth/verify-otp` so cookies stick on iOS
+  Safari.
+- After OTP verify, new users land on `/onboarding`. Onboarding has
+  two **mandatory** steps:
+    1. Pick a real display name (not phone-shaped, ≥2 chars)
+    2. Pick a pollito (saved to `users.avatar_url`)
+- Onboarding gate is enforced in `lib/supabase/middleware.ts`: any
+  authenticated user reaching a private HTML route with
+  `needsName(display_name) || !avatar_url` is redirected to
+  `/onboarding`. The middleware uses an admin client because RLS on
+  `public.users` returns 0 rows from the PostgREST request context
+  (see `auth.uid()` TODO above). API routes are exempt — they handle
+  auth themselves.
 - Login events recorded as `notifications` rows of type `'login_event'`
   with device label (User-Agent parse) + city/country (`x-vercel-ip-*`).
   Visible in `/avisos`.
-- The old HMAC-derived password (HMAC-SHA256 of phone keyed off
-  `SUPABASE_SERVICE_ROLE_KEY`) is gone. The OTP route now generates a
-  random 32-byte temp password the user never sees.
+- Rate limit: `otp_rate_limits` table, 5 verify attempts / 15 min and
+  5 generate attempts / hour, enforced in `app/api/auth/verify-otp/
+  route.ts` via `lib/auth/rate-limit.ts`.
 
-Files: `app/(auth)/{login,login/password,set-password,verify,onboarding}/page.tsx`,
-`app/api/auth/{check-phone,login-password,set-password,otp,login-poll,login-wait}/route.ts`,
-`lib/auth/{phone,turnstile,login-event,user-agent,rate-limit}.ts`,
-`lib/supabase/middleware.ts` (gating logic).
+Files: `app/(auth)/{login,onboarding}/page.tsx`,
+`app/api/auth/verify-otp/route.ts`, `app/api/users/me/route.ts`,
+`lib/auth/{phone,login-event,user-agent,rate-limit}.ts`,
+`lib/users/needs-name.ts`, `lib/supabase/middleware.ts` (gating logic),
+`components/ui/PhoneInput.tsx`.
 
 ---
 
@@ -456,7 +463,11 @@ Help: `menu_ayuda`, `help_puntaje`, `help_crear`, `menu_perfil`
 ## Security Architecture (added 2026-04-11)
 
 ### Admin Access Control
-- `users.is_admin` column (boolean) — set via migration 005. Two known admins: 573117312391, 351934255581
+- `users.is_admin` column (boolean) — set via migration 005, locked
+  down to exactly two phones via migration 024. The two admins are
+  `573117312391` (+57 311 731 2391) and `351934255581` (+351 934 255
+  581); migration 024 also demotes anyone else who somehow had the
+  flag, and is idempotent so re-running is safe.
 - `lib/auth/admin.ts` — `isCurrentUserAdmin()` server-side check, used in API routes and admin layout
 - `app/(app)/admin/layout.tsx` — server-side layout guard, redirects non-admins to /dashboard
 - Admin API routes (`/api/admin/*`, `/api/matches/sync`) use dual auth: admin session OR CRON_SECRET header
