@@ -476,16 +476,30 @@ join code, and predict-by-group cursors.
 
 ### Button ID → Flow
 Main menu:    `menu_mis_pollas`, `menu_predecir`, `menu_tabla`
-Polla menu:   `pred_{id}`, `rank_{id}`, `results_{id}`, `rotate_confirm_{id}`
+Polla menu:   `pred_{id}`, `rank_{id}`, `results_{id}`
+Invite (CTA URL, no callback): `wa.me/?text=…` opens the user's WhatsApp
+              contact picker pre-filled with the polla's invite text
+              (name + join_code + `/unirse/{slug}` link). Sent as a
+              follow-up message to every polla menu so any member can
+              invite — admin-only rotate-code was retired from the bot
+              (still available in the web admin panel).
 Predict:      `match_{id}`, `more_{pollaId}_{page}`, `pred_next_{id}`
 Predict-by-group: `predgrp_phase_{id}`, `predgrp_date_{id}`,
               `pgsel|{pollaId}|{groupKey}`, `pgmore|{pollaId}|{page}`,
               `pgreset|{pollaId}`
 Confirmation: `confirm_yes`, `confirm_no`
 Join code:    `join_code_yes`, `join_code_no`
-Admin rotate: `rotate_yes_{id}`, `rotate_no`
 Navigation:   `menu`, `polla_{id}`, `match_{id}`
 Help:         `menu_ayuda`, `help_puntaje`, `help_crear`, `menu_perfil`
+
+### Auto-send vs confirm-send
+Reply buttons (max 3) auto-send on tap; list rows require a confirm tap.
+Where it matters most we use reply buttons:
+- `handlePollaMenu` — 3 reply buttons (Pronosticar/Tabla/Resultados) for
+  every member, plus a separate CTA URL "Invitar al parche".
+- `handleMisPollas` — reply buttons when the user has ≤3 pollas, list
+  otherwise. Reply-button title is capped at 20 chars (truncated with
+  ellipsis); stats live in the message body.
 
 ### Env vars
 - `META_WA_ACCESS_TOKEN`, `META_WA_PHONE_NUMBER_ID` — outbound sends.

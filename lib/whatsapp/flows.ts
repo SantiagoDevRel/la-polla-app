@@ -18,7 +18,6 @@ import {
 } from "@/lib/matches/grouping";
 import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
-import { rotateJoinCode } from "@/lib/pollas/rotate-code";
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
 const FOOTER = "La Polla Colombiana 🐥";
@@ -278,6 +277,28 @@ export async function handleMisPollas(phone: string, userId: string) {
     countMap.set(p.polla_id, (countMap.get(p.polla_id) || 0) + 1);
   });
 
+  // Reply buttons (max 3, auto-send on tap) beat lists (require a confirm
+  // step) for the common case of 1-3 pollas. Beyond that, fall back to
+  // the scrollable list.
+  if (pollas.length <= 3) {
+    await sendReplyButtons(
+      phone,
+      "Tus pollas activas parce 👇 Tocá una para abrirla.",
+      pollas.map((polla) => ({
+        id: `polla_${polla.id}`,
+        // Reply-button title cap is 20 chars — name alone, with a graceful
+        // truncate. Stats live in the message body for compactness.
+        title:
+          polla.name.length <= 20
+            ? polla.name
+            : polla.name.slice(0, 19) + "…",
+      })),
+      "Tus Pollas",
+      FOOTER,
+    );
+    return;
+  }
+
   const rows = pollas.map((polla) => {
     const p = participations.find((pp) => pp.polla_id === polla.id);
     const trnLabel = TRN_LABELS[polla.tournament] || polla.tournament;
@@ -295,7 +316,7 @@ export async function handleMisPollas(phone: string, userId: string) {
     "Ver mis pollas",
     [{ title: "Activas", rows }],
     "Tus Pollas",
-    FOOTER
+    FOOTER,
   );
 }
 
@@ -339,30 +360,11 @@ export async function handlePollaMenu(
     `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
     `¿Qué querés hacer parce?`;
 
-  // Admins see a 4-row list (reply-buttons cap at 3). Non-admins keep the
-  // existing 3-button layout so the regular path stays visually identical.
-  if (participant.role === "admin") {
-    await sendListMessage(
-      phone,
-      body,
-      "Ver opciones",
-      [
-        {
-          title: "Opciones",
-          rows: [
-            { id: `pred_${pollaId}`, title: "Pronosticar 🎯", description: "Poné tus pronósticos" },
-            { id: `rank_${pollaId}`, title: "Ver Tabla 📊", description: "Mirá cómo va el parche" },
-            { id: `results_${pollaId}`, title: "Resultados ⚽", description: "Últimos partidos" },
-            { id: `rotate_confirm_${pollaId}`, title: "Generar nuevo código", description: "Genera un código de invitación nuevo" },
-          ],
-        },
-      ],
-      polla.name,
-      FOOTER,
-    );
-    return;
-  }
-
+  // Same 3 reply-button layout for admins and players. Reply buttons
+  // auto-send on tap (lists need a confirm), so this avoids a friction
+  // step every player hits. Admin-only "Generar código" was retired in
+  // favor of the universal "Invitar al parche" CTA below — every member
+  // can invite, the join code rotation lives in the web admin panel.
   await sendReplyButtons(
     phone,
     body,
@@ -372,7 +374,46 @@ export async function handlePollaMenu(
       { id: `results_${pollaId}`, title: "Resultados ⚽" },
     ],
     polla.name,
-    FOOTER
+    FOOTER,
+  );
+
+  // Follow-up "Invitar al parche" message. WhatsApp's interactive block
+  // can't mix reply buttons with a CTA URL in the same payload, so we
+  // send a second message with the share-sheet deep link. Tapping it
+  // opens WhatsApp's contact picker pre-filled with the invite text.
+  await sendInviteFriendCTA(phone, polla);
+}
+
+/**
+ * Sends a CTA URL message that opens the user's WhatsApp contact picker
+ * pre-filled with an invite to this polla. Reads the polla's join_code
+ * (best-effort: omitted if missing). Used as a follow-up to handlePollaMenu
+ * so every member has a one-tap invite path without hunting through the app.
+ */
+async function sendInviteFriendCTA(
+  phone: string,
+  polla: { id: string; name: string; slug: string },
+) {
+  const supabase = createAdminClient();
+  const { data: full } = await supabase
+    .from("pollas")
+    .select("join_code")
+    .eq("id", polla.id)
+    .maybeSingle();
+
+  const code = full?.join_code ?? null;
+  const inviteText =
+    `Te invito a *${polla.name}* en La Polla 🐔` +
+    (code ? `\n\nCódigo: *${code}*` : "") +
+    `\n\nEntrá acá: ${APP_URL}/unirse/${polla.slug}`;
+  const shareUrl = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
+
+  await sendCTAButton(
+    phone,
+    "¿Querés sumar gente al parche? Compartí el link con tus contactos 👇",
+    "Invitar al parche 🐥",
+    shareUrl,
+    FOOTER,
   );
 }
 
@@ -1406,106 +1447,4 @@ export async function handleJoinByCode(
   }
 }
 
-// ─── Rotate join code (admin only) ───────────────────────────────────
-//
-// Two-step flow: confirmation → execution. Both steps re-check the
-// polla_participants.role === "admin" gate independently so a forged
-// rotate_yes_<id> payload cannot bypass the confirm step. The admin
-// check here is byte-identical to the web route at
-// app/api/pollas/[slug]/rotate-code/route.ts.
-
-async function assertPollaAdmin(
-  phone: string,
-  userId: string,
-  pollaId: string,
-): Promise<{ polla: { id: string; name: string; slug: string } } | null> {
-  const supabase = createAdminClient();
-
-  const { data: polla } = await supabase
-    .from("pollas")
-    .select("id, name, slug")
-    .eq("id", pollaId)
-    .maybeSingle();
-  if (!polla) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.");
-    return null;
-  }
-
-  const { data: membership } = await supabase
-    .from("polla_participants")
-    .select("role")
-    .eq("polla_id", pollaId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!membership || membership.role !== "admin") {
-    await sendTextMessage(phone, "No sos admin de esta polla parce.");
-    return null;
-  }
-
-  return { polla };
-}
-
-/**
- * Step 1 of 2: confirm the admin wants to rotate. Sends a SI/NO prompt.
- */
-export async function handleRotateCodeConfirm(
-  phone: string,
-  userId: string,
-  pollaId: string,
-) {
-  const check = await assertPollaAdmin(phone, userId, pollaId);
-  if (!check) return;
-  const { polla } = check;
-
-  await sendReplyButtons(
-    phone,
-    `¿Generar un nuevo código de invitación para *${polla.name}*? El código actual dejará de funcionar.`,
-    [
-      { id: `rotate_yes_${pollaId}`, title: "Sí, rotar" },
-      { id: "rotate_no", title: "No" },
-    ],
-    polla.name,
-    FOOTER,
-  );
-}
-
-/**
- * Step 2 of 2: performs the rotation. Re-verifies admin permission
- * (defense in depth) and calls the shared rotateJoinCode helper so the
- * web + bot paths stay in lockstep.
- */
-export async function handleRotateCode(
-  phone: string,
-  userId: string,
-  pollaId: string,
-) {
-  const check = await assertPollaAdmin(phone, userId, pollaId);
-  if (!check) return;
-  const { polla } = check;
-
-  const admin = createAdminClient();
-  const result = await rotateJoinCode(admin, pollaId);
-
-  if (!result.ok) {
-    await sendTextMessage(
-      phone,
-      "Uy parce, no se pudo rotar el código. Intentá de nuevo.",
-    );
-    return;
-  }
-
-  await sendTextMessage(
-    phone,
-    `✅ Listo parce. Nuevo código: *${result.code}*\n\n` +
-      `Compartilo con el parche. El anterior ya no funciona.`,
-  );
-
-  await sendCTAButton(
-    phone,
-    "O mandales el link directo 👇",
-    "Abrir polla",
-    `${APP_URL}/pollas/${polla.slug}`,
-    FOOTER,
-  );
-}
 
