@@ -19,10 +19,24 @@ import { AnimatePresence, motion } from "framer-motion";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 
 const SEEN_KEY = "lp_welcome_seen_v1";
-const TYPE_MS = 28;
+const TYPE_MS = 26; // ms between chars — fast, energetic typewriter
+const CHAR_FADE_MS = 160; // each char's fade-in; multiple chars overlap mid-fade
+// Single eased curve reused everywhere so phases share the same
+// "physics". Acts close to easeOutExpo — soft landing, no overshoot.
+const SMOOTH: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
+// Two long lines, hardcoded \n between them. Each line is ~44 chars
+// and fits comfortably in the 360px container on every modern phone
+// (iPhone 12+, all Android). On the rare iPhone SE-class device the
+// browser wraps a line in two, which still reads cleanly because
+// per-char spans keep every char at its final coordinate — the
+// reveal is identical regardless of how many visual lines the wrap
+// produces.
 const INTRO =
-  "La Polla Colombiana es para que juegues con tus amigos los principales torneos del mundo:";
+  "La Polla Colombiana es para que juegues con\ntus amigos los principales torneos del mundo";
+// Pre-split once at module load so every render reuses the same
+// character array (and React keys stay stable across re-renders).
+const INTRO_CHARS = INTRO.split("");
 
 // Order curated for visual recognition: World Cup first (most universal),
 // then the three biggest club competitions, Serie A closes.
@@ -42,13 +56,15 @@ const STEPS = [
   "Y a pronosticar",
 ];
 
-// Stage gates — each phase unlocks ~Δ ms after the previous one.
+// Stage gates — ms between the previous beat finishing and the next
+// one starting. Tight enough to keep momentum, loose enough that
+// nothing animates over the previous block.
 type Stage = "intro" | "tournaments" | "steps" | "gratis" | "ready";
 const STAGE_DELAYS: Record<Exclude<Stage, "intro">, number> = {
-  tournaments: 350,
-  steps: 1100,
-  gratis: 2000,
-  ready: 700,
+  tournaments: 350, // intro typing finishes → logos start almost immediately
+  steps: 900, // logos cascade ~1.1s, then steps kick in
+  gratis: 2200, // 5 steps land + a beat of read time
+  ready: 1300, // savor the gold "GRATIS" before the CTA
 };
 
 export function WelcomeIntro() {
@@ -148,7 +164,7 @@ export function WelcomeIntro() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.7, ease: SMOOTH }}
           className="fixed inset-0 z-[10000] overflow-hidden bg-bg-base"
         >
           {/* Stadium video — same source as AppBackground for visual
@@ -189,6 +205,19 @@ export function WelcomeIntro() {
             }}
           />
 
+          {/* Bottom fade — masks the small gap iOS Safari leaves under
+              the video (its translateY(-7%) shifts the bottom edge up).
+              Without this the gap reads as a visible black bar between
+              the footage and the CTA. The gradient lands at solid bg-
+              base at 100% so any gap blends in cleanly. */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-[200px] pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(180deg, transparent 0%, rgba(8,12,16,0.7) 50%, rgba(8,12,16,1) 100%)",
+            }}
+          />
+
           {/* Skip chip — visible until the CTA arrives. */}
           {!showReady && (
             <button
@@ -200,9 +229,15 @@ export function WelcomeIntro() {
             </button>
           )}
 
-          {/* Centered column. */}
+          {/* Layout strategy: every block is rendered from the very first
+              frame with its final size and position. Stages only flip the
+              opacity/blur/transform of each block — never the DOM tree —
+              so the column's height is constant and nothing ever shifts
+              up or down as content reveals. overflow-y-auto is the
+              fallback for short viewports where the full stack still
+              wouldn't fit (older iPhones in landscape, etc.). */}
           <div
-            className="relative z-10 min-h-full flex flex-col items-center justify-center px-6 py-10 max-w-lg mx-auto text-center"
+            className="relative z-10 w-full h-full overflow-y-auto flex flex-col items-center justify-start px-6 pt-10 pb-12 max-w-lg mx-auto"
             onClick={fastForward}
           >
             {/* Wordmark */}
@@ -228,150 +263,177 @@ export function WelcomeIntro() {
               </span>
             </div>
 
-            {/* Intro line — typewriter */}
-            <p
-              className="text-text-primary text-[15px] leading-relaxed font-medium max-w-[34ch] min-h-[72px]"
-              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
-            >
-              {typed}
-              {stage === "intro" && (
-                <span
-                  className="inline-block w-[2px] h-[1.05em] bg-gold ml-0.5 align-[-0.15em] animate-pulse"
-                  aria-hidden="true"
-                />
-              )}
-            </p>
+            {/* Intro typewriter — per-character technique.
+                ─────────────────────────────────────────────────────────
+                Every character of INTRO is rendered as its own <span>
+                from the very first frame, in its exact final position.
+                The browser computes the layout once at mount and never
+                touches it again — the spans take their natural width
+                even when `opacity:0`, so the line wrap, line count,
+                vertical spacing and column height are LOCKED from
+                frame 0.
+                Reveal happens by toggling each span's opacity based on
+                `typed.length > i`. A 240ms CSS transition turns the
+                hard binary flip into a gentle fade, and because typed
+                grows one char per 50ms, multiple chars are mid-fade at
+                any moment — that overlap is what makes the reveal feel
+                fluid instead of stuttering.
+                There is literally NO mechanism by which a char could
+                move: the DOM never reorders, no width changes, no
+                container resizes. Whatever is on screen stays exactly
+                where it is for the entire intro. */}
+            <div className="w-full max-w-[360px] mx-auto">
+              <p
+                className="text-text-primary text-[15px] leading-relaxed font-medium text-center whitespace-pre-line"
+                style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
+              >
+                {INTRO_CHARS.map((ch, i) => {
+                  if (ch === "\n") return <br key={`br-${i}`} />;
+                  const visible = typed.length > i;
+                  return (
+                    <span
+                      key={i}
+                      style={{
+                        opacity: visible ? 1 : 0,
+                        transition: `opacity ${CHAR_FADE_MS}ms ease-out`,
+                      }}
+                    >
+                      {ch}
+                    </span>
+                  );
+                })}
+              </p>
+            </div>
 
-            {/* Tournament logos */}
-            <AnimatePresence>
-              {showTournaments && (
+            {/* Tournament logos — slot reserved (min-h) from the start so
+                the rest of the column doesn't move when the row reveals. */}
+            <div className="mt-6 w-full flex flex-wrap items-center justify-center gap-x-5 gap-y-3 min-h-[68px]">
+              {TOURNAMENT_ORDER.map((t, i) => (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.4 }}
-                  className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-3"
+                  key={t.slug}
+                  initial={{
+                    opacity: 0,
+                    scale: 0.92,
+                    filter: "blur(6px)",
+                  }}
+                  animate={
+                    showTournaments
+                      ? { opacity: 1, scale: 1, filter: "blur(0px)" }
+                      : { opacity: 0, scale: 0.92, filter: "blur(6px)" }
+                  }
+                  transition={{
+                    duration: 0.45,
+                    delay: showTournaments ? i * 0.13 : 0,
+                    ease: SMOOTH,
+                  }}
+                  className="flex flex-col items-center gap-1.5"
                 >
-                  {TOURNAMENT_ORDER.map((t, i) => (
-                    <motion.div
-                      key={t.slug}
-                      initial={{ opacity: 0, y: 8, scale: 0.85 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{
-                        duration: 0.4,
-                        delay: i * 0.12,
-                        ease: "easeOut",
-                      }}
-                      className="flex flex-col items-center gap-1.5"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={TOURNAMENT_ICONS[t.slug]}
-                        alt={t.name}
-                        width={36}
-                        height={36}
-                        className="object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
-                      />
-                      <span className="text-[10px] uppercase tracking-wider text-text-secondary">
-                        {t.name}
-                      </span>
-                    </motion.div>
-                  ))}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={TOURNAMENT_ICONS[t.slug]}
+                    alt={t.name}
+                    width={36}
+                    height={36}
+                    className="object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
+                  />
+                  <span className="text-[10px] uppercase tracking-wider text-text-secondary">
+                    {t.name}
+                  </span>
                 </motion.div>
-              )}
-            </AnimatePresence>
+              ))}
+            </div>
 
-            {/* Steps */}
-            <AnimatePresence>
-              {showSteps && (
-                <motion.ol
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className="mt-8 flex flex-col items-start gap-2.5 text-left"
-                >
-                  {STEPS.map((s, i) => (
-                    <motion.li
-                      key={s}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{
-                        duration: 0.35,
-                        delay: i * 0.18,
-                        ease: "easeOut",
-                      }}
-                      className="flex items-center gap-3 text-text-primary text-[14px] font-medium"
-                      style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
-                    >
-                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold/15 border border-gold/40 text-gold text-[11px] font-bold inline-flex items-center justify-center">
-                        {i + 1}
-                      </span>
-                      <span>{s}</span>
-                    </motion.li>
-                  ))}
-                </motion.ol>
-              )}
-            </AnimatePresence>
-
-            {/* Gratis punchline */}
-            <AnimatePresence>
-              {showGratis && (
-                <motion.p
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
-                  className="mt-8 text-text-primary text-[16px] font-semibold"
+            {/* Steps — list always mounted; per-item opacity flips on the
+                stage gate with a stagger so each line lands one after the
+                next without any vertical reflow. */}
+            <ol className="mt-8 w-full max-w-[34ch] mx-auto flex flex-col items-start gap-3 text-left">
+              {STEPS.map((s, i) => (
+                <motion.li
+                  key={s}
+                  initial={{ opacity: 0, filter: "blur(4px)" }}
+                  animate={
+                    showSteps
+                      ? { opacity: 1, filter: "blur(0px)" }
+                      : { opacity: 0, filter: "blur(4px)" }
+                  }
+                  transition={{
+                    duration: 0.7,
+                    delay: showSteps ? i * 0.32 : 0,
+                    ease: SMOOTH,
+                  }}
+                  className="flex items-center gap-3 text-text-primary text-[14px] font-medium w-full"
                   style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
                 >
-                  Todo esto es{" "}
-                  <motion.span
-                    initial={{ scale: 0.85 }}
-                    animate={{ scale: 1 }}
-                    transition={{
-                      duration: 0.5,
-                      delay: 0.15,
-                      ease: [0.34, 1.56, 0.64, 1], // gentle overshoot
-                    }}
-                    className="inline-block font-display text-gold text-[26px] tracking-wide align-[-0.05em]"
-                    style={{ textShadow: "0 2px 8px rgba(255,215,0,0.35)" }}
-                  >
-                    GRATIS
-                  </motion.span>
-                  .
-                </motion.p>
-              )}
-            </AnimatePresence>
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold/15 border border-gold/40 text-gold text-[11px] font-bold inline-flex items-center justify-center">
+                    {i + 1}
+                  </span>
+                  <span>{s}</span>
+                </motion.li>
+              ))}
+            </ol>
 
-            {/* CTA + credit */}
-            <AnimatePresence>
-              {showReady && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, ease: "easeOut" }}
-                  className="mt-10 flex flex-col items-center gap-4"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    onClick={dismiss}
-                    className="bg-gold text-bg-base font-bold px-10 py-3 rounded-full text-base hover:brightness-110 transition-all"
-                  >
-                    Empezar
-                  </button>
-                  <a
-                    href="https://instagram.com/santiagotrujilloz"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-text-muted hover:text-gold transition-colors inline-flex items-center gap-1.5"
-                  >
-                    <span>hecho por santiago</span>
-                    <span className="text-gold/80 underline underline-offset-2">
-                      @santiagotrujilloz
-                    </span>
-                  </a>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Gratis punchline — always rendered with its slot reserved. */}
+            <motion.p
+              initial={{ opacity: 0, filter: "blur(4px)" }}
+              animate={
+                showGratis
+                  ? { opacity: 1, filter: "blur(0px)" }
+                  : { opacity: 0, filter: "blur(4px)" }
+              }
+              transition={{ duration: 0.85, ease: SMOOTH }}
+              className="mt-8 text-text-primary text-[16px] font-semibold text-center"
+              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
+            >
+              Todo esto es{" "}
+              <motion.span
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={
+                  showGratis
+                    ? { scale: 1, opacity: 1 }
+                    : { scale: 0.7, opacity: 0 }
+                }
+                transition={{
+                  duration: 1.1,
+                  delay: showGratis ? 0.45 : 0,
+                  ease: [0.34, 1.4, 0.64, 1],
+                }}
+                className="inline-block font-display text-gold text-[26px] tracking-wide align-[-0.05em]"
+                style={{ textShadow: "0 2px 8px rgba(255,215,0,0.35)" }}
+              >
+                GRATIS
+              </motion.span>
+              .
+            </motion.p>
+
+            {/* CTA + credit — always rendered, pointer-events disabled
+                until showReady so users can't tap an invisible button. */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: showReady ? 1 : 0 }}
+              transition={{ duration: 0.8, ease: SMOOTH }}
+              className="mt-10 flex flex-col items-center gap-4"
+              style={{ pointerEvents: showReady ? "auto" : "none" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={dismiss}
+                className="bg-gold text-bg-base font-bold px-10 py-3 rounded-full text-base hover:brightness-110 transition-all"
+              >
+                Empezar
+              </button>
+              <a
+                href="https://instagram.com/santiagotrujilloz"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-text-muted hover:text-gold transition-colors inline-flex items-center gap-1.5"
+              >
+                <span>hecho por santiago</span>
+                <span className="text-gold/80 underline underline-offset-2">
+                  @santiagotrujilloz
+                </span>
+              </a>
+            </motion.div>
           </div>
         </motion.div>
       )}
