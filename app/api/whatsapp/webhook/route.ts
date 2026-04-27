@@ -193,7 +193,6 @@ async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
   await sendCTAButton(
     fromRaw,
     `¡Listo, parce! Te logueo a *La Polla* como *${e164}*.\n\n` +
-      "Si este número está mal, escribime desde el otro WhatsApp 📲\n\n" +
       "El link de abajo sirve por 10 minutos y solo lo podés usar una vez 🐔",
     "Entrar a La Polla",
     url,
