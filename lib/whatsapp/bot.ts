@@ -34,23 +34,26 @@ import {
   handleCancelPrediction,
 } from "./flows";
 
-// Validate required env vars on module load. Hard-throw instead of
-// warn: if either is missing the Graph URL would resolve to
-// ".../v21.0/undefined/messages" and every send would fail at runtime
-// with an opaque 404. Fail-fast at boot surfaces the misconfiguration
-// immediately in the build / deploy pipeline.
-const META_WA_ACCESS_TOKEN = process.env.META_WA_ACCESS_TOKEN;
-const META_WA_PHONE_NUMBER_ID = process.env.META_WA_PHONE_NUMBER_ID;
-
-if (!META_WA_ACCESS_TOKEN || !META_WA_PHONE_NUMBER_ID) {
-  throw new Error(
-    "[whatsapp] Missing required env: META_WA_ACCESS_TOKEN and/or " +
-    "META_WA_PHONE_NUMBER_ID. Refusing to start — sends would 404 " +
-    "at runtime otherwise."
-  );
+// Resolve WhatsApp Graph API config at call time, not module-load time.
+// Module-load throws break Vercel's "collect page data" build pass when
+// any preview env scope lacks META_WA_*, and make the whole app
+// undeployable. Deferring to runtime keeps the build green; sends still
+// fail loudly with the same message when the env actually matters.
+function getWhatsAppConfig(): { token: string; url: string } {
+  const token = process.env.META_WA_ACCESS_TOKEN;
+  const phoneNumberId = process.env.META_WA_PHONE_NUMBER_ID;
+  if (!token || !phoneNumberId) {
+    throw new Error(
+      "[whatsapp] Missing required env: META_WA_ACCESS_TOKEN and/or " +
+      "META_WA_PHONE_NUMBER_ID. Refusing to send — sends would 404 " +
+      "at runtime otherwise.",
+    );
+  }
+  return {
+    token,
+    url: `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+  };
 }
-
-const WA_API_URL = `https://graph.facebook.com/v21.0/${META_WA_PHONE_NUMBER_ID}/messages`;
 
 // ─── Types ───
 
@@ -149,10 +152,11 @@ export async function sendWhatsAppMessage(to: string, text: string) {
 // ─── Meta API Call ───
 
 async function callMetaAPI(to: string, payload: Record<string, unknown>) {
+  const { token, url } = getWhatsAppConfig();
   try {
-    const response = await axios.post(WA_API_URL, payload, {
+    const response = await axios.post(url, payload, {
       headers: {
-        Authorization: `Bearer ${META_WA_ACCESS_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     });

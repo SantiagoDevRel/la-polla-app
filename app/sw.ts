@@ -34,8 +34,6 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   /\/api\/whatsapp\/webhook/,
   /\/api\/admin\//,
   /\/login/,
-  /\/verify/,
-  /\/set-password/,
   /\/invites\/polla\//,
   /\/onboarding/,
 ];
