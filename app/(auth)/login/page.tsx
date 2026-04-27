@@ -13,6 +13,7 @@ import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import axios from "axios";
 import { createClient } from "@/lib/supabase/client";
 import TournamentBadge from "@/components/shared/TournamentBadge";
+import PhoneInput from "@/components/ui/PhoneInput";
 
 function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;
@@ -36,7 +37,10 @@ function LoginInner() {
   const supabase = useMemo(() => createClient(), []);
 
   const [step, setStep] = useState<Step>("input");
-  const [numero, setNumero] = useState("");
+  // E.164 phone (e.g. "+573001234567") emitted by PhoneInput. The
+  // country selector defaults to Colombia but accepts any country
+  // Twilio Verify supports.
+  const [phoneE164, setPhoneE164] = useState("");
   const [otp, setOtp] = useState("");
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -72,23 +76,25 @@ function LoginInner() {
       .catch(() => {});
   }, [searchParams]);
 
-  // E.164: +57 + número limpio. Aceptamos solo Colombia desde la UI.
+  // PhoneInput emits an E.164 string already (e.g. "+573001234567")
+  // or "" while the user types. We just trust it and validate the
+  // overall length before sending.
   function buildPhone(): string {
-    const cleaned = numero.replace(/\D/g, "");
-    return `+57${cleaned}`;
+    return phoneE164.trim();
   }
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const cleaned = numero.replace(/\D/g, "");
-    if (cleaned.length < 10) {
-      setError("Ingresá un número válido de 10 dígitos");
+    const phone = buildPhone();
+    // Smallest plausible E.164 is "+CCNNNNNNN" (~9 chars total). Twilio
+    // Verify itself will reject anything malformed.
+    if (!phone.startsWith("+") || phone.replace(/\D/g, "").length < 8) {
+      setError("Ingresá un número válido con código de país");
       return;
     }
     setSending(true);
     try {
-      const phone = buildPhone();
       // Client-side: no hay sesión todavía, no necesitamos cookies.
       // Mismo patrón que los-del-sur-app — el server-side intermediate
       // creaba quirks raros con rate-limit.
@@ -241,30 +247,10 @@ function LoginInner() {
               >
                 Tu número de celular
               </label>
-              <div className="flex gap-2">
-                <div
-                  className="h-12 shrink-0 px-3 rounded-xl flex items-center justify-center text-text-primary font-semibold text-sm border"
-                  style={{
-                    background: "rgba(255,255,255,0.04)",
-                    borderColor: "rgba(255,255,255,0.1)",
-                  }}
-                >
-                  🇨🇴 +57
-                </div>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel-national"
-                  placeholder="3001234567"
-                  value={numero}
-                  onChange={(e) => setNumero(e.target.value)}
-                  required
-                  disabled={sending}
-                  className="h-12 w-full rounded-xl px-3 text-base font-semibold tracking-wide bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50 outline-none disabled:opacity-50"
-                />
-              </div>
+              <PhoneInput onChange={setPhoneE164} />
               <p className="text-xs text-text-muted mt-1.5">
-                Te mandamos un código de 6 dígitos por SMS.
+                Te mandamos un código de 6 dígitos por SMS al número que
+                elijás (cualquier país).
               </p>
             </div>
 
@@ -276,7 +262,11 @@ function LoginInner() {
 
             <button
               type="submit"
-              disabled={sending || numero.replace(/\D/g, "").length < 10}
+              disabled={
+                sending ||
+                !phoneE164.startsWith("+") ||
+                phoneE164.replace(/\D/g, "").length < 8
+              }
               className="w-full bg-gold text-bg-base font-bold py-3.5 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-lg inline-flex items-center justify-center gap-2"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
             >
