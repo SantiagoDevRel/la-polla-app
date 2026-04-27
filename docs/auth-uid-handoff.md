@@ -1,7 +1,11 @@
 # Handoff: `auth.uid()` propagation fix
 
-> **Para una sesión nueva de Claude Code**: este doc es self-contained.
-> No necesitás contexto previo. Leelo entero antes de empezar.
+> **STATUS: RESUELTO 2026-04-26.** Ver sección "Resolución" al final.
+> El diagnóstico inicial era erróneo. El bug NO era propagación de JWT —
+> era recursión infinita en RLS. Migración 022 lo arregla.
+>
+> Lo que sigue es el doc original (preservado por contexto histórico)
+> seguido de la sección "Resolución" con el verdadero root cause.
 
 ## El problema en 1 párrafo
 
@@ -276,3 +280,116 @@ Para revertir todo si algo se complica.
 - 60-90 min probar hipótesis hasta encontrar la raíz
 - 30-60 min cleanup de admin clients redundantes
 - 30 min verificación + tests
+
+---
+
+## Resolución (2026-04-26)
+
+### El verdadero root cause
+
+**No era propagación de JWT. Era recursión infinita en la policy RLS de
+`polla_participants`.**
+
+Policy original (creada en algún migration anterior a la 020):
+
+```sql
+CREATE POLICY participants_select
+ON polla_participants
+FOR SELECT
+USING (
+  user_id = auth.uid()
+  OR EXISTS (
+    SELECT 1
+    FROM polla_participants me   -- ← lee la misma tabla desde su propio USING
+    WHERE me.polla_id = polla_participants.polla_id
+      AND me.user_id = auth.uid()
+      AND me.status = 'approved'
+  )
+);
+```
+
+Cada `SELECT` desde la app gatillaba la policy → la policy hacía `SELECT
+FROM polla_participants` → activaba la policy de nuevo → loop. Postgres
+abortaba con `infinite recursion detected in policy for relation
+"polla_participants"`. Quien diagnosticó esto inicialmente lo leyó como
+"0 rows returned" y asumió que era un problema de auth.uid(), lo que llevó
+al workaround con `createAdminClient()` en 46 archivos.
+
+Las policies de `pollas` y `predictions` también referencian
+polla_participants en sus EXISTS, así que la recursión se propagaba a esas
+queries también.
+
+### Cómo se descubrió
+
+El endpoint `/api/debug/auth-uid` (en `app/api/debug/auth-uid/route.ts`,
+borrar tras cleanup) ejecuta en una sola request:
+
+1. Lectura de cookies sb-*
+2. `supabase.auth.getUser()`
+3. `supabase.auth.getSession()` — verifica que access_token esté presente
+4. Query SSR (sin admin) que falla en producción
+5. Misma query con admin client
+6. RPC a `public.get_my_uid()` — devuelve `auth.uid()` resuelto en Postgres
+
+El JSON de salida en producción mostró:
+
+```json
+{
+  "getUser": { "userId": "aaaaaaaa-..." },
+  "getSession": { "info": { "hasAccessToken": true } },
+  "postgresAuthUid": { "uid": "aaaaaaaa-..." },  // ← coincide con userId
+  "rlsQuery": {
+    "rowCount": 0,
+    "error": "infinite recursion detected in policy for relation \"polla_participants\""
+  }
+}
+```
+
+Es decir: JWT propaga bien, `auth.uid()` resuelve correcto en Postgres. El
+único problema es la policy. Las 5 hipótesis del doc original fueron
+todas refutadas por el endpoint.
+
+### El fix
+
+Migración `022_fix_polla_participants_rls_recursion.sql`:
+
+- Crea `public.is_approved_participant(polla_id uuid)` con `SECURITY
+  DEFINER` y `search_path = public`. La función bypassea RLS para el
+  lookup interno (no recurse).
+- Reemplaza `participants_select` para que invoque la función en lugar de
+  hacer un EXISTS recursivo.
+- Misma garantía de seguridad: el caller solo puede ver participaciones
+  de pollas en las que él mismo está aprobado.
+
+Verificado post-fix con el mismo endpoint: `rlsQuery.error: null`,
+`rowCount` consistente con la policy esperada.
+
+### Cleanup pendiente
+
+Los 43 archivos con `createAdminClient()` siguen ahí. Cada uno necesita:
+
+1. Ver si tiene `getUser()` antes (sino, es legítimo admin).
+2. Reemplazar por el cliente SSR normal.
+3. Quitar `.eq("user_id", user.id)` redundante.
+4. Smoke test de la ruta.
+
+Los archivos en estos paths NO se tocan (admin legítimo):
+- `app/api/admin/*`, `app/(app)/admin/*`
+- `app/api/auth/*` (login flows pre-session)
+- `lib/whatsapp/*`, `app/api/whatsapp/webhook/*`
+- `lib/api-football/*`, `lib/football-data/*`, `lib/matches/ensure-fresh.ts`
+- `app/api/matches/sync-recent`
+- `lib/auth/*` (login events, rate limit, otp)
+- `app/api/pollas/preview` (público)
+- `lib/supabase/admin.ts` (la helper misma)
+
+### Artefactos a borrar tras cleanup
+
+- `app/api/debug/auth-uid/route.ts` (endpoint diagnóstico)
+- Migración `021_debug_get_my_uid.sql` (función helper SQL — opcional, es
+  inocua)
+
+### Tag de rollback
+
+`pre-auth-uid-fix` (creado antes del fix).
+
