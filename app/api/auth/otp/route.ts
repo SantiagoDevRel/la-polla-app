@@ -1,45 +1,117 @@
-// app/api/auth/otp/route.ts — Validates OTP delivered via the WhatsApp bot
-// and either creates a new account (with a temp password the user will
-// replace immediately on /set-password) or signs in an existing account.
+// app/api/auth/otp/route.ts — OTP send + verify via Supabase native phone
+// auth (Twilio Verify under the hood). Replaces the WhatsApp-bot OTP flow.
 //
-// Replaces the old HMAC-derived-password trick. The temp password here is
-// 32 cryptographically-random bytes; it never leaves the server. The user
-// always lands on /set-password right after to choose their real password,
-// which the middleware enforces by gating has_custom_password=false.
+// POST { phone, turnstileToken } → Supabase asks Twilio Verify to SMS a
+//   6-digit code to the phone. Returns 200 on dispatch.
+// PUT  { phone, code } → Supabase asks Twilio Verify to validate the code.
+//   On success, Supabase issues session cookies (set on the response by
+//   the SSR cookie adapter). Returns { newUser } so the frontend can route
+//   to /onboarding for first-time users.
 //
-// Bot-first flow: the bot generates the OTP and delivers it through the
-// 24h service window. POST is intentionally absent — generation is bot-
-// triggered via login_pending_sessions.
+// Server-side defense layers:
+//   1) Cloudflare Turnstile validation (POST only — verify is gated by code)
+//   2) Rate limit per phone (existing infra in lib/auth/rate-limit)
+//   3) Supabase + Twilio Verify Fraud Guard (geo restricted to +57)
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { randomBytes } from "crypto";
-import { validateOTP } from "@/lib/utils/otp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
 import { recordLoginEvent } from "@/lib/auth/login-event";
-import { normalizePhone, emailForPhone } from "@/lib/auth/phone";
+import { normalizePhone } from "@/lib/auth/phone";
+import { verifyTurnstile } from "@/lib/auth/turnstile";
+
+const sendSchema = z.object({
+  phone: z.string().min(8, "Número de teléfono inválido"),
+  turnstileToken: z.string().min(1, "Verificación anti-bot requerida"),
+});
 
 const verifySchema = z.object({
   phone: z.string().min(8, "Número de teléfono inválido"),
   code: z.string().length(6, "El código debe ser de 6 dígitos"),
 });
 
-function generateTempPassword(): string {
-  // 32 bytes = 64 hex chars, ample entropy. The user never sees this; it
-  // exists only between the OTP success and the /set-password submission.
-  return randomBytes(32).toString("hex");
+// POST — Envía el OTP por SMS via Twilio Verify (orquestado por Supabase).
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const parsed = sendSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 },
+      );
+    }
+
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
+
+    // Layer 1: Turnstile (anti-bot) — bypass-able only by humans, kills the
+    // automated SMS pumping attack vector that Twilio Fraud Guard alone may
+    // miss for sub-pumping rates.
+    const turnstile = await verifyTurnstile(parsed.data.turnstileToken, ip);
+    if (!turnstile.ok) {
+      return NextResponse.json(
+        { error: "Verificación anti-bot fallida. Recargá la página." },
+        { status: 400 },
+      );
+    }
+
+    const phone = normalizePhone(parsed.data.phone);
+
+    // Reject anything that isn't Colombian. Defense-in-depth — Twilio Verify
+    // is also geo-restricted to +57.
+    if (!phone.startsWith("57") || phone.length < 11 || phone.length > 13) {
+      return NextResponse.json(
+        { error: "Solo se permiten números colombianos (+57)" },
+        { status: 400 },
+      );
+    }
+
+    // Layer 2: rate limit per phone. Reuses the `generate` bucket from the
+    // old WhatsApp flow (5 sends per phone per hour).
+    const limit = await checkAndRecordAttempt(phone, "generate", ip);
+    if (limit.blocked) {
+      return NextResponse.json(
+        {
+          error: "Demasiados intentos. Esperá unos minutos antes de reintentar.",
+          retryAfter: limit.retryAfter,
+        },
+        { status: 429 },
+      );
+    }
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: `+${phone}`,
+      options: {
+        // Auto-create the auth user on first OTP. The 003_auth_user_sync
+        // trigger inserts the matching public.users row.
+        shouldCreateUser: true,
+      },
+    });
+
+    if (error) {
+      console.error("[otp POST] signInWithOtp failed:", error);
+      // Don't leak Twilio/Supabase internals to the user.
+      return NextResponse.json(
+        { error: "No pudimos enviar el código. Intentá en unos minutos." },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ status: "sent", phone });
+  } catch (err) {
+    console.error("[otp POST] error:", err);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
 }
 
-// PUT — Validates the OTP, creates or refreshes the account, and signs in.
-// Always returns needsPassword=true; the frontend redirects to /set-password
-// (existing users get their flag flipped to false here so middleware sends
-// them through the same flow — that's the forgot-password reset path).
+// PUT — Valida el código y autentica. Supabase setea cookies en la response.
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const parsed = verifySchema.safeParse(body);
-
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0].message },
@@ -52,140 +124,48 @@ export async function PUT(request: NextRequest) {
 
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
-    const verifyLimit = await checkAndRecordAttempt(phone, "verify", ip);
-    if (verifyLimit.blocked) {
+    const limit = await checkAndRecordAttempt(phone, "verify", ip);
+    if (limit.blocked) {
       return NextResponse.json(
         {
           error: "Demasiados intentos fallidos. Esperá 15 minutos.",
-          retryAfter: verifyLimit.retryAfter,
+          retryAfter: limit.retryAfter,
         },
         { status: 429 },
       );
     }
 
-    const isValid = await validateOTP(phone, code);
-    if (!isValid) {
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: `+${phone}`,
+      token: code,
+      type: "sms",
+    });
+
+    if (error || !data.user) {
+      console.error("[otp PUT] verifyOtp failed:", error);
       return NextResponse.json(
         { error: "Código inválido o expirado" },
         { status: 400 },
       );
     }
 
+    // Detect new user: created within the last 30 seconds. If so, the
+    // frontend routes to /onboarding for display name + first polla flow.
+    const createdAt = new Date(data.user.created_at).getTime();
+    const isNewUser = Date.now() - createdAt < 30_000;
+
+    // The 003_auth_user_sync trigger writes whatsapp_number = NEW.phone
+    // ("+57..."). Our internal lookups expect normalized form (no +). Fix
+    // it once on first verify so the user is consistent across tables.
     const admin = createAdminClient();
-    const tempPassword = generateTempPassword();
-    const email = emailForPhone(phone);
-
-    // Look up existing public.users row by normalized phone. If found, we
-    // either reset the temp password (mid-registration retry, or forgot-
-    // password flow). If not found, create a fresh auth user.
-    const { data: existingProfile } = await admin
+    await admin
       .from("users")
-      .select("id, has_custom_password")
-      .eq("whatsapp_number", phone)
-      .maybeSingle();
-
-    let userId: string;
-    let isNewUser = false;
-
-    if (existingProfile) {
-      // Reset auth password to the new temp value so signInWithPassword
-      // succeeds below. Flip has_custom_password=false so middleware sends
-      // the user through /set-password again — this doubles as the forgot-
-      // password reset (OTP proves phone ownership, then user picks a new
-      // password).
-      const { error: updateAuthErr } = await admin.auth.admin.updateUserById(
-        existingProfile.id,
-        { password: tempPassword },
-      );
-      if (updateAuthErr) {
-        console.error("[otp PUT] auth update failed:", updateAuthErr);
-        return NextResponse.json(
-          { error: "Error al iniciar sesión" },
-          { status: 500 },
-        );
-      }
-
-      const { error: profileErr } = await admin
-        .from("users")
-        .update({ has_custom_password: false })
-        .eq("id", existingProfile.id);
-      if (profileErr) {
-        console.error("[otp PUT] flag update failed:", profileErr);
-        // Non-fatal: middleware still works off has_custom_password but
-        // we'll leak the flag mismatch into /avisos. Log for follow-up.
-      }
-      userId = existingProfile.id;
-    } else {
-      const { data: newUser, error: createErr } =
-        await admin.auth.admin.createUser({
-          email,
-          password: tempPassword,
-          // Supabase Auth wants E.164 with the leading +; we pass it back
-          // here even though our internal lookups use the normalized form.
-          phone: `+${phone}`,
-          email_confirm: true,
-          phone_confirm: true,
-          user_metadata: { phone, auth_method: "whatsapp_otp" },
-        });
-
-      if (
-        createErr &&
-        !createErr.message.includes("already been registered")
-      ) {
-        console.error("[otp PUT] createUser failed:", createErr);
-        return NextResponse.json(
-          { error: "Error al crear cuenta" },
-          { status: 500 },
-        );
-      }
-
-      if (!newUser?.user) {
-        // The "already registered" branch lands here when Supabase Auth
-        // already has the email/phone but our public.users row is missing.
-        // Pull the auth.users id by email so we can still sign them in.
-        const { data: list } = await admin.auth.admin.listUsers();
-        const found = list?.users.find((u) => u.email === email);
-        if (!found) {
-          return NextResponse.json(
-            { error: "No pudimos completar el registro" },
-            { status: 500 },
-          );
-        }
-        await admin.auth.admin.updateUserById(found.id, {
-          password: tempPassword,
-        });
-        userId = found.id;
-      } else {
-        userId = newUser.user.id;
-        isNewUser = true;
-      }
-
-      // The 003_auth_user_sync trigger inserts public.users with whatsapp_
-      // number = NEW.phone (which is "+57..."). Normalize so all our lookups
-      // hit the same key shape.
-      await admin
-        .from("users")
-        .update({ whatsapp_number: phone })
-        .eq("id", userId);
-    }
-
-    // Sign in via the email/password client so cookies are set on the
-    // response. signInWithPassword is the only way to get the SSR cookie
-    // dance right.
-    const supabase = createClient();
-    const { data: session, error: signInErr } =
-      await supabase.auth.signInWithPassword({ email, password: tempPassword });
-
-    if (signInErr || !session.user) {
-      console.error("[otp PUT] signIn failed:", signInErr);
-      return NextResponse.json(
-        { error: "Error al iniciar sesión" },
-        { status: 500 },
-      );
-    }
+      .update({ whatsapp_number: phone, whatsapp_verified: true })
+      .eq("id", data.user.id);
 
     void recordLoginEvent({
-      userId: session.user.id,
+      userId: data.user.id,
       method: "otp",
       request,
     });
@@ -194,9 +174,6 @@ export async function PUT(request: NextRequest) {
       status: "Verificado",
       phone,
       newUser: isNewUser,
-      // Always true: every OTP-completed session lands at /set-password
-      // because we just rotated the password to a temp value.
-      needsPassword: true,
     });
   } catch (err) {
     console.error("[otp PUT] error:", err);
