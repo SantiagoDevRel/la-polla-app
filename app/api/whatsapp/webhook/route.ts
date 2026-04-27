@@ -1,16 +1,15 @@
 // app/api/whatsapp/webhook/route.ts — Inbound WhatsApp webhook.
 //
-// This is intentionally minimal — the bot is otherwise outbound-only
-// (invites + notifications). The only inbound flow we care about is
-// the SMS-OTP fallback: a user who can't receive SMS taps the
-// "Probar con WhatsApp" button on /login, which opens
-// `wa.me/<bot>?text=Quiero%20entrar%20a%20La%20Polla`. They press
-// send, Meta delivers the text here, we generate a one-time magic
-// token and reply with a CTA button that signs them in via
-// `/api/auth/wa-magic?token=…`.
+// Two intents are handled:
+//   1. Menu intent (greetings, "menú", the WhatsAppBubble pre-text):
+//      reply with a friendly note + CTA button that opens the app —
+//      the conversational bot was retired, the app itself is the menu.
+//   2. Login intent ("quiero entrar a la polla", etc.): SMS-OTP
+//      fallback. Generate a one-time magic token and reply with a
+//      CTA button that signs them in via `/api/auth/wa-magic?token=…`.
 //
-// Anything we don't recognize gets a polite "no entendí" reply so the
-// bot never goes silent and users always have a path forward.
+// Anything we don't recognize gets the menu reply so the bot never
+// goes silent and users always have a path forward.
 
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
@@ -19,6 +18,7 @@ import { sendTextMessage } from "@/lib/whatsapp/bot";
 import { sendCTAButton } from "@/lib/whatsapp/interactive";
 import { normalizePhone } from "@/lib/auth/phone";
 import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
+import { looksLikeMenuIntent } from "@/lib/whatsapp/menu-intent";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -109,15 +109,11 @@ export async function POST(request: NextRequest) {
 
 // ─── Routing ───
 
-const LOGIN_KEYWORDS = [
-  "quiero entrar",
-  "entrar a la polla",
-  "login",
-  "iniciar sesion",
-  "iniciar sesión",
-  "magic",
-  "wa-login",
-];
+// Tight match: only the exact phrase the /login page pre-fills as the
+// SMS-fallback button. Everything else falls through to the menu so
+// generic words like "login" or "entrar" don't accidentally generate
+// magic links for users who just wanted to chat with the bot.
+const LOGIN_KEYWORDS = ["quiero entrar a la polla"];
 
 async function handleMessage(msg: IncomingTextBody, request: NextRequest) {
   const text = (msg.text ?? "").toLowerCase();
@@ -130,14 +126,30 @@ async function handleMessage(msg: IncomingTextBody, request: NextRequest) {
     return;
   }
 
-  // Fallback: greet + tell them what we *can* do. Keeps the bot
-  // friendly and discoverable for users who type "hola".
-  await sendTextMessage(
-    msg.from,
-    "¡Hola! Soy el bot de La Polla 🐔\n\n" +
-      "Por ahora solo te ayudo a entrar si no te llegó el SMS. " +
-      'Mandame "*Quiero entrar a La Polla*" y te paso un link para ' +
-      "loguearte directo, sin códigos.",
+  // Catch-all: greetings, "menú", stickers, anything else → menu reply.
+  // We log whether it was a recognized menu intent for observability,
+  // but the response is the same — a discoverable bot beats a silent one.
+  const isMenuIntent =
+    msg.type === "text" && looksLikeMenuIntent(msg.text ?? "");
+  console.log(
+    `[wa-webhook] menu reply (intent=${isMenuIntent ? "menu" : "fallback"})`,
+  );
+  await replyWithMenu(msg.from);
+}
+
+// ─── Menu reply ───
+
+async function replyWithMenu(to: string) {
+  await sendCTAButton(
+    to,
+    "¡Qué más, parce! 🐔\n\n" +
+      "Acá te pongo en bandeja todo lo de *La Polla*: tus pollas, predicciones, " +
+      "tabla en vivo y resultados. Todo se maneja desde la app — abrila y listo.\n\n" +
+      "¿No te llega el SMS para entrar? Escribime *Quiero entrar a La Polla* " +
+      "y te paso un link mágico 🔑",
+    "Abrir La Polla",
+    `${APP_URL}/inicio`,
+    "🐔 La Polla Colombiana",
   );
 }
 
