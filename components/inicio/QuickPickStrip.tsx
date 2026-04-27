@@ -161,7 +161,7 @@ export function QuickPickStrip({
             type="button"
             onClick={submit}
             disabled={!selected || saving || Boolean(lockedToSaved)}
-            className="w-full py-2.5 rounded-full font-body text-[13px] font-extrabold tracking-[0.04em] text-bg-base bg-gradient-to-b from-gold to-amber disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-2.5 rounded-full font-body text-[13px] font-extrabold tracking-[0.04em] text-bg-base bg-gold hover:brightness-110 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving
               ? "Apuntando…"

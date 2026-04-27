@@ -68,7 +68,7 @@ export default async function AvisosPage() {
   const unread = unreadRes.count ?? 0;
 
   return (
-    <main className="min-h-[100dvh] px-4 pt-8 pb-24">
+    <main className="min-h-[100dvh] px-4 pt-4 pb-24">
       <AvisosList initialItems={items} initialUnread={unread} />
     </main>
   );

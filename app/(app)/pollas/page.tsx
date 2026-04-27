@@ -91,7 +91,7 @@ export default function MisPollasPage() {
           <button onClick={() => router.push("/inicio")} className="text-text-secondary text-xl">
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#F5F7FA" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
           </button>
-          <h1 className="lp-section-title flex items-center gap-2" style={{ fontSize: 22 }}>
+          <h1 className="lp-section-title flex items-center gap-2 text-[22px]">
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2">
               <path d="M6 9H4.5a2.5 2.5 0 010-5H6" /><path d="M18 9h1.5a2.5 2.5 0 000-5H18" />
               <path d="M4 22h16" /><path d="M18 2H6v7a6 6 0 0012 0V2z" />
@@ -234,22 +234,7 @@ export default function MisPollasPage() {
         {/* Create button */}
         <button
           onClick={() => router.push("/pollas/crear")}
-          style={{
-            width: "100%",
-            background: "#FFD700",
-            color: "#080c10",
-            fontWeight: 700,
-            borderRadius: 11,
-            padding: 12,
-            border: "none",
-            cursor: "pointer",
-            fontFamily: "'Outfit', sans-serif",
-            fontSize: 13,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-          }}
+          className="w-full bg-gold text-bg-base font-bold rounded-lg py-3 text-sm inline-flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"
         >
           <Plus size={14} strokeWidth={2.5} />
           Crear nueva polla
