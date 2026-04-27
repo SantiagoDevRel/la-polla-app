@@ -1,16 +1,20 @@
 # La Polla ⚽🇨🇴
 
-App de pollas mundialistas para el Mundial Colombia 2026. Crea grupos de pronósticos con tus amigos, predice marcadores, y compite en un ranking en tiempo real.
+App de pollas (predicciones de fútbol) para el Mundial Colombia 2026 y otras competencias. Crea grupos privados con tus amigos, predice marcadores, y compite en un ranking en tiempo real.
+
+Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
 ## Stack
 
 - **Next.js 14** App Router + TypeScript
-- **Supabase** (PostgreSQL + Auth + RLS)
-- **Meta WhatsApp Cloud API** — login por OTP y bot de notificaciones
-- **API-Football** (RapidAPI) — fuente de partidos y resultados
-- **Cloudflare Turnstile** — protección anti-bot en login
-- **Tailwind CSS**
-- **Vercel** — deploy target
+- **Supabase** (PostgreSQL + Auth + RLS) — phone+password con OTP de WhatsApp solo en el primer login
+- **Meta WhatsApp Cloud API** — bot conversacional para predecir/ver tabla, OTP de signup, recovery de clave
+- **football-data.org** — fuente de fixtures y resultados (UCL + Mundial 2026)
+- **Cloudflare Turnstile** — anti-bot en el flujo OTP (validado server-side)
+- **Tailwind CSS** + **Framer Motion** + **lucide-react**
+- **@serwist/next** — PWA instalable + service worker
+- **Vitest** — unit tests (41 cubriendo helpers críticos)
+- **Vercel** — deploy target con auto-deploy desde `main`
 
 ## Primeros pasos
 
@@ -28,27 +32,38 @@ npm install
 cp .env.example .env.local
 ```
 
-Llenar todas las variables en `.env.local`:
+Llenar en `.env.local`:
 
 ```
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-WHATSAPP_ACCESS_TOKEN=
-WHATSAPP_PHONE_NUMBER_ID=1050091718189402
-WHATSAPP_WEBHOOK_VERIFY_TOKEN=
-RAPIDAPI_KEY=
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=
-TURNSTILE_SECRET_KEY=
+
+# Meta WhatsApp Cloud API
+META_WA_ACCESS_TOKEN=
+META_WA_PHONE_NUMBER_ID=
+META_WA_WEBHOOK_VERIFY_TOKEN=
+META_WA_APP_SECRET=
+
+# Cloudflare Turnstile (test keys para dev: 1x00000000000000000000AA / 1x0000000000000000000000000000000AA)
+NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY=
+CLOUDFLARE_TURNSTILE_SECRET_KEY=
+
+# football-data.org
+FOOTBALL_DATA_KEY=
+
+# Cron / admin (server-only)
+CRON_SECRET=
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=573117312391
 ```
 
-### 3. Supabase schema
+### 3. Supabase migrations
 
-Ejecutar en el SQL Editor de Supabase:
-
-```
-supabase/migrations/001_initial_schema.sql
-```
+Aplicar todo `supabase/migrations/*.sql` en orden. Si usas Supabase CLI: `supabase db push`. Si trabajas vía dashboard, copiá y pegá cada archivo en el SQL Editor.
 
 ### 4. Correr en local
 
@@ -58,34 +73,67 @@ npm run dev
 
 Abre [http://localhost:3000](http://localhost:3000).
 
+### Validación pre-commit (manual)
+
+```bash
+npm run validate    # tsc --noEmit && next lint
+npm test            # vitest unit tests (41 tests)
+```
+
 ---
 
 ## Cómo funciona
 
 ### Auth
-Login exclusivo por WhatsApp OTP. Sin contraseñas. El usuario ingresa su número de teléfono, recibe un código de 6 dígitos por WhatsApp, y queda autenticado. No hay modo de bypass ni modo dev.
+
+- **Primera vez (registro)**: número de teléfono → OTP por WhatsApp → crear contraseña (4+ caracteres, alfanumérica) → completar onboarding (nombre + pollito).
+- **Login normal**: número + contraseña, sin pasar por el bot ni Turnstile (el rate-limit cubre brute-force).
+- **Olvidé clave**: link en `/login/password` regresa al flujo OTP. Validar el código resetea la clave a un valor temporal y vuelve a forzar `/set-password`.
+
+Detalle: el server NUNCA ve la contraseña HMAC-derivada del teléfono — usa una random temp pwd entre el OTP success y la creación de la real. La sesión se mantiene viva al cambiar la clave (usa `supabase.auth.updateUser`, no admin API).
 
 ### Pollas
-Una polla es un grupo de pronósticos. El creador configura:
-- Torneo (Mundial 2026, Liga BetPlay, etc.)
+
+Una polla es un grupo PRIVADO de pronósticos (`type='closed'` siempre). El creador configura:
+- Torneo (Mundial 2026, UCL 2024-25, etc.)
 - Alcance (torneo completo, fase de grupos, eliminatorias, partidos custom)
-- Modo de pago: `admin_collects` / `pay_winner`
-- Monto de entrada (opcional, en COP)
-- Privada o abierta
+- Modo de pago: `admin_collects` (organizador recoge en Nequi/efectivo) o `pay_winner` (todos pagan al ganador al final)
+- Monto de entrada en COP
+- Distribución de premios (porcentaje o monto fijo, configurable después)
+
+Para entrar a una polla ajena:
+- **Link de invitación** del organizador (`pollas.invite_token`)
+- **Código de 6 caracteres** del organizador, usable desde la app o desde el bot
 
 ### Pronósticos
-- Cada participante predice el marcador exacto de cada partido
-- Los pronósticos se cierran 5 minutos antes del partido (enforced por trigger en DB)
-- Los pronósticos de otros usuarios son invisibles hasta que el partido empiece
-- Puntos: marcador exacto = 5 pts, resultado correcto = 2 pts, goles de un equipo exactos = 1 pt
+
+- Cada participante predice el marcador exacto de cada partido.
+- Los pronósticos se cierran 5 min antes del kickoff (trigger DB `check_prediction_lock`).
+- Los pronósticos ajenos son invisibles hasta que el partido pase a `live`.
+- Sistema de 5 niveles:
+  - Marcador exacto → 5 pts (configurable por polla)
+  - Ganador correcto + misma diferencia de gol → 3 pts
+  - Ganador correcto solamente → 2 pts
+  - Acertar el marcador de un solo equipo → 1 pt
+  - Nada → 0
 
 ### Sistema de puntos
-Calculado automáticamente por trigger en Supabase cuando el partido pasa a `finished`. El ranking se actualiza en tiempo real dentro de cada polla.
 
-### Modos de pago
-La plataforma NO procesa dinero real. Solo trackea el estado de pago.
-- `admin_collects`: el admin recoge físicamente y distribuye, la plataforma solo muestra quién pagó
-- `pay_winner`: sin pago upfront, cada participante le paga al ganador directamente al final
+El trigger `on_match_finished` recalcula puntos cuando el partido pasa a `finished`. El ranking dentro de cada polla usa `RANK()` window function (empates comparten posición). El recálculo se replica en TS (`lib/scoring.ts`) para casos manuales.
+
+### WhatsApp bot
+
+`/api/whatsapp/webhook` recibe inbound del bot. Comportamientos:
+- Mensajes "hola", "menu", "muestrame el menu" → menú principal
+- Código de 6 caracteres → confirma + agrega a la polla
+- Link de polla → "esa polla es privada, pedile el código al admin"
+- Estado de conversación persistido en `whatsapp_conversation_state` (TTL 10 min) para flujos multi-paso (predecir, etc.)
+
+Botones interactivos vía Meta Cloud API (button + list messages, CTA URL).
+
+### Login events en /avisos
+
+Cada login exitoso (password u OTP) genera una notificación tipo `login_event` con device + ciudad+país (de los headers de Vercel). Aparece en el feed de avisos del usuario.
 
 ---
 
@@ -94,84 +142,71 @@ La plataforma NO procesa dinero real. Solo trackea el estado de pago.
 ```
 app/
   (app)/              # Rutas autenticadas
-    dashboard/        # Dashboard principal
-    pollas/crear/     # Crear nueva polla
-    pollas/[slug]/    # Vista de polla: partidos, pronósticos, ranking
-  (auth)/             # Rutas públicas
-    login/            # Ingreso con número de WhatsApp
-    verify/           # Verificación del OTP
+    inicio/           # Home: hero, en vivo, próximos, podio, rivales
+    pollas/           # Lista de pollas + crear (wizard 3 pasos) + detalle
+    perfil/           # Perfil + cambiar clave
+    avisos/           # Feed de notificaciones (incluye login events)
+    invites/polla/    # Landing de invite (con preview)
+    admin/matches/    # Sync manual de partidos (admin only)
+  (auth)/             # Rutas públicas / pre-onboarded
+    login/            # Phone input → check-phone → password o bot-OTP
+    login/password/   # Phone+password input
+    set-password/     # Crear o resetear clave (mandatory post-OTP)
+    verify/           # Backward-compat: ingresa código del bot
+    onboarding/       # Nombre + pollito
   api/
-    auth/otp/         # Generar y verificar OTP
-    pollas/           # CRUD de pollas
-    pollas/[slug]/    # GET polla por slug
-    pollas/[slug]/predictions/  # Guardar pronóstico
-    whatsapp/webhook/ # Webhook del bot de WhatsApp
+    auth/check-phone, login-password, set-password, otp, login-poll, login-wait
+    pollas/, pollas/[slug]/{join,predictions,payments,...}
+    whatsapp/webhook, matches/sync, admin/...
+  sw.ts               # Service worker source (Serwist genera /public/sw.js)
 components/
-  polla/              # PollaCard, MatchPredictionCard
-  ui/                 # Button, Input, PhoneInput
+  polla/              # PollaCard, PaymentsList, OrganizerPanel, etc.
+  inicio/             # PodiumCarousel, GreetingHero, RivalChip, etc.
+  shared/             # WhatsAppBubble (header de inicio), TournamentBadge
+  avisos/             # AvisosList con tipos + iconos
+  ui/                 # PhoneInput, Toast, Button, etc.
 lib/
-  api-football/       # Cliente y sync de partidos
-  supabase/           # Clientes server, client, admin
-  whatsapp/           # Bot y mensajes
-supabase/
-  migrations/         # Schema SQL completo
+  auth/               # phone, turnstile, login-event, user-agent, rate-limit, admin
+  db/columns.ts       # Listas explícitas — evita select("*")
+  log.ts              # redactPhone/Id/Text para no leakear PII en logs
+  whatsapp/           # bot, flows, menu-intent, interactive, state, bot-phone
+  matches/, pollas/, scoring.ts, notifications.ts
+supabase/migrations/  # 001 → 020. Append-only. Cada uno está documentado.
 ```
 
 ---
 
-## WhatsApp Bot
+## Deploy
 
-El webhook de WhatsApp está en `app/api/whatsapp/webhook/route.ts`. Para conectarlo en desarrollo se necesita una URL pública (ngrok o deploy en Vercel).
+`main` se auto-despliega en Vercel. Para forzar prod manual: `vercel --prod`.
 
-```bash
-# Con ngrok:
-ngrok http 3000
-# Configurar la URL pública en Meta WhatsApp Dashboard > Webhooks
-```
-
-En producción el webhook se configura con la URL de Vercel.
-
-**Nota**: el Access Token actual (`EAAT...`) es temporal. Antes del deploy a producción debe reemplazarse con un System User Token permanente desde Meta Business Manager.
+Después de un deploy nuevo:
+1. Verificá que `npm run validate` pasa antes de pushear
+2. Confirmá envs en Vercel → Settings → Environment Variables (incluido `CLOUDFLARE_TURNSTILE_SECRET_KEY` que ahora se valida server-side)
+3. Confirmá que el webhook de Meta apunta a `https://lapollacolombiana.com/api/whatsapp/webhook`
+4. Confirmá Site URL de Supabase → Auth en `lapollacolombiana.com`
 
 ---
 
-## Deploy en Vercel
+## Tags de seguridad / rollback
 
-```bash
-vercel --prod
-```
+- `pre-wompi-removal` — antes de eliminar el flujo Wompi/digital_pool
 
-Variables de entorno necesarias: las mismas del `.env.local`. Configurar en Vercel Dashboard > Settings > Environment Variables.
-
-Después del deploy:
-1. Actualizar el webhook de WhatsApp en Meta con la URL de producción
-2. Reemplazar el token temporal de Meta con un System User Token
-3. Reemplazar las Turnstile test keys con las keys reales de producción
+Para revertir cualquier deploy: `git revert <sha> && git push origin main`.
 
 ---
 
-## Estado actual
+## Pendiente / Roadmap
 
-| Feature | Estado |
-|---|---|
-| Setup base Next.js + Supabase | ✅ |
-| Schema Supabase (7 tablas) | ✅ |
-| Auth WhatsApp OTP end-to-end | ✅ |
-| Dashboard básico | ✅ |
-| Crear polla | ✅ |
-| Vista de polla con pronósticos y ranking | ✅ |
-| API routes polla/slug + predictions | ✅ |
-| WhatsApp bot webhook | ✅ construido, pendiente conectar |
-| Importar partidos del Mundial | ⏳ pendiente |
-| Deploy Vercel | ⏳ pendiente |
-| System User Token Meta | ⏳ pendiente |
-| Turnstile keys de producción | ⏳ pendiente |
+- **`auth.uid()` raíz** — el JWT de SSR no llega al PostgREST → `auth.uid()` devuelve NULL. El workaround: 46 archivos usan `createAdminClient()` con filtros `.eq("user_id", user.id)` manuales. Ver `docs/auth-uid-handoff.md`.
+- Optional: husky pre-commit hook + GitHub Actions CI cuando entren colaboradores.
+- Optional: error reporting (Sentry/Axiom) cuando el volumen lo justifique.
 
 ---
 
 ## Legal
 
-La plataforma no procesa pagos reales en v1. El campo `payment_mode` en la tabla `pollas` solo registra el acuerdo entre participantes. El modelo actual está fuera del alcance regulatorio de Coljuegos por no involucrar procesamiento de pagos.
+La plataforma no procesa pagos reales. El campo `payment_mode` solo registra el acuerdo entre participantes. El modelo actual está fuera del alcance regulatorio de Coljuegos por no involucrar procesamiento de dinero.
 
 ---
 
