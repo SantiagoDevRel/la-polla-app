@@ -16,14 +16,14 @@ export type FontScale = "sm" | "md" | "lg";
 const STORAGE_KEY = "la_polla_font_scale";
 
 // Numeric multipliers applied via CSS `zoom`. md=1 stays the canonical
-// design baseline. sm/lg are deliberately aggressive (-15% / +30%) —
-// los rangos chiquitos (0.9/1.15) eran imperceptibles en celular, donde
-// el viewport-meta absorbe parte del cambio. Si esto rompe layouts,
-// achicar lg primero.
+// design baseline. sm/lg are deliberately aggressive (−50% / +60%)
+// because users wanted the buttons to feel like real "zoom out / zoom
+// in" on mobile, not just a small bump. If the small end breaks
+// layouts on a particular page, raise sm closer to 0.7.
 export const FONT_SCALE_VALUES: Record<FontScale, number> = {
-  sm: 0.85,
+  sm: 0.5,
   md: 1.0,
-  lg: 1.3,
+  lg: 1.6,
 };
 
 export function getStoredScale(): FontScale {

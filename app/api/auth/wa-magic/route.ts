@@ -105,25 +105,30 @@ export async function GET(request: NextRequest) {
   if (!claimed)
     return errorPage("Este link ya se usó. Pedí uno nuevo desde /login.");
 
-  // Find or create the auth user. Supabase admin doesn't expose a
-  // get-by-phone helper, so we go through public.users (which the
-  // 003_auth_user_sync trigger keeps mirrored) for the id, then fall
-  // back to listUsers when nothing is mirrored yet.
+  // Resolve the auth.users.id for this phone authoritatively. The RPC
+  // (migration 026) reads auth.users directly via SECURITY DEFINER and
+  // matches by phone OR synthetic email, so it returns the SAME id
+  // whether the user previously signed up via SMS (auth.users.phone)
+  // or via a WhatsApp magic link (auth.users.email pattern). This is
+  // the linchpin against duplicate accounts: same phone → same id,
+  // regardless of which channel they used first.
   let authUserId: string | null = null;
   {
-    const { data: pub } = await admin
-      .from("users")
-      .select("id")
-      .eq("whatsapp_number", phoneNormalized)
-      .maybeSingle();
-    if (pub?.id) authUserId = pub.id as string;
+    const { data: rpcId, error: rpcErr } = await admin.rpc(
+      "find_auth_user_id_by_phone",
+      { p_phone: phoneE164 },
+    );
+    if (rpcErr) {
+      console.error("[wa-magic] find_auth_user_id_by_phone failed:", rpcErr);
+      return errorPage("No pudimos firmar tu sesión. Probá de nuevo.", 500);
+    }
+    if (typeof rpcId === "string" && rpcId.length > 0) authUserId = rpcId;
   }
 
   if (!authUserId) {
-    // Create the auth user. phone_confirm=true skips the SMS, since the
-    // WhatsApp leg is the proof-of-ownership. We also set a synthetic
-    // email so generateLink({type:'magiclink'}) below has something
-    // to anchor on.
+    // No existing auth user — create one. phone_confirm=true skips
+    // Twilio (the WhatsApp leg is the proof-of-ownership). The
+    // synthetic email anchors generateLink({type:'magiclink'}) below.
     const { data: created, error: createErr } =
       await admin.auth.admin.createUser({
         phone: phoneE164,
@@ -131,26 +136,43 @@ export async function GET(request: NextRequest) {
         email: syntheticEmail,
         email_confirm: true,
       });
+
     if (createErr || !created.user) {
-      console.error("[wa-magic] createUser failed:", createErr);
-      return errorPage("No pudimos crear tu cuenta. Probá de nuevo.", 500);
+      // Could be a unique-constraint race (phone or email taken since
+      // our RPC check). Re-query — if a row exists now, use it. This
+      // collapses the SMS-and-WA-tapped-at-the-same-instant case to a
+      // single account.
+      const { data: retryId } = await admin.rpc(
+        "find_auth_user_id_by_phone",
+        { p_phone: phoneE164 },
+      );
+      if (typeof retryId === "string" && retryId.length > 0) {
+        authUserId = retryId;
+      } else {
+        console.error("[wa-magic] createUser failed and recheck miss:", createErr);
+        return errorPage("No pudimos crear tu cuenta. Probá de nuevo.", 500);
+      }
+    } else {
+      authUserId = created.user.id;
     }
-    authUserId = created.user.id;
-  } else {
-    // Make sure the synthetic email is set on the auth row, otherwise
-    // generateLink({type:'magiclink', email}) below has nothing to
-    // match. updateUserById is idempotent — no-op if email already
-    // matches.
-    const { error: updErr } = await admin.auth.admin.updateUserById(
-      authUserId,
-      {
-        email: syntheticEmail,
-        email_confirm: true,
-      },
-    );
-    if (updErr) {
-      console.error("[wa-magic] updateUserById failed:", updErr);
-      // Non-fatal: maybe the email is already set. Continue.
+  }
+
+  // Make sure the synthetic email is on the auth row. The RPC matches
+  // accounts that came in via SMS-only (no email), and generateLink
+  // below needs an email to anchor on. updateUserById is idempotent —
+  // a no-op if the email already matches.
+  {
+    const { data: info } = await admin.auth.admin.getUserById(authUserId!);
+    if (info?.user && info.user.email !== syntheticEmail) {
+      const { error: updErr } = await admin.auth.admin.updateUserById(
+        authUserId!,
+        { email: syntheticEmail, email_confirm: true },
+      );
+      if (updErr) {
+        console.error("[wa-magic] updateUserById failed:", updErr);
+        // Non-fatal: continue and let generateLink try anyway. If it
+        // fails we fall into the catch below.
+      }
     }
   }
 
