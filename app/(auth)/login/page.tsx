@@ -14,6 +14,7 @@ import axios from "axios";
 import { createClient } from "@/lib/supabase/client";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
+import { botDeepLink } from "@/lib/whatsapp/bot-phone";
 
 function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;
@@ -369,6 +370,22 @@ function LoginInner() {
               <ArrowLeft className="w-4 h-4" /> Reenviar código o cambiar número
             </button>
           </form>
+
+          {/* SMS fallback: a small "no me llegó" line that links straight
+              to WhatsApp with a pre-filled login intent. The bot replies
+              with a one-tap CTA button that hits /api/auth/wa-magic and
+              signs the user in without ever copying a code. Kept tiny
+              on purpose — gold is reserved for the primary CTA. */}
+          <div className="text-center pt-1">
+            <a
+              href={botDeepLink("Quiero entrar a La Polla")}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-text-muted hover:text-gold transition-colors inline-flex items-center gap-1"
+            >
+              ¿No te llegó? <span className="underline">Probá con WhatsApp</span>
+            </a>
+          </div>
         </div>
       )}
     </div>
