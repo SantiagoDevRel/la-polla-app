@@ -145,7 +145,7 @@ async function replyWithMenu(to: string) {
     "¡Qué más, parce! 🐔\n\n" +
       "Acá te pongo en bandeja todo lo de *La Polla*: tus pollas, predicciones, " +
       "tabla en vivo y resultados. Todo se maneja desde la app — abrila y listo.\n\n" +
-      "¿No te llega el SMS para entrar? Escribime *Quiero entrar a La Polla* " +
+      "¿No te llega el SMS para entrar? Escribime *Hola parce! 🐥 quiero entrar a la polla* " +
       "y te paso un link mágico 🔑",
     "Abrir La Polla",
     `${APP_URL}/inicio`,
