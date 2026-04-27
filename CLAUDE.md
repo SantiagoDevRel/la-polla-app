@@ -509,7 +509,7 @@ Where it matters most we use reply buttons:
 
 ### Tone Rules (non-negotiable)
 - Colombian parcero Spanish: "parce", "listo", "eso es", "pilas", "bacano"
-- Emojis: 🐔 brand, 🐥 chick, ⚽ matches, 🏆 leaderboard, 💰 buy-in, 🎯 predictions, 📊 standings
+- Emojis: 🐥 chick (brand, default), 🐣 chick-with-egg (occasional), ⚽ matches, 🏆 leaderboard, 💰 buy-in, 🎯 predictions, 📊 standings. Never 🐔 or 🐓 — no rooster, no hen.
 - Footer: "La Polla Colombiana 🐥"
 - Never formal language. Never "estimado usuario"
 

@@ -167,7 +167,7 @@ async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
   await sendCTAButton(
     fromRaw,
     `¡Listo, parce! Te logueo a *La Polla* como *${e164}*.\n\n` +
-      "El link de abajo sirve por 10 minutos y solo lo puedes usar una vez 🐔",
+      "El link de abajo sirve por 10 minutos y solo lo puedes usar una vez 🐥",
     "Entrar a La Polla",
     url,
     "La Polla Colombiana 🐥",
