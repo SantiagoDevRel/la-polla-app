@@ -283,7 +283,7 @@ function LoginInner() {
               </button>
 
               <a
-                href={botDeepLink("Quiero entrar a La Polla")}
+                href={botDeepLink("Hola parce! 🐥 quiero entrar a la polla")}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold py-3.5 px-3 rounded-xl hover:brightness-110 transition-all text-base inline-flex items-center justify-center gap-2"
@@ -395,7 +395,7 @@ function LoginInner() {
               on purpose — gold is reserved for the primary CTA. */}
           <div className="text-center pt-1">
             <a
-              href={botDeepLink("Quiero entrar a La Polla")}
+              href={botDeepLink("Hola parce! 🐥 quiero entrar a la polla")}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-text-muted hover:text-gold transition-colors inline-flex items-center gap-1"
