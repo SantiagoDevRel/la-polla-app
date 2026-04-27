@@ -16,7 +16,7 @@ import {
 // "zoom out / 100% / zoom in" trio users expect. Numbers match the
 // multipliers in lib/font-scale.ts.
 const OPTIONS: { value: FontScale; label: string; size: number }[] = [
-  { value: "sm", label: "−50%", size: 13 },
+  { value: "sm", label: "−30%", size: 13 },
   { value: "md", label: "100%", size: 13 },
   { value: "lg", label: "+60%", size: 13 },
 ];

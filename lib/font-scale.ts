@@ -30,11 +30,15 @@ export type FontScale = "sm" | "md" | "lg";
 
 const STORAGE_KEY = "la_polla_font_scale";
 
-// Numeric multipliers. Aggressive on purpose — the user wanted real
-// "zoom out / zoom in" feel, not a token bump. md=1 stays the canonical
-// design baseline.
+// Numeric multipliers. md=1 is the canonical design baseline.
+// sm at 0.5 was "zoom out too much" — Tailwind paddings/gaps are
+// rem-based, so at 50% the layout collapsed inside cards (visually
+// the screen looked like it had blank columns on the sides). 0.7
+// scales the text noticeably without breaking the structure.
+// lg stays aggressive because the user explicitly asked for +60%
+// and didn't flag any layout issues there.
 export const FONT_SCALE_VALUES: Record<FontScale, number> = {
-  sm: 0.5,
+  sm: 0.7,
   md: 1.0,
   lg: 1.6,
 };
