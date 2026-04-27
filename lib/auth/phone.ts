@@ -1,9 +1,9 @@
 // lib/auth/phone.ts — Single source of truth for phone normalization.
 // Strips +, spaces, dashes, parens. "57 311-731-2391" → "573117312391".
-// Every internal lookup (public.users.whatsapp_number, login_pending_sessions
-// .phone, otp_rate_limits.phone_number) must use this same form so we don't
-// have drift between tables. Supabase Auth's auth.users.phone keeps its own
-// format with the leading + because Supabase normalizes it internally.
+// Every internal lookup (public.users.whatsapp_number, otp_rate_limits
+// .phone_number) must use this same form so we don't have drift between
+// tables. Supabase Auth's auth.users.phone keeps its own format with
+// the leading + because Supabase normalizes it internally.
 
 export function normalizePhone(raw: string): string {
   return (raw ?? "").replace(/[\s\-()+]/g, "");
