@@ -13,6 +13,7 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 import { InlineScoringGuide } from "@/components/polla/InlineScoringGuide";
+import FontScalePicker from "@/components/perfil/FontScalePicker";
 
 interface UserProfile {
   display_name: string;
@@ -206,6 +207,11 @@ export default function PerfilPage() {
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Tamaño del texto — preferencia local por dispositivo. Vive
+            arriba (justo después de las stats) en vez de pegado al
+            logout para que el usuario lo encuentre sin scrollear. */}
+        <FontScalePicker />
 
         {/* Actividad reciente */}
         {activity.length > 0 && (
