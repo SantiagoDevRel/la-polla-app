@@ -129,7 +129,7 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
                 className="font-display text-lg leading-none"
                 style={{ color: "var(--text-primary)" }}
               >
-                Describe el problema/feedback
+                Reportar un problema/feedback
               </h2>
               <button
                 type="button"
