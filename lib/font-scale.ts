@@ -16,12 +16,14 @@ export type FontScale = "sm" | "md" | "lg";
 const STORAGE_KEY = "la_polla_font_scale";
 
 // Numeric multipliers applied via CSS `zoom`. md=1 stays the canonical
-// design baseline; sm/lg are tuned to be noticeable but not break the
-// layout in obvious ways.
+// design baseline. sm/lg are deliberately aggressive (-15% / +30%) —
+// los rangos chiquitos (0.9/1.15) eran imperceptibles en celular, donde
+// el viewport-meta absorbe parte del cambio. Si esto rompe layouts,
+// achicar lg primero.
 export const FONT_SCALE_VALUES: Record<FontScale, number> = {
-  sm: 0.9,
+  sm: 0.85,
   md: 1.0,
-  lg: 1.15,
+  lg: 1.3,
 };
 
 export function getStoredScale(): FontScale {
