@@ -183,10 +183,18 @@ async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
 
   const url = `${APP_URL}/api/auth/wa-magic?token=${token}`;
 
+  // Show the resolved phone in the bot's reply so the user verifies
+  // the account they're about to enter BEFORE tapping the button.
+  // Important UX guard: the typed phone in the /login form is ignored
+  // when they click the WhatsApp button — only the WA sender's number
+  // counts. Surfacing the number here is where it has the most impact
+  // (they're looking at WhatsApp at this exact moment).
+  const e164 = `+${phoneNormalized}`;
   await sendCTAButton(
     fromRaw,
-    "¡Listo, parce! Tocá el botón de abajo y te logueás derechito en La Polla. " +
-      "El link sirve por 10 minutos y solo lo podés usar una vez 🐔",
+    `¡Listo, parce! Te logueo a *La Polla* como *${e164}*.\n\n` +
+      "Si este número está mal, escribime desde el otro WhatsApp 📲\n\n" +
+      "El link de abajo sirve por 10 minutos y solo lo podés usar una vez 🐔",
     "Entrar a La Polla",
     url,
     "La Polla Colombiana 🐥",

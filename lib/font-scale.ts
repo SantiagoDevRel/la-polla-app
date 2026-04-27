@@ -1,11 +1,14 @@
 // lib/font-scale.ts — Per-device user preference for global font size.
 //
-// We store one of three labels in localStorage and translate to a CSS
-// `zoom` factor at apply time. `zoom` was chosen over root font-size
-// because the codebase mixes Tailwind classes with pixel-based inline
-// styles (`fontSize: 12`) — only `zoom` scales both uniformly. It is
-// supported in Chrome/Edge/Safari and Firefox 126+ (May 2025); older
-// Firefox falls back silently to 100%, which is the desired behavior.
+// We store one of three labels in localStorage and translate to a root
+// font-size at apply time. The trade-off vs. CSS `zoom`: root
+// font-size only scales `rem`-based units (every Tailwind text size
+// is `rem`-based, so the bulk of the UI follows). Pixel-based inline
+// `fontSize: 14` styles stay fixed — that's intentional. Users asked
+// for "text scaling" without the layout shrinking on small zoom: with
+// `zoom` the whole body became half the viewport at sm, leaving empty
+// gutters; with root font-size the layout keeps its full width and
+// only the text grows or shrinks.
 //
 // Storage is per-device (localStorage). A user might want bigger text
 // on phone and default on desktop, and not having to round-trip the
@@ -47,11 +50,19 @@ export function setStoredScale(scale: FontScale): void {
   }
 }
 
+// Browser default root font-size.
+const DEFAULT_ROOT_PX = 16;
+
 export function applyScale(scale: FontScale): void {
   if (typeof document === "undefined") return;
   const value = FONT_SCALE_VALUES[scale];
-  // Apply to body so the viewport height calculations on html stay
-  // unscaled (avoids surprises with sticky/fixed positioning relative
-  // to the viewport).
-  document.body.style.zoom = String(value);
+  // Scale rem-based text via the root element's font-size. Layout
+  // (cards, paddings in px) stays put; only typography grows/shrinks.
+  document.documentElement.style.fontSize = `${DEFAULT_ROOT_PX * value}px`;
+  // Defensive cleanup: previous builds applied `zoom` to body, which
+  // shrank everything including widths and left empty gutters at sm.
+  // Clear it so users upgrading don't keep the broken state.
+  if (document.body.style.zoom) {
+    document.body.style.zoom = "";
+  }
 }

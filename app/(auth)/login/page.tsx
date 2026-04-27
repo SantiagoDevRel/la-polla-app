@@ -308,6 +308,15 @@ function LoginInner() {
                 WhatsApp
               </a>
             </div>
+
+            {/* Heads-up about the WA button: it ignores whatever the
+                user typed in the phone input above and uses their
+                actual WhatsApp account. Surfacing this here avoids
+                the "I typed +57 but got logged in as +351" surprise. */}
+            <p className="text-[11px] text-text-muted text-center leading-snug">
+              Si elegís WhatsApp, te logueamos con tu cuenta de WhatsApp
+              activa, no con el número que escribiste.
+            </p>
           </form>
 
           <p className="text-[10px] text-text-muted/70 text-center pt-1">
