@@ -6,8 +6,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import axios from "axios";
-import { Copy, RefreshCw, UserMinus } from "lucide-react";
+import { Copy, RefreshCw, Trash2, UserMinus } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import FootballLoader from "@/components/ui/FootballLoader";
 import EmptyState from "@/components/ui/EmptyState";
@@ -55,6 +56,7 @@ export default function OrganizerPanel({
   joinCode,
 }: OrganizerPanelProps) {
   const { showToast } = useToast();
+  const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(joinCode);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -150,6 +152,34 @@ export default function OrganizerPanel({
       const e = err as { response?: { data?: { error?: string } } };
       showToast(e.response?.data?.error || "Error actualizando pago", "error");
     } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deletePolla() {
+    // Two-line confirm so the consequence is unambiguous before the
+    // user clicks OK. Matches the existing expel() pattern (browser
+    // confirm) — the codebase blocks alert() but confirm() is OK.
+    const ok = window.confirm(
+      `¿Estás seguro que deseas borrar "${pollaName}"?\n\n` +
+        `Todos los datos se perderán: participantes, pronósticos, ` +
+        `tabla y resultados. Esta acción no se puede deshacer.`,
+    );
+    if (!ok) return;
+    setBusy("delete");
+    try {
+      await axios.delete(`/api/pollas/${pollaSlug}`);
+      showToast("Polla borrada", "success");
+      // Send the user out before the now-empty page re-fetches and
+      // 404s on its own. router.replace so the back button doesn't
+      // bring them to a dead URL.
+      router.replace("/inicio");
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      showToast(
+        e.response?.data?.error || "No se pudo borrar la polla",
+        "error",
+      );
       setBusy(null);
     }
   }
@@ -339,6 +369,27 @@ export default function OrganizerPanel({
             </p>
           </div>
         </div>
+      </section>
+
+      {/* Section D — Danger zone. Hard-deletes the polla via DELETE
+          /api/pollas/[slug]; cascade wipes participantes, pronósticos,
+          notifications e invites. */}
+      <section className="rounded-2xl p-5 border border-red-alert/30 bg-red-alert/5 space-y-3">
+        <h3 className="text-sm font-bold text-red-alert flex items-center gap-2">
+          <Trash2 className="w-4 h-4" /> Zona peligrosa
+        </h3>
+        <p className="text-xs text-text-muted">
+          Borrar la polla elimina permanentemente todos los participantes,
+          pronósticos y resultados. No se puede deshacer.
+        </p>
+        <button
+          onClick={deletePolla}
+          disabled={busy === "delete"}
+          className="w-full inline-flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-red-alert text-white font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer"
+        >
+          <Trash2 className={`w-4 h-4 ${busy === "delete" ? "animate-pulse" : ""}`} />
+          {busy === "delete" ? "Borrando..." : "Borrar polla"}
+        </button>
       </section>
     </div>
   );
