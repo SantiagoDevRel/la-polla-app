@@ -493,4 +493,29 @@ Help: `menu_ayuda`, `help_puntaje`, `help_crear`, `menu_perfil`
 - Configured in `next.config.mjs` headers() for all routes
 - CSP, HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, Permissions-Policy
 
-*Last updated: 2026-04-11 | To update: say "update UI system" in Claude.ai chat*
+---
+
+## Feedback Bubble (added 2026-04-27)
+
+Botón "Reportar problema" en `BrandHeader` (al lado del WhatsAppBubble) que abre un modal con un único textarea. Al enviar:
+
+1. POST a `/api/feedback` con `{ message, pageUrl }`. `user_id` se resuelve server-side desde la sesión Supabase — el form no lo expone al cliente.
+2. Insert en tabla `feedback` (migration 025). RLS: users INSERT/SELECT own, admins SELECT all.
+3. Fan-out best-effort (las fallas no rompen la request — el row queda guardado):
+   - WhatsApp al admin via `sendTextMessage()` → `FEEDBACK_NOTIFY_WHATSAPP` (E.164 sin +)
+   - Email via Resend → `FEEDBACK_NOTIFY_EMAIL`. Free tier de Resend manda desde `onboarding@resend.dev` al email dueño de la cuenta sin verificar dominio. Para enviar a otros destinatarios, verificar dominio y setear `RESEND_FROM_EMAIL`.
+
+### Files
+- `supabase/migrations/025_feedback.sql` — table + RLS
+- `app/api/feedback/route.ts` — auth-gated route, validates with zod, fan-out
+- `lib/email/feedback.ts` — Resend wrapper
+- `components/shared/ReportProblemBubble.tsx` — icon button + modal
+- `components/layout/BrandHeader.tsx` — wires both bubbles
+
+### Env vars (add to .env.local)
+- `FEEDBACK_NOTIFY_WHATSAPP` — admin phone (E.164 sin +). Ej: `351934255581`
+- `FEEDBACK_NOTIFY_EMAIL` — admin email
+- `RESEND_API_KEY` — de https://resend.com
+- `RESEND_FROM_EMAIL` (opcional) — default `La Polla <onboarding@resend.dev>`
+
+*Last updated: 2026-04-27 | To update: say "update UI system" in Claude.ai chat*
