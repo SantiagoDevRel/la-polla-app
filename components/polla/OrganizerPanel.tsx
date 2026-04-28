@@ -317,13 +317,21 @@ export default function OrganizerPanel({
                       </p>
                     </div>
                     <div className="flex-shrink-0 flex items-center gap-2">
-                      <span
-                        className={`inline-block w-2 h-2 rounded-full ${p.paid ? "bg-green-live" : "bg-text-muted/50"}`}
-                        style={p.paid ? { boxShadow: "0 0 5px rgba(0,230,118,0.6)" } : undefined}
-                      />
-                      <span className={`text-[11px] font-medium ${p.paid ? "text-green-live" : "text-text-muted"}`}>
-                        {p.paid ? "Pagado" : "Pendiente"}
-                      </span>
+                      {/* En 'pay_winner' nadie está "pagado" hasta que la
+                          polla termine y el ganador cobre — el indicador
+                          solo agrega ruido. Solo se muestra el dot+label
+                          cuando admin_collects. */}
+                      {paymentMode === "admin_collects" && (
+                        <>
+                          <span
+                            className={`inline-block w-2 h-2 rounded-full ${p.paid ? "bg-green-live" : "bg-text-muted/50"}`}
+                            style={p.paid ? { boxShadow: "0 0 5px rgba(0,230,118,0.6)" } : undefined}
+                          />
+                          <span className={`text-[11px] font-medium ${p.paid ? "text-green-live" : "text-text-muted"}`}>
+                            {p.paid ? "Pagado" : "Pendiente"}
+                          </span>
+                        </>
+                      )}
                       {paymentMode === "admin_collects" && p.role !== "admin" && !isExpelled && (
                         <button
                           onClick={() => togglePaid(p)}
