@@ -17,6 +17,7 @@ import PhoneInput from "@/components/ui/PhoneInput";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import InlineScoringGuide from "@/components/polla/InlineScoringGuide";
 import TournamentBadge from "@/components/shared/TournamentBadge";
+import UserAvatar from "@/components/ui/UserAvatar";
 import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { getPollitoByPosition } from "@/lib/pollitos";
 import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock } from "lucide-react";
@@ -226,6 +227,15 @@ function matchStatusAccent(m: Match, pointsEarned: number | null): string {
   return "#FFD700";
 }
 
+interface OtherPrediction {
+  user_id: string;
+  predicted_home: number;
+  predicted_away: number;
+  points_earned: number | null;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
 interface MatchRowProps {
   match: Match;
   pred: Prediction | undefined;
@@ -240,6 +250,12 @@ interface MatchRowProps {
    *  fallback so regular_season rows surface the tournament name +
    *  logo instead of raw enum text. */
   tournamentSlug: string;
+  /** Pronósticos de los demás participantes para este partido. Solo se
+   *  muestran cuando el match ya está bloqueado (live/finished o a <=5
+   *  min del kickoff) — el server filtra eso. Pasar [] cuando todavía
+   *  no hay nada que revelar. */
+  otherPredictions: OtherPrediction[];
+  locked: boolean;
 }
 
 function MatchRow({
@@ -253,6 +269,8 @@ function MatchRow({
   homeRef,
   awayRef,
   tournamentSlug,
+  otherPredictions,
+  locked,
 }: MatchRowProps) {
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
@@ -421,6 +439,59 @@ function MatchRow({
             </span>
           </div>
         ) : null}
+
+        {/* Pronósticos de los demás — solo se muestra una vez el match
+            está bloqueado (live/finished o <=5 min al kickoff). Hasta
+            entonces los pronósticos siguen siendo privados. El server
+            ya filtra qué predictions devuelve por match, así que aquí
+            solo renderizamos lo que llegó. */}
+        {locked && otherPredictions.length > 0 ? (
+          <div className="mt-3 pt-3 border-t border-border-subtle">
+            <p className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60 mb-2">
+              Pronósticos del parche · {otherPredictions.length}
+            </p>
+            <ul className="space-y-1.5">
+              {otherPredictions.map((op) => {
+                const showPoints = isFinished;
+                const tierCls = showPoints
+                  ? pointsTierClasses(op.points_earned ?? 0)
+                  : "bg-bg-elevated text-text-primary border-border-subtle";
+                return (
+                  <li
+                    key={op.user_id}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <UserAvatar
+                        avatarUrl={op.avatar_url}
+                        displayName={op.display_name ?? "Jugador"}
+                        size="sm"
+                        className="!w-6 !h-6"
+                      />
+                      <span className="text-[12px] text-text-primary/85 truncate">
+                        {op.display_name ?? "Jugador"}
+                      </span>
+                    </div>
+                    <span
+                      className={`shrink-0 inline-flex items-center gap-1 px-2 py-[2px] rounded-full border text-[11px] font-semibold tabular-nums ${tierCls}`}
+                      style={{ fontFeatureSettings: '"tnum"' }}
+                    >
+                      {op.predicted_home}-{op.predicted_away}
+                      {showPoints ? (
+                        <span className="text-[10px] opacity-80">
+                          ·{" "}
+                          {(op.points_earned ?? 0) > 0
+                            ? `+${op.points_earned}`
+                            : "0"}
+                        </span>
+                      ) : null}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -450,6 +521,15 @@ export default function PollaSlugPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [allPredictions, setAllPredictions] = useState<
+    Array<{
+      match_id: string;
+      user_id: string;
+      predicted_home: number;
+      predicted_away: number;
+      points_earned: number | null;
+    }>
+  >([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserStatus, setCurrentUserStatus] = useState("approved");
@@ -574,6 +654,7 @@ export default function PollaSlugPage() {
       setParticipants(data.participants);
       setMatches(data.matches);
       setPredictions(data.predictions);
+      setAllPredictions(data.allPredictions || []);
       setCurrentUserId(data.currentUserId);
       setCurrentUserRole(data.currentUserRole);
       setCurrentUserStatus(data.currentUserStatus || "approved");
@@ -631,6 +712,7 @@ export default function PollaSlugPage() {
       setTouchedMatches(new Set());
       const { data } = await axios.get(`/api/pollas/${slug}`);
       setPredictions(data.predictions);
+      setAllPredictions(data.allPredictions || []);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       showToast(e.response?.data?.error || "Error guardando", "error");
@@ -646,6 +728,55 @@ export default function PollaSlugPage() {
     if (m.status === "live" || m.status === "finished") return true;
     return Date.now() >= new Date(m.scheduled_at).getTime() - 5 * 60 * 1000;
   }
+
+  // Map de user_id -> {display_name, avatar_url} solo de participantes
+  // approved+paid. Se usa para enriquecer los pronósticos de los demás
+  // que devuelve el server (que no incluye user data) y para filtrar a
+  // gente que ya no debería aparecer (rejected/unpaid).
+  const participantInfoById = useMemo(() => {
+    const m = new Map<string, { display_name: string | null; avatar_url: string | null }>();
+    participants
+      .filter((p) => p.status === "approved" && p.paid)
+      .forEach((p) => {
+        m.set(p.user_id, {
+          display_name: p.users?.display_name ?? null,
+          avatar_url: p.users?.avatar_url ?? null,
+        });
+      });
+    return m;
+  }, [participants]);
+
+  // Agrupa los pronósticos de los demás por match_id, excluye al usuario
+  // actual y descarta los que ya no están en la lista de participantes.
+  const otherPredsByMatch = useMemo(() => {
+    const out = new Map<string, OtherPrediction[]>();
+    for (const ap of allPredictions) {
+      if (ap.user_id === currentUserId) continue;
+      const info = participantInfoById.get(ap.user_id);
+      if (!info) continue;
+      const arr = out.get(ap.match_id) ?? [];
+      arr.push({
+        user_id: ap.user_id,
+        predicted_home: ap.predicted_home,
+        predicted_away: ap.predicted_away,
+        points_earned: ap.points_earned,
+        display_name: info.display_name,
+        avatar_url: info.avatar_url,
+      });
+      out.set(ap.match_id, arr);
+    }
+    // Orden estable: por puntos (más a menos) cuando ya hay puntos,
+    // si no por nombre.
+    out.forEach((arr) => {
+      arr.sort((a: OtherPrediction, b: OtherPrediction) => {
+        const pa = a.points_earned ?? -1;
+        const pb = b.points_earned ?? -1;
+        if (pa !== pb) return pb - pa;
+        return (a.display_name ?? "").localeCompare(b.display_name ?? "");
+      });
+    });
+    return out;
+  }, [allPredictions, currentUserId, participantInfoById]);
 
   // Loading skeleton
   if (loading) {
@@ -829,6 +960,8 @@ export default function PollaSlugPage() {
                             homeRef={null}
                             awayRef={null}
                             tournamentSlug={polla.tournament}
+                            otherPredictions={otherPredsByMatch.get(match.id) ?? []}
+                            locked={isLocked(match)}
                           />
                         ))}
                       </div>
@@ -858,6 +991,8 @@ export default function PollaSlugPage() {
                           homeRef={null}
                           awayRef={null}
                           tournamentSlug={polla.tournament}
+                          otherPredictions={otherPredsByMatch.get(match.id) ?? []}
+                          locked={isLocked(match)}
                         />
                       ))}
                     </div>
@@ -917,6 +1052,8 @@ export default function PollaSlugPage() {
                                   homeRef={(el) => { homeInputRefs.current[match.id] = el; }}
                                   awayRef={(el) => { awayInputRefs.current[match.id] = el; }}
                                   tournamentSlug={polla.tournament}
+                                  otherPredictions={otherPredsByMatch.get(match.id) ?? []}
+                                  locked={isLocked(match)}
                                 />
                               ))}
                             </div>

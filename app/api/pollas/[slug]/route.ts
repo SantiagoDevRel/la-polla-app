@@ -90,6 +90,36 @@ export async function GET(
       .eq("polla_id", polla.id)
       .eq("user_id", user.id);
 
+    // Pronósticos de TODOS los participantes — solo para matches ya
+    // bloqueados (live/finished o a <=5 min del kickoff). Se devuelven
+    // aquí para que el cliente los muestre debajo del row del partido.
+    // No se filtran por user_id, pero el cliente los une con la lista
+    // de participantes (approved+paid) para renderizar solo gente que
+    // sigue en la polla.
+    const lockedMatchIds = (matches || [])
+      .filter((m) => {
+        if (m.status === "live" || m.status === "finished") return true;
+        const kickoffMs = new Date(m.scheduled_at).getTime();
+        return Number.isFinite(kickoffMs) && Date.now() >= kickoffMs - 5 * 60 * 1000;
+      })
+      .map((m) => m.id);
+
+    let allPredictions: Array<{
+      match_id: string;
+      user_id: string;
+      predicted_home: number;
+      predicted_away: number;
+      points_earned: number | null;
+    }> = [];
+    if (lockedMatchIds.length > 0) {
+      const { data: locked } = await adminSupabase
+        .from("predictions")
+        .select("match_id, user_id, predicted_home, predicted_away, points_earned")
+        .eq("polla_id", polla.id)
+        .in("match_id", lockedMatchIds);
+      allPredictions = locked || [];
+    }
+
     const currentRole = participant?.role || (polla.created_by === user.id ? "admin" : "player");
 
     return NextResponse.json({
@@ -100,6 +130,7 @@ export async function GET(
       pendingParticipants: [],
       matches: matches || [],
       predictions: predictions || [],
+      allPredictions,
       currentUserRole: currentRole,
       currentUserStatus: participant?.status || "approved",
       currentUserPaymentStatus: participant?.payment_status || "approved",
