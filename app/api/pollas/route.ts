@@ -200,20 +200,36 @@ export async function GET() {
       );
     }
 
-    // Participant counts for each polla — previously missing from this
-    // endpoint, so the UI silently rendered "0 participantes".
-    // allPollaIds is scoped to pollas this user belongs to, so admin-client
-    // use is safe.
+    // Participant counts + approved/paid breakdowns por polla. Necesitamos
+    // los 3 buckets para que la card del listado muestre pozo total
+    // consistente con la lógica de la página de detalle:
+    //   - pay_winner   → buy_in × approvedCount
+    //   - admin_collects → buy_in × paidCount (solo los que ya pagaron)
+    // total participantes (cualquier status) sigue mostrándose en la card.
     const allPollaIds = (pollas || []).map((p) => p.id);
     const participantCountByPolla: Record<string, number> = {};
+    const approvedCountByPolla: Record<string, number> = {};
+    const paidCountByPolla: Record<string, number> = {};
     if (allPollaIds.length > 0) {
       const { data: participantRows } = await admin
         .from("polla_participants")
-        .select("polla_id")
+        .select("polla_id, status, paid")
         .in("polla_id", allPollaIds);
-      for (const row of participantRows || []) {
+      for (const row of (participantRows || []) as Array<{
+        polla_id: string;
+        status: string | null;
+        paid: boolean | null;
+      }>) {
         participantCountByPolla[row.polla_id] =
           (participantCountByPolla[row.polla_id] || 0) + 1;
+        if (row.status === "approved") {
+          approvedCountByPolla[row.polla_id] =
+            (approvedCountByPolla[row.polla_id] || 0) + 1;
+          if (row.paid) {
+            paidCountByPolla[row.polla_id] =
+              (paidCountByPolla[row.polla_id] || 0) + 1;
+          }
+        }
       }
     }
 
@@ -245,10 +261,18 @@ export async function GET() {
         const m = matchById.get(id);
         return m ? TERMINAL_MATCH_STATUSES.has(m.status) : false;
       }).length;
+      const buyIn = (p as { buy_in_amount?: number | null }).buy_in_amount ?? 0;
+      const paymentMode = (p as { payment_mode?: string | null }).payment_mode;
+      const potCountedSeats =
+        paymentMode === "admin_collects"
+          ? paidCountByPolla[p.id] || 0
+          : approvedCountByPolla[p.id] || 0;
+      const potTotal = buyIn > 0 ? buyIn * potCountedSeats : 0;
       return {
         ...p,
         winner: winnersByPolla[p.id] || null,
         participant_count: participantCountByPolla[p.id] || 0,
+        pot_total: potTotal,
         total_matches: matchIds.length,
         finished_matches: finishedCount,
         user_rank: myRow?.rank ?? null,

@@ -16,6 +16,9 @@ export interface PollaCardProps {
     competitionLogoUrl?: string;
     participantCount: number;
     buyInAmount: number;
+    /** Pozo total acumulado (buy_in × seats que ya cuentan según
+     *  payment_mode). Se muestra al lado de la cuota individual. */
+    potTotal?: number;
     totalMatches: number;
     finishedMatches: number;
   };
@@ -105,7 +108,7 @@ export function PollaCard({
       </h3>
 
       {/* Stats row */}
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-3 flex items-center gap-3 flex-wrap">
         <span
           className="inline-flex items-center gap-1 font-body text-[12px] text-text-secondary tabular-nums"
           style={{ fontFeatureSettings: '"tnum"' }}
@@ -114,9 +117,20 @@ export function PollaCard({
           {polla.participantCount}
         </span>
         {polla.buyInAmount > 0 ? (
-          <span className="font-body text-[12px] text-text-secondary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-            {formatCOP(polla.buyInAmount)}
-          </span>
+          <>
+            <span className="font-body text-[12px] text-text-secondary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+              {formatCOP(polla.buyInAmount)} c/u
+            </span>
+            {polla.potTotal && polla.potTotal > 0 ? (
+              <span
+                className="font-body text-[12px] text-gold tabular-nums"
+                style={{ fontFeatureSettings: '"tnum"' }}
+                title="Pozo total acumulado"
+              >
+                · pozo {formatCOP(polla.potTotal)}
+              </span>
+            ) : null}
+          </>
         ) : (
           <span className="font-body text-[12px] text-text-muted">Gratis</span>
         )}
