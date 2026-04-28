@@ -52,7 +52,7 @@ function mapStatus(apiStatus: string): "live" | "finished" | "scheduled" {
 // tla en la respuesta. Toma iniciales de las primeras 3 palabras
 // significativas (descartando FC, CF, AC, etc), o las primeras 3
 // letras si el nombre es de una sola palabra.
-function deriveTla(name: string | undefined | null): string {
+export function deriveTla(name: string | undefined | null): string {
   if (!name) return "TBD";
   const stop = new Set(["FC", "CF", "AC", "SC", "AFC", "VFL", "VFB", "FK", "BK", "CD", "RC", "SD", "SS", "TSG", "USL"]);
   const words = name
