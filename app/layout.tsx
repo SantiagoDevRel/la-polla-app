@@ -4,6 +4,7 @@ import { Bebas_Neue, Outfit } from "next/font/google";
 import "./globals.css";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { CapacitorReady } from "@/components/layout/CapacitorReady";
+import { CapacitorBackButton } from "@/components/layout/CapacitorBackButton";
 
 const bebas = Bebas_Neue({
   subsets: ["latin"],
@@ -44,6 +45,7 @@ export default function RootLayout({
     <html lang="es" className={`${bebas.variable} ${outfit.variable}`}>
       <body className="antialiased">
         <CapacitorReady />
+        <CapacitorBackButton />
         <SplashScreen />
         {children}
       </body>
