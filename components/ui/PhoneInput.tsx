@@ -169,7 +169,7 @@ export default function PhoneInput({ onChange }: PhoneInputProps) {
           type="tel"
           value={localNumber}
           onChange={(e) => setLocalNumber(e.target.value.replace(/\D/g, ""))}
-          placeholder="311 731 2391"
+          placeholder="310 123 1234"
           className="flex-1 px-3 py-3 outline-none text-lg min-w-0 bg-bg-base text-text-primary placeholder:text-text-muted/50"
           required
         />

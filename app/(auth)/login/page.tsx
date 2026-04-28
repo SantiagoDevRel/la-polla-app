@@ -21,6 +21,13 @@ function fmtCOP(n: number): string {
 }
 
 const RETURN_TO_KEY = "lp_returnTo";
+// 60s client-side cooldown after a successful OTP send. Persisted in
+// sessionStorage so a refresh / navigation does not reset it. Server-side
+// (Supabase auth) also rate-limits, but this gives the user a visible
+// countdown instead of a generic "rate limit exceeded" error and stops
+// accidental rapid taps from the same browser.
+const OTP_COOLDOWN_MS = 60_000;
+const OTP_COOLDOWN_KEY = "lp_otp_cooldown_until";
 
 type Step = "input" | "otp";
 
@@ -47,6 +54,44 @@ function LoginInner() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PollaPreview | null>(null);
+  // Client-side OTP send cooldown. cooldownUntil is the epoch ms when
+  // the user can send again. nowTick triggers a re-render every second
+  // so the visible countdown updates.
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+
+  // Restore cooldown from sessionStorage on mount (survives refresh /
+  // step navigation). If the stored timestamp is in the past, clean it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.sessionStorage.getItem(OTP_COOLDOWN_KEY);
+    if (!raw) return;
+    const ts = Number.parseInt(raw, 10);
+    if (Number.isFinite(ts) && ts > Date.now()) {
+      setCooldownUntil(ts);
+    } else {
+      window.sessionStorage.removeItem(OTP_COOLDOWN_KEY);
+    }
+  }, []);
+
+  // Tick once per second only while a cooldown is active. When it
+  // finishes, clean up so we are not running a no-op interval.
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    if (cooldownUntil <= Date.now()) {
+      setCooldownUntil(null);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(OTP_COOLDOWN_KEY);
+      }
+      return;
+    }
+    const interval = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [cooldownUntil]);
+
+  const cooldownRemaining = cooldownUntil
+    ? Math.max(0, Math.ceil((cooldownUntil - nowTick) / 1000))
+    : 0;
 
   // Visiting /login means "I want to start fresh" — even if the user
   // already has a session for another account (legitimate: same person
@@ -97,6 +142,13 @@ function LoginInner() {
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // Block re-sends while the per-browser cooldown is active. Even if
+    // the user clicks fast, the disabled state on the button covers the
+    // happy path; this is the safety net (e.g. Enter key on the form).
+    if (cooldownRemaining > 0) {
+      setError(`Espera ${cooldownRemaining}s para reenviar el código`);
+      return;
+    }
     const phone = buildPhone();
     // Smallest plausible E.164 is "+CCNNNNNNN" (~9 chars total). Twilio
     // Verify itself will reject anything malformed.
@@ -123,6 +175,13 @@ function LoginInner() {
           setError(authErr.message || "No pudimos enviar el código");
         }
         return;
+      }
+      // Arm the cooldown only after a successful send — failures don't
+      // result in an SMS, so it would be unfair to lock the user out.
+      const until = Date.now() + OTP_COOLDOWN_MS;
+      setCooldownUntil(until);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(OTP_COOLDOWN_KEY, String(until));
       }
       setStep("otp");
     } catch (err) {
@@ -263,6 +322,7 @@ function LoginInner() {
                 type="submit"
                 disabled={
                   sending ||
+                  cooldownRemaining > 0 ||
                   !phoneE164.startsWith("+") ||
                   phoneE164.replace(/\D/g, "").length < 8
                 }
@@ -274,6 +334,8 @@ function LoginInner() {
                     <Loader2 className="w-5 h-5 animate-spin" />
                     Enviando…
                   </>
+                ) : cooldownRemaining > 0 ? (
+                  <>Espera {cooldownRemaining}s</>
                 ) : (
                   <>
                     <MessageSquare className="w-5 h-5" />
