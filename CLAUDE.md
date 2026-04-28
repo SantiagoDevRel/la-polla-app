@@ -464,11 +464,21 @@ Before any API call that fetches fixtures or match data, always verify the curre
 
 ### Active Tournaments (Production)
 
-Only two tournaments are active in production:
-- **Champions League** — API-Football league ID: 2
-- **FIFA World Cup 2026** — API-Football league ID: 1
+Cinco torneos activos. La UI Crear polla los muestra todos.
 
-All UI (crear polla, explorar, etc.) should only show these two. Admin page keeps full access.
+| Slug | Nombre | football-data code | ESPN league code |
+|---|---|---|---|
+| `champions_2025` | Champions League | `CL` | `uefa.champions` |
+| `worldcup_2026` | Mundial 2026 | `WC` | `fifa.world` |
+| `laliga_2025` | La Liga | `PD` | `esp.1` |
+| `premier_2025` | Premier League | `PL` | `eng.1` |
+| `seriea_2025` | Serie A | `SA` | `ita.1` |
+
+Para agregar un torneo nuevo:
+1. `lib/tournaments.ts` → entry en `TOURNAMENTS` + `TOURNAMENT_ICONS`.
+2. `lib/football-data/sync.ts` → entry en `COMPETITIONS`.
+3. `lib/espn/client.ts` → entry en `ESPN_LEAGUE_BY_TOURNAMENT`.
+4. `/public/tournaments/<slug>.png` o `.svg` para el logo.
 
 ---
 
