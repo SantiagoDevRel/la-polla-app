@@ -44,6 +44,14 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   // visitar /reset.html ejecuta JS que desuscribe TODOS los SWs y
   // limpia caches. Tiene que pegar al network siempre.
   /^\/reset\.html$/,
+  // HTML de pollas/inicio cambia con cada deploy (refs nuevas a chunks
+  // JS). Si lo cachea el SW, el cliente carga JS viejo con data API
+  // fresca → bug visual (minute calculado en lugar de elapsed). Forzar
+  // network garantiza chunks correctos.
+  /^\/pollas(\/|$)/,
+  /^\/inicio(\/|$)/,
+  /^\/avisos(\/|$)/,
+  /^\/perfil(\/|$)/,
 ];
 
 const serwist = new Serwist({
