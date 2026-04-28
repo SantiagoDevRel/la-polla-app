@@ -213,7 +213,13 @@ export default function OrganizerPanel({
 
   const inviteUrl = token ? `${APP_URL}/invites/polla/${token}` : "";
   const approved = participants.filter((p) => p.status === "approved");
-  const total = buyInAmount * approved.length;
+  // En 'admin_collects' (pago de entrada) el pozo solo refleja la plata
+  // ya recaudada — solo cuentan los participantes marcados como pagados.
+  // En 'pay_winner' no hay flujo de pagos intermedio, así que se cuentan
+  // todos los aprobados.
+  const counted =
+    paymentMode === "admin_collects" ? approved.filter((p) => p.paid) : approved;
+  const total = buyInAmount * counted.length;
 
   return (
     <div className="space-y-4">
