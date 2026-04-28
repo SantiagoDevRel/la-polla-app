@@ -87,23 +87,45 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
   }, [initialKey]);
 
   // Compute the validated payload + emit onChange whenever something changes.
+  // Reglas:
+  //   - cada value debe ser número >= 0 (permitimos 0 para que se pueda
+  //     guardar 100/0/0 o 98/2/0). Empty se interpreta como 0.
+  //   - percentage: la suma TIENE que ser exactamente 100 (con tolerancia
+  //     por floats). No se permite menos ni más — todo el pozo se reparte.
+  //   - cop: cuando pot > 0, la suma TIENE que igualar al pot. Cuando pot
+  //     todavía no es conocido (0 participantes aprobados/pagados), se
+  //     permite cualquier suma positiva para que el admin pueda preparar
+  //     la distribución antes de que entren participantes.
   useEffect(() => {
     if (!onChange) return;
-    const numeric = rows.map((r) => ({ position: r.position, value: parseFloat(r.value) }));
-    const valid = numeric.every((r) => Number.isFinite(r.value) && r.value > 0);
+    const numeric = rows.map((r) => ({
+      position: r.position,
+      value: r.value === "" ? 0 : parseFloat(r.value),
+    }));
+    const valid = numeric.every((r) => Number.isFinite(r.value) && r.value >= 0);
     if (!valid || numeric.length === 0) {
       onChange(null);
       return;
     }
+    const sum = numeric.reduce((acc, r) => acc + r.value, 0);
+    if (sum <= 0) {
+      onChange(null);
+      return;
+    }
     if (mode === "percentage") {
-      const sum = numeric.reduce((acc, r) => acc + r.value, 0);
-      if (sum > 100.0001) {
+      if (Math.abs(sum - 100) > 0.01) {
+        onChange(null);
+        return;
+      }
+    } else {
+      // cop
+      if (pot > 0 && Math.abs(sum - pot) > 0.5) {
         onChange(null);
         return;
       }
     }
     onChange({ mode, prizes: numeric });
-  }, [mode, rows, onChange]);
+  }, [mode, rows, onChange, pot]);
 
   function addRow() {
     setRows((prev) => {
@@ -131,11 +153,19 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
     setRows((prev) => prev.map((r) => ({ ...r, value: "" })));
   }
 
-  const numericRows = rows.map((r) => ({ position: r.position, value: parseFloat(r.value) }));
-  const total = numericRows.reduce((acc, r) => acc + (Number.isFinite(r.value) ? r.value : 0), 0);
+  const numericRows = rows.map((r) => ({
+    position: r.position,
+    value: r.value === "" ? 0 : parseFloat(r.value),
+  }));
+  const total = numericRows.reduce(
+    (acc, r) => acc + (Number.isFinite(r.value) ? r.value : 0),
+    0,
+  );
   const percentSum = mode === "percentage" ? total : 0;
-  const overflowPct = mode === "percentage" && percentSum > 100;
-  const overflowCOP = mode === "cop" && pot > 0 && total > pot;
+  const pctOff = mode === "percentage" && Math.abs(percentSum - 100) > 0.01;
+  const pctOver = mode === "percentage" && percentSum > 100.01;
+  const copOff = mode === "cop" && pot > 0 && Math.abs(total - pot) > 0.5;
+  const copOver = mode === "cop" && pot > 0 && total > pot + 0.5;
 
   return (
     <div className="space-y-4">
@@ -226,27 +256,23 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
         {mode === "percentage" ? (
           <>
             <p
-              className={`flex justify-between ${overflowPct ? "text-red-alert" : "text-text-secondary"}`}
+              className={`flex justify-between ${pctOff ? (pctOver ? "text-red-alert" : "text-amber") : "text-text-secondary"}`}
             >
               <span>Suma total</span>
               <span className="font-semibold">{percentSum.toFixed(2)}%</span>
             </p>
-            {pot > 0 && (
-              <p className="flex justify-between text-text-muted">
-                <span>Sobrante del pozo</span>
-                <span>{fmtCOP(Math.max(0, pot - (pot * percentSum) / 100))}</span>
-              </p>
-            )}
-            {overflowPct && (
-              <p className="text-red-alert text-[11px]">
-                Los porcentajes no pueden superar 100%.
+            {pctOff && (
+              <p className={`text-[11px] ${pctOver ? "text-red-alert" : "text-amber"}`}>
+                {pctOver
+                  ? `Te pasaste por ${(percentSum - 100).toFixed(2)}%. La suma debe ser exactamente 100%.`
+                  : `Faltan ${(100 - percentSum).toFixed(2)}% para llegar a 100%.`}
               </p>
             )}
           </>
         ) : (
           <>
             <p
-              className={`flex justify-between ${overflowCOP ? (optional ? "text-text-secondary" : "text-amber") : "text-text-secondary"}`}
+              className={`flex justify-between ${copOff ? (copOver ? "text-red-alert" : "text-amber") : "text-text-secondary"}`}
             >
               <span>Total a repartir</span>
               <span className="font-semibold">{fmtCOP(total)}</span>
@@ -257,9 +283,11 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
                 <span>{fmtCOP(pot)}</span>
               </p>
             )}
-            {overflowCOP && !optional && (
-              <p className="text-amber text-[11px]">
-                El total supera el pozo actual — verificalo antes del cierre.
+            {copOff && !optional && (
+              <p className={`text-[11px] ${copOver ? "text-red-alert" : "text-amber"}`}>
+                {copOver
+                  ? `Te pasaste por ${fmtCOP(total - pot)}. El total debe igualar el pozo (${fmtCOP(pot)}).`
+                  : `Faltan ${fmtCOP(pot - total)} para igualar el pozo.`}
               </p>
             )}
           </>
