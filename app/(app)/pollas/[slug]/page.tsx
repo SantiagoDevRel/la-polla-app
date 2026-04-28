@@ -313,7 +313,7 @@ function MatchRow({
             // aligns with broadcast time, and returns "90+" for
             // stoppage.
             const minuteLabel = formatLiveMinute(
-              computeLiveMinute(match.scheduled_at),
+              computeLiveMinute(match.scheduled_at, match.elapsed),
             );
             return (
               <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">

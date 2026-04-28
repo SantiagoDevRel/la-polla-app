@@ -1,22 +1,43 @@
 // lib/matches/live-minute.ts — shared helper for the live match clock.
 //
-// Football-data's free tier often omits the `minute` field for live
-// matches, and when it does ship one it can lag a few minutes behind
-// the broadcast. To keep our UI trustworthy we compute the match
-// minute locally from kickoff + a 15-minute halftime allowance:
+// Fuente preferida: `match.elapsed` poblado por ESPN cada minuto vía
+// el cron sync-live. ESPN reporta el minuto del partido auténtico
+// (con stoppage time del primer tiempo, descuento real, etc.) — más
+// confiable que cualquier cálculo nuestro.
+//
+// Fallback: cuando elapsed no está disponible (match recién flippeado
+// a live, ESPN aún no escribió, etc.) calculamos del kickoff con un
+// allowance fijo de 15 min de descanso:
 //
 //   real elapsed ≤ 45 → first-half minute = real elapsed
 //   real elapsed 46–60 → halftime (show 45')
 //   real elapsed ≥ 60 → second-half minute = real elapsed − 15
 //
-// Second-half times greater than 90 return the string "90+" so the
-// UI can render "90+'" during stoppage/added time. Returns null
-// before kickoff and when `scheduledAt` is invalid, so callers can
-// hide the clock safely.
+// El fallback es impreciso (ignora delayed kickoffs, descansos
+// extendidos, stoppage time del primer tiempo). Solo se usa como
+// emergency hasta que ESPN llene el campo.
 
 export type LiveMinute = number | "90+" | null;
 
-export function computeLiveMinute(scheduledAt: string | Date | null | undefined): LiveMinute {
+/**
+ * Devuelve el minuto del partido. Prioriza `dbElapsed` (autoritativo
+ * de ESPN). Si no hay, cae al cálculo desde kickoff.
+ *
+ * @param scheduledAt - kickoff programado (fallback only)
+ * @param dbElapsed   - matches.elapsed escrito por la sync (preferido)
+ */
+export function computeLiveMinute(
+  scheduledAt: string | Date | null | undefined,
+  dbElapsed?: number | null,
+): LiveMinute {
+  // Preferir el valor escrito por ESPN. Solo NULL/0 invalido — un 0
+  // genuino significa "kickoff exacto" pero los feed lo reportan como
+  // 1' inmediato, así que tratarlo como ausente es seguro.
+  if (typeof dbElapsed === "number" && dbElapsed > 0) {
+    if (dbElapsed >= 90) return "90+";
+    return dbElapsed;
+  }
+
   if (!scheduledAt) return null;
   const kickoffMs = new Date(scheduledAt).getTime();
   if (Number.isNaN(kickoffMs)) return null;
