@@ -374,7 +374,7 @@ function MatchRow({
                   value={effectiveDraft.home}
                   ref={homeRef ?? undefined}
                   onChange={(e) => onDraftChange("home", e.target.value)}
-                  placeholder="0"
+                  placeholder=""
                   className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
                     touched
                       ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
@@ -393,7 +393,7 @@ function MatchRow({
                     onDraftChange("away", e.target.value);
                     if (e.target.value.length >= 1) onJumpNext();
                   }}
-                  placeholder="0"
+                  placeholder=""
                   className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
                     touched
                       ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
