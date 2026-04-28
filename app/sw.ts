@@ -29,10 +29,14 @@ declare const self: ServiceWorkerGlobalScope;
 // stale response on the auth flow or any API surface, so we register a
 // single NetworkOnly handler that matches any of these patterns and
 // runs BEFORE the defaultCache rules below it.
+//
+// /api/ — ALL API endpoints. Antes solo cacheábamos auth/admin/webhook
+// pero /api/pollas/[slug] estaba cayendo al defaultCache, lo que hacía
+// que los scores de matches live se vieran stale (cliente refrescaba y
+// veía la respuesta cacheada en vez del DB fresh). Bloqueamos toda /api/
+// y el cache del cliente ya queda en headers HTTP de cada endpoint.
 const NEVER_CACHE_PATHS: RegExp[] = [
-  /\/api\/auth\//,
-  /\/api\/whatsapp\/webhook/,
-  /\/api\/admin\//,
+  /^\/api\//,
   /\/login/,
   /\/invites\/polla\//,
   /\/onboarding/,
