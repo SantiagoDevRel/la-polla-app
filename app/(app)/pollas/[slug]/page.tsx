@@ -1160,7 +1160,9 @@ export default function PollaSlugPage() {
                             {p.users?.display_name || "Usuario"}
                             {isMe && <span className="ml-1 text-xs text-gold">(tú)</span>}
                           </p>
-                          <p className="text-xs text-text-muted">{p.paid ? "Pagado" : "Pendiente"}</p>
+                          {polla.payment_mode === "admin_collects" && (
+                            <p className="text-xs text-text-muted">{p.paid ? "Pagado" : "Pendiente"}</p>
+                          )}
                         </div>
                         <span className="score-font text-[18px] text-text-primary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>{p.total_points}</span>
                       </div>
