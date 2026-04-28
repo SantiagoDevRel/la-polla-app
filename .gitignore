@@ -46,3 +46,24 @@ next-env.d.ts
 
 # Design handoff bundle from claude.ai/design — reference only
 design-handoff/
+
+# Capacitor — el folder `android/` SI se commitea (es el proyecto nativo
+# generado por `cap add android`), pero estos son outputs de Gradle que
+# se regeneran en cada build y NO deben ir al repo.
+/android/app/build/
+/android/build/
+/android/.gradle/
+/android/local.properties
+/android/.idea/
+/android/app/release/
+/android/app/debug/
+*.apk
+*.aab
+
+# Keystores — JAMAS al repo. Si se filtra una upload key, no podes
+# actualizar la app en Play Store. Backup va a un password manager
+# o disco encriptado, no a git.
+*.keystore
+*.jks
+keystore.properties
+!debug.keystore
