@@ -19,7 +19,13 @@ const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
 export const ESPN_LEAGUE_BY_TOURNAMENT: Record<string, string> = {
   champions_2025: "uefa.champions",
   worldcup_2026: "fifa.world",
-  // futuros: laliga_2025 → "esp.1", premier_2025 → "eng.1", etc.
+  laliga_2025: "esp.1",
+  premier_2025: "eng.1",
+  seriea_2025: "ita.1",
+  // Futuros candidatos:
+  //   europa_2025: "uefa.europa"
+  //   colombia_liga_2025: "col.1"
+  //   copa_libertadores_2025: "conmebol.libertadores"
 };
 
 // ─────────────────────────────────────────────────────────────────────
