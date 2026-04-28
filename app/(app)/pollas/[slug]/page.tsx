@@ -234,6 +234,7 @@ interface OtherPrediction {
   points_earned: number | null;
   display_name: string | null;
   avatar_url: string | null;
+  is_me?: boolean;
 }
 
 interface MatchRowProps {
@@ -459,7 +460,9 @@ function MatchRow({
                 return (
                   <li
                     key={op.user_id}
-                    className="flex items-center justify-between gap-2"
+                    className={`flex items-center justify-between gap-2 ${
+                      op.is_me ? "rounded-md bg-gold/8 px-1.5 -mx-1.5 py-0.5" : ""
+                    }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <UserAvatar
@@ -468,8 +471,13 @@ function MatchRow({
                         size="sm"
                         className="!w-6 !h-6"
                       />
-                      <span className="text-[12px] text-text-primary/85 truncate">
+                      <span
+                        className={`text-[12px] truncate ${
+                          op.is_me ? "text-gold font-semibold" : "text-text-primary/85"
+                        }`}
+                      >
                         {op.display_name ?? "Jugador"}
+                        {op.is_me ? <span className="text-[10px] text-gold/80 ml-1">(tú)</span> : null}
                       </span>
                     </div>
                     <span
@@ -746,12 +754,12 @@ export default function PollaSlugPage() {
     return m;
   }, [participants]);
 
-  // Agrupa los pronósticos de los demás por match_id, excluye al usuario
-  // actual y descarta los que ya no están en la lista de participantes.
+  // Agrupa los pronósticos de TODOS por match_id (incluido el usuario
+  // actual marcado con is_me=true para que pueda verse junto a los demás).
+  // Descarta los que ya no están en la lista de participantes approved+paid.
   const otherPredsByMatch = useMemo(() => {
     const out = new Map<string, OtherPrediction[]>();
     for (const ap of allPredictions) {
-      if (ap.user_id === currentUserId) continue;
       const info = participantInfoById.get(ap.user_id);
       if (!info) continue;
       const arr = out.get(ap.match_id) ?? [];
@@ -762,6 +770,7 @@ export default function PollaSlugPage() {
         points_earned: ap.points_earned,
         display_name: info.display_name,
         avatar_url: info.avatar_url,
+        is_me: ap.user_id === currentUserId,
       });
       out.set(ap.match_id, arr);
     }
