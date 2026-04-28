@@ -32,7 +32,7 @@ export default function DeleteAccountPage() {
             >
               santiagotrujillozuluaga@gmail.com
             </a>{" "}
-            con el asunto <strong>"Eliminar cuenta La Polla Colombiana"</strong> e incluye
+            con el asunto <strong>&quot;Eliminar cuenta La Polla Colombiana&quot;</strong> e incluye
             en el cuerpo del correo el número de teléfono celular con el que iniciaste sesión
             (formato internacional, ej. +57 311 234 5678).
           </p>
