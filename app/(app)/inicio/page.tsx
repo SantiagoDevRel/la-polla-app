@@ -637,10 +637,6 @@ export default async function InicioPage() {
         0,
       );
 
-  const userTournaments = Array.from(
-    new Set(sortedPollas.map((p) => p.tournament)),
-  );
-
   // Hero match = the soonest live-or-upcoming match across every active
   // polla's match_ids, read straight from our matches table. This is why
   // the hero is never empty as long as at least one scheduled match
