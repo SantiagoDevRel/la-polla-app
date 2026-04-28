@@ -20,6 +20,7 @@ interface PollaData {
   buy_in_amount: number;
   currency: string; payment_mode: string; type: string;
   participant_count?: number;
+  pot_total?: number;
   winner?: { display_name: string; total_points: number } | null;
   // Phase 3b enrichment — from /api/pollas
   total_matches?: number;
@@ -49,6 +50,7 @@ function adaptPolla(raw: PollaData): React.ComponentProps<typeof PollaCard>["pol
     competitionLogoUrl: TOURNAMENT_ICONS[raw.tournament],
     participantCount: raw.participant_count ?? 0,
     buyInAmount: raw.buy_in_amount ?? 0,
+    potTotal: raw.pot_total ?? 0,
     totalMatches: raw.total_matches ?? 0,
     finishedMatches: raw.finished_matches ?? 0,
   };
