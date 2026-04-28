@@ -8,10 +8,14 @@
 // Validaciones:
 // - mode requerido.
 // - prizes debe tener al menos una entrada.
-// - position >= 1, único, value > 0.
-// - mode='percentage': suma de values <= 100 (no exigimos === 100 porque
-//   el organizador puede dejar un margen para fee/comida/etc.).
-// - mode='cop': value es entero >= 0.
+// - position >= 1, único, value >= 0 (permitimos 0 para soportar
+//   formatos tipo 100/0/0 o 98/2/0 — winner-takes-all explícito).
+// - al menos un value > 0 (no se puede guardar todo en cero).
+// - mode='percentage': suma de values DEBE ser 100 (con tolerancia de
+//   floats). No menos ni más — el pozo se reparte completo.
+// - mode='cop': cliente valida que la suma == pot. El server no conoce
+//   el pot al momento del PATCH (depende de participantes aprobados/
+//   pagados), así que solo enforce no-negativos y suma > 0.
 //
 // DELETE: admin-only. Borra la distribución (vuelve a winner-takes-all).
 import { NextRequest, NextResponse } from "next/server";
@@ -54,16 +58,22 @@ function validate(body: unknown): { ok: true; value: PrizeDistribution } | { ok:
       return { ok: false, error: `position duplicada: ${position}` };
     }
     seen.add(position);
-    if (!Number.isFinite(value) || value <= 0) {
-      return { ok: false, error: "value debe ser > 0" };
+    if (!Number.isFinite(value) || value < 0) {
+      return { ok: false, error: "value debe ser >= 0" };
     }
     prizes.push({ position, value });
   }
   prizes.sort((a, b) => a.position - b.position);
+  const sum = prizes.reduce((acc, p) => acc + p.value, 0);
+  if (sum <= 0) {
+    return { ok: false, error: "al menos un puesto debe tener un valor > 0" };
+  }
   if (mode === "percentage") {
-    const sum = prizes.reduce((acc, p) => acc + p.value, 0);
-    if (sum > 100.0001) {
-      return { ok: false, error: `los porcentajes suman ${sum.toFixed(2)}%, máximo 100%` };
+    if (Math.abs(sum - 100) > 0.01) {
+      return {
+        ok: false,
+        error: `los porcentajes suman ${sum.toFixed(2)}%, deben sumar exactamente 100%`,
+      };
     }
   }
   return { ok: true, value: { mode, prizes } };
