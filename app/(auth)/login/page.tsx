@@ -158,22 +158,18 @@ function LoginInner() {
     }
     setSending(true);
     try {
-      // Client-side: no hay sesión todavía, no necesitamos cookies.
-      // Mismo patrón que los-del-sur-app — el server-side intermediate
-      // creaba quirks raros con rate-limit.
-      const { error: authErr } = await supabase.auth.signInWithOtp({
-        phone,
-        options: { channel: "sms" },
+      // Server-side: /api/auth/start-otp decide si dispara Supabase
+      // (que llama Twilio) o si es un phone admin del bypass list,
+      // en cuyo caso devuelve ok sin gastar Twilio. El cliente no se
+      // entera de la diferencia — UX idéntica.
+      const res = await fetch("/api/auth/start-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phone }),
       });
-      if (authErr) {
-        const msg = (authErr.message || "").toLowerCase();
-        if (msg.includes("phone signups") || msg.includes("provider")) {
-          setError("Login por celular no está activado. Contacta a soporte.");
-        } else if (msg.includes("rate") || msg.includes("limit")) {
-          setError("Muchos intentos. Espera un minuto e inténtalo de nuevo.");
-        } else {
-          setError(authErr.message || "No pudimos enviar el código");
-        }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error || "No pudimos enviar el código");
         return;
       }
       // Arm the cooldown only after a successful send — failures don't
