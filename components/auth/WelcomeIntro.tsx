@@ -39,12 +39,13 @@ const INTRO =
 const INTRO_CHARS = INTRO.split("");
 
 // Order curated for visual recognition: World Cup first (most universal),
-// then the three biggest club competitions, Serie A closes.
+// then the three biggest club competitions. Premier removed — its white
+// background renders inconsistently inside Capacitor WebView (Android),
+// breaking the row alignment vs the dark-on-dark logos of the others.
 const TOURNAMENT_ORDER: Array<{ slug: keyof typeof TOURNAMENT_ICONS; name: string }> = [
   { slug: "worldcup_2026", name: "Mundial" },
   { slug: "champions_2025", name: "Champions" },
   { slug: "laliga_2025", name: "La Liga" },
-  { slug: "premier_2025", name: "Premier" },
   { slug: "seriea_2025", name: "Serie A" },
 ];
 
