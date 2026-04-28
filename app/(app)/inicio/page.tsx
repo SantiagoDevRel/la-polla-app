@@ -820,13 +820,16 @@ export default async function InicioPage() {
                     const inMyPolla = uuid ? stripMatchInUserPolla.has(uuid) : false;
                     const predictionStatus =
                       !myPred && inMyPolla ? ("pending" as const) : undefined;
-                    // Always compute the minute locally from kickoff +
-                    // halftime allowance so the clock aligns with
-                    // broadcast timing. Football-data's minute field is
-                    // unreliable on the free tier.
+                    // Preferimos el `elapsed` escrito por ESPN (vive en
+                    // matches.elapsed de la DB). Como el strip se sirve
+                    // del endpoint /matches?status=LIVE de football-data
+                    // y NO de nuestra DB, m.elapsed acá es el de
+                    // football-data — poco confiable. computeLiveMinute
+                    // hace fallback al cálculo desde kickoff cuando
+                    // dbElapsed es null/0.
                     const minuteLabel =
                       m.status === "live"
-                        ? formatLiveMinute(computeLiveMinute(m.match_date)) ?? undefined
+                        ? formatLiveMinute(computeLiveMinute(m.match_date, m.elapsed)) ?? undefined
                         : undefined;
                     return (
                       <div key={m.id} className="snap-center">
