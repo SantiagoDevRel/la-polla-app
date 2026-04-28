@@ -63,6 +63,12 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true,
     },
+    Keyboard: {
+      // resize/style are iOS-only. resizeOnFullScreen es el unico que
+      // aplica en Android — es un workaround del bug donde el teclado
+      // no resizea la WebView cuando el StatusBar plugin esta activo.
+      resizeOnFullScreen: true,
+    },
   },
 };
 

@@ -1,13 +1,13 @@
 // components/layout/CapacitorReady.tsx
 //
-// Hides the native Capacitor splash screen when the React app first
-// mounts. Without this, native splash auto-hides at 1.5s leaving the
-// WebView blank during cold start + bundle download (10-30s on first
-// launch). With this, native splash stays visible until React paints,
-// then transitions smoothly into the React <SplashScreen /> video.
+// Runs once on mount inside the Capacitor native shell to:
+//   1) Hide the native splash screen (it stays visible until React
+//      paints, then we hand off to the React <SplashScreen /> video).
+//   2) Style the Android status bar to match the app's dark theme so
+//      it does not flash white on launch.
 //
-// Web (non-Capacitor) is a no-op — the dynamic import fails silently
-// and we early-return.
+// Web (non-Capacitor) is a no-op — every dynamic import is gated by an
+// isNativePlatform() check, and plugin failures are swallowed.
 
 "use client";
 
@@ -15,22 +15,31 @@ import { useEffect } from "react";
 
 export function CapacitorReady() {
   useEffect(() => {
-    // Skip on SSR.
     if (typeof window === "undefined") return;
 
-    // Detect Capacitor at runtime. Window.Capacitor is injected by the
-    // native bridge — absent on the regular web build.
     const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
       .Capacitor;
     if (!cap || typeof cap.isNativePlatform !== "function" || !cap.isNativePlatform()) {
       return;
     }
 
-    // Lazy-load the plugin so the package doesn't bloat the web bundle.
+    // 1) Hide native splash (handoff to React splash).
     import("@capacitor/splash-screen")
       .then(({ SplashScreen }) => SplashScreen.hide())
       .catch(() => {
-        /* plugin missing on this build — fine, splash auto-hides at launchShowDuration */
+        /* plugin missing — splash auto-hides at launchShowDuration */
+      });
+
+    // 2) Status bar style: dark background (#080c10) + light icons,
+    // overlapping disabled so content does not slide under it.
+    import("@capacitor/status-bar")
+      .then(async ({ StatusBar, Style }) => {
+        await StatusBar.setStyle({ style: Style.Dark });
+        await StatusBar.setBackgroundColor({ color: "#080c10" });
+        await StatusBar.setOverlaysWebView({ overlay: false });
+      })
+      .catch(() => {
+        /* plugin missing or unsupported — no-op */
       });
   }, []);
 

@@ -14,7 +14,11 @@
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",
+    "@capacitor/keyboard": "^8.0.3",
+    "@capacitor/network": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
+    "@capawesome/capacitor-app-update": "^8.0.3",
     "@marsidev/react-turnstile": "^1.5.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.0",

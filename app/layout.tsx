@@ -5,6 +5,8 @@ import "./globals.css";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { CapacitorReady } from "@/components/layout/CapacitorReady";
 import { CapacitorBackButton } from "@/components/layout/CapacitorBackButton";
+import { CapacitorAppUpdate } from "@/components/layout/CapacitorAppUpdate";
+import { OfflineBanner } from "@/components/layout/OfflineBanner";
 
 const bebas = Bebas_Neue({
   subsets: ["latin"],
@@ -46,6 +48,8 @@ export default function RootLayout({
       <body className="antialiased">
         <CapacitorReady />
         <CapacitorBackButton />
+        <CapacitorAppUpdate />
+        <OfflineBanner />
         <SplashScreen />
         {children}
       </body>
