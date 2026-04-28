@@ -12,6 +12,47 @@ Visual changes ONLY. Never touch API routes, Supabase calls, middleware, auth fl
 
 ---
 
+## Free-tier only (NON-NEGOTIABLE)
+
+La Polla es **gratis para todos los usuarios** y debe correr en planes
+gratuitos punta a punta. Antes de proponer cualquier cambio que
+involucre infra, providers o features que cuesten plata, parate.
+
+Reglas duras:
+
+1. **Sin Vercel Pro / Hobby paid**. Eso descarta `vercel.json` `crons`
+   pago, `maxDuration` > 60s, Edge Config, etc. Si algo necesita
+   ejecución programada, hay que conseguirlo via:
+   - Lazy/on-demand sync disparado por requests de usuarios reales
+     (ver `lib/matches/ensure-fresh.ts`).
+   - GitHub Actions schedule (gratis).
+   - Supabase pg_cron (incluido en plan free).
+   - Webhooks de terceros gratis.
+
+2. **Sin Supabase Pro**. Plan free → 500 MB DB, 1 GB storage, 2 GB
+   bandwidth, 50k MAU. Diseñá queries y schema con eso en la cabeza.
+
+3. **Sin upgrades de proveedores externos** salvo que el usuario lo
+   apruebe explícitamente. Twilio / Resend / Meta WhatsApp / Pixa /
+   football-data / API-Football: todo en free-tier hasta nuevo aviso.
+   Si una limitación bloquea un feature, **proponé el tradeoff antes
+   de asumir que hay que pagar**.
+
+4. **Sin servicios pagos nuevos**. Antes de sugerir un nuevo SaaS,
+   verificá que tenga free-tier viable y dejalo claro en el pitch.
+   Si la única opción es pago, decílo upfront para que el usuario
+   decida (no es un "yes" automático).
+
+5. **Optimizá costos en cada feature**. Cuando agregues algo que
+   consume requests/cómputo/storage, mencionalo y proponé el camino
+   más barato (cache agresivo, throttling, lazy load, sync compartido).
+
+**Si encontrás un feature trabado por límites de free-tier, listalo
+como tradeoff y dejá que el usuario decida si paga o si simplificamos
+el feature.** Nunca asumas que pagar es OK.
+
+---
+
 ## TODO · auth.uid() propagation audit (still open)
 
 `auth.uid()` returns NULL in the PostgREST request context even when

@@ -100,9 +100,28 @@ export async function syncCompetition(
     const row = mapMatchToRow(match, tournament);
 
     try {
-      const { error } = await supabase
-        .from("matches")
-        .upsert(row, { onConflict: "external_id" });
+      // Usamos la función Postgres `upsert_match_safe` que respeta el
+      // candado live_updated_at. Si ESPN escribió hace <10 min, los
+      // campos status/home_score/away_score/elapsed se preservan y
+      // football-data solo refresca metadata (teams, flags, kickoff,
+      // phase). En INSERT nuevo o cuando ESPN está silencioso, escribe
+      // todo normal. Migration 027 define la función.
+      const { error } = await supabase.rpc("upsert_match_safe", {
+        p_external_id: row.external_id,
+        p_tournament: row.tournament,
+        p_match_day: row.match_day,
+        p_phase: row.phase,
+        p_home_team: row.home_team,
+        p_away_team: row.away_team,
+        p_home_team_flag: row.home_team_flag,
+        p_away_team_flag: row.away_team_flag,
+        p_scheduled_at: row.scheduled_at,
+        p_venue: row.venue,
+        p_home_score: row.home_score,
+        p_away_score: row.away_score,
+        p_status: row.status,
+        p_elapsed: row.elapsed,
+      });
 
       if (error) {
         console.error(`[sync] Error upsert match ${row.external_id}: ${error.message}`);
