@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncEspnLive } from "@/lib/espn/sync";
+import { verifyPendingFinals } from "@/lib/matches/verify-final";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -72,10 +73,17 @@ async function runSync() {
   }
 
   const espn = await syncEspnLive();
+
+  // Después de la sync, chequear si hay matches que recién pasaron a
+  // finished y todavía no están verified contra la otra fuente.
+  // verifyPendingFinals corre solo cuando hay candidatos — barato.
+  const verifications = await verifyPendingFinals();
+
   return {
     ok: true,
     skipped: false,
     espn,
+    verifications,
     ms: Date.now() - started,
   };
 }
