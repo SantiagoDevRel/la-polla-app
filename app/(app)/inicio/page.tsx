@@ -37,7 +37,13 @@ import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { POLLA_COLUMNS_LITE } from "@/lib/db/columns";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { computeLiveMinute, formatLiveMinute } from "@/lib/matches/live-minute";
-import { getLiveMatches } from "@/lib/football-api";
+import { deriveTla } from "@/lib/football-api";
+
+// El strip "En vivo" depende de scores/elapsed que cambian cada minuto.
+// Sin esto, Next.js puede cachear el render del Server Component y
+// servir HTML stale aunque la DB esté fresh.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 import { MatchHero } from "@/components/match/MatchHero";
 import { LiveChip } from "@/components/match/LiveChip";
 import { ActivePollasEmpty } from "@/components/inicio/ActivePollasEmpty";
@@ -722,58 +728,61 @@ export default async function InicioPage() {
     }
   }
 
-  // Live strip uses football-data for real-time scores/minutes.
-  const userLive = userTournaments.length > 0 ? await getLiveMatches(userTournaments) : [];
-  const stripMatches = userLive
-    .sort(
-      (a, b) =>
-        new Date(a.match_date).getTime() - new Date(b.match_date).getTime(),
-    )
-    .slice(0, 10);
+  // Live strip ahora lee de NUESTRA DB (que tiene ESPN fresh via cron
+  // sync-live cada 1 min) en vez de llamar a football-data directo.
+  // football-data tiene 5-15 min de lag para in-play, ESPN sub-minuto.
+  // Solo matches que pertenecen a alguna polla activa del user
+  // (allUserMatchIds), filtrados por status='live', orden por kickoff,
+  // tope 10.
+  type StripMatch = {
+    id: string;
+    external_id: string | null;
+    home_team: string;
+    away_team: string;
+    home_team_flag: string | null;
+    away_team_flag: string | null;
+    scheduled_at: string;
+    status: string;
+    home_score: number | null;
+    away_score: number | null;
+    elapsed: number | null;
+    tournament: string;
+  };
+  let stripMatches: StripMatch[] = [];
+  if (allUserMatchIds.length > 0) {
+    const { data: rows } = await admin
+      .from("matches")
+      .select(
+        "id, external_id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, status, home_score, away_score, elapsed, tournament",
+      )
+      .in("id", allUserMatchIds)
+      .eq("status", "live")
+      .order("scheduled_at", { ascending: true })
+      .limit(10);
+    stripMatches = (rows || []) as StripMatch[];
+  }
   const showStrip = !isActiveEmpty && stripMatches.length >= 1;
 
-  // Enrich each live strip entry with the user's prediction context so
-  // LiveChip can show "Tu pred: X-Y" or "Falta pronóstico" in its
-  // footer. One roundtrip per load:
-  //   1. external_id → DB UUID for every strip match
-  //   2. predictions for this user on those UUIDs
-  //   3. which of those UUIDs actually belong to one of the user's
-  //      active pollas (otherwise we cannot say "Falta pronóstico" —
-  //      the user is not supposed to predict this match at all)
-  const stripExternalToUuid = new Map<string, string>();
+  // Predictions del user para los matches del strip — keyed por UUID.
+  // Como ya tenemos los UUIDs directo (no via external_id), no
+  // necesitamos el mapping ni el set de "in user polla" del flujo
+  // anterior — todos los matches del strip ya pertenecen al user.
   const stripPredByMatchUuid = new Map<string, { home: number; away: number }>();
-  const stripMatchInUserPolla = new Set<string>();
   if (stripMatches.length > 0) {
-    const { data: dbRows } = await admin
-      .from("matches")
-      .select("id, external_id")
-      .in("external_id", stripMatches.map((m) => m.id));
-    for (const row of (dbRows || []) as Array<{ id: string; external_id: string }>) {
-      stripExternalToUuid.set(row.external_id, row.id);
-    }
-    const uuids = Array.from(stripExternalToUuid.values());
-    if (uuids.length > 0) {
-      const { data: preds } = await admin
-        .from("predictions")
-        .select("match_id, predicted_home, predicted_away")
-        .eq("user_id", user.id)
-        .in("match_id", uuids);
-      for (const p of (preds || []) as Array<{
-        match_id: string;
-        predicted_home: number;
-        predicted_away: number;
-      }>) {
-        stripPredByMatchUuid.set(p.match_id, {
-          home: p.predicted_home,
-          away: p.predicted_away,
-        });
-      }
-      const pollaMatchIds = new Set(
-        activePollas.flatMap((p) => p.match_ids || []),
-      );
-      for (const uuid of uuids) {
-        if (pollaMatchIds.has(uuid)) stripMatchInUserPolla.add(uuid);
-      }
+    const { data: preds } = await admin
+      .from("predictions")
+      .select("match_id, predicted_home, predicted_away")
+      .eq("user_id", user.id)
+      .in("match_id", stripMatches.map((m) => m.id));
+    for (const p of (preds || []) as Array<{
+      match_id: string;
+      predicted_home: number;
+      predicted_away: number;
+    }>) {
+      stripPredByMatchUuid.set(p.match_id, {
+        home: p.predicted_home,
+        away: p.predicted_away,
+      });
     }
   }
 
@@ -815,32 +824,29 @@ export default async function InicioPage() {
               <div className="overflow-x-auto hide-scrollbar">
                 <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
                   {stripMatches.map((m) => {
-                    const uuid = stripExternalToUuid.get(m.id);
-                    const myPred = uuid ? stripPredByMatchUuid.get(uuid) : undefined;
-                    const inMyPolla = uuid ? stripMatchInUserPolla.has(uuid) : false;
+                    // Ahora m es un row de nuestra DB (UUID, elapsed
+                    // de ESPN, etc). Predictions se cargan keyed por
+                    // UUID, todos los matches del strip ya pertenecen
+                    // a una polla del user.
+                    const myPred = stripPredByMatchUuid.get(m.id);
                     const predictionStatus =
-                      !myPred && inMyPolla ? ("pending" as const) : undefined;
-                    // Preferimos el `elapsed` escrito por ESPN (vive en
-                    // matches.elapsed de la DB). Como el strip se sirve
-                    // del endpoint /matches?status=LIVE de football-data
-                    // y NO de nuestra DB, m.elapsed acá es el de
-                    // football-data — poco confiable. computeLiveMinute
-                    // hace fallback al cálculo desde kickoff cuando
-                    // dbElapsed es null/0.
+                      !myPred ? ("pending" as const) : undefined;
+                    const homeCode = deriveTla(m.home_team);
+                    const awayCode = deriveTla(m.away_team);
                     const minuteLabel =
                       m.status === "live"
-                        ? formatLiveMinute(computeLiveMinute(m.match_date, m.elapsed)) ?? undefined
+                        ? formatLiveMinute(computeLiveMinute(m.scheduled_at, m.elapsed)) ?? undefined
                         : undefined;
                     return (
                       <div key={m.id} className="snap-center">
                         <LiveChip
                           kind={m.status === "live" ? "live" : "upcoming"}
-                          homeCode={m.home_team_tla}
-                          awayCode={m.away_team_tla}
+                          homeCode={homeCode}
+                          awayCode={awayCode}
                           homeScore={m.status === "live" ? m.home_score ?? undefined : undefined}
                           awayScore={m.status === "live" ? m.away_score ?? undefined : undefined}
                           minuteLabel={minuteLabel}
-                          kickoffAt={m.status !== "live" ? new Date(m.match_date) : undefined}
+                          kickoffAt={m.status !== "live" ? new Date(m.scheduled_at) : undefined}
                           myPrediction={myPred}
                           predictionStatus={predictionStatus}
                         />
