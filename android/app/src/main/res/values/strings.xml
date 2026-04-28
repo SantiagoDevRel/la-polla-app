@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">La Polla Colombiana</string>
+    <string name="title_activity_main">La Polla Colombiana</string>
+    <string name="package_name">com.lapollacolombiana.app</string>
+    <string name="custom_url_scheme">com.lapollacolombiana.app</string>
+</resources>
