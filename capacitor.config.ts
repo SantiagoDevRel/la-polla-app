@@ -50,7 +50,14 @@ const config: CapacitorConfig = {
 
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1500,
+      // Native splash queda visible hasta que React monta y llama
+      // SplashScreen.hide() (ver components/layout/CapacitorReady.tsx).
+      // Evita el "flash blanco" durante cold start de Vercel + WebView
+      // load + bundle download. Si por algun motivo React nunca monta
+      // (ej. crash JS), el launchShowDuration funciona como timeout
+      // hard.
+      launchShowDuration: 30000,
+      launchAutoHide: false,
       backgroundColor: "#080c10",
       androidSplashResourceName: "splash",
       splashFullScreen: true,
