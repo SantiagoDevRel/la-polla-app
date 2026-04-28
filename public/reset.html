@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Limpiando caché — La Polla</title>
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <style>
+    html, body { margin: 0; padding: 0; background: #080c10; color: #F5F7FA; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100%; }
+    body { display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+    h1 { color: #FFD700; font-size: 22px; margin: 0 0 12px; }
+    p { color: #AEB7C7; font-size: 14px; line-height: 1.5; margin: 0 0 8px; max-width: 360px; }
+    code { background: #131b2b; padding: 2px 6px; border-radius: 4px; color: #F5F7FA; font-size: 12px; }
+    .ok { color: #1FD87F; }
+    .err { color: #FF3D57; }
+    button { margin-top: 16px; background: #FFD700; color: #080c10; border: 0; padding: 12px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>Limpiando caché</h1>
+    <p id="status">Esperando…</p>
+    <p style="margin-top:18px;font-size:11px;color:#6B7689">Si esta página queda colgada más de 10s, cerrá la app, abrí <code>lapollacolombiana.com/reset.html</code> en el navegador (Safari/Chrome — no en la PWA) y volvé a probar.</p>
+    <button id="manual" style="display:none" onclick="location.replace('/')">Volver a la app</button>
+  </div>
+
+<script>
+(async function () {
+  const status = document.getElementById('status');
+  const manualBtn = document.getElementById('manual');
+  const log = (msg, cls) => {
+    status.innerHTML += '<br>' + (cls ? '<span class="' + cls + '">' + msg + '</span>' : msg);
+  };
+
+  try {
+    status.textContent = 'Limpiando service workers...';
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      log('Service Workers encontrados: ' + regs.length);
+      for (const reg of regs) {
+        try {
+          await reg.unregister();
+          log('  ✓ unregistered ' + (reg.scope || ''), 'ok');
+        } catch (e) {
+          log('  ✗ ' + (e && e.message || e), 'err');
+        }
+      }
+    } else {
+      log('  (no hay soporte de Service Worker en este navegador)');
+    }
+
+    log('');
+    log('Limpiando caches...');
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      log('Caches encontrados: ' + keys.length);
+      for (const key of keys) {
+        try {
+          await caches.delete(key);
+          log('  ✓ deleted ' + key, 'ok');
+        } catch (e) {
+          log('  ✗ ' + (e && e.message || e), 'err');
+        }
+      }
+    } else {
+      log('  (no hay soporte de Cache Storage en este navegador)');
+    }
+
+    log('');
+    log('Limpiando sessionStorage / localStorage flags...');
+    try {
+      // No borramos todo — el localStorage puede tener cosas útiles del
+      // user (preferencias, drafts). Solo limpiamos claves de Next/Serwist.
+      const keys = Object.keys(localStorage);
+      let removed = 0;
+      for (const k of keys) {
+        if (k.startsWith('next-') || k.startsWith('serwist') || k.startsWith('__sw') || k.startsWith('workbox')) {
+          localStorage.removeItem(k);
+          removed++;
+        }
+      }
+      log('  ✓ ' + removed + ' claves de framework removidas', 'ok');
+    } catch (e) {
+      log('  ✗ ' + (e && e.message || e), 'err');
+    }
+
+    log('');
+    log('✓ Listo. Recargando en 2s...', 'ok');
+    setTimeout(function () { location.replace('/?t=' + Date.now()); }, 2000);
+    setTimeout(function () {
+      // Fallback en caso que el reload se quede colgado por algún motivo.
+      manualBtn.style.display = 'inline-block';
+    }, 6000);
+  } catch (err) {
+    log('');
+    log('Falló: ' + (err && err.message || err), 'err');
+    manualBtn.style.display = 'inline-block';
+  }
+})();
+</script>
+</body>
+</html>
