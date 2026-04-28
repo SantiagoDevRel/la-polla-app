@@ -48,14 +48,35 @@ function mapStatus(apiStatus: string): "live" | "finished" | "scheduled" {
   }
 }
 
+// Derive a 3-letter code from a team name when football-data omite el
+// tla en la respuesta. Toma iniciales de las primeras 3 palabras
+// significativas (descartando FC, CF, AC, etc), o las primeras 3
+// letras si el nombre es de una sola palabra.
+function deriveTla(name: string | undefined | null): string {
+  if (!name) return "TBD";
+  const stop = new Set(["FC", "CF", "AC", "SC", "AFC", "VFL", "VFB", "FK", "BK", "CD", "RC", "SD", "SS", "TSG", "USL"]);
+  const words = name
+    .split(/\s+/)
+    .map((w) => w.replace(/[^A-Za-zÀ-ÿ]/g, ""))
+    .filter((w) => w.length > 0 && !stop.has(w.toUpperCase()));
+  if (words.length === 0) return name.substring(0, 3).toUpperCase();
+  if (words.length === 1) return words[0].substring(0, 3).toUpperCase();
+  return words
+    .slice(0, 3)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapMatch(m: any): FootballMatch {
+  const homeName = m.homeTeam?.name || "TBD";
+  const awayName = m.awayTeam?.name || "TBD";
   return {
     id: String(m.id),
-    home_team: m.homeTeam?.name || "TBD",
-    away_team: m.awayTeam?.name || "TBD",
-    home_team_tla: m.homeTeam?.tla || "???",
-    away_team_tla: m.awayTeam?.tla || "???",
+    home_team: homeName,
+    away_team: awayName,
+    home_team_tla: m.homeTeam?.tla || m.homeTeam?.shortName?.substring(0, 3).toUpperCase() || deriveTla(homeName),
+    away_team_tla: m.awayTeam?.tla || m.awayTeam?.shortName?.substring(0, 3).toUpperCase() || deriveTla(awayName),
     home_team_flag: m.homeTeam?.crest || null,
     away_team_flag: m.awayTeam?.crest || null,
     home_score: m.score?.fullTime?.home ?? null,
