@@ -654,14 +654,15 @@ export default async function InicioPage() {
     tournament: string;
   };
 
-  // Próximos strip scope: scheduled matches inside the user's pollas,
-  // kickoff between (now + 5 min) and end-of-tomorrow, in chronological
-  // order. Capped at 15 so the horizontal scroll is fast but every
-  // actionable kickoff for today/tomorrow is surfaced. Dropping the
-  // previous "hero" selector — Inicio no longer single-features one
-  // match inline; the full score input lives in the polla Partidos
-  // tab where bulk fills + auto-jump already work.
-  let upcomingStripMatches: HeroRow[] = [];
+  // Próximos strip scope: una card por (polla, partido) cuando un
+  // partido aparece en varias pollas del usuario. Si tenés 3 pollas con
+  // los mismos 3 partidos, ves 9 cards — cada una linkea su QuickPick a
+  // la polla correcta para que pronostiqués en cada polla por separado.
+  // Filtra a partidos scheduled, kickoff entre (now + 5 min) y end-of-
+  // tomorrow, ordenado por kickoff asc y luego por nombre de polla
+  // estable. Cap 15 cards.
+  type StripEntry = { match: HeroRow; polla: EnrichedPolla };
+  let upcomingStripEntries: StripEntry[] = [];
   if (allUserMatchIds.length > 0) {
     const lockCutoff = new Date(Date.now() + 5 * 60 * 1000).toISOString();
     const tomorrowEnd = new Date();
@@ -674,37 +675,51 @@ export default async function InicioPage() {
       .eq("status", "scheduled")
       .gt("scheduled_at", lockCutoff)
       .lt("scheduled_at", tomorrowEnd.toISOString())
-      .order("scheduled_at", { ascending: true })
-      .limit(15);
-    upcomingStripMatches = ((rows || []) as HeroRow[]);
+      .order("scheduled_at", { ascending: true });
+    const matchById = new Map<string, HeroRow>();
+    for (const m of (rows || []) as HeroRow[]) matchById.set(m.id, m);
+
+    // Expandir: para cada polla activa, agregar una entry por cada
+    // match que esté en su match_ids y en la ventana de upcoming.
+    const expanded: StripEntry[] = [];
+    for (const polla of activePollas) {
+      for (const matchId of polla.match_ids || []) {
+        const match = matchById.get(matchId);
+        if (match) expanded.push({ match, polla });
+      }
+    }
+    expanded.sort((a, b) => {
+      const ka = new Date(a.match.scheduled_at).getTime();
+      const kb = new Date(b.match.scheduled_at).getTime();
+      if (ka !== kb) return ka - kb;
+      return a.polla.name.localeCompare(b.polla.name);
+    });
+    upcomingStripEntries = expanded.slice(0, 15);
   }
 
-  // Prediction map for the upcoming strip so each chip can surface
-  // "Tu pred: X-Y" or "Falta pronóstico".
-  const upcomingPredByMatch = new Map<string, { home: number; away: number }>();
-  if (upcomingStripMatches.length > 0) {
+  // Prediction map para el strip — keyed por (polla_id|match_id) porque
+  // un mismo match en pollas diferentes puede tener predictions distintas.
+  const upcomingPredByPollaMatch = new Map<string, { home: number; away: number }>();
+  if (upcomingStripEntries.length > 0) {
+    const pollaIds = Array.from(new Set(upcomingStripEntries.map((e) => e.polla.id)));
+    const matchIds = Array.from(new Set(upcomingStripEntries.map((e) => e.match.id)));
     const { data: preds } = await admin
       .from("predictions")
-      .select("match_id, predicted_home, predicted_away")
+      .select("polla_id, match_id, predicted_home, predicted_away")
       .eq("user_id", user.id)
-      .in("match_id", upcomingStripMatches.map((m) => m.id));
+      .in("polla_id", pollaIds)
+      .in("match_id", matchIds);
     for (const p of (preds || []) as Array<{
+      polla_id: string;
       match_id: string;
       predicted_home: number;
       predicted_away: number;
     }>) {
-      upcomingPredByMatch.set(p.match_id, {
+      upcomingPredByPollaMatch.set(`${p.polla_id}|${p.match_id}`, {
         home: p.predicted_home,
         away: p.predicted_away,
       });
     }
-  }
-
-  // Polla slug resolver for chip tap-through (→ /pollas/{slug}?tab=partidos).
-  function pollaForMatch(matchId: string): EnrichedPolla | null {
-    return (
-      activePollas.find((p) => (p.match_ids || []).includes(matchId)) ?? null
-    );
   }
 
   // Live strip uses football-data for real-time scores/minutes.
@@ -840,7 +855,7 @@ export default async function InicioPage() {
               per "page", so users swipe left-right through every
               prediction they still owe. Cap 15 cards — more than that
               and they should use the polla Partidos tab. */}
-          {!isActiveEmpty && upcomingStripMatches.length > 0 ? (
+          {!isActiveEmpty && upcomingStripEntries.length > 0 ? (
             <section>
               <h2 className="lp-section-title px-4 mb-3 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-gold" aria-hidden="true" />
@@ -848,28 +863,25 @@ export default async function InicioPage() {
               </h2>
               <div className="overflow-x-auto hide-scrollbar">
                 <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
-                  {upcomingStripMatches.map((m) => {
-                    const polla = pollaForMatch(m.id);
-                    const myPred = upcomingPredByMatch.get(m.id);
+                  {upcomingStripEntries.map(({ match: m, polla }) => {
+                    const myPred = upcomingPredByPollaMatch.get(`${polla.id}|${m.id}`);
                     return (
                       <div
-                        key={m.id}
+                        key={`${polla.id}|${m.id}`}
                         className="snap-center shrink-0 w-[88vw] max-w-[420px]"
                       >
                         <MatchHero
                           {...heroPropsFromDb(m)}
                           myPrediction={myPred ?? undefined}
                           quickPickSlot={
-                            polla ? (
-                              <QuickPickStrip
-                                pollaSlug={polla.slug}
-                                pollaName={polla.name}
-                                matchId={m.id}
-                                initialPrediction={myPred ?? undefined}
-                                presets={sampleQuickPickPresets(4)}
-                                locked={false}
-                              />
-                            ) : undefined
+                            <QuickPickStrip
+                              pollaSlug={polla.slug}
+                              pollaName={polla.name}
+                              matchId={m.id}
+                              initialPrediction={myPred ?? undefined}
+                              presets={sampleQuickPickPresets(4)}
+                              locked={false}
+                            />
                           }
                         />
                       </div>
