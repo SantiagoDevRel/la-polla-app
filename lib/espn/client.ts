@@ -139,8 +139,13 @@ export function parseEspnMinute(displayClock: string | undefined, period: number
   // "FT" → fin del partido. Devolvemos null y el status='finished'
   // ya describe el estado.
   if (trimmed.toUpperCase() === "FT") return null;
-  // "45+2'" o "45'+2" → tomamos el base + el adicional.
-  const match = trimmed.match(/^(\d+)(?:\s*\+\s*(\d+))?'?$/);
+  // ESPN usa varios formatos de displayClock dependiendo del momento:
+  //   "45"   "45'"   "45+2"   "45+2'"
+  //   "45'+2"     ← apostrofe entre base y +
+  //   "45'+2'"    ← apostrofe en ambos lados
+  //   "90'+3'"    ← stoppage time del segundo tiempo
+  // El regex tolera la apóstrofe opcional después del base y del extra.
+  const match = trimmed.match(/^(\d+)['′]?(?:\s*\+\s*(\d+)['′]?)?$/);
   if (!match) return null;
   const base = Number.parseInt(match[1], 10);
   const extra = match[2] ? Number.parseInt(match[2], 10) : 0;
