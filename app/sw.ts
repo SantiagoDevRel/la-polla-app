@@ -40,6 +40,10 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   /\/login/,
   /\/invites\/polla\//,
   /\/onboarding/,
+  // Kill-switch: si un user queda atrapado con un SW corrupto/viejo,
+  // visitar /reset.html ejecuta JS que desuscribe TODOS los SWs y
+  // limpia caches. Tiene que pegar al network siempre.
+  /^\/reset\.html$/,
 ];
 
 const serwist = new Serwist({
