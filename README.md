@@ -4,6 +4,27 @@ App de pollas (predicciones de fútbol) para el Mundial Colombia 2026 y otras co
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
+## Filosofía: free-tier punta a punta
+
+La Polla es **gratis para todos** y se mantiene sobre planes gratuitos
+de cada proveedor. Esto es una restricción dura, no una preferencia:
+
+- **Vercel** plan Hobby — sin crons pagos, sin Edge Config, sin
+  `maxDuration` > 60s. Sync de partidos es lazy (disparado por
+  requests reales) en vez de cron — ver `lib/matches/ensure-fresh.ts`.
+- **Supabase** plan free — 500 MB DB / 50k MAU. Schema y queries
+  diseñadas dentro de esos límites.
+- **football-data.org** plan free — 10 req/min. La sync usa filtro
+  `dateFrom/dateTo` chico + throttle adaptativo.
+- **Twilio Verify** — pay-as-you-go con presupuesto controlado por
+  `TWILIO_MONTHLY_BUDGET_USD`.
+- **Meta WhatsApp Cloud API**, **Resend** — free tiers.
+
+Antes de agregar un servicio, verificá que tenga free-tier viable. Si
+una limitación bloquea un feature, listá el tradeoff y dejá que el
+usuario decida — no asumas que pagar está OK. Mismo principio en
+`CLAUDE.md` para sesiones con Claude.
+
 ## Stack
 
 - **Next.js 14** App Router + TypeScript
