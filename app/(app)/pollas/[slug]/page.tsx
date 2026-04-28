@@ -721,8 +721,15 @@ export default function PollaSlugPage() {
           redundant with the ranking tab and crowded the header; the
           pot + (i) is the only context strip now. */}
       {polla.buy_in_amount > 0 && (() => {
-        const approvedCount = participants.filter((p) => p.status === "approved").length;
-        const total = polla.buy_in_amount * approvedCount;
+        // En 'admin_collects' (pago de entrada) el pozo solo refleja la
+        // plata efectivamente recaudada — solo cuentan los participantes
+        // marcados como pagados. En 'pay_winner' no hay flujo de pagos
+        // intermedio, así que se cuentan todos los aprobados.
+        const countedCount =
+          polla.payment_mode === "admin_collects"
+            ? participants.filter((p) => p.status === "approved" && p.paid).length
+            : participants.filter((p) => p.status === "approved").length;
+        const total = polla.buy_in_amount * countedCount;
         return (
           <div className="px-4 py-1.5 bg-bg-elevated border-b border-border-subtle">
             <div className="max-w-lg mx-auto text-center text-xs text-text-primary flex items-center justify-center gap-1.5">
@@ -1028,12 +1035,15 @@ export default function PollaSlugPage() {
 
             {/* Prize distribution lives inside Tabla so all participants
                 can see what's at stake. Admins get the editor in-place;
-                everyone else sees the read-only view. The pot is computed
-                the same way as the header pot band: buy_in × approved
-                participants. */}
+                everyone else sees the read-only view. El pot se calcula
+                igual que el header: en 'admin_collects' solo cuentan los
+                pagados, en 'pay_winner' todos los aprobados. */}
             {(() => {
-              const approvedCount = participants.filter((p) => p.status === "approved").length;
-              const pot = polla.buy_in_amount * approvedCount;
+              const countedCount =
+                polla.payment_mode === "admin_collects"
+                  ? participants.filter((p) => p.status === "approved" && p.paid).length
+                  : participants.filter((p) => p.status === "approved").length;
+              const pot = polla.buy_in_amount * countedCount;
               return isOrganizer ? (
                 <PrizeDistributionEditor
                   pollaSlug={polla.slug}
