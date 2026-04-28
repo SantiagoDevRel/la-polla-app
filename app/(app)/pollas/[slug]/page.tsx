@@ -654,9 +654,9 @@ export default function PollaSlugPage() {
   const awayInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const homeInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (silent: boolean = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const { data } = await axios.get(`/api/pollas/${slug}`);
       setPolla(data.polla);
       setParticipants(data.participants);
@@ -667,20 +667,50 @@ export default function PollaSlugPage() {
       setCurrentUserRole(data.currentUserRole);
       setCurrentUserStatus(data.currentUserStatus || "approved");
       setCurrentUserPaid(data.currentUserPaid ?? true);
-      const d: Record<string, { home: string; away: string }> = {};
-      data.predictions.forEach((p: Prediction) => {
-        d[p.match_id] = { home: p.predicted_home.toString(), away: p.predicted_away.toString() };
-      });
-      setDrafts(d);
+      // En refresh silencioso NO pisamos los drafts del usuario — si
+      // tipió un score y todavía no guardó, mantener su input. Solo
+      // seedeamos drafts en el primer load.
+      if (!silent) {
+        const d: Record<string, { home: string; away: string }> = {};
+        data.predictions.forEach((p: Prediction) => {
+          d[p.match_id] = { home: p.predicted_home.toString(), away: p.predicted_away.toString() };
+        });
+        setDrafts(d);
+      }
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || "Error cargando la polla");
+      if (!silent) {
+        const e = err as { response?: { data?: { error?: string } } };
+        setError(e.response?.data?.error || "Error cargando la polla");
+      }
+      // En silent: dejamos correr sin tocar el state — al siguiente tick
+      // reintenta. No queremos que un blip de red rompa la UI.
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [slug]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Client-side polling cuando hay match live en la polla. Backend se
+  // actualiza cada 1 min vía pg_cron + ESPN, pero la UI no se entera
+  // hasta que vuelva a fetchear. Re-cargamos cada 30s para que el
+  // score / minuto se vean fresh sin pedirle al user que refresque.
+  // Sin polling cuando no hay live: cero requests innecesarias.
+  useEffect(() => {
+    const hasLive = matches.some(
+      (m) => m.status === "live" ||
+        (m.status === "scheduled" &&
+          Date.now() >= new Date(m.scheduled_at).getTime() - 5 * 60 * 1000),
+    );
+    if (!hasLive) return;
+    const id = setInterval(() => {
+      // Solo refrescar si la pestaña está visible — ahorra requests
+      // cuando el user dejó la app abierta de fondo.
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      loadData(true);
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [matches, loadData]);
 
   // One-shot default-tab routing: admin_collects participants who have not
   // been confirmed by the organizer land on Pagos first. Ref guard avoids
