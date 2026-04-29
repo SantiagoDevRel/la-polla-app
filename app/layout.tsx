@@ -6,6 +6,7 @@ import { SplashScreen } from "@/components/layout/SplashScreen";
 import { CapacitorReady } from "@/components/layout/CapacitorReady";
 import { CapacitorBackButton } from "@/components/layout/CapacitorBackButton";
 import { CapacitorAppUpdate } from "@/components/layout/CapacitorAppUpdate";
+import { CapacitorDeepLinks } from "@/components/layout/CapacitorDeepLinks";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
 
 const bebas = Bebas_Neue({
@@ -48,6 +49,7 @@ export default function RootLayout({
       <body className="antialiased">
         <CapacitorReady />
         <CapacitorBackButton />
+        <CapacitorDeepLinks />
         <CapacitorAppUpdate />
         <OfflineBanner />
         <SplashScreen />

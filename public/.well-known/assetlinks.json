@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.lapollacolombiana.app",
+      "sha256_cert_fingerprints": [
+        "D4:18:4B:CD:42:32:A6:E5:38:E8:78:C9:A1:5C:89:68:BF:9B:51:BB:24:E4:0B:6F:A0:3E:59:C6:0D:89:59:9B"
+      ]
+    }
+  }
+]

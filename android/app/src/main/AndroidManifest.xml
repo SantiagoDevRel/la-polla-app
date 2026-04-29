@@ -19,6 +19,22 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Android App Links: capturar URLs https://lapollacolombiana.com/*
+                 directamente en el app (no abrir el browser). Requiere
+                 .well-known/assetlinks.json publicado en el dominio con
+                 los SHA-256 de la upload key + Play App Signing key.
+                 autoVerify=true hace que Android verifique el assetlinks
+                 al instalar y, si todo cuadra, asocie el dominio al app
+                 automaticamente sin "Open with..." prompt. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="lapollacolombiana.com" />
+                <data android:host="www.lapollacolombiana.com" />
+            </intent-filter>
         </activity>
 
         <provider
