@@ -42,6 +42,30 @@ export const TOURNAMENTS = [
     logoPath: `/tournaments/seria_a.png?v=${LOGO_V}`,
     color: "#007bc0",
   },
+  // Latin American leagues — ESPN-only (football-data plan free no las
+  // cubre). Single-source verification por ahora; cuando agreguemos
+  // un segundo proveedor (API-Football u otro), pasan a doble check.
+  {
+    slug: "libertadores_2026",
+    name: "Copa Libertadores",
+    apiCode: "CLI",
+    logoPath: `/tournaments/copa_libertadores.png?v=${LOGO_V}`,
+    color: "#005f8e",
+  },
+  {
+    slug: "sudamericana_2026",
+    name: "Copa Sudamericana",
+    apiCode: "CSU",
+    logoPath: `/tournaments/copa_sudamericana.png?v=${LOGO_V}`,
+    color: "#e9242a",
+  },
+  {
+    slug: "betplay_2026",
+    name: "Liga BetPlay",
+    apiCode: "BP",
+    logoPath: `/tournaments/liga_betplay.png?v=${LOGO_V}`,
+    color: "#fcd116",
+  },
 ] as const;
 
 export type TournamentSlug = (typeof TOURNAMENTS)[number]["slug"];
@@ -67,4 +91,7 @@ export const TOURNAMENT_ICONS: Record<string, string> = {
   laliga_2025: `/tournaments/la_liga.png?v=${LOGO_V}`,
   premier_2025: `/tournaments/premier_league.webp?v=${LOGO_V}`,
   seriea_2025: `/tournaments/seria_a.png?v=${LOGO_V}`,
+  libertadores_2026: `/tournaments/copa_libertadores.png?v=${LOGO_V}`,
+  sudamericana_2026: `/tournaments/copa_sudamericana.png?v=${LOGO_V}`,
+  betplay_2026: `/tournaments/liga_betplay.png?v=${LOGO_V}`,
 };

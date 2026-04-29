@@ -67,3 +67,5 @@ design-handoff/
 *.jks
 keystore.properties
 !debug.keystore
+
+.env*.local

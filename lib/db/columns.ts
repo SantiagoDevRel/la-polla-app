@@ -15,15 +15,16 @@ export const POLLA_COLUMNS =
 
 // Subset for /inicio enriched-polla aggregation: the page only needs
 // progress + ranking inputs, no pricing/payment fields. Trimming the row
-// keeps the SSR payload small.
+// keeps the SSR payload small. scope + starts_at incluidos para que
+// /inicio pueda resolver matches dinámicos via resolvePollaMatchIds.
 export const POLLA_COLUMNS_LITE =
-  "id, slug, name, tournament, status, type, match_ids, buy_in_amount, created_at" as const;
+  "id, slug, name, tournament, status, type, match_ids, buy_in_amount, created_at, scope, starts_at" as const;
 
 export const POLLA_PARTICIPANT_COLUMNS =
   "id, polla_id, user_id, role, status, paid, paid_at, paid_amount, payment_note, payment_proof_url, payment_mode_note, payment_status, total_points, rank, joined_at" as const;
 
 export const MATCH_COLUMNS =
-  "id, external_id, tournament, match_day, phase, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, venue, home_score, away_score, status, elapsed, notified_closing, created_at" as const;
+  "id, external_id, tournament, match_day, phase, home_team, away_team, home_team_flag, away_team_flag, home_team_abbr, away_team_abbr, scheduled_at, venue, home_score, away_score, status, elapsed, live_status_detail, notified_closing, created_at" as const;
 
 export const PREDICTION_COLUMNS =
   "id, polla_id, user_id, match_id, predicted_home, predicted_away, submitted_at, locked, visible, points_earned" as const;

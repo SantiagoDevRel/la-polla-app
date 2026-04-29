@@ -76,6 +76,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/api/whatsapp/webhook") ||
     path.startsWith("/api/whatsapp/test-send") ||
     path.startsWith("/api/matches/sync") ||
+    path.startsWith("/api/matches/discover") ||
     path.startsWith("/api/admin/");
 
   if (!user && !isPublicRoute && !isApiWebhook) {

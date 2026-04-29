@@ -36,7 +36,7 @@ import {
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { POLLA_COLUMNS_LITE } from "@/lib/db/columns";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
-import { computeLiveMinute, formatLiveMinute } from "@/lib/matches/live-minute";
+import { computeLiveMinute, formatLiveMinute, specialStatusLabel } from "@/lib/matches/live-minute";
 import { deriveTla } from "@/lib/football-api";
 
 // El strip "En vivo" depende de scores/elapsed que cambian cada minuto.
@@ -737,11 +737,14 @@ export default async function InicioPage() {
     away_team: string;
     home_team_flag: string | null;
     away_team_flag: string | null;
+    home_team_abbr: string | null;
+    away_team_abbr: string | null;
     scheduled_at: string;
     status: string;
     home_score: number | null;
     away_score: number | null;
     elapsed: number | null;
+    live_status_detail: string | null;
     tournament: string;
   };
   let stripMatches: StripMatch[] = [];
@@ -749,7 +752,7 @@ export default async function InicioPage() {
     const { data: rows } = await admin
       .from("matches")
       .select(
-        "id, external_id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, status, home_score, away_score, elapsed, tournament",
+        "id, external_id, home_team, away_team, home_team_flag, away_team_flag, home_team_abbr, away_team_abbr, scheduled_at, status, home_score, away_score, elapsed, live_status_detail, tournament",
       )
       .in("id", allUserMatchIds)
       .eq("status", "live")
@@ -827,11 +830,21 @@ export default async function InicioPage() {
                     const myPred = stripPredByMatchUuid.get(m.id);
                     const predictionStatus =
                       !myPred ? ("pending" as const) : undefined;
-                    const homeCode = deriveTla(m.home_team);
-                    const awayCode = deriveTla(m.away_team);
+                    // Preferimos abbreviation oficial del proveedor
+                    // (ESPN: ATM, ARS · football-data: ATL, ARS) sobre
+                    // el deriveTla del nombre, que en español falla
+                    // ('Club Atlético de Madrid' → 'CAD' en vez de
+                    // 'ATM'). deriveTla queda como último fallback.
+                    const homeCode = m.home_team_abbr || deriveTla(m.home_team);
+                    const awayCode = m.away_team_abbr || deriveTla(m.away_team);
+                    // Si ESPN reporta halftime / overtime / etc, la
+                    // etiqueta especial (Descanso, Penales, etc.) tiene
+                    // prioridad sobre el minuto numérico — sino veríamos
+                    // "47'" durante el descanso.
+                    const special = specialStatusLabel(m.live_status_detail);
                     const minuteLabel =
                       m.status === "live"
-                        ? formatLiveMinute(computeLiveMinute(m.scheduled_at, m.elapsed)) ?? undefined
+                        ? (special ?? formatLiveMinute(computeLiveMinute(m.scheduled_at, m.elapsed))) ?? undefined
                         : undefined;
                     return (
                       <div key={m.id} className="snap-center">
@@ -839,6 +852,8 @@ export default async function InicioPage() {
                           kind={m.status === "live" ? "live" : "upcoming"}
                           homeCode={homeCode}
                           awayCode={awayCode}
+                          homeLogo={m.home_team_flag}
+                          awayLogo={m.away_team_flag}
                           homeScore={m.status === "live" ? m.home_score ?? undefined : undefined}
                           awayScore={m.status === "live" ? m.away_score ?? undefined : undefined}
                           minuteLabel={minuteLabel}

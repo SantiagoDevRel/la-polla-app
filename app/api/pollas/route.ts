@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { generateUniqueJoinCode } from "@/lib/pollas/join-code";
 import { POLLA_COLUMNS } from "@/lib/db/columns";
+import { resolvePollaMatchIds } from "@/lib/matches/resolve-scope";
 import { z } from "zod";
 
 // Modos de pago válidos (payment_mode en la DB es varchar, no enum)
@@ -145,8 +146,28 @@ export async function GET() {
     participantPollas.forEach((p) => {
       if (!pollaMap.has(p.id)) pollaMap.set(p.id, p);
     });
-    const pollas = Array.from(pollaMap.values()).sort(
+    const pollasRaw = Array.from(pollaMap.values()).sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+
+    // Para pollas con scope dinámico (full / regular_season /
+    // knockouts / group_stage), match_ids no es canónico — los matches
+    // se resuelven por tournament+phase+starts_at. Enriquecemos in-
+    // memory para que el resto del código (effective_status, totals,
+    // progress) siga usando match_ids transparentemente.
+    const pollas = await Promise.all(
+      pollasRaw.map(async (p) => {
+        if (p.scope === "custom" || !p.scope) return p;
+        const resolved = await resolvePollaMatchIds(admin, {
+          id: p.id,
+          scope: p.scope,
+          tournament: p.tournament,
+          match_ids: p.match_ids,
+          starts_at: p.starts_at ?? null,
+          created_at: p.created_at,
+        });
+        return { ...p, match_ids: resolved };
+      }),
     );
 
     // Compute effective_status: a polla is effectively ended if every match_id is finished

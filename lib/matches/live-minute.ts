@@ -58,3 +58,38 @@ export function formatLiveMinute(minute: LiveMinute): string | null {
   if (minute == null) return null;
   return typeof minute === "number" ? `${minute}'` : `${minute}'`;
 }
+
+/**
+ * Mapea el status detail de ESPN a una etiqueta amistosa para los
+ * casos donde NO queremos mostrar el minuto (descanso, fin de
+ * tiempo regular, penales, etc). Cuando este helper devuelve string,
+ * la UI lo usa en lugar del clock minute.
+ *
+ * Pasale `match.live_status_detail` (o equivalente). Si no está o no
+ * matchea ningún caso especial, retorna null y la UI cae al minuto.
+ */
+export function specialStatusLabel(
+  liveStatusDetail: string | null | undefined,
+): string | null {
+  if (!liveStatusDetail) return null;
+  switch (liveStatusDetail) {
+    case "STATUS_HALFTIME":
+      return "Descanso";
+    case "STATUS_END_OF_REGULATION":
+      return "Fin 90'";
+    case "STATUS_END_OF_PERIOD":
+      return "Fin 1°T";
+    case "STATUS_OVERTIME":
+    case "STATUS_FIRST_HALF_EXTRA_TIME":
+    case "STATUS_SECOND_HALF_EXTRA_TIME":
+      return "Tiempo extra";
+    case "STATUS_END_OF_EXTRA_TIME":
+      return "Fin ET";
+    case "STATUS_SHOOTOUT":
+      return "Penales";
+    case "STATUS_DELAYED":
+      return "Demorado";
+    default:
+      return null;
+  }
+}
