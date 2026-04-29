@@ -22,11 +22,22 @@ export const ESPN_LEAGUE_BY_TOURNAMENT: Record<string, string> = {
   laliga_2025: "esp.1",
   premier_2025: "eng.1",
   seriea_2025: "ita.1",
-  // Futuros candidatos:
-  //   europa_2025: "uefa.europa"
-  //   colombia_liga_2025: "col.1"
-  //   copa_libertadores_2025: "conmebol.libertadores"
+  libertadores_2026: "conmebol.libertadores",
+  sudamericana_2026: "conmebol.sudamericana",
+  betplay_2026: "col.1",
 };
+
+/**
+ * Tournaments donde ESPN es la ÚNICA fuente disponible (football-data
+ * plan free no las cubre). El verify-final puede operar con
+ * single-source para estos. Cuando se agregue un segundo proveedor
+ * (API-Football, etc.) movemos estos slugs fuera de la lista.
+ */
+export const ESPN_ONLY_TOURNAMENTS: ReadonlySet<string> = new Set([
+  "libertadores_2026",
+  "sudamericana_2026",
+  "betplay_2026",
+]);
 
 // ─────────────────────────────────────────────────────────────────────
 // Tipos parciales — solo modelamos los campos que consumimos. ESPN
@@ -59,6 +70,8 @@ export interface ESPNCompetitor {
     displayName: string;
     shortDisplayName: string;
     abbreviation: string;
+    /** URL al CDN de ESPN con el escudo del equipo, 500x500 PNG. */
+    logo?: string;
   };
 }
 

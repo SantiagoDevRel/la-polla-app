@@ -44,7 +44,7 @@ function PitchIcon({ className }: { className?: string }) {
   );
 }
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
-import { computeLiveMinute, formatLiveMinute } from "@/lib/matches/live-minute";
+import { computeLiveMinute, formatLiveMinute, specialStatusLabel } from "@/lib/matches/live-minute";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 // ─── Tipos ───
@@ -76,6 +76,7 @@ interface Match {
   home_score: number | null; away_score: number | null; phase: string | null;
   match_day: number | null;
   elapsed: number | null;
+  live_status_detail: string | null;
 }
 interface Prediction {
   id: string; match_id: string; predicted_home: number; predicted_away: number;
@@ -312,7 +313,11 @@ function MatchRow({
             // deducts a 15-minute halftime allowance so the clock
             // aligns with broadcast time, and returns "90+" for
             // stoppage.
-            const minuteLabel = formatLiveMinute(
+            // Si ESPN reporta halftime / overtime / etc., la etiqueta
+            // especial gana al minuto. Durante el descanso muestra
+            // "Descanso" en vez de "47'".
+            const special = specialStatusLabel(match.live_status_detail);
+            const minuteLabel = special ?? formatLiveMinute(
               computeLiveMinute(match.scheduled_at, match.elapsed),
             );
             return (
@@ -1102,6 +1107,7 @@ export default function PollaSlugPage() {
                     })}
                   </div>
                 )}
+
               </div>
             )}
 

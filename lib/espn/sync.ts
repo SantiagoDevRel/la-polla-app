@@ -210,6 +210,7 @@ export async function syncEspnLive(): Promise<EspnSyncResult[]> {
         p_home_score: newHome,
         p_away_score: newAway,
         p_elapsed: newElapsed,
+        p_status_detail: event.status.type.name,
       });
       if (rpcErr) {
         console.error(`[espn-sync] rpc update failed for ${row.id}:`, rpcErr.message);

@@ -7,6 +7,10 @@ export interface LiveChipProps {
   kind: "live" | "upcoming";
   homeCode: string;
   awayCode: string;
+  /** URL al logo del equipo home (ESPN o football-data). Si está, se
+   *  muestra; si no, fallback al code de letras. */
+  homeLogo?: string | null;
+  awayLogo?: string | null;
   homeScore?: number;
   awayScore?: number;
   /** Pre-formatted minute label, e.g. "34'" or "90+'". Pass exactly
@@ -50,6 +54,8 @@ export function LiveChip(props: LiveChipProps) {
     kind,
     homeCode,
     awayCode,
+    homeLogo,
+    awayLogo,
     homeScore,
     awayScore,
     minuteLabel,
@@ -59,6 +65,38 @@ export function LiveChip(props: LiveChipProps) {
   } = props;
 
   const isLive = kind === "live";
+
+  function renderTeam(logo: string | null | undefined, code: string) {
+    if (logo) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logo}
+          alt={code}
+          width={24}
+          height={24}
+          className="object-contain"
+          style={{ width: 24, height: 24 }}
+          onError={(e) => {
+            // Si la imagen falla (ESPN cambió URL, etc.), ocultamos
+            // y mostramos el code de letras como fallback. Hacemos
+            // el toggle reemplazando el src con un data:1x1 transparente
+            // y agregando el code abajo en CSS — en práctica
+            // simplemente ocultamos el img y dejamos un span vecino.
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+            const sibling = (e.currentTarget as HTMLImageElement)
+              .nextElementSibling as HTMLElement | null;
+            if (sibling) sibling.style.display = "inline";
+          }}
+        />
+      );
+    }
+    return (
+      <span className="font-display text-[16px] tracking-[0.04em] text-text-primary">
+        {code}
+      </span>
+    );
+  }
 
   return (
     <div
@@ -91,10 +129,14 @@ export function LiveChip(props: LiveChipProps) {
         )}
       </div>
 
-      {/* Teams + score row */}
+      {/* Teams + score row. Mostramos el escudo cuando el provider
+          nos lo da (ESPN logo / football-data crest). Fallback al
+          code de letras (ATM/ARS/etc.) si no hay logo o falla la
+          imagen. El code SIEMPRE se renderiza junto al logo como
+          screen-reader / fallback. */}
       <div className="flex items-center justify-between">
-        <span className="font-display text-[16px] tracking-[0.04em] text-text-primary">
-          {homeCode}
+        <span className="flex items-center gap-1 min-w-0">
+          {renderTeam(homeLogo, homeCode)}
         </span>
         {isLive ? (
           <span
@@ -106,8 +148,8 @@ export function LiveChip(props: LiveChipProps) {
         ) : (
           <span className="font-display text-[16px] tracking-[0.04em] text-text-muted">—</span>
         )}
-        <span className="font-display text-[16px] tracking-[0.04em] text-text-primary">
-          {awayCode}
+        <span className="flex items-center gap-1 min-w-0 justify-end">
+          {renderTeam(awayLogo, awayCode)}
         </span>
       </div>
 

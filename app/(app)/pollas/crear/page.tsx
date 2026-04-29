@@ -72,7 +72,7 @@ const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = {
   pay_winner: "Al final, todos le pagan directamente al ganador.",
 };
 
-type GroupBy = "date" | "jornada" | "phase";
+type GroupBy = "date" | "phase";
 
 // ─── Componente principal ───
 
@@ -92,6 +92,12 @@ export default function CrearPollaPage() {
     paymentMode: "pay_winner",
     adminPaymentInstructions: "",
   });
+
+  // El creador siempre elige partidos específicos. Los placeholders
+  // de fases futuras (cuartos/semis/final) aparecen como rows en el
+  // picker — el organizador chequea cuáles incluir. Cuando ESPN
+  // publica el matchup real, el placeholder se promueve in-place
+  // (mismo UUID, predicciones intactas).
 
   // Scroll-to-top entre pasos. Sin esto el browser preserva la posición
   // del scroll del paso anterior y el usuario aparece a la mitad de la
@@ -144,15 +150,21 @@ export default function CrearPollaPage() {
     for (const m of matches) {
       let key: string;
       let label: string;
+      const isPlaceholder = m.home_team === "TBD" && m.away_team === "TBD";
 
       if (groupBy === "date") {
-        const d = new Date(m.scheduled_at);
-        key = d.toISOString().split("T")[0];
-        label = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
-        label = label.charAt(0).toUpperCase() + label.slice(1);
-      } else if (groupBy === "jornada") {
-        key = `md-${m.match_day ?? "sin"}`;
-        label = m.match_day ? `Jornada ${m.match_day}` : "Sin jornada";
+        // En vista por fecha, agrupamos los placeholders TBD aparte
+        // bajo "Por confirmar" — sus fechas son estimadas y mezclarlas
+        // con días reales confunde. Vista por fase muestra todo junto.
+        if (isPlaceholder) {
+          key = "_tbd";
+          label = "Por confirmar";
+        } else {
+          const d = new Date(m.scheduled_at);
+          key = d.toISOString().split("T")[0];
+          label = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+          label = label.charAt(0).toUpperCase() + label.slice(1);
+        }
       } else {
         key = m.phase || "unknown";
         label = formatPhase(m.phase);
@@ -162,7 +174,18 @@ export default function CrearPollaPage() {
       map.get(key)!.matches.push(m);
     }
 
-    map.forEach(({ label, matches: ms }, key) => {
+    // Ordenamos: fechas reales (asc por scheduled_at) primero, luego
+    // "_tbd" siempre al final, así el user ve los partidos confirmados
+    // primero y los placeholders al final.
+    const entries = Array.from(map.entries());
+    entries.sort(([keyA, valA], [keyB, valB]) => {
+      if (keyA === "_tbd") return 1;
+      if (keyB === "_tbd") return -1;
+      const a = valA.matches[0]?.scheduled_at ?? "";
+      const b = valB.matches[0]?.scheduled_at ?? "";
+      return a.localeCompare(b);
+    });
+    entries.forEach(([key, { label, matches: ms }]) => {
       groups.push({ key, label, matchIds: ms.map((m: MatchRow) => m.id), matches: ms });
     });
 
@@ -223,7 +246,10 @@ export default function CrearPollaPage() {
         if (!form.tournament) { setError("Selecciona un torneo"); return; }
       }
       if (step === 2) {
-        if (selectedMatchIds.size === 0) { setError("Selecciona al menos 1 partido"); return; }
+        if (selectedMatchIds.size === 0) {
+          setError("Selecciona al menos 1 partido");
+          return;
+        }
       }
     }
     setStep(targetStep);
@@ -358,13 +384,13 @@ export default function CrearPollaPage() {
 
             {/* Group filters */}
             <div className="hide-scrollbar" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
-              {(["date", "jornada", "phase"] as GroupBy[]).map((g) => (
+              {(["date", "phase"] as GroupBy[]).map((g) => (
                 <button key={g} onClick={() => setGroupBy(g)} style={{
                   borderRadius: 20, padding: "4px 10px", fontSize: 11, fontWeight: groupBy === g ? 600 : 500, cursor: "pointer", whiteSpace: "nowrap",
                   background: groupBy === g ? "rgba(255,215,0,0.1)" : "#0e1420", color: groupBy === g ? "#FFD700" : "#4a5568",
                   border: groupBy === g ? "1px solid rgba(255,215,0,0.22)" : "1px solid rgba(255,255,255,0.06)", fontFamily: "'Outfit', sans-serif",
                 }}>
-                  {{ date: "Por fecha", jornada: "Por jornada", phase: "Por fase" }[g]}
+                  {{ date: "Por fecha", phase: "Por fase" }[g]}
                 </button>
               ))}
             </div>
@@ -409,11 +435,22 @@ export default function CrearPollaPage() {
                     {/* Match rows */}
                     {group.matches.map((m) => {
                       const isChecked = selectedMatchIds.has(m.id);
-                      const time = new Date(m.scheduled_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+                      const isPlaceholder = m.home_team === "TBD" && m.away_team === "TBD";
+                      const time = isPlaceholder
+                        ? "Por confirmar"
+                        : new Date(m.scheduled_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+                      // Para placeholders mostramos el label de la fase
+                      // + slot ("Cuartos · #1") en vez de "TBD vs TBD"
+                      // que no le dice nada al user. Cuando ESPN publica
+                      // el matchup real, el row se promueve in-place.
+                      const placeholderTitle = isPlaceholder
+                        ? `${formatPhase(m.phase)} · #${m.match_day ?? "?"}`
+                        : null;
                       return (
                         <div key={m.id} onClick={() => toggleMatch(m.id)} style={{
                           display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", cursor: "pointer",
                           borderBottom: "1px solid rgba(255,255,255,0.04)", background: isChecked ? "rgba(255,215,0,0.03)" : "transparent",
+                          opacity: isPlaceholder ? 0.85 : 1,
                         }}>
                           {/* Checkbox */}
                           <div style={{
@@ -427,38 +464,54 @@ export default function CrearPollaPage() {
                             )}
                           </div>
 
-                          {/* Home team */}
-                          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                            {m.home_team_flag ? (
-                              <Image src={m.home_team_flag} alt={m.home_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                            ) : (
-                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#F5F7FA", flexShrink: 0 }}>
-                                {m.home_team.substring(0, 3).toUpperCase()}
+                          {isPlaceholder ? (
+                            // Render simplificado para placeholder:
+                            // "Cuartos · #1 — Por confirmar"
+                            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#AEB7C7" strokeWidth="2" style={{ flexShrink: 0 }}>
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M12 6v6l4 2" />
+                              </svg>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "#AEB7C7" }}>
+                                {placeholderTitle}
+                              </span>
+                            </div>
+                          ) : (
+                            <>
+                              {/* Home team */}
+                              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                                {m.home_team_flag ? (
+                                  <Image src={m.home_team_flag} alt={m.home_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                ) : (
+                                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#F5F7FA", flexShrink: 0 }}>
+                                    {m.home_team.substring(0, 3).toUpperCase()}
+                                  </div>
+                                )}
+                                <span style={{ fontSize: 12, fontWeight: 500, color: "#f0f4ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {m.home_team}
+                                </span>
                               </div>
-                            )}
-                            <span style={{ fontSize: 12, fontWeight: 500, color: "#f0f4ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {m.home_team}
-                            </span>
-                          </div>
 
-                          <span style={{ fontSize: 10, color: "#4a5568", flexShrink: 0 }}>vs</span>
+                              <span style={{ fontSize: 10, color: "#4a5568", flexShrink: 0 }}>vs</span>
 
-                          {/* Away team */}
-                          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                            {m.away_team_flag ? (
-                              <Image src={m.away_team_flag} alt={m.away_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                            ) : (
-                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#F5F7FA", flexShrink: 0 }}>
-                                {m.away_team.substring(0, 3).toUpperCase()}
+                              {/* Away team */}
+                              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                                {m.away_team_flag ? (
+                                  <Image src={m.away_team_flag} alt={m.away_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                ) : (
+                                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#F5F7FA", flexShrink: 0 }}>
+                                    {m.away_team.substring(0, 3).toUpperCase()}
+                                  </div>
+                                )}
+                                <span style={{ fontSize: 12, fontWeight: 500, color: "#f0f4ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {m.away_team}
+                                </span>
                               </div>
-                            )}
-                            <span style={{ fontSize: 12, fontWeight: 500, color: "#f0f4ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {m.away_team}
-                            </span>
-                          </div>
+                            </>
+                          )}
 
-                          {/* Time */}
-                          <span style={{ fontSize: 10, color: "#F5F7FA", flexShrink: 0, minWidth: 36, textAlign: "right" }}>{time}</span>
+                          {/* Time / "Por confirmar" */}
+                          <span style={{ fontSize: 10, color: isPlaceholder ? "#AEB7C7" : "#F5F7FA", flexShrink: 0, minWidth: 36, textAlign: "right", fontStyle: isPlaceholder ? "italic" : "normal" }}>{time}</span>
                         </div>
                       );
                     })}

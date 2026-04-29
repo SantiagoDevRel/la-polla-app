@@ -49,6 +49,16 @@ function mapPhase(stage: string): string {
 }
 
 function mapMatchToRow(match: FDMatch, tournament: string) {
+  // football-data usa `tla` (3-letter code FIFA-style). Si falta,
+  // dejamos null y el cliente cae al displayName.
+  const homeAbbr =
+    (match.homeTeam as { tla?: string; shortName?: string }).tla ??
+    (match.homeTeam as { tla?: string; shortName?: string }).shortName ??
+    null;
+  const awayAbbr =
+    (match.awayTeam as { tla?: string; shortName?: string }).tla ??
+    (match.awayTeam as { tla?: string; shortName?: string }).shortName ??
+    null;
   return {
     external_id: String(match.id),
     tournament,
@@ -58,6 +68,8 @@ function mapMatchToRow(match: FDMatch, tournament: string) {
     away_team: match.awayTeam.name,
     home_team_flag: match.homeTeam.crest || null,
     away_team_flag: match.awayTeam.crest || null,
+    home_team_abbr: homeAbbr,
+    away_team_abbr: awayAbbr,
     scheduled_at: match.utcDate,
     venue: match.venue || null,
     home_score: match.score?.fullTime?.home ?? null,
@@ -115,6 +127,8 @@ export async function syncCompetition(
         p_away_team: row.away_team,
         p_home_team_flag: row.home_team_flag,
         p_away_team_flag: row.away_team_flag,
+        p_home_team_abbr: row.home_team_abbr,
+        p_away_team_abbr: row.away_team_abbr,
         p_scheduled_at: row.scheduled_at,
         p_venue: row.venue,
         p_home_score: row.home_score,
