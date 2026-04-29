@@ -11,6 +11,7 @@ import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import OrganizerPanel from "@/components/polla/OrganizerPanel";
 import PrizeDistributionEditor from "@/components/polla/PrizeDistributionEditor";
 import PrizeDistributionView from "@/components/polla/PrizeDistributionView";
+import PollaPayoutFlow from "@/components/polla/PollaPayoutFlow";
 import EmptyState from "@/components/ui/EmptyState";
 import InviteModal from "@/components/polla/InviteModal";
 import PhoneInput from "@/components/ui/PhoneInput";
@@ -936,6 +937,13 @@ export default function PollaSlugPage() {
       </div>
 
       <main className="max-w-lg mx-auto p-4 space-y-3">
+        {/* Liquidación de pagos al cierre. El componente decide solo
+            si renderizar el banner / abrir el modal — cuando la polla
+            todavía no está 'ended' o no hay pendientes, no muestra
+            nada. Aparece arriba de cualquier tab para que el admin /
+            ganador / perdedor lo vea siempre. */}
+        <PollaPayoutFlow slug={slug} />
+
         {/* ── TAB PARTIDOS ── */}
         {activeTab === "partidos" && showPaymentPending && (
           <div className="rounded-2xl p-6 text-center lp-card space-y-3">
