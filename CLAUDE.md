@@ -61,6 +61,14 @@ cuando el user diga sí/no explícito o se haya completado.
   screenshot manual). Discutido 2026-04-29 — el user dijo
   "no" explícito a pasarela P2P real, pero el QR Bre-B sigue como
   posibilidad UX. Mantener visible.
+- **Pollas combinadas multi-torneo:** al crear polla, el organizador
+  debería poder elegir matches de DIFERENTES torneos (ej. cuartos de
+  Champions + clásico de La Liga + final de Sudamericana en una
+  misma polla). Hoy `pollas.tournament` es un solo string.
+  Pendiente: schema (¿array de tournaments? ¿drop tournament para
+  scope=custom?), refactor de `/pollas/crear` (picker que cruza
+  ligas), display en /pollas/[slug] header, fallback de tournament
+  badge cuando es combinada. Pedido por el user 2026-04-29.
 
 ---
 

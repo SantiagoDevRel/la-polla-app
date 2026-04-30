@@ -86,17 +86,25 @@ export default function AdminPage() {
   const [twilio, setTwilio] = useState<TwilioUsage | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [discrepancyCount, setDiscrepancyCount] = useState<number>(0);
+  const [claudeUsage, setClaudeUsage] = useState<{
+    mtdTotal: { calls: number; errors: number; tokensIn: number; tokensOut: number; costUSD: number };
+    byUser: Array<{ userId: string | null; displayName: string; calls: number; cost: number }>;
+    byEndpoint: Array<{ endpoint: string; calls: number; cost: number }>;
+    suspicious: Array<{ userId: string; displayName: string; count24h: number }>;
+    suspiciousThreshold: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryRes, twilioRes, analyticsRes, discRes] = await Promise.allSettled([
+      const [summaryRes, twilioRes, analyticsRes, discRes, claudeRes] = await Promise.allSettled([
         axios.get<Summary>("/api/admin/summary"),
         axios.get<TwilioUsage>("/api/admin/twilio-usage"),
         axios.get<Analytics>("/api/admin/analytics"),
         axios.get<{ matches: unknown[] }>("/api/admin/discrepancies"),
+        axios.get("/api/admin/claude-usage"),
       ]);
       if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
       else showToast("No se pudo cargar el panel", "error");
@@ -105,6 +113,7 @@ export default function AdminPage() {
       if (discRes.status === "fulfilled") {
         setDiscrepancyCount(discRes.value.data.matches?.length ?? 0);
       }
+      if (claudeRes.status === "fulfilled") setClaudeUsage(claudeRes.value.data);
     } finally {
       setLoading(false);
     }
@@ -468,6 +477,86 @@ export default function AdminPage() {
                 </button>
               </div>
             </section>
+
+            {/* Claude API · uso del mes */}
+            {claudeUsage ? (
+              <section
+                className="rounded-2xl p-4 space-y-3"
+                style={{ background: "#0e1420", border: "1px solid rgba(255,255,255,0.06)" }}
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-text-primary">Claude API · uso del mes</h2>
+                  <span className="text-[10px] text-text-muted">Haiku Vision + futuras</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-text-muted">Costo MTD</p>
+                    <p className="font-display mt-0.5 tabular-nums" style={{ fontSize: 22, color: "#FFD700", fontFeatureSettings: '"tnum"' }}>
+                      ${claudeUsage.mtdTotal.costUSD.toFixed(4)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-text-muted">Calls</p>
+                    <p className="font-display mt-0.5 tabular-nums" style={{ fontSize: 22, color: "#FFD700", fontFeatureSettings: '"tnum"' }}>
+                      {claudeUsage.mtdTotal.calls}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-text-muted">Errores</p>
+                    <p
+                      className="font-display mt-0.5 tabular-nums"
+                      style={{
+                        fontSize: 22,
+                        color: claudeUsage.mtdTotal.errors > 0 ? "#FF3D57" : "#FFD700",
+                        fontFeatureSettings: '"tnum"',
+                      }}
+                    >
+                      {claudeUsage.mtdTotal.errors}
+                    </p>
+                  </div>
+                </div>
+
+                {claudeUsage.suspicious.length > 0 ? (
+                  <div className="rounded-xl p-3 bg-amber/10 border border-amber/30 space-y-1">
+                    <p className="text-[11px] font-bold text-amber">
+                      Users sospechosos (&gt; {claudeUsage.suspiciousThreshold} uploads en 24h)
+                    </p>
+                    {claudeUsage.suspicious.map((s) => (
+                      <p key={s.userId} className="text-[11px] text-text-primary">
+                        {s.displayName} —{" "}
+                        <span className="tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+                          {s.count24h}
+                        </span>{" "}
+                        uploads
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+
+                {claudeUsage.byUser.length > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-text-muted">Top users (mes)</p>
+                    {claudeUsage.byUser.slice(0, 5).map((u) => (
+                      <div
+                        key={u.userId ?? "anon"}
+                        className="flex items-center justify-between text-[11px] py-1 border-b border-border-subtle/40 last:border-0"
+                      >
+                        <span className="text-text-primary truncate flex-1 mr-2">{u.displayName}</span>
+                        <span
+                          className="text-text-muted tabular-nums"
+                          style={{ fontFeatureSettings: '"tnum"' }}
+                        >
+                          {u.calls} calls · ${u.cost.toFixed(4)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-text-muted">Sin uso este mes todavía.</p>
+                )}
+              </section>
+            ) : null}
 
             {/* Sincronización */}
             <section
