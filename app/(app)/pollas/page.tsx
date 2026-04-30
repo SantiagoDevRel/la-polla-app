@@ -15,7 +15,9 @@ import FootballLoader from "@/components/ui/FootballLoader";
 
 interface PollaData {
   id: string; name: string; slug: string; description?: string;
-  tournament: string; status: string;
+  tournament: string;
+  tournaments?: string[] | null;
+  status: string;
   effective_status?: string;
   buy_in_amount: number;
   currency: string; payment_mode: string; type: string;
@@ -42,12 +44,22 @@ import { getTournamentName } from "@/lib/tournaments";
 import { formatPhone } from "@/lib/format-phone";
 
 function adaptPolla(raw: PollaData): React.ComponentProps<typeof PollaCard>["polla"] {
+  // Para pollas combinadas (>= 2 torneos), pasamos el array de logos
+  // a PollaCard. Para single-tournament queda sin competitionLogos y
+  // PollaCard cae al render del logo único.
+  const logos =
+    raw.tournaments && raw.tournaments.length > 1
+      ? (raw.tournaments
+          .map((slug) => TOURNAMENT_ICONS[slug])
+          .filter((u): u is string => !!u))
+      : undefined;
   return {
     id: raw.id,
     slug: raw.slug,
     name: raw.name,
     competitionName: getTournamentName(raw.tournament) ?? "Desconocido",
     competitionLogoUrl: TOURNAMENT_ICONS[raw.tournament],
+    competitionLogos: logos,
     participantCount: raw.participant_count ?? 0,
     buyInAmount: raw.buy_in_amount ?? 0,
     potTotal: raw.pot_total ?? 0,

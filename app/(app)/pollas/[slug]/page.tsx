@@ -299,7 +299,10 @@ function MatchRow({
       <div className="flex-1 min-w-0 p-3">
         {/* Phase label + kickoff pill. League-format matches get the
             tournament logo + name; knockout phases get the Spanish
-            phase translation. */}
+            phase translation. Si el match es editable y todavía no
+            hay pronóstico (ni guardado ni en draft), mostramos un
+            badge "Falta" rojo para que sea obvio que esa fila pide
+            atención. */}
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] text-text-primary/70 truncate">
             {isLeagueFormatPhase(match.phase) && TOURNAMENT_ICONS[tournamentSlug] ? (
@@ -312,6 +315,12 @@ function MatchRow({
               />
             ) : null}
             <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day)}</span>
+            {editable && !pred && !touched ? (
+              <span className="inline-flex items-center gap-0.5 text-[9px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md bg-red-alert/15 text-red-alert border border-red-alert/30 whitespace-nowrap">
+                <span aria-hidden="true">*</span>
+                Falta
+              </span>
+            ) : null}
           </span>
           {isLive ? (() => {
             // Always compute locally — football-data's minute is
@@ -377,44 +386,52 @@ function MatchRow({
                   {match.away_score ?? "—"}
                 </span>
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={effectiveDraft.home}
-                  ref={homeRef ?? undefined}
-                  onChange={(e) => onDraftChange("home", e.target.value)}
-                  placeholder=""
-                  className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
-                    touched
+            ) : (() => {
+              // Visual cue para pronósticos vacíos en matches editables:
+              // borde rojo + asterisco arriba. Una vez que el user
+              // tipea (o que ya hay un pred guardado) pasa al amber
+              // (touched) o al subtle (saved) normal.
+              const homeMissing = effectiveDraft.home === "" && !touched && !pred;
+              const awayMissing = effectiveDraft.away === "" && !touched && !pred;
+              const inputClass = (missing: boolean) =>
+                `w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
+                  missing
+                    ? "border-red-alert shadow-[0_0_0_2px_rgba(255,61,87,0.30)] focus:border-red-alert"
+                    : touched
                       ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
                       : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
-                  }`}
-                  style={{ border: "2px solid" }}
-                />
-                <span className="text-text-primary/40 font-bold">—</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={effectiveDraft.away}
-                  ref={awayRef ?? undefined}
-                  onChange={(e) => {
-                    onDraftChange("away", e.target.value);
-                    if (e.target.value.length >= 1) onJumpNext();
-                  }}
-                  placeholder=""
-                  className={`w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
-                    touched
-                      ? "border-amber shadow-[0_0_0_2px_rgba(255,159,28,0.25)]"
-                      : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
-                  }`}
-                  style={{ border: "2px solid" }}
-                />
-              </div>
-            )}
+                }`;
+              return (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={effectiveDraft.home}
+                    ref={homeRef ?? undefined}
+                    onChange={(e) => onDraftChange("home", e.target.value)}
+                    placeholder=""
+                    className={inputClass(homeMissing)}
+                    style={{ border: "2px solid" }}
+                  />
+                  <span className="text-text-primary/40 font-bold">—</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={effectiveDraft.away}
+                    ref={awayRef ?? undefined}
+                    onChange={(e) => {
+                      onDraftChange("away", e.target.value);
+                      if (e.target.value.length >= 1) onJumpNext();
+                    }}
+                    placeholder=""
+                    className={inputClass(awayMissing)}
+                    style={{ border: "2px solid" }}
+                  />
+                </div>
+              );
+            })()}
           </div>
 
           <div className="flex-1 min-w-0 text-left">
