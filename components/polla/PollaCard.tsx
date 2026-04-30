@@ -96,33 +96,43 @@ export function PollaCard({
         {polla.name}
       </h3>
 
-      {/* Stats row + logos a la derecha */}
+      {/* Stats row + logos a la derecha. Separadores '·' como elementos
+          aparte (no incrustados en el texto) para que el spacing sea
+          consistente. 'POZO' como label uppercase pequeño antes del
+          monto gold — mismo tamaño que las otras stats, balanceado. */}
       <div className="mt-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-wrap min-w-0">
-          <span
-            className="inline-flex items-center gap-1 font-body text-[12px] text-text-secondary tabular-nums"
-            style={{ fontFeatureSettings: '"tnum"' }}
-          >
+        <div
+          className="flex items-center gap-x-2 gap-y-1 flex-wrap min-w-0 font-body text-[12px] text-text-secondary tabular-nums"
+          style={{ fontFeatureSettings: '"tnum"' }}
+        >
+          <span className="inline-flex items-center gap-1">
             <Users className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
             {polla.participantCount}
           </span>
           {polla.buyInAmount > 0 ? (
             <>
-              <span className="font-body text-[12px] text-text-secondary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                {formatCOP(polla.buyInAmount)} c/u
-              </span>
+              <span className="text-text-muted/50" aria-hidden="true">·</span>
+              <span>{formatCOP(polla.buyInAmount)} c/u</span>
               {polla.potTotal && polla.potTotal > 0 ? (
-                <span
-                  className="font-body text-[12px] text-gold tabular-nums"
-                  style={{ fontFeatureSettings: '"tnum"' }}
-                  title="Pozo total acumulado"
-                >
-                  · pozo {formatCOP(polla.potTotal)}
-                </span>
+                <>
+                  <span className="text-text-muted/50" aria-hidden="true">·</span>
+                  <span
+                    className="inline-flex items-baseline gap-1 text-gold"
+                    title="Pozo total acumulado"
+                  >
+                    <span className="text-[10px] uppercase tracking-[0.08em] text-gold/70">
+                      Pozo
+                    </span>
+                    <span>{formatCOP(polla.potTotal)}</span>
+                  </span>
+                </>
               ) : null}
             </>
           ) : (
-            <span className="font-body text-[12px] text-text-muted">Gratis</span>
+            <>
+              <span className="text-text-muted/50" aria-hidden="true">·</span>
+              <span className="text-text-muted">Gratis</span>
+            </>
           )}
         </div>
 
