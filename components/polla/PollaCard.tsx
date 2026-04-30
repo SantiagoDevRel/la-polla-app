@@ -142,7 +142,7 @@ export function PollaCard({
             ? polla.competitionLogos.slice(0, 4).map((logo, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/85 ring-1 ring-white/20"
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/50 ring-1 ring-white/15"
                 >
                   <Image
                     src={logo}
@@ -155,7 +155,7 @@ export function PollaCard({
               ))
             : polla.competitionLogoUrl
               ? (
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/85 ring-1 ring-white/20">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/50 ring-1 ring-white/15">
                   <Image
                     src={polla.competitionLogoUrl}
                     alt=""
