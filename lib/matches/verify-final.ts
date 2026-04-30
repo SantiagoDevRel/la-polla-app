@@ -18,6 +18,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ESPN_LEAGUE_BY_TOURNAMENT,
+  ESPN_ONLY_TOURNAMENTS,
   fetchEspnScoreboard,
   mapEspnStatus,
   parseEspnScore,
@@ -163,6 +164,29 @@ async function verifyOneMatch(match: MatchRow): Promise<VerifyResult> {
   const alertedSuffix = previousAlertedMatch ? previousAlertedMatch[0] : "";
 
   if (!espnFinished) {
+    // Single-source para tournaments ESPN-only (libertadores,
+    // sudamericana, betplay): ESPN ya escribió status=finished + scores
+    // en una sync anterior. Si ESPN ya no tiene el evento en scoreboard
+    // (eviction por antigüedad), no podemos comparar — pero como no hay
+    // segunda fuente, trustamos lo que está en DB y marcamos verified.
+    if (
+      ESPN_ONLY_TOURNAMENTS.has(match.tournament) &&
+      fdFinished &&
+      fdHome !== null &&
+      fdAway !== null
+    ) {
+      result.status = "verified";
+      result.notes = `Verificado (single-source ESPN): ${fdHome}-${fdAway}.`;
+      await admin
+        .from("matches")
+        .update({
+          final_verified_at: new Date().toISOString(),
+          final_verification_notes: result.notes,
+        })
+        .eq("id", match.id);
+      return result;
+    }
+
     result.status = "pending";
     result.notes = `ESPN aún no marca finished (espn=${espnHome}-${espnAway}). football-data: ${fdHome}-${fdAway}.`;
     await persistNote(admin, match.id, result.notes + alertedSuffix);
