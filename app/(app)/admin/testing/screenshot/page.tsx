@@ -40,8 +40,8 @@ interface VerifyResultUI {
     name: boolean;
     date: "today_or_newer" | "older" | "missing";
   };
-  notes: string;
   rejectionReason: string | null;
+  warning: string | null;
   tokensIn: number;
   tokensOut: number;
   costUSD: number;
@@ -369,10 +369,10 @@ export default function ScreenshotTestPage() {
               </div>
             ) : null}
 
-            {result.notes ? (
-              <div className="rounded-lg px-3 py-2 bg-bg-base border border-border-subtle">
-                <p className="text-[10px] uppercase text-text-muted mb-0.5">Notes</p>
-                <p className="text-[11px] text-text-secondary">{result.notes}</p>
+            {result.warning ? (
+              <div className="rounded-lg px-3 py-2 bg-amber/10 border border-amber/30">
+                <p className="text-[10px] uppercase text-amber mb-0.5">Warning</p>
+                <p className="text-[11px] text-amber/90">{result.warning}</p>
               </div>
             ) : null}
 

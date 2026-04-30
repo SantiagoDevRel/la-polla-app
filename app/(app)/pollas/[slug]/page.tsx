@@ -52,7 +52,12 @@ import FootballLoader from "@/components/ui/FootballLoader";
 
 interface Polla {
   id: string; slug: string; name: string; description: string;
-  tournament: string; status: string; buy_in_amount: number; currency: string;
+  tournament: string;
+  /** Lista completa cuando es polla combinada (>1 torneo). NULL/undef
+   *  para single-tournament. El primary `tournament` siempre coincide
+   *  con `tournaments[0]`. */
+  tournaments: string[] | null;
+  status: string; buy_in_amount: number; currency: string;
   payment_mode: string; points_exact: number; points_winner: number;
   points_goal_diff: number; points_correct_result: number;
   points_one_team: number; created_by: string; scope: string; type: string;
@@ -875,20 +880,51 @@ export default function PollaSlugPage() {
           <div className="flex items-center gap-3 mb-2">
             <button onClick={() => router.push("/pollas")} className="text-text-secondary text-xl">←</button>
             <h1 className="text-lg font-bold text-text-primary truncate flex-1">{polla.name}</h1>
-            <span
-              className="text-[11px] text-text-secondary rounded-full flex items-center"
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 20,
-                padding: "4px 10px",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <TournamentBadge tournamentSlug={polla.tournament} size="sm" />
-            </span>
+            {/* Cuando la polla es combinada (>= 2 torneos) mostramos
+                la stack de logos en orden, sin nombres. Single-
+                tournament conserva el badge clásico con nombre. */}
+            {polla.tournaments && polla.tournaments.length > 1 ? (
+              <span
+                className="rounded-full flex items-center"
+                style={{
+                  background: "rgba(255,215,0,0.08)",
+                  border: "1px solid rgba(255,215,0,0.25)",
+                  padding: "4px 10px",
+                  gap: 6,
+                }}
+                title={polla.tournaments
+                  .map((s) => getTournamentName(s) ?? s)
+                  .join(" · ")}
+              >
+                {polla.tournaments.map((slug) =>
+                  TOURNAMENT_ICONS[slug] ? (
+                    <Image
+                      key={slug}
+                      src={TOURNAMENT_ICONS[slug]!}
+                      alt={getTournamentName(slug) ?? slug}
+                      width={16}
+                      height={16}
+                      className="object-contain"
+                    />
+                  ) : null,
+                )}
+              </span>
+            ) : (
+              <span
+                className="text-[11px] text-text-secondary rounded-full flex items-center"
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 20,
+                  padding: "4px 10px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <TournamentBadge tournamentSlug={polla.tournament} size="sm" />
+              </span>
+            )}
           </div>
         </div>
       </header>
