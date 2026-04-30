@@ -155,9 +155,14 @@ export async function syncEspnLive(): Promise<EspnSyncResult[]> {
     const fromIso = new Date(minMs - KICKOFF_TOLERANCE_MS).toISOString();
     const toIso = new Date(maxMs + KICKOFF_TOLERANCE_MS).toISOString();
 
+    // Solo matches con AL MENOS 1 PREDICTION. Si nadie pronosticó el
+    // partido, no lo necesitamos en DB live — ahorramos compute /
+    // requests / costo Twilio en alertas innecesarias. Cuando un user
+    // pronostique por primera vez, el partido entra al sync en el
+    // próximo tick.
     const { data: candidates, error: queryErr } = await supabase
       .from("matches")
-      .select("id, external_id, espn_id, tournament, home_team, away_team, scheduled_at")
+      .select("id, external_id, espn_id, tournament, home_team, away_team, scheduled_at, predictions!inner(id)")
       .eq("tournament", tournament)
       .gte("scheduled_at", fromIso)
       .lte("scheduled_at", toIso);
@@ -168,7 +173,17 @@ export async function syncEspnLive(): Promise<EspnSyncResult[]> {
       results.push(result);
       continue;
     }
-    const candidateRows = (candidates || []) as DbMatch[];
+    // De-dup por id — el join puede traer la misma row varias veces
+    // si tiene múltiples predictions.
+    const seen = new Set<string>();
+    const candidateRows: DbMatch[] = [];
+    for (const row of (candidates ?? []) as Array<DbMatch & { predictions: unknown }>) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      const { predictions: _join, ...rest } = row;
+      void _join;
+      candidateRows.push(rest as DbMatch);
+    }
 
     // 3. Iterar eventos y aplicar updates.
     for (const event of events) {

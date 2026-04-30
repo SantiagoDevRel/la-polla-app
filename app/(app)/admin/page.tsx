@@ -85,34 +85,23 @@ export default function AdminPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [twilio, setTwilio] = useState<TwilioUsage | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [bypassLinks, setBypassLinks] = useState<Array<{ phone: string; label: string; url: string }>>([]);
-  const [bypassError, setBypassError] = useState<string | null>(null);
   const [discrepancyCount, setDiscrepancyCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryRes, twilioRes, analyticsRes, bypassRes, discRes] = await Promise.allSettled([
+      const [summaryRes, twilioRes, analyticsRes, discRes] = await Promise.allSettled([
         axios.get<Summary>("/api/admin/summary"),
         axios.get<TwilioUsage>("/api/admin/twilio-usage"),
         axios.get<Analytics>("/api/admin/analytics"),
-        axios.get<{ links: Array<{ phone: string; label: string; url: string }> }>("/api/admin/bypass-urls"),
         axios.get<{ matches: unknown[] }>("/api/admin/discrepancies"),
       ]);
       if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
       else showToast("No se pudo cargar el panel", "error");
       if (twilioRes.status === "fulfilled") setTwilio(twilioRes.value.data);
       if (analyticsRes.status === "fulfilled") setAnalytics(analyticsRes.value.data);
-      if (bypassRes.status === "fulfilled") {
-        setBypassLinks(bypassRes.value.data.links);
-        setBypassError(null);
-      } else {
-        const status = (bypassRes.reason as { response?: { status?: number; data?: { error?: string } } })?.response;
-        setBypassError(status?.data?.error ?? `Error ${status?.status ?? "desconocido"}`);
-      }
       if (discRes.status === "fulfilled") {
         setDiscrepancyCount(discRes.value.data.matches?.length ?? 0);
       }
@@ -120,16 +109,6 @@ export default function AdminPage() {
       setLoading(false);
     }
   }, [showToast]);
-
-  async function copyToClipboard(text: string, phone: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedPhone(phone);
-      setTimeout(() => setCopiedPhone(null), 1800);
-    } catch {
-      showToast("No se pudo copiar — copialo manual del campo", "error");
-    }
-  }
 
   useEffect(() => {
     load();
@@ -467,56 +446,6 @@ export default function AdminPage() {
                 </div>
               </section>
             )}
-
-            {/* Acceso directo admin (bookmarkable URLs sin OTP) */}
-            <section
-              className="rounded-2xl p-4 space-y-3"
-              style={{ background: "#0e1420", border: "1px solid rgba(255,215,0,0.15)" }}
-            >
-              <div>
-                <p className="text-sm font-bold text-text-primary">Acceso directo</p>
-                <p className="text-[11px] text-text-muted mt-0.5">
-                  URLs personales firmadas con HMAC. Cada visita te loguea como ese admin sin OTP.
-                  Pegalas en el bookmark del browser. Para revocar, rotar <code>ADMIN_BYPASS_SECRET</code> en Vercel.
-                </p>
-              </div>
-              {bypassError ? (
-                <p className="text-[11px] text-red-alert">{bypassError}</p>
-              ) : bypassLinks.length === 0 ? (
-                <p className="text-[11px] text-text-muted">Cargando…</p>
-              ) : (
-                <ul className="space-y-2">
-                  {bypassLinks.map((l) => (
-                    <li
-                      key={l.phone}
-                      className="rounded-xl px-3 py-2 bg-bg-elevated border border-border-subtle space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[12px] font-semibold text-text-primary truncate">{l.label}</p>
-                        <span className="text-[10px] text-text-muted tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                          {l.phone}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          readOnly
-                          value={l.url}
-                          onFocus={(e) => e.currentTarget.select()}
-                          className="flex-1 min-w-0 bg-bg-base border border-border-subtle rounded-lg px-2 py-1 text-[10px] text-text-secondary font-mono"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(l.url, l.phone)}
-                          className="text-[11px] font-semibold px-3 py-1 rounded-lg bg-gold/15 border border-gold/30 text-gold hover:bg-gold/20 transition-colors flex-shrink-0"
-                        >
-                          {copiedPhone === l.phone ? "Copiado ✓" : "Copiar"}
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
 
             {/* Sincronización */}
             <section
