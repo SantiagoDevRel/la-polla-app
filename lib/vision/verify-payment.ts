@@ -38,12 +38,29 @@ export interface VerifyExpected {
   amountCOP: number;
 }
 
+export type SourceType =
+  | "bank_app"
+  | "wallet"
+  | "notes_app"
+  | "messaging"
+  | "browser"
+  | "edited"
+  | "physical"
+  | "other"
+  | "unclear";
+
 export interface VerifyResult {
   /** Decisión final: si auto-aprobar este pago o no. */
   valid: boolean;
   /** Confidence del análisis. 'low' siempre forza review manual.
    *  Para method='otro' SIEMPRE devolvemos low (admin debe verificar). */
   confidence: "high" | "low";
+  /** Qué tipo de imagen Haiku identificó. Solo bank_app y wallet
+   *  pueden auto-aprobar — el resto se rechaza sin importar el texto. */
+  sourceType: SourceType;
+  /** Texto libre que Haiku usó para clasificar la source. Útil para
+   *  debugging y para mostrarle al admin por qué se aceptó/rechazó. */
+  sourceEvidence: string;
   /** Lo que Haiku detectó del screenshot. */
   detectedAmount: number | null;
   detectedAccount: string | null;
@@ -56,6 +73,7 @@ export interface VerifyResult {
   /** Resultado por chequeo. La decisión final usa solo los relevantes
    *  al método (ej. para nequi, name=true automáticamente). */
   checks: {
+    source: boolean; // true si sourceType ∈ {bank_app, wallet}
     amount: boolean;
     account: boolean;
     name: boolean;
@@ -74,29 +92,53 @@ export interface VerifyResult {
   model: string;
 }
 
+const VALID_SOURCES: SourceType[] = ["bank_app", "wallet"];
+
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 const PRICE_IN_PER_MTOK = 1.0;
 const PRICE_OUT_PER_MTOK = 5.0;
 
 function buildSystemPrompt(method: PayoutMethod): string {
-  const base = `Sos un verificador de comprobantes de pago bancario en Colombia. Recibís una imagen de un screenshot y un objeto con la transferencia esperada.
+  const base = `Sos un verificador de comprobantes de pago bancario en Colombia. Recibís una imagen y un objeto con la transferencia esperada.
 
-Tu trabajo es EXTRAER 5 cosas del screenshot. Quien decide si auto-aprobar es el código que corre después; vos extrae con honestidad.
+PASO 1 — IDENTIFICAR LA SOURCE.
+Antes de extraer datos, decidí qué tipo de imagen es. Solo apps bancarias / wallets de pago Colombianas son aceptables. CUALQUIER otra cosa = rechazo automático.
 
-Cosas a extraer:
+Categorías para source_type:
+- "bank_app"      → app bancaria legítima: Nequi (rosa, logo Nequi), Bancolombia (amarillo, logo Bancolombia), Daviplata (rojo, logo DaviPlata), BBVA, Banco de Bogotá, Davivienda, Scotiabank Colpatria, Banco Popular, AV Villas, Itaú, Banco Caja Social, etc. Tienen logo del banco visible, header tipo "Comprobante", "Pago exitoso", "Transferencia exitosa", icono de check, número de comprobante, layout tipo app móvil.
+- "wallet"        → wallet de pago Colombiano: Movii, Tpaga, RappiPay, dale!. Mismas señales que bank_app pero del wallet.
+- "notes_app"     → captura de Notas / Notes / Apple Notes / Google Keep / Samsung Notes. Texto plano sin chrome de banco. Sin logo. Suele tener fondo blanco / amarillo claro y tipografía system del OS.
+- "messaging"     → WhatsApp, Telegram, Messenger, iMessage. Mensajes de chat con burbujas.
+- "browser"       → captura de página web (Chrome / Safari address bar visible). Aunque sea una página de banco web, no un comprobante.
+- "edited"        → imagen claramente editada / Photoshop / mock. Layout inconsistente, fuentes mezcladas, alineación rara.
+- "physical"      → foto de un papel / impresión.
+- "other"         → cualquier otra cosa (calculadora, calendario, screenshot de código, meme, screenshot vacío, etc.).
+- "unclear"       → no se puede determinar.
+
+REGLA DE ORO: si source_type NO es "bank_app" ni "wallet" → valid=false sin importar qué texto contenga. Es muy fácil escribir "Pago a Santiago $20.000" en una nota; el comprobante REAL tiene logo del banco y branding.
+
+Señales típicas de fraude (forzar source_type apropiado):
+- Texto "Pago exitoso" pero sin logo del banco visible → NO es bank_app.
+- Layout sin status bar de celular (hora/batería arriba) ni header de app → suele ser nota.
+- Texto en una sola fuente del OS (San Francisco / Roboto) sin tipografía de marca → suele ser nota o WhatsApp.
+- Muy pocas líneas, sin número de referencia, sin fecha-hora completa → sospechoso.
+
+PASO 2 — SI ES bank_app O wallet, extraer:
 1. monto en COP (number, sin centavos, sin separadores)
-2. cuenta destino (string — celular para Nequi, número de cuenta para Bancolombia, etc. Si la app la muestra enmascarada como "****1234", extraé los últimos dígitos visibles).
-3. método visible en el screenshot (string — Nequi, Bancolombia, otro banco. null si no aparece claramente).
+2. cuenta destino (string — celular para Nequi, número de cuenta para Bancolombia, etc. Si está enmascarada "****1234", devolvé los últimos dígitos visibles).
+3. método visible (string — Nequi, Bancolombia, etc. null si no aparece claramente).
 4. nombre del beneficiario tal cual aparece (string). null si no se ve.
 5. fecha en ISO YYYY-MM-DD. Si dice "Hoy" usás la fecha que te pasan en el contexto. Si solo hora sin fecha, null.
 
 Reglas de status:
 - La transferencia debe figurar como EXITOSA / completada / aprobada (no pendiente, no rechazada). Si está en otro estado, valid=false.
-- Confidence "high" SOLO si pudiste leer claramente: monto, cuenta destino, status exitoso. Si la imagen está borrosa, recortada o no es claramente bancaria → confidence "low" y valid=false.
+- Confidence "high" SOLO si: source_type es bank_app/wallet con logo visible Y pudiste leer claramente monto + cuenta + status exitoso. Cualquier duda → confidence "low".
 
 Devolvé SIEMPRE un objeto JSON válido con esta forma exacta, sin markdown:
 
 {
+  "source_type": "bank_app" | "wallet" | "notes_app" | "messaging" | "browser" | "edited" | "physical" | "other" | "unclear",
+  "source_evidence": "string — qué señales viste para clasificar (ej. 'Logo Bancolombia visible en el header, icono de check verde, número de comprobante')",
   "valid": boolean,
   "confidence": "high" | "low",
   "detected_amount": number | null,
@@ -108,8 +150,14 @@ Devolvé SIEMPRE un objeto JSON válido con esta forma exacta, sin markdown:
   "rejection_reason": string | null
 }
 
+Si source_type NO es bank_app ni wallet:
+- valid: false
+- confidence: "high" (estás SEGURO de que NO es comprobante bancario)
+- rejection_reason: "El comprobante no parece de una app bancaria. Detectamos: [tipo]."
+- detected_* puede ser null o lo que veas.
+
 Si valid=true, rejection_reason es null.
-Si valid=false, rejection_reason explica brevemente por qué (en español, una oración).`;
+Si valid=false por otra razón (monto / cuenta / nombre no coinciden), rejection_reason explica brevemente.`;
 
   switch (method) {
     case "nequi":
@@ -242,6 +290,8 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     .join("");
 
   let parsed: {
+    source_type?: SourceType;
+    source_evidence?: string;
     valid?: boolean;
     confidence?: "high" | "low";
     detected_amount?: number | null;
@@ -259,12 +309,14 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     return {
       valid: false,
       confidence: "low",
+      sourceType: "unclear",
+      sourceEvidence: "",
       detectedAmount: null,
       detectedAccount: null,
       detectedMethod: null,
       detectedRecipientName: null,
       detectedDate: null,
-      checks: { amount: false, account: false, name: false, date: "missing" },
+      checks: { source: false, amount: false, account: false, name: false, date: "missing" },
       notes: `Respuesta no-JSON: ${text.slice(0, 200)}`,
       rejectionReason: "No pudimos parsear la respuesta del verificador.",
       tokensIn,
@@ -275,6 +327,13 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
   }
 
   // Doble check determinista server-side. Defense-in-depth.
+  // PRIMER GATE: source_type. Si no es app bancaria/wallet, rechazar
+  // sin importar si el texto del screenshot coincide con lo esperado.
+  // Esto es la defensa contra "tomé un screenshot de notas con el
+  // texto correcto y lo subí".
+  const sourceType: SourceType = parsed.source_type ?? "unclear";
+  const sourceMatches = VALID_SOURCES.includes(sourceType);
+
   const detectedAccountDigits = normalizeDigits(parsed.detected_account ?? "");
   const expectedAccountDigits = normalizeDigits(args.expected.account);
   const accountMatches =
@@ -307,12 +366,14 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
   const dateCheck = checkDate(parsed.detected_date ?? null);
 
   // Decisión por método:
-  //   - nequi: amount + account + status
-  //   - bancolombia: amount + account + name + status
+  //   - bank_app/wallet REQUERIDO siempre.
+  //   - nequi: source + amount + account + status
+  //   - bancolombia: source + amount + account + name + status
   //   - otro: SIEMPRE confidence:low → admin review manual
   let coreMatch =
     !!parsed.valid &&
     parsed.confidence === "high" &&
+    sourceMatches &&
     accountMatches &&
     amountMatches &&
     nameMatches;
@@ -332,7 +393,9 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
 
   let rejectionReason = parsed.rejection_reason ?? null;
   if (!coreMatch && !rejectionReason) {
-    if (args.expected.method === "otro") {
+    if (!sourceMatches) {
+      rejectionReason = `La imagen no parece ser de una app bancaria. Detectamos: ${sourceType.replace("_", " ")}.`;
+    } else if (args.expected.method === "otro") {
       rejectionReason = "Método 'Otro': el organizador debe revisar manualmente.";
     } else if (!amountMatches) {
       rejectionReason = `Monto detectado (${parsed.detected_amount ?? "—"}) no coincide con el esperado ($${args.expected.amountCOP}).`;
@@ -358,6 +421,8 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
   return {
     valid: coreMatch,
     confidence: finalConfidence,
+    sourceType,
+    sourceEvidence: parsed.source_evidence ?? "",
     detectedAmount: typeof parsed.detected_amount === "number" ? parsed.detected_amount : null,
     detectedAccount: parsed.detected_account ?? null,
     detectedMethod: parsed.detected_method ?? null,
@@ -367,6 +432,7 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
         ? parsed.detected_date
         : null,
     checks: {
+      source: sourceMatches,
       amount: amountMatches,
       account: accountMatches,
       name: nameMatches,
