@@ -14,6 +14,9 @@ export interface PollaCardProps {
     name: string;
     competitionName: string;
     competitionLogoUrl?: string;
+    /** Stack de logos cuando la polla es combinada (>= 2 torneos).
+     *  Si está y tiene > 1, reemplaza el single-logo header. */
+    competitionLogos?: string[];
     participantCount: number;
     buyInAmount: number;
     /** Pozo total acumulado (buy_in × seats que ya cuentan según
@@ -80,26 +83,12 @@ export function PollaCard({
         />
       ) : null}
 
-      {/* Comp tag row */}
-      <div className="flex items-center gap-1.5">
-        {polla.competitionLogoUrl ? (
-          <Image
-            src={polla.competitionLogoUrl}
-            alt=""
-            width={14}
-            height={14}
-            className="object-contain"
-          />
-        ) : null}
-        <span className="font-body text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted truncate">
-          {polla.competitionName}
-        </span>
-      </div>
-
-      {/* Polla name */}
+      {/* Polla name — primer header. Antes había una row separada con
+          logo+nombre del torneo, pero la quitamos para ahorrar espacio
+          vertical. Los logos van en la stats row a la derecha. */}
       <h3
         className={cn(
-          "mt-1.5 font-body font-bold text-text-primary leading-[1.3]",
+          "font-body font-bold text-text-primary leading-[1.3]",
           isCarousel ? "text-[16px] line-clamp-2" : "text-[18px] line-clamp-1",
         )}
         style={{ letterSpacing: "-0.01em" }}
@@ -107,33 +96,68 @@ export function PollaCard({
         {polla.name}
       </h3>
 
-      {/* Stats row */}
-      <div className="mt-3 flex items-center gap-3 flex-wrap">
-        <span
-          className="inline-flex items-center gap-1 font-body text-[12px] text-text-secondary tabular-nums"
-          style={{ fontFeatureSettings: '"tnum"' }}
-        >
-          <Users className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
-          {polla.participantCount}
-        </span>
-        {polla.buyInAmount > 0 ? (
-          <>
-            <span className="font-body text-[12px] text-text-secondary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-              {formatCOP(polla.buyInAmount)} c/u
-            </span>
-            {polla.potTotal && polla.potTotal > 0 ? (
-              <span
-                className="font-body text-[12px] text-gold tabular-nums"
-                style={{ fontFeatureSettings: '"tnum"' }}
-                title="Pozo total acumulado"
-              >
-                · pozo {formatCOP(polla.potTotal)}
+      {/* Stats row + logos a la derecha */}
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-wrap min-w-0">
+          <span
+            className="inline-flex items-center gap-1 font-body text-[12px] text-text-secondary tabular-nums"
+            style={{ fontFeatureSettings: '"tnum"' }}
+          >
+            <Users className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
+            {polla.participantCount}
+          </span>
+          {polla.buyInAmount > 0 ? (
+            <>
+              <span className="font-body text-[12px] text-text-secondary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+                {formatCOP(polla.buyInAmount)} c/u
               </span>
-            ) : null}
-          </>
-        ) : (
-          <span className="font-body text-[12px] text-text-muted">Gratis</span>
-        )}
+              {polla.potTotal && polla.potTotal > 0 ? (
+                <span
+                  className="font-body text-[12px] text-gold tabular-nums"
+                  style={{ fontFeatureSettings: '"tnum"' }}
+                  title="Pozo total acumulado"
+                >
+                  · pozo {formatCOP(polla.potTotal)}
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <span className="font-body text-[12px] text-text-muted">Gratis</span>
+          )}
+        </div>
+
+        {/* Logos del torneo (1 = primary, > 1 = combinada) */}
+        <div
+          className="flex items-center gap-1 flex-shrink-0"
+          title={
+            polla.competitionLogos && polla.competitionLogos.length > 1
+              ? `Combinada · ${polla.competitionLogos.length} torneos`
+              : polla.competitionName
+          }
+        >
+          {polla.competitionLogos && polla.competitionLogos.length > 1
+            ? polla.competitionLogos.slice(0, 4).map((logo, i) => (
+                <Image
+                  key={i}
+                  src={logo}
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="object-contain"
+                />
+              ))
+            : polla.competitionLogoUrl
+              ? (
+                <Image
+                  src={polla.competitionLogoUrl}
+                  alt=""
+                  width={16}
+                  height={16}
+                  className="object-contain"
+                />
+              )
+              : null}
+        </div>
       </div>
 
       {/* Rank row — shown alongside endedState when userContext is also present */}

@@ -115,6 +115,21 @@ export default function CrearPollaPage() {
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [selectedMatchIds, setSelectedMatchIds] = useState<Set<string>>(new Set());
   const [groupBy, setGroupBy] = useState<GroupBy>("date");
+  // Collapsed state por torneo en el picker — para que el organizador
+  // pueda esconder un torneo después de elegir matches y no tenga que
+  // scrollear todo. Solo aplica en pollas combinadas.
+  const [collapsedTournaments, setCollapsedTournaments] = useState<Set<string>>(
+    new Set(),
+  );
+
+  function toggleTournamentCollapse(slug: string) {
+    setCollapsedTournaments((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }
 
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -509,11 +524,16 @@ export default function CrearPollaPage() {
             ) : (
               tournamentBlocks.map((block) => {
                 const allTournamentSelected = block.matchIds.every((id) => selectedMatchIds.has(id));
+                const isCollapsed = collapsedTournaments.has(block.tournamentSlug);
+                const selectedInTournament = block.matchIds.filter((id) =>
+                  selectedMatchIds.has(id),
+                ).length;
                 return (
                   <div key={block.tournamentSlug} className="space-y-2 mt-4 first:mt-0">
                     {/* Tournament header — solo lo mostramos cuando hay
-                        más de 1 torneo, para no agregar ruido en
-                        single-tournament. */}
+                        más de 1 torneo. Click en el header colapsa/
+                        expande las subsecciones. Botón "Todo el torneo"
+                        está aparte para no chocar con el toggle. */}
                     {isCombined ? (
                       <div
                         style={{
@@ -525,13 +545,37 @@ export default function CrearPollaPage() {
                           background: "rgba(255,215,0,0.06)",
                           border: "1px solid rgba(255,215,0,0.18)",
                           marginTop: 12,
+                          gap: 8,
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <button
+                          type="button"
+                          onClick={() => toggleTournamentCollapse(block.tournamentSlug)}
+                          aria-expanded={!isCollapsed}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: 0,
+                            flex: 1,
+                            minWidth: 0,
+                            fontFamily: "'Outfit', sans-serif",
+                          }}
+                        >
+                          <ChevronRight
+                            className="w-4 h-4 text-gold flex-shrink-0 transition-transform"
+                            style={{
+                              transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)",
+                            }}
+                            aria-hidden="true"
+                          />
                           {block.tournamentLogo ? (
                             <img
                               src={block.tournamentLogo}
-                              alt={block.tournamentName}
+                              alt=""
                               width={20}
                               height={20}
                               style={{ objectFit: "contain", borderRadius: 4 }}
@@ -541,9 +585,12 @@ export default function CrearPollaPage() {
                             {block.tournamentName}
                           </span>
                           <span style={{ fontSize: 11, color: "#AEB7C7" }}>
-                            · {block.matchIds.length} partidos
+                            ·{" "}
+                            {selectedInTournament > 0
+                              ? `${selectedInTournament}/${block.matchIds.length} sel`
+                              : `${block.matchIds.length} partidos`}
                           </span>
-                        </div>
+                        </button>
                         <button
                           onClick={() => toggleGroup(block.matchIds)}
                           style={{
@@ -554,14 +601,15 @@ export default function CrearPollaPage() {
                             cursor: "pointer",
                             fontFamily: "'Outfit', sans-serif",
                             fontWeight: 700,
+                            flexShrink: 0,
                           }}
                         >
-                          {allTournamentSelected ? "Quitar todo" : "Todo el torneo"}
+                          {allTournamentSelected ? "Quitar todo" : "Todo"}
                         </button>
                       </div>
                     ) : null}
 
-                    {block.subgroups.map((group) => {
+                    {!isCollapsed && block.subgroups.map((group) => {
                       const allGroupSelected = group.matchIds.every((id) => selectedMatchIds.has(id));
                       return (
                         <div key={group.key}>
