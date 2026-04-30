@@ -87,6 +87,7 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [bypassLinks, setBypassLinks] = useState<Array<{ phone: string; label: string; url: string }>>([]);
   const [bypassError, setBypassError] = useState<string | null>(null);
+  const [discrepancyCount, setDiscrepancyCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
@@ -94,11 +95,12 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryRes, twilioRes, analyticsRes, bypassRes] = await Promise.allSettled([
+      const [summaryRes, twilioRes, analyticsRes, bypassRes, discRes] = await Promise.allSettled([
         axios.get<Summary>("/api/admin/summary"),
         axios.get<TwilioUsage>("/api/admin/twilio-usage"),
         axios.get<Analytics>("/api/admin/analytics"),
         axios.get<{ links: Array<{ phone: string; label: string; url: string }> }>("/api/admin/bypass-urls"),
+        axios.get<{ matches: unknown[] }>("/api/admin/discrepancies"),
       ]);
       if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
       else showToast("No se pudo cargar el panel", "error");
@@ -110,6 +112,9 @@ export default function AdminPage() {
       } else {
         const status = (bypassRes.reason as { response?: { status?: number; data?: { error?: string } } })?.response;
         setBypassError(status?.data?.error ?? `Error ${status?.status ?? "desconocido"}`);
+      }
+      if (discRes.status === "fulfilled") {
+        setDiscrepancyCount(discRes.value.data.matches?.length ?? 0);
       }
     } finally {
       setLoading(false);
@@ -194,6 +199,48 @@ export default function AdminPage() {
           <div className="flex flex-col items-center gap-2 py-8"><FootballLoader /><p className="text-text-muted text-sm">Cargando…</p></div>
         ) : (
           <>
+            {/* Discrepancias — siempre lo primero. Si hay 0 mostramos
+                un banner sutil verde; si hay > 0 mostramos amber con
+                CTA para resolverlas. Ranking máximo en la página. */}
+            <section
+              className="rounded-2xl p-4 flex items-center gap-3"
+              style={
+                discrepancyCount > 0
+                  ? { background: "rgba(255,159,28,0.10)", border: "1px solid rgba(255,159,28,0.35)" }
+                  : { background: "rgba(31,216,127,0.06)", border: "1px solid rgba(31,216,127,0.20)" }
+              }
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-text-primary">
+                  {discrepancyCount > 0
+                    ? `${discrepancyCount} discrepancia${discrepancyCount > 1 ? "s" : ""} pendiente${discrepancyCount > 1 ? "s" : ""}`
+                    : "Sin discrepancias"}
+                </p>
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  {discrepancyCount > 0
+                    ? "El scoring está pausado en estos partidos. Resolvé para que se ejecute."
+                    : "Todos los partidos con pronósticos están verificados."}
+                </p>
+              </div>
+              {discrepancyCount > 0 ? (
+                <button
+                  onClick={() => router.push("/admin/discrepancias")}
+                  className="text-sm font-semibold px-4 py-2 rounded-xl flex-shrink-0 hover:brightness-110 transition-all"
+                  style={{ background: "#FF9F1C", color: "#080c10" }}
+                >
+                  Resolver
+                </button>
+              ) : (
+                <button
+                  onClick={() => router.push("/admin/discrepancias")}
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border flex-shrink-0 hover:border-text-secondary/40 transition-colors"
+                  style={{ borderColor: "rgba(255,255,255,0.12)", color: "#AEB7C7" }}
+                >
+                  Ver
+                </button>
+              )}
+            </section>
+
             {/* Stats */}
             <section className="grid grid-cols-2 gap-3">
               {[
@@ -492,28 +539,6 @@ export default function AdminPage() {
                     <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
                   </svg>
                   Sincronizar partidos
-                </button>
-              </div>
-            </section>
-
-            {/* Discrepancias de score */}
-            <section
-              className="rounded-2xl p-4"
-              style={{ background: "#0e1420", border: "1px solid rgba(255,159,28,0.25)" }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-bold text-text-primary">Discrepancias de score</p>
-                  <p className="text-xs text-text-muted mt-0.5">
-                    Resolver partidos cuando ESPN y football-data no coinciden — el scoring queda pausado hasta que confirmés cuál es el real.
-                  </p>
-                </div>
-                <button
-                  onClick={() => router.push("/admin/discrepancias")}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold hover:brightness-110 transition-all cursor-pointer flex-shrink-0"
-                  style={{ background: "#FF9F1C", color: "#080c10" }}
-                >
-                  Resolver
                 </button>
               </div>
             </section>

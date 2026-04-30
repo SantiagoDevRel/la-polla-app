@@ -40,10 +40,13 @@ export async function GET() {
   }
 
   const admin = createAdminClient();
+  // Igual que el cron de verify-final: solo mostramos discrepancias de
+  // matches que tienen al menos 1 prediction. Si no hay nadie esperando
+  // que se le puntue ese partido, no es trabajo del admin resolverlo.
   const { data, error } = await admin
     .from("matches")
     .select(
-      "id, external_id, espn_id, tournament, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, scheduled_at, final_verification_notes",
+      "id, external_id, espn_id, tournament, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, scheduled_at, final_verification_notes, predictions!inner(id)",
     )
     .eq("status", "finished")
     .is("final_verified_at", null)
@@ -54,7 +57,15 @@ export async function GET() {
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 
-  const matches = (data ?? []) as MatchRow[];
+  const seen = new Set<string>();
+  const matches: MatchRow[] = [];
+  for (const row of (data ?? []) as Array<MatchRow & { predictions: unknown }>) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    const { predictions: _join, ...rest } = row;
+    void _join;
+    matches.push(rest as MatchRow);
+  }
 
   // Agrupamos por tournament para hacer 1 fetch ESPN por liga, no N.
   const byTournament = new Map<string, MatchRow[]>();
