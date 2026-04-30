@@ -11,6 +11,8 @@ import {
   isValidDisplayName,
 } from "@/lib/users/needs-name";
 
+const PAYOUT_METHODS = ["nequi", "daviplata", "bancolombia", "transfiya", "otro"] as const;
+
 const updateSchema = z.object({
   display_name: z
     .string()
@@ -22,6 +24,8 @@ const updateSchema = z.object({
     )
     .optional(),
   avatar_url: z.string().max(50).optional(),
+  default_payout_method: z.enum(PAYOUT_METHODS).nullable().optional(),
+  default_payout_account: z.string().trim().min(3).max(120).nullable().optional(),
 });
 
 export async function GET() {
@@ -34,7 +38,7 @@ export async function GET() {
 
     const { data: userData } = await admin
       .from("users")
-      .select("display_name, whatsapp_number, avatar_url, is_admin")
+      .select("display_name, whatsapp_number, avatar_url, is_admin, default_payout_method, default_payout_account, default_payout_set_at")
       .eq("id", user.id)
       .single();
 
@@ -107,9 +111,22 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const updateData: Record<string, string> = {};
+    const updateData: Record<string, string | null> = {};
     if (parsed.data.display_name) updateData.display_name = parsed.data.display_name;
     if (parsed.data.avatar_url) updateData.avatar_url = parsed.data.avatar_url;
+
+    // Payout default: ambos campos viajan juntos. Permitimos null
+    // explícito para borrar la cuenta guardada.
+    const wantsPayout =
+      parsed.data.default_payout_method !== undefined ||
+      parsed.data.default_payout_account !== undefined;
+    if (wantsPayout) {
+      updateData.default_payout_method = parsed.data.default_payout_method ?? null;
+      updateData.default_payout_account = parsed.data.default_payout_account ?? null;
+      updateData.default_payout_set_at = updateData.default_payout_account
+        ? new Date().toISOString()
+        : null;
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });

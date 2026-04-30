@@ -50,6 +50,7 @@ import { ActivePollasEmpty } from "@/components/inicio/ActivePollasEmpty";
 import { PodiumCarousel } from "@/components/inicio/PodiumCarousel";
 import { GreetingHero } from "@/components/inicio/GreetingHero";
 import GlobalPayoutBanner from "@/components/inicio/GlobalPayoutBanner";
+import DefaultPayoutPrompt from "@/components/inicio/DefaultPayoutPrompt";
 import { RivalChip } from "@/components/inicio/RivalChip";
 import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
@@ -801,6 +802,13 @@ export default async function InicioPage() {
 
       <main className="pb-[110px]">
         <div className="max-w-lg mx-auto space-y-8">
+          {/* Default payout prompt — modal "agregá tu cuenta para
+              cobrar" que se le muestra UNA VEZ por sesión a los users
+              que aún no tienen default_payout_method/account seteado en
+              perfil. Saltable — para los que no quieren ahora, no
+              bloquea nada. Re-aparece próxima sesión. */}
+          <DefaultPayoutPrompt />
+
           {/* Pagos pendientes — banner global pinned arriba con todas
               las transacciones unpaid del viewer en cualquier polla
               finalizada. Se monta solo si hay tx pendientes; auto-abre
