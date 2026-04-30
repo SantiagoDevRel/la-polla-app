@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Banknote, Copy, X, Check } from "lucide-react";
+import WinnerPayoutModal, { type PayoutMethod } from "@/components/polla/WinnerPayoutModal";
 
 interface PendingPayout {
   transactionId: string;
@@ -28,6 +29,7 @@ interface PendingPayout {
     method: string | null;
     account: string | null;
   } | null;
+  viewerNeedsAccount: boolean;
 }
 
 const METHOD_LABEL: Record<string, string> = {
@@ -50,14 +52,24 @@ export default function GlobalPayoutBanner() {
   const [actingId, setActingId] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Winner-needs-account flow: si el viewer es ganador en una polla y
+  // todavía no dejó cuenta de cobro, le mostramos el WinnerPayoutModal
+  // primero (con video). De a una polla por vez — al guardar pasa a
+  // la siguiente que falte. Cuando ya tienen todas las cuentas seteadas,
+  // pasa el flow normal del banner regular.
+  const [winnerPrompt, setWinnerPrompt] = useState<PendingPayout | null>(null);
+  const [savingAccount, setSavingAccount] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const res = await axios.get<{ pending: PendingPayout[] }>(
         "/api/users/me/pending-payouts",
       );
       setItems(res.data.pending);
+      return res.data.pending;
     } catch {
       setItems([]);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -67,12 +79,24 @@ export default function GlobalPayoutBanner() {
     void load();
   }, [load]);
 
-  // Auto-open una vez por sesión cuando hay tx pendientes — el user no
-  // tiene que clickear el banner la primera vez. Después de cerrar
-  // (X o "Cerrar") queda pinned hasta que se salde todo.
+  // Auto-open: al cargar la lista decidimos qué mostrar primero.
+  //   - Si hay incoming con viewerNeedsAccount → priorizamos el winner
+  //     modal (de a uno).
+  //   - Si no hay accounts pendientes pero sí hay tx → abre el banner
+  //     regular una vez por sesión.
   useEffect(() => {
     if (loading || items.length === 0) return;
     if (typeof window === "undefined") return;
+
+    const needsAccount = items.find((i) => i.viewerNeedsAccount);
+    if (needsAccount) {
+      // Winner sin cuenta — mostrar modal cada visita (NO gateamos por
+      // sessionStorage). Si ya lo cerraron y volvieron al inicio, lo
+      // mostramos otra vez hasta que pongan la cuenta.
+      setWinnerPrompt(needsAccount);
+      return;
+    }
+
     const k = "global-payout-modal-shown";
     if (window.sessionStorage.getItem(k) === "1") return;
     setOpen(true);
@@ -81,7 +105,30 @@ export default function GlobalPayoutBanner() {
     } catch {
       /* sessionStorage unavailable */
     }
-  }, [loading, items.length]);
+  }, [loading, items]);
+
+  async function saveWinnerAccount(method: PayoutMethod, account: string) {
+    if (!winnerPrompt || savingAccount) return;
+    setSavingAccount(true);
+    try {
+      await axios.patch(
+        `/api/pollas/${winnerPrompt.pollaSlug}/payout-method`,
+        { method, account },
+      );
+      const next = await load();
+      // Después del save, ¿queda alguna otra polla con cuenta pendiente?
+      const stillNeeds = next.find((i) => i.viewerNeedsAccount);
+      if (stillNeeds) {
+        setWinnerPrompt(stillNeeds);
+      } else {
+        setWinnerPrompt(null);
+      }
+    } catch {
+      /* swallow — el modal queda abierto para reintento */
+    } finally {
+      setSavingAccount(false);
+    }
+  }
 
   async function markPaid(item: PendingPayout) {
     if (actingId) return;
@@ -115,6 +162,21 @@ export default function GlobalPayoutBanner() {
 
   return (
     <>
+      {/* Winner-needs-account modal — prioridad. Solo cuando hay un
+          incoming en una polla donde el viewer todavía no dejó cuenta.
+          Después del save, el endpoint vuelve sin viewerNeedsAccount y
+          este modal no se vuelve a abrir. */}
+      {winnerPrompt ? (
+        <WinnerPayoutModal
+          open={true}
+          pollaName={winnerPrompt.pollaName}
+          position={1}
+          prizeAmount={winnerPrompt.amount}
+          onSubmit={saveWinnerAccount}
+          onClose={() => setWinnerPrompt(null)}
+        />
+      ) : null}
+
       <button
         type="button"
         onClick={() => setOpen(true)}
