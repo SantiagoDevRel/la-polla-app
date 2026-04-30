@@ -126,13 +126,13 @@ export async function GET() {
     partByKey.set(`${p.polla_id}|${p.user_id}`, p);
   }
 
-  // 4. Filtrar a las que involucran al viewer:
-  //    - viewer = from o viewer = to → mostrar
-  //    - viewer = admin de la polla y la transacción no involucra al
-  //      viewer (ej. en pay_winner mode, otro user pagó a otro user)
-  //      → no mostrar (no es asunto del admin a menos que él esté
-  //      directamente involucrado).
-  //    Resultado: solo mostramos lo que el viewer puede ACCIONAR.
+  // 4. Filtrar a las que involucran al viewer (from o to). Para
+  //    incoming agregamos viewerNeedsAccount: si el viewer todavía
+  //    no dejó payout_method+account en esa polla, el cliente le
+  //    muestra el WinnerPayoutModal de "decinos cómo cobrar" antes
+  //    de la lista regular.
+  //    Para outgoing agregamos counterpartyAccount (la cuenta del que
+  //    cobra, para que el que paga la pueda copiar).
   const pending = transactions
     .filter((t) => t.from_user_id === user.id || t.to_user_id === user.id)
     .map((t) => {
@@ -143,6 +143,7 @@ export async function GET() {
         direction === "incoming" ? t.from_user_id : t.to_user_id;
       const counterparty = userById.get(counterpartyId);
       const counterpartyPart = partByKey.get(`${t.polla_id}|${counterpartyId}`);
+      const viewerPart = partByKey.get(`${t.polla_id}|${user.id}`);
       // Si el otro lado es el admin (created_by) de la polla y NO
       // tiene row en polla_participants (caso admin_collects con
       // admin no participante), su cuenta de cobro no aplica acá —
@@ -154,6 +155,9 @@ export async function GET() {
               account: counterpartyPart?.payout_account ?? null,
             }
           : null;
+      const viewerNeedsAccount =
+        direction === "incoming" &&
+        (!viewerPart?.payout_method || !viewerPart?.payout_account);
       return {
         transactionId: t.id,
         pollaId: t.polla_id,
@@ -164,6 +168,7 @@ export async function GET() {
         amount: Number(t.amount),
         counterpartyName: counterparty?.display_name ?? "—",
         counterpartyAccount,
+        viewerNeedsAccount,
       };
     });
 
