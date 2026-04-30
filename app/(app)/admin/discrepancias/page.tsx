@@ -152,7 +152,7 @@ export default function AdminDiscrepanciasPage() {
                   {/* Score side-by-side */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
-                      <p className="text-[10px] uppercase tracking-wide text-text-muted">football-data</p>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">DB (último sync)</p>
                       <p className="font-display text-[28px] text-text-primary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
                         {fd.h ?? "—"} - {fd.a ?? "—"}
                       </p>
