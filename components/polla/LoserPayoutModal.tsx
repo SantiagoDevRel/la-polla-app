@@ -67,7 +67,7 @@ export default function LoserPayoutModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center px-4 py-6">
       <video
         className="absolute inset-0 w-full h-full object-cover"
         autoPlay
@@ -83,10 +83,10 @@ export default function LoserPayoutModal({
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at center, rgba(8,12,16,0.45) 0%, rgba(8,12,16,0.9) 100%)",
+            "radial-gradient(ellipse at center, rgba(8,12,16,0.12) 0%, rgba(8,12,16,0.6) 100%)",
         }}
       />
-      <div className="relative w-full sm:max-w-md p-5 pb-7 sm:rounded-2xl rounded-t-3xl bg-bg-card/88 backdrop-blur-md border-t sm:border border-amber/25 shadow-[0_0_30px_rgba(255,159,28,0.18)] animate-fade-in">
+      <div className="relative w-full max-w-sm p-5 pb-7 rounded-2xl bg-bg-card/72 backdrop-blur-xl border border-amber/35 shadow-[0_0_30px_rgba(255,159,28,0.22)] animate-fade-in">
         {onClose && !forceAction && (
           <button
             type="button"

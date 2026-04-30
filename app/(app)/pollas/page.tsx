@@ -62,7 +62,7 @@ export default function MisPollasPage() {
   const [pollas, setPollas] = useState<PollaData[]>([]);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [endedOpen, setEndedOpen] = useState(false);
+  const [endedOpen, setEndedOpen] = useState(true);
   const [joinOpen, setJoinOpen] = useState(false);
 
   useEffect(() => {
