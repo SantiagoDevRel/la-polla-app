@@ -31,6 +31,12 @@ interface FormState {
   buyInAmount: number;
   paymentMode: PaymentMode;
   adminPaymentInstructions: string;
+  // Cuenta estructurada del admin para AI-assist screenshot (solo
+  // aplica cuando paymentMode === 'admin_collects'). Pre-llenado de
+  // users.default_payout_* si el admin ya lo seteó en /perfil.
+  adminPayoutMethod: "nequi" | "bancolombia" | "otro" | null;
+  adminPayoutAccount: string;
+  adminPayoutAccountName: string;
 }
 
 interface MatchRow {
@@ -93,7 +99,43 @@ export default function CrearPollaPage() {
     buyInAmount: 0,
     paymentMode: "pay_winner",
     adminPaymentInstructions: "",
+    adminPayoutMethod: null,
+    adminPayoutAccount: "",
+    adminPayoutAccountName: "",
   });
+
+  // Pre-fill admin payout fields desde users.default_payout_* — si
+  // el admin ya configuró su cuenta en /perfil, no le re-preguntamos.
+  // Si nunca lo configuró, los campos quedan vacíos y los completa
+  // acá (y opcionalmente lo guardamos como default global, futuro).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await axios.get<{
+          profile?: {
+            default_payout_method?: "nequi" | "bancolombia" | "otro" | null;
+            default_payout_account?: string | null;
+            default_payout_account_name?: string | null;
+          };
+        }>("/api/users/me");
+        if (cancelled) return;
+        if (data.profile?.default_payout_method && data.profile?.default_payout_account) {
+          setForm((prev) => ({
+            ...prev,
+            adminPayoutMethod: data.profile!.default_payout_method ?? null,
+            adminPayoutAccount: data.profile!.default_payout_account ?? "",
+            adminPayoutAccountName: data.profile!.default_payout_account_name ?? "",
+          }));
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // El creador siempre elige partidos específicos. Los placeholders
   // de fases futuras (cuartos/semis/final) aparecen como rows en el
@@ -322,8 +364,19 @@ export default function CrearPollaPage() {
   async function handleSubmit() {
     setError("");
     if (form.buyInAmount < 1000) { setError("El valor mínimo es $1.000"); return; }
-    if (form.paymentMode === "admin_collects" && form.adminPaymentInstructions.trim() === "") {
-      setError("Debes indicar instrucciones de pago"); return;
+    if (form.paymentMode === "admin_collects") {
+      if (form.adminPaymentInstructions.trim() === "") {
+        setError("Debes indicar instrucciones de pago"); return;
+      }
+      if (!form.adminPayoutMethod) {
+        setError("Elegí el método para recibir el pago (Nequi, Bancolombia u Otro)"); return;
+      }
+      if (!form.adminPayoutAccount.trim()) {
+        setError("Falta el número de cuenta o celular para recibir el pago"); return;
+      }
+      if (form.adminPayoutMethod !== "nequi" && form.adminPayoutAccountName.trim().length < 2) {
+        setError(`Para ${form.adminPayoutMethod} hay que poner el nombre como aparece en la cuenta`); return;
+      }
     }
 
     setLoading(true);
@@ -341,6 +394,12 @@ export default function CrearPollaPage() {
         buyInAmount: form.buyInAmount,
         paymentMode: form.paymentMode,
         adminPaymentInstructions: form.adminPaymentInstructions,
+        adminPayoutMethod: form.adminPayoutMethod ?? undefined,
+        adminPayoutAccount: form.adminPayoutAccount.trim() || undefined,
+        adminPayoutAccountName:
+          form.adminPayoutMethod !== "nequi"
+            ? form.adminPayoutAccountName.trim() || undefined
+            : undefined,
         scope: "custom",
         matchIds: Array.from(selectedMatchIds),
         prizeDistribution: prizeDistribution ?? undefined,
@@ -793,12 +852,82 @@ export default function CrearPollaPage() {
             </div>
 
             {form.paymentMode === "admin_collects" && (
-              <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-                <h2 className="text-base font-bold text-text-primary">Instrucciones de pago</h2>
-                <textarea value={form.adminPaymentInstructions} onChange={(e) => updateForm("adminPaymentInstructions", e.target.value)}
-                  placeholder="Ej: Enviar a Nequi 310-123-4567" rows={4}
-                  className="w-full px-4 py-3 rounded-xl outline-none resize-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50" />
-              </div>
+              <>
+                {/* Cuenta estructurada del admin — usada por la AI
+                    para verificar screenshots automáticamente. */}
+                <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
+                  <div>
+                    <h2 className="text-base font-bold text-text-primary">
+                      Tu cuenta para recibir pagos <span className="text-red-alert">*</span>
+                    </h2>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      Los participantes van a transferir a esta cuenta. La AI valida los comprobantes contra estos datos.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {(["nequi", "bancolombia", "otro"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => updateForm("adminPayoutMethod", m)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                          form.adminPayoutMethod === m
+                            ? "bg-gold text-bg-base border-gold"
+                            : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
+                        }`}
+                      >
+                        {m === "nequi" ? "Nequi" : m === "bancolombia" ? "Bancolombia" : "Otro"}
+                      </button>
+                    ))}
+                  </div>
+
+                  <input
+                    type="text"
+                    value={form.adminPayoutAccount}
+                    onChange={(e) => updateForm("adminPayoutAccount", e.target.value)}
+                    placeholder={
+                      form.adminPayoutMethod === "nequi"
+                        ? "Número de celular Nequi"
+                        : form.adminPayoutMethod === "bancolombia"
+                          ? "Número de cuenta Bancolombia"
+                          : "Banco + número de cuenta"
+                    }
+                    className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
+                  />
+
+                  {form.adminPayoutMethod && form.adminPayoutMethod !== "nequi" ? (
+                    <>
+                      <input
+                        type="text"
+                        value={form.adminPayoutAccountName}
+                        onChange={(e) => updateForm("adminPayoutAccountName", e.target.value)}
+                        placeholder="Nombre completo como aparece en la cuenta"
+                        className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
+                      />
+                      <p className="text-[11px] text-text-muted">
+                        EXACTAMENTE como aparece en tu cuenta del banco. La AI verifica el nombre del beneficiario contra el screenshot.
+                      </p>
+                    </>
+                  ) : null}
+                </div>
+
+                <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
+                  <div>
+                    <h2 className="text-base font-bold text-text-primary">Instrucciones extra</h2>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      Detalles libres que ven los participantes (opcional). Ej: pongan &apos;pago polla&apos; en la referencia.
+                    </p>
+                  </div>
+                  <textarea
+                    value={form.adminPaymentInstructions}
+                    onChange={(e) => updateForm("adminPaymentInstructions", e.target.value)}
+                    placeholder="Ej: Pongan 'pago polla' en la referencia"
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-xl outline-none resize-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
+                  />
+                </div>
+              </>
             )}
 
             {/* Sección 3: Premios (opcional) */}

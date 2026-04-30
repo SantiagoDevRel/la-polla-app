@@ -33,6 +33,11 @@ const createPollaSchema = z
     matchIds: z.array(z.string()).optional(),
     // Solo requerido cuando paymentMode === 'admin_collects'
     adminPaymentInstructions: z.string().optional(),
+    // Cuenta estructurada del admin para AI-assist screenshot.
+    // Solo aplica para admin_collects. Para nequi, name=null.
+    adminPayoutMethod: z.enum(["nequi", "bancolombia", "otro"]).optional(),
+    adminPayoutAccount: z.string().trim().min(3).max(120).optional(),
+    adminPayoutAccountName: z.string().trim().min(2).max(120).optional(),
     // Distribución de premios opcional al crear; el organizador puede
     // editarla luego desde el panel admin.
     prizeDistribution: z
@@ -64,6 +69,24 @@ const createPollaSchema = z
       message: "Las instrucciones de pago son obligatorias cuando el admin recoge el pozo",
       path: ["adminPaymentInstructions"],
     }
+  )
+  // admin_collects requiere también admin_payout_method + account
+  // (estructurado para que la AI verifique screenshots).
+  .refine(
+    (data) => {
+      if (data.paymentMode !== "admin_collects") return true;
+      if (!data.adminPayoutMethod || !data.adminPayoutAccount) return false;
+      // bancolombia y otro requieren nombre. nequi no.
+      if (data.adminPayoutMethod !== "nequi" && !data.adminPayoutAccountName) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        "Para 'pago al principio' tenés que indicar el método (Nequi/Bancolombia/Otro), número de cuenta y nombre (excepto Nequi).",
+      path: ["adminPayoutMethod"],
+    },
   )
   // Validación: buy_in_amount debe ser >= 1000
   .refine(
@@ -386,6 +409,19 @@ export async function POST(request: NextRequest) {
           parsed.data.paymentMode === "admin_collects"
             ? parsed.data.adminPaymentInstructions
             : null,
+        admin_payout_method:
+          parsed.data.paymentMode === "admin_collects"
+            ? parsed.data.adminPayoutMethod
+            : null,
+        admin_payout_account:
+          parsed.data.paymentMode === "admin_collects"
+            ? parsed.data.adminPayoutAccount
+            : null,
+        admin_payout_account_name:
+          parsed.data.paymentMode === "admin_collects" &&
+          parsed.data.adminPayoutMethod !== "nequi"
+            ? parsed.data.adminPayoutAccountName
+            : null,
         match_ids: parsed.data.matchIds || null,
         created_by: user.id,
         join_code: joinCode,
@@ -418,6 +454,19 @@ export async function POST(request: NextRequest) {
             admin_payment_instructions:
               parsed.data.paymentMode === "admin_collects"
                 ? parsed.data.adminPaymentInstructions
+                : null,
+            admin_payout_method:
+              parsed.data.paymentMode === "admin_collects"
+                ? parsed.data.adminPayoutMethod
+                : null,
+            admin_payout_account:
+              parsed.data.paymentMode === "admin_collects"
+                ? parsed.data.adminPayoutAccount
+                : null,
+            admin_payout_account_name:
+              parsed.data.paymentMode === "admin_collects" &&
+              parsed.data.adminPayoutMethod !== "nequi"
+                ? parsed.data.adminPayoutAccountName
                 : null,
             match_ids: parsed.data.matchIds || null,
             created_by: user.id,
