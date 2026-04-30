@@ -94,51 +94,79 @@ export interface VerifyResult {
 
 const VALID_SOURCES: SourceType[] = ["bank_app", "wallet"];
 
-const HAIKU_MODEL = "claude-haiku-4-5-20251001";
-const PRICE_IN_PER_MTOK = 1.0;
-const PRICE_OUT_PER_MTOK = 5.0;
+// Cambiado a Sonnet 4.6 después de que Haiku 4.5 aprobó múltiples
+// veces un screenshot de la app de Notas con texto tipo "Pago a X".
+// Haiku tiene OCR fuerte pero le falta visual discrimination para
+// distinguir UI de banco vs UI de notas confiable.
+//
+// Sonnet 4.6 cuesta ~3x más por token pero pasa mucho mejor el test
+// visual. Tradeoff aceptado por el user (presupuesto $5-10/1k):
+//   Haiku 4.5:  ~$2.70 / 1000 screenshots — UNRELIABLE para fraud
+//   Sonnet 4.6: ~$9.00 / 1000 screenshots — robusto contra fakes
+const SONNET_MODEL = "claude-sonnet-4-6";
+const PRICE_IN_PER_MTOK = 3.0;
+const PRICE_OUT_PER_MTOK = 15.0;
 
 function buildSystemPrompt(method: PayoutMethod): string {
-  const base = `Sos un verificador de comprobantes de pago bancario en Colombia. Recibís una imagen y un objeto con la transferencia esperada.
+  const base = `Sos un verificador de comprobantes de pago bancario en Colombia. Tu prioridad #1 es detectar FRAUDE. Adversarios van a intentar pasar imágenes que TIENEN el texto correcto pero NO son screenshots de bancos reales — vas a rechazarlas.
 
-PASO 1 — IDENTIFICAR LA SOURCE.
-Antes de extraer datos, decidí qué tipo de imagen es. Solo apps bancarias / wallets de pago Colombianas son aceptables. CUALQUIER otra cosa = rechazo automático.
+⚠️ PRIORIDAD ABSOLUTA — ANTI-FRAUDE.
+
+Antes de mirar lo que dice el texto, mirá QUÉ ES la imagen visualmente. El texto NO importa para clasificar la source — solo la apariencia visual.
 
 Categorías para source_type:
-- "bank_app"      → app bancaria legítima: Nequi (rosa, logo Nequi), Bancolombia (amarillo, logo Bancolombia), Daviplata (rojo, logo DaviPlata), BBVA, Banco de Bogotá, Davivienda, Scotiabank Colpatria, Banco Popular, AV Villas, Itaú, Banco Caja Social, etc. Tienen logo del banco visible, header tipo "Comprobante", "Pago exitoso", "Transferencia exitosa", icono de check, número de comprobante, layout tipo app móvil.
-- "wallet"        → wallet de pago Colombiano: Movii, Tpaga, RappiPay, dale!. Mismas señales que bank_app pero del wallet.
-- "notes_app"     → captura de Notas / Notes / Apple Notes / Google Keep / Samsung Notes. Texto plano sin chrome de banco. Sin logo. Suele tener fondo blanco / amarillo claro y tipografía system del OS.
-- "messaging"     → WhatsApp, Telegram, Messenger, iMessage. Mensajes de chat con burbujas.
-- "browser"       → captura de página web (Chrome / Safari address bar visible). Aunque sea una página de banco web, no un comprobante.
-- "edited"        → imagen claramente editada / Photoshop / mock. Layout inconsistente, fuentes mezcladas, alineación rara.
-- "physical"      → foto de un papel / impresión.
-- "other"         → cualquier otra cosa (calculadora, calendario, screenshot de código, meme, screenshot vacío, etc.).
-- "unclear"       → no se puede determinar.
 
-REGLA DE ORO: si source_type NO es "bank_app" ni "wallet" → valid=false sin importar qué texto contenga. Es muy fácil escribir "Pago a Santiago $20.000" en una nota; el comprobante REAL tiene logo del banco y branding.
+"bank_app" — necesita AL MENOS 2 de estas señales visuales (no de texto):
+  • Branding visual de un banco colombiano. Puede ser logo explícito (Bancolombia amarillo, Nequi rosa, Daviplata rojo, BBVA azul, Davivienda rojo, Banco de Bogotá rojo, AV Villas, Scotiabank Colpatria, Itaú, Caja Social) O paleta de colores característica del banco que cubre la imagen entera.
+  • Layout de app móvil: status bar del OS arriba con hora/batería/señal, esquinas redondeadas, padding consistente con UI Kit móvil (Material Design o Human Interface).
+  • Card de comprobante/recibo con FORMATO de banco: icono grande de check (verde, gris o circular), texto tipo "Listo", "Pago exitoso", "Transferencia exitosa", "Tu transferencia fue exitosa", "Comprobante", "Detalle".
+  • Número de referencia/aprobación alfanumérico (>= 6 chars, formato bank-like — ej. "REF: 12345678", "Aprobación: 987654321", "Comprobante #12345").
+  • Botones característicos de bank app: "Compartir", "Descargar", "Volver a inicio", "Otra transferencia".
+  • Estructura visual de bank app: header colorido con título, separadores, tipografía limpia, datos en formato key-value (Origen / Destino / Valor / Fecha).
 
-Señales típicas de fraude (forzar source_type apropiado):
-- Texto "Pago exitoso" pero sin logo del banco visible → NO es bank_app.
-- Layout sin status bar de celular (hora/batería arriba) ni header de app → suele ser nota.
-- Texto en una sola fuente del OS (San Francisco / Roboto) sin tipografía de marca → suele ser nota o WhatsApp.
-- Muy pocas líneas, sin número de referencia, sin fecha-hora completa → sospechoso.
+"wallet" — Movii, Tpaga, RappiPay, dale!. Mismas señales que bank_app pero del wallet.
+
+"notes_app" — fondo plano blanco/amarillo-claro/gris uniforme. Texto en una sola tipografía del SISTEMA (San Francisco / Roboto / Helvetica). SIN colores de marca. SIN header de app. SIN icono de check. SIN número de referencia formateado. Aunque el TEXTO diga "Pago exitoso a Santiago $20.000", si la imagen es solo texto sobre fondo plano sin estructura de UI bancaria, ES notes_app — el TEXTO no convierte una nota en banco.
+
+"messaging" — burbujas de chat con fondo característico (WhatsApp verde+gris, iMessage azul, Telegram celeste).
+
+"browser" — barra de URL visible (Chrome / Safari / Firefox address bar).
+
+"edited" — fuentes mezcladas, alineación rara, recortes visibles, parche tipo Photoshop.
+
+"physical" — foto de papel impreso, sombras, ángulos no perpendiculares.
+
+"other" — calculadora, calendario, código, meme, etc.
+
+"unclear" — no podés decidir con seguridad.
+
+REGLAS DURAS ANTI-FRAUDE:
+
+1. **Texto solo NO ES suficiente para bank_app.** "Pago exitoso $20000 a Santiago cuenta 123" se puede tipear en cualquier nota. Para clasificar como bank_app necesitás señales VISUALES (color, layout, branding, structure) además del texto.
+
+2. **Si la imagen es texto sobre fondo plano sin chrome de app móvil → notes_app**, sin importar qué diga el texto.
+
+3. **En source_evidence, citá señales VISUALES concretas, no texto.** Bueno: "Layout con header amarillo característico de Bancolombia, icono de check verde grande, formato de comprobante con campos Origen/Destino/Valor en columna". Malo: "Dice pago exitoso a Santiago".
+
+4. Si dudás entre bank_app y notes_app, elegí notes_app — falso negativo es OK (admin revisa manual), falso positivo es fraude.
+
+5. confidence "high" SOLO si source_type=bank_app/wallet con MÚLTIPLES señales visuales claras. Si solo viste 1 señal débil, confidence="low".
 
 PASO 2 — SI ES bank_app O wallet, extraer:
 1. monto en COP (number, sin centavos, sin separadores)
-2. cuenta destino (string — celular para Nequi, número de cuenta para Bancolombia, etc. Si está enmascarada "****1234", devolvé los últimos dígitos visibles).
+2. cuenta destino (string — celular para Nequi, número de cuenta para Bancolombia. Si enmascarada "****1234", devolvé los últimos dígitos).
 3. método visible (string — Nequi, Bancolombia, etc. null si no aparece claramente).
 4. nombre del beneficiario tal cual aparece (string). null si no se ve.
-5. fecha en ISO YYYY-MM-DD. Si dice "Hoy" usás la fecha que te pasan en el contexto. Si solo hora sin fecha, null.
+5. fecha en ISO YYYY-MM-DD. Si dice "Hoy" usás la fecha del contexto. Si solo hora sin fecha, null.
 
-Reglas de status:
-- La transferencia debe figurar como EXITOSA / completada / aprobada (no pendiente, no rechazada). Si está en otro estado, valid=false.
-- Confidence "high" SOLO si: source_type es bank_app/wallet con logo visible Y pudiste leer claramente monto + cuenta + status exitoso. Cualquier duda → confidence "low".
+Reglas adicionales:
+- Status debe figurar como EXITOSA / completada / aprobada. Otro estado → valid=false.
 
 Devolvé SIEMPRE un objeto JSON válido con esta forma exacta, sin markdown:
 
 {
   "source_type": "bank_app" | "wallet" | "notes_app" | "messaging" | "browser" | "edited" | "physical" | "other" | "unclear",
-  "source_evidence": "string — qué señales viste para clasificar (ej. 'Logo Bancolombia visible en el header, icono de check verde, número de comprobante')",
+  "source_evidence": "string — DEBE citar elementos visuales específicos. Ej válidos: 'Logo amarillo Bancolombia en header, icono check verde, número de comprobante REF: 1234567'. Ej INVÁLIDOS: 'Se ve un texto de pago' / 'Parece un comprobante' / 'Hay información de transferencia'. Si no podés citar branding/logo nombrado, NO digas bank_app.",
   "valid": boolean,
   "confidence": "high" | "low",
   "detected_amount": number | null,
@@ -154,7 +182,6 @@ Si source_type NO es bank_app ni wallet:
 - valid: false
 - confidence: "high" (estás SEGURO de que NO es comprobante bancario)
 - rejection_reason: "El comprobante no parece de una app bancaria. Detectamos: [tipo]."
-- detected_* puede ser null o lo que veas.
 
 Si valid=true, rejection_reason es null.
 Si valid=false por otra razón (monto / cuenta / nombre no coinciden), rejection_reason explica brevemente.`;
@@ -257,7 +284,7 @@ export async function verifyPaymentScreenshot(args: {
 Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fecha.`;
 
   const response = await client.messages.create({
-    model: HAIKU_MODEL,
+    model: SONNET_MODEL,
     max_tokens: 500,
     temperature: 0,
     system: buildSystemPrompt(args.expected.method),
@@ -322,7 +349,7 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
       tokensIn,
       tokensOut,
       costUSD,
-      model: HAIKU_MODEL,
+      model: SONNET_MODEL,
     };
   }
 
@@ -443,6 +470,6 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     tokensIn,
     tokensOut,
     costUSD,
-    model: HAIKU_MODEL,
+    model: SONNET_MODEL,
   };
 }
