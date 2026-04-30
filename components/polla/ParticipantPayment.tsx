@@ -12,6 +12,7 @@ import axios from "axios";
 import { Banknote, CreditCard } from "lucide-react";
 import AdminPaymentReview from "./AdminPaymentReview";
 import PaymentsList from "./PaymentsList";
+import PaymentProofUpload from "./PaymentProofUpload";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 interface PaymentParticipant {
@@ -33,6 +34,9 @@ interface PaymentParticipant {
 
 interface PollaPaymentInfo {
   adminPaymentInstructions: string | null;
+  adminPayoutMethod: "nequi" | "bancolombia" | "otro" | null;
+  adminPayoutAccount: string | null;
+  adminPayoutAccountName: string | null;
   buyInAmount: number;
   currency: string;
   paymentMode: string;
@@ -138,26 +142,47 @@ export default function ParticipantPayment({
     <div className="space-y-4">
       {awaitingApproval ? (
         <>
-          <div className="rounded-2xl p-5 space-y-2 lp-card">
-            <div className="flex items-center gap-2">
-              <Banknote className="w-5 h-5 text-gold" aria-hidden="true" />
-              <h3 className="font-bold text-text-primary">Esperando aprobación del organizador</h3>
-            </div>
-            <p className="text-sm text-text-secondary leading-snug">
-              Pagale al organizador por fuera de la app. Una vez que él te marque como pagado, vas a poder pronosticar.
-            </p>
-          </div>
-          {instructions ? (
-            <div className="rounded-xl p-4 space-y-2 bg-bg-elevated border border-border-subtle">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-gold" aria-hidden="true" />
-                <p className="text-sm font-semibold text-text-primary">Cómo pagar</p>
+          {/* Upload con AI-assist — solo cuando el admin configuró
+              cuenta estructurada. Si no, fallback al banner clásico. */}
+          {pollaPaymentInfo.adminPayoutMethod && pollaPaymentInfo.adminPayoutAccount ? (
+            <PaymentProofUpload
+              pollaSlug={pollaSlug}
+              buyInAmount={pollaPaymentInfo.buyInAmount}
+              payoutMethod={pollaPaymentInfo.adminPayoutMethod}
+              payoutAccount={pollaPaymentInfo.adminPayoutAccount}
+              payoutAccountName={pollaPaymentInfo.adminPayoutAccountName}
+              extraInstructions={instructions || null}
+              onApproved={() => {
+                void loadPayments();
+              }}
+              onPendingReview={() => {
+                void loadPayments();
+              }}
+            />
+          ) : (
+            <>
+              <div className="rounded-2xl p-5 space-y-2 lp-card">
+                <div className="flex items-center gap-2">
+                  <Banknote className="w-5 h-5 text-gold" aria-hidden="true" />
+                  <h3 className="font-bold text-text-primary">Esperando aprobación del organizador</h3>
+                </div>
+                <p className="text-sm text-text-secondary leading-snug">
+                  Pagale al organizador por fuera de la app. Una vez que él te marque como pagado, vas a poder pronosticar.
+                </p>
               </div>
-              <p className="text-sm text-text-secondary whitespace-pre-wrap leading-snug">
-                {instructions}
-              </p>
-            </div>
-          ) : null}
+              {instructions ? (
+                <div className="rounded-xl p-4 space-y-2 bg-bg-elevated border border-border-subtle">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-gold" aria-hidden="true" />
+                    <p className="text-sm font-semibold text-text-primary">Cómo pagar</p>
+                  </div>
+                  <p className="text-sm text-text-secondary whitespace-pre-wrap leading-snug">
+                    {instructions}
+                  </p>
+                </div>
+              ) : null}
+            </>
+          )}
         </>
       ) : null}
       <PaymentsList

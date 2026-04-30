@@ -456,6 +456,28 @@ export default function AdminPage() {
               </section>
             )}
 
+            {/* Comprobantes de pago — review queue admin_collects */}
+            <section
+              className="rounded-2xl p-4"
+              style={{ background: "#0e1420", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-text-primary">Comprobantes de pago</p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Screenshots subidos por participantes en pollas con &apos;pago al principio&apos;. Revisá lo que la AI auto-aprobó o lo que dejó pendiente.
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push("/admin/payment-proofs")}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold hover:brightness-110 transition-all cursor-pointer flex-shrink-0"
+                  style={{ background: "#FFD700", color: "#080c10" }}
+                >
+                  Revisar
+                </button>
+              </div>
+            </section>
+
             {/* Lab — endpoints de prueba antes de cablear a prod */}
             <section
               className="rounded-2xl p-4"
