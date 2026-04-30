@@ -15,14 +15,12 @@ import Image from "next/image";
 import { ArrowLeft, Upload, Check, X as XIcon, AlertTriangle } from "lucide-react";
 import { preprocessImageForVision } from "@/lib/vision/preprocess-image";
 
-type PayoutMethod = "nequi" | "daviplata" | "bancolombia" | "transfiya" | "otro";
+type PayoutMethod = "nequi" | "bancolombia" | "otro";
 
-const METHODS: Array<{ id: PayoutMethod; label: string }> = [
-  { id: "nequi", label: "Nequi" },
-  { id: "daviplata", label: "Daviplata" },
-  { id: "bancolombia", label: "Bancolombia" },
-  { id: "transfiya", label: "Transfiya" },
-  { id: "otro", label: "Otro" },
+const METHODS: Array<{ id: PayoutMethod; label: string; hint: string }> = [
+  { id: "nequi", label: "Nequi", hint: "Verifica monto + celular. Ignora nombre." },
+  { id: "bancolombia", label: "Bancolombia", hint: "Verifica monto + cuenta + nombre." },
+  { id: "otro", label: "Otro", hint: "Haiku extrae lo que puede; el organizador siempre revisa manual." },
 ];
 
 interface VerifyResultUI {
@@ -63,6 +61,7 @@ export default function ScreenshotTestPage() {
   const [result, setResult] = useState<VerifyResultUI | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [bytesInfo, setBytesInfo] = useState<{ before: number; after: number } | null>(null);
+  const [resultMethod, setResultMethod] = useState<PayoutMethod | null>(null);
 
   function pickFile(f: File | null) {
     setFile(f);
@@ -75,8 +74,13 @@ export default function ScreenshotTestPage() {
 
   async function submit() {
     if (!file || submitting) return;
-    if (!account.trim() || !amount.trim() || !recipientName.trim()) {
-      setError("Completá cuenta, nombre del beneficiario y monto.");
+    if (!account.trim() || !amount.trim()) {
+      setError("Completá cuenta y monto.");
+      return;
+    }
+    // Para nequi el nombre es opcional. Para bancolombia + otro, requerido.
+    if (method !== "nequi" && !recipientName.trim()) {
+      setError(`Para ${method} hay que poner el nombre del beneficiario.`);
       return;
     }
     setSubmitting(true);
@@ -101,6 +105,7 @@ export default function ScreenshotTestPage() {
         { headers: { "Content-Type": "multipart/form-data" } },
       );
       setResult(data.result);
+      setResultMethod(method);
     } catch (err) {
       const message =
         (err as { response?: { data?: { error?: string } }; message?: string })
@@ -154,6 +159,9 @@ export default function ScreenshotTestPage() {
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-text-muted mt-1.5">
+              {METHODS.find((m) => m.id === method)?.hint}
+            </p>
           </div>
 
           <div>
@@ -169,18 +177,20 @@ export default function ScreenshotTestPage() {
             />
           </div>
 
-          <div>
-            <label className="text-[10px] uppercase tracking-wide text-text-muted block mb-1">
-              Nombre del beneficiario (full)
-            </label>
-            <input
-              type="text"
-              value={recipientName}
-              onChange={(e) => setRecipientName(e.target.value)}
-              placeholder="ej. Juan Pablo Pérez Gómez"
-              className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50"
-            />
-          </div>
+          {method !== "nequi" ? (
+            <div>
+              <label className="text-[10px] uppercase tracking-wide text-text-muted block mb-1">
+                Nombre del beneficiario (full)
+              </label>
+              <input
+                type="text"
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+                placeholder="ej. Juan Pablo Pérez Gómez"
+                className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50"
+              />
+            </div>
+          ) : null}
 
           <div>
             <label className="text-[10px] uppercase tracking-wide text-text-muted block mb-1">
@@ -228,7 +238,13 @@ export default function ScreenshotTestPage() {
           <button
             type="button"
             onClick={submit}
-            disabled={!file || !account.trim() || !recipientName.trim() || !amount.trim() || submitting}
+            disabled={
+                !file ||
+                !account.trim() ||
+                !amount.trim() ||
+                (method !== "nequi" && !recipientName.trim()) ||
+                submitting
+              }
             className="w-full bg-gold text-bg-base font-display text-base tracking-wide py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
           >
             {submitting ? "VERIFICANDO…" : "VERIFICAR CON HAIKU"}
@@ -294,7 +310,16 @@ export default function ScreenshotTestPage() {
               <dd className="text-right text-text-primary truncate">
                 {result.detectedRecipientName ?? "—"}
               </dd>
-              <CheckMark ok={result.checks.name} />
+              {resultMethod === "nequi" ? (
+                <span
+                  className="text-[9px] uppercase px-1.5 py-0.5 rounded-md bg-text-muted/15 text-text-muted border border-border-subtle whitespace-nowrap"
+                  title="Nequi no valida nombre"
+                >
+                  N/A
+                </span>
+              ) : (
+                <CheckMark ok={result.checks.name} />
+              )}
 
               <dt className="text-text-muted">Método</dt>
               <dd className="text-right text-text-primary truncate">

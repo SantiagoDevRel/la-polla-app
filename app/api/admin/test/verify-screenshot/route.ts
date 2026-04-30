@@ -1,38 +1,37 @@
 // app/api/admin/test/verify-screenshot/route.ts
 //
 // POST — endpoint de TESTING para que el admin suba un screenshot,
-// declare lo esperado (método + cuenta + monto) y vea qué decide
-// Haiku. NO escribe a polla_participants ni polla_payouts; solo
-// retorna el veredicto + costos.
+// declare lo esperado (método + cuenta + nombre opcional + monto) y
+// vea qué decide Haiku. NO escribe a polla_participants ni
+// polla_payouts; solo retorna el veredicto + costos.
 //
 // Multipart/form-data esperado:
-//   image:   File (image/jpeg|png|webp)
-//   method:  string (nequi|daviplata|bancolombia|transfiya|otro)
-//   account: string
-//   amount:  string (COP, sin centavos)
+//   image:           File (image/jpeg|png|webp)
+//   method:          string (nequi|bancolombia|otro)
+//   account:         string
+//   recipient_name:  string (opcional para nequi, requerido para
+//                            bancolombia y otro)
+//   amount:          string (COP, sin centavos)
 
 import { NextRequest, NextResponse } from "next/server";
-import { isCurrentUserAdmin } from "@/lib/auth/admin";
+import { isCurrentUserAdmin, getAuthenticatedUser } from "@/lib/auth/admin";
 import {
   verifyPaymentScreenshot,
   type PayoutMethod,
 } from "@/lib/vision/verify-payment";
+import { logClaudeUsage } from "@/lib/vision/log-usage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VALID_METHODS: PayoutMethod[] = [
-  "nequi",
-  "daviplata",
-  "bancolombia",
-  "transfiya",
-  "otro",
-];
+const VALID_METHODS: PayoutMethod[] = ["nequi", "bancolombia", "otro"];
 
 export async function POST(request: NextRequest) {
   if (!(await isCurrentUserAdmin())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
+  const me = await getAuthenticatedUser();
+  const userId = me?.id ?? null;
 
   let formData: FormData;
   try {
@@ -51,13 +50,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Falta image" }, { status: 400 });
   }
   if (typeof methodRaw !== "string" || !VALID_METHODS.includes(methodRaw as PayoutMethod)) {
-    return NextResponse.json({ error: "method inválido" }, { status: 400 });
+    return NextResponse.json({ error: "method inválido (debe ser nequi, bancolombia u otro)" }, { status: 400 });
   }
   if (typeof account !== "string" || account.trim().length < 3) {
     return NextResponse.json({ error: "account inválido" }, { status: 400 });
   }
-  if (typeof recipientName !== "string" || recipientName.trim().length < 2) {
-    return NextResponse.json({ error: "recipient_name inválido (mínimo 2 caracteres)" }, { status: 400 });
+  // recipient_name: requerido para bancolombia y otro, opcional para nequi.
+  const method = methodRaw as PayoutMethod;
+  let nameForVerify: string | undefined;
+  if (method === "nequi") {
+    nameForVerify = typeof recipientName === "string" ? recipientName.trim() || undefined : undefined;
+  } else {
+    if (typeof recipientName !== "string" || recipientName.trim().length < 2) {
+      return NextResponse.json(
+        { error: `Para ${method} hay que poner el nombre completo del beneficiario.` },
+        { status: 400 },
+      );
+    }
+    nameForVerify = recipientName.trim();
   }
   if (typeof amountRaw !== "string") {
     return NextResponse.json({ error: "amount inválido" }, { status: 400 });
@@ -67,7 +77,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "amount debe ser > 0" }, { status: 400 });
   }
 
-  // Determinar media_type aceptado por Anthropic API.
   const type = image.type;
   let mediaType: "image/jpeg" | "image/png" | "image/webp";
   if (type === "image/jpeg" || type === "image/jpg") mediaType = "image/jpeg";
@@ -80,9 +89,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Tamaño max 10MB upload — Haiku Vision igual va a auto-resize a 1568px.
-  // Idealmente el cliente preprocesa con lib/vision/preprocess-image,
-  // pero defensive cap por si suben raw.
   if (image.size > 10 * 1024 * 1024) {
     return NextResponse.json(
       { error: "Imagen mayor a 10 MB. Probá una más liviana." },
@@ -98,12 +104,25 @@ export async function POST(request: NextRequest) {
       imageBase64: base64,
       imageMediaType: mediaType,
       expected: {
-        method: methodRaw as PayoutMethod,
+        method,
         account: account.trim(),
-        recipientName: recipientName.trim(),
+        recipientName: nameForVerify,
         amountCOP,
       },
     });
+
+    // Log a claude_api_usage. Best-effort — no rompe la response.
+    void logClaudeUsage({
+      userId,
+      endpoint: "test/verify-screenshot",
+      model: result.model,
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
+      imageBytes: image.size,
+      costUSD: result.costUSD,
+      success: true,
+    });
+
     return NextResponse.json({
       ok: true,
       result,
@@ -113,6 +132,20 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("[admin/test/verify-screenshot] failed:", err);
     const message = err instanceof Error ? err.message : "Error desconocido";
+
+    // Log la falla también para tener visibilidad en /admin.
+    void logClaudeUsage({
+      userId,
+      endpoint: "test/verify-screenshot",
+      model: "claude-haiku-4-5-20251001",
+      tokensIn: 0,
+      tokensOut: 0,
+      imageBytes: image.size,
+      costUSD: 0,
+      success: false,
+      errorMessage: message,
+    });
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
