@@ -51,6 +51,7 @@ import { PodiumCarousel } from "@/components/inicio/PodiumCarousel";
 import { GreetingHero } from "@/components/inicio/GreetingHero";
 import GlobalPayoutBanner from "@/components/inicio/GlobalPayoutBanner";
 import DefaultPayoutPrompt from "@/components/inicio/DefaultPayoutPrompt";
+import UnpaidPollasBanner from "@/components/inicio/UnpaidPollasBanner";
 import { RivalChip } from "@/components/inicio/RivalChip";
 import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
@@ -808,6 +809,14 @@ export default async function InicioPage() {
               perfil. Saltable — para los que no quieren ahora, no
               bloquea nada. Re-aparece próxima sesión. */}
           <DefaultPayoutPrompt />
+
+          {/* URGENT: pollas activas admin_collects donde el viewer
+              todavía no pagó → no puede pronosticar. Más prioritario
+              que el GlobalPayoutBanner (este es para EMPEZAR, ese es
+              para el final). Auto-abre modal una vez por sesión. */}
+          <section className="px-4">
+            <UnpaidPollasBanner />
+          </section>
 
           {/* Pagos pendientes — banner global pinned arriba con todas
               las transacciones unpaid del viewer en cualquier polla
