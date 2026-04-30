@@ -7,14 +7,17 @@
 import { useState } from "react";
 import { Trophy, Copy, X } from "lucide-react";
 
-export type PayoutMethod = "nequi" | "daviplata" | "bancolombia" | "transfiya" | "otro";
+export type PayoutMethod = "nequi" | "bancolombia" | "otro";
 
-const METHOD_OPTIONS: Array<{ id: PayoutMethod; label: string; placeholder: string }> = [
-  { id: "nequi", label: "Nequi", placeholder: "Número de celular (ej: 311 314 7831)" },
-  { id: "daviplata", label: "Daviplata", placeholder: "Número de celular" },
-  { id: "bancolombia", label: "Bancolombia", placeholder: "Número de cuenta de ahorros" },
-  { id: "transfiya", label: "Transfiya", placeholder: "Llave (celular o usuario)" },
-  { id: "otro", label: "Otro", placeholder: "Banco + tipo + número (ej: Davivienda 0011-...)" },
+const METHOD_OPTIONS: Array<{
+  id: PayoutMethod;
+  label: string;
+  placeholder: string;
+  needsName: boolean;
+}> = [
+  { id: "nequi", label: "Nequi", placeholder: "Número de celular (ej: 311 314 7831)", needsName: false },
+  { id: "bancolombia", label: "Bancolombia", placeholder: "Número de cuenta de ahorros", needsName: true },
+  { id: "otro", label: "Otro", placeholder: "Banco + tipo + número (ej: Davivienda 0011-...)", needsName: true },
 ];
 
 function fmtCOP(n: number): string {
@@ -29,7 +32,12 @@ interface Props {
   /** Pre-fill from user profile if they had set a default. */
   initialMethod?: PayoutMethod;
   initialAccount?: string;
-  onSubmit: (method: PayoutMethod, account: string) => Promise<void> | void;
+  initialAccountName?: string;
+  onSubmit: (
+    method: PayoutMethod,
+    account: string,
+    accountName: string | null,
+  ) => Promise<void> | void;
   onClose?: () => void;
 }
 
@@ -40,22 +48,28 @@ export default function WinnerPayoutModal({
   prizeAmount,
   initialMethod,
   initialAccount,
+  initialAccountName,
   onSubmit,
   onClose,
 }: Props) {
   const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "nequi");
   const [account, setAccount] = useState(initialAccount ?? "");
+  const [accountName, setAccountName] = useState(initialAccountName ?? "");
   const [submitting, setSubmitting] = useState(false);
 
   if (!open) return null;
   const cur = METHOD_OPTIONS.find((m) => m.id === method)!;
+  const needsName = cur.needsName;
   const ord = position === 1 ? "1°" : position === 2 ? "2°" : position === 3 ? "3°" : `${position}°`;
+  const canSubmit =
+    !!account.trim() && !submitting && (!needsName || accountName.trim().length >= 2);
 
   async function submit() {
-    if (!account.trim() || submitting) return;
+    if (!canSubmit) return;
     setSubmitting(true);
     try {
-      await onSubmit(method, account.trim());
+      const finalName = needsName ? accountName.trim() : null;
+      await onSubmit(method, account.trim(), finalName);
     } finally {
       setSubmitting(false);
     }
@@ -144,14 +158,30 @@ export default function WinnerPayoutModal({
           value={account}
           onChange={(e) => setAccount(e.target.value)}
           placeholder={cur.placeholder}
-          className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 mb-4"
+          className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 mb-2"
           autoFocus
         />
+
+        {needsName ? (
+          <input
+            type="text"
+            value={accountName}
+            onChange={(e) => setAccountName(e.target.value)}
+            placeholder="Nombre completo como aparece en la cuenta"
+            className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 mb-2"
+          />
+        ) : null}
+
+        <p className="text-[11px] text-text-muted mb-3">
+          {needsName
+            ? "El nombre tiene que ser EXACTAMENTE como aparece en tu cuenta del banco."
+            : "Nequi solo se identifica por celular."}
+        </p>
 
         <button
           type="button"
           onClick={submit}
-          disabled={!account.trim() || submitting}
+          disabled={!canSubmit}
           className="w-full bg-gold text-bg-base font-display text-lg tracking-wide py-3.5 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_24px_rgba(255,215,0,0.25)]"
         >
           {submitting ? "GUARDANDO…" : "DECIRLE AL PARCHE"}

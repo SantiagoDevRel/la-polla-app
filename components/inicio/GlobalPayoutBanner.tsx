@@ -107,13 +107,17 @@ export default function GlobalPayoutBanner() {
     }
   }, [loading, items]);
 
-  async function saveWinnerAccount(method: PayoutMethod, account: string) {
+  async function saveWinnerAccount(
+    method: PayoutMethod,
+    account: string,
+    accountName: string | null,
+  ) {
     if (!winnerPrompt || savingAccount) return;
     setSavingAccount(true);
     try {
       await axios.patch(
         `/api/pollas/${winnerPrompt.pollaSlug}/payout-method`,
-        { method, account },
+        { method, account, accountName },
       );
       const next = await load();
       // Después del save, ¿queda alguna otra polla con cuenta pendiente?

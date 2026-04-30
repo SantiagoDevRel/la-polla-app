@@ -181,6 +181,8 @@ export default function PayoutPreviewPage() {
         }}
         onClose={() => setScenario(null)}
       />
+      {/* preview no usa accountName — el modal lo pide internamente
+          si method != nequi pero el state local solo guarda method+account. */}
 
       <LoserPayoutModal
         open={scenario === "loser_owes"}

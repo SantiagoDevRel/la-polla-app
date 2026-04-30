@@ -600,19 +600,20 @@ export default function PollaSlugPage() {
     }));
   }, [upcomingMatches]);
 
-  // Default state: only TODAY's upcoming-date group starts expanded so
-  // people who open the polla can see the matches they need to
-  // predict right now. Everything else starts collapsed, including
-  // tomorrow and beyond. Users manually expand the days they care
-  // about. Preserves prior toggles by only touching the set while
-  // it is still empty.
+  // Default state: el grupo de la PRÓXIMA fecha (la más cercana en el
+  // tiempo, sea hoy / mañana / pasado mañana / dentro de una semana)
+  // arranca expandido. Todo el resto cerrado (incluido finalizadas).
+  // Es la primera cosa que el user va a querer pronosticar.
+  // upcomingByDate ya está sorted por kickoff ASC porque
+  // upcomingMatches lo está, así que el primer grupo es siempre el
+  // más próximo. Preservamos toggles previos del user — solo seteamos
+  // mientras el set sigue vacío.
   useEffect(() => {
     if (upcomingByDate.length === 0) return;
     setExpandedDates((prev) => {
       if (prev.size > 0) return prev;
-      const todayKey = dateKey(new Date().toISOString());
-      const todayGroup = upcomingByDate.find((g) => g.key === todayKey);
-      return todayGroup ? new Set([todayKey]) : new Set();
+      const firstUpcomingKey = upcomingByDate[0]?.key;
+      return firstUpcomingKey ? new Set([firstUpcomingKey]) : new Set();
     });
   }, [upcomingByDate]);
 

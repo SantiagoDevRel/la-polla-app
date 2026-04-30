@@ -11,7 +11,7 @@
 // to GenericStringError.
 
 export const POLLA_COLUMNS =
-  "id, slug, name, description, created_by, type, status, tournament, scope, match_ids, buy_in_amount, currency, platform_fee_pct, prize_pool, points_exact, points_winner, points_one_team, points_goal_diff, points_correct_result, payment_mode, admin_payment_instructions, invite_token, join_code, prize_distribution, created_at, starts_at, ends_at" as const;
+  "id, slug, name, description, created_by, type, status, tournament, tournaments, scope, match_ids, buy_in_amount, currency, platform_fee_pct, prize_pool, points_exact, points_winner, points_one_team, points_goal_diff, points_correct_result, payment_mode, admin_payment_instructions, invite_token, join_code, prize_distribution, created_at, starts_at, ends_at" as const;
 
 // Subset for /inicio enriched-polla aggregation: the page only needs
 // progress + ranking inputs, no pricing/payment fields. Trimming the row

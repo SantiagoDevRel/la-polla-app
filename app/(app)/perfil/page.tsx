@@ -23,6 +23,7 @@ interface UserProfile {
   is_admin?: boolean;
   default_payout_method: PayoutMethod | null;
   default_payout_account: string | null;
+  default_payout_account_name: string | null;
 }
 
 interface UserStats {
@@ -100,18 +101,31 @@ export default function PerfilPage() {
     } catch { showToast("Error actualizando pollito", "error"); } finally { setSavingAvatar(false); }
   }
 
-  async function handlePayoutSave(method: PayoutMethod, account: string) {
+  async function handlePayoutSave(
+    method: PayoutMethod,
+    account: string,
+    accountName: string | null,
+  ) {
     try {
       await axios.patch("/api/users/me", {
         default_payout_method: method,
         default_payout_account: account,
+        default_payout_account_name: accountName,
       });
       setProfile((prev) =>
-        prev ? { ...prev, default_payout_method: method, default_payout_account: account } : prev,
+        prev
+          ? {
+              ...prev,
+              default_payout_method: method,
+              default_payout_account: account,
+              default_payout_account_name: accountName,
+            }
+          : prev,
       );
       showToast("Cuenta de pago guardada", "success");
-    } catch {
-      showToast("Error guardando la cuenta", "error");
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } } };
+      showToast(e.response?.data?.error || "Error guardando la cuenta", "error");
     }
   }
 
@@ -120,9 +134,17 @@ export default function PerfilPage() {
       await axios.patch("/api/users/me", {
         default_payout_method: null,
         default_payout_account: null,
+        default_payout_account_name: null,
       });
       setProfile((prev) =>
-        prev ? { ...prev, default_payout_method: null, default_payout_account: null } : prev,
+        prev
+          ? {
+              ...prev,
+              default_payout_method: null,
+              default_payout_account: null,
+              default_payout_account_name: null,
+            }
+          : prev,
       );
       showToast("Cuenta de pago borrada", "success");
     } catch {
@@ -232,6 +254,7 @@ export default function PerfilPage() {
         <PayoutDefaultEditor
           initialMethod={profile.default_payout_method ?? undefined}
           initialAccount={profile.default_payout_account ?? undefined}
+          initialAccountName={profile.default_payout_account_name ?? undefined}
           onSave={handlePayoutSave}
           onClear={handlePayoutClear}
         />

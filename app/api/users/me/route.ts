@@ -11,7 +11,10 @@ import {
   isValidDisplayName,
 } from "@/lib/users/needs-name";
 
-const PAYOUT_METHODS = ["nequi", "daviplata", "bancolombia", "transfiya", "otro"] as const;
+// Solo 3 métodos soportados: nequi, bancolombia, otro. Removidos
+// daviplata + transfiya — el verifier AI se simplifica con menos
+// variantes y hay menor riesgo de mismatch.
+const PAYOUT_METHODS = ["nequi", "bancolombia", "otro"] as const;
 
 const updateSchema = z.object({
   display_name: z
@@ -26,6 +29,9 @@ const updateSchema = z.object({
   avatar_url: z.string().max(50).optional(),
   default_payout_method: z.enum(PAYOUT_METHODS).nullable().optional(),
   default_payout_account: z.string().trim().min(3).max(120).nullable().optional(),
+  /** Nombre como aparece en la cuenta. Requerido si method=bancolombia
+   *  u otro. Opcional para nequi (que solo identifica por celular). */
+  default_payout_account_name: z.string().trim().min(2).max(120).nullable().optional(),
 });
 
 export async function GET() {
@@ -38,7 +44,7 @@ export async function GET() {
 
     const { data: userData } = await admin
       .from("users")
-      .select("display_name, whatsapp_number, avatar_url, is_admin, default_payout_method, default_payout_account, default_payout_set_at")
+      .select("display_name, whatsapp_number, avatar_url, is_admin, default_payout_method, default_payout_account, default_payout_account_name, default_payout_set_at")
       .eq("id", user.id)
       .single();
 
@@ -115,15 +121,32 @@ export async function PATCH(request: NextRequest) {
     if (parsed.data.display_name) updateData.display_name = parsed.data.display_name;
     if (parsed.data.avatar_url) updateData.avatar_url = parsed.data.avatar_url;
 
-    // Payout default: ambos campos viajan juntos. Permitimos null
-    // explícito para borrar la cuenta guardada.
+    // Payout default: 3 campos viajan juntos. Permitimos null explícito
+    // para borrar la cuenta guardada.
+    // Validación: si method=bancolombia u otro, name es REQUERIDO al
+    // guardar (Sonnet lo necesita para verificar screenshots).
     const wantsPayout =
       parsed.data.default_payout_method !== undefined ||
-      parsed.data.default_payout_account !== undefined;
+      parsed.data.default_payout_account !== undefined ||
+      parsed.data.default_payout_account_name !== undefined;
     if (wantsPayout) {
-      updateData.default_payout_method = parsed.data.default_payout_method ?? null;
-      updateData.default_payout_account = parsed.data.default_payout_account ?? null;
-      updateData.default_payout_set_at = updateData.default_payout_account
+      const method = parsed.data.default_payout_method ?? null;
+      const account = parsed.data.default_payout_account ?? null;
+      const name = parsed.data.default_payout_account_name ?? null;
+      if (method && method !== "nequi" && account && !name) {
+        return NextResponse.json(
+          {
+            error: `Para ${method} hay que poner el nombre como aparece en la cuenta del banco.`,
+          },
+          { status: 400 },
+        );
+      }
+      updateData.default_payout_method = method;
+      updateData.default_payout_account = account;
+      // Para nequi forzamos null aunque el cliente mande algo — solo
+      // se identifica por celular.
+      updateData.default_payout_account_name = method === "nequi" ? null : name;
+      updateData.default_payout_set_at = account
         ? new Date().toISOString()
         : null;
     }
