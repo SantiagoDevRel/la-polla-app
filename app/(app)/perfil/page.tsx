@@ -14,12 +14,15 @@ import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 import { InlineScoringGuide } from "@/components/polla/InlineScoringGuide";
 import FontScalePicker from "@/components/perfil/FontScalePicker";
+import PayoutDefaultEditor, { type PayoutMethod } from "@/components/perfil/PayoutDefaultEditor";
 
 interface UserProfile {
   display_name: string;
   whatsapp_number: string;
   avatar_url: string | null;
   is_admin?: boolean;
+  default_payout_method: PayoutMethod | null;
+  default_payout_account: string | null;
 }
 
 interface UserStats {
@@ -95,6 +98,36 @@ export default function PerfilPage() {
       setShowAvatarPicker(false);
       showToast("Pollito actualizado", "success");
     } catch { showToast("Error actualizando pollito", "error"); } finally { setSavingAvatar(false); }
+  }
+
+  async function handlePayoutSave(method: PayoutMethod, account: string) {
+    try {
+      await axios.patch("/api/users/me", {
+        default_payout_method: method,
+        default_payout_account: account,
+      });
+      setProfile((prev) =>
+        prev ? { ...prev, default_payout_method: method, default_payout_account: account } : prev,
+      );
+      showToast("Cuenta de pago guardada", "success");
+    } catch {
+      showToast("Error guardando la cuenta", "error");
+    }
+  }
+
+  async function handlePayoutClear() {
+    try {
+      await axios.patch("/api/users/me", {
+        default_payout_method: null,
+        default_payout_account: null,
+      });
+      setProfile((prev) =>
+        prev ? { ...prev, default_payout_method: null, default_payout_account: null } : prev,
+      );
+      showToast("Cuenta de pago borrada", "success");
+    } catch {
+      showToast("Error borrando la cuenta", "error");
+    }
   }
 
   function pointsColorClass(pts: number): string {
@@ -192,6 +225,16 @@ export default function PerfilPage() {
             {profile.whatsapp_number}
           </p>
         </div>
+
+        {/* Cuenta de pago — debajo del pollito + nombre. Edit / clear /
+            cambiar de banco. Pre-llena el WinnerPayoutModal cuando ganan
+            una polla, así no tienen que re-tipear cada vez. */}
+        <PayoutDefaultEditor
+          initialMethod={profile.default_payout_method ?? undefined}
+          initialAccount={profile.default_payout_account ?? undefined}
+          onSave={handlePayoutSave}
+          onClear={handlePayoutClear}
+        />
 
         {/* Stats — Bebas Neue numbers */}
         <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="grid grid-cols-3 gap-3">
