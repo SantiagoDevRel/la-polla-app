@@ -50,13 +50,27 @@ cuando el user diga sí/no explícito o se haya completado.
   pendientes hasta que decida.
 - **AI-assist screenshot end-to-end (Fase 2 después de validar el
   test bench):** una vez que el user valide que Haiku pesca bien
-  contra screenshots reales, hay que cablear: migración de
-  `pollas.admin_payout_method/account` + tabla `payment_proofs` +
-  storage 7 días con auto-delete + tabla `claude_api_usage` para
-  tracking de costos + admin dashboard con MTD spend + throttle 10
-  screenshots/día/user + cap 1 screenshot per join (admin_collects)
-  / N per loser (pay_winner) + disclaimer "se guarda por 7 días" +
-  flag a admin si user supera el threshold de uploads.
+  contra screenshots reales, hay que cablear:
+  - **SCOPE: solo modo `admin_collects` (pago al principio).** Para
+    `pay_winner` (pago al final), NO usamos Haiku — el ganador ve el
+    screenshot directamente y decide si dejar o revocar. Decisión
+    del user 2026-04-29: el AI sirve para evitar que el organizador
+    olvide marcar pagados (loser bloqueado de pronosticar) — eso solo
+    aplica a admin_collects.
+  - Migración de `pollas.admin_payout_method/account` (estructurado
+    para que Haiku compare).
+  - Tabla `payment_proofs` con storage 7 días + auto-delete pg_cron.
+  - Tabla `claude_api_usage` (✓ ya creada en migración 037).
+  - Admin dashboard con MTD spend (✓ ya creado en /admin).
+  - Throttle 10 screenshots/día/user con flag al admin (✓ tracking
+    listo, falta enforce).
+  - Cap por flujo: 1 screenshot per joining user (admin_collects).
+  - **Disclaimers obligatorios al subir:**
+    - "El screenshot estará guardado por 7 días."
+    - "El organizador validará este screenshot — si detecta algo raro
+      puede revertir tu pago a no-aprobado."
+    - "AI puede cometer errores. El organizador siempre tiene la
+      última palabra."
 - **Deep links / QR Bre-B para una-tap-pay** (alternativa a
   screenshot manual). Discutido 2026-04-29 — el user dijo
   "no" explícito a pasarela P2P real, pero el QR Bre-B sigue como

@@ -26,12 +26,15 @@ const METHODS: Array<{ id: PayoutMethod; label: string; hint: string }> = [
 interface VerifyResultUI {
   valid: boolean;
   confidence: "high" | "low";
+  sourceType: string;
+  sourceEvidence: string;
   detectedAmount: number | null;
   detectedAccount: string | null;
   detectedMethod: string | null;
   detectedRecipientName: string | null;
   detectedDate: string | null;
   checks: {
+    source: boolean;
     amount: boolean;
     account: boolean;
     name: boolean;
@@ -43,6 +46,18 @@ interface VerifyResultUI {
   tokensOut: number;
   costUSD: number;
 }
+
+const SOURCE_LABEL: Record<string, string> = {
+  bank_app: "App bancaria",
+  wallet: "Wallet de pago",
+  notes_app: "App de notas",
+  messaging: "Chat (WhatsApp/etc)",
+  browser: "Browser",
+  edited: "Imagen editada",
+  physical: "Foto de papel",
+  other: "Otro",
+  unclear: "No determinado",
+};
 
 function fmtCOP(n: number | null): string {
   if (n === null) return "—";
@@ -291,6 +306,12 @@ export default function ScreenshotTestPage() {
             </div>
 
             <dl className="text-[12px] grid grid-cols-[1fr_auto_auto] gap-x-2 gap-y-1.5 items-center">
+              <dt className="text-text-muted">Tipo de imagen</dt>
+              <dd className="text-right text-text-primary truncate">
+                {SOURCE_LABEL[result.sourceType] ?? result.sourceType}
+              </dd>
+              <CheckMark ok={result.checks.source} />
+
               <dt className="text-text-muted">Monto</dt>
               <dd
                 className="text-right text-text-primary tabular-nums"
@@ -333,6 +354,13 @@ export default function ScreenshotTestPage() {
               </dd>
               <DateMark status={result.checks.date} />
             </dl>
+
+            {result.sourceEvidence ? (
+              <div className="rounded-lg px-3 py-2 bg-bg-base border border-border-subtle">
+                <p className="text-[10px] uppercase text-text-muted mb-0.5">Por qué Haiku clasificó así la imagen</p>
+                <p className="text-[11px] text-text-secondary">{result.sourceEvidence}</p>
+              </div>
+            ) : null}
 
             {result.rejectionReason ? (
               <div className="rounded-lg px-3 py-2 bg-bg-base border border-border-subtle">
