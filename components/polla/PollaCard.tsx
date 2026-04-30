@@ -126,9 +126,12 @@ export function PollaCard({
           )}
         </div>
 
-        {/* Logos del torneo (1 = primary, > 1 = combinada) */}
+        {/* Logos del torneo (1 = primary, > 1 = combinada). Cada logo
+            va en un circle con fondo claro para que los logos oscuros
+            (Bancolombia amarillo o Champions azul) tengan contraste
+            sobre el fondo dark del card. */}
         <div
-          className="flex items-center gap-1 flex-shrink-0"
+          className="flex items-center gap-1.5 flex-shrink-0"
           title={
             polla.competitionLogos && polla.competitionLogos.length > 1
               ? `Combinada · ${polla.competitionLogos.length} torneos`
@@ -137,24 +140,30 @@ export function PollaCard({
         >
           {polla.competitionLogos && polla.competitionLogos.length > 1
             ? polla.competitionLogos.slice(0, 4).map((logo, i) => (
-                <Image
+                <span
                   key={i}
-                  src={logo}
-                  alt=""
-                  width={16}
-                  height={16}
-                  className="object-contain"
-                />
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/85 ring-1 ring-white/20"
+                >
+                  <Image
+                    src={logo}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="object-contain"
+                  />
+                </span>
               ))
             : polla.competitionLogoUrl
               ? (
-                <Image
-                  src={polla.competitionLogoUrl}
-                  alt=""
-                  width={16}
-                  height={16}
-                  className="object-contain"
-                />
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/85 ring-1 ring-white/20">
+                  <Image
+                    src={polla.competitionLogoUrl}
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="object-contain"
+                  />
+                </span>
               )
               : null}
         </div>
