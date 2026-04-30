@@ -96,43 +96,47 @@ export function PollaCard({
         {polla.name}
       </h3>
 
-      {/* Stats row + logos a la derecha. Separadores '·' como elementos
-          aparte (no incrustados en el texto) para que el spacing sea
-          consistente. 'POZO' como label uppercase pequeño antes del
-          monto gold — mismo tamaño que las otras stats, balanceado. */}
+      {/* Stats stack en 2 líneas + logos a la derecha. Línea 1:
+          [personas] count · cuota. Línea 2: POZO $xxx (cuando aplica)
+          o 'Gratis'. Los logos quedan a la derecha alineados al
+          centro vertical de las dos líneas — tienen aire para 1 o 4
+          torneos sin chocar con los stats. */}
       <div className="mt-2 flex items-center justify-between gap-3">
         <div
-          className="flex items-center gap-x-2 gap-y-1 flex-wrap min-w-0 font-body text-[12px] text-text-secondary tabular-nums"
+          className="flex flex-col gap-0.5 min-w-0 font-body tabular-nums"
           style={{ fontFeatureSettings: '"tnum"' }}
         >
-          <span className="inline-flex items-center gap-1">
-            <Users className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
-            {polla.participantCount}
-          </span>
+          {/* Línea 1: participants · cuota */}
+          <div className="flex items-center gap-x-2 flex-wrap text-[12px] text-text-secondary">
+            <span className="inline-flex items-center gap-1">
+              <Users className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
+              {polla.participantCount}
+            </span>
+            {polla.buyInAmount > 0 ? (
+              <>
+                <span className="text-text-muted/50" aria-hidden="true">·</span>
+                <span>{formatCOP(polla.buyInAmount)} c/u</span>
+              </>
+            ) : null}
+          </div>
+
+          {/* Línea 2: POZO $xxx (gold) o Gratis */}
           {polla.buyInAmount > 0 ? (
-            <>
-              <span className="text-text-muted/50" aria-hidden="true">·</span>
-              <span>{formatCOP(polla.buyInAmount)} c/u</span>
-              {polla.potTotal && polla.potTotal > 0 ? (
-                <>
-                  <span className="text-text-muted/50" aria-hidden="true">·</span>
-                  <span
-                    className="inline-flex items-baseline gap-1 text-gold"
-                    title="Pozo total acumulado"
-                  >
-                    <span className="text-[10px] uppercase tracking-[0.08em] text-gold/70">
-                      Pozo
-                    </span>
-                    <span>{formatCOP(polla.potTotal)}</span>
-                  </span>
-                </>
-              ) : null}
-            </>
+            polla.potTotal && polla.potTotal > 0 ? (
+              <div
+                className="inline-flex items-baseline gap-1.5 text-gold"
+                title="Pozo total acumulado"
+              >
+                <span className="text-[10px] uppercase tracking-[0.1em] text-gold/70 font-semibold">
+                  Pozo
+                </span>
+                <span className="text-[14px] font-semibold">
+                  {formatCOP(polla.potTotal)}
+                </span>
+              </div>
+            ) : null
           ) : (
-            <>
-              <span className="text-text-muted/50" aria-hidden="true">·</span>
-              <span className="text-text-muted">Gratis</span>
-            </>
+            <span className="text-[12px] text-text-muted">Gratis</span>
           )}
         </div>
 
