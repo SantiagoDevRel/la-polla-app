@@ -104,10 +104,15 @@ export default function CrearPollaPage() {
     adminPayoutAccountName: "",
   });
 
+  // payoutLocked = true cuando hay default cargado y el user todavía
+  // no apretó "cambiar". En ese estado mostramos solo una card resumen
+  // con la cuenta default + botón "cambiar". Si apreta, locked=false
+  // y aparece el picker completo. Si no había default, locked=false
+  // de entrada (fallback al picker tradicional).
+  const [payoutLocked, setPayoutLocked] = useState(false);
+
   // Pre-fill admin payout fields desde users.default_payout_* — si
   // el admin ya configuró su cuenta en /perfil, no le re-preguntamos.
-  // Si nunca lo configuró, los campos quedan vacíos y los completa
-  // acá (y opcionalmente lo guardamos como default global, futuro).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -127,6 +132,7 @@ export default function CrearPollaPage() {
             adminPayoutAccount: data.profile!.default_payout_account ?? "",
             adminPayoutAccountName: data.profile!.default_payout_account_name ?? "",
           }));
+          setPayoutLocked(true);
         }
       } catch {
         /* ignore */
@@ -854,63 +860,106 @@ export default function CrearPollaPage() {
             {form.paymentMode === "admin_collects" && (
               <>
                 {/* Cuenta estructurada del admin — usada por la AI
-                    para verificar screenshots automáticamente. */}
-                <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-                  <div>
-                    <h2 className="text-base font-bold text-text-primary">
-                      Tu cuenta para recibir pagos <span className="text-red-alert">*</span>
-                    </h2>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      Los participantes van a transferir a esta cuenta. La AI valida los comprobantes contra estos datos.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {(["nequi", "bancolombia", "otro"] as const).map((m) => (
+                    para verificar screenshots automáticamente. Si el
+                    admin tiene un default en /perfil, mostramos solo
+                    una card resumen + botón "cambiar". Sin nag para
+                    re-tipear lo mismo cada vez que crea polla. */}
+                {payoutLocked && form.adminPayoutMethod && form.adminPayoutAccount ? (
+                  <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h2 className="text-base font-bold text-text-primary">
+                          Recibís pagos en
+                        </h2>
+                        <p className="text-xs text-text-muted mt-0.5">
+                          Tu cuenta default del perfil. Los participantes le transfieren acá.
+                        </p>
+                      </div>
                       <button
-                        key={m}
                         type="button"
-                        onClick={() => updateForm("adminPayoutMethod", m)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                          form.adminPayoutMethod === m
-                            ? "bg-gold text-bg-base border-gold"
-                            : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
-                        }`}
+                        onClick={() => setPayoutLocked(false)}
+                        className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-border-subtle text-text-secondary hover:border-gold/40 hover:text-gold transition-colors flex-shrink-0"
                       >
-                        {m === "nequi" ? "Nequi" : m === "bancolombia" ? "Bancolombia" : "Otro"}
+                        Cambiar
                       </button>
-                    ))}
-                  </div>
-
-                  <input
-                    type="text"
-                    value={form.adminPayoutAccount}
-                    onChange={(e) => updateForm("adminPayoutAccount", e.target.value)}
-                    placeholder={
-                      form.adminPayoutMethod === "nequi"
-                        ? "Número de celular Nequi"
-                        : form.adminPayoutMethod === "bancolombia"
-                          ? "Número de cuenta Bancolombia"
-                          : "Banco + número de cuenta"
-                    }
-                    className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
-                  />
-
-                  {form.adminPayoutMethod && form.adminPayoutMethod !== "nequi" ? (
-                    <>
-                      <input
-                        type="text"
-                        value={form.adminPayoutAccountName}
-                        onChange={(e) => updateForm("adminPayoutAccountName", e.target.value)}
-                        placeholder="Nombre completo como aparece en la cuenta"
-                        className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
-                      />
-                      <p className="text-[11px] text-text-muted">
-                        EXACTAMENTE como aparece en tu cuenta del banco. La AI verifica el nombre del beneficiario contra el screenshot.
+                    </div>
+                    <div className="rounded-xl px-4 py-3 bg-bg-elevated border border-border-subtle">
+                      <p
+                        className="text-[14px] font-semibold text-text-primary tabular-nums"
+                        style={{ fontFeatureSettings: '"tnum"' }}
+                      >
+                        {form.adminPayoutMethod === "nequi"
+                          ? "Nequi"
+                          : form.adminPayoutMethod === "bancolombia"
+                            ? "Bancolombia"
+                            : "Otro"}{" "}
+                        · {form.adminPayoutAccount}
                       </p>
-                    </>
-                  ) : null}
-                </div>
+                      {form.adminPayoutAccountName ? (
+                        <p className="text-[11px] text-text-muted truncate">
+                          A nombre de {form.adminPayoutAccountName}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
+                    <div>
+                      <h2 className="text-base font-bold text-text-primary">
+                        Tu cuenta para recibir pagos <span className="text-red-alert">*</span>
+                      </h2>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        Los participantes van a transferir a esta cuenta. La AI valida los comprobantes contra estos datos.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {(["nequi", "bancolombia", "otro"] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => updateForm("adminPayoutMethod", m)}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                            form.adminPayoutMethod === m
+                              ? "bg-gold text-bg-base border-gold"
+                              : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
+                          }`}
+                        >
+                          {m === "nequi" ? "Nequi" : m === "bancolombia" ? "Bancolombia" : "Otro"}
+                        </button>
+                      ))}
+                    </div>
+
+                    <input
+                      type="text"
+                      value={form.adminPayoutAccount}
+                      onChange={(e) => updateForm("adminPayoutAccount", e.target.value)}
+                      placeholder={
+                        form.adminPayoutMethod === "nequi"
+                          ? "Número de celular Nequi"
+                          : form.adminPayoutMethod === "bancolombia"
+                            ? "Número de cuenta Bancolombia"
+                            : "Banco + número de cuenta"
+                      }
+                      className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
+                    />
+
+                    {form.adminPayoutMethod && form.adminPayoutMethod !== "nequi" ? (
+                      <>
+                        <input
+                          type="text"
+                          value={form.adminPayoutAccountName}
+                          onChange={(e) => updateForm("adminPayoutAccountName", e.target.value)}
+                          placeholder="Nombre completo como aparece en la cuenta"
+                          className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
+                        />
+                        <p className="text-[11px] text-text-muted">
+                          EXACTAMENTE como aparece en tu cuenta del banco. La AI verifica el nombre del beneficiario contra el screenshot.
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
+                )}
 
                 <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
                   <div>
