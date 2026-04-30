@@ -138,15 +138,23 @@ async function verifyOneMatch(match: MatchRow): Promise<VerifyResult> {
   const fdAway = match.away_score;
 
   // 3. Comparar.
+  // El marker "alerted=<iso>" del cycle anterior debe sobrevivir cualquier
+  // re-write de notes — si lo perdemos, el próximo tick re-notifica y
+  // spammeamos al admin con N emails idénticos. Preservamos el suffix
+  // explícitamente en cada UPDATE.
+  const previousNotes = match.final_verification_notes ?? "";
+  const previousAlertedMatch = previousNotes.match(/ alerted=[^ ]+/);
+  const alertedSuffix = previousAlertedMatch ? previousAlertedMatch[0] : "";
+
   if (!espnFinished) {
     result.status = "pending";
     result.notes = `ESPN aún no marca finished (espn=${espnHome}-${espnAway}). football-data: ${fdHome}-${fdAway}.`;
-    await persistNote(admin, match.id, result.notes);
+    await persistNote(admin, match.id, result.notes + alertedSuffix);
     return result;
   }
 
   if (espnHome === fdHome && espnAway === fdAway && fdFinished) {
-    // ✅ Coinciden. Marcar verified.
+    // ✅ Coinciden. Marcar verified. El alerted= ya no importa.
     result.status = "verified";
     result.notes = `Verificado: ESPN y football-data coinciden en ${fdHome}-${fdAway}.`;
     await admin
@@ -162,27 +170,36 @@ async function verifyOneMatch(match: MatchRow): Promise<VerifyResult> {
   // ❌ Discrepancia.
   result.status = "discrepancy";
   result.notes = `DISCREPANCIA — ESPN: ${espnHome}-${espnAway}, football-data: ${fdHome}-${fdAway}.`;
-  await persistNote(admin, match.id, result.notes);
 
-  // Notificar admin solo una vez por match (track via notes que ya
-  // contengan "alerted=").
-  const alreadyAlerted = (match.final_verification_notes ?? "").includes("alerted=");
+  // Notificar admin solo una vez por match (gate via alerted= en notes).
+  // Hacemos un UPDATE solo, con o sin el alerted nuevo según corresponda.
+  const alreadyAlerted = !!alertedSuffix;
   if (!alreadyAlerted) {
     try {
       await notifyAdmin({
         title: `Discrepancia de score: ${match.home_team} vs ${match.away_team}`,
-        body: result.notes + `\n\nMatch ID: ${match.id}\nKickoff: ${match.scheduled_at}\n\nEl scoring NO se ejecutó. Revisá manual y ejecutá:\nUPDATE matches SET final_verified_at=NOW(), final_verification_notes='manual override' WHERE id='${match.id}';`,
+        body: result.notes + `\n\nMatch ID: ${match.id}\nKickoff: ${match.scheduled_at}\n\nResolvé desde /admin/discrepancias o forzá manualmente:\nUPDATE matches SET final_verified_at=NOW(), final_verification_notes='manual override' WHERE id='${match.id}';`,
         category: "score_mismatch",
       });
-      await admin
-        .from("matches")
-        .update({
-          final_verification_notes: `${result.notes} alerted=${new Date().toISOString()}`,
-        })
-        .eq("id", match.id);
     } catch (err) {
       console.error("[verify-final] notifyAdmin failed:", err);
     }
+    await admin
+      .from("matches")
+      .update({
+        final_verification_notes: `${result.notes} alerted=${new Date().toISOString()}`,
+      })
+      .eq("id", match.id);
+  } else {
+    // Ya alerté antes. Preservo el alerted= original y solo refresco el
+    // texto de la discrepancia (las cifras pueden haber cambiado por
+    // un upsert posterior — quiero el snapshot más reciente).
+    await admin
+      .from("matches")
+      .update({
+        final_verification_notes: `${result.notes}${alertedSuffix}`,
+      })
+      .eq("id", match.id);
   }
 
   return result;
