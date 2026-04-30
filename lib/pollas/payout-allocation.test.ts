@@ -24,10 +24,6 @@ function totalAlloc(out: ReturnType<typeof computePayout>): number {
   return out.allocations.reduce((s, a) => s + a.allocation, 0);
 }
 
-function totalTx(out: ReturnType<typeof computePayout>): number {
-  return out.transactions.reduce((s, t) => s + t.amount, 0);
-}
-
 function balancesAfterPayWinner(
   participants: ParticipantForPayout[],
   buyIn: number,
