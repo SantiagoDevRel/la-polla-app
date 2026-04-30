@@ -4,7 +4,7 @@
 // Cache-bust version para los logos de torneos. Incrementar (por ejemplo
 // "2" -> "3") cada vez que se reemplace el archivo fuente de un logo
 // para forzar a los clientes y al service worker a pedirlo de nuevo.
-const LOGO_V = "4";
+const LOGO_V = "5";
 
 export const TOURNAMENTS = [
   {
