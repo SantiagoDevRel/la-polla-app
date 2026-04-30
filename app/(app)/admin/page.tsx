@@ -447,6 +447,28 @@ export default function AdminPage() {
               </section>
             )}
 
+            {/* Lab — endpoints de prueba antes de cablear a prod */}
+            <section
+              className="rounded-2xl p-4"
+              style={{ background: "#0e1420", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-text-primary">Lab · Test Haiku Vision</p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Subí un screenshot, declará lo esperado, mirá si Haiku lo verifica bien.
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push("/admin/testing/screenshot")}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold hover:brightness-110 transition-all cursor-pointer flex-shrink-0"
+                  style={{ background: "#FFD700", color: "#080c10" }}
+                >
+                  Probar
+                </button>
+              </div>
+            </section>
+
             {/* Sincronización */}
             <section
               className="rounded-2xl p-4"

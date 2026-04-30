@@ -78,7 +78,7 @@ export default function DefaultPayoutPromptModal({
             Tu cuenta para cobrar
           </h2>
           <p className="text-[13px] text-text-secondary mt-1.5 leading-snug">
-            Dejá tu Nequi, Bancolombia o lo que uses. Cuando ganes una polla, el parche te paga directo a esa cuenta.
+            Cuando ganes una polla, todos te pagarán directamente a esta cuenta.
           </p>
         </div>
 
