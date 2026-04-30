@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
   const image = formData.get("image");
   const methodRaw = formData.get("method");
   const account = formData.get("account");
+  const recipientName = formData.get("recipient_name");
   const amountRaw = formData.get("amount");
 
   if (!(image instanceof File) || image.size === 0) {
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
   }
   if (typeof account !== "string" || account.trim().length < 3) {
     return NextResponse.json({ error: "account inválido" }, { status: 400 });
+  }
+  if (typeof recipientName !== "string" || recipientName.trim().length < 2) {
+    return NextResponse.json({ error: "recipient_name inválido (mínimo 2 caracteres)" }, { status: 400 });
   }
   if (typeof amountRaw !== "string") {
     return NextResponse.json({ error: "amount inválido" }, { status: 400 });
@@ -96,6 +100,7 @@ export async function POST(request: NextRequest) {
       expected: {
         method: methodRaw as PayoutMethod,
         account: account.trim(),
+        recipientName: recipientName.trim(),
         amountCOP,
       },
     });
