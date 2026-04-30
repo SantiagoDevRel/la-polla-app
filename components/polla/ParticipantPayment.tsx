@@ -13,6 +13,7 @@ import { Banknote, CreditCard } from "lucide-react";
 import AdminPaymentReview from "./AdminPaymentReview";
 import PaymentsList from "./PaymentsList";
 import PaymentProofUpload from "./PaymentProofUpload";
+import PollaProofsReview from "./PollaProofsReview";
 import FootballLoader from "@/components/ui/FootballLoader";
 
 interface PaymentParticipant {
@@ -107,25 +108,37 @@ export default function ParticipantPayment({
   const mode = pollaPaymentInfo.paymentMode;
   const amIAdmin = isAdmin || currentUserRole === "admin";
 
-  // admin_collects + admin → review panel clásico
+  // admin_collects + admin → review panel clásico + proofs review
+  // (la AI subió comprobantes a payment_proofs, organizador puede
+  // aprobar/rechazar desde acá sin ir a /admin global).
   if (mode === "admin_collects" && amIAdmin) {
     return (
-      <AdminPaymentReview
-        pollaSlug={pollaSlug}
-        payments={payments.map((p) => ({
-          ...p,
-          users: p.users
-            ? {
-                id: p.users.id,
-                display_name: p.users.display_name ?? "",
-                whatsapp_number: p.users.whatsapp_number ?? "",
-              }
-            : { id: "", display_name: "", whatsapp_number: "" },
-        }))}
-        buyInAmount={pollaPaymentInfo.buyInAmount}
-        currency={pollaPaymentInfo.currency}
-        onPaymentUpdated={loadPayments}
-      />
+      <div className="space-y-4">
+        <PollaProofsReview
+          pollaSlug={pollaSlug}
+          buyInAmount={pollaPaymentInfo.buyInAmount}
+          expectedMethod={pollaPaymentInfo.adminPayoutMethod}
+          expectedAccount={pollaPaymentInfo.adminPayoutAccount}
+          expectedAccountName={pollaPaymentInfo.adminPayoutAccountName}
+          onChanged={loadPayments}
+        />
+        <AdminPaymentReview
+          pollaSlug={pollaSlug}
+          payments={payments.map((p) => ({
+            ...p,
+            users: p.users
+              ? {
+                  id: p.users.id,
+                  display_name: p.users.display_name ?? "",
+                  whatsapp_number: p.users.whatsapp_number ?? "",
+                }
+              : { id: "", display_name: "", whatsapp_number: "" },
+          }))}
+          buyInAmount={pollaPaymentInfo.buyInAmount}
+          currency={pollaPaymentInfo.currency}
+          onPaymentUpdated={loadPayments}
+        />
+      </div>
     );
   }
 
