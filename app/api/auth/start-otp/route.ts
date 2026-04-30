@@ -1,17 +1,11 @@
 // app/api/auth/start-otp/route.ts — Origen único para iniciar el OTP.
 //
-// Por qué existe: para los phones admin (lib/auth/admin-phones.ts) NO
-// queremos disparar Twilio ni Supabase signInWithOtp — el admin va a
-// usar el código bypass server-side. Para todos los demás, sí
-// disparamos Supabase normal y se manda SMS.
-//
-// El cliente llama a este endpoint con {phone} y nunca le interesa
-// saber si fue bypass o no — la UX (pantalla de OTP) es idéntica.
-// Eso evita filtrar el listado de phones admin al bundle del cliente.
+// Llama a Supabase signInWithOtp que dispara el SMS via Twilio.
+// Aplica rate-limit por phone para no abrir la puerta a fuerza bruta
+// del verify-otp.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSbClient } from "@supabase/supabase-js";
-import { isAdminBypassPhone } from "@/lib/auth/admin-phones";
 import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
 import { normalizePhone } from "@/lib/auth/phone";
 
@@ -39,11 +33,10 @@ export async function POST(request: NextRequest) {
   }
   const phoneNormalized = phoneE164.replace(/\D/g, "");
 
-  // Rate limit por phone (5 generate-attempts / hora). Aplica también
-  // para admins — no queremos que un script de fuerza bruta pueda
-  // probar bypass codes ilimitadamente. La limitación está en el
-  // verify-otp también (5 verifies / 15 min), pero esta capa de
-  // generate-rate evita inundar el endpoint.
+  // Rate limit por phone (5 generate-attempts / hora). El verify-otp
+  // tiene su propio limit de 5/15min, pero limitar generates evita
+  // que un atacante use signInWithOtp como un canal para inundar
+  // Twilio costos.
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
   const limit = await checkAndRecordAttempt(phoneNormalized, "generate", ip);
@@ -57,14 +50,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Admin bypass: NO llamamos a Twilio. El admin ya conoce el código
-  // bypass (server-only env var ADMIN_BYPASS_OTP). Devolvemos ok
-  // genérico — el cliente no se entera de la diferencia.
-  if (isAdminBypassPhone(phoneE164)) {
-    return NextResponse.json({ ok: true });
-  }
-
-  // Path normal: Supabase signInWithOtp dispara el SMS via Twilio.
+  // Supabase signInWithOtp dispara el SMS via Twilio.
   // Anon client (no cookies — no hay sesión todavía).
   const supabase = createSbClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

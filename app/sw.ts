@@ -74,3 +74,14 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+// Skip-waiting on demand: el cliente puede mandar
+// postMessage({type:'SKIP_WAITING'}) cuando detecta un SW waiting (ver
+// components/layout/SWAutoReload.tsx). Activamos de inmediato — sin
+// esperar al próximo reload natural. Combinado con clientsClaim:true,
+// el cliente recibe controllerchange y recarga.
+self.addEventListener("message", (event: ExtendableMessageEvent) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    void self.skipWaiting();
+  }
+});
