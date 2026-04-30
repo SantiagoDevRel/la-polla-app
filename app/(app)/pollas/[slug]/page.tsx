@@ -902,12 +902,11 @@ export default function PollaSlugPage() {
                 tournament conserva el badge clásico con nombre. */}
             {polla.tournaments && polla.tournaments.length > 1 ? (
               <span
-                className="rounded-full flex items-center"
+                className="rounded-full flex items-center gap-1.5"
                 style={{
                   background: "rgba(255,215,0,0.08)",
                   border: "1px solid rgba(255,215,0,0.25)",
-                  padding: "4px 10px",
-                  gap: 6,
+                  padding: "4px 8px",
                 }}
                 title={polla.tournaments
                   .map((s) => getTournamentName(s) ?? s)
@@ -915,14 +914,18 @@ export default function PollaSlugPage() {
               >
                 {polla.tournaments.map((slug) =>
                   TOURNAMENT_ICONS[slug] ? (
-                    <Image
+                    <span
                       key={slug}
-                      src={TOURNAMENT_ICONS[slug]!}
-                      alt={getTournamentName(slug) ?? slug}
-                      width={16}
-                      height={16}
-                      className="object-contain"
-                    />
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/85 ring-1 ring-white/20"
+                    >
+                      <Image
+                        src={TOURNAMENT_ICONS[slug]!}
+                        alt={getTournamentName(slug) ?? slug}
+                        width={20}
+                        height={20}
+                        className="object-contain"
+                      />
+                    </span>
                   ) : null,
                 )}
               </span>
