@@ -12,6 +12,58 @@ Visual changes ONLY. Never touch API routes, Supabase calls, middleware, auth fl
 
 ---
 
+## NUNCA dejes ideas a medio camino
+
+Cada vez que el usuario menciona una idea, feature, o decisión —
+aunque la conversación cambie de tema después — la idea queda
+**abierta hasta que el usuario diga sí o no explícito.** No la des
+por descartada porque "el usuario cambió de tema". Si el flujo se
+fue para otro lado:
+
+1. Logueala en `## Open ideas / pending decisions` abajo en este
+   mismo archivo. Línea por idea: contexto + qué falta decidir.
+2. Cuando termine la tarea actual, **re-preguntale al usuario sobre
+   las pendientes** antes de cerrar la conversación. Una sola línea:
+   "¿Avanzamos con X o lo dejamos para después?"
+3. Solo borrá una idea de esta lista cuando el usuario diga "no"
+   explícito, "déjalo", "ya lo descartamos", o cuando se haya
+   completado e ido a prod.
+
+**Por qué:** se nos pasó el chat de Claude embedded en /admin
+durante 4 mensajes seguidos porque cada turno yo seguía la última
+cosa que pidió el usuario sin volver a las pendientes. Mala forma —
+se pierden ideas grandes que el usuario sí quería.
+
+---
+
+## Open ideas / pending decisions
+
+Items que el usuario mencionó y NO descartó. Remové entradas solo
+cuando el user diga sí/no explícito o se haya completado.
+
+- **Chat embebido de Claude en /admin para hacer cambios al repo
+  desde el celular cuando no tiene PC a la mano.** Discutido
+  2026-04-29. El user pidió "este claude api tendria las mismas
+  capabilities tuyas" + opción de usar Opus. Le pasé 3 caminos
+  rankeados (Codespaces zero-code, GitHub Actions worker, Vercel
+  Sandbox v2). **Pendiente:** que el user elija un camino. Re-asks
+  pendientes hasta que decida.
+- **AI-assist screenshot end-to-end (Fase 2 después de validar el
+  test bench):** una vez que el user valide que Haiku pesca bien
+  contra screenshots reales, hay que cablear: migración de
+  `pollas.admin_payout_method/account` + tabla `payment_proofs` +
+  storage 7 días con auto-delete + tabla `claude_api_usage` para
+  tracking de costos + admin dashboard con MTD spend + throttle 10
+  screenshots/día/user + cap 1 screenshot per join (admin_collects)
+  / N per loser (pay_winner) + disclaimer "se guarda por 7 días" +
+  flag a admin si user supera el threshold de uploads.
+- **Deep links / QR Bre-B para una-tap-pay** (alternativa a
+  screenshot manual). Discutido 2026-04-29 — el user dijo
+  "no" explícito a pasarela P2P real, pero el QR Bre-B sigue como
+  posibilidad UX. Mantener visible.
+
+---
+
 ## Free-tier only (NON-NEGOTIABLE)
 
 La Polla es **gratis para todos los usuarios** y debe correr en planes
