@@ -4,7 +4,7 @@
 // Cache-bust version para los logos de torneos. Incrementar (por ejemplo
 // "2" -> "3") cada vez que se reemplace el archivo fuente de un logo
 // para forzar a los clientes y al service worker a pedirlo de nuevo.
-const LOGO_V = "3";
+const LOGO_V = "4";
 
 export const TOURNAMENTS = [
   {
@@ -49,21 +49,21 @@ export const TOURNAMENTS = [
     slug: "libertadores_2026",
     name: "Copa Libertadores",
     apiCode: "CLI",
-    logoPath: `/tournaments/copa_libertadores.png?v=${LOGO_V}`,
+    logoPath: `/tournaments/copa_libertadores.svg?v=${LOGO_V}`,
     color: "#005f8e",
   },
   {
     slug: "sudamericana_2026",
     name: "Copa Sudamericana",
     apiCode: "CSU",
-    logoPath: `/tournaments/copa_sudamericana.png?v=${LOGO_V}`,
+    logoPath: `/tournaments/copa_sudamericana.svg?v=${LOGO_V}`,
     color: "#e9242a",
   },
   {
     slug: "betplay_2026",
     name: "Liga BetPlay",
     apiCode: "BP",
-    logoPath: `/tournaments/liga_betplay.png?v=${LOGO_V}`,
+    logoPath: `/tournaments/liga_betplay.svg?v=${LOGO_V}`,
     color: "#fcd116",
   },
 ] as const;
@@ -91,7 +91,7 @@ export const TOURNAMENT_ICONS: Record<string, string> = {
   laliga_2025: `/tournaments/la_liga.png?v=${LOGO_V}`,
   premier_2025: `/tournaments/premier_league.webp?v=${LOGO_V}`,
   seriea_2025: `/tournaments/seria_a.png?v=${LOGO_V}`,
-  libertadores_2026: `/tournaments/copa_libertadores.png?v=${LOGO_V}`,
-  sudamericana_2026: `/tournaments/copa_sudamericana.png?v=${LOGO_V}`,
-  betplay_2026: `/tournaments/liga_betplay.png?v=${LOGO_V}`,
+  libertadores_2026: `/tournaments/copa_libertadores.svg?v=${LOGO_V}`,
+  sudamericana_2026: `/tournaments/copa_sudamericana.svg?v=${LOGO_V}`,
+  betplay_2026: `/tournaments/liga_betplay.svg?v=${LOGO_V}`,
 };
