@@ -916,7 +916,7 @@ export default function PollaSlugPage() {
                   TOURNAMENT_ICONS[slug] ? (
                     <span
                       key={slug}
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/50 ring-1 ring-white/15"
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/90 ring-1 ring-white/30"
                     >
                       <Image
                         src={TOURNAMENT_ICONS[slug]!}
