@@ -22,6 +22,10 @@ const createPollaSchema = z
     name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
     description: z.string().optional(),
     tournament: z.string().min(1, "El torneo es requerido"),
+    /** Pollas combinadas: si está y tiene > 1 entry, se persiste el
+     *  array completo en pollas.tournaments. El primer entry suele
+     *  coincidir con `tournament` (primary para display). */
+    tournaments: z.array(z.string().min(1)).min(1).optional(),
     scope: z.enum(["full", "group_stage", "knockouts", "custom"]).default("full"),
     type: z.literal("closed").default("closed"),
     buyInAmount: z.number().min(0, "El valor de entrada no puede ser negativo"),
@@ -366,6 +370,13 @@ export async function POST(request: NextRequest) {
         description: parsed.data.description || "",
         slug,
         tournament: parsed.data.tournament,
+        // Solo persistimos tournaments[] cuando la polla es combinada
+        // (más de 1 torneo). Para single-tournament dejamos null para
+        // mantener el shape histórico simple.
+        tournaments:
+          parsed.data.tournaments && parsed.data.tournaments.length > 1
+            ? parsed.data.tournaments
+            : null,
         scope: parsed.data.scope,
         type: parsed.data.type,
         buy_in_amount: parsed.data.buyInAmount,
@@ -395,6 +406,10 @@ export async function POST(request: NextRequest) {
             description: parsed.data.description || "",
             slug: uniqueSlug,
             tournament: parsed.data.tournament,
+            tournaments:
+              parsed.data.tournaments && parsed.data.tournaments.length > 1
+                ? parsed.data.tournaments
+                : null,
             scope: parsed.data.scope,
             type: parsed.data.type,
             buy_in_amount: parsed.data.buyInAmount,

@@ -1,36 +1,42 @@
 // components/onboarding/DefaultPayoutPromptModal.tsx
-// Modal "agregá tu cuenta para cobrar" que se le muestra a TODOS los
-// users la primera vez que entran a /inicio sin tener un default
-// guardado en perfil. Cuando lo guardan, queda en
-// users.default_payout_method/account y al ganar cualquier polla se
-// pre-llena solo — sin nag.
+// Modal "agregá tu cuenta para cobrar" mostrado a TODOS los users que
+// aún no tienen un default. Saltable. Cuando lo guardan queda en
+// users.default_payout_method/account/account_name y al ganar pollas
+// se pre-llena solo.
 //
-// Diseño:
-//   - Centrado, full-screen-mobile-bottomsheet desktop, gold border.
-//   - "Saltar por ahora" disponible — no bloquea el uso de la app.
-//   - Una vez saltado, se mantiene una flag en sessionStorage para
-//     no nag-ear varias veces en la misma visita. Al próximo session
-//     vuelve a aparecer hasta que lo guarden o lo descarten en perfil.
+// Reglas por método (alineadas al verifier AI):
+//   - nequi:        celular (sin nombre).
+//   - bancolombia:  cuenta + nombre completo (Sonnet usa el nombre
+//                   para verificar screenshots).
+//   - otro:         cuenta + nombre completo.
 "use client";
 
 import { useState } from "react";
 import { CreditCard, X } from "lucide-react";
 
-export type PayoutMethod = "nequi" | "daviplata" | "bancolombia" | "transfiya" | "otro";
+export type PayoutMethod = "nequi" | "bancolombia" | "otro";
 
-const METHOD_OPTIONS: Array<{ id: PayoutMethod; label: string; placeholder: string }> = [
-  { id: "nequi", label: "Nequi", placeholder: "Número de celular" },
-  { id: "daviplata", label: "Daviplata", placeholder: "Número de celular" },
-  { id: "bancolombia", label: "Bancolombia", placeholder: "Número de cuenta" },
-  { id: "transfiya", label: "Transfiya", placeholder: "Llave (celular o usuario)" },
-  { id: "otro", label: "Otro", placeholder: "Banco + tipo + número" },
+const METHOD_OPTIONS: Array<{
+  id: PayoutMethod;
+  label: string;
+  accountPlaceholder: string;
+  needsName: boolean;
+}> = [
+  { id: "nequi", label: "Nequi", accountPlaceholder: "Número de celular", needsName: false },
+  { id: "bancolombia", label: "Bancolombia", accountPlaceholder: "Número de cuenta", needsName: true },
+  { id: "otro", label: "Otro", accountPlaceholder: "Banco + tipo + número", needsName: true },
 ];
 
 interface Props {
   open: boolean;
   initialMethod?: PayoutMethod;
   initialAccount?: string;
-  onSubmit: (method: PayoutMethod, account: string) => Promise<void> | void;
+  initialAccountName?: string;
+  onSubmit: (
+    method: PayoutMethod,
+    account: string,
+    accountName: string | null,
+  ) => Promise<void> | void;
   onSkip: () => void;
 }
 
@@ -38,21 +44,27 @@ export default function DefaultPayoutPromptModal({
   open,
   initialMethod,
   initialAccount,
+  initialAccountName,
   onSubmit,
   onSkip,
 }: Props) {
   const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "nequi");
   const [account, setAccount] = useState(initialAccount ?? "");
+  const [accountName, setAccountName] = useState(initialAccountName ?? "");
   const [saving, setSaving] = useState(false);
 
   if (!open) return null;
   const cur = METHOD_OPTIONS.find((m) => m.id === method)!;
+  const needsName = cur.needsName;
+  const canSave =
+    !!account.trim() && !saving && (!needsName || accountName.trim().length >= 2);
 
   async function handleSubmit() {
-    if (!account.trim() || saving) return;
+    if (!canSave) return;
     setSaving(true);
     try {
-      await onSubmit(method, account.trim());
+      const finalName = needsName ? accountName.trim() : null;
+      await onSubmit(method, account.trim(), finalName);
     } finally {
       setSaving(false);
     }
@@ -82,7 +94,6 @@ export default function DefaultPayoutPromptModal({
           </p>
         </div>
 
-        {/* Method picker */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           {METHOD_OPTIONS.map((m) => (
             <button
@@ -100,24 +111,36 @@ export default function DefaultPayoutPromptModal({
           ))}
         </div>
 
-        {/* Account input */}
         <input
           type="text"
           value={account}
           onChange={(e) => setAccount(e.target.value)}
-          placeholder={cur.placeholder}
+          placeholder={cur.accountPlaceholder}
           className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 mb-2"
           autoFocus
         />
 
+        {needsName ? (
+          <input
+            type="text"
+            value={accountName}
+            onChange={(e) => setAccountName(e.target.value)}
+            placeholder="Nombre completo como aparece en la cuenta"
+            className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 mb-2"
+          />
+        ) : null}
+
         <p className="text-[11px] text-text-muted text-center mb-3">
-          Solo lo ven los participantes de pollas donde ganes. Lo podés borrar o cambiar en /perfil.
+          {needsName
+            ? "El nombre tiene que ser EXACTAMENTE como aparece en tu cuenta."
+            : "Nequi solo se identifica por celular."}
+          {" "}Solo lo ven los participantes de pollas donde ganes.
         </p>
 
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!account.trim() || saving}
+          disabled={!canSave}
           className="w-full bg-gold text-bg-base font-display text-base tracking-wide py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(255,215,0,0.2)]"
         >
           {saving ? "GUARDANDO…" : "GUARDAR"}

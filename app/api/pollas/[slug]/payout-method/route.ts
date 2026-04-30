@@ -1,33 +1,26 @@
 // app/api/pollas/[slug]/payout-method/route.ts
 //
-// PATCH — el ganador (o cualquier participante) guarda su método y
-// cuenta de cobro EN ESTA POLLA. Se persiste en
-// polla_participants.payout_method / payout_account / payout_set_at.
+// PATCH — el ganador (o cualquier participante) guarda su método +
+// cuenta + nombre de cobro EN ESTA POLLA. Se persiste en
+// polla_participants.payout_method / payout_account /
+// payout_account_name / payout_set_at.
 //
-// Si la polla terminó y el viewer tiene incoming transactions
-// pendientes, el WinnerPayoutModal escribe acá. Si NO terminó pero el
-// viewer ya quiere tener guardada su info para el futuro, también
-// escribe acá.
-//
-// Validación: method ∈ {nequi, daviplata, bancolombia, transfiya, otro}.
-// account: 3..120 chars. Trim.
+// Reglas por método (alineadas al verifier AI):
+//   - nequi:        account=celular. account_name no se usa (ignorado).
+//   - bancolombia:  account=número de cuenta. account_name REQUERIDO.
+//   - otro:         account=cualquier string. account_name REQUERIDO.
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const PayoutMethodSchema = z.enum([
-  "nequi",
-  "daviplata",
-  "bancolombia",
-  "transfiya",
-  "otro",
-]);
+const PayoutMethodSchema = z.enum(["nequi", "bancolombia", "otro"]);
 
 const BodySchema = z.object({
   method: PayoutMethodSchema,
   account: z.string().trim().min(3).max(120),
+  accountName: z.string().trim().min(2).max(120).nullable().optional(),
 });
 
 export async function PATCH(
@@ -81,11 +74,26 @@ export async function PATCH(
     );
   }
 
+  // Validación: bancolombia + otro requieren accountName.
+  if (parsed.data.method !== "nequi") {
+    if (!parsed.data.accountName || parsed.data.accountName.trim().length < 2) {
+      return NextResponse.json(
+        {
+          error: `Para ${parsed.data.method} hay que poner el nombre como aparece en la cuenta del banco.`,
+        },
+        { status: 400 },
+      );
+    }
+  }
+  const accountNameToStore =
+    parsed.data.method === "nequi" ? null : (parsed.data.accountName ?? null);
+
   const { error: updateErr } = await admin
     .from("polla_participants")
     .update({
       payout_method: parsed.data.method,
       payout_account: parsed.data.account,
+      payout_account_name: accountNameToStore,
       payout_set_at: new Date().toISOString(),
     })
     .eq("id", participant.id);

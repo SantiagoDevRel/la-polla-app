@@ -24,7 +24,9 @@ type Step = 1 | 2 | 3;
 
 interface FormState {
   name: string;
-  tournament: string;
+  /** Lista de torneos. Single-tournament = array de 1. Combinada = 2+.
+   *  El primer elemento es el primary (display badge en header). */
+  tournaments: string[];
   type: "closed";
   buyInAmount: number;
   paymentMode: PaymentMode;
@@ -84,7 +86,7 @@ export default function CrearPollaPage() {
   const [prizeDistribution, setPrizeDistribution] = useState<PrizeDistribution | null>(null);
   const [form, setForm] = useState<FormState>({
     name: "",
-    tournament: "champions_2025",
+    tournaments: [],
     type: "closed",
     // 0 = vacío. El input formatea "" cuando es 0 y muestra el placeholder
     // "10000" en gris para sugerir el mínimo sin pre-llenarlo.
@@ -118,19 +120,25 @@ export default function CrearPollaPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Fetch matches when tournament changes and we're on step 2
+  // Fetch matches de TODOS los torneos seleccionados en paralelo
+  // cuando entramos al paso 2. Para pollas combinadas esto trae N
+  // listas que después se agrupan por torneo > fecha.
   useEffect(() => {
     if (step !== 2) return;
+    if (form.tournaments.length === 0) return;
     async function loadMatches() {
       setMatchesLoading(true);
       try {
-        const { data } = await axios.get(`/api/matches?tournament=${form.tournament}&status=scheduled`);
-        // Filter out anything already within 5 minutes of kickoff or in the past —
-        // those can't be predicted anymore, so they shouldn't be selectable.
+        const responses = await Promise.all(
+          form.tournaments.map((t) =>
+            axios.get<{ matches: MatchRow[] }>(`/api/matches?tournament=${t}&status=scheduled`),
+          ),
+        );
+        const merged: MatchRow[] = responses.flatMap((r) => r.data.matches ?? []);
         const bufferMs = 5 * 60 * 1000;
         const cutoff = Date.now() + bufferMs;
-        const upcoming = (data.matches || []).filter(
-          (m: MatchRow) => new Date(m.scheduled_at).getTime() > cutoff
+        const upcoming = merged.filter(
+          (m: MatchRow) => new Date(m.scheduled_at).getTime() > cutoff,
         );
         setMatches(upcoming);
       } catch {
@@ -140,57 +148,97 @@ export default function CrearPollaPage() {
       }
     }
     loadMatches();
-  }, [step, form.tournament]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, form.tournaments.join(",")]);
 
-  // Group matches
-  const groupedMatches = useMemo(() => {
-    const groups: { key: string; label: string; matchIds: string[]; matches: MatchRow[] }[] = [];
-    const map = new Map<string, { label: string; matches: MatchRow[] }>();
+  // Group matches.
+  //   - Single-tournament: groups planos (por fecha o fase).
+  //   - Combinada (2+ torneos): primero por torneo, dentro por fecha/fase.
+  // Cada `tournamentBlock` es un torneo con sus subgrupos. La UI usa
+  // esto para renderizar headers de torneo + subgrupos colapsables.
+  interface SubGroup {
+    key: string;
+    label: string;
+    matchIds: string[];
+    matches: MatchRow[];
+  }
+  interface TournamentBlock {
+    tournamentSlug: string;
+    tournamentName: string;
+    tournamentLogo: string | null;
+    matchIds: string[]; // para "seleccionar todo del torneo"
+    subgroups: SubGroup[];
+  }
 
+  const tournamentBlocks = useMemo<TournamentBlock[]>(() => {
+    if (matches.length === 0) return [];
+    // Buckets por torneo en el orden de form.tournaments para
+    // determinismo (primary primero).
+    const byTournament = new Map<string, MatchRow[]>();
+    for (const t of form.tournaments) byTournament.set(t, []);
     for (const m of matches) {
-      let key: string;
-      let label: string;
-      const isPlaceholder = m.home_team === "TBD" && m.away_team === "TBD";
-
-      if (groupBy === "date") {
-        // En vista por fecha, agrupamos los placeholders TBD aparte
-        // bajo "Por confirmar" — sus fechas son estimadas y mezclarlas
-        // con días reales confunde. Vista por fase muestra todo junto.
-        if (isPlaceholder) {
-          key = "_tbd";
-          label = "Por confirmar";
-        } else {
-          const d = new Date(m.scheduled_at);
-          key = d.toISOString().split("T")[0];
-          label = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
-          label = label.charAt(0).toUpperCase() + label.slice(1);
-        }
-      } else {
-        key = m.phase || "unknown";
-        label = formatPhase(m.phase);
-      }
-
-      if (!map.has(key)) map.set(key, { label, matches: [] });
-      map.get(key)!.matches.push(m);
+      const list = byTournament.get(m.tournament) ?? [];
+      list.push(m);
+      byTournament.set(m.tournament, list);
     }
 
-    // Ordenamos: fechas reales (asc por scheduled_at) primero, luego
-    // "_tbd" siempre al final, así el user ve los partidos confirmados
-    // primero y los placeholders al final.
-    const entries = Array.from(map.entries());
-    entries.sort(([keyA, valA], [keyB, valB]) => {
-      if (keyA === "_tbd") return 1;
-      if (keyB === "_tbd") return -1;
-      const a = valA.matches[0]?.scheduled_at ?? "";
-      const b = valB.matches[0]?.scheduled_at ?? "";
-      return a.localeCompare(b);
-    });
-    entries.forEach(([key, { label, matches: ms }]) => {
-      groups.push({ key, label, matchIds: ms.map((m: MatchRow) => m.id), matches: ms });
-    });
+    const blocks: TournamentBlock[] = [];
+    for (const tSlug of form.tournaments) {
+      const list = byTournament.get(tSlug) ?? [];
+      if (list.length === 0) continue;
+      const meta = TOURNAMENTS.find((t) => t.slug === tSlug);
 
-    return groups;
-  }, [matches, groupBy]);
+      // Subgroups dentro del torneo
+      const subMap = new Map<string, { label: string; matches: MatchRow[] }>();
+      for (const m of list) {
+        let key: string;
+        let label: string;
+        const isPlaceholder = m.home_team === "TBD" && m.away_team === "TBD";
+
+        if (groupBy === "date") {
+          if (isPlaceholder) {
+            key = "_tbd";
+            label = "Por confirmar";
+          } else {
+            const d = new Date(m.scheduled_at);
+            key = d.toISOString().split("T")[0];
+            label = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+            label = label.charAt(0).toUpperCase() + label.slice(1);
+          }
+        } else {
+          key = m.phase || "unknown";
+          label = formatPhase(m.phase);
+        }
+
+        if (!subMap.has(key)) subMap.set(key, { label, matches: [] });
+        subMap.get(key)!.matches.push(m);
+      }
+
+      const subEntries = Array.from(subMap.entries());
+      subEntries.sort(([keyA, valA], [keyB, valB]) => {
+        if (keyA === "_tbd") return 1;
+        if (keyB === "_tbd") return -1;
+        const a = valA.matches[0]?.scheduled_at ?? "";
+        const b = valB.matches[0]?.scheduled_at ?? "";
+        return a.localeCompare(b);
+      });
+      const subgroups: SubGroup[] = subEntries.map(([key, { label, matches: ms }]) => ({
+        key: `${tSlug}|${key}`,
+        label,
+        matchIds: ms.map((m) => m.id),
+        matches: ms,
+      }));
+
+      blocks.push({
+        tournamentSlug: tSlug,
+        tournamentName: meta?.name ?? tSlug,
+        tournamentLogo: meta?.logoPath ?? null,
+        matchIds: list.map((m) => m.id),
+        subgroups,
+      });
+    }
+    return blocks;
+  }, [matches, groupBy, form.tournaments]);
 
   function formatPhase(phase: string | null): string {
     const labels: Record<string, string> = {
@@ -243,7 +291,7 @@ export default function CrearPollaPage() {
     if (targetStep > step) {
       if (step === 1) {
         if (form.name.trim().length < 3) { setError("El nombre debe tener al menos 3 caracteres"); return; }
-        if (!form.tournament) { setError("Selecciona un torneo"); return; }
+        if (form.tournaments.length === 0) { setError("Seleccioná al menos un torneo"); return; }
       }
       if (step === 2) {
         if (selectedMatchIds.size === 0) {
@@ -268,7 +316,16 @@ export default function CrearPollaPage() {
       const { data } = await axios.post<{
         polla: { slug: string } | null;
       }>("/api/pollas", {
-        ...form,
+        name: form.name,
+        // El primer torneo es el primary (display badge). El array
+        // completo va aparte en `tournaments` para que la API pueda
+        // persistir polla.tournaments cuando es combinada.
+        tournament: form.tournaments[0],
+        tournaments: form.tournaments,
+        type: form.type,
+        buyInAmount: form.buyInAmount,
+        paymentMode: form.paymentMode,
+        adminPaymentInstructions: form.adminPaymentInstructions,
         scope: "custom",
         matchIds: Array.from(selectedMatchIds),
         prizeDistribution: prizeDistribution ?? undefined,
@@ -286,7 +343,11 @@ export default function CrearPollaPage() {
 
   const STEP_LABELS = ["Info", "Partidos", "Configuración"];
 
-  const tournamentMeta = TOURNAMENTS.find((t) => t.slug === form.tournament);
+  const primaryTournament = form.tournaments[0] ?? null;
+  const tournamentMeta = primaryTournament
+    ? TOURNAMENTS.find((t) => t.slug === primaryTournament)
+    : null;
+  const isCombined = form.tournaments.length > 1;
 
   return (
     <div className="min-h-screen">
@@ -338,22 +399,56 @@ export default function CrearPollaPage() {
             </div>
 
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-              <h2 className="text-base font-bold text-text-primary">Torneo <span className="text-red-alert">*</span></h2>
+              <div>
+                <h2 className="text-base font-bold text-text-primary">Torneos <span className="text-red-alert">*</span></h2>
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  Podés elegir más de uno para hacer una polla combinada.
+                </p>
+              </div>
               <div className="space-y-2">
                 {TOURNAMENTS.map((t) => {
-                  const isSelected = form.tournament === t.slug;
+                  const isSelected = form.tournaments.includes(t.slug);
                   return (
-                    <button key={t.slug} type="button" onClick={() => { updateForm("tournament", t.slug); setSelectedMatchIds(new Set()); }}
-                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 flex items-center gap-3 cursor-pointer ${isSelected ? "border-gold/30 bg-gold/10" : "border-border-subtle hover:border-gold/20 bg-bg-elevated"}`}>
+                    <button
+                      key={t.slug}
+                      type="button"
+                      onClick={() => {
+                        setForm((prev) => {
+                          const set = new Set(prev.tournaments);
+                          if (set.has(t.slug)) set.delete(t.slug);
+                          else set.add(t.slug);
+                          return { ...prev, tournaments: Array.from(set) };
+                        });
+                        // Cualquier cambio de torneos invalida la
+                        // selección de partidos previa — los IDs viejos
+                        // pueden no existir en el nuevo set.
+                        setSelectedMatchIds(new Set());
+                      }}
+                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 flex items-center gap-3 cursor-pointer ${
+                        isSelected
+                          ? "border-gold/30 bg-gold/10"
+                          : "border-border-subtle hover:border-gold/20 bg-bg-elevated"
+                      }`}
+                    >
                       <img src={t.logoPath} alt={t.name} width={24} height={24} style={{ objectFit: "contain", borderRadius: 4 }} />
                       <span className="font-medium text-text-primary flex-1">{t.name}</span>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? "border-gold bg-gold" : "border-border-medium"}`}>
-                        {isSelected && <div className="w-2 h-2 rounded-full bg-bg-base" />}
+                      {/* Checkbox cuadrado para señalar multi-select */}
+                      <div
+                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                          isSelected ? "border-gold bg-gold" : "border-border-medium"
+                        }`}
+                      >
+                        {isSelected ? <Check className="w-3.5 h-3.5 text-bg-base" /> : null}
                       </div>
                     </button>
                   );
                 })}
               </div>
+              {form.tournaments.length > 1 ? (
+                <p className="text-[11px] text-gold">
+                  Polla combinada · {form.tournaments.length} torneos seleccionados.
+                </p>
+              ) : null}
             </div>
 
             {/* Tipo de polla: privada (closed) es el único modo soportado. */}
@@ -409,31 +504,85 @@ export default function CrearPollaPage() {
               <div className="flex flex-col items-center gap-2 py-8"><FootballLoader /><p className="text-text-muted text-sm">Cargando partidos...</p></div>
             ) : matches.length === 0 ? (
               <div className="text-center py-8 lp-card">
-                <p className="text-text-muted text-sm">No hay partidos programados para este torneo</p>
+                <p className="text-text-muted text-sm">No hay partidos programados para los torneos seleccionados.</p>
               </div>
             ) : (
-              groupedMatches.map((group) => {
-                const allGroupSelected = group.matchIds.every((id) => selectedMatchIds.has(id));
+              tournamentBlocks.map((block) => {
+                const allTournamentSelected = block.matchIds.every((id) => selectedMatchIds.has(id));
                 return (
-                  <div key={group.key}>
-                    {/* Group header */}
-                    <div style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "8px 0 6px", borderBottom: "1px solid rgba(255,255,255,0.06)",
-                    }}>
-                      <div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#f0f4ff" }}>{group.label}</span>
-                        <span style={{ fontSize: 11, color: "#4a5568", marginLeft: 6 }}>· {group.matches.length} partidos</span>
+                  <div key={block.tournamentSlug} className="space-y-2 mt-4 first:mt-0">
+                    {/* Tournament header — solo lo mostramos cuando hay
+                        más de 1 torneo, para no agregar ruido en
+                        single-tournament. */}
+                    {isCombined ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "10px 12px",
+                          borderRadius: 12,
+                          background: "rgba(255,215,0,0.06)",
+                          border: "1px solid rgba(255,215,0,0.18)",
+                          marginTop: 12,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          {block.tournamentLogo ? (
+                            <img
+                              src={block.tournamentLogo}
+                              alt={block.tournamentName}
+                              width={20}
+                              height={20}
+                              style={{ objectFit: "contain", borderRadius: 4 }}
+                            />
+                          ) : null}
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "#FFD700" }}>
+                            {block.tournamentName}
+                          </span>
+                          <span style={{ fontSize: 11, color: "#AEB7C7" }}>
+                            · {block.matchIds.length} partidos
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => toggleGroup(block.matchIds)}
+                          style={{
+                            fontSize: 11,
+                            color: allTournamentSelected ? "#ff3d57" : "#FFD700",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            fontFamily: "'Outfit', sans-serif",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {allTournamentSelected ? "Quitar todo" : "Todo el torneo"}
+                        </button>
                       </div>
-                      <button onClick={() => toggleGroup(group.matchIds)} style={{
-                        fontSize: 10, color: allGroupSelected ? "#ff3d57" : "#FFD700", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontWeight: 600,
-                      }}>
-                        {allGroupSelected ? "Deseleccionar" : "Sel. todos"} →
-                      </button>
-                    </div>
+                    ) : null}
 
-                    {/* Match rows */}
-                    {group.matches.map((m) => {
+                    {block.subgroups.map((group) => {
+                      const allGroupSelected = group.matchIds.every((id) => selectedMatchIds.has(id));
+                      return (
+                        <div key={group.key}>
+                          {/* Sub-group header — fecha o fase dentro del torneo */}
+                          <div style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "8px 0 6px", borderBottom: "1px solid rgba(255,255,255,0.06)",
+                          }}>
+                            <div>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "#f0f4ff" }}>{group.label}</span>
+                              <span style={{ fontSize: 11, color: "#4a5568", marginLeft: 6 }}>· {group.matches.length} partidos</span>
+                            </div>
+                            <button onClick={() => toggleGroup(group.matchIds)} style={{
+                              fontSize: 10, color: allGroupSelected ? "#ff3d57" : "#FFD700", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontWeight: 600,
+                            }}>
+                              {allGroupSelected ? "Deseleccionar" : "Sel. todos"} →
+                            </button>
+                          </div>
+
+                          {/* Match rows */}
+                          {group.matches.map((m) => {
                       const isChecked = selectedMatchIds.has(m.id);
                       const isPlaceholder = m.home_team === "TBD" && m.away_team === "TBD";
                       const time = isPlaceholder
@@ -516,6 +665,9 @@ export default function CrearPollaPage() {
                       );
                     })}
                   </div>
+                  );
+                })}
+                </div>
                 );
               })
             )}
@@ -626,7 +778,10 @@ export default function CrearPollaPage() {
             <div className="rounded-xl p-4 flex items-start gap-2.5 bg-bg-elevated border border-border-subtle">
               <Info className="w-4 h-4 text-blue-info flex-shrink-0 mt-0.5" />
               <p className="text-sm text-text-secondary">
-                {selectedMatchIds.size} partidos seleccionados · {tournamentMeta?.name || form.tournament}
+                {selectedMatchIds.size} partidos seleccionados ·{" "}
+                {isCombined
+                  ? `${form.tournaments.length} torneos combinados`
+                  : (tournamentMeta?.name ?? form.tournaments[0] ?? "—")}
               </p>
             </div>
 

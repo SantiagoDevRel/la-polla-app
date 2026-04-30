@@ -13,6 +13,7 @@ export default function DefaultPayoutPreviewPage() {
   const [open, setOpen] = useState(true);
   const [savedMethod, setSavedMethod] = useState<PayoutMethod | null>(null);
   const [savedAccount, setSavedAccount] = useState<string | null>(null);
+  const [savedName, setSavedName] = useState<string | null>(null);
   const [skipCount, setSkipCount] = useState(0);
 
   return (
@@ -36,6 +37,7 @@ export default function DefaultPayoutPreviewPage() {
         <p className="text-text-primary font-semibold mb-1">Estado simulado</p>
         <p>Método guardado: {savedMethod ?? "—"}</p>
         <p>Cuenta guardada: {savedAccount ?? "—"}</p>
+        <p>Nombre guardado: {savedName ?? "—"}</p>
         <p>Veces saltado: {skipCount}</p>
       </div>
 
@@ -43,9 +45,11 @@ export default function DefaultPayoutPreviewPage() {
         open={open}
         initialMethod={savedMethod ?? undefined}
         initialAccount={savedAccount ?? undefined}
-        onSubmit={(m, a) => {
+        initialAccountName={savedName ?? undefined}
+        onSubmit={(m, a, n) => {
           setSavedMethod(m);
           setSavedAccount(a);
+          setSavedName(n);
           setOpen(false);
         }}
         onSkip={() => {

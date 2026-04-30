@@ -168,11 +168,19 @@ export default function PollaPayoutFlow({ slug, refreshKey = 0 }: Props) {
     }
   }, [loading, summary]);
 
-  async function saveWinnerAccount(method: PayoutMethod, account: string) {
+  async function saveWinnerAccount(
+    method: PayoutMethod,
+    account: string,
+    accountName: string | null,
+  ) {
     if (savingPayout) return;
     setSavingPayout(true);
     try {
-      await axios.patch(`/api/pollas/${slug}/payout-method`, { method, account });
+      await axios.patch(`/api/pollas/${slug}/payout-method`, {
+        method,
+        account,
+        accountName,
+      });
       setWinnerOpen(false);
       await fetchSummary();
     } catch (err) {

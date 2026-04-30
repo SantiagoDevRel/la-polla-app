@@ -1,46 +1,79 @@
 // components/perfil/PayoutDefaultEditor.tsx — Sección en /perfil para
-// guardar un método+cuenta de pago default. Cuando un user gana una
-// polla, el WinnerPayoutModal pre-llena con esto y solo confirma con
-// un tap.
+// guardar un método+cuenta+nombre de pago default. Cuando un user
+// gana una polla, el WinnerPayoutModal pre-llena con esto y solo
+// confirma con un tap.
+//
+// Reglas por método (alineadas al verifier AI):
+//   - nequi:        celular. NO se pide nombre (Nequi solo identifica
+//                   por celular).
+//   - bancolombia:  número de cuenta + nombre como aparece en el
+//                   banco. Sonnet usa el nombre para verificar
+//                   screenshots.
+//   - otro:         número/llave + nombre como aparece. Mismo motivo.
 //
 // Comportamiento:
-//   - Si ya hay cuenta seteada → modo VIEW: muestra "Bancolombia · 0123"
-//     y un botón con lápiz para editar.
-//   - Si NO hay → modo EDIT: editor completo con chips + input.
+//   - Si ya hay cuenta seteada → modo VIEW: muestra resumen + lápiz.
+//   - Si NO hay → modo EDIT: editor completo.
 //   - Después de guardar → vuelve a modo VIEW automáticamente.
 "use client";
 
 import { useEffect, useState } from "react";
 import { CreditCard, Pencil, Check } from "lucide-react";
 
-export type PayoutMethod = "nequi" | "daviplata" | "bancolombia" | "transfiya" | "otro";
+export type PayoutMethod = "nequi" | "bancolombia" | "otro";
 
-const METHOD_OPTIONS: Array<{ id: PayoutMethod; label: string; placeholder: string }> = [
-  { id: "nequi", label: "Nequi", placeholder: "Número de celular (ej: 311 314 7831)" },
-  { id: "daviplata", label: "Daviplata", placeholder: "Número de celular" },
-  { id: "bancolombia", label: "Bancolombia", placeholder: "Número de cuenta" },
-  { id: "transfiya", label: "Transfiya", placeholder: "Llave (celular o usuario)" },
-  { id: "otro", label: "Otro", placeholder: "Banco + tipo + número" },
+const METHOD_OPTIONS: Array<{
+  id: PayoutMethod;
+  label: string;
+  accountPlaceholder: string;
+  needsName: boolean;
+  helper: string;
+}> = [
+  {
+    id: "nequi",
+    label: "Nequi",
+    accountPlaceholder: "Número de celular (ej: 311 314 7831)",
+    needsName: false,
+    helper: "Nequi se identifica solo por celular.",
+  },
+  {
+    id: "bancolombia",
+    label: "Bancolombia",
+    accountPlaceholder: "Número de cuenta",
+    needsName: true,
+    helper: "El nombre debe ser EXACTAMENTE como aparece en la cuenta del banco — lo usamos para validar el screenshot del pago.",
+  },
+  {
+    id: "otro",
+    label: "Otro",
+    accountPlaceholder: "Banco + tipo + número",
+    needsName: true,
+    helper: "El nombre debe ser EXACTAMENTE como aparece en la cuenta — lo usamos para validar el screenshot del pago.",
+  },
 ];
 
 const METHOD_LABEL: Record<PayoutMethod, string> = {
   nequi: "Nequi",
-  daviplata: "Daviplata",
   bancolombia: "Bancolombia",
-  transfiya: "Transfiya",
   otro: "Otro",
 };
 
 interface Props {
   initialMethod?: PayoutMethod | null;
   initialAccount?: string | null;
-  onSave: (method: PayoutMethod, account: string) => Promise<void> | void;
+  initialAccountName?: string | null;
+  onSave: (
+    method: PayoutMethod,
+    account: string,
+    accountName: string | null,
+  ) => Promise<void> | void;
   onClear?: () => Promise<void> | void;
 }
 
 export default function PayoutDefaultEditor({
   initialMethod,
   initialAccount,
+  initialAccountName,
   onSave,
   onClear,
 }: Props) {
@@ -48,25 +81,28 @@ export default function PayoutDefaultEditor({
   const [mode, setMode] = useState<"view" | "edit">(hasInitial ? "view" : "edit");
   const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "nequi");
   const [account, setAccount] = useState(initialAccount ?? "");
+  const [accountName, setAccountName] = useState(initialAccountName ?? "");
   const [saving, setSaving] = useState(false);
 
-  // Mantener sincronía si el padre cambia los initials (ej. después de
-  // refetch). Si el user está editando activamente NO pisamos sus
-  // cambios — solo cuando volvemos a entrar a la página.
   useEffect(() => {
-    if (mode === "edit" && saving === false) return; // no override mid-edit
+    if (mode === "edit" && saving === false) return;
     setMethod(initialMethod ?? "nequi");
     setAccount(initialAccount ?? "");
+    setAccountName(initialAccountName ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMethod, initialAccount]);
+  }, [initialMethod, initialAccount, initialAccountName]);
 
   const cur = METHOD_OPTIONS.find((m) => m.id === method)!;
+  const needsName = cur.needsName;
+  const canSave =
+    !!account.trim() && !saving && (!needsName || accountName.trim().length >= 2);
 
   async function save() {
-    if (!account.trim() || saving) return;
+    if (!canSave) return;
     setSaving(true);
     try {
-      await onSave(method, account.trim());
+      const finalName = needsName ? accountName.trim() : null;
+      await onSave(method, account.trim(), finalName);
       setMode("view");
     } finally {
       setSaving(false);
@@ -82,6 +118,7 @@ export default function PayoutDefaultEditor({
     await onClear();
     setMethod("nequi");
     setAccount("");
+    setAccountName("");
     setMode("edit");
   }
 
@@ -100,6 +137,11 @@ export default function PayoutDefaultEditor({
           >
             {METHOD_LABEL[initialMethod!]} · {initialAccount}
           </p>
+          {initialAccountName ? (
+            <p className="text-[11px] text-text-muted truncate">
+              A nombre de {initialAccountName}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
@@ -147,15 +189,30 @@ export default function PayoutDefaultEditor({
         type="text"
         value={account}
         onChange={(e) => setAccount(e.target.value)}
-        placeholder={cur.placeholder}
+        placeholder={cur.accountPlaceholder}
         className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
       />
+
+      {needsName ? (
+        <div>
+          <input
+            type="text"
+            value={accountName}
+            onChange={(e) => setAccountName(e.target.value)}
+            placeholder="Nombre completo como aparece en la cuenta"
+            className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
+          />
+          <p className="text-[11px] text-text-muted mt-1.5">{cur.helper}</p>
+        </div>
+      ) : (
+        <p className="text-[11px] text-text-muted">{cur.helper}</p>
+      )}
 
       <div className="flex gap-2">
         <button
           type="button"
           onClick={save}
-          disabled={!account.trim() || saving}
+          disabled={!canSave}
           className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gold text-bg-base font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-50"
         >
           {saving ? "Guardando…" : (<><Check className="w-4 h-4" /> Guardar</>)}
@@ -166,6 +223,7 @@ export default function PayoutDefaultEditor({
             onClick={() => {
               setMethod(initialMethod ?? "nequi");
               setAccount(initialAccount ?? "");
+              setAccountName(initialAccountName ?? "");
               setMode("view");
             }}
             className="px-3 py-2 rounded-xl border border-border-subtle text-text-secondary text-sm hover:border-text-secondary/40 transition-colors"

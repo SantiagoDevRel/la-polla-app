@@ -48,11 +48,16 @@ export default function DefaultPayoutPrompt() {
     void load();
   }, [load]);
 
-  async function save(method: PayoutMethod, account: string) {
+  async function save(
+    method: PayoutMethod,
+    account: string,
+    accountName: string | null,
+  ) {
     try {
       await axios.patch("/api/users/me", {
         default_payout_method: method,
         default_payout_account: account,
+        default_payout_account_name: accountName,
       });
       setHasDefault(true);
       setOpen(false);
