@@ -55,11 +55,16 @@ interface MatchRow {
 export async function verifyPendingFinals(): Promise<VerifyResult[]> {
   const admin = createAdminClient();
 
-  // Solo matches recién finalizados sin verificar. Limita el lookup —
-  // en estado de reposo casi siempre devuelve 0 rows.
+  // Solo matches recién finalizados sin verificar QUE TIENEN AL MENOS
+  // UNA PREDICCIÓN ASOCIADA. Si un match no está en ninguna polla, no
+  // hay scoring que ejecutar — no tiene sentido pedir verificación
+  // (ni alertar al admin) por algo que no afecta a ningún user.
+  // Esto baja drásticamente el ruido de alertas en torneos como liga
+  // colombiana donde sync-eamos toda la fixture pero solo unas pocas
+  // matches están en pollas activas.
   const { data, error } = await admin
     .from("matches")
-    .select("id, external_id, espn_id, tournament, home_team, away_team, home_score, away_score, status, scheduled_at, final_verified_at, final_verification_notes")
+    .select("id, external_id, espn_id, tournament, home_team, away_team, home_score, away_score, status, scheduled_at, final_verified_at, final_verification_notes, predictions!inner(id)")
     .eq("status", "finished")
     .is("final_verified_at", null);
 
@@ -67,7 +72,18 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
     console.error("[verify-final] db query failed:", error.message);
     return [];
   }
-  const candidates = (data || []) as MatchRow[];
+  // El !inner del select fuerza al menos 1 prediction; pero distinct no
+  // está disponible directo, así que de-duplicamos en cliente por id.
+  const seen = new Set<string>();
+  const candidates: MatchRow[] = [];
+  for (const row of (data ?? []) as Array<MatchRow & { predictions: unknown }>) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    // Tiramos la columna join antes de pasar al verifier.
+    const { predictions: _join, ...rest } = row;
+    void _join;
+    candidates.push(rest as MatchRow);
+  }
   if (candidates.length === 0) return [];
 
   const results: VerifyResult[] = [];
