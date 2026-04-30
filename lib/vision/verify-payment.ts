@@ -79,10 +79,10 @@ export interface VerifyResult {
     name: boolean;
     date: "today_or_newer" | "older" | "missing";
   };
-  /** Texto libre con notas — útil para debugging y para mostrar al admin. */
-  notes: string;
   /** Razón resumida de por qué se rechazó (si valid=false). */
   rejectionReason: string | null;
+  /** Warning informativo opcional (ej. fecha vieja). No bloquea. */
+  warning: string | null;
   /** Tokens consumidos para logging de costos. */
   tokensIn: number;
   tokensOut: number;
@@ -108,83 +108,47 @@ const PRICE_IN_PER_MTOK = 3.0;
 const PRICE_OUT_PER_MTOK = 15.0;
 
 function buildSystemPrompt(method: PayoutMethod): string {
-  const base = `Sos un verificador de comprobantes de pago bancario en Colombia. Tu prioridad #1 es detectar FRAUDE. Adversarios van a intentar pasar imágenes que TIENEN el texto correcto pero NO son screenshots de bancos reales — vas a rechazarlas.
+  void method;
+  // Prompt minimalista. Output muy corto = menos costo de tokens.
+  // El system prompt es siempre el mismo (apto para prompt caching
+  // futuro). NO pedimos explicación libre — solo los campos exactos.
+  const base = `Verificador de comprobantes bancarios Colombia. Anti-fraude.
 
-⚠️ PRIORIDAD ABSOLUTA — ANTI-FRAUDE.
+PASO 1 — Clasificar la SOURCE solo por apariencia visual (NO por texto):
+  bank_app   = app bancaria real (Nequi, Bancolombia, Daviplata, BBVA, Davivienda, Banco de Bogotá, AV Villas, etc.). Branding/colores del banco + layout móvil + card de comprobante con check.
+  wallet     = Movii / Tpaga / RappiPay / dale!. Mismas señales.
+  notes_app  = fondo plano + tipografía del OS sin branding. Aunque diga "Pago exitoso", si no hay UI de banco → notes_app.
+  messaging  = burbujas de chat (WhatsApp, iMessage, Telegram).
+  browser    = barra de URL visible.
+  edited     = Photoshop / mockup.
+  physical   = foto de papel.
+  other      = otro.
+  unclear    = no podés decidir.
 
-Antes de mirar lo que dice el texto, mirá QUÉ ES la imagen visualmente. El texto NO importa para clasificar la source — solo la apariencia visual.
+Texto solo NO basta para bank_app. Si dudás → notes_app.
 
-Categorías para source_type:
+PASO 2 — Si bank_app/wallet, extraer monto/cuenta/método/nombre/fecha. Status debe ser exitoso/aprobado/completado.
 
-"bank_app" — necesita AL MENOS 2 de estas señales visuales (no de texto):
-  • Branding visual de un banco colombiano. Puede ser logo explícito (Bancolombia amarillo, Nequi rosa, Daviplata rojo, BBVA azul, Davivienda rojo, Banco de Bogotá rojo, AV Villas, Scotiabank Colpatria, Itaú, Caja Social) O paleta de colores característica del banco que cubre la imagen entera.
-  • Layout de app móvil: status bar del OS arriba con hora/batería/señal, esquinas redondeadas, padding consistente con UI Kit móvil (Material Design o Human Interface).
-  • Card de comprobante/recibo con FORMATO de banco: icono grande de check (verde, gris o circular), texto tipo "Listo", "Pago exitoso", "Transferencia exitosa", "Tu transferencia fue exitosa", "Comprobante", "Detalle".
-  • Número de referencia/aprobación alfanumérico (>= 6 chars, formato bank-like — ej. "REF: 12345678", "Aprobación: 987654321", "Comprobante #12345").
-  • Botones característicos de bank app: "Compartir", "Descargar", "Volver a inicio", "Otra transferencia".
-  • Estructura visual de bank app: header colorido con título, separadores, tipografía limpia, datos en formato key-value (Origen / Destino / Valor / Fecha).
-
-"wallet" — Movii, Tpaga, RappiPay, dale!. Mismas señales que bank_app pero del wallet.
-
-"notes_app" — fondo plano blanco/amarillo-claro/gris uniforme. Texto en una sola tipografía del SISTEMA (San Francisco / Roboto / Helvetica). SIN colores de marca. SIN header de app. SIN icono de check. SIN número de referencia formateado. Aunque el TEXTO diga "Pago exitoso a Santiago $20.000", si la imagen es solo texto sobre fondo plano sin estructura de UI bancaria, ES notes_app — el TEXTO no convierte una nota en banco.
-
-"messaging" — burbujas de chat con fondo característico (WhatsApp verde+gris, iMessage azul, Telegram celeste).
-
-"browser" — barra de URL visible (Chrome / Safari / Firefox address bar).
-
-"edited" — fuentes mezcladas, alineación rara, recortes visibles, parche tipo Photoshop.
-
-"physical" — foto de papel impreso, sombras, ángulos no perpendiculares.
-
-"other" — calculadora, calendario, código, meme, etc.
-
-"unclear" — no podés decidir con seguridad.
-
-REGLAS DURAS ANTI-FRAUDE:
-
-1. **Texto solo NO ES suficiente para bank_app.** "Pago exitoso $20000 a Santiago cuenta 123" se puede tipear en cualquier nota. Para clasificar como bank_app necesitás señales VISUALES (color, layout, branding, structure) además del texto.
-
-2. **Si la imagen es texto sobre fondo plano sin chrome de app móvil → notes_app**, sin importar qué diga el texto.
-
-3. **En source_evidence, citá señales VISUALES concretas, no texto.** Bueno: "Layout con header amarillo característico de Bancolombia, icono de check verde grande, formato de comprobante con campos Origen/Destino/Valor en columna". Malo: "Dice pago exitoso a Santiago".
-
-4. Si dudás entre bank_app y notes_app, elegí notes_app — falso negativo es OK (admin revisa manual), falso positivo es fraude.
-
-5. confidence "high" SOLO si source_type=bank_app/wallet con MÚLTIPLES señales visuales claras. Si solo viste 1 señal débil, confidence="low".
-
-PASO 2 — SI ES bank_app O wallet, extraer:
-1. monto en COP (number, sin centavos, sin separadores)
-2. cuenta destino (string — celular para Nequi, número de cuenta para Bancolombia. Si enmascarada "****1234", devolvé los últimos dígitos).
-3. método visible (string — Nequi, Bancolombia, etc. null si no aparece claramente).
-4. nombre del beneficiario tal cual aparece (string). null si no se ve.
-5. fecha en ISO YYYY-MM-DD. Si dice "Hoy" usás la fecha del contexto. Si solo hora sin fecha, null.
-
-Reglas adicionales:
-- Status debe figurar como EXITOSA / completada / aprobada. Otro estado → valid=false.
-
-Devolvé SIEMPRE un objeto JSON válido con esta forma exacta, sin markdown:
+Output: SOLO JSON, sin markdown, sin texto antes/después. Mantené strings cortos (1 frase máx).
 
 {
-  "source_type": "bank_app" | "wallet" | "notes_app" | "messaging" | "browser" | "edited" | "physical" | "other" | "unclear",
-  "source_evidence": "string — DEBE citar elementos visuales específicos. Ej válidos: 'Logo amarillo Bancolombia en header, icono check verde, número de comprobante REF: 1234567'. Ej INVÁLIDOS: 'Se ve un texto de pago' / 'Parece un comprobante' / 'Hay información de transferencia'. Si no podés citar branding/logo nombrado, NO digas bank_app.",
+  "source_type": "bank_app|wallet|notes_app|messaging|browser|edited|physical|other|unclear",
+  "source_evidence": "string corto (≤12 palabras) citando elementos visuales — ej. 'logo Bancolombia amarillo + check verde + REF: 12345'. Si no podés citar visual concreto, NO digas bank_app.",
   "valid": boolean,
-  "confidence": "high" | "low",
-  "detected_amount": number | null,
-  "detected_account": string | null,
-  "detected_method": string | null,
-  "detected_recipient_name": string | null,
-  "detected_date": "YYYY-MM-DD" | null,
-  "notes": string,
-  "rejection_reason": string | null
+  "confidence": "high|low",
+  "detected_amount": number|null,
+  "detected_account": string|null,
+  "detected_method": string|null,
+  "detected_recipient_name": string|null,
+  "detected_date": "YYYY-MM-DD"|null,
+  "rejection_reason": string|null
 }
 
-Si source_type NO es bank_app ni wallet:
-- valid: false
-- confidence: "high" (estás SEGURO de que NO es comprobante bancario)
-- rejection_reason: "El comprobante no parece de una app bancaria. Detectamos: [tipo]."
-
-Si valid=true, rejection_reason es null.
-Si valid=false por otra razón (monto / cuenta / nombre no coinciden), rejection_reason explica brevemente.`;
+Reglas:
+- valid=true SOLO si source_type∈{bank_app,wallet} + status exitoso + datos legibles claros.
+- confidence=high SOLO si tu source_evidence cita ≥2 señales visuales concretas.
+- rejection_reason=null si valid=true. Si valid=false: 1 frase corta (≤12 palabras).
+- Sin "notes". Sin párrafos. Sin explicaciones largas.`;
 
   switch (method) {
     case "nequi":
@@ -285,7 +249,9 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
 
   const response = await client.messages.create({
     model: SONNET_MODEL,
-    max_tokens: 500,
+    // Output reducido: el JSON cabe en ~200 tokens con strings cortos.
+    // Antes 500. Ahorra ~50% del costo de output.
+    max_tokens: 250,
     temperature: 0,
     system: buildSystemPrompt(args.expected.method),
     messages: [
@@ -326,7 +292,6 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     detected_method?: string | null;
     detected_recipient_name?: string | null;
     detected_date?: string | null;
-    notes?: string;
     rejection_reason?: string | null;
   } = {};
   try {
@@ -344,8 +309,8 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
       detectedRecipientName: null,
       detectedDate: null,
       checks: { source: false, amount: false, account: false, name: false, date: "missing" },
-      notes: `Respuesta no-JSON: ${text.slice(0, 200)}`,
       rejectionReason: "No pudimos parsear la respuesta del verificador.",
+      warning: null,
       tokensIn,
       tokensOut,
       costUSD,
@@ -435,14 +400,13 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     }
   }
 
-  // Si todo matchea pero la fecha es vieja, agregamos warning a notes.
-  let notes = parsed.notes ?? "";
+  // Si todo matchea pero la fecha es vieja, exponemos un warning
+  // informativo (no bloquea la aprobación).
+  let warning: string | null = null;
   if (coreMatch && dateCheck === "older") {
-    const dateNote = `Fecha detectada (${parsed.detected_date}) es anterior a hoy en Colombia (${todayInColombia()}). Posible screenshot reusado — revisá manualmente.`;
-    notes = notes ? `${notes} · ${dateNote}` : dateNote;
+    warning = `Fecha del screenshot (${parsed.detected_date}) anterior a hoy (${todayInColombia()}). Posible reuso.`;
   } else if (coreMatch && dateCheck === "missing") {
-    const dateNote = `No se pudo extraer la fecha del screenshot.`;
-    notes = notes ? `${notes} · ${dateNote}` : dateNote;
+    warning = "Fecha no detectada en el screenshot.";
   }
 
   return {
@@ -465,8 +429,8 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
       name: nameMatches,
       date: dateCheck,
     },
-    notes,
     rejectionReason,
+    warning,
     tokensIn,
     tokensOut,
     costUSD,
