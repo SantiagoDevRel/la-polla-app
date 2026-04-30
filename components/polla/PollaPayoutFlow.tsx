@@ -275,15 +275,23 @@ export default function PollaPayoutFlow({ slug, refreshKey = 0 }: Props) {
         />
       ) : null}
 
-      {/* Settlement modal */}
-      {modalOpen ? (
+      {/* Settlement modal — solo cuando NO hay un winner-modal pendiente
+          que tomar precedencia. Si el ganador necesita poner cuenta,
+          mostramos solo el WinnerPayoutModal y el SettlementModal queda
+          en espera para abrirse después de que el winner save. */}
+      {modalOpen && !winnerOpen ? (
         <SettlementModal
           summary={summary}
           actingTxId={actingTxId}
           onMarkPaid={markPaid}
           onUnmarkPaid={unmarkPaid}
           onClose={() => setModalOpen(false)}
-          onOpenWinner={() => setWinnerOpen(true)}
+          onOpenWinner={() => {
+            // Cerrar settlement antes de abrir winner — evita que dos
+            // modals se solapen tapando el video del WinnerPayoutModal.
+            setModalOpen(false);
+            setWinnerOpen(true);
+          }}
           showAllAdmin={showAllAdmin}
           setShowAllAdmin={setShowAllAdmin}
         />
@@ -318,8 +326,8 @@ function SettlementModal({
   const viewerOwes = summary.myOutgoing.length > 0;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/65 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full sm:max-w-md bg-bg-card border-t sm:border border-gold/20 rounded-t-3xl sm:rounded-2xl p-5 pb-7 sm:my-6 max-h-[92vh] overflow-y-auto shadow-[0_0_40px_rgba(255,215,0,0.12)]">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center px-4 py-6 bg-black/55 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-full max-w-sm bg-bg-card border border-gold/20 rounded-2xl p-5 max-h-[88vh] overflow-y-auto shadow-[0_0_40px_rgba(255,215,0,0.18)]">
         <button
           type="button"
           onClick={onClose}
@@ -357,7 +365,7 @@ function SettlementModal({
             onClick={onOpenWinner}
             className="w-full rounded-xl px-3 py-3 bg-gold text-bg-base font-semibold text-[13px] mb-3 hover:brightness-110 transition-all"
           >
-            Decirle al parche cómo cobrar tu premio
+            Poner mi cuenta para cobrar
           </button>
         ) : null}
 

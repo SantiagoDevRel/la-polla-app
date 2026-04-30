@@ -62,7 +62,7 @@ export default function WinnerPayoutModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center px-4 py-6">
       {/* Video background. The celebration clip is short + loops; lite
           mp4 keeps the bandwidth bounded. Poster used while loading. */}
       <video
@@ -76,16 +76,21 @@ export default function WinnerPayoutModal({
         <source src="/videos/la-polla-celebration.webm" type="video/webm" />
         <source src="/videos/la-polla-celebration-lite.mp4" type="video/mp4" />
       </video>
-      {/* Dim + gold gradient over the video for legibility. */}
+      {/* Dim suave para que el video se vea claramente detrás del card.
+          Antes los gradientes oscurecían demasiado y el video no se
+          reconocía. Ahora el viñeteado es ligero y la legibilidad la da
+          el blur del card en vez del overlay. */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse at center, rgba(8,12,16,0.45) 0%, rgba(8,12,16,0.85) 100%)",
+            "radial-gradient(ellipse at center, rgba(8,12,16,0.10) 0%, rgba(8,12,16,0.55) 100%)",
         }}
       />
-      {/* Content */}
-      <div className="relative w-full sm:max-w-md p-5 pb-8 sm:rounded-2xl rounded-t-3xl bg-bg-card/85 backdrop-blur-md border-t sm:border border-gold/25 shadow-[0_0_40px_rgba(255,215,0,0.18)] animate-fade-in">
+      {/* Content — card compacta y centrada (no sticky-bottom). El
+          backdrop-blur del card ya garantiza legibilidad sobre el video
+          sin necesidad de un dim oscuro al frente. */}
+      <div className="relative w-full max-w-sm p-5 pb-7 rounded-2xl bg-bg-card/70 backdrop-blur-xl border border-gold/30 shadow-[0_0_40px_rgba(255,215,0,0.25)] animate-fade-in">
         {onClose && (
           <button
             type="button"

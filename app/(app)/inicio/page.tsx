@@ -49,6 +49,7 @@ import { LiveChip } from "@/components/match/LiveChip";
 import { ActivePollasEmpty } from "@/components/inicio/ActivePollasEmpty";
 import { PodiumCarousel } from "@/components/inicio/PodiumCarousel";
 import { GreetingHero } from "@/components/inicio/GreetingHero";
+import GlobalPayoutBanner from "@/components/inicio/GlobalPayoutBanner";
 import { RivalChip } from "@/components/inicio/RivalChip";
 import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
@@ -800,6 +801,14 @@ export default async function InicioPage() {
 
       <main className="pb-[110px]">
         <div className="max-w-lg mx-auto space-y-8">
+          {/* Pagos pendientes — banner global pinned arriba con todas
+              las transacciones unpaid del viewer en cualquier polla
+              finalizada. Se monta solo si hay tx pendientes; auto-abre
+              el modal una vez por sesión. */}
+          <section className="px-4">
+            <GlobalPayoutBanner />
+          </section>
+
           {/* Block 7 - Empty state. Replaces blocks 3/4/5/6 entirely when
               the user has no active pollas. Offers two paths out: create
               a new polla, or join an existing one with a 6-char code. */}
