@@ -32,6 +32,13 @@ interface VerifyResultUI {
   detectedAccount: string | null;
   detectedMethod: string | null;
   detectedRecipientName: string | null;
+  detectedDate: string | null;
+  checks: {
+    amount: boolean;
+    account: boolean;
+    name: boolean;
+    date: "today_or_newer" | "older" | "missing";
+  };
   notes: string;
   rejectionReason: string | null;
   tokensIn: number;
@@ -48,6 +55,7 @@ export default function ScreenshotTestPage() {
   const router = useRouter();
   const [method, setMethod] = useState<PayoutMethod>("bancolombia");
   const [account, setAccount] = useState("");
+  const [recipientName, setRecipientName] = useState("");
   const [amount, setAmount] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -67,8 +75,8 @@ export default function ScreenshotTestPage() {
 
   async function submit() {
     if (!file || submitting) return;
-    if (!account.trim() || !amount.trim()) {
-      setError("Completá cuenta y monto.");
+    if (!account.trim() || !amount.trim() || !recipientName.trim()) {
+      setError("Completá cuenta, nombre del beneficiario y monto.");
       return;
     }
     setSubmitting(true);
@@ -84,6 +92,7 @@ export default function ScreenshotTestPage() {
       fd.append("image", new File([pre.blob], "screenshot.jpg", { type: "image/jpeg" }));
       fd.append("method", method);
       fd.append("account", account.trim());
+      fd.append("recipient_name", recipientName.trim());
       fd.append("amount", amount.replace(/\D/g, ""));
 
       const { data } = await axios.post<{ result: VerifyResultUI }>(
@@ -162,6 +171,19 @@ export default function ScreenshotTestPage() {
 
           <div>
             <label className="text-[10px] uppercase tracking-wide text-text-muted block mb-1">
+              Nombre del beneficiario (full)
+            </label>
+            <input
+              type="text"
+              value={recipientName}
+              onChange={(e) => setRecipientName(e.target.value)}
+              placeholder="ej. Juan Pablo Pérez Gómez"
+              className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-wide text-text-muted block mb-1">
               Monto exacto (COP)
             </label>
             <input
@@ -206,7 +228,7 @@ export default function ScreenshotTestPage() {
           <button
             type="button"
             onClick={submit}
-            disabled={!file || !account.trim() || !amount.trim() || submitting}
+            disabled={!file || !account.trim() || !recipientName.trim() || !amount.trim() || submitting}
             className="w-full bg-gold text-bg-base font-display text-base tracking-wide py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
           >
             {submitting ? "VERIFICANDO…" : "VERIFICAR CON HAIKU"}
@@ -252,29 +274,39 @@ export default function ScreenshotTestPage() {
               </span>
             </div>
 
-            <dl className="text-[12px] grid grid-cols-2 gap-x-3 gap-y-1.5">
-              <dt className="text-text-muted">Detected amount</dt>
+            <dl className="text-[12px] grid grid-cols-[1fr_auto_auto] gap-x-2 gap-y-1.5 items-center">
+              <dt className="text-text-muted">Monto</dt>
               <dd
                 className="text-right text-text-primary tabular-nums"
                 style={{ fontFeatureSettings: '"tnum"' }}
               >
                 {fmtCOP(result.detectedAmount)}
               </dd>
+              <CheckMark ok={result.checks.amount} />
 
-              <dt className="text-text-muted">Detected account</dt>
+              <dt className="text-text-muted">Cuenta</dt>
               <dd className="text-right text-text-primary truncate">
                 {result.detectedAccount ?? "—"}
               </dd>
+              <CheckMark ok={result.checks.account} />
 
-              <dt className="text-text-muted">Detected method</dt>
-              <dd className="text-right text-text-primary truncate">
-                {result.detectedMethod ?? "—"}
-              </dd>
-
-              <dt className="text-text-muted">Recipient name</dt>
+              <dt className="text-text-muted">Beneficiario</dt>
               <dd className="text-right text-text-primary truncate">
                 {result.detectedRecipientName ?? "—"}
               </dd>
+              <CheckMark ok={result.checks.name} />
+
+              <dt className="text-text-muted">Método</dt>
+              <dd className="text-right text-text-primary truncate">
+                {result.detectedMethod ?? "—"}
+              </dd>
+              <span />
+
+              <dt className="text-text-muted">Fecha</dt>
+              <dd className="text-right text-text-primary truncate tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+                {result.detectedDate ?? "—"}
+              </dd>
+              <DateMark status={result.checks.date} />
             </dl>
 
             {result.rejectionReason ? (
@@ -305,5 +337,45 @@ export default function ScreenshotTestPage() {
         ) : null}
       </main>
     </div>
+  );
+}
+
+function CheckMark({ ok }: { ok: boolean }) {
+  return ok ? (
+    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-turf/20 text-turf">
+      <Check className="w-3 h-3" />
+    </span>
+  ) : (
+    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-alert/20 text-red-alert">
+      <XIcon className="w-3 h-3" />
+    </span>
+  );
+}
+
+function DateMark({ status }: { status: "today_or_newer" | "older" | "missing" }) {
+  if (status === "today_or_newer") {
+    return (
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-turf/20 text-turf">
+        <Check className="w-3 h-3" />
+      </span>
+    );
+  }
+  if (status === "older") {
+    return (
+      <span
+        className="text-[9px] uppercase px-1.5 py-0.5 rounded-md bg-amber/15 text-amber border border-amber/30 whitespace-nowrap"
+        title="Fecha anterior a hoy — posible screenshot reusado"
+      >
+        Vieja
+      </span>
+    );
+  }
+  return (
+    <span
+      className="text-[9px] uppercase px-1.5 py-0.5 rounded-md bg-text-muted/15 text-text-muted border border-border-subtle whitespace-nowrap"
+      title="No se pudo extraer la fecha"
+    >
+      ?
+    </span>
   );
 }

@@ -18,6 +18,10 @@ export interface VerifyExpected {
    *  cuenta para bancolombia, llave/celular para transfiya, texto libre
    *  para otro). Se compara con detectedAccount normalizando dígitos. */
   account: string;
+  /** Nombre completo como aparece en la cuenta destino. Ej: "Juan
+   *  Pablo Pérez Gómez". Se compara con detectedRecipientName por
+   *  token-overlap (aceptamos abreviaturas tipo "JUAN P. PEREZ"). */
+  recipientName: string;
   /** Monto exacto esperado en COP. Sin centavos. Sin tolerancia. */
   amountCOP: number;
 }
@@ -32,6 +36,19 @@ export interface VerifyResult {
   detectedAccount: string | null;
   detectedMethod: string | null;
   detectedRecipientName: string | null;
+  /** Fecha detectada del screenshot en ISO (YYYY-MM-DD). null si no
+   *  pudo extraerla. Se valida contra "hoy o más reciente" en hora
+   *  Colombia (UTC-5). Si es más vieja, marcamos un warning pero NO
+   *  bloqueamos la aprobación si los otros 3 datos matchean. */
+  detectedDate: string | null;
+  /** Resultado de cada chequeo individual — útil para que el admin
+   *  vea qué pasó cuando hay rechazo o duda. */
+  checks: {
+    amount: boolean;
+    account: boolean;
+    name: boolean;
+    date: "today_or_newer" | "older" | "missing";
+  };
   /** Texto libre con notas — útil para debugging y para mostrar al admin. */
   notes: string;
   /** Razón resumida de por qué se rechazó (si valid=false). */
@@ -47,17 +64,22 @@ const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 const PRICE_IN_PER_MTOK = 1.0;
 const PRICE_OUT_PER_MTOK = 5.0;
 
-const SYSTEM_PROMPT = `Sos un verificador de comprobantes de pago bancario en Colombia. Recibís una imagen de un screenshot y un objeto con la transferencia esperada (método, cuenta destino y monto exacto en pesos colombianos).
+const SYSTEM_PROMPT = `Sos un verificador de comprobantes de pago bancario en Colombia. Recibís una imagen de un screenshot y un objeto con la transferencia esperada (método, cuenta destino, nombre del beneficiario y monto exacto en pesos colombianos).
 
-Tu trabajo es decidir si el screenshot es legítimo Y si las cifras coinciden EXACTAMENTE con lo esperado.
+Tu trabajo es EXTRAER 5 cosas del screenshot y devolverlas. Quien decide si auto-aprobar es el código que corre después; vos extrae y reporta con honestidad.
 
-Reglas estrictas:
-1. La transferencia debe ser EXITOSA (no pendiente, no rechazada, no en proceso).
-2. El monto debe ser EXACTAMENTE el esperado. No aceptes "más cerca", "pago parcial" ni "monto + comisión". Si dice 20.500 y se esperaban 20.000, es INVÁLIDO.
-3. La cuenta destino del screenshot debe matchear la cuenta esperada. Comparar solo dígitos (ignorar espacios, puntos, guiones). Si la app muestra cuenta enmascarada (****1234), aceptar si los últimos dígitos coinciden.
-4. El método debe matchear (Nequi, Daviplata, Bancolombia, Transfiya, otro). Si la imagen es de una app diferente, INVÁLIDO.
-5. Si la imagen no es claramente un screenshot bancario o no podés leer las cifras, devolvé confidence: "low" y valid: false.
-6. Confidence "high" solo si pudiste leer claramente: monto, cuenta destino, status del pago, fecha/hora.
+Cosas a extraer:
+1. monto en COP (number, sin centavos, sin separadores)
+2. cuenta destino (string, exacto como aparece — masked OK, ej. "****1234")
+3. método de transferencia (string: Nequi, Daviplata, Bancolombia, Transfiya, u otro nombre del banco)
+4. nombre del beneficiario (string, exacto como aparece — abreviado o no)
+5. fecha de la transacción en ISO YYYY-MM-DD. Si dice "Hoy" infieres la fecha de la zona horaria Colombia (UTC-5) que te indica el contexto. Si solo dice hora sin fecha y nada más, devolvé null.
+
+Reglas:
+- La transferencia debe figurar como EXITOSA / completada (no pendiente, no rechazada). Si está en otro estado, valid=false.
+- Si la imagen no es claramente un screenshot bancario, no podés leer los datos, o el status es ambiguo: confidence="low", valid=false.
+- Confidence "high" SOLO si pudiste leer claramente: monto, cuenta destino, nombre, status, y al menos parcialmente la fecha.
+- En "valid" sé estricto: solo devolvé true si TODOS los 4 datos esperados (monto, cuenta, nombre, método) coinciden. Si el monto difiere por 500 pesos (ej. comisión), valid=false.
 
 Devolvé SIEMPRE un objeto JSON válido con esta forma exacta, sin markdown, sin texto antes o después:
 
@@ -68,6 +90,7 @@ Devolvé SIEMPRE un objeto JSON válido con esta forma exacta, sin markdown, sin
   "detected_account": string | null,
   "detected_method": string | null,
   "detected_recipient_name": string | null,
+  "detected_date": "YYYY-MM-DD" | null,
   "notes": string,
   "rejection_reason": string | null
 }
@@ -89,6 +112,59 @@ function methodLabel(m: PayoutMethod): string {
   }
 }
 
+/** Normaliza un nombre: lowercase + sin tildes + sin puntos +
+ *  trim + un solo espacio entre tokens. "Juan P. Pérez" → "juan p perez". */
+function normalizeName(s: string): string {
+  return (s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[.,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Match de nombre tolerante a abreviaturas. La cuenta de un banco
+ *  puede mostrar "JUAN P PEREZ G" cuando el user declara "Juan Pablo
+ *  Pérez Gómez". Estrategia:
+ *   - Tokenizamos ambos.
+ *   - Para cada token full del expected (longitud >= 3), buscamos
+ *     un token en detected que matchee como prefijo o iguales.
+ *   - Si al menos 2 tokens >= 3 chars matchean (o todos los tokens
+ *     >= 3 chars del expected si hay menos de 2), considerar match.
+ *   - Iniciales sueltas (1 char + punto) no cuentan como match
+ *     positivo pero tampoco como negativo. */
+function namesMatch(expected: string, detected: string): boolean {
+  const ex = normalizeName(expected).split(" ").filter((t) => t.length >= 3);
+  const de = normalizeName(detected).split(" ").filter((t) => t.length >= 1);
+  if (ex.length === 0 || de.length === 0) return false;
+  let matched = 0;
+  for (const tok of ex) {
+    const found = de.some((d) => d === tok || d.startsWith(tok) || tok.startsWith(d));
+    if (found) matched++;
+  }
+  // Requerimos al menos 2 matches (o todos si el expected tiene < 2).
+  const required = Math.min(2, ex.length);
+  return matched >= required;
+}
+
+/** Hoy en zona horaria Colombia (UTC-5, sin DST) como YYYY-MM-DD. */
+function todayInColombia(): string {
+  const now = new Date();
+  // Sumamos -5h (Colombia es UTC-5) y devolvemos la fecha local.
+  const cop = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+  return cop.toISOString().slice(0, 10);
+}
+
+/** Compara dos fechas YYYY-MM-DD. Devuelve "today_or_newer" si la
+ *  detected es >= hoy_COP; "older" si es estrictamente anterior;
+ *  "missing" si no se pudo extraer. */
+function checkDate(detectedISO: string | null): "today_or_newer" | "older" | "missing" {
+  if (!detectedISO || !/^\d{4}-\d{2}-\d{2}$/.test(detectedISO)) return "missing";
+  const today = todayInColombia();
+  return detectedISO >= today ? "today_or_newer" : "older";
+}
+
 export async function verifyPaymentScreenshot(args: {
   imageBase64: string;
   imageMediaType: "image/jpeg" | "image/png" | "image/webp";
@@ -100,12 +176,15 @@ export async function verifyPaymentScreenshot(args: {
   }
   const client = new Anthropic({ apiKey });
 
+  const today = todayInColombia();
   const userText = `Verificá si este screenshot muestra un pago EXITOSO de exactamente $${args.expected.amountCOP.toLocaleString("es-CO")} COP a:
   - Método: ${methodLabel(args.expected.method)}
   - Cuenta destino: ${args.expected.account}
+  - Beneficiario: ${args.expected.recipientName}
 
-Si las tres cosas (monto exacto, cuenta destino, método) matchean → valid: true.
-Cualquier otro caso → valid: false con rejection_reason específica.`;
+Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fecha.
+
+valid debe ser true SOLO si los 4 datos (monto, cuenta, método, beneficiario) coinciden con lo esperado y la transacción figura como exitosa. Cualquier discrepancia → valid: false con rejection_reason específica.`;
 
   const response = await client.messages.create({
     model: HAIKU_MODEL,
@@ -149,6 +228,7 @@ Cualquier otro caso → valid: false con rejection_reason específica.`;
     detected_account?: string | null;
     detected_method?: string | null;
     detected_recipient_name?: string | null;
+    detected_date?: string | null;
     notes?: string;
     rejection_reason?: string | null;
   } = {};
@@ -164,6 +244,8 @@ Cualquier otro caso → valid: false con rejection_reason específica.`;
       detectedAccount: null,
       detectedMethod: null,
       detectedRecipientName: null,
+      detectedDate: null,
+      checks: { amount: false, account: false, name: false, date: "missing" },
       notes: `Respuesta no-JSON: ${text.slice(0, 200)}`,
       rejectionReason: "No pudimos parsear la respuesta del verificador.",
       tokensIn,
@@ -187,9 +269,22 @@ Cualquier otro caso → valid: false con rejection_reason específica.`;
   const amountMatches =
     typeof parsed.detected_amount === "number" &&
     parsed.detected_amount === args.expected.amountCOP;
+  const nameMatches = namesMatch(
+    args.expected.recipientName,
+    parsed.detected_recipient_name ?? "",
+  );
+  const dateCheck = checkDate(parsed.detected_date ?? null);
 
-  const finallyValid =
-    !!parsed.valid && parsed.confidence === "high" && accountMatches && amountMatches;
+  // Decisión final:
+  //   - valid:true requiere amount, account, name, confidence high.
+  //   - date "older" o "missing" NO bloquea — solo agrega un warning.
+  const coreMatch =
+    !!parsed.valid &&
+    parsed.confidence === "high" &&
+    accountMatches &&
+    amountMatches &&
+    nameMatches;
+  const finallyValid = coreMatch;
 
   let rejectionReason = parsed.rejection_reason ?? null;
   if (!finallyValid && !rejectionReason) {
@@ -197,9 +292,21 @@ Cualquier otro caso → valid: false con rejection_reason específica.`;
       rejectionReason = `Monto detectado (${parsed.detected_amount ?? "—"}) no coincide con el esperado ($${args.expected.amountCOP}).`;
     } else if (!accountMatches) {
       rejectionReason = `Cuenta detectada (${parsed.detected_account ?? "—"}) no coincide con la esperada (${args.expected.account}).`;
+    } else if (!nameMatches) {
+      rejectionReason = `Nombre detectado ("${parsed.detected_recipient_name ?? "—"}") no coincide con el esperado ("${args.expected.recipientName}").`;
     } else if (parsed.confidence === "low") {
       rejectionReason = "El verificador no pudo leer el screenshot con confianza alta.";
     }
+  }
+
+  // Si todo matchea pero la fecha es vieja, agregamos warning a notes.
+  let notes = parsed.notes ?? "";
+  if (finallyValid && dateCheck === "older") {
+    const dateNote = `Fecha detectada (${parsed.detected_date}) es anterior a hoy en Colombia (${todayInColombia()}). Posible screenshot reusado — revisá manualmente.`;
+    notes = notes ? `${notes} · ${dateNote}` : dateNote;
+  } else if (finallyValid && dateCheck === "missing") {
+    const dateNote = `No se pudo extraer la fecha del screenshot.`;
+    notes = notes ? `${notes} · ${dateNote}` : dateNote;
   }
 
   return {
@@ -209,7 +316,14 @@ Cualquier otro caso → valid: false con rejection_reason específica.`;
     detectedAccount: parsed.detected_account ?? null,
     detectedMethod: parsed.detected_method ?? null,
     detectedRecipientName: parsed.detected_recipient_name ?? null,
-    notes: parsed.notes ?? "",
+    detectedDate: parsed.detected_date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.detected_date) ? parsed.detected_date : null,
+    checks: {
+      amount: amountMatches,
+      account: accountMatches,
+      name: nameMatches,
+      date: dateCheck,
+    },
+    notes,
     rejectionReason,
     tokensIn,
     tokensOut,
