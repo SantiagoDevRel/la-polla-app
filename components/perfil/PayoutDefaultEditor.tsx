@@ -27,28 +27,24 @@ const METHOD_OPTIONS: Array<{
   label: string;
   accountPlaceholder: string;
   needsName: boolean;
-  helper: string;
 }> = [
   {
     id: "nequi",
     label: "Nequi",
     accountPlaceholder: "Número de celular (ej: 311 314 7831)",
     needsName: false,
-    helper: "Nequi se identifica solo por celular.",
   },
   {
     id: "bancolombia",
     label: "Bancolombia",
     accountPlaceholder: "Número de cuenta",
     needsName: true,
-    helper: "El nombre debe ser EXACTAMENTE como aparece en la cuenta del banco — lo usamos para validar el screenshot del pago.",
   },
   {
     id: "otro",
     label: "Otro",
     accountPlaceholder: "Banco + tipo + número",
     needsName: true,
-    helper: "El nombre debe ser EXACTAMENTE como aparece en la cuenta — lo usamos para validar el screenshot del pago.",
   },
 ];
 
@@ -158,15 +154,9 @@ export default function PayoutDefaultEditor({
   // ── EDIT MODE ───────────────────────────────────────────────────────
   return (
     <section className="rounded-2xl p-5 lp-card space-y-3">
-      <div className="flex items-start gap-3">
-        <CreditCard className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-text-primary">Cuenta para cobrar</h3>
-          <p className="text-xs text-text-muted mt-0.5">
-            Cuando ganes una polla, todos te pagarán directamente a esta cuenta.
-          </p>
-        </div>
-      </div>
+      <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+        <CreditCard className="w-5 h-5 text-gold" /> Cuenta para cobrar
+      </h3>
 
       <div className="flex flex-wrap gap-1.5">
         {METHOD_OPTIONS.map((m) => (
@@ -194,19 +184,14 @@ export default function PayoutDefaultEditor({
       />
 
       {needsName ? (
-        <div>
-          <input
-            type="text"
-            value={accountName}
-            onChange={(e) => setAccountName(e.target.value)}
-            placeholder="Nombre completo como aparece en la cuenta"
-            className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
-          />
-          <p className="text-[11px] text-text-muted mt-1.5">{cur.helper}</p>
-        </div>
-      ) : (
-        <p className="text-[11px] text-text-muted">{cur.helper}</p>
-      )}
+        <input
+          type="text"
+          value={accountName}
+          onChange={(e) => setAccountName(e.target.value)}
+          placeholder="Nombre como aparece en la cuenta"
+          className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
+        />
+      ) : null}
 
       <div className="flex gap-2">
         <button
