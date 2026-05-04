@@ -54,6 +54,8 @@ import DefaultPayoutPrompt from "@/components/inicio/DefaultPayoutPrompt";
 import UnpaidPollasBanner from "@/components/inicio/UnpaidPollasBanner";
 import { RivalChip } from "@/components/inicio/RivalChip";
 import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
+import PredictNowCTA from "@/components/inicio/PredictNowCTA";
+import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
 // ─── Local types ───────────────────────────────────────────────────────
@@ -603,6 +605,10 @@ export default async function InicioPage() {
   const displayName = publicUser?.display_name || user.phone || "Usuario";
   const firstName = displayName.split(" ")[0];
 
+  // Resumen de pronósticos pendientes — dedupe-ado con el cálculo del
+  // layout (badge del bottom nav) vía React `cache`.
+  const pendingSummary = await getPendingPredictionsSummary(user.id);
+
   // Enriched pollas + sort + cap.
   const allPollas = await fetchEnrichedPollas(user.id);
   const sortedPollas = sortPollasForCarousel(allPollas);
@@ -817,6 +823,11 @@ export default async function InicioPage() {
           <section className="px-4">
             <UnpaidPollasBanner />
           </section>
+
+          {/* CTA principal: pronósticos pendientes (one-tap desde home
+              al primer match sin pronosticar). Se monta solo cuando hay
+              count > 0; oculto cuando el user está al día. */}
+          <PredictNowCTA count={pendingSummary.count} first={pendingSummary.first} />
 
           {/* Pagos pendientes — banner global pinned arriba con todas
               las transacciones unpaid del viewer en cualquier polla

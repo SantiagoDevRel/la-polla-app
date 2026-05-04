@@ -17,23 +17,27 @@ import FontScaleApplier from "@/components/layout/FontScaleApplier";
 import SWAutoReload from "@/components/layout/SWAutoReload";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
 
 export const dynamic = "force-dynamic";
 
-async function getNavContext(): Promise<{ unread: number }> {
+async function getNavContext(): Promise<{ unread: number; pollasPending: number }> {
   try {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { unread: 0 };
+    if (!user) return { unread: 0, pollasPending: 0 };
     const admin = createAdminClient();
     const { count } = await admin
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .is("read_at", null);
-    return { unread: count ?? 0 };
+    // getPendingPredictionsSummary es cache()-ado: si /inicio también
+    // lo llama dentro del mismo request, comparten el resultado.
+    const pending = await getPendingPredictionsSummary(user.id);
+    return { unread: count ?? 0, pollasPending: pending.count };
   } catch {
-    return { unread: 0 };
+    return { unread: 0, pollasPending: 0 };
   }
 }
 
@@ -42,7 +46,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { unread } = await getNavContext();
+  const { unread, pollasPending } = await getNavContext();
 
   return (
     <ToastProvider>
@@ -56,7 +60,11 @@ export default async function AppLayout({
             quedaban pegados al header. */}
         <div className="pt-3">{children}</div>
       </div>
-      <BottomNav createHref="/pollas/crear" notifUnread={unread} />
+      <BottomNav
+        createHref="/pollas/crear"
+        notifUnread={unread}
+        pollasPending={pollasPending}
+      />
     </ToastProvider>
   );
 }
