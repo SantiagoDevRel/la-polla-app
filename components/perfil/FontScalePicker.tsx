@@ -53,9 +53,6 @@ export default function FontScalePicker() {
         <Type className="w-3.5 h-3.5" style={{ color: "#FFD700" }} />
         Tamaño del texto
       </div>
-      <p className="text-[11px] text-text-muted mb-3">
-        Cambia el tamaño de toda la app. Se guarda en este dispositivo.
-      </p>
       <div
         role="radiogroup"
         aria-label="Tamaño del texto"
