@@ -5,7 +5,8 @@
 //
 //   1. Auth + valida que el viewer es participante de la polla
 //      con paid=false todavía.
-//   2. Cap: máximo 1 screenshot por (polla, user) — defensa anti-abuso.
+//   2. Cap: máximo 3 screenshots por (polla, user) — defensa anti-abuso.
+//      Después de 3 intentos, organizador tiene que aprobar manual.
 //   3. Throttle global: máximo 10 uploads por user en las últimas 24h
 //      (cualquier polla). Si pasa, flaggeamos en claude_api_usage.
 //   4. Preprocesa la imagen client-side ya — el endpoint trustea que
@@ -35,6 +36,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_UPLOADS_PER_USER_24H = 10;
+const MAX_PROOFS_PER_POLLA = 3;
 const ENDPOINT_NAME = "pollas/payment-proof";
 
 export async function POST(
@@ -101,22 +103,21 @@ export async function POST(
     );
   }
 
-  // 3. Cap: 1 proof por (polla, user)
-  const { data: existingProof } = await admin
+  // 3. Cap: hasta MAX_PROOFS_PER_POLLA por (polla, user). Permite reintentar
+  //    si la AI rechazó por mala foto, pero corta el abuso. Después del cap,
+  //    el organizador tiene que aprobar manual.
+  const { data: existingProofs } = await admin
     .from("payment_proofs")
     .select("id, admin_decision")
     .eq("polla_id", polla.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (existingProof && existingProof.admin_decision !== false) {
-    // Si admin ya rechazó (admin_decision=false), permitimos un segundo
-    // upload. Si está pendiente o aprobado, no.
+    .eq("user_id", user.id);
+  const proofsCount = existingProofs?.length ?? 0;
+  if (proofsCount >= MAX_PROOFS_PER_POLLA) {
     return NextResponse.json(
       {
-        error:
-          "Ya subiste un comprobante. Esperá a que el organizador lo revise.",
+        error: `Ya subiste ${MAX_PROOFS_PER_POLLA} comprobantes para esta polla. Pedile al organizador que apruebe el pago manualmente.`,
       },
-      { status: 409 },
+      { status: 429 },
     );
   }
 

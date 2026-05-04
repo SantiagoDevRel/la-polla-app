@@ -13,8 +13,13 @@
 
 import { useState } from "react";
 import axios from "axios";
-import { Upload, Check, AlertTriangle, X as XIcon, Copy, ShieldCheck } from "lucide-react";
+import { Upload, Check, AlertTriangle, X as XIcon, Copy, ShieldCheck, Clock } from "lucide-react";
 import { preprocessImageForVision } from "@/lib/vision/preprocess-image";
+
+type SubmitStatus = {
+  kind: "pending_review" | "verifier_unavailable";
+  reason: string | null;
+} | null;
 
 interface Props {
   pollaSlug: string;
@@ -53,10 +58,12 @@ export default function PaymentProofUpload({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState<SubmitStatus>(null);
 
   function pickFile(f: File | null) {
     setFile(f);
     setError(null);
+    setStatus(null);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(f ? URL.createObjectURL(f) : null);
   }
@@ -76,6 +83,7 @@ export default function PaymentProofUpload({
     if (!file || submitting) return;
     setSubmitting(true);
     setError(null);
+    setStatus(null);
     try {
       const pre = await preprocessImageForVision(file);
       const fd = new FormData();
@@ -83,17 +91,27 @@ export default function PaymentProofUpload({
       const { data } = await axios.post<{
         ok: boolean;
         autoApproved: boolean;
-        valid: boolean;
-        rejectionReason: string | null;
-        sourceType: string;
+        valid?: boolean;
+        rejectionReason?: string | null;
+        sourceType?: string;
+        reason?: string;
       }>(`/api/pollas/${pollaSlug}/payment-proof`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       if (data.autoApproved) {
+        // Parent va a desmontarnos al refetchar y ver paid=true.
         onApproved();
-      } else {
-        onPendingReview(data.rejectionReason);
+        return;
       }
+      const fallbackReason = data.reason ?? null;
+      const kind: SubmitStatus = data.valid === undefined && fallbackReason
+        ? { kind: "verifier_unavailable", reason: fallbackReason }
+        : { kind: "pending_review", reason: data.rejectionReason ?? null };
+      setStatus(kind);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      setFile(null);
+      onPendingReview(data.rejectionReason ?? null);
     } catch (err) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
@@ -165,6 +183,26 @@ export default function PaymentProofUpload({
           <li>El organizador puede revertir tu pago a no-aprobado si detecta algo raro.</li>
         </ul>
       </div>
+
+      {/* Status del último intento — visible cuando AI no auto-aprobó.
+          Se limpia cuando el user elige un archivo nuevo. */}
+      {status ? (
+        <div className="rounded-xl px-3 py-2.5 bg-amber/5 border border-amber/30 space-y-1">
+          <p className="text-[12px] text-amber font-semibold flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            {status.kind === "verifier_unavailable"
+              ? "Comprobante recibido — revisión manual"
+              : "Comprobante recibido — pendiente de revisión"}
+          </p>
+          <p className="text-[11px] text-text-secondary leading-snug">
+            {status.kind === "verifier_unavailable"
+              ? (status.reason ?? "El verificador automático no está disponible ahora. El organizador revisará tu comprobante manualmente.")
+              : status.reason
+                ? `La AI no pudo confirmarlo (${status.reason}). El organizador lo va a revisar manualmente. Si querés podés subir otro intento.`
+                : "La AI no pudo confirmarlo automáticamente. El organizador lo va a revisar manualmente. Si querés podés subir otro intento."}
+          </p>
+        </div>
+      ) : null}
 
       {/* File picker */}
       <label className="flex items-center justify-center gap-2 w-full bg-bg-elevated border border-dashed border-border-subtle rounded-xl px-4 py-5 cursor-pointer hover:border-gold/40 transition-colors text-[13px] text-text-secondary">
