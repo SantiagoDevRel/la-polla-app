@@ -54,23 +54,7 @@ const createPollaSchema = z
       })
       .optional(),
   })
-  // Validación condicional: si el modo es admin_collects, las instrucciones son obligatorias
-  .refine(
-    (data) => {
-      if (data.paymentMode === "admin_collects") {
-        return (
-          data.adminPaymentInstructions !== undefined &&
-          data.adminPaymentInstructions.trim().length > 0
-        );
-      }
-      return true;
-    },
-    {
-      message: "Las instrucciones de pago son obligatorias cuando el admin recoge el pozo",
-      path: ["adminPaymentInstructions"],
-    }
-  )
-  // admin_collects requiere también admin_payout_method + account
+  // admin_collects requiere admin_payout_method + account
   // (estructurado para que la AI verifique screenshots).
   .refine(
     (data) => {

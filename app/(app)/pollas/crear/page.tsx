@@ -1,7 +1,7 @@
 // app/(app)/pollas/crear/page.tsx — Wizard de 3 pasos para crear una nueva polla
 // Paso 1: Info (nombre, torneo, tipo)
 // Paso 2: Partidos (selección de partidos del torneo)
-// Paso 3: Configuración (cuota de entrada + modo de pago + instrucciones)
+// Paso 3: Configuración (cuota de entrada + modo de pago)
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -30,7 +30,6 @@ interface FormState {
   type: "closed";
   buyInAmount: number;
   paymentMode: PaymentMode;
-  adminPaymentInstructions: string;
   // Cuenta estructurada del admin para AI-assist screenshot (solo
   // aplica cuando paymentMode === 'admin_collects'). Pre-llenado de
   // users.default_payout_* si el admin ya lo seteó en /perfil.
@@ -98,7 +97,6 @@ export default function CrearPollaPage() {
     // "10000" en gris para sugerir el mínimo sin pre-llenarlo.
     buyInAmount: 0,
     paymentMode: "pay_winner",
-    adminPaymentInstructions: "",
     adminPayoutMethod: null,
     adminPayoutAccount: "",
     adminPayoutAccountName: "",
@@ -371,9 +369,6 @@ export default function CrearPollaPage() {
     setError("");
     if (form.buyInAmount < 1000) { setError("El valor mínimo es $1.000"); return; }
     if (form.paymentMode === "admin_collects") {
-      if (form.adminPaymentInstructions.trim() === "") {
-        setError("Debes indicar instrucciones de pago"); return;
-      }
       if (!form.adminPayoutMethod) {
         setError("Elegí el método para recibir el pago (Nequi, Bancolombia u Otro)"); return;
       }
@@ -399,7 +394,6 @@ export default function CrearPollaPage() {
         type: form.type,
         buyInAmount: form.buyInAmount,
         paymentMode: form.paymentMode,
-        adminPaymentInstructions: form.adminPaymentInstructions,
         adminPayoutMethod: form.adminPayoutMethod ?? undefined,
         adminPayoutAccount: form.adminPayoutAccount.trim() || undefined,
         adminPayoutAccountName:
@@ -788,7 +782,7 @@ export default function CrearPollaPage() {
           </div>
         )}
 
-        {/* ═══ PASO 3 — Configuración (cuota + modo de pago + instrucciones) ═══ */}
+        {/* ═══ PASO 3 — Configuración (cuota + modo de pago) ═══ */}
         {step === 3 && (
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
             {/* Sección 1: Cuota de entrada */}
@@ -961,21 +955,6 @@ export default function CrearPollaPage() {
                   </div>
                 )}
 
-                <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-                  <div>
-                    <h2 className="text-base font-bold text-text-primary">Instrucciones extra</h2>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      Detalles libres que ven los participantes (opcional). Ej: pongan &apos;pago polla&apos; en la referencia.
-                    </p>
-                  </div>
-                  <textarea
-                    value={form.adminPaymentInstructions}
-                    onChange={(e) => updateForm("adminPaymentInstructions", e.target.value)}
-                    placeholder="Ej: Pongan 'pago polla' en la referencia"
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-xl outline-none resize-none transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
-                  />
-                </div>
               </>
             )}
 
