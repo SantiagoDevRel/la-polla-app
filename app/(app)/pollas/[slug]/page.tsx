@@ -1033,6 +1033,9 @@ export default function PollaSlugPage() {
               </div>
             ) : (
               <div className="space-y-5 pb-32">
+                <p className="text-[11px] uppercase tracking-[0.08em] text-text-muted px-1">
+                  Resultado de los 90&apos;
+                </p>
                 {/* ── Finalizados — plain collapsible header, match cards
                     render directly below without a surrounding card so
                     we avoid the "card-in-card" look. ── */}
