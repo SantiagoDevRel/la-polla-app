@@ -7,7 +7,9 @@
 //
 // Métodos soportados (intencionalmente reducidos):
 //   - 'nequi':       valida monto + cuenta (celular). NO valida nombre.
-//   - 'bancolombia': valida monto + cuenta + nombre del beneficiario.
+//   - 'bancolombia': valida monto + cuenta. NO valida nombre — cuando
+//                    transferís a una cuenta inscrita, Bancolombia no
+//                    muestra el nombre del beneficiario en el comprobante.
 //   - 'otro':        Haiku extrae lo que puede, pero la decisión final
 //                    SIEMPRE queda como "low confidence" para que el
 //                    organizador la valide manualmente.
@@ -15,7 +17,7 @@
 // El "method" detectado del screenshot NO se compara contra el expected
 // porque las apps no muestran el nombre del banco con un standard
 // (a veces dice "Bancolombia", a veces "BANCOLOMBIA S.A.", a veces
-// nada — solo el logo). Confiamos en el match de monto + cuenta + nombre.
+// nada — solo el logo). Confiamos en el match de monto + cuenta.
 //
 // La fecha del screenshot es informacional (warning si es vieja, no
 // bloquea aprobación).
@@ -29,10 +31,11 @@ export interface VerifyExpected {
   /** Cuenta destino esperada. Para nequi: celular. Para bancolombia:
    *  número de cuenta. Para otro: lo que el organizador haya puesto. */
   account: string;
-  /** Nombre completo del beneficiario, como aparece en la cuenta.
-   *  REQUERIDO para bancolombia + otro. IGNORADO para nequi.
-   *  Match tolerante a abreviaturas: "Juan Pablo Pérez" matchea con
-   *  "JUAN P PEREZ". Tildes y Ñ se normalizan. */
+  /** Nombre completo del beneficiario. Históricamente requerido para
+   *  bancolombia, pero las cuentas inscritas en Colombia ya no lo
+   *  muestran en el comprobante — por eso lo ignoramos en la decisión.
+   *  Lo dejamos en el tipo para que callers viejos no rompan, pero
+   *  la lógica de aprobación NO lo usa. */
   recipientName?: string;
   /** Monto exacto esperado en COP. Sin centavos. Sin tolerancia. */
   amountCOP: number;
@@ -161,7 +164,9 @@ Para esta verificación específica (método Nequi):
       return base + `
 
 Para esta verificación específica (método Bancolombia):
-- valid=true requiere: monto exacto + cuenta coincidente + nombre del beneficiario que claramente coincida (tolerante a abreviaturas) + status exitoso.`;
+- valid=true requiere: monto exacto + cuenta coincidente + status exitoso.
+- NO valides el nombre del beneficiario. Bancolombia no lo muestra
+  cuando transferís a una cuenta inscrita.`;
     case "otro":
       return base + `
 
@@ -236,14 +241,10 @@ export async function verifyPaymentScreenshot(args: {
   const client = new Anthropic({ apiKey });
 
   const today = todayInColombia();
-  const expectedNameLine =
-    args.expected.method !== "nequi" && args.expected.recipientName
-      ? `\n  - Beneficiario: ${args.expected.recipientName}`
-      : "";
 
   const userText = `Verificá si este screenshot muestra un pago EXITOSO de exactamente $${args.expected.amountCOP.toLocaleString("es-CO")} COP a:
   - Método: ${methodLabel(args.expected.method)}
-  - Cuenta destino: ${args.expected.account}${expectedNameLine}
+  - Cuenta destino: ${args.expected.account}
 
 Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fecha.`;
 
@@ -339,28 +340,18 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     typeof parsed.detected_amount === "number" &&
     parsed.detected_amount === args.expected.amountCOP;
 
-  // Name check — depende del método.
-  let nameMatches: boolean;
-  if (args.expected.method === "nequi") {
-    // Nequi no siempre muestra el nombre. No bloqueamos por esto.
-    nameMatches = true;
-  } else if (args.expected.recipientName) {
-    nameMatches = namesMatch(
-      args.expected.recipientName,
-      parsed.detected_recipient_name ?? "",
-    );
-  } else {
-    // Bancolombia / Otro sin recipientName declarado: asumimos pass
-    // (el caller no lo proveyó).
-    nameMatches = true;
-  }
+  // Name check — desactivado en todos los métodos. Bancolombia no
+  // muestra el nombre cuando transferís a cuenta inscrita, y Nequi
+  // tampoco lo expone consistentemente. Confiamos en monto + cuenta.
+  const nameMatches = true;
 
   const dateCheck = checkDate(parsed.detected_date ?? null);
 
   // Decisión por método:
   //   - bank_app/wallet REQUERIDO siempre.
   //   - nequi: source + amount + account + status
-  //   - bancolombia: source + amount + account + name + status
+  //   - bancolombia: source + amount + account + status (sin nombre,
+  //                  cuenta inscrita no lo muestra)
   //   - otro: SIEMPRE confidence:low → admin review manual
   let coreMatch =
     !!parsed.valid &&
@@ -393,8 +384,6 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
       rejectionReason = `Monto detectado (${parsed.detected_amount ?? "—"}) no coincide con el esperado ($${args.expected.amountCOP}).`;
     } else if (!accountMatches) {
       rejectionReason = `Cuenta detectada (${parsed.detected_account ?? "—"}) no coincide con la esperada (${args.expected.account}).`;
-    } else if (!nameMatches) {
-      rejectionReason = `Nombre detectado ("${parsed.detected_recipient_name ?? "—"}") no coincide con el esperado ("${args.expected.recipientName ?? "—"}").`;
     } else if (parsed.confidence === "low") {
       rejectionReason = "El verificador no pudo leer el screenshot con confianza alta.";
     }
