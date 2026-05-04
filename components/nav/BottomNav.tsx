@@ -23,6 +23,11 @@ export interface BottomNavProps {
   onCreatePolla?: () => void;
   /** Count of unread avisos; shows a red badge on the Avisos tab when > 0. */
   notifUnread?: number;
+  /** Count of partidos por pronosticar across all the viewer's active
+   *  pollas; gold badge on the Pollas tab when > 0. Distinto color que
+   *  Avisos para que el viewer mayor distinga "tenés algo que hacer
+   *  acá" (gold) vs "te avisaron de algo" (red). */
+  pollasPending?: number;
 }
 
 const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; label: string }> = [
@@ -52,14 +57,21 @@ function TabItem({
   tab,
   active,
   badge,
+  badgeTone = "red",
+  badgeLabelPrefix,
 }: {
   tab: (typeof TABS)[number];
   active: boolean;
   badge?: number;
+  /** "red" para avisos sin leer; "gold" para acciones pendientes (pronósticos). */
+  badgeTone?: "red" | "gold";
+  /** Prefijo del aria-label del badge. Default "sin leer". */
+  badgeLabelPrefix?: string;
 }) {
   const { Icon, label, href } = tab;
   const showBadge = typeof badge === "number" && badge > 0;
   const badgeLabel = showBadge ? (badge! > 9 ? "9+" : String(badge)) : null;
+  const badgeBg = badgeTone === "gold" ? "bg-gold text-bg-base" : "bg-red-alert text-white";
   return (
     <Link
       href={href}
@@ -72,8 +84,11 @@ function TabItem({
         <Icon className="w-[22px] h-[22px]" strokeWidth={2} aria-hidden="true" />
         {showBadge && (
           <span
-            className="absolute -top-1 -right-2 min-w-[14px] h-[14px] px-[3px] rounded-full bg-red-alert text-white text-[9px] font-bold leading-[14px] text-center border-[2px] border-bg-base"
-            aria-label={`${badge} sin leer`}
+            className={cn(
+              "absolute -top-1 -right-2 min-w-[14px] h-[14px] px-[3px] rounded-full text-[9px] font-bold leading-[14px] text-center border-[2px] border-bg-base",
+              badgeBg,
+            )}
+            aria-label={`${badge} ${badgeLabelPrefix ?? "sin leer"}`}
           >
             {badgeLabel}
           </span>
@@ -84,7 +99,13 @@ function TabItem({
   );
 }
 
-export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }: BottomNavProps) {
+export function BottomNav({
+  active,
+  createHref,
+  onCreatePolla,
+  notifUnread = 0,
+  pollasPending = 0,
+}: BottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast();
@@ -128,7 +149,13 @@ export function BottomNav({ active, createHref, onCreatePolla, notifUnread = 0 }
         <div className="relative h-full flex items-center px-4">
           <div className="flex-1 flex">
             <TabItem tab={left} active={resolvedActive === left.key} />
-            <TabItem tab={middleLeft} active={resolvedActive === middleLeft.key} />
+            <TabItem
+              tab={middleLeft}
+              active={resolvedActive === middleLeft.key}
+              badge={pollasPending}
+              badgeTone="gold"
+              badgeLabelPrefix="por pronosticar"
+            />
           </div>
 
           {/* Reserved center slot — 64px wide. Stops the FAB from sitting
