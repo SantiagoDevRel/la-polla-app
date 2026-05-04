@@ -5,8 +5,10 @@
 //
 //   1. Auth + valida que el viewer es participante de la polla
 //      con paid=false todavía.
-//   2. Cap: máximo 3 screenshots por (polla, user) — defensa anti-abuso.
-//      Después de 3 intentos, organizador tiene que aprobar manual.
+//   2. Cap: máximo 2 screenshots por (polla, user) — defensa anti-abuso.
+//      Después de 2 intentos, organizador tiene que aprobar manual.
+//      Excepción: testers en TESTER_USER_IDS bypassan el cap (Santi
+//      necesita iterar sin chocar contra la regla mientras audita).
 //   3. Throttle global: máximo 10 uploads por user en las últimas 24h
 //      (cualquier polla). Si pasa, flaggeamos en claude_api_usage.
 //   4. Preprocesa la imagen client-side ya — el endpoint trustea que
@@ -36,8 +38,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_UPLOADS_PER_USER_24H = 10;
-const MAX_PROOFS_PER_POLLA = 3;
+const MAX_PROOFS_PER_POLLA = 2;
 const ENDPOINT_NAME = "pollas/payment-proof";
+
+// Bypass para testers — saltan el cap de comprobantes por polla. NO
+// saltan el throttle de 10/24h ni la verificación AI. Hardcoded a
+// propósito: son IDs estables del owner del proyecto y mantenerlos
+// acá hace el bypass auditable en git.
+const TESTER_USER_IDS = new Set<string>([
+  "2c765059-4f94-462a-90f5-8c207fd913f8", // Santi 🇨🇴 (+57 311 7312391)
+  "fcb50add-ba50-4141-ab81-8faea347e689", // Santi PT (+351 934 255 581)
+]);
 
 export async function POST(
   request: NextRequest,
@@ -105,20 +116,22 @@ export async function POST(
 
   // 3. Cap: hasta MAX_PROOFS_PER_POLLA por (polla, user). Permite reintentar
   //    si la AI rechazó por mala foto, pero corta el abuso. Después del cap,
-  //    el organizador tiene que aprobar manual.
-  const { data: existingProofs } = await admin
-    .from("payment_proofs")
-    .select("id, admin_decision")
-    .eq("polla_id", polla.id)
-    .eq("user_id", user.id);
-  const proofsCount = existingProofs?.length ?? 0;
-  if (proofsCount >= MAX_PROOFS_PER_POLLA) {
-    return NextResponse.json(
-      {
-        error: `Ya subiste ${MAX_PROOFS_PER_POLLA} comprobantes para esta polla. Pedile al organizador que apruebe el pago manualmente.`,
-      },
-      { status: 429 },
-    );
+  //    el organizador tiene que aprobar manual. Testers bypassan.
+  if (!TESTER_USER_IDS.has(user.id)) {
+    const { data: existingProofs } = await admin
+      .from("payment_proofs")
+      .select("id, admin_decision")
+      .eq("polla_id", polla.id)
+      .eq("user_id", user.id);
+    const proofsCount = existingProofs?.length ?? 0;
+    if (proofsCount >= MAX_PROOFS_PER_POLLA) {
+      return NextResponse.json(
+        {
+          error: `Ya subiste ${MAX_PROOFS_PER_POLLA} comprobantes para esta polla. Pedile al organizador que apruebe el pago manualmente.`,
+        },
+        { status: 429 },
+      );
+    }
   }
 
   // 4. Throttle global por user — 10 uploads en 24h.

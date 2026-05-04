@@ -473,12 +473,7 @@ export default function CrearPollaPage() {
             </div>
 
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-              <div>
-                <h2 className="text-base font-bold text-text-primary">Torneos <span className="text-red-alert">*</span></h2>
-                <p className="text-[11px] text-text-muted mt-0.5">
-                  Podés elegir más de uno para hacer una polla combinada.
-                </p>
-              </div>
+              <h2 className="text-base font-bold text-text-primary">Torneos <span className="text-red-alert">*</span></h2>
               <div className="space-y-2">
                 {TOURNAMENTS.map((t) => {
                   const isSelected = form.tournaments.includes(t.slug);
@@ -861,14 +856,9 @@ export default function CrearPollaPage() {
                 {payoutLocked && form.adminPayoutMethod && form.adminPayoutAccount ? (
                   <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h2 className="text-base font-bold text-text-primary">
-                          Recibís pagos en
-                        </h2>
-                        <p className="text-xs text-text-muted mt-0.5">
-                          Tu cuenta default del perfil. Los participantes le transfieren acá.
-                        </p>
-                      </div>
+                      <h2 className="text-base font-bold text-text-primary min-w-0">
+                        Recibís pagos en
+                      </h2>
                       <button
                         type="button"
                         onClick={() => setPayoutLocked(false)}
@@ -898,14 +888,9 @@ export default function CrearPollaPage() {
                   </div>
                 ) : (
                   <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-                    <div>
-                      <h2 className="text-base font-bold text-text-primary">
-                        Tu cuenta para recibir pagos <span className="text-red-alert">*</span>
-                      </h2>
-                      <p className="text-xs text-text-muted mt-0.5">
-                        Los participantes van a transferir a esta cuenta. La AI valida los comprobantes contra estos datos.
-                      </p>
-                    </div>
+                    <h2 className="text-base font-bold text-text-primary">
+                      Tu cuenta para recibir pagos <span className="text-red-alert">*</span>
+                    </h2>
 
                     <div className="flex flex-wrap gap-1.5">
                       {(["nequi", "bancolombia", "otro"] as const).map((m) => (
@@ -967,10 +952,6 @@ export default function CrearPollaPage() {
                   Opcional
                 </span>
               </div>
-              <p className="text-xs text-text-muted">
-                Define cómo se reparten los premios entre los puestos. Puedes modificarlo después
-                desde el panel del organizador.
-              </p>
               <PrizeDistributionForm
                 pot={0}
                 initial={prizeDistribution}

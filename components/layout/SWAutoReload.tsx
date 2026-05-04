@@ -17,6 +17,10 @@
 //  4) Cuando el tab vuelve a foco (visibilitychange visible),
 //     re-check — agarra deploys hechos mientras el user tenía la
 //     PWA en background.
+//  5) Poll cada 3 min mientras el tab está visible — para usuarios
+//     que se quedan sentados en una pantalla sin navegar (ej. mirando
+//     scoreboard live). Sin el poll, esos clientes podían quedarse
+//     trabados varios minutos en JS viejo después de un deploy.
 "use client";
 
 import { useEffect } from "react";
@@ -65,9 +69,19 @@ export default function SWAutoReload() {
     };
     document.addEventListener("visibilitychange", onVisibility);
 
+    // Poll cada 3 min — atrapa deploys mientras el user está sentado
+    // en una pantalla viva (live scoreboard, lobby de polla, etc).
+    const POLL_MS = 3 * 60 * 1000;
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void checkForUpdate();
+      }
+    }, POLL_MS);
+
     return () => {
       navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(intervalId);
     };
   }, []);
 
