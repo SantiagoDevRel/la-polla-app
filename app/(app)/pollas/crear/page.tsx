@@ -36,6 +36,7 @@ interface FormState {
   adminPayoutMethod: "nequi" | "bancolombia" | "otro" | null;
   adminPayoutAccount: string;
   adminPayoutAccountName: string;
+  adminPayoutAccountType: "ahorros" | "corriente" | null;
 }
 
 interface MatchRow {
@@ -100,6 +101,7 @@ export default function CrearPollaPage() {
     adminPayoutMethod: null,
     adminPayoutAccount: "",
     adminPayoutAccountName: "",
+    adminPayoutAccountType: null,
   });
 
   // payoutLocked = true cuando hay default cargado y el user todavía
@@ -120,6 +122,7 @@ export default function CrearPollaPage() {
             default_payout_method?: "nequi" | "bancolombia" | "otro" | null;
             default_payout_account?: string | null;
             default_payout_account_name?: string | null;
+            default_payout_account_type?: "ahorros" | "corriente" | null;
           };
         }>("/api/users/me");
         if (cancelled) return;
@@ -129,6 +132,7 @@ export default function CrearPollaPage() {
             adminPayoutMethod: data.profile!.default_payout_method ?? null,
             adminPayoutAccount: data.profile!.default_payout_account ?? "",
             adminPayoutAccountName: data.profile!.default_payout_account_name ?? "",
+            adminPayoutAccountType: data.profile!.default_payout_account_type ?? null,
           }));
           setPayoutLocked(true);
         }
@@ -378,6 +382,9 @@ export default function CrearPollaPage() {
       if (form.adminPayoutMethod !== "nequi" && form.adminPayoutAccountName.trim().length < 2) {
         setError(`Para ${form.adminPayoutMethod} hay que poner el nombre como aparece en la cuenta`); return;
       }
+      if (form.adminPayoutMethod !== "nequi" && !form.adminPayoutAccountType) {
+        setError("Elegí si la cuenta es de ahorros o corriente"); return;
+      }
     }
 
     setLoading(true);
@@ -399,6 +406,10 @@ export default function CrearPollaPage() {
         adminPayoutAccountName:
           form.adminPayoutMethod !== "nequi"
             ? form.adminPayoutAccountName.trim() || undefined
+            : undefined,
+        adminPayoutAccountType:
+          form.adminPayoutMethod !== "nequi"
+            ? form.adminPayoutAccountType ?? undefined
             : undefined,
         scope: "custom",
         matchIds: Array.from(selectedMatchIds),
@@ -872,18 +883,19 @@ export default function CrearPollaPage() {
                         className="text-[14px] font-semibold text-text-primary tabular-nums"
                         style={{ fontFeatureSettings: '"tnum"' }}
                       >
+                        {form.adminPayoutAccount}
+                      </p>
+                      <p className="text-[11px] text-text-muted truncate">
+                        {form.adminPayoutAccountType
+                          ? `${form.adminPayoutAccountType === "ahorros" ? "Ahorros" : "Corriente"} `
+                          : ""}
                         {form.adminPayoutMethod === "nequi"
                           ? "Nequi"
                           : form.adminPayoutMethod === "bancolombia"
                             ? "Bancolombia"
-                            : "Otro"}{" "}
-                        · {form.adminPayoutAccount}
+                            : "Otro"}
+                        {form.adminPayoutAccountName ? ` · ${form.adminPayoutAccountName}` : ""}
                       </p>
-                      {form.adminPayoutAccountName ? (
-                        <p className="text-[11px] text-text-muted truncate">
-                          A nombre de {form.adminPayoutAccountName}
-                        </p>
-                      ) : null}
                     </div>
                   </div>
                 ) : (
@@ -925,16 +937,29 @@ export default function CrearPollaPage() {
 
                     {form.adminPayoutMethod && form.adminPayoutMethod !== "nequi" ? (
                       <>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(["ahorros", "corriente"] as const).map((t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => updateForm("adminPayoutAccountType", t)}
+                              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                                form.adminPayoutAccountType === t
+                                  ? "bg-gold text-bg-base border-gold"
+                                  : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
+                              }`}
+                            >
+                              {t === "ahorros" ? "Ahorros" : "Corriente"}
+                            </button>
+                          ))}
+                        </div>
                         <input
                           type="text"
                           value={form.adminPayoutAccountName}
                           onChange={(e) => updateForm("adminPayoutAccountName", e.target.value)}
-                          placeholder="Nombre completo como aparece en la cuenta"
+                          placeholder="Nombre como aparece en la cuenta"
                           className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
                         />
-                        <p className="text-[11px] text-text-muted">
-                          EXACTAMENTE como aparece en tu cuenta del banco. La AI verifica el nombre del beneficiario contra el screenshot.
-                        </p>
                       </>
                     ) : null}
                   </div>

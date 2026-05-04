@@ -22,6 +22,7 @@ interface UnpaidPolla {
   adminPayoutMethod: "nequi" | "bancolombia" | "otro" | null;
   adminPayoutAccount: string | null;
   adminPayoutAccountName: string | null;
+  adminPayoutAccountType: "ahorros" | "corriente" | null;
   adminPaymentInstructions: string | null;
   proofStatus: "none" | "pending_review" | "rejected";
   lastRejectionReason: string | null;
@@ -31,6 +32,11 @@ const METHOD_LABEL: Record<string, string> = {
   nequi: "Nequi",
   bancolombia: "Bancolombia",
   otro: "Otro",
+};
+
+const ACCOUNT_TYPE_LABEL: Record<string, string> = {
+  ahorros: "Ahorros",
+  corriente: "Corriente",
 };
 
 function fmtCOP(n: number): string {
@@ -157,32 +163,35 @@ export default function UnpaidPollasBanner() {
                   </div>
 
                   {it.adminPayoutMethod && it.adminPayoutAccount ? (
-                    <div className="flex items-center gap-2">
-                      <p
-                        className="flex-1 min-w-0 truncate text-[12px] text-text-secondary tabular-nums"
-                        style={{ fontFeatureSettings: '"tnum"' }}
-                      >
-                        {METHOD_LABEL[it.adminPayoutMethod] ?? it.adminPayoutMethod} · {it.adminPayoutAccount}
+                    <>
+                      <div className="flex items-center gap-2">
+                        <p
+                          className="flex-1 min-w-0 truncate text-[14px] font-semibold text-text-primary tabular-nums"
+                          style={{ fontFeatureSettings: '"tnum"' }}
+                        >
+                          {it.adminPayoutAccount}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => copyAccount(it.adminPayoutAccount!, it.pollaSlug)}
+                          className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-border-subtle hover:border-gold/40 text-text-secondary hover:text-gold transition-colors"
+                        >
+                          {copiedSlug === it.pollaSlug ? (<><Check className="w-3 h-3" /> Copiado</>) : (<><Copy className="w-3 h-3" /> Copiar</>)}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-text-secondary truncate">
+                        {it.adminPayoutAccountType
+                          ? `${ACCOUNT_TYPE_LABEL[it.adminPayoutAccountType]} `
+                          : ""}
+                        {METHOD_LABEL[it.adminPayoutMethod] ?? it.adminPayoutMethod}
+                        {it.adminPayoutAccountName ? ` · ${it.adminPayoutAccountName}` : ""}
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => copyAccount(it.adminPayoutAccount!, it.pollaSlug)}
-                        className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-border-subtle hover:border-gold/40 text-text-secondary hover:text-gold transition-colors"
-                      >
-                        {copiedSlug === it.pollaSlug ? (<><Check className="w-3 h-3" /> Copiado</>) : (<><Copy className="w-3 h-3" /> Copiar</>)}
-                      </button>
-                    </div>
+                    </>
                   ) : (
                     <p className="text-[11px] text-text-muted">
                       El organizador todavía no configuró su cuenta de cobro.
                     </p>
                   )}
-
-                  {it.adminPayoutAccountName ? (
-                    <p className="text-[11px] text-text-muted truncate">
-                      A nombre de {it.adminPayoutAccountName}
-                    </p>
-                  ) : null}
 
                   {it.proofStatus === "pending_review" ? (
                     <p className="text-[11px] text-amber">

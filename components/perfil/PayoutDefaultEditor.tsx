@@ -21,30 +21,35 @@ import { useEffect, useState } from "react";
 import { CreditCard, Pencil, Check } from "lucide-react";
 
 export type PayoutMethod = "nequi" | "bancolombia" | "otro";
+export type PayoutAccountType = "ahorros" | "corriente";
 
 const METHOD_OPTIONS: Array<{
   id: PayoutMethod;
   label: string;
   accountPlaceholder: string;
   needsName: boolean;
+  needsAccountType: boolean;
 }> = [
   {
     id: "nequi",
     label: "Nequi",
     accountPlaceholder: "Número de celular (ej: 311 314 7831)",
     needsName: false,
+    needsAccountType: false,
   },
   {
     id: "bancolombia",
     label: "Bancolombia",
     accountPlaceholder: "Número de cuenta",
     needsName: true,
+    needsAccountType: true,
   },
   {
     id: "otro",
     label: "Otro",
     accountPlaceholder: "Banco + tipo + número",
     needsName: true,
+    needsAccountType: true,
   },
 ];
 
@@ -54,14 +59,21 @@ const METHOD_LABEL: Record<PayoutMethod, string> = {
   otro: "Otro",
 };
 
+const ACCOUNT_TYPE_LABEL: Record<PayoutAccountType, string> = {
+  ahorros: "Ahorros",
+  corriente: "Corriente",
+};
+
 interface Props {
   initialMethod?: PayoutMethod | null;
   initialAccount?: string | null;
   initialAccountName?: string | null;
+  initialAccountType?: PayoutAccountType | null;
   onSave: (
     method: PayoutMethod,
     account: string,
     accountName: string | null,
+    accountType: PayoutAccountType | null,
   ) => Promise<void> | void;
   onClear?: () => Promise<void> | void;
 }
@@ -70,6 +82,7 @@ export default function PayoutDefaultEditor({
   initialMethod,
   initialAccount,
   initialAccountName,
+  initialAccountType,
   onSave,
   onClear,
 }: Props) {
@@ -78,6 +91,9 @@ export default function PayoutDefaultEditor({
   const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "nequi");
   const [account, setAccount] = useState(initialAccount ?? "");
   const [accountName, setAccountName] = useState(initialAccountName ?? "");
+  const [accountType, setAccountType] = useState<PayoutAccountType | null>(
+    initialAccountType ?? null,
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -85,20 +101,26 @@ export default function PayoutDefaultEditor({
     setMethod(initialMethod ?? "nequi");
     setAccount(initialAccount ?? "");
     setAccountName(initialAccountName ?? "");
+    setAccountType(initialAccountType ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMethod, initialAccount, initialAccountName]);
+  }, [initialMethod, initialAccount, initialAccountName, initialAccountType]);
 
   const cur = METHOD_OPTIONS.find((m) => m.id === method)!;
   const needsName = cur.needsName;
+  const needsAccountType = cur.needsAccountType;
   const canSave =
-    !!account.trim() && !saving && (!needsName || accountName.trim().length >= 2);
+    !!account.trim() &&
+    !saving &&
+    (!needsName || accountName.trim().length >= 2) &&
+    (!needsAccountType || accountType !== null);
 
   async function save() {
     if (!canSave) return;
     setSaving(true);
     try {
       const finalName = needsName ? accountName.trim() : null;
-      await onSave(method, account.trim(), finalName);
+      const finalType = needsAccountType ? accountType : null;
+      await onSave(method, account.trim(), finalName, finalType);
       setMode("view");
     } finally {
       setSaving(false);
@@ -115,6 +137,7 @@ export default function PayoutDefaultEditor({
     setMethod("nequi");
     setAccount("");
     setAccountName("");
+    setAccountType(null);
     setMode("edit");
   }
 
@@ -131,13 +154,13 @@ export default function PayoutDefaultEditor({
             className="text-sm font-semibold text-text-primary truncate tabular-nums"
             style={{ fontFeatureSettings: '"tnum"' }}
           >
-            {METHOD_LABEL[initialMethod!]} · {initialAccount}
+            {initialAccount}
           </p>
-          {initialAccountName ? (
-            <p className="text-[11px] text-text-muted truncate">
-              A nombre de {initialAccountName}
-            </p>
-          ) : null}
+          <p className="text-[11px] text-text-muted truncate">
+            {initialAccountType ? `${ACCOUNT_TYPE_LABEL[initialAccountType]} ` : ""}
+            {METHOD_LABEL[initialMethod!]}
+            {initialAccountName ? ` · ${initialAccountName}` : ""}
+          </p>
         </div>
         <button
           type="button"
@@ -182,6 +205,25 @@ export default function PayoutDefaultEditor({
         placeholder={cur.accountPlaceholder}
         className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
       />
+
+      {needsAccountType ? (
+        <div className="flex flex-wrap gap-1.5">
+          {(["ahorros", "corriente"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setAccountType(t)}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                accountType === t
+                  ? "bg-gold text-bg-base border-gold"
+                  : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
+              }`}
+            >
+              {ACCOUNT_TYPE_LABEL[t]}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {needsName ? (
         <input

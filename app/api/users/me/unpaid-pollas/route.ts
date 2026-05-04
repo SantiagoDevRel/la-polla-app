@@ -28,37 +28,29 @@ export async function GET() {
   const { data: parts } = await admin
     .from("polla_participants")
     .select(
-      "polla_id, status, paid, role, pollas:polla_id (slug, name, status, payment_mode, buy_in_amount, admin_payout_method, admin_payout_account, admin_payout_account_name, admin_payment_instructions)",
+      "polla_id, status, paid, role, pollas:polla_id (slug, name, status, payment_mode, buy_in_amount, admin_payout_method, admin_payout_account, admin_payout_account_name, admin_payout_account_type, admin_payment_instructions)",
     )
     .eq("user_id", user.id)
     .eq("status", "approved")
     .eq("paid", false);
 
   // Filtrar solo pollas activas en admin_collects (no organizador).
+  type PollaShape = {
+    slug: string;
+    name: string;
+    status: string;
+    payment_mode: string;
+    buy_in_amount: number;
+    admin_payout_method: string | null;
+    admin_payout_account: string | null;
+    admin_payout_account_name: string | null;
+    admin_payout_account_type: string | null;
+    admin_payment_instructions: string | null;
+  };
   type PartRow = {
     polla_id: string;
     role: string;
-    pollas: {
-      slug: string;
-      name: string;
-      status: string;
-      payment_mode: string;
-      buy_in_amount: number;
-      admin_payout_method: string | null;
-      admin_payout_account: string | null;
-      admin_payout_account_name: string | null;
-      admin_payment_instructions: string | null;
-    } | Array<{
-      slug: string;
-      name: string;
-      status: string;
-      payment_mode: string;
-      buy_in_amount: number;
-      admin_payout_method: string | null;
-      admin_payout_account: string | null;
-      admin_payout_account_name: string | null;
-      admin_payment_instructions: string | null;
-    }> | null;
+    pollas: PollaShape | PollaShape[] | null;
   };
 
   const unwrap = <T,>(v: T | T[] | null): T | null =>
@@ -116,6 +108,7 @@ export async function GET() {
       adminPayoutMethod: polla!.admin_payout_method,
       adminPayoutAccount: polla!.admin_payout_account,
       adminPayoutAccountName: polla!.admin_payout_account_name,
+      adminPayoutAccountType: polla!.admin_payout_account_type,
       adminPaymentInstructions: polla!.admin_payment_instructions,
       proofStatus,
       lastRejectionReason: last?.ai_rejection_reason ?? null,

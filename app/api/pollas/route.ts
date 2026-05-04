@@ -38,6 +38,7 @@ const createPollaSchema = z
     adminPayoutMethod: z.enum(["nequi", "bancolombia", "otro"]).optional(),
     adminPayoutAccount: z.string().trim().min(3).max(120).optional(),
     adminPayoutAccountName: z.string().trim().min(2).max(120).optional(),
+    adminPayoutAccountType: z.enum(["ahorros", "corriente"]).optional(),
     // Distribución de premios opcional al crear; el organizador puede
     // editarla luego desde el panel admin.
     prizeDistribution: z
@@ -54,21 +55,22 @@ const createPollaSchema = z
       })
       .optional(),
   })
-  // admin_collects requiere admin_payout_method + account
-  // (estructurado para que la AI verifique screenshots).
+  // admin_collects requiere admin_payout_method + account.
+  // Bancolombia/otro requieren además ahorros|corriente para que el
+  // pagador sepa qué tipo de cuenta elegir en su app.
   .refine(
     (data) => {
       if (data.paymentMode !== "admin_collects") return true;
       if (!data.adminPayoutMethod || !data.adminPayoutAccount) return false;
-      // bancolombia y otro requieren nombre. nequi no.
-      if (data.adminPayoutMethod !== "nequi" && !data.adminPayoutAccountName) {
-        return false;
+      if (data.adminPayoutMethod !== "nequi") {
+        if (!data.adminPayoutAccountName) return false;
+        if (!data.adminPayoutAccountType) return false;
       }
       return true;
     },
     {
       message:
-        "Para 'pago al principio' tenés que indicar el método (Nequi/Bancolombia/Otro), número de cuenta y nombre (excepto Nequi).",
+        "Para 'pago al principio' tenés que indicar método, número de cuenta, nombre y tipo (ahorros/corriente). Para Nequi solo el celular.",
       path: ["adminPayoutMethod"],
     },
   )
@@ -406,6 +408,11 @@ export async function POST(request: NextRequest) {
           parsed.data.adminPayoutMethod !== "nequi"
             ? parsed.data.adminPayoutAccountName
             : null,
+        admin_payout_account_type:
+          parsed.data.paymentMode === "admin_collects" &&
+          parsed.data.adminPayoutMethod !== "nequi"
+            ? parsed.data.adminPayoutAccountType
+            : null,
         match_ids: parsed.data.matchIds || null,
         created_by: user.id,
         join_code: joinCode,
@@ -451,6 +458,11 @@ export async function POST(request: NextRequest) {
               parsed.data.paymentMode === "admin_collects" &&
               parsed.data.adminPayoutMethod !== "nequi"
                 ? parsed.data.adminPayoutAccountName
+                : null,
+            admin_payout_account_type:
+              parsed.data.paymentMode === "admin_collects" &&
+              parsed.data.adminPayoutMethod !== "nequi"
+                ? parsed.data.adminPayoutAccountType
                 : null,
             match_ids: parsed.data.matchIds || null,
             created_by: user.id,

@@ -23,11 +23,23 @@ interface Props {
   payoutMethod: "nequi" | "bancolombia" | "otro" | null;
   payoutAccount: string | null;
   payoutAccountName: string | null;
+  payoutAccountType: "ahorros" | "corriente" | null;
   /** Texto libre extra que el admin agregó (opcional). */
   extraInstructions: string | null;
   onApproved: () => void;
   onPendingReview: (rejectionReason: string | null) => void;
 }
+
+const METHOD_LABEL: Record<string, string> = {
+  nequi: "Nequi",
+  bancolombia: "Bancolombia",
+  otro: "Otro",
+};
+
+const ACCOUNT_TYPE_LABEL: Record<string, string> = {
+  ahorros: "Ahorros",
+  corriente: "Corriente",
+};
 
 function fmtCOP(n: number): string {
   return `$${Math.round(n).toLocaleString("es-CO")}`;
@@ -38,6 +50,7 @@ export default function PaymentProofUpload({
   buyInAmount,
   payoutMethod,
   payoutAccount,
+  payoutAccountType,
   extraInstructions,
   onApproved,
   onPendingReview,
@@ -124,7 +137,9 @@ export default function PaymentProofUpload({
         <ShieldCheck className="w-5 h-5 text-gold" /> Subir comprobante
       </h3>
 
-      {/* Datos del admin a quien transferir — minimal: cuenta + monto */}
+      {/* Datos del admin a quien transferir — minimal: cuenta + monto.
+          Si es Bancolombia/Otro mostramos "Ahorros · Bancolombia" debajo
+          del número para que el pagador no se confunda con el tipo. */}
       <div className="rounded-xl px-3 py-3 bg-bg-elevated border border-border-subtle space-y-2">
         <p className="text-[10px] uppercase tracking-wide text-text-muted">Pagale a</p>
         <div className="flex items-center justify-between gap-2">
@@ -139,6 +154,12 @@ export default function PaymentProofUpload({
             {copied ? (<><Check className="w-3 h-3" /> Copiado</>) : (<><Copy className="w-3 h-3" /> Copiar</>)}
           </button>
         </div>
+        {payoutMethod ? (
+          <p className="text-[12px] text-text-secondary">
+            {payoutAccountType ? `${ACCOUNT_TYPE_LABEL[payoutAccountType]} ` : ""}
+            {METHOD_LABEL[payoutMethod] ?? payoutMethod}
+          </p>
+        ) : null}
         <p
           className="font-display text-[20px] text-gold tabular-nums"
           style={{ fontFeatureSettings: '"tnum"' }}
