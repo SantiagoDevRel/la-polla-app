@@ -15,6 +15,7 @@ import {
 // daviplata + transfiya — el verifier AI se simplifica con menos
 // variantes y hay menor riesgo de mismatch.
 const PAYOUT_METHODS = ["nequi", "bancolombia", "otro"] as const;
+const PAYOUT_ACCOUNT_TYPES = ["ahorros", "corriente"] as const;
 
 const updateSchema = z.object({
   display_name: z
@@ -29,9 +30,10 @@ const updateSchema = z.object({
   avatar_url: z.string().max(50).optional(),
   default_payout_method: z.enum(PAYOUT_METHODS).nullable().optional(),
   default_payout_account: z.string().trim().min(3).max(120).nullable().optional(),
-  /** Nombre como aparece en la cuenta. Requerido si method=bancolombia
-   *  u otro. Opcional para nequi (que solo identifica por celular). */
+  /** Nombre como aparece en la cuenta. Opcional. */
   default_payout_account_name: z.string().trim().min(2).max(120).nullable().optional(),
+  /** Tipo de cuenta. Solo aplica para bancolombia/otro; null para nequi. */
+  default_payout_account_type: z.enum(PAYOUT_ACCOUNT_TYPES).nullable().optional(),
 });
 
 export async function GET() {
@@ -44,7 +46,7 @@ export async function GET() {
 
     const { data: userData } = await admin
       .from("users")
-      .select("display_name, whatsapp_number, avatar_url, is_admin, default_payout_method, default_payout_account, default_payout_account_name, default_payout_set_at")
+      .select("display_name, whatsapp_number, avatar_url, is_admin, default_payout_method, default_payout_account, default_payout_account_name, default_payout_account_type, default_payout_set_at")
       .eq("id", user.id)
       .single();
 
@@ -121,31 +123,24 @@ export async function PATCH(request: NextRequest) {
     if (parsed.data.display_name) updateData.display_name = parsed.data.display_name;
     if (parsed.data.avatar_url) updateData.avatar_url = parsed.data.avatar_url;
 
-    // Payout default: 3 campos viajan juntos. Permitimos null explícito
-    // para borrar la cuenta guardada.
-    // Validación: si method=bancolombia u otro, name es REQUERIDO al
-    // guardar (Sonnet lo necesita para verificar screenshots).
+    // Payout default: 4 campos viajan juntos (method, account, name,
+    // type). Permitimos null explícito para borrar la cuenta guardada.
     const wantsPayout =
       parsed.data.default_payout_method !== undefined ||
       parsed.data.default_payout_account !== undefined ||
-      parsed.data.default_payout_account_name !== undefined;
+      parsed.data.default_payout_account_name !== undefined ||
+      parsed.data.default_payout_account_type !== undefined;
     if (wantsPayout) {
       const method = parsed.data.default_payout_method ?? null;
       const account = parsed.data.default_payout_account ?? null;
       const name = parsed.data.default_payout_account_name ?? null;
-      if (method && method !== "nequi" && account && !name) {
-        return NextResponse.json(
-          {
-            error: `Para ${method} hay que poner el nombre como aparece en la cuenta del banco.`,
-          },
-          { status: 400 },
-        );
-      }
+      const accountType = parsed.data.default_payout_account_type ?? null;
       updateData.default_payout_method = method;
       updateData.default_payout_account = account;
-      // Para nequi forzamos null aunque el cliente mande algo — solo
-      // se identifica por celular.
+      // Para nequi forzamos name y type a null — Nequi solo se identifica
+      // por celular y no tiene ahorros/corriente.
       updateData.default_payout_account_name = method === "nequi" ? null : name;
+      updateData.default_payout_account_type = method === "nequi" ? null : accountType;
       updateData.default_payout_set_at = account
         ? new Date().toISOString()
         : null;

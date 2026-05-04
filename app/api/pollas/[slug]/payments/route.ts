@@ -43,7 +43,7 @@ export async function GET(
     const adminClient = createAdminClient();
     const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
-      .select("id, payment_mode, admin_payment_instructions, admin_payout_method, admin_payout_account, admin_payout_account_name, buy_in_amount, currency")
+      .select("id, payment_mode, admin_payment_instructions, admin_payout_method, admin_payout_account, admin_payout_account_name, admin_payout_account_type, buy_in_amount, currency")
       .eq("slug", params.slug)
       .single();
 
@@ -110,6 +110,7 @@ export async function GET(
         adminPayoutMethod: polla.admin_payout_method,
         adminPayoutAccount: polla.admin_payout_account,
         adminPayoutAccountName: polla.admin_payout_account_name,
+        adminPayoutAccountType: polla.admin_payout_account_type,
         buyInAmount: polla.buy_in_amount,
         currency: polla.currency,
         paymentMode: polla.payment_mode,

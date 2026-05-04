@@ -14,7 +14,7 @@ import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 import { InlineScoringGuide } from "@/components/polla/InlineScoringGuide";
 import FontScalePicker from "@/components/perfil/FontScalePicker";
-import PayoutDefaultEditor, { type PayoutMethod } from "@/components/perfil/PayoutDefaultEditor";
+import PayoutDefaultEditor, { type PayoutMethod, type PayoutAccountType } from "@/components/perfil/PayoutDefaultEditor";
 
 interface UserProfile {
   display_name: string;
@@ -24,6 +24,7 @@ interface UserProfile {
   default_payout_method: PayoutMethod | null;
   default_payout_account: string | null;
   default_payout_account_name: string | null;
+  default_payout_account_type: PayoutAccountType | null;
 }
 
 interface UserStats {
@@ -105,12 +106,14 @@ export default function PerfilPage() {
     method: PayoutMethod,
     account: string,
     accountName: string | null,
+    accountType: PayoutAccountType | null,
   ) {
     try {
       await axios.patch("/api/users/me", {
         default_payout_method: method,
         default_payout_account: account,
         default_payout_account_name: accountName,
+        default_payout_account_type: accountType,
       });
       setProfile((prev) =>
         prev
@@ -119,6 +122,7 @@ export default function PerfilPage() {
               default_payout_method: method,
               default_payout_account: account,
               default_payout_account_name: accountName,
+              default_payout_account_type: accountType,
             }
           : prev,
       );
@@ -135,6 +139,7 @@ export default function PerfilPage() {
         default_payout_method: null,
         default_payout_account: null,
         default_payout_account_name: null,
+        default_payout_account_type: null,
       });
       setProfile((prev) =>
         prev
@@ -143,6 +148,7 @@ export default function PerfilPage() {
               default_payout_method: null,
               default_payout_account: null,
               default_payout_account_name: null,
+              default_payout_account_type: null,
             }
           : prev,
       );
@@ -255,6 +261,7 @@ export default function PerfilPage() {
           initialMethod={profile.default_payout_method ?? undefined}
           initialAccount={profile.default_payout_account ?? undefined}
           initialAccountName={profile.default_payout_account_name ?? undefined}
+          initialAccountType={profile.default_payout_account_type ?? undefined}
           onSave={handlePayoutSave}
           onClear={handlePayoutClear}
         />

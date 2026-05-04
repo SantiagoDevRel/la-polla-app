@@ -38,6 +38,7 @@ interface PollaPaymentInfo {
   adminPayoutMethod: "nequi" | "bancolombia" | "otro" | null;
   adminPayoutAccount: string | null;
   adminPayoutAccountName: string | null;
+  adminPayoutAccountType: "ahorros" | "corriente" | null;
   buyInAmount: number;
   currency: string;
   paymentMode: string;
@@ -166,6 +167,7 @@ export default function ParticipantPayment({
               payoutMethod={pollaPaymentInfo.adminPayoutMethod}
               payoutAccount={pollaPaymentInfo.adminPayoutAccount}
               payoutAccountName={pollaPaymentInfo.adminPayoutAccountName}
+              payoutAccountType={pollaPaymentInfo.adminPayoutAccountType}
               extraInstructions={instructions || null}
               onApproved={() => {
                 void loadPayments();
