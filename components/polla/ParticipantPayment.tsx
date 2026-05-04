@@ -54,7 +54,10 @@ export default function ParticipantPayment({
   currentUserId,
   currentUserRole,
 }: ParticipantPaymentProps) {
-  const [loading, setLoading] = useState(true);
+  // initialLoading vs subsequent refetches: no queremos desmontar el
+  // upload form (y perder el banner de status) cada vez que un hijo
+  // pide refrescar — solo mostramos el skeleton en la primera carga.
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payments, setPayments] = useState<PaymentParticipant[]>([]);
   const [pollaPaymentInfo, setPollaPaymentInfo] = useState<PollaPaymentInfo | null>(null);
@@ -62,7 +65,6 @@ export default function ParticipantPayment({
 
   const loadPayments = useCallback(async () => {
     try {
-      setLoading(true);
       setError(null);
       const { data } = await axios.get(`/api/pollas/${pollaSlug}/payments`);
       setPayments(data.payments);
@@ -72,7 +74,7 @@ export default function ParticipantPayment({
       const e = err as { response?: { data?: { error?: string } } };
       setError(e.response?.data?.error || "No pudimos cargar los pagos.");
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
   }, [pollaSlug]);
 
@@ -80,7 +82,7 @@ export default function ParticipantPayment({
     loadPayments();
   }, [loadPayments]);
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="rounded-xl p-4 text-center lp-card flex flex-col items-center gap-2">
         <FootballLoader variant="plata" />

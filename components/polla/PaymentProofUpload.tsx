@@ -1,14 +1,10 @@
 // components/polla/PaymentProofUpload.tsx
 //
-// Subir comprobante de pago a una polla admin_collects. Muestra los
-// datos esperados (cuenta del admin), pide la imagen, preprocesa
-// client-side y POSTea a /api/pollas/:slug/payment-proof. El server
-// corre Sonnet vision; si confirma → marca paid=true al instante.
-//
-// Disclaimer obligatorio:
-//   - Screenshot guardado 7 días.
-//   - AI lo revisa primero (puede equivocarse).
-//   - Organizador puede revertir el pago si detecta algo raro.
+// Subir comprobante de pago a una polla admin_collects. Muestra cuenta
+// + monto, pide la imagen, preprocesa client-side y POSTea a
+// /api/pollas/:slug/payment-proof. El server corre Sonnet vision; si
+// confirma → marca paid=true al instante. Si no, status banner inline
+// dice que el organizador lo va a revisar manualmente.
 "use client";
 
 import { useState } from "react";
@@ -33,12 +29,6 @@ interface Props {
   onPendingReview: (rejectionReason: string | null) => void;
 }
 
-const METHOD_LABEL: Record<string, string> = {
-  nequi: "Nequi",
-  bancolombia: "Bancolombia",
-  otro: "Otro",
-};
-
 function fmtCOP(n: number): string {
   return `$${Math.round(n).toLocaleString("es-CO")}`;
 }
@@ -48,7 +38,6 @@ export default function PaymentProofUpload({
   buyInAmount,
   payoutMethod,
   payoutAccount,
-  payoutAccountName,
   extraInstructions,
   onApproved,
   onPendingReview,
@@ -131,28 +120,17 @@ export default function PaymentProofUpload({
 
   return (
     <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 border border-gold/30">
-      <div className="flex items-start gap-3">
-        <ShieldCheck className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
-        <div className="flex-1">
-          <h3 className="font-bold text-text-primary">Subir comprobante</h3>
-          <p className="text-[12px] text-text-muted mt-0.5">
-            Subí el screenshot de la transferencia y la AI te aprueba al instante si los datos coinciden.
-          </p>
-        </div>
-      </div>
+      <h3 className="font-bold text-text-primary flex items-center gap-2">
+        <ShieldCheck className="w-5 h-5 text-gold" /> Subir comprobante
+      </h3>
 
-      {/* Datos del admin a quien transferir */}
-      <div className="rounded-xl px-3 py-3 bg-bg-elevated border border-border-subtle space-y-1.5">
+      {/* Datos del admin a quien transferir — minimal: cuenta + monto */}
+      <div className="rounded-xl px-3 py-3 bg-bg-elevated border border-border-subtle space-y-2">
         <p className="text-[10px] uppercase tracking-wide text-text-muted">Pagale a</p>
         <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-semibold text-text-primary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-              {METHOD_LABEL[payoutMethod] ?? payoutMethod} · {payoutAccount}
-            </p>
-            {payoutAccountName ? (
-              <p className="text-[11px] text-text-secondary truncate">A nombre de {payoutAccountName}</p>
-            ) : null}
-          </div>
+          <p className="min-w-0 flex-1 text-[16px] font-semibold text-text-primary tabular-nums truncate" style={{ fontFeatureSettings: '"tnum"' }}>
+            {payoutAccount}
+          </p>
           <button
             type="button"
             onClick={copyAccount}
@@ -162,59 +140,48 @@ export default function PaymentProofUpload({
           </button>
         </div>
         <p
-          className="font-display text-[18px] text-gold tabular-nums"
+          className="font-display text-[20px] text-gold tabular-nums"
           style={{ fontFeatureSettings: '"tnum"' }}
         >
-          {fmtCOP(buyInAmount)} exactos
+          {fmtCOP(buyInAmount)}
         </p>
         {extraInstructions ? (
-          <p className="text-[11px] text-text-secondary whitespace-pre-wrap leading-snug pt-1">
+          <p className="text-[11px] text-text-secondary whitespace-pre-wrap leading-snug">
             {extraInstructions}
           </p>
         ) : null}
       </div>
 
-      {/* Disclaimer */}
-      <div className="rounded-lg px-3 py-2 bg-amber/5 border border-amber/20 space-y-1">
-        <p className="text-[11px] text-amber font-semibold">Antes de subir, leé:</p>
-        <ul className="text-[11px] text-text-secondary space-y-0.5 list-disc list-inside">
-          <li>El screenshot se guarda 7 días y después se borra solo.</li>
-          <li>La AI revisa primero — si te aprueba, podés pronosticar al instante.</li>
-          <li>El organizador puede revertir tu pago a no-aprobado si detecta algo raro.</li>
-        </ul>
-      </div>
-
       {/* Status del último intento — visible cuando AI no auto-aprobó.
           Se limpia cuando el user elige un archivo nuevo. */}
       {status ? (
-        <div className="rounded-xl px-3 py-2.5 bg-amber/5 border border-amber/30 space-y-1">
-          <p className="text-[12px] text-amber font-semibold flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" />
-            {status.kind === "verifier_unavailable"
-              ? "Comprobante recibido — revisión manual"
-              : "Comprobante recibido — pendiente de revisión"}
+        <div className="rounded-xl px-3 py-3 bg-amber/10 border border-amber/40 space-y-1">
+          <p className="text-[14px] text-amber font-bold flex items-center gap-1.5">
+            <Clock className="w-4 h-4" /> Comprobante recibido
           </p>
-          <p className="text-[11px] text-text-secondary leading-snug">
-            {status.kind === "verifier_unavailable"
-              ? (status.reason ?? "El verificador automático no está disponible ahora. El organizador revisará tu comprobante manualmente.")
-              : status.reason
-                ? `La AI no pudo confirmarlo (${status.reason}). El organizador lo va a revisar manualmente. Si querés podés subir otro intento.`
-                : "La AI no pudo confirmarlo automáticamente. El organizador lo va a revisar manualmente. Si querés podés subir otro intento."}
+          <p className="text-[12px] text-text-secondary leading-snug">
+            El organizador va a revisarlo y aprobarte manualmente.
           </p>
         </div>
       ) : null}
 
-      {/* File picker */}
-      <label className="flex items-center justify-center gap-2 w-full bg-bg-elevated border border-dashed border-border-subtle rounded-xl px-4 py-5 cursor-pointer hover:border-gold/40 transition-colors text-[13px] text-text-secondary">
-        <Upload className="w-4 h-4" />
-        {file ? file.name : "Tocá para elegir tu screenshot"}
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-          className="hidden"
-        />
-      </label>
+      {/* File picker — CTA prominente, gold, grande */}
+      {!file ? (
+        <label className="flex flex-col items-center justify-center gap-2 w-full bg-gold/10 border-2 border-dashed border-gold/50 rounded-2xl px-4 py-7 cursor-pointer hover:bg-gold/15 transition-colors">
+          <Upload className="w-7 h-7 text-gold" />
+          <span className="font-display text-[16px] tracking-wide text-gold uppercase text-center">
+            Sube tu screenshot aquí
+          </span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+            className="hidden"
+          />
+        </label>
+      ) : (
+        <p className="text-[12px] text-text-secondary text-center truncate">{file.name}</p>
+      )}
 
       {previewUrl ? (
         <div className="rounded-xl overflow-hidden border border-border-subtle relative" style={{ height: 240 }}>
