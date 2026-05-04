@@ -60,15 +60,9 @@ export default function PrizeDistributionEditor({ pollaSlug, pot, initial }: Pro
 
   return (
     <section className="rounded-2xl p-5 lp-card space-y-4">
-      <div className="flex items-start gap-3">
-        <Trophy className="w-5 h-5 text-gold flex-shrink-0 mt-0.5" />
-        <div className="flex-1">
-          <h3 className="text-sm font-bold text-text-primary">Premios</h3>
-          <p className="text-xs text-text-muted mt-0.5">
-            Define cuántos puestos premias y cuánto se lleva cada uno.
-          </p>
-        </div>
-      </div>
+      <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+        <Trophy className="w-5 h-5 text-gold" /> Premios
+      </h3>
 
       <PrizeDistributionForm pot={pot} initial={initial} onChange={setPending} />
 
