@@ -201,15 +201,19 @@ export function mapMatchDay(round: string): number | null {
 }
 
 /**
- * Calcula el score final considerando tiempo extra y penales.
+ * Calcula el score del tiempo reglamentario (90 + adición).
  *
- * API-Football reporta goals como el marcador al final del tiempo reglamentario.
- * Si hubo tiempo extra, el score real está en score.fulltime o score.extratime.
- * Si hubo penales, score.penalty tiene los goles de penales (no se suman al marcador).
+ * API-Football expone:
+ *   - goals.home/away              → marcador final (incluye ET si hubo)
+ *   - score.fulltime.home/away     → marcador a los 90
+ *   - score.extratime.home/away    → goles SOLO del alargue (delta)
+ *   - score.penalty.home/away      → goles de la tanda de penales
  *
- * Para la polla, usamos el marcador final incluyendo tiempo extra
- * (que es lo que goals ya refleja en AET), y para PEN usamos
- * los goals que ya incluyen ET.
+ * Para pollas usamos siempre los 90 reglamentarios — el alargue mete
+ * suerte que castiga injustamente al que clavó el resultado regulation.
+ * Cuando el match fue FT (sin ET) los dos campos son iguales; cuando
+ * fue AET, fulltime es lo que queremos. PEN también se decide en 90 +
+ * ET, así que en ese caso fulltime sigue siendo el regulation score.
  */
 export function mapFinalScore(
   fixture: ApiFootballFixture
@@ -221,7 +225,13 @@ export function mapFinalScore(
     return { home: null, away: null };
   }
 
-  // goals ya contiene el marcador final (incluyendo ET si aplica)
+  // score.fulltime es el resultado de los 90 + adición. Si por algún
+  // motivo viene null (datos incompletos en estados raros como AWD/WO),
+  // caemos a goals como último recurso.
+  const ft = fixture.score?.fulltime;
+  if (ft && ft.home !== null && ft.away !== null) {
+    return { home: ft.home, away: ft.away };
+  }
   return {
     home: fixture.goals.home,
     away: fixture.goals.away,

@@ -20,7 +20,14 @@ export interface FDMatch {
   homeTeam: { id: number; name: string; crest: string };
   awayTeam: { id: number; name: string; crest: string };
   score: {
+    // fullTime: marcador al final del match. SI el partido fue a ET,
+    //   incluye los goles del alargue. Si terminó en 90, es solo 90.
     fullTime: { home: number | null; away: number | null };
+    // regularTime: marcador a los 90 + adición. Solo aparece cuando
+    //   el match fue a alargue. Si no, viene undefined.
+    regularTime?: { home: number | null; away: number | null };
+    // duration: 'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT'.
+    duration?: string;
   };
   competition: { id: number; name: string };
   venue: string | null;
