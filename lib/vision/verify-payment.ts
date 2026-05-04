@@ -180,34 +180,6 @@ function normalizeDigits(s: string): string {
   return (s ?? "").replace(/\D/g, "");
 }
 
-/** Normaliza un nombre: lowercase + sin tildes + sin Ñ → N + sin
- *  puntos + un solo espacio entre tokens. "Juan P. Núñez" →
- *  "juan p nunez". */
-function normalizeName(s: string): string {
-  return (s ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/ñ/g, "n")
-    .replace(/[.,]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Match de nombre tolerante a abreviaturas. */
-function namesMatch(expected: string, detected: string): boolean {
-  const ex = normalizeName(expected).split(" ").filter((t) => t.length >= 3);
-  const de = normalizeName(detected).split(" ").filter((t) => t.length >= 1);
-  if (ex.length === 0 || de.length === 0) return false;
-  let matched = 0;
-  for (const tok of ex) {
-    const found = de.some((d) => d === tok || d.startsWith(tok) || tok.startsWith(d));
-    if (found) matched++;
-  }
-  const required = Math.min(2, ex.length);
-  return matched >= required;
-}
-
 /** Hoy en zona horaria Colombia (UTC-5, sin DST) como YYYY-MM-DD. */
 function todayInColombia(): string {
   const now = new Date();
