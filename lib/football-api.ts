@@ -79,8 +79,12 @@ function mapMatch(m: any): FootballMatch {
     away_team_tla: m.awayTeam?.tla || m.awayTeam?.shortName?.substring(0, 3).toUpperCase() || deriveTla(awayName),
     home_team_flag: m.homeTeam?.crest || null,
     away_team_flag: m.awayTeam?.crest || null,
-    home_score: m.score?.fullTime?.home ?? null,
-    away_score: m.score?.fullTime?.away ?? null,
+    // Score reglamentario (90 + adición). football-data.org expone
+    // `regularTime` solo cuando el match fue a alargue; si no está,
+    // `fullTime` es el resultado de los 90 (no hubo ET). Para pollas
+    // siempre usamos los 90 — sin ET ni penales.
+    home_score: m.score?.regularTime?.home ?? m.score?.fullTime?.home ?? null,
+    away_score: m.score?.regularTime?.away ?? m.score?.fullTime?.away ?? null,
     status: mapStatus(m.status),
     elapsed: m.minute ?? null,
     tournament: CODE_TO_TOURNAMENT[m.competition?.code] || m.competition?.code || "unknown",

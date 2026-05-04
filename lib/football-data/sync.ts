@@ -72,8 +72,13 @@ function mapMatchToRow(match: FDMatch, tournament: string) {
     away_team_abbr: awayAbbr,
     scheduled_at: match.utcDate,
     venue: match.venue || null,
-    home_score: match.score?.fullTime?.home ?? null,
-    away_score: match.score?.fullTime?.away ?? null,
+    // Score del tiempo reglamentario (90 + adición), NO del alargue.
+    // football-data.org expone `regularTime` solo cuando el match fue a
+    // ET; en ese caso `fullTime` ya incluye los goles del alargue. Para
+    // pollas usamos siempre el resultado de los 90 — el alargue mete
+    // suerte que castiga injustamente al que clavó el regulation score.
+    home_score: match.score?.regularTime?.home ?? match.score?.fullTime?.home ?? null,
+    away_score: match.score?.regularTime?.away ?? match.score?.fullTime?.away ?? null,
     status: mapStatus(match.status),
     // Current minute while the match is live. football-data serves
     // this at the top level on IN_PLAY / PAUSED states; null otherwise.
