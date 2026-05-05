@@ -695,4 +695,60 @@ Botón "Reportar problema" en `BrandHeader` (al lado del WhatsAppBubble) que abr
 - `RESEND_API_KEY` — de https://resend.com
 - `RESEND_FROM_EMAIL` (opcional) — default `La Polla <onboarding@resend.dev>`
 
-*Last updated: 2026-04-27 | To update: say "update UI system" in Claude.ai chat*
+---
+
+## Lecciones / gotchas conocidos (importante leer en cada sesión nueva)
+
+### Matches: NUNCA usar `(tournament, scheduled_at)` como clave de unicidad
+
+En la mayoría de torneos juegan **varios partidos en paralelo** al mismo
+horario (Libertadores tiene 4-8 partidos a las 5pm el martes; lo mismo
+Champions/Europa/Mundial los días pico). Si dedupás o agrupás por
+`(tournament, scheduled_at)`, vas a tratar partidos distintos como
+duplicados y borrarlos.
+
+**Clave de unicidad correcta:** `(tournament, scheduled_at, home_team_normalizado, away_team_normalizado)`.
+
+**Cómo identificar dups REALES (cuando hay dos fuentes de datos):**
+- Las filas canónicas vienen de football-data.org (`external_id` numérico
+  como `552094`) o api-football (`wc2026_xxxxxxxx`).
+- Las filas duplicadas insertadas erróneamente por `lib/espn/sync.ts` tienen
+  prefijo `external_id LIKE 'espn:%'`.
+- Un dup real es: par (numeric, espn:) en mismo `(tournament, scheduled_at)`
+  Y los teams coinciden (substring contains o primer token, considerando
+  variaciones tipo "FC Bayern München" vs "Bayern Munich").
+
+### Antes de borrar matches, chequear TODAS las tablas que referencian `match_id`:
+
+- `predictions.match_id` (UNIQUE constraint con user_id)
+- `notifications.match_id`
+- `match_result_notifications.match_id`
+- `whatsapp_conversation_state.match_id`
+- `pollas.match_ids` (es un ARRAY uuid, NO un FK — usar `match_id = ANY(match_ids)`)
+
+NO existe tabla `polla_matches` (la relación polla→match vive en el array
+de la columna `pollas.match_ids`).
+
+### Workflow seguro para cleanups destructivos en producción:
+
+1. `CREATE TABLE matches_backup_<fecha> AS SELECT * FROM matches WHERE 1=0`
+2. `INSERT INTO matches_backup_<fecha> SELECT ... WHERE <criterio>` — backup primero
+3. Verificar count del backup vs lo esperado antes de tocar nada
+4. `DELETE FROM matches WHERE id IN (SELECT id FROM backup) AND <repetir criterio>`
+   — el segundo filtro es defense-in-depth
+5. Si algo sale mal: `INSERT INTO matches SELECT * FROM backup WHERE id NOT IN (SELECT id FROM matches)`
+
+Pasó 2026-05-04: borré 1,030 matches usando `(tournament, scheduled_at)` y maté
+partidos paralelos legítimos de Libertadores. Restauré desde backup. Por eso
+existe esta sección.
+
+### Soporte / privacy URLs
+
+`/privacy` y `/soporte` deben estar en `publicRoutes` de
+`lib/supabase/middleware.ts`. Apple/Play rechazan apps si la Privacy Policy
+URL devuelve redirect (lo mismo pasaba con `/.well-known/assetlinks.json`
+para Android App Links — está en el matcher exclude del middleware).
+
+---
+
+*Last updated: 2026-05-04 | To update: say "update UI system" in Claude.ai chat*

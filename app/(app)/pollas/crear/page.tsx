@@ -266,8 +266,20 @@ export default function CrearPollaPage() {
             label = "Por confirmar";
           } else {
             const d = new Date(m.scheduled_at);
-            key = d.toISOString().split("T")[0];
-            label = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+            // Bogota TZ para AMBOS key y label. Antes usabamos
+            // d.toISOString() (UTC) como key — eso partia en dos secciones
+            // los partidos del mismo dia Bogota cuando algunos kickoff-eaban
+            // PM (UTC siguiente dia). El label, en cambio, usaba locale del
+            // sistema sin timeZone, asi que ambas secciones mostraban "Tue
+            // 5 May" pero con keys distintas.
+            key = new Intl.DateTimeFormat("en-CA", {
+              timeZone: "America/Bogota",
+              year: "numeric", month: "2-digit", day: "2-digit",
+            }).format(d);
+            label = new Intl.DateTimeFormat("es-CO", {
+              timeZone: "America/Bogota",
+              weekday: "long", day: "numeric", month: "long",
+            }).format(d);
             label = label.charAt(0).toUpperCase() + label.slice(1);
           }
         } else {
