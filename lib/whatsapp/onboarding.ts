@@ -141,13 +141,12 @@ export async function handleNameConfirmed(
     return;
   }
 
-  // Sin pending code: welcome + opción de unirse con código manual.
-  await sendReplyButtons(
+  // Sin pending code: welcome + pedimos el código directo (state
+  // waiting_join_code para que un bareCode lo procese sin SI/NO).
+  await setState(phone, { action: "waiting_join_code" });
+  await sendTextMessage(
     phone,
     "¡Listo parce! 🎉 Tu perfil está armado.\n\n" +
-      "Únete a una polla con tu *código de invitación*.",
-    [{ id: "join_with_code", title: "Unirme con código" }],
-    undefined,
-    FOOTER,
+      "Mándame el *código de 6 caracteres* de la polla a la que te invitaron 🐥",
   );
 }
