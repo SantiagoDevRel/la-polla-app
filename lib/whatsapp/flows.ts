@@ -236,9 +236,21 @@ export async function handleMisPollas(phone: string, userId: string) {
     .eq("status", "approved");
 
   if (!participations || participations.length === 0) {
+    // Reply button: pedirle al user el código de invitación de una polla
+    // existente (caso muy común — alguien lo invitó por WA pero no tiene
+    // el link a mano). Si tapea, le seteamos state waiting_join_code y
+    // esperamos los 6 caracteres en el siguiente mensaje.
+    await sendReplyButtons(
+      phone,
+      "Todavía no estás en ninguna polla 🐣\n\n¿Tienes un *código de invitación* de un parche? Pegámelo y te uno al toque.",
+      [{ id: "join_with_code", title: "Unirme con código" }],
+      undefined,
+      FOOTER,
+    );
+    // Follow-up CTA URL para crear la propia polla.
     await sendCTAButton(
       phone,
-      "Todavía no estás en ninguna polla 🐣\n\nCreá una vos mismo o pedile a un amigo el link de invitación.",
+      "_O si querés armar tu propio parche desde cero:_",
       "Crear mi polla",
       `${APP_URL}/pollas/crear`,
       FOOTER,

@@ -34,7 +34,8 @@ export type ConversationAction =
   | "picking_match"
   | "waiting_prediction"
   | "confirm_prediction"
-  | "waiting_join_confirm";
+  | "waiting_join_confirm"
+  | "waiting_join_code";
 
 export type ConversationState = {
   action: ConversationAction;
