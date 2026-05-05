@@ -234,13 +234,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Build the body parameters.
-    // {{1}} = first name. {{2}} = "N pronóstico(s)" — short string que
-    // se inyecta en una frase del body fijo. NO mandamos la lista de
-    // partidos para evitar que Meta rechace el template por contenido
-    // de variable demasiado estructurado.
+    // {{1}} = first name. {{2}} = count number ("3"). El template body
+    // tiene "tienes {{2}} pronósticos pendientes" → la palabra fija va
+    // afuera de la variable. Meta acepta variables que sean solo números
+    // sin problema y el body no termina con variable (regla de Meta).
     const firstName = (entry.display_name ?? "parce").split(" ")[0];
     const count = entry.matches.length;
-    const countText = count === 1 ? "1 pronóstico" : `${count} pronósticos`;
+    const countText = String(count);
 
     const components: TemplateComponent[] = [
       {
