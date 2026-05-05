@@ -36,7 +36,9 @@ export type ConversationAction =
   | "confirm_prediction"
   | "waiting_join_confirm"
   | "waiting_join_code"
-  | "onboarding_ask_name";
+  | "onboarding_ask_name"
+  | "waiting_payment_method"
+  | "waiting_payment_account";
 
 export type ConversationState = {
   action: ConversationAction;
