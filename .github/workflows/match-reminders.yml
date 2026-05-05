@@ -1,0 +1,48 @@
+# Daily match reminders cron.
+#
+# Pega POST a /api/cron/match-reminders todos los dias a las 13:00 UTC
+# (8:00 am Bogota, UTC-5). El endpoint verifica el bearer token contra
+# CRON_SECRET y manda template messages a usuarios con partidos hoy.
+#
+# Free tier: GitHub Actions schedule corre gratis en repos publicos.
+# (Vercel cron requiere plan Pro — no nos sirve por la regla
+# free-tier-only del proyecto.)
+#
+# workflow_dispatch permite triggear manual desde la UI de GitHub o
+# `gh workflow run` para testing.
+
+name: Match Reminders Daily
+
+on:
+  schedule:
+    # 13:00 UTC = 8:00 AM Bogota (Colombia, UTC-5, no DST)
+    - cron: "0 13 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST a la API de reminders
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          : "${APP_URL:=https://lapollacolombiana.com}"
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET secret no configurado en repo settings"
+            exit 1
+          fi
+          response=$(curl -sS -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            "$APP_URL/api/cron/match-reminders" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+          body="${response%HTTP_STATUS:*}"
+          status="${response##*HTTP_STATUS:}"
+          echo "Status: $status"
+          echo "Body: $body"
+          if [ "$status" -ge 400 ]; then
+            echo "Cron failed with status $status"
+            exit 1
+          fi
