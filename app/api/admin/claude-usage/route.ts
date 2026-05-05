@@ -150,7 +150,7 @@ export async function GET() {
   const proofCalls = recent.filter(
     (r) => r.user_id && r.polla_id && proofEndpoints.has(r.endpoint),
   );
-  const screenshotByCallId = new Map<string, string>();
+  const screenshotByCallId = new Map<string, { url: string; proofId: string }>();
   if (proofCalls.length > 0) {
     // Window de busqueda: ±10 min del call, mismo user+polla.
     const earliestCall = proofCalls.reduce(
@@ -162,9 +162,10 @@ export async function GET() {
     ).toISOString();
     const { data: proofs } = await admin
       .from("payment_proofs")
-      .select("user_id, polla_id, storage_path, created_at")
+      .select("id, user_id, polla_id, storage_path, created_at")
       .gte("created_at", earliestSearchTime);
     const proofList = (proofs ?? []) as Array<{
+      id: string;
       user_id: string;
       polla_id: string;
       storage_path: string;
@@ -189,7 +190,7 @@ export async function GET() {
           .from("payment-proofs")
           .createSignedUrl(bestProof.storage_path, 60 * 60);
         if (signed?.signedUrl) {
-          screenshotByCallId.set(call.id, signed.signedUrl);
+          screenshotByCallId.set(call.id, { url: signed.signedUrl, proofId: bestProof.id });
         }
       }
     }
@@ -218,7 +219,8 @@ export async function GET() {
       success: r.success,
       errorMessage: r.error_message,
       createdAt: r.created_at,
-      screenshotUrl: screenshotByCallId.get(r.id) ?? null,
+      screenshotUrl: screenshotByCallId.get(r.id)?.url ?? null,
+      proofId: screenshotByCallId.get(r.id)?.proofId ?? null,
     })),
   });
 }
