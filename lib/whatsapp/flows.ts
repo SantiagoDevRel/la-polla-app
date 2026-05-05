@@ -438,7 +438,7 @@ export async function handlePollaMenu(
         `⚽ Torneo: ${trnLabel}\n` +
         `📊 Tu posición final: *#${participant.rank ?? "—"}*\n` +
         `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
-        `Esta polla ya terminó parce. Solo podés ver los resultados finales.`,
+        `Esta polla ya terminó parce. Solo puedes ver los resultados finales.`,
       [
         { id: `rank_${pollaId}`, title: "Ver Tabla 📊" },
         { id: `results_${pollaId}`, title: "Resultados ⚽" },
@@ -454,7 +454,7 @@ export async function handlePollaMenu(
     `⚽ Torneo: ${trnLabel}\n` +
     `📊 Tu posición: *#${participant.rank ?? "—"}*\n` +
     `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
-    `¿Qué querés hacer parce?`;
+    `¿Qué quieres hacer parce?`;
 
   // Same 3 reply-button layout for admins and players. Reply buttons
   // auto-send on tap (lists need a confirm), so this avoids a friction
@@ -1439,17 +1439,9 @@ export async function handleProfile(phone: string, userId: string) {
       `👤 *${name}*\n` +
       `📊 Pollas activas: *${activeCount}*\n` +
       `🎯 Predicciones: *${predCount}*\n` +
-      `🏆 Mejor posición: *#${bestRank && bestRank < 999 ? bestRank : "—"}*\n\n` +
-      `_Visitá tu perfil completo para ver más stats_`
+      `🏆 Mejor posición: *#${bestRank && bestRank < 999 ? bestRank : "—"}*`
   );
-
-  await sendCTAButton(
-    phone,
-    "Dale, mirá todos tus datos 👇",
-    "Ver perfil 👤",
-    `${APP_URL}/perfil`,
-    FOOTER
-  );
+  // Sin CTA URL a la web — el resumen alcanza para WA-only users.
 }
 
 // ─── Join by code ─────────────────────────────────────────────────────
@@ -1501,14 +1493,14 @@ export async function handleJoinByCode(
   const result = await joinByCode({ userId, phone, code });
 
   if (result.ok) {
-    const inviteUrl = `${APP_URL}/pollas/${result.polla.slug}`;
-    await sendCTAButton(
+    // Confirmación + menú nativo de la polla (Pronosticar / Tabla / Resultados).
+    // NO mandamos un CTA URL a la web — los WA-only users deben poder hacer
+    // todo desde acá sin abrir el browser.
+    await sendTextMessage(
       phone,
-      `¡Te uniste a *${result.polla.name}*! 🎉\n\nMirá la polla en la app 👇`,
-      "Abrir polla 🐥",
-      inviteUrl,
-      FOOTER,
+      `¡Te uniste a *${result.polla.name}*! 🎉`,
     );
+    await handlePollaMenu(phone, userId, result.polla.id);
     return;
   }
 
