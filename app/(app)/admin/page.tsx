@@ -93,18 +93,24 @@ export default function AdminPage() {
     suspicious: Array<{ userId: string; displayName: string; count24h: number }>;
     suspiciousThreshold: number;
   } | null>(null);
+  const [waTemplateUsage, setWaTemplateUsage] = useState<{
+    mtd: { total_sends: number; total_sent: number; total_failed: number; cost_usd: number; period_start: string };
+    by_template: Record<string, { sent: number; failed: number; cost_usd: number; category: string }>;
+    last_send_at: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryRes, twilioRes, analyticsRes, discRes, claudeRes] = await Promise.allSettled([
+      const [summaryRes, twilioRes, analyticsRes, discRes, claudeRes, waTplRes] = await Promise.allSettled([
         axios.get<Summary>("/api/admin/summary"),
         axios.get<TwilioUsage>("/api/admin/twilio-usage"),
         axios.get<Analytics>("/api/admin/analytics"),
         axios.get<{ matches: unknown[] }>("/api/admin/discrepancies"),
         axios.get("/api/admin/claude-usage"),
+        axios.get("/api/admin/wa-template-usage"),
       ]);
       if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
       else showToast("No se pudo cargar el panel", "error");
@@ -124,6 +130,7 @@ export default function AdminPage() {
         setDiscrepancyCount(discRes.value.data.matches?.length ?? 0);
       }
       if (claudeRes.status === "fulfilled") setClaudeUsage(claudeRes.value.data);
+      if (waTplRes.status === "fulfilled") setWaTemplateUsage(waTplRes.value.data);
     } finally {
       setLoading(false);
     }
@@ -338,6 +345,73 @@ export default function AdminPage() {
                   )}
                 </>
               ) : null}
+            </section>
+
+            {/* WhatsApp templates · MTD spend */}
+            <section
+              className="rounded-2xl p-4 space-y-3"
+              style={{ background: "#0e1420", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-text-primary">WhatsApp templates · MTD</h2>
+                <span className="text-[10px] text-text-muted">Reminders, alertas, etc.</span>
+              </div>
+
+              {!waTemplateUsage ? (
+                <p className="text-xs text-text-muted">Cargando…</p>
+              ) : waTemplateUsage.mtd.total_sends === 0 ? (
+                <p className="text-xs text-text-muted">Sin envíos este mes.</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Costo MTD</p>
+                      <p className="font-display mt-0.5 tabular-nums" style={{ fontSize: 22, color: "#FFD700", fontFeatureSettings: '"tnum"' }}>
+                        ${waTemplateUsage.mtd.cost_usd.toFixed(4)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Enviados</p>
+                      <p className="font-display mt-0.5 tabular-nums" style={{ fontSize: 22, color: "#FFD700", fontFeatureSettings: '"tnum"' }}>
+                        {waTemplateUsage.mtd.total_sent}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Fallidos</p>
+                      <p
+                        className="font-display mt-0.5 tabular-nums"
+                        style={{
+                          fontSize: 22,
+                          color: waTemplateUsage.mtd.total_failed > 0 ? "#FF3D57" : "#FFD700",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {waTemplateUsage.mtd.total_failed}
+                      </p>
+                    </div>
+                  </div>
+
+                  {Object.keys(waTemplateUsage.by_template).length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Por template</p>
+                      {Object.entries(waTemplateUsage.by_template).map(([name, stats]) => (
+                        <div key={name} className="flex items-center justify-between text-xs">
+                          <span className="text-text-primary truncate">{name}</span>
+                          <span className="text-text-muted shrink-0 ml-2">
+                            {stats.sent} enviados · ${stats.cost_usd.toFixed(4)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {waTemplateUsage.last_send_at && (
+                    <p className="text-[11px] text-text-muted">
+                      Último envío: {new Date(waTemplateUsage.last_send_at).toLocaleString("es-CO")}
+                    </p>
+                  )}
+                </>
+              )}
             </section>
 
             {/* Activity overview */}
