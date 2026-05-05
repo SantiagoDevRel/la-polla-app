@@ -25,6 +25,12 @@ import {
   handleNameSubmit,
   userNeedsOnboarding,
 } from "./onboarding";
+import {
+  askPaymentMethod,
+  handlePaymentAccountSubmit,
+  handlePaymentMethodSelected,
+  handleShowPaymentInfo,
+} from "./payment";
 import { looksLikeMenuIntent } from "./menu-intent";
 import {
   handleCancelPrediction,
@@ -115,8 +121,26 @@ export async function processIncomingMessage(
     const body = text.body.trim();
     const lower = body.toLowerCase();
 
-    // Mid-flow: waiting for a score input.
     const state = await getState(from);
+
+    // Mid-flow: payment account input. Antes que cualquier comando para
+    // que números no se interpreten como bareCode/score por error.
+    if (state?.action === "waiting_payment_account") {
+      await handlePaymentAccountSubmit(from, user.id, body);
+      return;
+    }
+
+    // Comandos para gestionar info de pago.
+    if (lower === "pago" || lower === "metodo de pago" || lower === "método de pago") {
+      await handleShowPaymentInfo(from, user.id);
+      return;
+    }
+    if (lower === "cambiar pago" || lower === "cambiar metodo de pago" || lower === "cambiar método de pago") {
+      await askPaymentMethod(from);
+      return;
+    }
+
+    // Mid-flow: waiting for a score input.
     if (state && state.action === "waiting_prediction" && state.pollaId) {
       if (lower === "cancelar") {
         await handleCancelPrediction(
@@ -215,19 +239,15 @@ export async function processIncomingMessage(
       return;
     }
 
-    // Default: nudge to menu.
-    await sendTextMessage(
-      from,
-      "🤔 Parce, no entendí bien. Escribí *menu* y te muestro tus pollas.",
-    );
+    // Default: cualquier texto no reconocido → menú principal con
+    // botones. Decisión 2026-05-04 del user: nada de "no entendí, escribe
+    // menu" — directo al menú para no dejar al user en dead-end.
+    await handleMainMenu(from, user.display_name, user.id);
     return;
   }
 
-  // Anything else (sticker, audio, etc.).
-  await sendTextMessage(
-    from,
-    "🤔 Parce, no entendí bien. Escribí *menu* y te muestro tus pollas.",
-  );
+  // Sticker / audio / unsupported → menú directo (mismo principio).
+  await handleMainMenu(from, user.display_name, user.id);
 }
 
 async function routePayload(
@@ -248,7 +268,8 @@ async function routePayload(
     payload === "confirm_yes" ||
     payload === "confirm_no" ||
     payload === "join_code_yes" ||
-    payload === "join_code_no";
+    payload === "join_code_no" ||
+    payload.startsWith("paymeth_");
   if (!keepState) {
     await clearState(from);
   }
@@ -264,6 +285,13 @@ async function routePayload(
       from,
       "¡Listo parce! 🐥\n\nMándame el *código de 6 caracteres* de la polla que quieres entrar\n\n_Te lo pasa el organizador de la polla._",
     );
+    return;
+  }
+
+  // Selección de banco para método de pago.
+  if (payload.startsWith("paymeth_")) {
+    const methodId = payload.slice("paymeth_".length);
+    await handlePaymentMethodSelected(from, methodId);
     return;
   }
 

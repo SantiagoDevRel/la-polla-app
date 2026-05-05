@@ -1501,6 +1501,22 @@ export async function handleJoinByCode(
       `¡Te uniste a *${result.polla.name}*! 🎉`,
     );
     await handlePollaMenu(phone, userId, result.polla.id);
+
+    // Si la polla tiene buy_in > 0 y el user no tiene método de pago
+    // guardado, arrancamos el flujo para que el ganador cobre cuando
+    // toque. Una sola vez (la primera polla paga).
+    const supabase2 = createAdminClient();
+    const { data: pollaInfo } = await supabase2
+      .from("pollas")
+      .select("buy_in_amount")
+      .eq("id", result.polla.id)
+      .maybeSingle();
+    if (pollaInfo && Number(pollaInfo.buy_in_amount) > 0) {
+      const { userNeedsPaymentInfo, askPaymentMethod } = await import("./payment");
+      if (await userNeedsPaymentInfo(userId)) {
+        await askPaymentMethod(phone);
+      }
+    }
     return;
   }
 
