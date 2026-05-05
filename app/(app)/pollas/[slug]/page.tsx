@@ -264,6 +264,12 @@ interface MatchRowProps {
    *  no hay nada que revelar. */
   otherPredictions: OtherPrediction[];
   locked: boolean;
+  /** Display names de participantes approved+paid que aún NO han
+   *  pronosticado este partido. Solo se renderizan cuando !locked —
+   *  sirve para que el parche se nudgee mutuamente antes del cierre.
+   *  Cuando el match se bloquea, esta lista se oculta y los marcadores
+   *  pasan a mostrarse via otherPredictions. Pasar [] si todos predijeron. */
+  missingPredictions: string[];
 }
 
 function MatchRow({
@@ -279,6 +285,7 @@ function MatchRow({
   tournamentSlug,
   otherPredictions,
   locked,
+  missingPredictions,
 }: MatchRowProps) {
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
@@ -466,6 +473,22 @@ function MatchRow({
               Tu {pred.predicted_home}-{pred.predicted_away} ·{" "}
               {(pointsEarned ?? 0) > 0 ? `+${pointsEarned}` : "0"} pts
             </span>
+          </div>
+        ) : null}
+
+        {/* Lista de quién aún no pronosticó. Visible para todos los
+            miembros mientras el partido NO está bloqueado. Sirve para
+            nudgear ("hey, no has puesto pronóstico"). Sin marcadores —
+            solo nombres. Cuando el match se bloquea, desaparece esta
+            sección y aparece la de pronósticos revelados (abajo). */}
+        {!locked && missingPredictions.length > 0 ? (
+          <div className="mt-3 pt-3 border-t border-border-subtle">
+            <p className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60 mb-1.5">
+              ⏳ Aún no pronostica · {missingPredictions.length}
+            </p>
+            <p className="text-[12px] text-text-primary/80 leading-snug">
+              {missingPredictions.join(", ")}
+            </p>
           </div>
         ) : null}
 
@@ -813,6 +836,36 @@ export default function PollaSlugPage() {
     return m;
   }, [participants]);
 
+  // Para cada match, lista de display_names de participantes
+  // approved+paid que NO tienen prediction. Visible solo cuando match
+  // no está bloqueado (la check de locked vive en MatchRow). Sirve
+  // para nudgear al parche antes del cierre.
+  const missingByMatch = useMemo(() => {
+    const out = new Map<string, string[]>();
+    if (participantInfoById.size === 0) return out;
+    // Para cada match, calcular: participantes - quienes ya predijeron.
+    const predsByMatch = new Map<string, Set<string>>();
+    for (const ap of allPredictions) {
+      const set = predsByMatch.get(ap.match_id);
+      if (set) set.add(ap.user_id);
+      else predsByMatch.set(ap.match_id, new Set([ap.user_id]));
+    }
+    // Solo computamos para matches scheduled (los locked/live/finished
+    // no muestran missing — ya pasó el momento de pronosticar).
+    for (const m of matches) {
+      if (m.status !== "scheduled") continue;
+      const predicted = predsByMatch.get(m.id) ?? new Set<string>();
+      const missing: string[] = [];
+      Array.from(participantInfoById.entries()).forEach(([uid, info]) => {
+        if (predicted.has(uid)) return;
+        missing.push(info.display_name ?? "Anónimo");
+      });
+      missing.sort((a, b) => a.localeCompare(b));
+      if (missing.length > 0) out.set(m.id, missing);
+    }
+    return out;
+  }, [matches, allPredictions, participantInfoById]);
+
   // Agrupa los pronósticos de TODOS por match_id (incluido el usuario
   // actual marcado con is_me=true para que pueda verse junto a los demás).
   // Descarta los que ya no están en la lista de participantes approved+paid.
@@ -1074,6 +1127,7 @@ export default function PollaSlugPage() {
                             tournamentSlug={polla.tournament}
                             otherPredictions={otherPredsByMatch.get(match.id) ?? []}
                             locked={isLocked(match)}
+                            missingPredictions={missingByMatch.get(match.id) ?? []}
                           />
                         ))}
                       </div>
@@ -1105,6 +1159,7 @@ export default function PollaSlugPage() {
                           tournamentSlug={polla.tournament}
                           otherPredictions={otherPredsByMatch.get(match.id) ?? []}
                           locked={isLocked(match)}
+                          missingPredictions={missingByMatch.get(match.id) ?? []}
                         />
                       ))}
                     </div>
@@ -1166,6 +1221,7 @@ export default function PollaSlugPage() {
                                   tournamentSlug={polla.tournament}
                                   otherPredictions={otherPredsByMatch.get(match.id) ?? []}
                                   locked={isLocked(match)}
+                                  missingPredictions={missingByMatch.get(match.id) ?? []}
                                 />
                               ))}
                             </div>

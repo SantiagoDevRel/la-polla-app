@@ -108,7 +108,17 @@ export default function AdminPage() {
       ]);
       if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
       else showToast("No se pudo cargar el panel", "error");
-      if (twilioRes.status === "fulfilled") setTwilio(twilioRes.value.data);
+      if (twilioRes.status === "fulfilled") {
+        setTwilio(twilioRes.value.data);
+      } else {
+        // Si la request falla (500/network), mostramos error en lugar de
+        // dejar el card en "Cargando…" para siempre.
+        const reason = twilioRes.reason as { response?: { data?: { error?: string } }; message?: string };
+        setTwilio({
+          configured: true,
+          error: reason?.response?.data?.error ?? reason?.message ?? "No se pudo cargar Twilio",
+        });
+      }
       if (analyticsRes.status === "fulfilled") setAnalytics(analyticsRes.value.data);
       if (discRes.status === "fulfilled") {
         setDiscrepancyCount(discRes.value.data.matches?.length ?? 0);
@@ -445,9 +455,9 @@ export default function AdminPage() {
                   ))}
                 </div>
 
-                {/* Login method breakdown */}
+                {/* Login method breakdown — usuarios únicos por método */}
                 <div>
-                  <p className="text-[10px] uppercase tracking-wide text-text-muted mb-1.5">Método de login</p>
+                  <p className="text-[10px] uppercase tracking-wide text-text-muted mb-1.5">Método de login (usuarios únicos)</p>
                   <div className="flex gap-3 text-xs">
                     <span className="text-text-secondary">SMS/OTP: <span className="text-gold font-bold">{analytics.methods.otp}</span></span>
                     <span className="text-text-secondary">Password: <span className="text-gold font-bold">{analytics.methods.password}</span></span>

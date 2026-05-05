@@ -96,7 +96,11 @@ export async function GET() {
   const cityCounts: Record<string, number> = {};
   const countryCounts: Record<string, number> = {};
   const deviceCounts: Record<string, number> = {};
-  const methodCounts: Record<string, number> = { otp: 0, password: 0 };
+  // Sets de user_ids únicos por método: cada usuario cuenta UNA vez,
+  // sin importar cuántas veces se loguee. Antes era count de events y
+  // se inflaba con testers que se loguean 10 veces.
+  const otpUsers = new Set<string>();
+  const passwordUsers = new Set<string>();
   const loginsByDay: Record<string, number> = {};
   const loginsByHour: number[] = Array(24).fill(0);
 
@@ -105,14 +109,14 @@ export async function GET() {
     if (meta.city) cityCounts[meta.city] = (cityCounts[meta.city] ?? 0) + 1;
     if (meta.country) countryCounts[meta.country] = (countryCounts[meta.country] ?? 0) + 1;
     if (meta.device) deviceCounts[meta.device] = (deviceCounts[meta.device] ?? 0) + 1;
-    if (meta.method === "otp" || meta.method === "password") {
-      methodCounts[meta.method]++;
-    }
+    if (meta.method === "otp") otpUsers.add(e.user_id);
+    else if (meta.method === "password") passwordUsers.add(e.user_id);
     const day = e.created_at.slice(0, 10);
     loginsByDay[day] = (loginsByDay[day] ?? 0) + 1;
     const hour = new Date(e.created_at).getHours();
     loginsByHour[hour]++;
   }
+  const methodCounts = { otp: otpUsers.size, password: passwordUsers.size };
 
   // Build a 14-day series for signups + logins (fill zeros for empty days).
   const days: string[] = [];
