@@ -18,7 +18,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTextMessage } from "./bot";
-import { clearState, getState } from "./state";
+import { clearState, getState, setState } from "./state";
 import { looksLikeMenuIntent } from "./menu-intent";
 import {
   handleCancelPrediction,
@@ -153,9 +153,17 @@ export async function processIncomingMessage(
       // Any other text falls through to the default menu nudge below.
     }
 
-    // Bare 6-char code in the join alphabet → ask SI/NO.
+    // Bare 6-char code in the join alphabet.
     const bareCode = lower.match(/^[abcdefghjklmnpqrstuvwxyz23456789]{6}$/);
     if (bareCode) {
+      // Si veníamos del flujo "Unirme con código" (empty Mis Pollas →
+      // botón → user manda el código), saltar la confirmación SI/NO y
+      // unir directo: el user ya consintió al tapear el botón.
+      if (state?.action === "waiting_join_code") {
+        await clearState(from);
+        await handleJoinByCode(from, user.id, lower.toUpperCase());
+        return;
+      }
       await handleJoinByCodeConfirm(from, lower.toUpperCase());
       return;
     }
@@ -211,6 +219,20 @@ async function routePayload(
     payload === "join_code_no";
   if (!keepState) {
     await clearState(from);
+  }
+
+  // "Unirme con código" desde empty-state de Mis Pollas. Setea state y
+  // pide al user que escriba el código de 6 caracteres en el próximo
+  // mensaje. La text branch lo agarra cuando state.action === "waiting_join_code"
+  // y llama handleJoinByCode directo (sin pasar por el SI/NO de
+  // handleJoinByCodeConfirm — el user ya pidió explícitamente unirse).
+  if (payload === "join_with_code") {
+    await setState(from, { action: "waiting_join_code" });
+    await sendTextMessage(
+      from,
+      "¡Dale parce! 🐥\n\nMandame el *código de 6 caracteres* del parche al que querés entrar.\n\n_Te lo pasó el organizador o cualquier miembro de la polla._",
+    );
+    return;
   }
 
   // Join-by-code SI/NO.
