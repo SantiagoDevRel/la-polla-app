@@ -451,11 +451,10 @@ export async function handlePollaMenu(
     `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
     `¿Qué quieres hacer parce?`;
 
-  // Same 3 reply-button layout for admins and players. Reply buttons
-  // auto-send on tap (lists need a confirm), so this avoids a friction
-  // step every player hits. Admin-only "Generar código" was retired in
-  // favor of the universal "Invitar a la polla" CTA below — every member
-  // can invite, the join code rotation lives in the web admin panel.
+  // Solo el menú con 3 reply buttons. Antes se mandaba un follow-up
+  // "Invitar a la polla" con CTA URL — sacado por feedback del user
+  // 2026-05-04: spammeaba en cada renderizado del menú. Para invitar,
+  // queda el comando explícito "invitar" o se hace desde la web.
   await sendReplyButtons(
     phone,
     body,
@@ -467,12 +466,6 @@ export async function handlePollaMenu(
     polla.name,
     FOOTER,
   );
-
-  // Follow-up "Invitar a la polla" message. WhatsApp's interactive block
-  // can't mix reply buttons with a CTA URL in the same payload, so we
-  // send a second message with the share-sheet deep link. Tapping it
-  // opens WhatsApp's contact picker pre-filled with the invite text.
-  await sendInviteFriendCTA(phone, polla);
 }
 
 /**
@@ -1051,6 +1044,15 @@ export async function handleConfirmPrediction(
     return;
   }
 
+  // Detectar si es la primera predicción del user (en cualquier polla).
+  // Lo usamos abajo para disparar el ask de payment method una sola vez,
+  // justo cuando la persona ya está activamente jugando.
+  const { count: prevPredCount } = await supabase
+    .from("predictions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+  const isFirstPredictionEver = (prevPredCount ?? 0) === 0;
+
   // Upsert prediction
   const { error } = await supabase.from("predictions").upsert(
     {
@@ -1092,6 +1094,24 @@ export async function handleConfirmPrediction(
     "Pronóstico guardado ✅",
     FOOTER
   );
+
+  // Después de la PRIMERA predicción de su vida, si la polla tiene
+  // buy_in > 0 y no tiene método de pago guardado, le pedimos. Solo en
+  // ese momento — no antes (saturaba al unirse) ni después (perdía el
+  // momento de mayor engagement).
+  if (isFirstPredictionEver) {
+    const { data: pollaInfo } = await supabase
+      .from("pollas")
+      .select("buy_in_amount")
+      .eq("id", pollaId)
+      .maybeSingle();
+    if (pollaInfo && Number(pollaInfo.buy_in_amount) > 0) {
+      const { userNeedsPaymentInfo, askPaymentMethod } = await import("./payment");
+      if (await userNeedsPaymentInfo(user.id)) {
+        await askPaymentMethod(phone);
+      }
+    }
+  }
 }
 
 // ─── FLOW 6: Leaderboard ───
@@ -1528,17 +1548,10 @@ export async function handleJoinByCode(
       return;
     }
 
-    // Polla gratis o pay_winner: abrir polla menu directo.
+    // Polla gratis o pay_winner: abrir polla menu directo. El método de
+    // pago se pide después de la primera predicción (no acá) — evita
+    // saturar al user con preguntas apenas se une.
     await handlePollaMenu(phone, userId, result.polla.id);
-
-    // Si la polla tiene buy_in > 0 (pay_winner) y user no tiene
-    // método de pago guardado, lo pedimos para cuando toque cobrar.
-    if (buyIn > 0) {
-      const { userNeedsPaymentInfo, askPaymentMethod } = await import("./payment");
-      if (await userNeedsPaymentInfo(userId)) {
-        await askPaymentMethod(phone);
-      }
-    }
     return;
   }
 
