@@ -234,15 +234,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Build the body parameters.
+    // {{1}} = first name. {{2}} = "N pronóstico(s)" — short string que
+    // se inyecta en una frase del body fijo. NO mandamos la lista de
+    // partidos para evitar que Meta rechace el template por contenido
+    // de variable demasiado estructurado.
     const firstName = (entry.display_name ?? "parce").split(" ")[0];
-    const matchesText = formatMatchesBlock(entry.matches);
+    const count = entry.matches.length;
+    const countText = count === 1 ? "1 pronóstico" : `${count} pronósticos`;
 
     const components: TemplateComponent[] = [
       {
         type: "body",
         parameters: [
           { type: "text", text: firstName },
-          { type: "text", text: matchesText },
+          { type: "text", text: countText },
         ],
       },
     ];
@@ -259,7 +264,7 @@ export async function POST(request: NextRequest) {
       user_id: entry.user_id,
       phone: entry.whatsapp_number,
       template_name: TEMPLATE_NAME,
-      variables: { firstName, matchesText, matchCount: entry.matches.length },
+      variables: { firstName, countText, matchCount: entry.matches.length },
       meta_message_id: result.messageId ?? null,
       status: result.ok ? "sent" : "failed",
       error: result.error ?? null,
@@ -287,58 +292,4 @@ export async function POST(request: NextRequest) {
     },
     errors: errors.slice(0, 5),
   });
-}
-
-/**
- * Formatea la lista de matches como bloque de texto que va en el
- * template variable {{2}}. Ej output:
- *
- *   Tienes 2 pronosticos pendientes hoy:
- *
- *   • 2:00pm Real Madrid vs Barcelona
- *   • 4:30pm PSG vs Bayern Munich
- *
- *   Polla: Champions 2024-25
- */
-function formatMatchesBlock(matches: MatchToRemind[]): string {
-  const count = matches.length;
-  const header =
-    count === 1
-      ? "Tienes 1 pronostico pendiente hoy:"
-      : `Tienes ${count} pronosticos pendientes hoy:`;
-
-  // Sort by kickoff time
-  const sorted = [...matches].sort((a, b) =>
-    a.scheduled_at.localeCompare(b.scheduled_at),
-  );
-
-  const lines = sorted.map((m) => {
-    const time = formatBogotaTime(m.scheduled_at);
-    return `• ${time} ${m.home_team} vs ${m.away_team}`;
-  });
-
-  // Group polla names (may have one or several)
-  const pollaNames = Array.from(new Set(sorted.map((m) => m.polla_name)));
-  const pollaLine =
-    pollaNames.length === 1
-      ? `Polla: ${pollaNames[0]}`
-      : `Pollas: ${pollaNames.join(", ")}`;
-
-  return `${header}\n\n${lines.join("\n")}\n\n${pollaLine}`;
-}
-
-/**
- * Format an ISO timestamp as "h:mma" en Bogota TZ. Ej "2026-05-05T19:00:00Z"
- * → "2:00pm".
- */
-function formatBogotaTime(iso: string): string {
-  const d = new Date(iso);
-  // Adjust to Bogota (UTC-5)
-  const bog = new Date(d.getTime() - 5 * 60 * 60 * 1000);
-  const h24 = bog.getUTCHours();
-  const m = bog.getUTCMinutes();
-  const ampm = h24 >= 12 ? "pm" : "am";
-  const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
-  const mm = m.toString().padStart(2, "0");
-  return `${h12}:${mm}${ampm}`;
 }
