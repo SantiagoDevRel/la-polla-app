@@ -17,11 +17,13 @@ export function looksLikeMenuIntent(body: string): boolean {
     "hola", "ola", "hi", "hey", "ey", "ola parce",
     "buenas", "buenas tardes", "buenos dias", "buenos días", "buenas noches",
     "menu", "menú", "inicio", "start",
+    "pronosticar", "pronostico", "pronóstico", "predecir", "predicciones",
     "que mas", "qué más", "que mas parce", "qué más parce",
     "parce", "parcero",
   ]);
   if (exactGreetings.has(t)) return true;
   if (/\bmen[uú]\b/.test(t)) return true;
+  if (/\bpronostic\w*/.test(t)) return true;
   if (/^(hola|ola|hey|buenas|parce|que\s*m[aá]s|qu[eé]\s*onda)\b/.test(t)) return true;
   if (/(mu[eé]stra(me)?|mostr(a|á)me|d[aá]me)\s+(el\s+)?men[uú]/.test(t)) return true;
   return false;
