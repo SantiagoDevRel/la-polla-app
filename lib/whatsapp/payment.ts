@@ -151,7 +151,8 @@ export async function handlePaymentAccountSubmit(
     await sendTextMessage(
       phone,
       `✅ Listo. Guardé tu info de pago:\n*${trimmed}*\n\n` +
-        `_Para cambiarla, escribe_ *pago* _en cualquier momento._`,
+        `_Para cambiarla, escribe_ *pago* _en cualquier momento._\n` +
+        `_Escribe_ *menu* _para volver al menú principal._`,
     );
     return;
   }
@@ -173,7 +174,8 @@ export async function handlePaymentAccountSubmit(
   await sendTextMessage(
     phone,
     `✅ Listo parce. Guardé tu *${method.label}* al *${digits}*.\n\n` +
-      `_Para cambiarla, escribe_ *pago* _en cualquier momento._`,
+      `_Para cambiarla, escribe_ *pago* _en cualquier momento._\n` +
+      `_Escribe_ *menu* _para volver al menú principal._`,
   );
 }
 
@@ -394,11 +396,8 @@ export async function handlePaymentProofImage(
     return;
   }
 
-  // 7. Confirmar recepción y avisar que va a verificar
-  await sendTextMessage(
-    phone,
-    "📸 Recibí tu comprobante. Verificando... ⏳",
-  );
+  // (sin mensaje "verificando..." — el user ya ve la indicación de typing
+  // del bot mientras procesamos. Ahorra spam.)
 
   // 8. Llamar al verifier AI
   const expected = {
@@ -440,7 +439,8 @@ export async function handlePaymentProofImage(
     await clearState(phone);
     await sendTextMessage(
       phone,
-      "El verificador automático no está disponible ahora. El organizador revisará tu comprobante manualmente y te avisamos cuando apruebe.",
+      "El verificador automático no está disponible ahora. El organizador revisará tu comprobante manualmente.\n\n" +
+        "_Escribe_ *menu* _para volver al menú principal._",
     );
     return;
   }
@@ -490,34 +490,25 @@ export async function handlePaymentProofImage(
       })
       .eq("id", participant.id);
 
-    await sendTextMessage(
-      phone,
-      `✅ ¡Comprobante aprobado! Ya estás dentro de *${polla.name}*. ¡A pronosticar! 🎯`,
-    );
-    // Mostrar el menú de la polla para que arranque a pronosticar.
+    // SOLO el menú de la polla. Sin "comprobante aprobado!" + sin
+    // ask de payment method (eso se hace cuando hagan su primera
+    // predicción, no acá). El polla menu en sí ya tiene "🏆 nombre"
+    // + Pronosticar/Tabla/Resultados — eso es la confirmación.
     const { handlePollaMenu } = await import("./flows");
     await handlePollaMenu(phone, userId, polla.id);
-
-    // Si todavía no tiene método de pago default, lo pedimos ahora —
-    // single moment para capturarlo (la primera polla con buy-in que paga).
-    if (await userNeedsPaymentInfo(userId)) {
-      await askPaymentMethod(phone);
-    }
     return;
   }
 
-  // 11. AI rechazó → explicar y dejar que reintenten (hasta cap)
-  const reason = verifyResult.rejectionReason ?? "El comprobante no parece válido.";
+  // 11. AI rechazó. Mensaje corto: pedile al organizador que apruebe.
+  // Limpiamos el state — si quiere reintentar puede mandar otra foto y
+  // el cap por polla lo deja hasta MAX_PROOFS_PER_POLLA.
+  await clearState(phone);
   await sendTextMessage(
     phone,
-    `⚠️ *No pude aprobar el comprobante automáticamente.*\n\n${reason}\n\n` +
-      `Puedes mandarme otra foto más clara, o pedirle al organizador que apruebe manual.`,
+    `❌ No pude aprobar el comprobante.\n\n` +
+      `Pídele al organizador de *${polla.name}* que apruebe tu pago manualmente.\n\n` +
+      `_Escribe_ *menu* _para volver al menú principal._`,
   );
-  // No clearState — dejamos waiting_payment_proof para el reintento.
-  await setState(phone, {
-    action: "waiting_payment_proof",
-    pollaId: polla.id,
-  });
 }
 
 // ─── Comando "pago": ver/cambiar info actual ───
