@@ -217,11 +217,71 @@ export async function handleMainMenu(
 
 // ─── FLOW 2: Unknown User ───
 
+/**
+ * Cuando el bot recibe un mensaje desde un número que NO tiene cuenta:
+ * creamos auth.users + public.users sobre la marcha (la WA delivery es
+ * proof-of-ownership del número) y disparamos el flujo de onboarding 100%
+ * en WhatsApp. Después de esto el siguiente mensaje del user encuentra
+ * un perfil en DB y entra al gate de onboarding del router normal.
+ *
+ * Mismo patrón que /api/auth/wa-magic crea cuentas para users sin row,
+ * pero acá iniciado por el primer "hola" al bot en vez de por tap a un
+ * magic link.
+ */
 export async function handleUnknownUser(phone: string) {
-  await sendTextMessage(
-    phone,
-    "No te encuentro en La Polla 🐣. Registrate en lapollacolombiana.com y volvé a escribirme cuando tengas tu cuenta."
-  );
+  const { handleAskName } = await import("./onboarding");
+  const { normalizePhone, emailForPhone } = await import("@/lib/auth/phone");
+
+  const phoneNormalized = normalizePhone(phone);
+  const phoneE164 = `+${phoneNormalized}`;
+  const syntheticEmail = emailForPhone(phoneNormalized);
+
+  const supabase = createAdminClient();
+
+  // Buscar usuario por phone (puede ya existir en auth.users sin row en
+  // public.users — el trigger debería crearlo, pero por seguridad).
+  let authUserId: string | null = null;
+  const { data: rpcId } = await supabase.rpc("find_auth_user_id_by_phone", {
+    p_phone: phoneE164,
+  });
+  if (typeof rpcId === "string" && rpcId.length > 0) {
+    authUserId = rpcId;
+  }
+
+  if (!authUserId) {
+    const { data: created, error: createErr } =
+      await supabase.auth.admin.createUser({
+        phone: phoneE164,
+        phone_confirm: true,
+        email: syntheticEmail,
+        email_confirm: true,
+      });
+    if (createErr || !created.user) {
+      console.error("[wa-unknown] createUser failed:", createErr);
+      await sendTextMessage(
+        phone,
+        "No pude crear tu cuenta, parce. Inténtalo en un minuto.",
+      );
+      return;
+    }
+    authUserId = created.user.id;
+  }
+
+  // Asegurar que public.users existe (el trigger normalmente lo crea, pero
+  // si estamos en una race lo upserteamos manualmente).
+  await supabase
+    .from("users")
+    .upsert(
+      {
+        id: authUserId,
+        whatsapp_number: phoneNormalized,
+        whatsapp_verified: true,
+      },
+      { onConflict: "id" },
+    );
+
+  // Arrancar onboarding en WA: pedir el nombre.
+  await handleAskName(phone);
 }
 
 // ─── FLOW 3: Mis Pollas ───
@@ -242,7 +302,7 @@ export async function handleMisPollas(phone: string, userId: string) {
     // esperamos los 6 caracteres en el siguiente mensaje.
     await sendReplyButtons(
       phone,
-      "Todavía no estás en ninguna polla 🐣\n\n¿Tienes un *código de invitación* de un parche? Pegámelo y te uno al toque.",
+      "Todavía no estás en ninguna polla 🐣\n\n¿Tienes el *código de invitación* de un parche? Pásamelo y entras de una.",
       [{ id: "join_with_code", title: "Unirme con código" }],
       undefined,
       FOOTER,
@@ -250,7 +310,7 @@ export async function handleMisPollas(phone: string, userId: string) {
     // Follow-up CTA URL para crear la propia polla.
     await sendCTAButton(
       phone,
-      "_O si querés armar tu propio parche desde cero:_",
+      "_O si quieres armar tu propio parche desde cero:_",
       "Crear mi polla",
       `${APP_URL}/pollas/crear`,
       FOOTER,
