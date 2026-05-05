@@ -68,6 +68,8 @@ export async function updateSession(request: NextRequest) {
     "/api/pollas/preview",
     "/unirse",
     "/invites/polla",
+    "/privacy",
+    "/soporte",
   ];
   const isPublicRoute = publicRoutes.some((route) => path.startsWith(route));
 
