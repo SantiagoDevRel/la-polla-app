@@ -111,15 +111,25 @@ function PaymentPendingBanner({ onGo }: { onGo: () => void }) {
 }
 
 function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: string }) {
-  if (flagUrl) {
+  // Track si la imagen falló al cargar (404, CORS, network, etc.) para
+  // mostrar fallback con iniciales en vez de quedar en blanco. El bug
+  // anterior usaba onError → display:none, dejando espacio vacío.
+  const [errored, setErrored] = useState(false);
+
+  // unoptimized: skipea el optimizador de imágenes de Vercel para
+  // logos externos pequeños (24x24). Evita rate limits del optimizer
+  // + reduce 404 silenciosos cuando el optimizer no puede procesar
+  // la URL externa por permisos.
+  if (flagUrl && !errored) {
     return (
       <Image
         src={flagUrl}
         alt={teamName}
         width={24}
         height={24}
+        unoptimized
         style={{ objectFit: "contain", borderRadius: "50%" }}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+        onError={() => setErrored(true)}
       />
     );
   }
