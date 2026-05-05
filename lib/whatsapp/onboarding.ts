@@ -19,7 +19,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTextMessage } from "./bot";
 import { sendReplyButtons, sendListMessage } from "./interactive";
-import { setState, clearState } from "./state";
+import { setState, getState, clearState } from "./state";
 import { isValidDisplayName, needsName } from "@/lib/users/needs-name";
 import { POLLITO_TYPES } from "@/lib/pollitos";
 
@@ -116,7 +116,14 @@ export async function sendAskPollito(
   phone: string,
   page: number,
 ): Promise<void> {
-  await setState(phone, { action: "onboarding_pick_pollito" });
+  // Preservar pending_join_code si venía desde el step anterior — sin
+  // esto, cada setState lo borraría y se perdería la intención del wa.me
+  // link al cambiar de step de onboarding.
+  const prev = await getState(phone);
+  await setState(phone, {
+    action: "onboarding_pick_pollito",
+    pendingJoinCode: prev?.pendingJoinCode,
+  });
 
   const start = page * POLLITOS_PER_PAGE;
   const end = start + POLLITOS_PER_PAGE;
@@ -177,9 +184,25 @@ export async function handlePollitoConfirmed(
     return;
   }
 
+  // Antes de limpiar el state, sacamos pendingJoinCode si lo había.
+  // Si el user llegó por wa.me link de invitación, lo unimos directo a
+  // esa polla sin que tenga que tapear nada más — es el camino "abuela".
+  const prev = await getState(phone);
+  const pendingCode = prev?.pendingJoinCode;
   await clearState(phone);
 
-  // Welcome + nudge to either join with a code or create their own.
+  if (pendingCode) {
+    const { handleJoinByCode } = await import("./flows");
+    await sendTextMessage(
+      phone,
+      "¡Listo, parcero! 🎉 Tu perfil quedó armado.\n\n" +
+        "Ahora te uno a la polla a la que te invitaron 👇",
+    );
+    await handleJoinByCode(phone, userId, pendingCode);
+    return;
+  }
+
+  // Sin pending code: welcome + opción de unirse con código manual.
   await sendReplyButtons(
     phone,
     "¡Listo, parcero! 🎉 Ya tienes tu perfil armado.\n\n" +

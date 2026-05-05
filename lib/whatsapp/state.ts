@@ -55,6 +55,11 @@ export type ConversationState = {
   predictGroupMode?: "phase" | "date";
   predictGroupKey?: string;
   predictGroupPage?: number;
+  // Set when bot recibe "unirse XXXXXX" desde un usuario sin cuenta. Lo
+  // preservamos durante el onboarding (nombre + pollito) para auto-join
+  // al final. Sin esto el code se perderia entre el primer mensaje y el
+  // welcome final.
+  pendingJoinCode?: string;
 };
 
 const STATE_TTL_MINUTES = 10;
@@ -74,6 +79,7 @@ interface StateRow {
   predict_group_mode: "phase" | "date" | null;
   predict_group_key: string | null;
   predict_group_page: number | null;
+  pending_join_code: string | null;
   updated_at: string;
   expires_at: string;
 }
@@ -81,7 +87,7 @@ interface StateRow {
 const SELECT_COLUMNS =
   "phone, action, polla_id, match_id, match_index, total_matches, page, " +
   "predicted_home, predicted_away, join_code, predict_group_mode, " +
-  "predict_group_key, predict_group_page, updated_at, expires_at";
+  "predict_group_key, predict_group_page, pending_join_code, updated_at, expires_at";
 
 async function retryOnce<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -121,6 +127,7 @@ export async function setState(
     predict_group_mode: state.predictGroupMode ?? null,
     predict_group_key: state.predictGroupKey ?? null,
     predict_group_page: state.predictGroupPage ?? null,
+    pending_join_code: state.pendingJoinCode ?? null,
     updated_at: new Date().toISOString(),
     expires_at: new Date(
       Date.now() + STATE_TTL_MINUTES * 60 * 1000,
@@ -167,6 +174,7 @@ export async function getState(
       predictGroupMode: row.predict_group_mode ?? undefined,
       predictGroupKey: row.predict_group_key ?? undefined,
       predictGroupPage: row.predict_group_page ?? undefined,
+      pendingJoinCode: row.pending_join_code ?? undefined,
     };
   } catch (error) {
     console.error("[conversation_state] getState failed", {

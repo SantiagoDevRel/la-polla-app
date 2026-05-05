@@ -35,6 +35,7 @@ interface PollaSummary {
   match_ids: string[] | null;
   payment_mode: string;
   admin_payment_instructions: string | null;
+  join_code?: string;
 }
 
 interface OrganizerSummary {
@@ -462,12 +463,24 @@ export default function OpenInvitePage() {
               <p className="text-text-secondary text-sm mt-0.5">No puedes unirte.</p>
             </div>
           ) : authed === false ? (
-            <button
-              onClick={goLogin}
-              className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all text-base"
-            >
-              Iniciar sesión y unirse
-            </button>
+            <>
+              {polla.join_code ? (
+                <a
+                  href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER ?? "573117312391"}?text=${encodeURIComponent(`unirse ${polla.join_code}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full block text-center bg-[#25D366] text-white font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all text-base"
+                >
+                  Continuar en WhatsApp
+                </a>
+              ) : null}
+              <button
+                onClick={goLogin}
+                className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all text-base mt-2"
+              >
+                {polla.join_code ? "O iniciar sesión en la web" : "Iniciar sesión y unirse"}
+              </button>
+            </>
           ) : (
             <button
               onClick={handleJoin}
