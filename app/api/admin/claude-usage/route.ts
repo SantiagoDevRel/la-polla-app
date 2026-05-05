@@ -62,7 +62,7 @@ export async function GET() {
       .from("claude_api_usage")
       .select("id, user_id, polla_id, endpoint, model, tokens_in, tokens_out, image_bytes, cost_usd, success, error_message, created_at")
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(50),
   ]);
 
   const mtd = (mtdRows ?? []) as UsageRow[];
@@ -141,6 +141,60 @@ export async function GET() {
     }))
     .sort((a, b) => b.count24h - a.count24h);
 
+  // Para los recent calls que son de payment-proof (web o WA),
+  // buscamos el screenshot asociado en payment_proofs (match por
+  // user_id + polla_id en ventana de ±10 min) y generamos signed URL.
+  // Esto permite ver el thumbnail del screenshot directo en el card del
+  // dashboard de Claude API sin saltar a otra pantalla.
+  const proofEndpoints = new Set(["pollas/payment-proof", "wa/payment-proof"]);
+  const proofCalls = recent.filter(
+    (r) => r.user_id && r.polla_id && proofEndpoints.has(r.endpoint),
+  );
+  const screenshotByCallId = new Map<string, string>();
+  if (proofCalls.length > 0) {
+    // Window de busqueda: ±10 min del call, mismo user+polla.
+    const earliestCall = proofCalls.reduce(
+      (m, r) => (r.created_at < m ? r.created_at : m),
+      proofCalls[0].created_at,
+    );
+    const earliestSearchTime = new Date(
+      new Date(earliestCall).getTime() - 10 * 60 * 1000,
+    ).toISOString();
+    const { data: proofs } = await admin
+      .from("payment_proofs")
+      .select("user_id, polla_id, storage_path, created_at")
+      .gte("created_at", earliestSearchTime);
+    const proofList = (proofs ?? []) as Array<{
+      user_id: string;
+      polla_id: string;
+      storage_path: string;
+      created_at: string;
+    }>;
+
+    for (const call of proofCalls) {
+      // Encontrar el proof mas cercano en tiempo para mismo user+polla
+      const callTime = new Date(call.created_at).getTime();
+      let bestProof: typeof proofList[0] | null = null;
+      let bestDiff = Infinity;
+      for (const p of proofList) {
+        if (p.user_id !== call.user_id || p.polla_id !== call.polla_id) continue;
+        const diff = Math.abs(new Date(p.created_at).getTime() - callTime);
+        if (diff < bestDiff && diff <= 10 * 60 * 1000) {
+          bestDiff = diff;
+          bestProof = p;
+        }
+      }
+      if (bestProof) {
+        const { data: signed } = await admin.storage
+          .from("payment-proofs")
+          .createSignedUrl(bestProof.storage_path, 60 * 60);
+        if (signed?.signedUrl) {
+          screenshotByCallId.set(call.id, signed.signedUrl);
+        }
+      }
+    }
+  }
+
   return NextResponse.json({
     mtdTotal: {
       calls: totalCalls,
@@ -164,6 +218,7 @@ export async function GET() {
       success: r.success,
       errorMessage: r.error_message,
       createdAt: r.created_at,
+      screenshotUrl: screenshotByCallId.get(r.id) ?? null,
     })),
   });
 }

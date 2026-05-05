@@ -63,7 +63,7 @@ interface Analytics {
   top_cities: { key: string; count: number }[];
   top_countries: { key: string; count: number }[];
   top_devices: { key: string; count: number }[];
-  methods: { otp: number; password: number };
+  methods: { otp: number };
   logins_by_hour: number[];
 }
 
@@ -92,6 +92,19 @@ export default function AdminPage() {
     byEndpoint: Array<{ endpoint: string; calls: number; cost: number }>;
     suspicious: Array<{ userId: string; displayName: string; count24h: number }>;
     suspiciousThreshold: number;
+    recent?: Array<{
+      id: string;
+      userId: string | null;
+      displayName: string | null;
+      endpoint: string;
+      tokensIn: number;
+      tokensOut: number;
+      costUSD: number;
+      success: boolean;
+      errorMessage: string | null;
+      createdAt: string;
+      screenshotUrl: string | null;
+    }>;
   } | null>(null);
   const [waTemplateUsage, setWaTemplateUsage] = useState<{
     mtd: { total_sends: number; total_sent: number; total_failed: number; cost_usd: number; period_start: string };
@@ -496,7 +509,7 @@ export default function AdminPage() {
                 className="rounded-2xl p-4 space-y-4"
                 style={{ background: "#0e1420", border: "1px solid rgba(255,255,255,0.06)" }}
               >
-                <h2 className="text-sm font-bold text-text-primary">Ubicación y dispositivos (30d)</h2>
+                <h2 className="text-sm font-bold text-text-primary">Ubicación y dispositivos (30d, usuarios únicos)</h2>
 
                 <div className="grid grid-cols-1 gap-4">
                   {[
@@ -529,12 +542,11 @@ export default function AdminPage() {
                   ))}
                 </div>
 
-                {/* Login method breakdown — usuarios únicos por método */}
+                {/* Login method breakdown — solo SMS/OTP (no usamos password) */}
                 <div>
                   <p className="text-[10px] uppercase tracking-wide text-text-muted mb-1.5">Método de login (usuarios únicos)</p>
                   <div className="flex gap-3 text-xs">
                     <span className="text-text-secondary">SMS/OTP: <span className="text-gold font-bold">{analytics.methods.otp}</span></span>
-                    <span className="text-text-secondary">Password: <span className="text-gold font-bold">{analytics.methods.password}</span></span>
                   </div>
                 </div>
               </section>
@@ -639,6 +651,78 @@ export default function AdminPage() {
                 ) : (
                   <p className="text-[11px] text-text-muted">Sin uso este mes todavía.</p>
                 )}
+
+                {/* Lista scrolleable de calls recientes con thumbnail
+                    del screenshot cuando aplica (payment-proof endpoints).
+                    Hasta 50 calls, max-height 480 con overflow. */}
+                {claudeUsage.recent && claudeUsage.recent.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase tracking-wide text-text-muted">
+                      Calls recientes ({claudeUsage.recent.length})
+                    </p>
+                    <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                      {claudeUsage.recent.map((call) => (
+                        <div
+                          key={call.id}
+                          className="rounded-lg p-2 flex gap-2"
+                          style={{ background: "#131d2e", border: "1px solid rgba(255,255,255,0.04)" }}
+                        >
+                          {call.screenshotUrl ? (
+                            <a
+                              href={call.screenshotUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="shrink-0 w-14 h-14 rounded overflow-hidden bg-black"
+                              title="Ver screenshot completo"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={call.screenshotUrl}
+                                alt="proof"
+                                className="w-full h-full object-cover"
+                              />
+                            </a>
+                          ) : (
+                            <div
+                              className="shrink-0 w-14 h-14 rounded flex items-center justify-center text-[10px] text-text-muted"
+                              style={{ background: "rgba(255,255,255,0.03)" }}
+                            >
+                              —
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-[11px] text-text-primary truncate">
+                                {call.displayName ?? "(sin user)"}
+                              </span>
+                              <span
+                                className={`text-[10px] tabular-nums shrink-0 ${
+                                  call.success ? "text-text-muted" : "text-red-alert"
+                                }`}
+                                style={{ fontFeatureSettings: '"tnum"' }}
+                              >
+                                ${call.costUSD.toFixed(4)}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-text-muted truncate">
+                              {call.endpoint} · {call.tokensIn}↓/{call.tokensOut}↑ tokens
+                            </p>
+                            <p className="text-[10px] text-text-muted">
+                              {new Date(call.createdAt).toLocaleString("es-CO", {
+                                month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                              })}
+                            </p>
+                            {call.errorMessage && (
+                              <p className="text-[10px] text-red-alert truncate mt-0.5">
+                                {call.errorMessage}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </section>
             ) : null}
 
@@ -676,7 +760,9 @@ export default function AdminPage() {
                 <h2 className="text-sm font-bold text-text-primary">Usuarios</h2>
                 <span className="text-xs text-text-muted">{summary?.users.length ?? 0}</span>
               </div>
-              <div className="space-y-2">
+              {/* Scroll interno para no inflar la página global. ~480px
+                  cabe ~7-8 user rows, después scroll dentro del card. */}
+              <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
                 {summary?.users.map((u) => (
                   <div
                     key={u.id}
@@ -726,7 +812,8 @@ export default function AdminPage() {
                 <h2 className="text-sm font-bold text-text-primary">Pollas</h2>
                 <span className="text-xs text-text-muted">{summary?.pollas.length ?? 0}</span>
               </div>
-              <div className="space-y-2">
+              {/* Scroll interno para no inflar la página global. */}
+              <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
                 {summary?.pollas.map((p) => (
                   <div
                     key={p.id}

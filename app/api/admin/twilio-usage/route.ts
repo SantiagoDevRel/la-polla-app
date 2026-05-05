@@ -76,8 +76,21 @@ export async function GET() {
     const ok = [smsMonthRes, smsAllRes, verifyMonthRes, verifyAllRes, totalMonthRes].every(r => r.ok);
     if (!ok) {
       const failed = [smsMonthRes, smsAllRes, verifyMonthRes, verifyAllRes, totalMonthRes].find(r => !r.ok);
+      // Leemos el body del error de Twilio para que el admin vea el motivo
+      // exacto (ej. "Authentication Error: invalid credentials").
+      let body = "";
+      try {
+        body = (await failed?.text()) ?? "";
+      } catch {
+        // ignore body read failure
+      }
+      const detail = body.slice(0, 240).replace(/\s+/g, " ");
+      console.error("[twilio-usage] Twilio API error:", failed?.status, detail);
       return NextResponse.json(
-        { configured: true, error: `Twilio API ${failed?.status}: ${failed?.statusText}` },
+        {
+          configured: true,
+          error: `Twilio API ${failed?.status} ${failed?.statusText}${detail ? ` — ${detail}` : ""}`,
+        },
         { status: 502 },
       );
     }

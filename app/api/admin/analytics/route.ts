@@ -93,30 +93,44 @@ export async function GET() {
   ).size;
   const activeUsers30d = new Set(events.map(e => e.user_id)).size;
 
-  const cityCounts: Record<string, number> = {};
-  const countryCounts: Record<string, number> = {};
-  const deviceCounts: Record<string, number> = {};
-  // Sets de user_ids únicos por método: cada usuario cuenta UNA vez,
-  // sin importar cuántas veces se loguee. Antes era count de events y
-  // se inflaba con testers que se loguean 10 veces.
+  // Para ciudad/país/device contamos USUARIOS ÚNICOS, no eventos.
+  // Antes era count de login events y se inflaba con testers (yo me
+  // logueo 10 veces desde Medellín y aparecen 10 — basura). Lo que
+  // queremos saber: cuántos users distintos tenemos en cada lugar.
+  const cityUsers: Record<string, Set<string>> = {};
+  const countryUsers: Record<string, Set<string>> = {};
+  const deviceUsers: Record<string, Set<string>> = {};
   const otpUsers = new Set<string>();
-  const passwordUsers = new Set<string>();
   const loginsByDay: Record<string, number> = {};
   const loginsByHour: number[] = Array(24).fill(0);
 
   for (const e of events) {
     const meta = e.metadata ?? {};
-    if (meta.city) cityCounts[meta.city] = (cityCounts[meta.city] ?? 0) + 1;
-    if (meta.country) countryCounts[meta.country] = (countryCounts[meta.country] ?? 0) + 1;
-    if (meta.device) deviceCounts[meta.device] = (deviceCounts[meta.device] ?? 0) + 1;
+    if (meta.city) {
+      (cityUsers[meta.city] ??= new Set()).add(e.user_id);
+    }
+    if (meta.country) {
+      (countryUsers[meta.country] ??= new Set()).add(e.user_id);
+    }
+    if (meta.device) {
+      (deviceUsers[meta.device] ??= new Set()).add(e.user_id);
+    }
     if (meta.method === "otp") otpUsers.add(e.user_id);
-    else if (meta.method === "password") passwordUsers.add(e.user_id);
+    // Password method removed — la app no usa password (solo SMS OTP via
+    // Twilio Verify desde abril 2026). Quitado del analytics.
     const day = e.created_at.slice(0, 10);
     loginsByDay[day] = (loginsByDay[day] ?? 0) + 1;
     const hour = new Date(e.created_at).getHours();
     loginsByHour[hour]++;
   }
-  const methodCounts = { otp: otpUsers.size, password: passwordUsers.size };
+
+  // Convert Sets to counts
+  const setSize = (m: Record<string, Set<string>>) =>
+    Object.fromEntries(Object.entries(m).map(([k, v]) => [k, v.size]));
+  const cityCounts = setSize(cityUsers);
+  const countryCounts = setSize(countryUsers);
+  const deviceCounts = setSize(deviceUsers);
+  const methodCounts = { otp: otpUsers.size };
 
   // Build a 14-day series for signups + logins (fill zeros for empty days).
   const days: string[] = [];
