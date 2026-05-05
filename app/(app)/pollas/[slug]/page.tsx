@@ -589,6 +589,11 @@ export default function PollaSlugPage() {
       points_earned: number | null;
     }>
   >([]);
+  // Para matches scheduled (no bloqueados): user_ids que ya pronosticaron,
+  // sin scores. Pobla la lista "Aún no pronostica" sin spoilear.
+  const [predictedUserIdsByMatch, setPredictedUserIdsByMatch] = useState<
+    Record<string, string[]>
+  >({});
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserStatus, setCurrentUserStatus] = useState("approved");
@@ -715,6 +720,7 @@ export default function PollaSlugPage() {
       setMatches(data.matches);
       setPredictions(data.predictions);
       setAllPredictions(data.allPredictions || []);
+      setPredictedUserIdsByMatch(data.predictedUserIdsByMatch || {});
       setCurrentUserId(data.currentUserId);
       setCurrentUserRole(data.currentUserRole);
       setCurrentUserStatus(data.currentUserStatus || "approved");
@@ -803,6 +809,7 @@ export default function PollaSlugPage() {
       const { data } = await axios.get(`/api/pollas/${slug}`);
       setPredictions(data.predictions);
       setAllPredictions(data.allPredictions || []);
+      setPredictedUserIdsByMatch(data.predictedUserIdsByMatch || {});
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       showToast(e.response?.data?.error || "Error guardando", "error");
@@ -843,18 +850,13 @@ export default function PollaSlugPage() {
   const missingByMatch = useMemo(() => {
     const out = new Map<string, string[]>();
     if (participantInfoById.size === 0) return out;
-    // Para cada match, calcular: participantes - quienes ya predijeron.
-    const predsByMatch = new Map<string, Set<string>>();
-    for (const ap of allPredictions) {
-      const set = predsByMatch.get(ap.match_id);
-      if (set) set.add(ap.user_id);
-      else predsByMatch.set(ap.match_id, new Set([ap.user_id]));
-    }
     // Solo computamos para matches scheduled (los locked/live/finished
-    // no muestran missing — ya pasó el momento de pronosticar).
+    // no muestran missing — ya pasó el momento de pronosticar). Usamos
+    // predictedUserIdsByMatch (devuelto por server SIN scores para no
+    // spoilear) en vez de allPredictions (que solo trae matches lockeados).
     for (const m of matches) {
       if (m.status !== "scheduled") continue;
-      const predicted = predsByMatch.get(m.id) ?? new Set<string>();
+      const predicted = new Set(predictedUserIdsByMatch[m.id] ?? []);
       const missing: string[] = [];
       Array.from(participantInfoById.entries()).forEach(([uid, info]) => {
         if (predicted.has(uid)) return;
@@ -864,7 +866,7 @@ export default function PollaSlugPage() {
       if (missing.length > 0) out.set(m.id, missing);
     }
     return out;
-  }, [matches, allPredictions, participantInfoById]);
+  }, [matches, predictedUserIdsByMatch, participantInfoById]);
 
   // Agrupa los pronósticos de TODOS por match_id (incluido el usuario
   // actual marcado con is_me=true para que pueda verse junto a los demás).

@@ -126,6 +126,30 @@ export async function GET(
       allPredictions = locked || [];
     }
 
+    // Para matches NO bloqueados, devolvemos solo (match_id, user_id)
+    // sin scores — sirve para que el cliente compute "quién aún no ha
+    // pronosticado" sin spoilear marcadores. Sin esto el feature
+    // missingByMatch en el cliente no puede saber quién sí pronosticó
+    // partidos próximos y los marcaba a todos como missing.
+    const upcomingScheduledIds = (matches || [])
+      .filter((m) => m.status === "scheduled" && !lockedMatchIds.includes(m.id))
+      .map((m) => m.id);
+    let predictedUserIdsByMatch: Record<string, string[]> = {};
+    if (upcomingScheduledIds.length > 0) {
+      const { data: upcomingPreds } = await adminSupabase
+        .from("predictions")
+        .select("match_id, user_id")
+        .eq("polla_id", polla.id)
+        .in("match_id", upcomingScheduledIds);
+      predictedUserIdsByMatch = (upcomingPreds || []).reduce(
+        (acc, p) => {
+          (acc[p.match_id] = acc[p.match_id] || []).push(p.user_id);
+          return acc;
+        },
+        {} as Record<string, string[]>,
+      );
+    }
+
     const currentRole = participant?.role || (polla.created_by === user.id ? "admin" : "player");
 
     return NextResponse.json({
@@ -137,6 +161,7 @@ export async function GET(
       matches: matches || [],
       predictions: predictions || [],
       allPredictions,
+      predictedUserIdsByMatch,
       currentUserRole: currentRole,
       currentUserStatus: participant?.status || "approved",
       currentUserPaymentStatus: participant?.payment_status || "approved",
