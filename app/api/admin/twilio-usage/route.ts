@@ -56,26 +56,24 @@ export async function GET() {
   };
 
   try {
-    // Pull SMS, Verify and totalprice (all categories) in parallel for the
-    // current month + all-time totals. totalprice is the most reliable
-    // overall budget number.
+    // Pull SMS y totalprice. NOT pulling Category="verify" — Twilio Usage
+    // API no acepta "verify" como categoría (los OTP via Verify se
+    // dividen en sub-products: verify-sms, verify-totp, verify-push, etc.,
+    // y para nuestro caso de SMS OTP los costos ya quedan capturados en
+    // `sms` + `totalprice`). totalprice es el budget number más confiable.
     const [
       smsMonthRes,
       smsAllRes,
-      verifyMonthRes,
-      verifyAllRes,
       totalMonthRes,
     ] = await Promise.all([
       fetch(url("Usage/Records.json", { Category: "sms", StartDate: startOfMonth, EndDate: endOfMonth }), { headers, cache: "no-store" }),
       fetch(url("Usage/Records/AllTime.json", { Category: "sms" }), { headers, cache: "no-store" }),
-      fetch(url("Usage/Records.json", { Category: "verify", StartDate: startOfMonth, EndDate: endOfMonth }), { headers, cache: "no-store" }),
-      fetch(url("Usage/Records/AllTime.json", { Category: "verify" }), { headers, cache: "no-store" }),
       fetch(url("Usage/Records.json", { Category: "totalprice", StartDate: startOfMonth, EndDate: endOfMonth }), { headers, cache: "no-store" }),
     ]);
 
-    const ok = [smsMonthRes, smsAllRes, verifyMonthRes, verifyAllRes, totalMonthRes].every(r => r.ok);
+    const ok = [smsMonthRes, smsAllRes, totalMonthRes].every(r => r.ok);
     if (!ok) {
-      const failed = [smsMonthRes, smsAllRes, verifyMonthRes, verifyAllRes, totalMonthRes].find(r => !r.ok);
+      const failed = [smsMonthRes, smsAllRes, totalMonthRes].find(r => !r.ok);
       // Leemos el body del error de Twilio para que el admin vea el motivo
       // exacto (ej. "Authentication Error: invalid credentials").
       let body = "";
@@ -95,8 +93,8 @@ export async function GET() {
       );
     }
 
-    const [smsMonth, smsAll, verifyMonth, verifyAll, totalMonth] = await Promise.all(
-      [smsMonthRes, smsAllRes, verifyMonthRes, verifyAllRes, totalMonthRes].map(r => r.json() as Promise<TwilioUsageResponse>)
+    const [smsMonth, smsAll, totalMonth] = await Promise.all(
+      [smsMonthRes, smsAllRes, totalMonthRes].map(r => r.json() as Promise<TwilioUsageResponse>)
     );
 
     const sumPrice = (d: TwilioUsageResponse) =>
@@ -116,12 +114,10 @@ export async function GET() {
       this_month: {
         total_cost: monthCost,
         sms: { count: sumCount(smsMonth), cost: sumPrice(smsMonth) },
-        verify: { count: sumCount(verifyMonth), cost: sumPrice(verifyMonth) },
         period: { start: startOfMonth, end: endOfMonth },
       },
       all_time: {
         sms: { count: sumCount(smsAll), cost: sumPrice(smsAll) },
-        verify: { count: sumCount(verifyAll), cost: sumPrice(verifyAll) },
       },
     });
   } catch (e) {

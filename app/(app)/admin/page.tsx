@@ -41,12 +41,10 @@ interface TwilioUsage {
   this_month?: {
     total_cost: number;
     sms: { count: number; cost: number };
-    verify: { count: number; cost: number };
     period: { start: string; end: string };
   };
   all_time?: {
     sms: { count: number; cost: number };
-    verify: { count: number; cost: number };
   };
 }
 
@@ -104,6 +102,7 @@ export default function AdminPage() {
       errorMessage: string | null;
       createdAt: string;
       screenshotUrl: string | null;
+      proofId: string | null;
     }>;
   } | null>(null);
   const [waTemplateUsage, setWaTemplateUsage] = useState<{
@@ -162,6 +161,20 @@ export default function AdminPage() {
       await load();
     } catch {
       showToast("Error eliminando usuario", "error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDeleteProof(proofId: string) {
+    if (!window.confirm("¿Borrar este screenshot? El user va a quedar como pendiente y podrá subir otro.")) return;
+    setBusyId(proofId);
+    try {
+      await axios.delete(`/api/admin/payment-proofs/${proofId}`);
+      showToast("Screenshot eliminado", "success");
+      await load();
+    } catch {
+      showToast("Error eliminando screenshot", "error");
     } finally {
       setBusyId(null);
     }
@@ -302,17 +315,11 @@ export default function AdminPage() {
                 <p className="text-xs text-red-alert">Error: {twilio.error}</p>
               ) : twilio.this_month ? (
                 <>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Mes actual</p>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Costo mes</p>
                       <p className="font-display mt-0.5" style={{ fontSize: 22, color: "#FFD700" }}>
                         {formatUSD(twilio.this_month.total_cost)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Verifies mes</p>
-                      <p className="font-display mt-0.5" style={{ fontSize: 22, color: "#FFD700" }}>
-                        {twilio.this_month.verify.count}
                       </p>
                     </div>
                     <div>
@@ -350,10 +357,8 @@ export default function AdminPage() {
                   {twilio.all_time && (
                     <p className="text-[11px] text-text-muted">
                       All-time:{" "}
-                      {twilio.all_time.verify.count + twilio.all_time.sms.count} mensajes ·{" "}
-                      {formatUSD(
-                        twilio.all_time.verify.cost + twilio.all_time.sms.cost,
-                      )}
+                      {twilio.all_time.sms.count} SMS ·{" "}
+                      {formatUSD(twilio.all_time.sms.cost)}
                     </p>
                   )}
                 </>
@@ -633,20 +638,22 @@ export default function AdminPage() {
                 {claudeUsage.byUser.length > 0 ? (
                   <div className="space-y-1">
                     <p className="text-[10px] uppercase tracking-wide text-text-muted">Top users (mes)</p>
-                    {claudeUsage.byUser.slice(0, 5).map((u) => (
-                      <div
-                        key={u.userId ?? "anon"}
-                        className="flex items-center justify-between text-[11px] py-1 border-b border-border-subtle/40 last:border-0"
-                      >
-                        <span className="text-text-primary truncate flex-1 mr-2">{u.displayName}</span>
-                        <span
-                          className="text-text-muted tabular-nums"
-                          style={{ fontFeatureSettings: '"tnum"' }}
+                    <div className="space-y-1 max-h-[240px] overflow-y-auto pr-1">
+                      {claudeUsage.byUser.map((u) => (
+                        <div
+                          key={u.userId ?? "anon"}
+                          className="flex items-center justify-between text-[11px] py-1 border-b border-border-subtle/40 last:border-0"
                         >
-                          {u.calls} calls · ${u.cost.toFixed(4)}
-                        </span>
-                      </div>
-                    ))}
+                          <span className="text-text-primary truncate flex-1 mr-2">{u.displayName}</span>
+                          <span
+                            className="text-text-muted tabular-nums"
+                            style={{ fontFeatureSettings: '"tnum"' }}
+                          >
+                            {u.calls} calls · ${u.cost.toFixed(4)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <p className="text-[11px] text-text-muted">Sin uso este mes todavía.</p>
@@ -695,14 +702,27 @@ export default function AdminPage() {
                               <span className="text-[11px] text-text-primary truncate">
                                 {call.displayName ?? "(sin user)"}
                               </span>
-                              <span
-                                className={`text-[10px] tabular-nums shrink-0 ${
-                                  call.success ? "text-text-muted" : "text-red-alert"
-                                }`}
-                                style={{ fontFeatureSettings: '"tnum"' }}
-                              >
-                                ${call.costUSD.toFixed(4)}
-                              </span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span
+                                  className={`text-[10px] tabular-nums ${
+                                    call.success ? "text-text-muted" : "text-red-alert"
+                                  }`}
+                                  style={{ fontFeatureSettings: '"tnum"' }}
+                                >
+                                  ${call.costUSD.toFixed(4)}
+                                </span>
+                                {call.proofId && (
+                                  <button
+                                    onClick={() => handleDeleteProof(call.proofId!)}
+                                    disabled={busyId === call.proofId}
+                                    className="text-[12px] leading-none px-1.5 py-0.5 rounded cursor-pointer transition-all disabled:opacity-40 hover:bg-red-alert/10"
+                                    style={{ color: "#ff3d57" }}
+                                    title="Borrar screenshot"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <p className="text-[10px] text-text-muted truncate">
                               {call.endpoint} · {call.tokensIn}↓/{call.tokensOut}↑ tokens
