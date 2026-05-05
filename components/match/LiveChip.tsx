@@ -1,6 +1,7 @@
 // components/match/LiveChip.tsx — Tribuna Caliente §3.7
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/cn";
 
 export interface LiveChipProps {
@@ -49,6 +50,42 @@ function formatUpcoming(date: Date): string {
   return `${weekday} · ${time}`;
 }
 
+/**
+ * Renderiza el logo del equipo. Si la URL falla en runtime (404, host
+ * caído como crests.football-data.org, CSP block), cae al code de
+ * letras (ATM/ARS/etc.) en vez de quedar en blanco. El bug previo
+ * usaba e.currentTarget.style.display = "none" pero no había sibling
+ * para mostrar — simplemente desaparecía el escudo y nada lo reemplazaba.
+ */
+function TeamLogoOrCode({
+  logo,
+  code,
+}: {
+  logo: string | null | undefined;
+  code: string;
+}) {
+  const [errored, setErrored] = useState(false);
+  if (logo && !errored) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={logo}
+        alt={code}
+        width={24}
+        height={24}
+        className="object-contain"
+        style={{ width: 24, height: 24 }}
+        onError={() => setErrored(true)}
+      />
+    );
+  }
+  return (
+    <span className="font-display text-[16px] tracking-[0.04em] text-text-primary">
+      {code}
+    </span>
+  );
+}
+
 export function LiveChip(props: LiveChipProps) {
   const {
     kind,
@@ -67,35 +104,7 @@ export function LiveChip(props: LiveChipProps) {
   const isLive = kind === "live";
 
   function renderTeam(logo: string | null | undefined, code: string) {
-    if (logo) {
-      return (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={logo}
-          alt={code}
-          width={24}
-          height={24}
-          className="object-contain"
-          style={{ width: 24, height: 24 }}
-          onError={(e) => {
-            // Si la imagen falla (ESPN cambió URL, etc.), ocultamos
-            // y mostramos el code de letras como fallback. Hacemos
-            // el toggle reemplazando el src con un data:1x1 transparente
-            // y agregando el code abajo en CSS — en práctica
-            // simplemente ocultamos el img y dejamos un span vecino.
-            (e.currentTarget as HTMLImageElement).style.display = "none";
-            const sibling = (e.currentTarget as HTMLImageElement)
-              .nextElementSibling as HTMLElement | null;
-            if (sibling) sibling.style.display = "inline";
-          }}
-        />
-      );
-    }
-    return (
-      <span className="font-display text-[16px] tracking-[0.04em] text-text-primary">
-        {code}
-      </span>
-    );
+    return <TeamLogoOrCode logo={logo} code={code} />;
   }
 
   return (
