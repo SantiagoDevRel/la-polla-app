@@ -227,10 +227,18 @@ export async function handleMainMenu(
  * Mismo patrón que /api/auth/wa-magic crea cuentas para users sin row,
  * pero acá iniciado por el primer "hola" al bot en vez de por tap a un
  * magic link.
+ *
+ * `messageBody` (opcional): si la primera interacción del usuario
+ * desconocido fue tapear un wa.me link con texto pre-llenado tipo
+ * "unirse ABCD23", extraemos el código y lo guardamos en
+ * pending_join_code para auto-unirlo al final del onboarding. Esto cubre
+ * el caso "abuela": user recibe link, lo tapéa, llega a WhatsApp ya
+ * pre-llenado, lo manda, y termina en la polla sin ver la web.
  */
-export async function handleUnknownUser(phone: string) {
+export async function handleUnknownUser(phone: string, messageBody?: string) {
   const { handleAskName } = await import("./onboarding");
   const { normalizePhone, emailForPhone } = await import("@/lib/auth/phone");
+  const { setState } = await import("./state");
 
   const phoneNormalized = normalizePhone(phone);
   const phoneE164 = `+${phoneNormalized}`;
@@ -280,8 +288,27 @@ export async function handleUnknownUser(phone: string) {
       { onConflict: "id" },
     );
 
-  // Arrancar onboarding en WA: pedir el nombre.
+  // Si el primer mensaje vino con "unirse XXXXXX" (tap desde link wa.me
+  // pre-llenado), guardar el code para auto-join al final del onboarding.
+  // Aceptamos también el formato "unirse a la polla CODE" o solo el code
+  // bare (6 chars) por flexibilidad.
+  let pendingCode: string | undefined;
+  if (messageBody) {
+    const trimmed = messageBody.trim().toUpperCase();
+    const m = trimmed.match(/(?:^|\s)([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})(?:\s|$)/);
+    if (m) pendingCode = m[1];
+  }
+
+  // Arrancar onboarding en WA: pedir el nombre. handleAskName setea state
+  // action="onboarding_ask_name" — sobrescribimos despues con el pending
+  // code para no perderlo.
   await handleAskName(phone);
+  if (pendingCode) {
+    await setState(phone, {
+      action: "onboarding_ask_name",
+      pendingJoinCode: pendingCode,
+    });
+  }
 }
 
 // ─── FLOW 3: Mis Pollas ───

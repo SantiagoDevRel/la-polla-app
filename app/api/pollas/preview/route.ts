@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const query = admin
     .from("pollas")
     .select(
-      "id, slug, name, description, tournament, buy_in_amount, type, status, created_by, match_ids, payment_mode, admin_payment_instructions"
+      "id, slug, name, description, tournament, buy_in_amount, type, status, created_by, match_ids, payment_mode, admin_payment_instructions, join_code"
     );
   const { data: polla, error } = slug
     ? await query.eq("slug", slug).maybeSingle()
@@ -67,10 +67,14 @@ export async function GET(request: NextRequest) {
   // invite preview page needs it for downstream calls (membership check,
   // matches fetch); it is not a sensitive field since the polla is
   // already addressable by slug and invite_token publicly.
-  const { created_by: _createdBy, ...publicPolla } = polla;
+  // join_code: solo se devuelve cuando el caller tiene invite_token
+  // válido (ya tiene la "llave" para unirse, exponer el code corto no
+  // amplía superficie). En consultas por slug no se devuelve para no
+  // filtrar la llave a quien solo conoce el slug.
+  const { created_by: _createdBy, join_code, ...publicPolla } = polla;
   void _createdBy;
   return NextResponse.json({
-    polla: publicPolla,
+    polla: token ? { ...publicPolla, join_code } : publicPolla,
     participantCount: count ?? 0,
     organizer,
   });

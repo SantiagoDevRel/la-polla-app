@@ -74,7 +74,10 @@ export async function processIncomingMessage(
     .maybeSingle();
 
   if (!user) {
-    await handleUnknownUser(from);
+    // Pass the message body so handleUnknownUser puede detectar "unirse
+    // XXXXXX" en el primer mensaje (caso wa.me link de invite) y lo
+    // guarda en pending_join_code para auto-join al final del onboarding.
+    await handleUnknownUser(from, text?.body);
     return;
   }
 
@@ -82,6 +85,21 @@ export async function processIncomingMessage(
   // Interceptamos antes que cualquier otra cosa para que el bot no muestre
   // mis-pollas / menú principal con un perfil incompleto.
   if (userNeedsOnboarding(user)) {
+    // Si el primer mensaje contiene "unirse XXXXXX" (caso wa.me link de
+    // invitación con perfil aún incompleto), preservamos el code para
+    // auto-join al terminar onboarding. Mismo patrón que handleUnknownUser.
+    if (text?.body) {
+      const upper = text.body.trim().toUpperCase();
+      const m = upper.match(/(?:^|\s)([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})(?:\s|$)/);
+      if (m) {
+        const existing = await getState(from);
+        await setState(from, {
+          action: existing?.action ?? "onboarding_ask_name",
+          ...existing,
+          pendingJoinCode: m[1],
+        });
+      }
+    }
     await routeOnboarding(from, user, type, text, interactive);
     return;
   }
