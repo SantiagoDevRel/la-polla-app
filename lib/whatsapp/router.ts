@@ -23,8 +23,6 @@ import {
   handleAskName,
   handleNameConfirmed,
   handleNameSubmit,
-  handlePollitoConfirmed,
-  sendAskPollito,
   userNeedsOnboarding,
 } from "./onboarding";
 import { looksLikeMenuIntent } from "./menu-intent";
@@ -264,7 +262,7 @@ async function routePayload(
     await setState(from, { action: "waiting_join_code" });
     await sendTextMessage(
       from,
-      "¡Listo parce! 🐥\n\nMándame el *código de 6 caracteres* del parche al que quieres entrar.\n\n_Te lo pasa el organizador o cualquier miembro de la polla._",
+      "¡Listo parce! 🐥\n\nMándame el *código de 6 caracteres* de la polla que quieres entrar\n\n_Te lo pasa el organizador de la polla._",
     );
     return;
   }
@@ -476,24 +474,8 @@ async function routeOnboarding(
       await handleAskName(from);
       return;
     }
-    // Pollito pagination
-    if (payload.startsWith("onbpoll_more_")) {
-      const page = parseInt(payload.slice("onbpoll_more_".length), 10) || 0;
-      await sendAskPollito(from, page);
-      return;
-    }
-    // Pollito pick
-    if (payload.startsWith("onbpoll_")) {
-      const pollitoId = payload.slice("onbpoll_".length);
-      await handlePollitoConfirmed(from, user.id, pollitoId);
-      return;
-    }
-    // Stale payload from a previous flow → re-prompt onboarding from start.
-    if (needsOnboardingNameFirst(user)) {
-      await handleAskName(from);
-    } else {
-      await sendAskPollito(from, 0);
-    }
+    // Stale payload from un flujo anterior → re-prompt onboarding.
+    await handleAskName(from);
     return;
   }
 
@@ -504,39 +486,13 @@ async function routeOnboarding(
       await handleNameSubmit(from, body);
       return;
     }
-    if (state?.action === "onboarding_pick_pollito") {
-      await sendTextMessage(
-        from,
-        "Tapéa uno de los pollitos del listado de arriba, parce 👆",
-      );
-      return;
-    }
 
-    // No state set yet — start from the top.
-    if (needsOnboardingNameFirst(user)) {
-      await handleAskName(from);
-    } else {
-      await sendAskPollito(from, 0);
-    }
+    // No state set yet — start from the top (pedir nombre).
+    await handleAskName(from);
     return;
   }
 
   // Anything else (sticker, audio) → restart prompt.
-  if (needsOnboardingNameFirst(user)) {
-    await handleAskName(from);
-  } else {
-    await sendAskPollito(from, 0);
-  }
+  await handleAskName(from);
 }
 
-function needsOnboardingNameFirst(user: {
-  display_name: string | null;
-}): boolean {
-  // Local copy of needsName logic — avoids importing the helper into the
-  // router for a single check. If display_name is missing or phone-shaped,
-  // we ask name first; otherwise it's the pollito step.
-  const dn = (user.display_name ?? "").trim();
-  if (dn.length === 0) return true;
-  const stripped = dn.replace(/^\+/, "");
-  return /^\d{8,15}$/.test(stripped);
-}

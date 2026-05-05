@@ -18,7 +18,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTextMessage } from "./bot";
-import { sendReplyButtons, sendListMessage } from "./interactive";
+import { sendReplyButtons } from "./interactive";
 import { setState, getState, clearState } from "./state";
 import { isValidDisplayName, needsName } from "@/lib/users/needs-name";
 import { POLLITO_TYPES } from "@/lib/pollitos";
@@ -44,8 +44,7 @@ export async function handleAskName(phone: string): Promise<void> {
   await sendTextMessage(
     phone,
     "¡Bienvenido a *La Polla Colombiana*! 🐥\n\n" +
-      "Para armar tu perfil necesito saber cómo te llamas.\n\n" +
-      "Mándame tu nombre (o como te dicen los amigos). Ej: *Juan Pérez* o *Juancho*",
+      "Escríbeme tu nombre. Ej: *Juan*",
   );
 }
 
@@ -70,14 +69,14 @@ export async function handleNameSubmit(
 
   // Encode name into the button payload so we don't need a state column.
   // Reply button id max length is 256 — comfortable margin for ≤50-char
-  // names. Title (the visible text) is capped to 20.
+  // names. Title (the visible text) is capped to 20 chars por WA.
   const yesPayload = `onbname_yes|${trimmed}`;
   await sendReplyButtons(
     phone,
     `¿Tu nombre es *${trimmed}*?`,
     [
-      { id: yesPayload, title: "Sí, ese soy" },
-      { id: "onbname_no", title: "No, lo escribo de nuevo" },
+      { id: yesPayload, title: "Sí" },
+      { id: "onbname_no", title: "No, cambiar" },
     ],
     undefined,
     FOOTER,
@@ -85,7 +84,14 @@ export async function handleNameSubmit(
   // No state change here — the payload carries the candidate name.
 }
 
-// ─── Step 3: save name and ask for pollito ───
+// ─── Step 3: save name + assign random pollito → done ───
+//
+// Decisión 2026-05-04: NO pedimos pollito en el onboarding de WA. Lo
+// asignamos aleatorio. Razones:
+//   - Elegir avatar visual sin previews es UX horrible en WA.
+//   - El user puede cambiar el pollito después desde el perfil web.
+//   - Onboarding queda en UN solo paso (nombre), reduce abandono.
+// El web /onboarding sigue mostrando el picker como antes.
 
 export async function handleNameConfirmed(
   phone: string,
@@ -93,100 +99,33 @@ export async function handleNameConfirmed(
   name: string,
 ): Promise<void> {
   const supabase = createAdminClient();
-  const { error } = await supabase
-    .from("users")
-    .update({ display_name: name.trim().slice(0, 50) })
-    .eq("id", userId);
-  if (error) {
-    console.error("[onboarding] save name failed:", error);
-    await sendTextMessage(
-      phone,
-      "Algo falló guardando tu nombre, parce. Intenta de nuevo en un minuto.",
-    );
-    return;
-  }
-  await sendAskPollito(phone, /*page*/ 0);
-}
-
-// ─── Step 4: pollito picker (paginated 10 + 6) ───
-
-const POLLITOS_PER_PAGE = 9; // leave 1 row for "Ver más" on page 0
-
-export async function sendAskPollito(
-  phone: string,
-  page: number,
-): Promise<void> {
-  // Preservar pending_join_code si venía desde el step anterior — sin
-  // esto, cada setState lo borraría y se perdería la intención del wa.me
-  // link al cambiar de step de onboarding.
-  const prev = await getState(phone);
-  await setState(phone, {
-    action: "onboarding_pick_pollito",
-    pendingJoinCode: prev?.pendingJoinCode,
-  });
-
-  const start = page * POLLITOS_PER_PAGE;
-  const end = start + POLLITOS_PER_PAGE;
-  const slice = POLLITO_TYPES.slice(start, end);
-  const hasMore = end < POLLITO_TYPES.length;
-
-  const rows: { id: string; title: string }[] = slice.map((p) => ({
-    id: `onbpoll_${p.id}`,
-    title: p.label.slice(0, 24), // WA list row title cap
-  }));
-  if (hasMore) {
-    rows.push({ id: `onbpoll_more_${page + 1}`, title: "Ver más pollitos ➡️" });
-  } else if (page > 0) {
-    rows.push({ id: `onbpoll_more_0`, title: "⬅️ Volver al inicio" });
-  }
-
-  const headerText = page === 0 ? "🐥 Elige tu pollito" : "🐥 Más pollitos";
-  await sendListMessage(
-    phone,
-    "Tu pollito te representa en las pollas y en la tabla. " +
-      "Lo puedes cambiar después desde tu perfil.",
-    "Ver opciones",
-    [{ title: headerText, rows }],
-    headerText,
-    FOOTER,
+  // Asignar pollito aleatorio. Excluimos los "hincha de equipo" (dim,
+  // millos, verde, envigado) para no asumir afinidad de equipo de un
+  // user nuevo — sería raro que a un hincha del Nacional le toque el
+  // pollito del Millos por sorteo.
+  const generic = POLLITO_TYPES.filter(
+    (p) => !["dim", "millos", "verde", "envigado"].includes(p.id),
   );
-}
+  const randomPollito = generic[Math.floor(Math.random() * generic.length)];
 
-// ─── Step 5: save pollito + welcome ───
-
-export async function handlePollitoConfirmed(
-  phone: string,
-  userId: string,
-  pollitoId: string,
-): Promise<void> {
-  // Validate the id is one of ours (defense against tampered payload).
-  const valid = POLLITO_TYPES.some((p) => p.id === pollitoId);
-  if (!valid) {
-    await sendTextMessage(
-      phone,
-      "No reconocí ese pollito, parce. Intenta de nuevo escribiendo *menu*.",
-    );
-    await clearState(phone);
-    return;
-  }
-
-  const supabase = createAdminClient();
   const { error } = await supabase
     .from("users")
-    .update({ avatar_url: pollitoId })
+    .update({
+      display_name: name.trim().slice(0, 50),
+      avatar_url: randomPollito.id,
+    })
     .eq("id", userId);
   if (error) {
-    console.error("[onboarding] save pollito failed:", error);
+    console.error("[onboarding] save profile failed:", error);
     await sendTextMessage(
       phone,
-      "Algo falló guardando tu pollito. Intenta de nuevo en un minuto.",
+      "Algo falló guardando tu perfil, parce. Intenta de nuevo en un minuto.",
     );
     return;
   }
 
-  // Antes de limpiar el state, sacamos pendingJoinCode si lo había.
-  // Si el user llegó por wa.me link de invitación, lo unimos directo a
-  // esa polla sin que tenga que tapear nada más — es el camino "abuela".
+  // Antes de limpiar el state, sacar pendingJoinCode si lo había (caso
+  // wa.me link de invitación). Si está, unimos directo a esa polla.
   const prev = await getState(phone);
   const pendingCode = prev?.pendingJoinCode;
   await clearState(phone);
@@ -195,8 +134,8 @@ export async function handlePollitoConfirmed(
     const { handleJoinByCode } = await import("./flows");
     await sendTextMessage(
       phone,
-      "¡Listo, parcero! 🎉 Tu perfil quedó armado.\n\n" +
-        "Ahora te uno a la polla a la que te invitaron 👇",
+      "¡Listo parce! 🎉 Tu perfil está armado.\n\n" +
+        "Te uno a la polla 👇",
     );
     await handleJoinByCode(phone, userId, pendingCode);
     return;
@@ -205,8 +144,8 @@ export async function handlePollitoConfirmed(
   // Sin pending code: welcome + opción de unirse con código manual.
   await sendReplyButtons(
     phone,
-    "¡Listo, parcero! 🎉 Ya tienes tu perfil armado.\n\n" +
-      "Ahora puedes unirte a una polla con un código o crear la tuya.",
+    "¡Listo parce! 🎉 Tu perfil está armado.\n\n" +
+      "Únete a una polla con tu *código de invitación*.",
     [{ id: "join_with_code", title: "Unirme con código" }],
     undefined,
     FOOTER,
