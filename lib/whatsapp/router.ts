@@ -19,6 +19,14 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTextMessage } from "./bot";
 import { clearState, getState, setState } from "./state";
+import {
+  handleAskName,
+  handleNameConfirmed,
+  handleNameSubmit,
+  handlePollitoConfirmed,
+  sendAskPollito,
+  userNeedsOnboarding,
+} from "./onboarding";
 import { looksLikeMenuIntent } from "./menu-intent";
 import {
   handleCancelPrediction,
@@ -61,12 +69,20 @@ export async function processIncomingMessage(
   const supabase = createAdminClient();
   const { data: user } = await supabase
     .from("users")
-    .select("id, display_name, whatsapp_number")
+    .select("id, display_name, whatsapp_number, avatar_url")
     .eq("whatsapp_number", from)
     .maybeSingle();
 
   if (!user) {
     await handleUnknownUser(from);
+    return;
+  }
+
+  // ONBOARDING GATE — usuario existe pero le falta display_name o pollito.
+  // Interceptamos antes que cualquier otra cosa para que el bot no muestre
+  // mis-pollas / menú principal con un perfil incompleto.
+  if (userNeedsOnboarding(user)) {
+    await routeOnboarding(from, user, type, text, interactive);
     return;
   }
 
@@ -230,7 +246,7 @@ async function routePayload(
     await setState(from, { action: "waiting_join_code" });
     await sendTextMessage(
       from,
-      "¡Dale parce! 🐥\n\nMandame el *código de 6 caracteres* del parche al que querés entrar.\n\n_Te lo pasó el organizador o cualquier miembro de la polla._",
+      "¡Listo parce! 🐥\n\nMándame el *código de 6 caracteres* del parche al que quieres entrar.\n\n_Te lo pasa el organizador o cualquier miembro de la polla._",
     );
     return;
   }
@@ -406,4 +422,103 @@ async function routePayload(
 
   // Fallback: re-render the main menu.
   await handleMainMenu(from, user.display_name, user.id);
+}
+
+// ─── Onboarding routing ───
+//
+// Sólo se llama cuando userNeedsOnboarding(user) === true. Maneja:
+//   - Texto libre: intent "ask_name" recibe nombre, "pick_pollito" pide
+//     re-tap del botón.
+//   - Payloads: onbname_yes|<name> guarda nombre, onbname_no re-pregunta,
+//     onbpoll_<id> guarda pollito, onbpoll_more_<page> pagina la lista.
+async function routeOnboarding(
+  from: string,
+  user: { id: string; display_name: string | null; avatar_url: string | null },
+  type: string,
+  text?: { body?: string },
+  interactive?: {
+    button_reply?: { id: string; title?: string };
+    list_reply?: { id: string; title?: string };
+  },
+): Promise<void> {
+  const state = await getState(from);
+
+  if (type === "interactive" && interactive) {
+    const payload =
+      interactive.button_reply?.id || interactive.list_reply?.id || "";
+    if (!payload) return;
+
+    // onbname_yes|<name>
+    if (payload.startsWith("onbname_yes|")) {
+      const name = payload.slice("onbname_yes|".length);
+      await handleNameConfirmed(from, user.id, name);
+      return;
+    }
+    if (payload === "onbname_no") {
+      await handleAskName(from);
+      return;
+    }
+    // Pollito pagination
+    if (payload.startsWith("onbpoll_more_")) {
+      const page = parseInt(payload.slice("onbpoll_more_".length), 10) || 0;
+      await sendAskPollito(from, page);
+      return;
+    }
+    // Pollito pick
+    if (payload.startsWith("onbpoll_")) {
+      const pollitoId = payload.slice("onbpoll_".length);
+      await handlePollitoConfirmed(from, user.id, pollitoId);
+      return;
+    }
+    // Stale payload from a previous flow → re-prompt onboarding from start.
+    if (needsOnboardingNameFirst(user)) {
+      await handleAskName(from);
+    } else {
+      await sendAskPollito(from, 0);
+    }
+    return;
+  }
+
+  if (type === "text" && text?.body) {
+    const body = text.body.trim();
+
+    if (state?.action === "onboarding_ask_name") {
+      await handleNameSubmit(from, body);
+      return;
+    }
+    if (state?.action === "onboarding_pick_pollito") {
+      await sendTextMessage(
+        from,
+        "Tapéa uno de los pollitos del listado de arriba, parce 👆",
+      );
+      return;
+    }
+
+    // No state set yet — start from the top.
+    if (needsOnboardingNameFirst(user)) {
+      await handleAskName(from);
+    } else {
+      await sendAskPollito(from, 0);
+    }
+    return;
+  }
+
+  // Anything else (sticker, audio) → restart prompt.
+  if (needsOnboardingNameFirst(user)) {
+    await handleAskName(from);
+  } else {
+    await sendAskPollito(from, 0);
+  }
+}
+
+function needsOnboardingNameFirst(user: {
+  display_name: string | null;
+}): boolean {
+  // Local copy of needsName logic — avoids importing the helper into the
+  // router for a single check. If display_name is missing or phone-shaped,
+  // we ask name first; otherwise it's the pollito step.
+  const dn = (user.display_name ?? "").trim();
+  if (dn.length === 0) return true;
+  const stripped = dn.replace(/^\+/, "");
+  return /^\d{8,15}$/.test(stripped);
 }
