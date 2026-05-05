@@ -29,6 +29,7 @@ import {
   askPaymentMethod,
   handlePaymentAccountSubmit,
   handlePaymentMethodSelected,
+  handlePaymentProofImage,
   handleShowPaymentInfo,
 } from "./payment";
 import { looksLikeMenuIntent } from "./menu-intent";
@@ -63,12 +64,17 @@ export interface IncomingMessage {
     button_reply?: { id: string; title?: string };
     list_reply?: { id: string; title?: string };
   };
+  image?: {
+    id: string;
+    mime_type?: string;
+    caption?: string;
+  };
 }
 
 export async function processIncomingMessage(
   message: IncomingMessage,
 ): Promise<void> {
-  const { from, type, text, interactive } = message;
+  const { from, type, text, interactive, image } = message;
 
   const supabase = createAdminClient();
   const { data: user } = await supabase
@@ -105,6 +111,22 @@ export async function processIncomingMessage(
       }
     }
     await routeOnboarding(from, user, type, text, interactive);
+    return;
+  }
+
+  // ─── IMAGEN: solo procesamos si state es waiting_payment_proof. Si no,
+  // explicamos al user que solo aceptamos comprobantes acá.
+  if (type === "image" && image?.id) {
+    const state = await getState(from);
+    if (state?.action === "waiting_payment_proof") {
+      await handlePaymentProofImage(from, user.id, image.id);
+      return;
+    }
+    await sendTextMessage(
+      from,
+      "Recibí tu foto, parce 📸 pero no estaba esperando ninguna en este momento. " +
+        "Si querés mandar un comprobante de pago, primero únete a una polla y te lo pido cuando toque.",
+    );
     return;
   }
 
