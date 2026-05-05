@@ -325,21 +325,16 @@ export async function handleMisPollas(phone: string, userId: string) {
   if (!participations || participations.length === 0) {
     // Reply button: pedirle al user el código de invitación de una polla
     // existente (caso muy común — alguien lo invitó por WA pero no tiene
-    // el link a mano). Si tapea, le seteamos state waiting_join_code y
+    // el link a mano). Si tapea, seteamos state waiting_join_code y
     // esperamos los 6 caracteres en el siguiente mensaje.
+    // No agregamos un CTA secundario para "crear polla" — la creación se
+    // hace desde la web y la opción aparece en el menú principal cuando
+    // ya tienen perfil completo.
     await sendReplyButtons(
       phone,
-      "Todavía no estás en ninguna polla 🐣\n\n¿Tienes el *código de invitación* de un parche? Pásamelo y entras de una.",
+      "Todavía no estás en ninguna polla 🐣\n\n¿Tienes el *código de invitación* de una polla? Pásamelo y entras de una.",
       [{ id: "join_with_code", title: "Unirme con código" }],
       undefined,
-      FOOTER,
-    );
-    // Follow-up CTA URL para crear la propia polla.
-    await sendCTAButton(
-      phone,
-      "_O si quieres armar tu propio parche desde cero:_",
-      "Crear mi polla",
-      `${APP_URL}/pollas/crear`,
       FOOTER,
     );
     return;
@@ -354,16 +349,15 @@ export async function handleMisPollas(phone: string, userId: string) {
     .eq("status", "active");
 
   if (!pollas || pollas.length === 0) {
-    await sendTextMessage(
+    // Tus pollas anteriores cerraron. No empujamos "crear polla" desde
+    // el bot — los WA-only users normalmente son passive-players que
+    // entran a pollas a las que los invitan.
+    await sendReplyButtons(
       phone,
-      "😴 No tenés pollas activas en este momento parce.\n\n_Creá una nueva y armá el parche_"
-    );
-    await sendCTAButton(
-      phone,
-      "Dale, creá una polla nueva 🐥",
-      "Crear polla",
-      `${APP_URL}/pollas/crear`,
-      FOOTER
+      "😴 No tienes pollas activas en este momento parce.\n\n¿Te invitaron a una polla nueva? Mándame el código.",
+      [{ id: "join_with_code", title: "Unirme con código" }],
+      undefined,
+      FOOTER,
     );
     return;
   }
@@ -465,7 +459,7 @@ export async function handlePollaMenu(
   // Same 3 reply-button layout for admins and players. Reply buttons
   // auto-send on tap (lists need a confirm), so this avoids a friction
   // step every player hits. Admin-only "Generar código" was retired in
-  // favor of the universal "Invitar al parche" CTA below — every member
+  // favor of the universal "Invitar a la polla" CTA below — every member
   // can invite, the join code rotation lives in the web admin panel.
   await sendReplyButtons(
     phone,
@@ -479,7 +473,7 @@ export async function handlePollaMenu(
     FOOTER,
   );
 
-  // Follow-up "Invitar al parche" message. WhatsApp's interactive block
+  // Follow-up "Invitar a la polla" message. WhatsApp's interactive block
   // can't mix reply buttons with a CTA URL in the same payload, so we
   // send a second message with the share-sheet deep link. Tapping it
   // opens WhatsApp's contact picker pre-filled with the invite text.
@@ -512,8 +506,8 @@ async function sendInviteFriendCTA(
 
   await sendCTAButton(
     phone,
-    "¿Querés sumar gente al parche? Compartí el link con tus contactos 👇",
-    "Invitar al parche 🐥",
+    "¿Quieres sumar gente a la polla? Comparte el link con tus contactos 👇",
+    "Invitar a la polla 🐥",
     shareUrl,
     FOOTER,
   );
@@ -1380,7 +1374,7 @@ export async function handleHelpTopic(
   if (topic === "help_crear") {
     await sendCTAButton(
       phone,
-      "Creá tu polla desde la web, es bacano y rapidito 🐥\n\n_Elegí torneo, poné el nombre y compartile el link al parche_",
+      "Crea tu polla desde la web, es bacano y rapidito 🐥\n\n_Eliges el torneo, pones el nombre y compartes el link con tus amigos_",
       "Crear mi polla 🏆",
       `${APP_URL}/pollas/crear`,
       FOOTER
