@@ -323,19 +323,15 @@ export async function handleMisPollas(phone: string, userId: string) {
     .eq("status", "approved");
 
   if (!participations || participations.length === 0) {
-    // Reply button: pedirle al user el código de invitación de una polla
-    // existente (caso muy común — alguien lo invitó por WA pero no tiene
-    // el link a mano). Si tapea, seteamos state waiting_join_code y
-    // esperamos los 6 caracteres en el siguiente mensaje.
-    // No agregamos un CTA secundario para "crear polla" — la creación se
-    // hace desde la web y la opción aparece en el menú principal cuando
-    // ya tienen perfil completo.
-    await sendReplyButtons(
+    // Asumimos intent: si el user llegó aquí, quiere unirse a una polla.
+    // Pedimos el código directo y seteamos state waiting_join_code para
+    // que el bareCode handler salte el SI/NO y una de una. Ahorramos 2
+    // mensajes (el botón "Unirme con código" + el SI/NO de confirm).
+    await setState(phone, { action: "waiting_join_code" });
+    await sendTextMessage(
       phone,
-      "Todavía no estás en ninguna polla 🐣\n\n¿Tienes el *código de invitación* de una polla? Pásamelo y entras de una.",
-      [{ id: "join_with_code", title: "Unirme con código" }],
-      undefined,
-      FOOTER,
+      "Todavía no estás en ninguna polla 🐣\n\n" +
+        "Mándame el *código de 6 caracteres* de la polla a la que te invitaron y te uno enseguida 🐥",
     );
     return;
   }
@@ -349,15 +345,14 @@ export async function handleMisPollas(phone: string, userId: string) {
     .eq("status", "active");
 
   if (!pollas || pollas.length === 0) {
-    // Tus pollas anteriores cerraron. No empujamos "crear polla" desde
-    // el bot — los WA-only users normalmente son passive-players que
-    // entran a pollas a las que los invitan.
-    await sendReplyButtons(
+    // Tus pollas anteriores cerraron. Mismo patrón: asumimos intent +
+    // setState waiting_join_code para que un código bare se procese
+    // directo sin pedir confirm.
+    await setState(phone, { action: "waiting_join_code" });
+    await sendTextMessage(
       phone,
-      "😴 No tienes pollas activas en este momento parce.\n\n¿Te invitaron a una polla nueva? Mándame el código.",
-      [{ id: "join_with_code", title: "Unirme con código" }],
-      undefined,
-      FOOTER,
+      "😴 No tienes pollas activas en este momento parce.\n\n" +
+        "Si te invitaron a una polla nueva, mándame el *código de 6 caracteres* y te uno 🐥",
     );
     return;
   }
