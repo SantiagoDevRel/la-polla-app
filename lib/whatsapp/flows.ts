@@ -468,39 +468,6 @@ export async function handlePollaMenu(
   );
 }
 
-/**
- * Sends a CTA URL message that opens the user's WhatsApp contact picker
- * pre-filled with an invite to this polla. Reads the polla's join_code
- * (best-effort: omitted if missing). Used as a follow-up to handlePollaMenu
- * so every member has a one-tap invite path without hunting through the app.
- */
-async function sendInviteFriendCTA(
-  phone: string,
-  polla: { id: string; name: string; slug: string },
-) {
-  const supabase = createAdminClient();
-  const { data: full } = await supabase
-    .from("pollas")
-    .select("join_code")
-    .eq("id", polla.id)
-    .maybeSingle();
-
-  const code = full?.join_code ?? null;
-  const inviteText =
-    `Te invito a *${polla.name}* en La Polla 🐥` +
-    (code ? `\n\nCódigo: *${code}*` : "") +
-    `\n\nEntrá acá: ${APP_URL}/unirse/${polla.slug}`;
-  const shareUrl = `https://wa.me/?text=${encodeURIComponent(inviteText)}`;
-
-  await sendCTAButton(
-    phone,
-    "¿Quieres sumar gente a la polla? Comparte el link con tus contactos 👇",
-    "Invitar a la polla 🐥",
-    shareUrl,
-    FOOTER,
-  );
-}
-
 // ─── FLOW 5: Pronosticar ───
 
 export async function handlePronosticar(
