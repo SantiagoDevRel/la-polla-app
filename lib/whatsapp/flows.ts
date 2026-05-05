@@ -1493,25 +1493,52 @@ export async function handleJoinByCode(
   const result = await joinByCode({ userId, phone, code });
 
   if (result.ok) {
-    // Confirmación + menú nativo de la polla (Pronosticar / Tabla / Resultados).
-    // NO mandamos un CTA URL a la web — los WA-only users deben poder hacer
-    // todo desde acá sin abrir el browser.
+    // Confirmación inicial. NO CTA URL a web — todo en bot.
     await sendTextMessage(
       phone,
       `¡Te uniste a *${result.polla.name}*! 🎉`,
     );
-    await handlePollaMenu(phone, userId, result.polla.id);
 
-    // Si la polla tiene buy_in > 0 y el user no tiene método de pago
-    // guardado, arrancamos el flujo para que el ganador cobre cuando
-    // toque. Una sola vez (la primera polla paga).
+    // Chequear si necesita subir comprobante (admin_collects, paid=false).
     const supabase2 = createAdminClient();
     const { data: pollaInfo } = await supabase2
       .from("pollas")
-      .select("buy_in_amount")
+      .select(
+        "id, name, payment_mode, buy_in_amount, admin_payout_method, admin_payout_account, admin_payout_account_name",
+      )
       .eq("id", result.polla.id)
       .maybeSingle();
-    if (pollaInfo && Number(pollaInfo.buy_in_amount) > 0) {
+
+    const buyIn = pollaInfo ? Number(pollaInfo.buy_in_amount) : 0;
+    const isPaid = pollaInfo && pollaInfo.payment_mode === "admin_collects" && buyIn > 0;
+
+    if (
+      isPaid &&
+      pollaInfo &&
+      pollaInfo.admin_payout_method &&
+      pollaInfo.admin_payout_account
+    ) {
+      // Pedir comprobante. Reemplaza el polla menu (lo abrimos cuando
+      // pague o si decide pedir aprobación manual).
+      const { askPaymentProof } = await import("./payment");
+      await askPaymentProof(
+        phone,
+        pollaInfo.id,
+        pollaInfo.name,
+        buyIn,
+        pollaInfo.admin_payout_method,
+        pollaInfo.admin_payout_account,
+        pollaInfo.admin_payout_account_name,
+      );
+      return;
+    }
+
+    // Polla gratis o pay_winner: abrir polla menu directo.
+    await handlePollaMenu(phone, userId, result.polla.id);
+
+    // Si la polla tiene buy_in > 0 (pay_winner) y user no tiene
+    // método de pago guardado, lo pedimos para cuando toque cobrar.
+    if (buyIn > 0) {
       const { userNeedsPaymentInfo, askPaymentMethod } = await import("./payment");
       if (await userNeedsPaymentInfo(userId)) {
         await askPaymentMethod(phone);

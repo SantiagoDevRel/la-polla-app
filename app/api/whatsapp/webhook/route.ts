@@ -115,12 +115,15 @@ async function dispatch(message: any, request: NextRequest): Promise<void> {
     }
   }
 
-  // 2. Conversational bot — hand off to the router.
+  // 2. Conversational bot — hand off to the router. Pass image too: el
+  //    router lo despachea a payment-proof flow si state es
+  //    waiting_payment_proof.
   const incoming: IncomingMessage = {
     from,
     type,
     text: message.text,
     interactive: message.interactive,
+    image: message.image,
   };
   await processIncomingMessage(incoming);
 }

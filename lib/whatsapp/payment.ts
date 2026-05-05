@@ -13,8 +13,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTextMessage } from "./bot";
 import { sendListMessage } from "./interactive";
 import { setState, getState, clearState } from "./state";
+import { downloadWhatsAppMedia } from "./media";
+import {
+  verifyPaymentScreenshot,
+  type PayoutMethod,
+} from "@/lib/vision/verify-payment";
+import { logClaudeUsage } from "@/lib/vision/log-usage";
 
 const FOOTER = "La Polla Colombiana 🐥";
+
+const MAX_PROOFS_PER_POLLA = 2;
+const MAX_UPLOADS_PER_USER_24H = 10;
 
 // Catálogo de métodos de pago. El `id` se guarda en
 // users.default_payout_method como slug canónico.
@@ -184,6 +193,331 @@ async function savePayoutInfo(
       default_payout_set_at: new Date().toISOString(),
     })
     .eq("id", userId);
+}
+
+// ─── Payment PROOF (admin_collects polla): pedir + procesar screenshot ───
+
+/**
+ * Pide al user que mande la foto del comprobante de pago. Setea state
+ * waiting_payment_proof con el pollaId para saber a qué polla aplicar
+ * cuando llegue la imagen.
+ */
+export async function askPaymentProof(
+  phone: string,
+  pollaId: string,
+  pollaName: string,
+  buyInAmount: number,
+  payoutMethod: string,
+  payoutAccount: string,
+  payoutAccountName: string | null,
+): Promise<void> {
+  await setState(phone, {
+    action: "waiting_payment_proof",
+    pollaId,
+  });
+
+  const methodLabel =
+    PAYMENT_METHODS.find((m) => m.id === payoutMethod)?.label ?? payoutMethod;
+
+  const formattedAmount = new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(buyInAmount);
+
+  await sendTextMessage(
+    phone,
+    `💸 *Para empezar a pronosticar en ${pollaName}*\n\n` +
+      `Transfiere *${formattedAmount}* al organizador:\n\n` +
+      `🏦 ${methodLabel}\n` +
+      `🔢 ${payoutAccount}` +
+      (payoutAccountName ? `\n👤 ${payoutAccountName}` : "") +
+      `\n\nCuando hayas pagado, *mándame la foto del comprobante* aquí mismo 📸\n\n` +
+      `_El comprobante se guarda 7 días y solo lo ve el organizador._`,
+  );
+}
+
+/**
+ * Procesa una imagen recibida cuando state.action === "waiting_payment_proof".
+ * Baja la imagen de Meta CDN, la sube a Supabase Storage, llama al verifier
+ * AI, persiste en payment_proofs, y marca paid=true si AI valida.
+ *
+ * Lógica idéntica a la del endpoint /api/pollas/[slug]/payment-proof —
+ * compartida via lib/vision/verify-payment + lib/vision/log-usage.
+ */
+export async function handlePaymentProofImage(
+  phone: string,
+  userId: string,
+  mediaId: string,
+): Promise<void> {
+  const state = await getState(phone);
+  const pollaId = state?.pollaId;
+  if (!pollaId) {
+    await sendTextMessage(
+      phone,
+      "No tengo claro a qué polla pertenece este comprobante, parce. Escribe *menu* y elige tu polla primero.",
+    );
+    await clearState(phone);
+    return;
+  }
+
+  const supabase = createAdminClient();
+
+  // 1. Polla sanity checks
+  const { data: polla } = await supabase
+    .from("pollas")
+    .select(
+      "id, slug, name, payment_mode, buy_in_amount, admin_payout_method, admin_payout_account, admin_payout_account_name",
+    )
+    .eq("id", pollaId)
+    .maybeSingle();
+  if (!polla) {
+    await sendTextMessage(phone, "No encontré esa polla.");
+    await clearState(phone);
+    return;
+  }
+  if (polla.payment_mode !== "admin_collects") {
+    await sendTextMessage(phone, "Esta polla no necesita comprobante.");
+    await clearState(phone);
+    return;
+  }
+  if (
+    !polla.admin_payout_method ||
+    !polla.admin_payout_account ||
+    !polla.buy_in_amount
+  ) {
+    await sendTextMessage(
+      phone,
+      "El organizador no terminó de configurar la cuenta. Pídele que la complete.",
+    );
+    await clearState(phone);
+    return;
+  }
+
+  // 2. Participant check
+  const { data: participant } = await supabase
+    .from("polla_participants")
+    .select("id, paid")
+    .eq("polla_id", pollaId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!participant) {
+    await sendTextMessage(phone, "No estás como participante de esta polla.");
+    await clearState(phone);
+    return;
+  }
+  if (participant.paid) {
+    await sendTextMessage(phone, "Tu pago ya está aprobado. ¡Ya puedes pronosticar!");
+    await clearState(phone);
+    return;
+  }
+
+  // 3. Cap por polla (max 2 intentos por user) — mismo cap que el endpoint web
+  const { data: existing } = await supabase
+    .from("payment_proofs")
+    .select("id")
+    .eq("polla_id", pollaId)
+    .eq("user_id", userId);
+  if ((existing?.length ?? 0) >= MAX_PROOFS_PER_POLLA) {
+    await sendTextMessage(
+      phone,
+      `Ya mandaste ${MAX_PROOFS_PER_POLLA} comprobantes de esta polla. Pídele al organizador que apruebe el pago manual.`,
+    );
+    await clearState(phone);
+    return;
+  }
+
+  // 4. Throttle global 10/24h
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count: recentCount } = await supabase
+    .from("claude_api_usage")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("endpoint", "wa/payment-proof")
+    .gte("created_at", since);
+  if ((recentCount ?? 0) >= MAX_UPLOADS_PER_USER_24H) {
+    await sendTextMessage(
+      phone,
+      "Mandaste muchos comprobantes hoy. Si es un error, contacta al organizador para que apruebe manual.",
+    );
+    await clearState(phone);
+    return;
+  }
+
+  // 5. Bajar la imagen de Meta CDN
+  let media;
+  try {
+    media = await downloadWhatsAppMedia(mediaId);
+  } catch (err) {
+    console.error("[wa/payment-proof] download failed:", err);
+    await sendTextMessage(
+      phone,
+      "No pude descargar la foto, parce. Intenta enviarla de nuevo.",
+    );
+    return;
+  }
+
+  // Validar formato
+  let mediaType: "image/jpeg" | "image/png" | "image/webp";
+  if (media.mediaType === "image/jpeg" || media.mediaType === "image/jpg")
+    mediaType = "image/jpeg";
+  else if (media.mediaType === "image/png") mediaType = "image/png";
+  else if (media.mediaType === "image/webp") mediaType = "image/webp";
+  else {
+    await sendTextMessage(
+      phone,
+      "Solo acepto fotos JPG, PNG o WebP. Manda el comprobante en otro formato.",
+    );
+    return;
+  }
+  if (media.size > 10 * 1024 * 1024) {
+    await sendTextMessage(phone, "La foto es muy pesada (>10 MB). Intenta otra.");
+    return;
+  }
+
+  // 6. Subir a Supabase Storage
+  const ext = mediaType === "image/png" ? "png" : mediaType === "image/webp" ? "webp" : "jpg";
+  const proofId = crypto.randomUUID();
+  const storagePath = `pollas/${polla.id}/${userId}/${proofId}.${ext}`;
+  const { error: uploadErr } = await supabase.storage
+    .from("payment-proofs")
+    .upload(storagePath, media.buffer, {
+      contentType: mediaType,
+      upsert: false,
+    });
+  if (uploadErr) {
+    console.error("[wa/payment-proof] storage upload failed:", uploadErr);
+    await sendTextMessage(
+      phone,
+      "No pude guardar el comprobante. Intenta de nuevo.",
+    );
+    return;
+  }
+
+  // 7. Confirmar recepción y avisar que va a verificar
+  await sendTextMessage(
+    phone,
+    "📸 Recibí tu comprobante. Verificando... ⏳",
+  );
+
+  // 8. Llamar al verifier AI
+  const expected = {
+    method: polla.admin_payout_method as PayoutMethod,
+    account: polla.admin_payout_account,
+    recipientName: polla.admin_payout_account_name ?? undefined,
+    amountCOP: Number(polla.buy_in_amount),
+  };
+
+  let verifyResult;
+  try {
+    verifyResult = await verifyPaymentScreenshot({
+      imageBase64: media.buffer.toString("base64"),
+      imageMediaType: mediaType,
+      expected,
+    });
+  } catch (err) {
+    console.error("[wa/payment-proof] verifier failed:", err);
+    void logClaudeUsage({
+      userId,
+      pollaId: polla.id,
+      endpoint: "wa/payment-proof",
+      model: "claude-sonnet-4-6",
+      tokensIn: 0,
+      tokensOut: 0,
+      imageBytes: media.size,
+      costUSD: 0,
+      success: false,
+      errorMessage: err instanceof Error ? err.message : "verifier error",
+    });
+    await supabase.from("payment_proofs").insert({
+      id: proofId,
+      polla_id: polla.id,
+      user_id: userId,
+      storage_path: storagePath,
+      ai_valid: null,
+      ai_rejection_reason: "Verificador AI no disponible — admin debe revisar manualmente.",
+    });
+    await clearState(phone);
+    await sendTextMessage(
+      phone,
+      "El verificador automático no está disponible ahora. El organizador revisará tu comprobante manualmente y te avisamos cuando apruebe.",
+    );
+    return;
+  }
+
+  // 9. Persistir resultado
+  await supabase.from("payment_proofs").insert({
+    id: proofId,
+    polla_id: polla.id,
+    user_id: userId,
+    storage_path: storagePath,
+    ai_source_type: verifyResult.sourceType,
+    ai_valid: verifyResult.valid,
+    ai_confidence: verifyResult.confidence,
+    ai_detected_amount: verifyResult.detectedAmount,
+    ai_detected_account: verifyResult.detectedAccount,
+    ai_detected_recipient_name: verifyResult.detectedRecipientName,
+    ai_detected_date: verifyResult.detectedDate,
+    ai_rejection_reason: verifyResult.rejectionReason,
+    ai_evidence: verifyResult.sourceEvidence,
+    ai_tokens_in: verifyResult.tokensIn,
+    ai_tokens_out: verifyResult.tokensOut,
+    ai_cost_usd: verifyResult.costUSD,
+  });
+
+  void logClaudeUsage({
+    userId,
+    pollaId: polla.id,
+    endpoint: "wa/payment-proof",
+    model: verifyResult.model,
+    tokensIn: verifyResult.tokensIn,
+    tokensOut: verifyResult.tokensOut,
+    imageBytes: media.size,
+    costUSD: verifyResult.costUSD,
+    success: true,
+  });
+
+  await clearState(phone);
+
+  // 10. Si AI auto-aprueba, marcar paid y abrir polla menu
+  if (verifyResult.valid) {
+    await supabase
+      .from("polla_participants")
+      .update({
+        paid: true,
+        paid_at: new Date().toISOString(),
+        payment_status: "approved",
+      })
+      .eq("id", participant.id);
+
+    await sendTextMessage(
+      phone,
+      `✅ ¡Comprobante aprobado! Ya estás dentro de *${polla.name}*. ¡A pronosticar! 🎯`,
+    );
+    // Mostrar el menú de la polla para que arranque a pronosticar.
+    const { handlePollaMenu } = await import("./flows");
+    await handlePollaMenu(phone, userId, polla.id);
+
+    // Si todavía no tiene método de pago default, lo pedimos ahora —
+    // single moment para capturarlo (la primera polla con buy-in que paga).
+    if (await userNeedsPaymentInfo(userId)) {
+      await askPaymentMethod(phone);
+    }
+    return;
+  }
+
+  // 11. AI rechazó → explicar y dejar que reintenten (hasta cap)
+  const reason = verifyResult.rejectionReason ?? "El comprobante no parece válido.";
+  await sendTextMessage(
+    phone,
+    `⚠️ *No pude aprobar el comprobante automáticamente.*\n\n${reason}\n\n` +
+      `Puedes mandarme otra foto más clara, o pedirle al organizador que apruebe manual.`,
+  );
+  // No clearState — dejamos waiting_payment_proof para el reintento.
+  await setState(phone, {
+    action: "waiting_payment_proof",
+    pollaId: polla.id,
+  });
 }
 
 // ─── Comando "pago": ver/cambiar info actual ───

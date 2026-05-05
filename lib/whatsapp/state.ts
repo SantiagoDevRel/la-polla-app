@@ -38,7 +38,8 @@ export type ConversationAction =
   | "waiting_join_code"
   | "onboarding_ask_name"
   | "waiting_payment_method"
-  | "waiting_payment_account";
+  | "waiting_payment_account"
+  | "waiting_payment_proof";
 
 export type ConversationState = {
   action: ConversationAction;
