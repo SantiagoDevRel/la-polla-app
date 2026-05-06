@@ -131,14 +131,23 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
   const countryFlag = flagUrlForTeam(teamName);
   const src = countryFlag ?? flagUrl;
   if (src && !errored) {
+    // <img> plain en lugar de next/image: para SVGs externos (banderas
+    // de jsdelivr) next/image a veces no renderiza por validacion de
+    // formato. <img> es mas robusto para este caso especifico de
+    // imagenes de proveedores externos pequenas (24x24).
     return (
-      <Image
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
         src={src}
         alt={teamName}
         width={24}
         height={24}
-        unoptimized
-        style={{ objectFit: "contain", borderRadius: countryFlag ? 4 : "50%" }}
+        style={{
+          width: 24,
+          height: 24,
+          objectFit: "contain",
+          borderRadius: countryFlag ? 4 : "50%",
+        }}
         onError={() => setErrored(true)}
       />
     );
