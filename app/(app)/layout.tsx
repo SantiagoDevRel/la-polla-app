@@ -9,6 +9,7 @@
 // FAB and a live Avisos badge. Queries are best-effort — any failure
 // falls back to BottomNav defaults (default pollito, zero badge) so the
 // nav keeps working even when auth/DB hiccups during dev.
+import { redirect } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
 import BottomNav from "@/components/nav/BottomNav";
 import { AppBackground } from "@/components/layout/AppBackground";
@@ -18,6 +19,7 @@ import SWAutoReload from "@/components/layout/SWAutoReload";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
+import { needsName } from "@/lib/users/needs-name";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +43,39 @@ async function getNavContext(): Promise<{ unread: number; pollasPending: number 
   }
 }
 
+async function getDisplayName(): Promise<string | null | undefined> {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return undefined; // no auth → la pagina de login se encarga
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("users")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    return data?.display_name ?? null;
+  } catch {
+    return undefined;
+  }
+}
+
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Gate de onboarding: si el viewer esta autenticado pero su display_name
+  // todavia es NULL o phone-shaped (cuenta creada por bot/web sin nombre),
+  // forzar /onboarding antes de dejarlo ver cualquier ruta autenticada.
+  // Esto evita que aparezcan usuarios "573114685089" en pollas.
+  const dn = await getDisplayName();
+  if (dn !== undefined && needsName(dn)) {
+    redirect("/onboarding");
+  }
+
   const { unread, pollasPending } = await getNavContext();
 
   return (
