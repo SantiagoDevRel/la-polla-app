@@ -10,8 +10,10 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { X, Phone, Mail, MapPin, Smartphone, Trophy, Banknote, Calendar, Hash } from "lucide-react";
+import { X, Phone, Mail, MapPin, Smartphone, Trophy, Banknote, Calendar, Hash, Eye, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { needsName } from "@/lib/users/needs-name";
+import UserPayoutsPreview from "@/components/admin/UserPayoutsPreview";
 
 interface LoginEvent {
   at: string;
@@ -85,6 +87,7 @@ export default function UserDetailModal({
   const [data, setData] = useState<DetailPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previewingPayouts, setPreviewingPayouts] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,6 +162,34 @@ export default function UserDetailModal({
                   Registrado · {fmtDate(data.profile.createdAt)}
                 </p>
               </div>
+            </div>
+
+            {/* Avisos: si el user no tiene nombre real, va a ver el
+                onboarding obligatorio en cuanto entre a la app. */}
+            {needsName(data.profile.displayName) ? (
+              <div className="mb-4 rounded-lg p-2.5 flex items-start gap-2 bg-red-alert/10 border border-red-alert/30">
+                <AlertTriangle className="w-4 h-4 text-red-alert flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-[12px] text-red-alert font-semibold">
+                    Onboarding obligatorio pendiente
+                  </p>
+                  <p className="text-[11px] text-red-alert/80 mt-0.5">
+                    Este usuario verá la pantalla "¿Cómo te llamas?" antes de poder usar la app — no puede saltarla.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Acciones admin */}
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setPreviewingPayouts(true)}
+                className="w-full flex items-center justify-center gap-1.5 text-[12px] py-2 rounded-lg bg-gold/10 border border-gold/30 text-gold hover:bg-gold/15 transition-colors"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Ver vista de pagos de este usuario
+              </button>
             </div>
 
             {/* Stats trio */}
@@ -349,6 +380,13 @@ export default function UserDetailModal({
           </>
         )}
       </div>
+
+      {previewingPayouts ? (
+        <UserPayoutsPreview
+          userId={userId}
+          onClose={() => setPreviewingPayouts(false)}
+        />
+      ) : null}
     </div>
   );
 }
