@@ -177,9 +177,12 @@ export function countryIsoForTeam(teamName: string | null | undefined): string |
  * URL de la bandera en la CDN de jsDelivr (usa el repo lipis/flag-icons,
  * que tiene SVGs en aspect ratio 4x3 y soporta sub-codes como gb-eng).
  * Cero rate limits, jsDelivr CDN.
+ *
+ * Tag 7.0.0 verificado en 2026-05-06 — la 7.5.4 que use originalmente
+ * NO existe en jsdelivr (404), por eso las banderas no cargaban.
  */
 export function flagUrlForTeam(teamName: string | null | undefined): string | null {
   const iso = countryIsoForTeam(teamName);
   if (!iso) return null;
-  return `https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.5.4/flags/4x3/${iso}.svg`;
+  return `https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/${iso}.svg`;
 }
