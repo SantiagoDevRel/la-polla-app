@@ -10,10 +10,10 @@
 // involvement ya filtrado server-side).
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { Banknote, Copy, X, Check } from "lucide-react";
+import { Banknote, Copy, X, Check, Paperclip, Image as ImageIcon } from "lucide-react";
 import WinnerPayoutModal, { type PayoutMethod } from "@/components/polla/WinnerPayoutModal";
 
 interface PendingPayout {
@@ -30,6 +30,8 @@ interface PendingPayout {
     account: string | null;
   } | null;
   viewerNeedsAccount: boolean;
+  hasProof: boolean;
+  proofUploadedAt: string | null;
 }
 
 const METHOD_LABEL: Record<string, string> = {
@@ -59,6 +61,10 @@ export default function GlobalPayoutBanner() {
   // pasa el flow normal del banner regular.
   const [winnerPrompt, setWinnerPrompt] = useState<PendingPayout | null>(null);
   const [savingAccount, setSavingAccount] = useState(false);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [viewingProofUrl, setViewingProofUrl] = useState<string | null>(null);
+  const [loadingProofId, setLoadingProofId] = useState<string | null>(null);
+  const fileInputRefs = useRef<Map<string, HTMLInputElement | null>>(new Map());
 
   const load = useCallback(async () => {
     try {
@@ -82,29 +88,22 @@ export default function GlobalPayoutBanner() {
   // Auto-open: al cargar la lista decidimos qué mostrar primero.
   //   - Si hay incoming con viewerNeedsAccount → priorizamos el winner
   //     modal (de a uno).
-  //   - Si no hay accounts pendientes pero sí hay tx → abre el banner
-  //     regular una vez por sesión.
+  //   - Si no hay accounts pendientes pero sí hay tx → abre el modal
+  //     regular cada vez que el user entre a /inicio. La X siempre lo
+  //     cierra y vuelve a aparecer al próximo mount (decisión deliberada
+  //     del owner — quería que sirva de recordatorio insistente hasta
+  //     que se resuelva el último pago).
   useEffect(() => {
     if (loading || items.length === 0) return;
     if (typeof window === "undefined") return;
 
     const needsAccount = items.find((i) => i.viewerNeedsAccount);
     if (needsAccount) {
-      // Winner sin cuenta — mostrar modal cada visita (NO gateamos por
-      // sessionStorage). Si ya lo cerraron y volvieron al inicio, lo
-      // mostramos otra vez hasta que pongan la cuenta.
       setWinnerPrompt(needsAccount);
       return;
     }
 
-    const k = "global-payout-modal-shown";
-    if (window.sessionStorage.getItem(k) === "1") return;
     setOpen(true);
-    try {
-      window.sessionStorage.setItem(k, "1");
-    } catch {
-      /* sessionStorage unavailable */
-    }
   }, [loading, items]);
 
   async function saveWinnerAccount(
@@ -156,6 +155,40 @@ export default function GlobalPayoutBanner() {
       setTimeout(() => setCopied(null), 1500);
     } catch {
       /* clipboard unavailable */
+    }
+  }
+
+  async function uploadProof(item: PendingPayout, file: File) {
+    if (uploadingId) return;
+    setUploadingId(item.transactionId);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      await axios.post(
+        `/api/pollas/${item.pollaSlug}/payout-confirm/${item.transactionId}/proof`,
+        fd,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+      await load();
+    } catch {
+      /* swallow — el user puede reintentar */
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
+  async function viewProof(item: PendingPayout) {
+    if (loadingProofId) return;
+    setLoadingProofId(item.transactionId);
+    try {
+      const res = await axios.get<{ url: string | null }>(
+        `/api/pollas/${item.pollaSlug}/payout-confirm/${item.transactionId}/proof`,
+      );
+      if (res.data.url) setViewingProofUrl(res.data.url);
+    } catch {
+      /* swallow */
+    } finally {
+      setLoadingProofId(null);
     }
   }
 
@@ -254,6 +287,19 @@ export default function GlobalPayoutBanner() {
                           {fmtCOP(it.amount)}
                         </span>
                       </div>
+                      {it.hasProof ? (
+                        <button
+                          type="button"
+                          onClick={() => viewProof(it)}
+                          disabled={loadingProofId === it.transactionId}
+                          className="w-full mb-1.5 text-[12px] font-semibold py-1.5 rounded-lg bg-bg-base border border-gold/40 text-gold hover:bg-gold/10 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          {loadingProofId === it.transactionId
+                            ? "Cargando…"
+                            : "Ver comprobante"}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => markPaid(it)}
@@ -327,14 +373,49 @@ export default function GlobalPayoutBanner() {
                             Esperando que indique cómo cobrar…
                           </p>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => markPaid(it)}
-                          disabled={actingId === it.transactionId}
-                          className="w-full text-[12px] font-semibold py-1.5 rounded-lg bg-turf/15 border border-turf/30 text-turf hover:bg-turf/20 transition-colors disabled:opacity-50"
-                        >
-                          {actingId === it.transactionId ? "…" : "Ya pagué"}
-                        </button>
+                        <input
+                          ref={(el) => {
+                            if (el) fileInputRefs.current.set(it.transactionId, el);
+                          }}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) void uploadProof(it, f);
+                            e.target.value = "";
+                          }}
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              fileInputRefs.current.get(it.transactionId)?.click()
+                            }
+                            disabled={uploadingId === it.transactionId}
+                            className="text-[12px] font-semibold py-1.5 rounded-lg bg-bg-base border border-border-subtle text-text-secondary hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                          >
+                            <Paperclip className="w-3.5 h-3.5" />
+                            {uploadingId === it.transactionId
+                              ? "Subiendo…"
+                              : it.hasProof
+                                ? "Cambiar"
+                                : "Comprobante"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => markPaid(it)}
+                            disabled={actingId === it.transactionId}
+                            className="text-[12px] font-semibold py-1.5 rounded-lg bg-turf/15 border border-turf/30 text-turf hover:bg-turf/20 transition-colors disabled:opacity-50"
+                          >
+                            {actingId === it.transactionId ? "…" : "Ya pagué"}
+                          </button>
+                        </div>
+                        {it.hasProof ? (
+                          <p className="text-[10px] text-gold/80 mt-1.5 text-center">
+                            ✓ Comprobante adjunto
+                          </p>
+                        ) : null}
                       </li>
                     );
                   })}
@@ -363,6 +444,32 @@ export default function GlobalPayoutBanner() {
               </button>
             ) : null}
           </div>
+        </div>
+      ) : null}
+
+      {/* Lightbox del comprobante. La signed URL caduca a los 10 min,
+          así que ni cacheamos — si el user cierra y vuelve a abrir,
+          se pide otra. */}
+      {viewingProofUrl ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+          onClick={() => setViewingProofUrl(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setViewingProofUrl(null)}
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2"
+            aria-label="Cerrar"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={viewingProofUrl}
+            alt="Comprobante de pago"
+            className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       ) : null}
     </>
