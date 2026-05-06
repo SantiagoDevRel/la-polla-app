@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { flagUrlForTeam } from "@/lib/flags/country-iso";
 
 export interface LiveChipProps {
   kind: "live" | "upcoming";
@@ -12,6 +13,11 @@ export interface LiveChipProps {
    *  muestra; si no, fallback al code de letras. */
   homeLogo?: string | null;
   awayLogo?: string | null;
+  /** Nombre completo del equipo. Cuando matchea con una seleccion
+   *  nacional conocida (Argentina, Brazil, etc.) se prefiere la bandera
+   *  del pais sobre el logo del provider. */
+  homeName?: string;
+  awayName?: string;
   homeScore?: number;
   awayScore?: number;
   /** Pre-formatted minute label, e.g. "34'" or "90+'". Pass exactly
@@ -60,21 +66,28 @@ function formatUpcoming(date: Date): string {
 function TeamLogoOrCode({
   logo,
   code,
+  teamName,
 }: {
   logo: string | null | undefined;
   code: string;
+  teamName?: string;
 }) {
   const [errored, setErrored] = useState(false);
-  if (logo && !errored) {
+  // Si el teamName matchea una seleccion nacional conocida, preferir
+  // la bandera del pais sobre el logo del provider — eso resuelve el
+  // caso del Mundial donde ESPN no siempre devuelve crest util.
+  const countryFlag = teamName ? flagUrlForTeam(teamName) : null;
+  const src = countryFlag ?? logo;
+  if (src && !errored) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={logo}
+        src={src}
         alt={code}
         width={24}
         height={24}
         className="object-contain"
-        style={{ width: 24, height: 24 }}
+        style={{ width: 24, height: 24, borderRadius: countryFlag ? 4 : 0 }}
         onError={() => setErrored(true)}
       />
     );
@@ -93,6 +106,8 @@ export function LiveChip(props: LiveChipProps) {
     awayCode,
     homeLogo,
     awayLogo,
+    homeName,
+    awayName,
     homeScore,
     awayScore,
     minuteLabel,
@@ -103,8 +118,12 @@ export function LiveChip(props: LiveChipProps) {
 
   const isLive = kind === "live";
 
-  function renderTeam(logo: string | null | undefined, code: string) {
-    return <TeamLogoOrCode logo={logo} code={code} />;
+  function renderTeam(
+    logo: string | null | undefined,
+    code: string,
+    name?: string,
+  ) {
+    return <TeamLogoOrCode logo={logo} code={code} teamName={name} />;
   }
 
   return (
@@ -145,7 +164,7 @@ export function LiveChip(props: LiveChipProps) {
           screen-reader / fallback. */}
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1 min-w-0">
-          {renderTeam(homeLogo, homeCode)}
+          {renderTeam(homeLogo, homeCode, homeName)}
         </span>
         {isLive ? (
           <span
@@ -158,7 +177,7 @@ export function LiveChip(props: LiveChipProps) {
           <span className="font-display text-[16px] tracking-[0.04em] text-text-muted">—</span>
         )}
         <span className="flex items-center gap-1 min-w-0 justify-end">
-          {renderTeam(awayLogo, awayCode)}
+          {renderTeam(awayLogo, awayCode, awayName)}
         </span>
       </div>
 

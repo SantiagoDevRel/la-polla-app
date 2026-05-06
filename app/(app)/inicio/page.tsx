@@ -891,6 +891,8 @@ export default async function InicioPage() {
                           awayCode={awayCode}
                           homeLogo={m.home_team_flag}
                           awayLogo={m.away_team_flag}
+                          homeName={m.home_team}
+                          awayName={m.away_team}
                           homeScore={m.status === "live" ? m.home_score ?? undefined : undefined}
                           awayScore={m.status === "live" ? m.away_score ?? undefined : undefined}
                           minuteLabel={minuteLabel}
