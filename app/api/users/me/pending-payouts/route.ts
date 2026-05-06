@@ -18,6 +18,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { materializePayoutsIfNeeded } from "@/lib/pollas/materialize-payouts";
 
 interface PayoutRow {
   id: string;
@@ -84,7 +85,14 @@ export async function GET() {
     return NextResponse.json({ pending: [] });
   }
 
-  // 2. Transacciones unpaid en esas pollas.
+  // 2. Lazy materialize: si alguna polla cerró pero las tx todavía no
+  // se persistieron, las creamos en este momento. Esto hace que Casvi /
+  // Dani / cualquier participante vea sus pagos en /inicio sin que el
+  // admin tenga que entrar a la polla primero a abrir el modal.
+  // Idempotente — si ya hay filas, no hace nada.
+  await materializePayoutsIfNeeded(admin, Array.from(pollaIds));
+
+  // 3. Transacciones unpaid en esas pollas.
   const { data: txs } = await admin
     .from("polla_payouts")
     .select(

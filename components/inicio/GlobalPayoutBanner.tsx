@@ -197,6 +197,14 @@ export default function GlobalPayoutBanner() {
   const incoming = items.filter((i) => i.direction === "incoming");
   const outgoing = items.filter((i) => i.direction === "outgoing");
 
+  // Si tiene pagos OUTGOING pendientes, el modal queda bloqueado: no se
+  // puede cerrar hasta que marque cada uno como pagado. Decisión del
+  // owner para forzar que la gente cumpla con los ganadores antes de
+  // seguir usando la app. Solo aplica al modal regular — el winner-
+  // needs-account modal sí sigue siendo cerrable porque ese es del
+  // viewer hacia adentro (sus datos), no responsabilidad con terceros.
+  const hasOutgoingPending = outgoing.length > 0;
+
   return (
     <>
       {/* Winner-needs-account modal — prioridad. Solo cuando hay un
@@ -242,14 +250,16 @@ export default function GlobalPayoutBanner() {
       {open ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center px-4 py-6 bg-black/55 backdrop-blur-sm overflow-y-auto">
           <div className="relative w-full max-w-sm bg-bg-card border border-gold/20 rounded-2xl p-5 max-h-[88vh] overflow-y-auto shadow-[0_0_40px_rgba(255,215,0,0.18)]">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors p-1"
-              aria-label="Cerrar"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {hasOutgoingPending ? null : (
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors p-1"
+                aria-label="Cerrar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
 
             <div className="mb-4 pr-6">
               <h2 className="font-display text-[20px] tracking-[0.04em] text-gold uppercase">
@@ -258,6 +268,16 @@ export default function GlobalPayoutBanner() {
               <p className="text-[12px] text-text-secondary mt-0.5">
                 De todas tus pollas finalizadas.
               </p>
+              {hasOutgoingPending ? (
+                <div className="mt-3 rounded-lg px-3 py-2 bg-red-alert/10 border border-red-alert/30">
+                  <p className="text-[12px] text-red-alert font-semibold">
+                    Cumple con tus pagos para cerrar este aviso.
+                  </p>
+                  <p className="text-[11px] text-red-alert/80 mt-0.5">
+                    Sube el comprobante si pudiste — el ganador queda más tranquilo.
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             {incoming.length > 0 ? (
@@ -423,13 +443,15 @@ export default function GlobalPayoutBanner() {
               </section>
             ) : null}
 
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="w-full mt-3 px-3 py-2.5 rounded-xl border border-border-subtle text-text-secondary text-[13px] hover:border-text-secondary/40 transition-colors"
-            >
-              Cerrar
-            </button>
+            {hasOutgoingPending ? null : (
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="w-full mt-3 px-3 py-2.5 rounded-xl border border-border-subtle text-text-secondary text-[13px] hover:border-text-secondary/40 transition-colors"
+              >
+                Cerrar
+              </button>
+            )}
 
             {items.length > 0 ? (
               <button
