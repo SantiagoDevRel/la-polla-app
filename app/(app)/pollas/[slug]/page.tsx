@@ -510,7 +510,7 @@ function MatchRow({
         {locked && otherPredictions.length > 0 ? (
           <div className="mt-3 pt-3 border-t border-border-subtle">
             <p className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60 mb-2">
-              Pronósticos del parche · {otherPredictions.length}
+              Pronósticos de la polla · {otherPredictions.length}
             </p>
             <ul className="space-y-1.5">
               {otherPredictions.map((op) => {

@@ -108,7 +108,7 @@ export default function SoportePage() {
           <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
             Desde la pantalla de inicio, toca el botón dorado con el símbolo
             &quot;+&quot;. Eliges el torneo (Champions, Mundial, La Liga,
-            Premier o Serie A), defines el nombre del parche, el modo de pago y
+            Premier o Serie A), defines el nombre de la polla, el modo de pago y
             listo. Te damos un código y un link para invitar.
           </p>
 
