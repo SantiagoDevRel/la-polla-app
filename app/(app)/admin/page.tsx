@@ -114,15 +114,31 @@ export default function AdminPage() {
     by_template: Record<string, { sent: number; failed: number; cost_usd: number; category: string }>;
     last_send_at: string | null;
   } | null>(null);
+  const [twilioByPhone, setTwilioByPhone] = useState<{
+    configured: boolean;
+    period?: { start: string; end: string };
+    sample_size?: number;
+    truncated?: boolean;
+    totals?: { cost: number; count: number };
+    byPhone?: Array<{
+      phone: string;
+      displayName: string | null;
+      count: number;
+      cost: number;
+      lastSent: string;
+    }>;
+    error?: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryRes, twilioRes, analyticsRes, discRes, claudeRes, waTplRes] = await Promise.allSettled([
+      const [summaryRes, twilioRes, twilioPhoneRes, analyticsRes, discRes, claudeRes, waTplRes] = await Promise.allSettled([
         axios.get<Summary>("/api/admin/summary"),
         axios.get<TwilioUsage>("/api/admin/twilio-usage"),
+        axios.get("/api/admin/twilio-by-phone"),
         axios.get<Analytics>("/api/admin/analytics"),
         axios.get<{ matches: unknown[] }>("/api/admin/discrepancies"),
         axios.get("/api/admin/claude-usage"),
@@ -141,6 +157,7 @@ export default function AdminPage() {
           error: reason?.response?.data?.error ?? reason?.message ?? "No se pudo cargar Twilio",
         });
       }
+      if (twilioPhoneRes.status === "fulfilled") setTwilioByPhone(twilioPhoneRes.value.data);
       if (analyticsRes.status === "fulfilled") setAnalytics(analyticsRes.value.data);
       if (discRes.status === "fulfilled") {
         setDiscrepancyCount(discRes.value.data.matches?.length ?? 0);
@@ -367,6 +384,64 @@ export default function AdminPage() {
                   )}
                 </>
               ) : null}
+            </section>
+
+            {/* Twilio · top numeros (SMS por destino, ultimos 30d) */}
+            <section
+              className="rounded-2xl p-4 space-y-3"
+              style={{ background: "#0e1420", border: "1px solid rgba(255,255,255,0.06)" }}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-text-primary">Twilio · top números (30d)</h2>
+                {twilioByPhone?.totals ? (
+                  <span className="text-[10px] text-text-muted tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+                    {twilioByPhone.totals.count} SMS · {formatUSD(twilioByPhone.totals.cost)}
+                  </span>
+                ) : null}
+              </div>
+              {!twilioByPhone ? (
+                <p className="text-xs text-text-muted">Cargando…</p>
+              ) : !twilioByPhone.configured ? (
+                <p className="text-xs text-text-muted">Twilio no configurado.</p>
+              ) : twilioByPhone.error ? (
+                <p className="text-xs text-red-alert">Error: {twilioByPhone.error}</p>
+              ) : !twilioByPhone.byPhone || twilioByPhone.byPhone.length === 0 ? (
+                <p className="text-xs text-text-muted">Sin SMS en los últimos 30 días.</p>
+              ) : (
+                <>
+                  {twilioByPhone.truncated ? (
+                    <p className="text-[10px] text-amber">
+                      Mostrando primeros 1000 mensajes. Hay más sin contar.
+                    </p>
+                  ) : null}
+                  <div className="space-y-1.5 max-h-[320px] overflow-y-auto pr-1">
+                    {twilioByPhone.byPhone.map((row) => (
+                      <div
+                        key={row.phone}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
+                        style={{ background: "#131d2e" }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] text-text-primary truncate">
+                            {row.displayName ?? "(sin nombre)"}
+                          </p>
+                          <p className="text-[10px] text-text-muted tabular-nums truncate" style={{ fontFeatureSettings: '"tnum"' }}>
+                            {row.phone}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end flex-shrink-0">
+                          <span className="text-[12px] text-gold tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+                            {formatUSD(row.cost)}
+                          </span>
+                          <span className="text-[10px] text-text-muted tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+                            {row.count} SMS
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </section>
 
             {/* WhatsApp templates · MTD spend */}
