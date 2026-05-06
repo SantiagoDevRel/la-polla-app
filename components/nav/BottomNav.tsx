@@ -25,7 +25,7 @@ export interface BottomNavProps {
   notifUnread?: number;
   /** Count of partidos por pronosticar across all the viewer's active
    *  pollas; gold badge on the Pollas tab when > 0. Distinto color que
-   *  Avisos para que el viewer mayor distinga "tenés algo que hacer
+   *  Avisos para que el viewer mayor distinga "tienes algo que hacer
    *  acá" (gold) vs "te avisaron de algo" (red). */
   pollasPending?: number;
 }

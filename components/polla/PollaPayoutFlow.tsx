@@ -255,7 +255,7 @@ export default function PollaPayoutFlow({ slug, refreshKey = 0 }: Props) {
                 : summary.myIncoming.length > 0 && summary.myOutgoing.length === 0
                 ? "Te tienen que pagar"
                 : summary.myOutgoing.length > 0
-                ? "Tenés un pago pendiente"
+                ? "Tienes un pago pendiente"
                 : "Pagos pendientes en esta polla"}
             </p>
             <p className="text-[11px] text-text-secondary">Tocá para ver el detalle.</p>

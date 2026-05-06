@@ -666,9 +666,9 @@ export default async function InicioPage() {
   };
 
   // Próximos strip scope: una card por (polla, partido) cuando un
-  // partido aparece en varias pollas del usuario. Si tenés 3 pollas con
+  // partido aparece en varias pollas del usuario. Si tienes 3 pollas con
   // los mismos 3 partidos, ves 9 cards — cada una linkea su QuickPick a
-  // la polla correcta para que pronostiqués en cada polla por separado.
+  // la polla correcta para que pronostiques en cada polla por separado.
   // Filtra a partidos scheduled, kickoff entre (now + 5 min) y end-of-
   // tomorrow, ordenado por kickoff asc y luego por nombre de polla
   // estable. Cap 15 cards.

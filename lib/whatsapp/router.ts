@@ -124,8 +124,8 @@ export async function processIncomingMessage(
     }
     await sendTextMessage(
       from,
-      "Recibí tu foto, parce 📸 pero no estaba esperando ninguna en este momento. " +
-        "Si querés mandar un comprobante de pago, primero únete a una polla y te lo pido cuando toque.",
+      "Recibí tu foto 📸 pero no estaba esperando ninguna en este momento. " +
+        "Si quieres mandar un comprobante de pago, primero únete a una polla y te lo pido cuando toque.",
     );
     return;
   }
@@ -224,7 +224,7 @@ export async function processIncomingMessage(
         await clearState(from);
         await sendTextMessage(
           from,
-          "Listo parce, no te uniste. Si querés probar con otro código, mándamelo de nuevo.",
+          "Listo, no te uniste. Si quieres probar con otro código, mándamelo de nuevo.",
         );
         return;
       }
@@ -305,7 +305,7 @@ async function routePayload(
     await setState(from, { action: "waiting_join_code" });
     await sendTextMessage(
       from,
-      "¡Listo parce! 🐥\n\nMándame el *código de 6 caracteres* de la polla que quieres entrar\n\n_Te lo pasa el organizador de la polla._",
+      "¡Listo! 🐥\n\nMándame el *código de 6 caracteres* de la polla que quieres entrar\n\n_Te lo pasa el organizador de la polla._",
     );
     return;
   }
@@ -334,7 +334,7 @@ async function routePayload(
     await clearState(from);
     await sendTextMessage(
       from,
-      "Listo parce, no te uniste. Si querés probar con otro código, mándamelo de nuevo.",
+      "Listo, no te uniste. Si quieres probar con otro código, mándamelo de nuevo.",
     );
     return;
   }

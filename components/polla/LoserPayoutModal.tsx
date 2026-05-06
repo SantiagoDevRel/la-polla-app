@@ -144,7 +144,7 @@ export default function LoserPayoutModal({
               indique{winners.length > 1 ? "n" : ""} cómo cobrar.
             </p>
             <p className="text-[11px] text-text-muted mt-1">
-              Pegale un toque por WhatsApp para que abra la app.
+              Mándale un mensaje por WhatsApp para que abra la app.
             </p>
           </div>
         )}

@@ -281,7 +281,7 @@ interface MatchRowProps {
   locked: boolean;
   /** Display names de participantes approved+paid que aún NO han
    *  pronosticado este partido. Solo se renderizan cuando !locked —
-   *  sirve para que el parche se nudgee mutuamente antes del cierre.
+   *  sirve para que los participantes se nudgeen mutuamente antes del cierre.
    *  Cuando el match se bloquea, esta lista se oculta y los marcadores
    *  pasan a mostrarse via otherPredictions. Pasar [] si todos predijeron. */
   missingPredictions: string[];
@@ -894,7 +894,7 @@ export default function PollaSlugPage() {
   // Para cada match, lista de display_names de participantes
   // approved+paid que NO tienen prediction. Visible solo cuando match
   // no está bloqueado (la check de locked vive en MatchRow). Sirve
-  // para nudgear al parche antes del cierre.
+  // para nudgear a los participantes antes del cierre.
   const missingByMatch = useMemo(() => {
     const out = new Map<string, string[]>();
     if (participantInfoById.size === 0) return out;

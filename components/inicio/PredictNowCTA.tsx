@@ -1,5 +1,5 @@
 // components/inicio/PredictNowCTA.tsx — Pill prominente en /inicio que
-// le dice al user "tenés N pronósticos pendientes, tocá para ir directo
+// le dice al user "tienes N pronósticos pendientes, toca para ir directo
 // al primero". Pensado para usuarios mayores que se pierden en el flow
 // (Pollas → polla → Partidos → input).
 //
