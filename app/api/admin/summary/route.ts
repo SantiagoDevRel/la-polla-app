@@ -23,7 +23,7 @@ export async function GET() {
         .order("created_at", { ascending: false }),
       admin
         .from("pollas")
-        .select("id, name, tournament, status, created_at")
+        .select("id, slug, name, tournament, status, created_at")
         .order("created_at", { ascending: false }),
     ]);
 
