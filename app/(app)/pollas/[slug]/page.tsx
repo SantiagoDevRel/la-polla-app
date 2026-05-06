@@ -48,6 +48,7 @@ import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { computeLiveMinute, formatLiveMinute, specialStatusLabel } from "@/lib/matches/live-minute";
 import FootballLoader from "@/components/ui/FootballLoader";
 import { computePayout, type PaymentMode } from "@/lib/pollas/payout-allocation";
+import { flagUrlForTeam } from "@/lib/flags/country-iso";
 
 function fmtCOP(n: number): string {
   return `$${Math.round(n).toLocaleString("es-CO")}`;
@@ -117,23 +118,27 @@ function PaymentPendingBanner({ onGo }: { onGo: () => void }) {
 
 function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: string }) {
   // Track si la imagen falló al cargar (404, CORS, network, etc.) para
-  // mostrar fallback con iniciales en vez de quedar en blanco. El bug
-  // anterior usaba onError → display:none, dejando espacio vacío.
+  // mostrar fallback con iniciales en vez de quedar en blanco.
   const [errored, setErrored] = useState(false);
 
+  // Prioridad de fuentes para el "logo" del equipo:
+  //   1. Bandera del país via flag-icons CDN si el team_name matchea
+  //      una selección nacional conocida (Mundial, Copa América, etc.).
+  //   2. flagUrl del provider (ESPN logo, football-data crest).
+  //   3. Iniciales del team_name como fallback final.
   // unoptimized: skipea el optimizador de imágenes de Vercel para
-  // logos externos pequeños (24x24). Evita rate limits del optimizer
-  // + reduce 404 silenciosos cuando el optimizer no puede procesar
-  // la URL externa por permisos.
-  if (flagUrl && !errored) {
+  // logos externos pequeños (24x24).
+  const countryFlag = flagUrlForTeam(teamName);
+  const src = countryFlag ?? flagUrl;
+  if (src && !errored) {
     return (
       <Image
-        src={flagUrl}
+        src={src}
         alt={teamName}
         width={24}
         height={24}
         unoptimized
-        style={{ objectFit: "contain", borderRadius: "50%" }}
+        style={{ objectFit: "contain", borderRadius: countryFlag ? 4 : "50%" }}
         onError={() => setErrored(true)}
       />
     );
