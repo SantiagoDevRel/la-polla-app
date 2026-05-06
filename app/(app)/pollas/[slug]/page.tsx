@@ -47,6 +47,11 @@ function PitchIcon({ className }: { className?: string }) {
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { computeLiveMinute, formatLiveMinute, specialStatusLabel } from "@/lib/matches/live-minute";
 import FootballLoader from "@/components/ui/FootballLoader";
+import { computePayout, type PaymentMode } from "@/lib/pollas/payout-allocation";
+
+function fmtCOP(n: number): string {
+  return `$${Math.round(n).toLocaleString("es-CO")}`;
+}
 
 // ─── Tipos ───
 
@@ -853,6 +858,39 @@ export default function PollaSlugPage() {
     return m;
   }, [participants]);
 
+  // Premio (en COP) por user — preview que se muestra al lado del
+  // puntaje en la tabla. Reutiliza la misma función pure que el modal
+  // de cierre (PollaPayoutFlow). Cuando la polla aún está activa muestra
+  // el "premio si terminara hoy" (preview); cuando ya cerró es el final.
+  const payoutByUser = useMemo(() => {
+    const out = new Map<string, number>();
+    if (!polla) return out;
+    const paid = participants.filter(
+      (p) => p.status === "approved" && p.paid,
+    );
+    if (paid.length === 0) return out;
+    const buyIn = Number(polla.buy_in_amount ?? 0);
+    if (buyIn <= 0) return out;
+    const computation = computePayout({
+      participants: paid.map((p) => ({
+        user_id: p.user_id,
+        display_name: p.users?.display_name ?? "—",
+        rank: p.rank ?? 9999,
+        joined_at: p.joined_at,
+      })),
+      prizeDistribution: polla.prize_distribution,
+      pot: buyIn * paid.length,
+      buyIn,
+      paymentMode: (polla.payment_mode as PaymentMode) ?? "admin_collects",
+      adminUserId: polla.created_by,
+    });
+    if (computation.errors.length > 0) return out;
+    for (const a of computation.allocations) {
+      if (a.allocation > 0) out.set(a.user_id, a.allocation);
+    }
+    return out;
+  }, [participants, polla]);
+
   // Para cada match, lista de display_names de participantes
   // approved+paid que NO tienen prediction. Visible solo cuando match
   // no está bloqueado (la check de locked vive en MatchRow). Sirve
@@ -1341,9 +1379,22 @@ export default function PollaSlugPage() {
                             {p.users?.display_name || "Usuario"}
                             {isMe && <span className="ml-1 text-xs text-gold">(tú)</span>}
                           </p>
-                          {polla.payment_mode === "admin_collects" && (
-                            <p className="text-xs text-text-muted">{p.paid ? "Pagado" : "Pendiente"}</p>
-                          )}
+                          {(() => {
+                            const prize = payoutByUser.get(p.user_id) ?? 0;
+                            if (prize > 0) {
+                              return (
+                                <p className="text-xs text-gold font-semibold tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
+                                  {polla.status === "ended" ? "Premio" : "Va ganando"}: {fmtCOP(prize)}
+                                </p>
+                              );
+                            }
+                            if (polla.payment_mode === "admin_collects") {
+                              return (
+                                <p className="text-xs text-text-muted">{p.paid ? "Pagado" : "Pendiente"}</p>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         <span className="score-font text-[18px] text-text-primary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>{p.total_points}</span>
                       </div>
