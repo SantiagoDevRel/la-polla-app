@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
 import FootballLoader from "@/components/ui/FootballLoader";
+import PayoutsByPolla from "@/components/admin/PayoutsByPolla";
+import UserDetailModal from "@/components/admin/UserDetailModal";
 
 interface AdminUser {
   id: string;
@@ -19,6 +21,7 @@ interface AdminUser {
 
 interface AdminPolla {
   id: string;
+  slug: string;
   name: string;
   tournament: string;
   status: string;
@@ -84,6 +87,7 @@ export default function AdminPage() {
   const [twilio, setTwilio] = useState<TwilioUsage | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [discrepancyCount, setDiscrepancyCount] = useState<number>(0);
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [claudeUsage, setClaudeUsage] = useState<{
     mtdTotal: { calls: number; errors: number; tokensIn: number; tokensOut: number; costUSD: number };
     byUser: Array<{ userId: string | null; displayName: string; calls: number; cost: number }>;
@@ -789,9 +793,13 @@ export default function AdminPage() {
                     className="rounded-xl p-3 flex items-center gap-3"
                     style={{ background: "#131d2e", border: "1px solid rgba(255,255,255,0.04)" }}
                   >
-                    <div className="flex-1 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => setViewingUserId(u.id)}
+                      className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                    >
                       <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-medium text-text-primary truncate">
+                        <p className="text-sm font-medium text-text-primary truncate underline decoration-transparent hover:decoration-text-primary/40">
                           {u.display_name || "Sin nombre"}
                         </p>
                         {u.is_admin && (
@@ -806,9 +814,12 @@ export default function AdminPage() {
                       <p className="text-xs text-text-muted truncate">
                         {u.whatsapp_number} · {formatDate(u.created_at)}
                       </p>
-                    </div>
+                    </button>
                     <button
-                      onClick={() => handleDeleteUser(u)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteUser(u);
+                      }}
                       disabled={busyId === u.id}
                       className="text-xs px-3 py-1.5 rounded-lg border cursor-pointer transition-all disabled:opacity-40"
                       style={{ borderColor: "rgba(255,61,87,0.4)", color: "#ff3d57" }}
@@ -840,14 +851,23 @@ export default function AdminPage() {
                     className="rounded-xl p-3 flex items-center gap-3"
                     style={{ background: "#131d2e", border: "1px solid rgba(255,255,255,0.04)" }}
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{p.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/pollas/${p.slug}`)}
+                      className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                    >
+                      <p className="text-sm font-medium text-text-primary truncate underline decoration-transparent hover:decoration-text-primary/40">
+                        {p.name}
+                      </p>
                       <p className="text-xs text-text-muted truncate">
                         {p.tournament} · {p.status} · {formatDate(p.created_at)}
                       </p>
-                    </div>
+                    </button>
                     <button
-                      onClick={() => handleDeletePolla(p)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePolla(p);
+                      }}
                       disabled={busyId === p.id}
                       className="text-xs px-3 py-1.5 rounded-lg border cursor-pointer transition-all disabled:opacity-40"
                       style={{ borderColor: "rgba(255,61,87,0.4)", color: "#ff3d57" }}
@@ -861,9 +881,20 @@ export default function AdminPage() {
                 )}
               </div>
             </section>
+
+            {/* Pagos por polla — accordion colapsable, scroll interno
+                por bloque para no inflar la pagina global. */}
+            <PayoutsByPolla />
           </>
         )}
       </main>
+
+      {viewingUserId ? (
+        <UserDetailModal
+          userId={viewingUserId}
+          onClose={() => setViewingUserId(null)}
+        />
+      ) : null}
     </div>
   );
 }

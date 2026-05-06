@@ -9,6 +9,7 @@ import {
   POLLA_PARTICIPANT_COLUMNS,
   PREDICTION_COLUMNS,
 } from "@/lib/db/columns";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 export async function GET(
   request: NextRequest,
@@ -49,8 +50,15 @@ export async function GET(
       .eq("user_id", user.id)
       .maybeSingle();
 
+    // Admin global puede leer cualquier polla en modo observador (read-
+    // only). El cliente decide si renderizar UI de participante o de
+    // admin viewer. Sin esta puerta, los admins no podrían inspeccionar
+    // pollas de otras personas desde el dashboard.
     if (!participant && polla.created_by !== user.id) {
-      return NextResponse.json({ error: "No tienes acceso a esta polla" }, { status: 403 });
+      const isAdmin = await isCurrentUserAdmin();
+      if (!isAdmin) {
+        return NextResponse.json({ error: "No tienes acceso a esta polla" }, { status: 403 });
+      }
     }
 
     // Cargar participantes aprobados con sus puntos y rank
