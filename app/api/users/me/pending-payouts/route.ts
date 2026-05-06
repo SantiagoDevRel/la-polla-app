@@ -26,6 +26,8 @@ interface PayoutRow {
   to_user_id: string;
   amount: number;
   paid_at: string | null;
+  proof_storage_path: string | null;
+  proof_uploaded_at: string | null;
 }
 
 interface PollaRow {
@@ -85,7 +87,9 @@ export async function GET() {
   // 2. Transacciones unpaid en esas pollas.
   const { data: txs } = await admin
     .from("polla_payouts")
-    .select("id, polla_id, from_user_id, to_user_id, amount, paid_at")
+    .select(
+      "id, polla_id, from_user_id, to_user_id, amount, paid_at, proof_storage_path, proof_uploaded_at",
+    )
     .in("polla_id", Array.from(pollaIds))
     .is("paid_at", null);
 
@@ -169,6 +173,8 @@ export async function GET() {
         counterpartyName: counterparty?.display_name ?? "—",
         counterpartyAccount,
         viewerNeedsAccount,
+        hasProof: Boolean(t.proof_storage_path),
+        proofUploadedAt: t.proof_uploaded_at,
       };
     });
 

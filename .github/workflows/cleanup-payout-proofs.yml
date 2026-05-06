@@ -1,0 +1,43 @@
+# Daily cleanup de screenshots peer-to-peer >7 dias.
+#
+# POST a /api/cron/cleanup-payout-proofs todos los dias a las 09:00 UTC
+# (4:00 am Bogota, UTC-5). Borra del bucket payout-proofs los archivos
+# subidos hace mas de 7 dias y nullifica las columnas en polla_payouts.
+#
+# Free tier: GitHub Actions schedule en repos publicos.
+
+name: Cleanup Payout Proofs Daily
+
+on:
+  schedule:
+    # 09:00 UTC = 4:00 AM Bogota
+    - cron: "0 9 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST a la API de cleanup
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          : "${APP_URL:=https://lapollacolombiana.com}"
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET secret no configurado en repo settings"
+            exit 1
+          fi
+          response=$(curl -sS -w "\nHTTP_STATUS:%{http_code}" -X POST \
+            "$APP_URL/api/cron/cleanup-payout-proofs" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+          body="${response%HTTP_STATUS:*}"
+          status="${response##*HTTP_STATUS:}"
+          echo "Status: $status"
+          echo "Body: $body"
+          if [ "$status" -ge 400 ]; then
+            echo "Cleanup failed with status $status"
+            exit 1
+          fi
