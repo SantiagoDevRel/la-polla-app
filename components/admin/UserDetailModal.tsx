@@ -174,7 +174,7 @@ export default function UserDetailModal({
                     Onboarding obligatorio pendiente
                   </p>
                   <p className="text-[11px] text-red-alert/80 mt-0.5">
-                    Este usuario verá la pantalla "¿Cómo te llamas?" antes de poder usar la app — no puede saltarla.
+                    Este usuario verá la pantalla del onboarding (¿Cómo te llamas?) antes de poder usar la app — no puede saltarla.
                   </p>
                 </div>
               </div>
