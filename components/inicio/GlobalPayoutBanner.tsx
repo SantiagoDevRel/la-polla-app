@@ -192,7 +192,7 @@ export default function GlobalPayoutBanner() {
             {items.length === 1
               ? incoming.length === 1
                 ? "Te tienen que pagar"
-                : "Tenés un pago pendiente"
+                : "Tienes un pago pendiente"
               : `${items.length} pagos pendientes`}
           </p>
           <p className="text-[11px] text-text-secondary truncate">

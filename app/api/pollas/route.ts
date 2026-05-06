@@ -70,7 +70,7 @@ const createPollaSchema = z
     },
     {
       message:
-        "Para 'pago al principio' tenés que indicar método, número de cuenta, nombre y tipo (ahorros/corriente). Para Nequi solo el celular.",
+        "Para 'pago al principio' tienes que indicar método, número de cuenta, nombre y tipo (ahorros/corriente). Para Nequi solo el celular.",
       path: ["adminPayoutMethod"],
     },
   )

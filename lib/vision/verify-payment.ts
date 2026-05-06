@@ -126,7 +126,7 @@ PASO 1 — Clasificar la SOURCE solo por apariencia visual (NO por texto):
   edited     = Photoshop / mockup.
   physical   = foto de papel.
   other      = otro.
-  unclear    = no podés decidir.
+  unclear    = no puedes decidir.
 
 Texto solo NO basta para bank_app. Si dudás → notes_app.
 
@@ -136,7 +136,7 @@ Output: SOLO JSON, sin markdown, sin texto antes/después. Mantené strings cort
 
 {
   "source_type": "bank_app|wallet|notes_app|messaging|browser|edited|physical|other|unclear",
-  "source_evidence": "string corto (≤12 palabras) citando elementos visuales — ej. 'logo Bancolombia amarillo + check verde + REF: 12345'. Si no podés citar visual concreto, NO digas bank_app.",
+  "source_evidence": "string corto (≤12 palabras) citando elementos visuales — ej. 'logo Bancolombia amarillo + check verde + REF: 12345'. Si no puedes citar visual concreto, NO digas bank_app.",
   "valid": boolean,
   "confidence": "high|low",
   "detected_amount": number|null,

@@ -403,7 +403,7 @@ export async function handleMisPollas(phone: string, userId: string) {
 
   await sendListMessage(
     phone,
-    `Escoge cuál polla querés ver parce 👇`,
+    `Escoge cuál polla quieres ver 👇`,
     "Ver mis pollas",
     [{ title: "Activas", rows }],
     "Tus Pollas",
@@ -485,7 +485,7 @@ export async function handlePronosticar(
   if (polla.status === "ended") {
     await sendTextMessage(
       phone,
-      "Esta polla ya terminó parce. Solo podés ver los resultados finales."
+      "Esta polla ya terminó. Solo puedes ver los resultados finales."
     );
     return;
   }
@@ -598,7 +598,7 @@ export async function handlePronosticar(
       await setState(phone, { action: "picking_group", pollaId });
       await sendReplyButtons(
         phone,
-        "¿Cómo querés ver los partidos parce?",
+        "¿Cómo quieres ver los partidos?",
         [
           { id: `predgrp_phase_${pollaId}`, title: "Por fase" },
           { id: `predgrp_date_${pollaId}`, title: "Por fecha" },
@@ -659,8 +659,8 @@ export async function handlePronosticar(
         await sendListMessage(
           phone,
           stateMode === "phase"
-            ? `¿Qué fase querés pronosticar?${groupPage > 0 ? ` _(página ${groupPage + 1})_` : ""}`
-            : `¿Qué fecha querés pronosticar?${groupPage > 0 ? ` _(página ${groupPage + 1})_` : ""}`,
+            ? `¿Qué fase quieres pronosticar?${groupPage > 0 ? ` _(página ${groupPage + 1})_` : ""}`
+            : `¿Qué fecha quieres pronosticar?${groupPage > 0 ? ` _(página ${groupPage + 1})_` : ""}`,
           "Ver grupos",
           [{ title: "Grupos", rows }],
           `🎯 ${polla.name}`,
@@ -729,7 +729,7 @@ export async function handlePronosticar(
 
   await sendListMessage(
     phone,
-    `¿Cuál partido querés predecir parce? ⚽${page > 0 ? ` _(página ${page + 1})_` : ""}`,
+    `¿Cuál partido quieres predecir? ⚽${page > 0 ? ` _(página ${page + 1})_` : ""}`,
     "Ver partidos",
     [{ title: "Partidos disponibles", rows }],
     `🎯 ${polla.name}`,
@@ -869,8 +869,8 @@ async function showPredictionPrompt(
   await sendTextMessage(
     phone,
     header +
-      `\nEscribí el resultado así:\n*2-1* _(local primero)_\n\n` +
-      `_Tenés hasta ${dateStr} para predecir_ ⏰`
+      `\nEscribe el resultado así:\n*2-1* _(local primero)_\n\n` +
+      `_Tienes hasta ${dateStr} para predecir_ ⏰`
   );
 }
 
@@ -1453,7 +1453,7 @@ export async function handleJoinByCodeConfirm(phone: string, code: string) {
   await setState(phone, { action: "waiting_join_confirm", joinCode: normalized });
   await sendReplyButtons(
     phone,
-    `¿Querés unirte a la polla con el código *${normalized}*?`,
+    `¿Quieres unirte a la polla con el código *${normalized}*?`,
     [
       { id: "join_code_yes", title: "Sí, unirme" },
       { id: "join_code_no", title: "No" },

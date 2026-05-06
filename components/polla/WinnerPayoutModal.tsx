@@ -130,7 +130,7 @@ export default function WinnerPayoutModal({
             {fmtCOP(prizeAmount)}
           </p>
           <p className="text-[12px] text-text-secondary mt-1.5 max-w-[90%]">
-            El parche te tiene que pagar. Decinos cómo.
+            Dinos a qué cuenta te enviamos el premio.
           </p>
         </div>
 
@@ -184,7 +184,7 @@ export default function WinnerPayoutModal({
           disabled={!canSubmit}
           className="w-full bg-gold text-bg-base font-display text-lg tracking-wide py-3.5 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_24px_rgba(255,215,0,0.25)]"
         >
-          {submitting ? "GUARDANDO…" : "DECIRLE AL PARCHE"}
+          {submitting ? "GUARDANDO…" : "GUARDAR CUENTA"}
         </button>
 
         <p className="text-[11px] text-text-muted text-center mt-3">

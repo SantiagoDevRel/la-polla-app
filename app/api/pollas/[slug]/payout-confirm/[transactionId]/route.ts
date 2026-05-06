@@ -65,7 +65,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
   const isTo = tx.to_user_id === user.id;
   if (!isAdmin && !isFrom && !isTo) {
     return NextResponse.json(
-      { error: "No podés confirmar esta transacción" },
+      { error: "No puedes confirmar esta transacción" },
       { status: 403 },
     );
   }
