@@ -148,13 +148,30 @@ export async function syncLeague(
     const matchRow: MatchRow = mapFixtureToMatch(fixture, tournament);
 
     try {
-      // 4. Upsert usando external_id como campo de conflicto
-      const { error } = await supabase
-        .from('matches')
-        .upsert(matchRow, { onConflict: 'external_id' });
+      // 4. CRITICAL: usar upsert_match_safe (no upsert directo) para que
+      // el dedup cross-provider funcione. Bug fixed 2026-05-06: antes
+      // este sync hacia .upsert(matchRow, {onConflict:'external_id'}) que
+      // solo dedupa contra rows del mismo proveedor, creando duplicados
+      // cuando ESPN o openfootball habian sincronizado el mismo partido.
+      const { error } = await supabase.rpc('upsert_match_safe', {
+        p_external_id: matchRow.external_id,
+        p_tournament: matchRow.tournament,
+        p_match_day: matchRow.match_day,
+        p_phase: matchRow.phase,
+        p_home_team: matchRow.home_team,
+        p_away_team: matchRow.away_team,
+        p_home_team_flag: matchRow.home_team_flag,
+        p_away_team_flag: matchRow.away_team_flag,
+        p_scheduled_at: matchRow.scheduled_at,
+        p_venue: matchRow.venue,
+        p_home_score: matchRow.home_score,
+        p_away_score: matchRow.away_score,
+        p_status: matchRow.status,
+        p_elapsed: null,
+      });
 
       if (error) {
-        console.error(`[sync] Error en upsert fixture ${matchRow.external_id}:`, error.message);
+        console.error(`[sync] Error en upsert_match_safe fixture ${matchRow.external_id}:`, error.message);
         errors++;
       } else {
         synced++;
@@ -212,7 +229,9 @@ export async function importMatches(): Promise<{
 
   const supabase = getSupabaseAdmin();
   let imported = 0;
-  let updated = 0;
+  // updated ya no se usa: el RPC upsert_match_safe no diferencia
+  // insert vs update y todo entra al contador imported.
+  const updated = 0;
   let errors = 0;
 
   // 2. Procesar cada fixture
@@ -231,38 +250,34 @@ export async function importMatches(): Promise<{
     const matchRow: MatchRow = mapFixtureToMatch(fixture, TOURNAMENT_ID);
 
     try {
-      // 4. Verificar si ya existe por external_id
-      const { data: existing } = await supabase
-        .from('matches')
-        .select('id')
-        .eq('external_id', matchRow.external_id)
-        .maybeSingle();
-
-      if (existing) {
-        // UPDATE: el partido ya existe, actualizar datos
-        const { error } = await supabase
-          .from('matches')
-          .update(matchRow)
-          .eq('external_id', matchRow.external_id);
-
-        if (error) {
-          console.error(`[sync] Error actualizando fixture ${matchRow.external_id}:`, error.message);
-          errors++;
-        } else {
-          updated++;
-        }
+      // 4. CRITICAL: usar upsert_match_safe (no insert/update directo)
+      // para que el dedup cross-provider funcione. Antes este path tenia
+      // un select+insert/update por external_id que dedupaba solo contra
+      // sus propios rows. Ahora delegamos al RPC que tambien chequea
+      // espn_id y match-by-team.
+      const { error } = await supabase.rpc('upsert_match_safe', {
+        p_external_id: matchRow.external_id,
+        p_tournament: matchRow.tournament,
+        p_match_day: matchRow.match_day,
+        p_phase: matchRow.phase,
+        p_home_team: matchRow.home_team,
+        p_away_team: matchRow.away_team,
+        p_home_team_flag: matchRow.home_team_flag,
+        p_away_team_flag: matchRow.away_team_flag,
+        p_scheduled_at: matchRow.scheduled_at,
+        p_venue: matchRow.venue,
+        p_home_score: matchRow.home_score,
+        p_away_score: matchRow.away_score,
+        p_status: matchRow.status,
+        p_elapsed: null,
+      });
+      if (error) {
+        console.error(`[sync] Error procesando fixture ${matchRow.external_id}:`, error.message);
+        errors++;
       } else {
-        // INSERT: partido nuevo
-        const { error } = await supabase
-          .from('matches')
-          .insert(matchRow);
-
-        if (error) {
-          console.error(`[sync] Error insertando fixture ${matchRow.external_id}:`, error.message);
-          errors++;
-        } else {
-          imported++;
-        }
+        // No distinguimos imported vs updated cuando vamos por RPC; se
+        // suma al contador combinado.
+        imported++;
       }
     } catch (err) {
       // Si Supabase falla, logueamos pero NO rompemos el proceso
