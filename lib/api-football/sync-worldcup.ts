@@ -235,11 +235,32 @@ export async function syncWorldCup2026(): Promise<{
     };
 
     try {
-      const { error } = await supabase
-        .from("matches")
-        .upsert(row, { onConflict: "external_id" });
+      // CRITICAL: usar upsert_match_safe (no upsert directo) para que el
+      // dedup cross-provider funcione. La funcion hace 3 lookups: por
+      // external_id, por espn_id, y por (tournament + scheduled_at +-2h
+      // + teams normalizados). Sin esto, este sync crearia rows wc2026_*
+      // paralelos a los espn:* y a los de football-data, causando partidos
+      // duplicados en pollas del Mundial. Bug fixed 2026-05-06 — antes
+      // se hacia .from("matches").upsert(row, {onConflict:"external_id"})
+      // y dedupaba solo contra otros wc2026_*.
+      const { error } = await supabase.rpc("upsert_match_safe", {
+        p_external_id: row.external_id,
+        p_tournament: row.tournament,
+        p_match_day: row.match_day,
+        p_phase: row.phase,
+        p_home_team: row.home_team,
+        p_away_team: row.away_team,
+        p_home_team_flag: row.home_team_flag,
+        p_away_team_flag: row.away_team_flag,
+        p_scheduled_at: row.scheduled_at,
+        p_venue: row.venue,
+        p_home_score: row.home_score,
+        p_away_score: row.away_score,
+        p_status: row.status,
+        p_elapsed: null,
+      });
       if (error) {
-        console.error(`[wc2026] Upsert failed for ${externalId}:`, error.message);
+        console.error(`[wc2026] upsert_match_safe failed for ${externalId}:`, error.message);
         errors++;
       } else {
         synced++;
