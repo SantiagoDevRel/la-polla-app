@@ -5,8 +5,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { motion } from "framer-motion";
-import { staggerContainer, fadeUp } from "@/lib/animations";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -14,6 +13,7 @@ import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 import { InlineScoringGuide } from "@/components/polla/InlineScoringGuide";
 import FontScalePicker from "@/components/perfil/FontScalePicker";
+import LanguageToggle from "@/components/perfil/LanguageToggle";
 import PayoutDefaultEditor, { type PayoutMethod, type PayoutAccountType } from "@/components/perfil/PayoutDefaultEditor";
 
 interface UserProfile {
@@ -27,12 +27,6 @@ interface UserProfile {
   default_payout_account_type: PayoutAccountType | null;
 }
 
-interface UserStats {
-  pollasCount: number;
-  predictionsCount: number;
-  bestRank: number | null;
-}
-
 interface ActivityItem {
   matchName: string;
   pollaName: string;
@@ -40,11 +34,11 @@ interface ActivityItem {
 }
 
 export default function PerfilPage() {
+  const t = useTranslations("Perfil");
   const router = useRouter();
   const { showToast } = useToast();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [stats, setStats] = useState<UserStats>({ pollasCount: 0, predictionsCount: 0, bestRank: null });
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [editName, setEditName] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -68,7 +62,6 @@ export default function PerfilPage() {
           setProfile(data.profile);
           setEditName(data.profile.display_name);
         }
-        if (data.stats) setStats(data.stats);
         if (data.recentActivity) setActivity(data.recentActivity);
       } catch { /* silently fail */ } finally { setLoading(false); }
     }
@@ -76,14 +69,14 @@ export default function PerfilPage() {
   }, []);
 
   async function handleSaveName() {
-    if (editName.trim().length < 2) { showToast("Mínimo 2 caracteres", "error"); return; }
+    if (editName.trim().length < 2) { showToast(t("errMinChars"), "error"); return; }
     setSaving(true);
     try {
       await axios.patch("/api/users/me", { display_name: editName.trim() });
       setProfile((prev) => prev ? { ...prev, display_name: editName.trim() } : prev);
       setIsEditing(false);
-      showToast("Nombre actualizado", "success");
-    } catch { showToast("Error actualizando nombre", "error"); } finally { setSaving(false); }
+      showToast(t("toastNameUpdated"), "success");
+    } catch { showToast(t("errUpdateName"), "error"); } finally { setSaving(false); }
   }
 
   async function handleLogout() {
@@ -98,8 +91,8 @@ export default function PerfilPage() {
       await axios.patch("/api/users/me", { avatar_url: pollitoId });
       setProfile((prev) => prev ? { ...prev, avatar_url: pollitoId } : prev);
       setShowAvatarPicker(false);
-      showToast("Pollito actualizado", "success");
-    } catch { showToast("Error actualizando pollito", "error"); } finally { setSavingAvatar(false); }
+      showToast(t("toastChickenUpdated"), "success");
+    } catch { showToast(t("errUpdateChicken"), "error"); } finally { setSavingAvatar(false); }
   }
 
   async function handlePayoutSave(
@@ -126,10 +119,10 @@ export default function PerfilPage() {
             }
           : prev,
       );
-      showToast("Cuenta de pago guardada", "success");
+      showToast(t("toastPayoutSaved"), "success");
     } catch (err) {
       const e = err as { response?: { data?: { error?: string } } };
-      showToast(e.response?.data?.error || "Error guardando la cuenta", "error");
+      showToast(e.response?.data?.error || t("errSavePayout"), "error");
     }
   }
 
@@ -152,9 +145,9 @@ export default function PerfilPage() {
             }
           : prev,
       );
-      showToast("Cuenta de pago borrada", "success");
+      showToast(t("toastPayoutCleared"), "success");
     } catch {
-      showToast("Error borrando la cuenta", "error");
+      showToast(t("errClearPayout"), "error");
     }
   }
 
@@ -164,14 +157,14 @@ export default function PerfilPage() {
     return "text-text-muted";
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="flex flex-col items-center gap-2"><FootballLoader /><p className="text-text-muted">Cargando perfil...</p></div></div>;
-  if (!profile) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">Error cargando perfil</p></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="flex flex-col items-center gap-2"><FootballLoader /><p className="text-text-muted">{t("loading")}</p></div></div>;
+  if (!profile) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">{t("errLoading")}</p></div>;
 
   return (
     <div className="min-h-screen">
       <header className="px-4 pt-4 pb-6">
         <div className="max-w-lg mx-auto">
-          <h1 className="lp-section-title text-center text-[22px]">Mi Perfil</h1>
+          <h1 className="lp-section-title text-center text-[22px]">{t("header")}</h1>
         </div>
       </header>
 
@@ -199,7 +192,7 @@ export default function PerfilPage() {
 
           {showAvatarPicker && (
             <div className="w-full mb-4 rounded-xl p-3 bg-bg-elevated border border-border-subtle">
-              <p className="text-xs text-text-secondary text-center mb-3">Elige tu pollito</p>
+              <p className="text-xs text-text-secondary text-center mb-3">{t("pickChicken")}</p>
               <div className="grid grid-cols-4 gap-1.5 justify-items-center">
                 {POLLITO_TYPES.map((p) => {
                   const isSelected = profile.avatar_url === p.id;
@@ -243,7 +236,7 @@ export default function PerfilPage() {
               className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-bg-elevated/50 transition-colors text-text-primary"
             >
               <span className="text-lg font-bold">{profile.display_name}</span>
-              <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">Editar</span>
+              <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">{t("edit")}</span>
             </button>
           )}
           <p className="text-text-secondary text-sm mt-1 flex items-center gap-1">
@@ -266,23 +259,11 @@ export default function PerfilPage() {
           onClear={handlePayoutClear}
         />
 
-        {/* Stats — Bebas Neue numbers */}
-        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="grid grid-cols-3 gap-3">
-          {[
-            { value: String(stats.pollasCount), label: "Pollas" },
-            { value: String(stats.predictionsCount), label: "Pronósticos" },
-            { value: stats.bestRank ? `${stats.bestRank}°` : "—", label: "Mejor pos." },
-          ].map((s) => (
-            <motion.div key={s.label} variants={fadeUp} className="lp-card p-3 text-center">
-              <p className="font-display text-gold text-[26px] leading-none">{s.value}</p>
-              <p className="text-[10px] text-text-muted mt-1">{s.label}</p>
-            </motion.div>
-          ))}
-        </motion.div>
+        {/* Idioma — ES / EN. Setea cookie y, en prod, salta al dominio
+            correspondiente (lapollacolombiana.com vs chickenpicks.app). */}
+        <LanguageToggle />
 
-        {/* Tamaño del texto — preferencia local por dispositivo. Vive
-            arriba (justo después de las stats) en vez de pegado al
-            logout para que el usuario lo encuentre sin scrollear. */}
+        {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />
 
         {/* Actividad reciente */}
@@ -292,7 +273,7 @@ export default function PerfilPage() {
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
               </svg>
-              Actividad reciente
+              {t("recentActivity")}
             </div>
             {activity.map((item, i) => (
               <div
@@ -309,7 +290,7 @@ export default function PerfilPage() {
                   <div className={`font-display text-[20px] ${pointsColorClass(item.pointsEarned)}`}>
                     +{item.pointsEarned}
                   </div>
-                  <div className="text-[9px] text-text-muted">pts</div>
+                  <div className="text-[9px] text-text-muted">{t("pointsLabel")}</div>
                 </div>
               </div>
             ))}
@@ -322,7 +303,7 @@ export default function PerfilPage() {
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold">
               <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
             </svg>
-            ¿Cómo se puntúa?
+            {t("scoringTitle")}
           </div>
           <InlineScoringGuide />
         </div>
@@ -338,14 +319,14 @@ export default function PerfilPage() {
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h0a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
             </svg>
-            Panel de administración
+            {t("adminPanel")}
           </button>
         )}
 
         {/* Logout */}
         <button onClick={handleLogout}
           className="w-full py-3 rounded-xl font-medium transition-colors text-red-alert border border-red-dim hover:bg-red-dim">
-          Cerrar sesión
+          {t("logout")}
         </button>
 
         <div className="h-4" />

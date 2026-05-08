@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import axios from "axios";
+import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import OrganizerPanel from "@/components/polla/OrganizerPanel";
@@ -99,18 +100,19 @@ type TabType = "partidos" | "ranking" | "pagos" | "info" | "organizar";
 
 // TeamCrest — renders flag URL via next/image proxy, falls back to 3-letter abbreviation
 function PaymentPendingBanner({ onGo }: { onGo: () => void }) {
+  const t = useTranslations("Detail");
   return (
     <div className="rounded-xl p-3 flex items-center gap-3 bg-gold/10 border border-gold/30">
       <Banknote className="w-5 h-5 text-gold shrink-0" aria-hidden="true" />
       <p className="text-xs text-text-primary flex-1 leading-snug">
-        Tu pago está pendiente de aprobación. Ve a la tab Pagos para confirmar.
+        {t("paymentPendingBanner")}
       </p>
       <button
         type="button"
         onClick={onGo}
         className="text-xs font-semibold bg-gold text-bg-base px-3 py-1.5 rounded-lg hover:brightness-110 transition-all shrink-0"
       >
-        Ir a Pagos
+        {t("paymentPendingCTA")}
       </button>
     </div>
   );
@@ -156,11 +158,11 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
 }
 
 // Shared single-line formatter for the match-row kickoff pill. "mar 23 ·
-// 19:30" — same locale-aware output the old fmtDate helper produced,
-// extracted so MatchRow can live at module scope without needing
-// closure over the component state.
-function formatKickoffShort(iso: string): string {
-  return new Intl.DateTimeFormat("es-CO", {
+// 19:30" — locale-aware output. Receives locale to choose between
+// es-CO (Colombian) and en-US formats.
+function formatKickoffShort(iso: string, locale: string): string {
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  return new Intl.DateTimeFormat(intlTag, {
     day: "2-digit",
     month: "short",
     hour: "numeric",
@@ -181,37 +183,39 @@ function dateKey(iso: string): string {
 }
 
 // Human-friendly date header, e.g. "HOY · MIÉ 23 ABR" or "JUEVES 24 ABR".
-function formatDateHeader(iso: string): string {
+function formatDateHeader(
+  iso: string,
+  locale: string,
+  todayLabel: string,
+  tomorrowLabel: string,
+): string {
   const d = new Date(iso);
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
   const tomorrow = new Date(now);
   tomorrow.setDate(now.getDate() + 1);
   const isTomorrow = d.toDateString() === tomorrow.toDateString();
-  const base = new Intl.DateTimeFormat("es-CO", {
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  const base = new Intl.DateTimeFormat(intlTag, {
     weekday: "long",
     day: "numeric",
     month: "short",
   }).format(d);
   const pretty = base.replace(/\./g, "").toUpperCase();
-  if (sameDay) return `HOY · ${pretty}`;
-  if (isTomorrow) return `MAÑANA · ${pretty}`;
+  if (sameDay) return `${todayLabel} · ${pretty}`;
+  if (isTomorrow) return `${tomorrowLabel} · ${pretty}`;
   return pretty;
 }
 
-// Spanish labels for the phase column. When the match sits in a league
-// format (regular_season / league_stage) the tournament name — with its
-// own logo — replaces the phase label so "regular_season" never leaks
-// into the UI.
-const PHASE_ES: Record<string, string> = {
-  group_stage: "Fase de grupos",
-  round_of_32: "16avos",
-  round_of_16: "Octavos",
-  quarter_finals: "Cuartos",
-  semi_finals: "Semifinales",
-  final: "Final",
-  third_place: "Tercer puesto",
-  playoff: "Repechaje",
+const PHASE_KEYS: Record<string, string> = {
+  group_stage: "phaseGroupStage",
+  round_of_32: "phaseRoundOf32",
+  round_of_16: "phaseRoundOf16",
+  quarter_finals: "phaseQuarterFinals",
+  semi_finals: "phaseSemiFinals",
+  final: "phaseFinal",
+  third_place: "phaseThirdPlace",
+  playoff: "phasePlayoff",
 };
 
 function isLeagueFormatPhase(phase: string | null | undefined): boolean {
@@ -224,18 +228,18 @@ function phaseLabel(
   phase: string | null | undefined,
   tournamentSlug: string,
   matchDay: number | null | undefined,
+  t: (key: string, values?: Record<string, string | number>) => string,
 ): string {
   // League-format matches carry a match_day number (jornada). Surface it
-  // so the user sees "Jornada 33" instead of just the tournament name.
+  // so the user sees "Jornada 33" / "Match day 33".
   if (!phase || isLeagueFormatPhase(phase)) {
-    if (matchDay) return `Jornada ${matchDay}`;
-    return getTournamentName(tournamentSlug) ?? "Liga";
+    if (matchDay) return t("phaseMatchDay", { n: matchDay });
+    return getTournamentName(tournamentSlug) ?? t("phaseLeague");
   }
   const normalised = phase.toLowerCase();
-  return (
-    PHASE_ES[normalised] ??
-    phase.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-  );
+  const key = PHASE_KEYS[normalised];
+  if (key) return t(key);
+  return phase.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function pointsTierClasses(points: number): string {
@@ -307,6 +311,10 @@ function MatchRow({
   locked,
   missingPredictions,
 }: MatchRowProps) {
+  const t = useTranslations("Detail");
+  const tMatch = useTranslations("Match");
+  const tCommon = useTranslations("Common");
+  const locale = useLocale();
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
   const pointsEarned = pred?.points_earned ?? null;
@@ -341,11 +349,11 @@ function MatchRow({
                 className="object-contain flex-shrink-0"
               />
             ) : null}
-            <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day)}</span>
+            <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day, t)}</span>
             {editable && !pred && !touched ? (
               <span className="inline-flex items-center gap-0.5 text-[9px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md bg-red-alert/15 text-red-alert border border-red-alert/30 whitespace-nowrap">
                 <span aria-hidden="true">*</span>
-                Falta
+                {t("missingBadge")}
               </span>
             ) : null}
           </span>
@@ -365,16 +373,16 @@ function MatchRow({
             return (
               <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
-                En vivo{minuteLabel ? ` · ${minuteLabel}` : ""}
+                {tMatch("live")}{minuteLabel ? ` · ${minuteLabel}` : ""}
               </span>
             );
           })() : isFinished ? (
             <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-bg-elevated border border-border-subtle text-text-primary/70 text-[10px] font-bold uppercase tracking-[0.08em]">
-              Final
+              {t("matchFinal")}
             </span>
           ) : (
             <span className="inline-flex items-center px-2 py-[2px] rounded-full bg-gold/10 border border-gold/30 text-gold text-[10px] font-bold uppercase tracking-[0.08em]">
-              {formatKickoffShort(match.scheduled_at)}
+              {formatKickoffShort(match.scheduled_at, locale)}
             </span>
           )}
         </div>
@@ -477,7 +485,7 @@ function MatchRow({
         {isLive && pred ? (
           <div className="mt-2 text-center">
             <p className="text-[11px] text-text-primary/70">
-              Tu pronóstico · {pred.predicted_home}-{pred.predicted_away}
+              {t("yourPredCompact", { home: pred.predicted_home, away: pred.predicted_away })}
             </p>
           </div>
         ) : null}
@@ -490,8 +498,14 @@ function MatchRow({
                 pointsEarned ?? 0,
               )}`}
             >
-              Tu {pred.predicted_home}-{pred.predicted_away} ·{" "}
-              {(pointsEarned ?? 0) > 0 ? `+${pointsEarned}` : "0"} pts
+              {t("yourFinishedChip", {
+                home: pred.predicted_home,
+                away: pred.predicted_away,
+                points:
+                  (pointsEarned ?? 0) > 0
+                    ? t("pointsValuePos", { n: pointsEarned ?? 0 })
+                    : t("pointsValueZero"),
+              })}
             </span>
           </div>
         ) : null}
@@ -504,7 +518,7 @@ function MatchRow({
         {!locked && missingPredictions.length > 0 ? (
           <div className="mt-3 pt-3 border-t border-border-subtle">
             <p className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60 mb-1.5">
-              ⏳ Aún no pronostica · {missingPredictions.length}
+              {t("missingPredsLabel", { count: missingPredictions.length })}
             </p>
             <p className="text-[12px] text-text-primary/80 leading-snug">
               {missingPredictions.join(", ")}
@@ -520,7 +534,7 @@ function MatchRow({
         {locked && otherPredictions.length > 0 ? (
           <div className="mt-3 pt-3 border-t border-border-subtle">
             <p className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60 mb-2">
-              Pronósticos de la polla · {otherPredictions.length}
+              {t("poolPredsLabel", { count: otherPredictions.length })}
             </p>
             <ul className="space-y-1.5">
               {otherPredictions.map((op) => {
@@ -538,7 +552,7 @@ function MatchRow({
                     <div className="flex items-center gap-2 min-w-0">
                       <UserAvatar
                         avatarUrl={op.avatar_url}
-                        displayName={op.display_name ?? "Jugador"}
+                        displayName={op.display_name ?? tCommon("playerFallback")}
                         size="sm"
                         className="!w-6 !h-6"
                       />
@@ -547,8 +561,8 @@ function MatchRow({
                           op.is_me ? "text-gold font-semibold" : "text-text-primary/85"
                         }`}
                       >
-                        {op.display_name ?? "Jugador"}
-                        {op.is_me ? <span className="text-[10px] text-gold/80 ml-1">(tú)</span> : null}
+                        {op.display_name ?? tCommon("playerFallback")}
+                        {op.is_me ? <span className="text-[10px] text-gold/80 ml-1">{t("youParen")}</span> : null}
                       </span>
                     </div>
                     <span
@@ -577,6 +591,14 @@ function MatchRow({
 }
 
 export default function PollaSlugPage() {
+  const t = useTranslations("Detail");
+  const tCommon = useTranslations("Common");
+  const tMatch = useTranslations("Match");
+  const locale = useLocale();
+  const tDateLabels = useMemo(
+    () => ({ today: tMatch("today"), tomorrow: tMatch("tomorrow") }),
+    [tMatch],
+  );
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -758,7 +780,7 @@ export default function PollaSlugPage() {
     } catch (err: unknown) {
       if (!silent) {
         const e = err as { response?: { data?: { error?: string } } };
-        setError(e.response?.data?.error || "Error cargando la polla");
+        setError(e.response?.data?.error || t("errLoading"));
       }
       // En silent: dejamos correr sin tocar el state — al siguiente tick
       // reintenta. No queremos que un blip de red rompa la UI.
@@ -824,7 +846,7 @@ export default function PollaSlugPage() {
           });
         })
       );
-      showToast(`${pendingSaveIds.length} pronóstico${pendingSaveIds.length > 1 ? "s" : ""} guardado${pendingSaveIds.length > 1 ? "s" : ""}`, "success");
+      showToast(t("predictionsSaved", { count: pendingSaveIds.length }), "success");
       setTouchedMatches(new Set());
       const { data } = await axios.get(`/api/pollas/${slug}`);
       setPredictions(data.predictions);
@@ -832,7 +854,7 @@ export default function PollaSlugPage() {
       setPredictedUserIdsByMatch(data.predictedUserIdsByMatch || {});
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      showToast(e.response?.data?.error || "Error guardando", "error");
+      showToast(e.response?.data?.error || t("errSaving"), "error");
     } finally {
       setSavingAll(false);
     }
@@ -913,7 +935,7 @@ export default function PollaSlugPage() {
       const missing: string[] = [];
       Array.from(participantInfoById.entries()).forEach(([uid, info]) => {
         if (predicted.has(uid)) return;
-        missing.push(info.display_name ?? "Anónimo");
+        missing.push(info.display_name ?? t("anonymousFallback"));
       });
       missing.sort((a, b) => a.localeCompare(b));
       if (missing.length > 0) out.set(m.id, missing);
@@ -960,7 +982,7 @@ export default function PollaSlugPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center animate-fade-in">
           <div className="mb-3 flex justify-center"><FootballLoader /></div>
-          <p className="text-text-secondary font-medium">Cargando polla...</p>
+          <p className="text-text-secondary font-medium">{t("loading")}</p>
         </div>
       </div>
     );
@@ -971,9 +993,9 @@ export default function PollaSlugPage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="rounded-2xl p-6 text-center max-w-sm w-full lp-card">
           <div className="mb-3"><Info className="w-10 h-10 text-text-muted mx-auto" /></div>
-          <p className="text-text-primary font-medium mb-4">{error || "Polla no encontrada"}</p>
+          <p className="text-text-primary font-medium mb-4">{error || t("notFound")}</p>
           <button onClick={() => router.push("/inicio")} className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold">
-            Volver
+            {tCommon("back")}
           </button>
         </div>
       </div>
@@ -990,12 +1012,14 @@ export default function PollaSlugPage() {
     currentUserPaid === false &&
     !isOrganizer;
   const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
-    { key: "partidos", label: "Partidos", icon: <PitchIcon className="w-4 h-4" />, show: true },
-    { key: "ranking", label: "Tabla", icon: <Trophy className="w-4 h-4" />, show: true },
-    { key: "pagos", label: "Pagos", icon: <Banknote className="w-4 h-4" />, show: polla.payment_mode !== "pay_winner" },
-    { key: "organizar", label: "Admin", icon: <Settings className="w-4 h-4" />, show: isOrganizer },
-    { key: "info", label: "Info", icon: <Info className="w-4 h-4" />, show: true },
+    { key: "partidos", label: t("tabPartidos"), icon: <PitchIcon className="w-4 h-4" />, show: true },
+    { key: "ranking", label: t("tabRanking"), icon: <Trophy className="w-4 h-4" />, show: true },
+    { key: "pagos", label: t("tabPagos"), icon: <Banknote className="w-4 h-4" />, show: polla.payment_mode !== "pay_winner" },
+    { key: "organizar", label: t("tabOrganizar"), icon: <Settings className="w-4 h-4" />, show: isOrganizer },
+    { key: "info", label: t("tabInfo"), icon: <Info className="w-4 h-4" />, show: true },
   ];
+
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
 
   return (
     <div className="min-h-screen">
@@ -1075,8 +1099,13 @@ export default function PollaSlugPage() {
           <div className="px-4 py-1.5 bg-bg-elevated border-b border-border-subtle">
             <div className="max-w-lg mx-auto text-center text-xs text-text-primary flex items-center justify-center gap-1.5">
               <span>
-                Pozo: <span className="font-semibold text-gold">${total.toLocaleString("es-CO")}</span> total{" "}
-                <span className="text-text-primary/70">(${polla.buy_in_amount.toLocaleString("es-CO")} por persona)</span>
+                {t("potLabel")}{" "}
+                <span className="font-semibold text-gold">
+                  {t("potTotal", { amount: `$${total.toLocaleString(intlTag)}` })}
+                </span>{" "}
+                <span className="text-text-primary/70">
+                  {t("potPerPerson", { amount: `$${polla.buy_in_amount.toLocaleString(intlTag)}` })}
+                </span>
               </span>
               <ScoringExplanation compact />
             </div>
@@ -1114,16 +1143,16 @@ export default function PollaSlugPage() {
           <div className="rounded-2xl p-6 text-center lp-card space-y-3">
             <Banknote className="w-10 h-10 text-gold mx-auto" />
             <div>
-              <h2 className="text-lg font-bold text-text-primary mb-1">Esperando aprobación del organizador</h2>
+              <h2 className="text-lg font-bold text-text-primary mb-1">{t("waitingApprovalTitle")}</h2>
               <p className="text-sm text-text-secondary">
-                Una vez confirmado tu pago, vas a poder pronosticar.
+                {t("waitingApprovalBody")}
               </p>
             </div>
             <button
               onClick={() => setActiveTab("pagos")}
               className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all"
             >
-              Ir a Pagos
+              {t("paymentPendingCTA")}
             </button>
           </div>
         )}
@@ -1131,18 +1160,18 @@ export default function PollaSlugPage() {
           <>
             {currentUserStatus === "rejected" && (
               <div className="rounded-xl p-4 bg-red-alert/10 border border-red-alert/20 text-center mb-3">
-                <p className="text-sm text-red-alert font-semibold">Tu solicitud fue rechazada</p>
-                <p className="text-xs text-text-secondary mt-1">El admin de esta polla rechazó tu solicitud de ingreso.</p>
+                <p className="text-sm text-red-alert font-semibold">{t("rejectedTitle")}</p>
+                <p className="text-xs text-text-secondary mt-1">{t("rejectedBody")}</p>
               </div>
             )}
             {matches.length === 0 ? (
               <div className="lp-card p-6 text-center" style={{ backgroundColor: "rgba(14, 20, 32, 0.4)" }}>
-                <p className="text-text-primary">No hay partidos cargados aun. Los partidos se actualizaran cuando el calendario sea confirmado.</p>
+                <p className="text-text-primary">{t("noMatches")}</p>
               </div>
             ) : (
               <div className="space-y-5 pb-32">
                 <p className="text-[11px] uppercase tracking-[0.08em] text-text-muted px-1">
-                  Resultado de los 90&apos;
+                  {t("ninetyMinResult")}
                 </p>
                 {/* ── Finalizados — plain collapsible header, match cards
                     render directly below without a surrounding card so
@@ -1157,7 +1186,7 @@ export default function PollaSlugPage() {
                     >
                       <span className="lp-section-title flex items-center gap-2" style={{ fontSize: 14 }}>
                         <Lock className="w-3.5 h-3.5 text-text-primary/60" />
-                        Finalizados
+                        {t("finishedSection")}
                         <span className="text-text-primary/60 font-normal">· {finishedMatches.length}</span>
                       </span>
                       <ChevronDown
@@ -1195,7 +1224,7 @@ export default function PollaSlugPage() {
                   <div className="space-y-2">
                     <h3 className="lp-section-title flex items-center gap-2 px-1" style={{ fontSize: 14 }}>
                       <span className="w-2 h-2 rounded-full bg-red-alert animate-pulse" />
-                      En vivo
+                      {t("liveSection")}
                       <span className="text-text-primary/60 font-normal">· {liveMatches.length}</span>
                     </h3>
                     <div className="space-y-3">
@@ -1230,7 +1259,7 @@ export default function PollaSlugPage() {
                   <div className="space-y-3">
                     <h3 className="lp-section-title flex items-center gap-2 px-1" style={{ fontSize: 14 }}>
                       <Clock className="w-3.5 h-3.5 text-gold" />
-                      Próximos
+                      {t("upcomingSection")}
                       <span className="text-text-primary/60 font-normal">· {upcomingMatches.length}</span>
                     </h3>
                     {upcomingByDate.map((group) => {
@@ -1244,7 +1273,12 @@ export default function PollaSlugPage() {
                             aria-expanded={open}
                           >
                             <span className="text-[11px] font-bold tracking-[0.08em] uppercase text-text-primary/80">
-                              {formatDateHeader(group.matches[0].scheduled_at)}
+                              {formatDateHeader(
+                                group.matches[0].scheduled_at,
+                                locale,
+                                tDateLabels.today,
+                                tDateLabels.tomorrow,
+                              )}
                               <span className="text-text-primary/50 font-normal ml-1.5">· {group.matches.length}</span>
                             </span>
                             <ChevronDown
@@ -1301,7 +1335,7 @@ export default function PollaSlugPage() {
                     disabled={savingAll}
                     className="w-full bg-gold text-bg-base font-display text-lg tracking-wide py-3.5 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_24px_rgba(255,215,0,0.25)] cursor-pointer"
                   >
-                    {savingAll ? "Guardando..." : `GUARDAR ${pendingSaveIds.length} PRONÓSTICO${pendingSaveIds.length > 1 ? "S" : ""}`}
+                    {savingAll ? t("savingDots") : t("saveAll", { count: pendingSaveIds.length })}
                   </button>
                 </div>
               </div>
@@ -1324,21 +1358,24 @@ export default function PollaSlugPage() {
               >
                 <Trophy className="w-6 h-6 flex-shrink-0" />
                 <p className="text-sm font-bold leading-snug">
-                  {participants[0].users?.display_name || "El ganador"} ganó esta polla con {participants[0].total_points} puntos
+                  {t("winnerBanner", {
+                    name: participants[0].users?.display_name || t("winnerFallback"),
+                    points: participants[0].total_points,
+                  })}
                 </p>
               </div>
             )}
             <div className="rounded-2xl overflow-hidden lp-card">
             {participants.length === 0 ? (
               <EmptyState
-                title="Aún no hay participantes"
-                subtitle="Comparte el link de invitación desde la pestaña Organizar para empezar."
+                title={t("noParticipantsTitle")}
+                subtitle={t("noParticipantsBody")}
               />
             ) : (
               <>
                 {matches.every((m) => m.status === "scheduled") && (
                   <div className="px-4 py-3 text-xs text-text-secondary text-center" style={{ backgroundColor: "var(--bg-card-elevated)" }}>
-                    El ranking se actualiza cuando terminen los partidos
+                    {t("rankingUpdateNotice")}
                   </div>
                 )}
                 {/* Leaderboard excludes paid=false rows: admin_collects
@@ -1381,21 +1418,21 @@ export default function PollaSlugPage() {
                         />
                         <div className="flex-1 min-w-0">
                           <p className={`font-medium text-sm truncate ${isMe ? "text-gold font-bold" : "text-text-primary"}`}>
-                            {p.users?.display_name || "Usuario"}
-                            {isMe && <span className="ml-1 text-xs text-gold">(tú)</span>}
+                            {p.users?.display_name || tCommon("userFallback")}
+                            {isMe && <span className="ml-1 text-xs text-gold">{t("youParen")}</span>}
                           </p>
                           {(() => {
                             const prize = payoutByUser.get(p.user_id) ?? 0;
                             if (prize > 0) {
                               return (
                                 <p className="text-xs text-gold font-semibold tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                                  {polla.status === "ended" ? "Premio" : "Va ganando"}: {fmtCOP(prize)}
+                                  {polla.status === "ended" ? t("prizeLabel") : t("leadingLabel")}: {fmtCOP(prize)}
                                 </p>
                               );
                             }
                             if (polla.payment_mode === "admin_collects") {
                               return (
-                                <p className="text-xs text-text-muted">{p.paid ? "Pagado" : "Pendiente"}</p>
+                                <p className="text-xs text-text-muted">{p.paid ? t("paidLabel") : t("pendingLabel")}</p>
                               );
                             }
                             return null;
@@ -1463,16 +1500,16 @@ export default function PollaSlugPage() {
               {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
               <div className="grid grid-cols-3 gap-2 text-sm">
                 {[
-                  { label: "Torneo", value: getTournamentBySlug(polla.tournament)?.name || polla.tournament },
-                  { label: "Participantes", value: String(participants.length) },
+                  { label: t("infoTournament"), value: getTournamentBySlug(polla.tournament)?.name || polla.tournament },
+                  { label: t("infoParticipants"), value: String(participants.length) },
                   {
-                    label: "Pago",
+                    label: t("infoPayment"),
                     value:
                       polla.payment_mode === "admin_collects"
-                        ? "Pago al principio"
+                        ? t("paymentUpfront")
                         : polla.payment_mode === "pay_winner"
-                          ? "Pago al final"
-                          : "Pago digital",
+                          ? t("paymentAtEnd")
+                          : t("paymentDigital"),
                   },
                 ].map((item) => (
                   <div key={item.label} className="rounded-xl p-2 bg-bg-elevated">
@@ -1484,7 +1521,7 @@ export default function PollaSlugPage() {
             </div>
 
             <div className="rounded-2xl p-5 lp-card">
-              <h4 className="font-bold text-text-primary mb-3">Sistema de puntos</h4>
+              <h4 className="font-bold text-text-primary mb-3">{t("pointsSystem")}</h4>
               <InlineScoringGuide
                 points={{
                   exact: polla.points_exact,
@@ -1499,9 +1536,9 @@ export default function PollaSlugPage() {
             {currentUserRole === "admin" && (
               <div className="rounded-2xl p-5 lp-card space-y-3">
                 <h4 className="font-bold text-text-primary flex items-center gap-2">
-                  <Handshake className="w-4 h-4 text-gold" /> Invitar participante
+                  <Handshake className="w-4 h-4 text-gold" /> {t("inviteParticipant")}
                 </h4>
-                <p className="text-xs text-text-secondary">Envía una invitación por WhatsApp a esta polla privada.</p>
+                <p className="text-xs text-text-secondary">{t("inviteHelp")}</p>
                 <div className="flex gap-2 items-start">
                   <div className="flex-1 min-w-0">
                     <PhoneInput
@@ -1522,21 +1559,21 @@ export default function PollaSlugPage() {
                       try {
                         const { data: res } = await axios.post(`/api/pollas/${slug}/invite`, { whatsapp_number: invitePhoneFull });
                         if (res.unregistered && res.shareLink) {
-                          setInviteMsg({ text: `No registrado. Comparte este link: ${res.shareLink}`, type: "success" });
+                          setInviteMsg({ text: t("inviteUnregistered", { link: res.shareLink }), type: "success" });
                         } else {
-                          setInviteMsg({ text: "¡Invitación enviada!", type: "success" });
+                          setInviteMsg({ text: t("inviteSent"), type: "success" });
                         }
                         setInvitePhoneFull("");
                       } catch (err: unknown) {
                         const e = err as { response?: { data?: { error?: string } } };
-                        setInviteMsg({ text: e.response?.data?.error || "Error enviando", type: "error" });
+                        setInviteMsg({ text: e.response?.data?.error || t("inviteError"), type: "error" });
                       } finally {
                         setInviteSending(false);
                       }
                     }}
                     className="bg-gold text-bg-base font-semibold px-4 py-3 rounded-xl text-sm hover:brightness-110 disabled:opacity-40 transition-all cursor-pointer"
                   >
-                    {inviteSending ? "..." : "Enviar"}
+                    {inviteSending ? "..." : t("inviteSend")}
                   </button>
                 </div>
                 {inviteMsg && (
@@ -1548,7 +1585,7 @@ export default function PollaSlugPage() {
             )}
 
             <button onClick={() => setShowInviteModal(true)} className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all">
-              <Share2 className="w-4 h-4 inline-block mr-1" /> Invitar amigos
+              <Share2 className="w-4 h-4 inline-block mr-1" /> {t("inviteFriends")}
             </button>
           </div>
         )}

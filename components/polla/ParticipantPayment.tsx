@@ -10,6 +10,7 @@
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { Banknote, CreditCard } from "lucide-react";
+import { useTranslations } from "next-intl";
 import AdminPaymentReview from "./AdminPaymentReview";
 import PaymentsList from "./PaymentsList";
 import PaymentProofUpload from "./PaymentProofUpload";
@@ -55,6 +56,7 @@ export default function ParticipantPayment({
   currentUserId,
   currentUserRole,
 }: ParticipantPaymentProps) {
+  const t = useTranslations("Payments");
   // initialLoading vs subsequent refetches: no queremos desmontar el
   // upload form (y perder el banner de status) cada vez que un hijo
   // pide refrescar — solo mostramos el skeleton en la primera carga.
@@ -73,11 +75,11 @@ export default function ParticipantPayment({
       setIsAdmin(data.isAdmin);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || "No pudimos cargar los pagos.");
+      setError(e.response?.data?.error || t("errLoad"));
     } finally {
       setInitialLoading(false);
     }
-  }, [pollaSlug]);
+  }, [pollaSlug, t]);
 
   useEffect(() => {
     loadPayments();
@@ -87,7 +89,7 @@ export default function ParticipantPayment({
     return (
       <div className="rounded-xl p-4 text-center lp-card flex flex-col items-center gap-2">
         <FootballLoader variant="plata" />
-        <p className="text-text-muted text-sm">Cargando pagos...</p>
+        <p className="text-text-muted text-sm">{t("loading")}</p>
       </div>
     );
   }
@@ -95,14 +97,14 @@ export default function ParticipantPayment({
   if (error || !pollaPaymentInfo) {
     return (
       <div className="rounded-xl p-4 text-center lp-card space-y-2">
-        <p className="text-sm font-medium text-text-primary">No pudimos cargar los pagos</p>
-        <p className="text-xs text-text-muted">{error || "Intentá de nuevo."}</p>
+        <p className="text-sm font-medium text-text-primary">{t("errLoadTitle")}</p>
+        <p className="text-xs text-text-muted">{error || t("tryAgain")}</p>
         <button
           type="button"
           onClick={loadPayments}
           className="text-xs px-3 py-1.5 rounded-lg border border-border-subtle hover:border-gold/40 text-text-secondary hover:text-gold transition-colors"
         >
-          Reintentar
+          {t("retry")}
         </button>
       </div>
     );
@@ -181,17 +183,17 @@ export default function ParticipantPayment({
               <div className="rounded-2xl p-5 space-y-2 lp-card">
                 <div className="flex items-center gap-2">
                   <Banknote className="w-5 h-5 text-gold" aria-hidden="true" />
-                  <h3 className="font-bold text-text-primary">Esperando aprobación del organizador</h3>
+                  <h3 className="font-bold text-text-primary">{t("waitingApprovalTitle")}</h3>
                 </div>
                 <p className="text-sm text-text-secondary leading-snug">
-                  Pagale al organizador por fuera de la app. Una vez que él te marque como pagado, vas a poder pronosticar.
+                  {t("waitingApprovalBody")}
                 </p>
               </div>
               {instructions ? (
                 <div className="rounded-xl p-4 space-y-2 bg-bg-elevated border border-border-subtle">
                   <div className="flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-gold" aria-hidden="true" />
-                    <p className="text-sm font-semibold text-text-primary">Cómo pagar</p>
+                    <p className="text-sm font-semibold text-text-primary">{t("howToPay")}</p>
                   </div>
                   <p className="text-sm text-text-secondary whitespace-pre-wrap leading-snug">
                     {instructions}

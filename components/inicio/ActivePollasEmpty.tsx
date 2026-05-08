@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { PollitoMoment } from "@/components/pollito/PollitoMoment";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
 import { useToast } from "@/components/ui/Toast";
@@ -19,6 +20,8 @@ export interface ActivePollasEmptyProps {
 }
 
 export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
+  const t = useTranslations("Inicio");
+  const tNav = useTranslations("Nav");
   const router = useRouter();
   const { showToast } = useToast();
   const [joinOpen, setJoinOpen] = useState(false);
@@ -32,12 +35,12 @@ export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
         forceDisplay="inline"
         forceShow
         cta={{
-          label: "Crear polla",
+          label: t("createPolla"),
           onClick: () => router.push("/pollas/crear"),
         }}
       />
       <p className="mt-4 font-body text-[14px] text-text-secondary text-center">
-        Todavía no tienes pollas activas. Crea una o únete con código.
+        {t("emptyMessage")}
       </p>
       <div className="mt-3 flex justify-center">
         <button
@@ -46,7 +49,7 @@ export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
           className="inline-flex items-center gap-2 font-body text-[14px] font-semibold text-gold hover:text-amber transition-colors"
         >
           <KeyRound className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
-          Unirme con código
+          {tNav("joinWithCode")}
         </button>
       </div>
 
@@ -55,7 +58,7 @@ export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
         onOpenChange={setJoinOpen}
         onSuccess={(polla) => {
           setJoinOpen(false);
-          showToast(`Te uniste a ${polla.name}`, "success");
+          showToast(tNav("joinedToast", { name: polla.name }), "success");
           router.push(`/pollas/${polla.slug}`);
         }}
       />

@@ -9,18 +9,15 @@
 
 import { useState } from "react";
 import { Banknote, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { CopyAccountButton } from "./WinnerPayoutModal";
 
-function fmtCOP(n: number): string {
-  return `$${Math.round(n).toLocaleString("es-CO")}`;
-}
-
-const METHOD_LABEL: Record<string, string> = {
-  nequi: "Nequi",
-  daviplata: "Daviplata",
-  bancolombia: "Bancolombia",
-  transfiya: "Transfiya",
-  otro: "Otro",
+const METHOD_LABEL_KEYS: Record<string, string> = {
+  nequi: "methodNequi",
+  daviplata: "methodDaviplata",
+  bancolombia: "methodBancolombia",
+  transfiya: "methodTransfiya",
+  otro: "methodOtro",
 };
 
 interface Winner {
@@ -51,6 +48,12 @@ export default function LoserPayoutModal({
   onLater,
   onClose,
 }: Props) {
+  const t = useTranslations("Payments");
+  const tPayout = useTranslations("Payout");
+  const tCommon = useTranslations("Common");
+  const locale = useLocale();
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  const fmtCOP = (n: number): string => `$${Math.round(n).toLocaleString(intlTag)}`;
   const [paying, setPaying] = useState(false);
   if (!open) return null;
 
@@ -92,7 +95,7 @@ export default function LoserPayoutModal({
             type="button"
             onClick={onClose}
             className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors p-1"
-            aria-label="Cerrar"
+            aria-label={tCommon("close")}
           >
             <X className="w-5 h-5" />
           </button>
@@ -103,16 +106,17 @@ export default function LoserPayoutModal({
             <Banknote className="w-6 h-6 text-amber" />
           </div>
           <h2 className="font-display text-[22px] tracking-[0.04em] text-text-primary uppercase">
-            Hay que pagar
+            {t("loserTitle")}
           </h2>
           <p className="text-[13px] text-text-secondary mt-0.5">
-            {pollaName} terminó.{" "}
-            {winners.length === 1 ? `Ganó ${winners[0].display_name}` : `Ganaron ${winners.length} jugadores`}.
+            {winners.length === 1
+              ? t("loserSubtitleSingle", { pollaName, name: winners[0].display_name })
+              : t("loserSubtitleMany", { pollaName, count: winners.length })}
           </p>
           <p className="font-display text-[32px] tracking-[0.04em] text-amber mt-2 tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
             {fmtCOP(amountOwed)}
           </p>
-          <p className="text-[11px] text-text-muted">tu parte</p>
+          <p className="text-[11px] text-text-muted">{t("loserYourShare")}</p>
         </div>
 
         {/* Winner accounts */}
@@ -126,7 +130,7 @@ export default function LoserPayoutModal({
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-semibold text-text-primary truncate">{w.display_name}</p>
                   <p className="text-[12px] text-text-secondary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                    {METHOD_LABEL[w.payout_method!] ?? w.payout_method} · {w.payout_account}
+                    {METHOD_LABEL_KEYS[w.payout_method!] ? tPayout(METHOD_LABEL_KEYS[w.payout_method!]) : w.payout_method} · {w.payout_account}
                   </p>
                 </div>
                 <CopyAccountButton value={w.payout_account!} />
@@ -136,15 +140,16 @@ export default function LoserPayoutModal({
         ) : (
           <div className="rounded-xl px-3 py-3 bg-bg-elevated border border-border-subtle text-center mb-4">
             <p className="text-[12px] text-text-secondary">
-              Esperando que{" "}
-              {winners
-                .filter((w) => !w.payout_account)
-                .map((w) => w.display_name)
-                .join(", ")}{" "}
-              indique{winners.length > 1 ? "n" : ""} cómo cobrar.
+              {t("loserAwaiting", {
+                names: winners
+                  .filter((w) => !w.payout_account)
+                  .map((w) => w.display_name)
+                  .join(", "),
+                plural: winners.length > 1 ? "n" : "",
+              })}
             </p>
             <p className="text-[11px] text-text-muted mt-1">
-              Mándale un mensaje por WhatsApp para que abra la app.
+              {t("loserAwaitingHint")}
             </p>
           </div>
         )}
@@ -156,7 +161,7 @@ export default function LoserPayoutModal({
               onClick={onLater}
               className="flex-1 px-3 py-3 rounded-xl border border-border-subtle text-text-secondary text-sm hover:border-text-secondary/40 transition-colors"
             >
-              Pagar después
+              {t("loserPayLater")}
             </button>
           )}
           <button
@@ -165,7 +170,7 @@ export default function LoserPayoutModal({
             disabled={paying || !allReady}
             className="flex-1 bg-gold text-bg-base font-display text-base tracking-wide py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
           >
-            {paying ? "GUARDANDO…" : "YA PAGUÉ"}
+            {paying ? t("loserSaving") : t("loserPaid")}
           </button>
         </div>
       </div>

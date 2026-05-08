@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { AlertTriangle, X, Copy, Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface UnpaidPolla {
   pollaSlug: string;
@@ -46,6 +47,8 @@ function fmtCOP(n: number): string {
 const SESSION_KEY = "unpaid-pollas-modal-shown";
 
 export default function UnpaidPollasBanner() {
+  const t = useTranslations("Banners");
+  const tCommon = useTranslations("Common");
   const router = useRouter();
   const [items, setItems] = useState<UnpaidPolla[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,8 +101,8 @@ export default function UnpaidPollasBanner() {
   const totalOwed = items.reduce((s, i) => s + i.buyInAmount, 0);
   const headline =
     items.length === 1
-      ? `Hacé tu pago para empezar a pronosticar`
-      : `${items.length} pollas esperan tu pago`;
+      ? t("unpaidHeadlineOne")
+      : t("unpaidHeadlineMany", { count: items.length });
 
   return (
     <>
@@ -113,11 +116,11 @@ export default function UnpaidPollasBanner() {
           <p className="text-[13px] font-semibold text-text-primary">{headline}</p>
           <p className="text-[11px] text-text-secondary truncate">
             {items.length === 1
-              ? `${fmtCOP(items[0].buyInAmount)} en ${items[0].pollaName}`
-              : `${fmtCOP(totalOwed)} totales · tap para ver detalle`}
+              ? t("unpaidDetailOne", { amount: fmtCOP(items[0].buyInAmount), pollaName: items[0].pollaName })
+              : t("unpaidDetailMany", { amount: fmtCOP(totalOwed) })}
           </p>
         </div>
-        <span className="text-[11px] text-red-alert font-bold whitespace-nowrap">Pagar →</span>
+        <span className="text-[11px] text-red-alert font-bold whitespace-nowrap">{t("payButton")}</span>
       </button>
 
       {open ? (
@@ -127,7 +130,7 @@ export default function UnpaidPollasBanner() {
               type="button"
               onClick={() => setOpen(false)}
               className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors p-1"
-              aria-label="Cerrar"
+              aria-label={tCommon("close")}
             >
               <X className="w-5 h-5" />
             </button>
@@ -137,10 +140,10 @@ export default function UnpaidPollasBanner() {
                 <AlertTriangle className="w-6 h-6 text-red-alert" />
               </div>
               <h2 className="font-display text-[20px] tracking-[0.04em] text-red-alert uppercase">
-                Pagos pendientes
+                {t("pendingPayments")}
               </h2>
               <p className="text-[12px] text-text-secondary mt-0.5">
-                Hacé el pago al organizador y subí el comprobante para que la AI te apruebe y puedas pronosticar.
+                {t("pendingHelp")}
               </p>
             </div>
 
@@ -176,7 +179,7 @@ export default function UnpaidPollasBanner() {
                           onClick={() => copyAccount(it.adminPayoutAccount!, it.pollaSlug)}
                           className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-border-subtle hover:border-gold/40 text-text-secondary hover:text-gold transition-colors"
                         >
-                          {copiedSlug === it.pollaSlug ? (<><Check className="w-3 h-3" /> Copiado</>) : (<><Copy className="w-3 h-3" /> Copiar</>)}
+                          {copiedSlug === it.pollaSlug ? (<><Check className="w-3 h-3" /> {tCommon("copied")}</>) : (<><Copy className="w-3 h-3" /> {tCommon("copy")}</>)}
                         </button>
                       </div>
                       <p className="text-[11px] text-text-secondary truncate">
@@ -189,19 +192,19 @@ export default function UnpaidPollasBanner() {
                     </>
                   ) : (
                     <p className="text-[11px] text-text-muted">
-                      El organizador todavía no configuró su cuenta de cobro.
+                      {t("organizerNotConfigured")}
                     </p>
                   )}
 
                   {it.proofStatus === "pending_review" ? (
                     <p className="text-[11px] text-amber">
-                      ⌛ Tu comprobante está en revisión.
+                      {t("proofPending")}
                     </p>
                   ) : it.proofStatus === "rejected" ? (
                     <p className="text-[11px] text-red-alert">
-                      ✗ Tu comprobante fue rechazado.{" "}
-                      {it.lastRejectionReason ? `(${it.lastRejectionReason})` : ""}{" "}
-                      Subí uno nuevo.
+                      {it.lastRejectionReason
+                        ? t("proofRejectedWithReason", { reason: it.lastRejectionReason })
+                        : t("proofRejected")}
                     </p>
                   ) : null}
 
@@ -213,7 +216,7 @@ export default function UnpaidPollasBanner() {
                     }}
                     className="w-full mt-1 bg-gold text-bg-base font-display text-base tracking-wide py-2.5 rounded-xl hover:brightness-110 transition-all"
                   >
-                    {it.proofStatus === "rejected" ? "VOLVER A SUBIR" : "SUBIR COMPROBANTE"}
+                    {it.proofStatus === "rejected" ? t("reupload") : t("uploadProof")}
                   </button>
                 </li>
               ))}
@@ -224,7 +227,7 @@ export default function UnpaidPollasBanner() {
               onClick={() => setOpen(false)}
               className="w-full mt-3 px-3 py-2.5 rounded-xl border border-border-subtle text-text-secondary text-[13px] hover:border-text-secondary/40 transition-colors"
             >
-              Pagar después
+              {t("payLater")}
             </button>
           </div>
         </div>

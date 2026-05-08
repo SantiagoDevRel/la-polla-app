@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import axios from "axios";
 import { motion } from "framer-motion";
+import { useLocale, useTranslations } from "next-intl";
 import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Handshake, Lock } from "lucide-react";
 import { TOURNAMENTS } from "@/lib/tournaments";
@@ -56,35 +57,39 @@ interface MatchRow {
   venue: string | null;
 }
 
-// ─── Datos de configuración ───
-
-const PAYMENT_MODE_OPTIONS = [
-  {
-    value: "admin_collects" as PaymentMode,
-    title: "Pago al principio",
-    icon: "banknote",
-    description: "Cada participante le paga al organizador (tú) antes de entrar a la polla.",
-    tag: "",
-  },
-  {
-    value: "pay_winner" as PaymentMode,
-    title: "Pago al final",
-    icon: "handshake",
-    description: "Al terminar la polla, cada participante le paga directamente al ganador.",
-    tag: "",
-  },
-];
-
-const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = {
-  admin_collects: "Cada participante le paga al organizador (tú) antes de entrar. Cada vez que alguien te pague, lo marcas como pagado para que pueda participar.",
-  pay_winner: "Al final, todos le pagan directamente al ganador.",
-};
-
 type GroupBy = "date" | "phase";
 
 // ─── Componente principal ───
 
 export default function CrearPollaPage() {
+  const t = useTranslations("Crear");
+  const locale = useLocale();
+  const PAYMENT_MODE_OPTIONS = useMemo(
+    () => [
+      {
+        value: "admin_collects" as PaymentMode,
+        title: t("paymentModeUpfrontTitle"),
+        icon: "banknote",
+        description: t("paymentModeUpfrontDesc"),
+        tag: "",
+      },
+      {
+        value: "pay_winner" as PaymentMode,
+        title: t("paymentModeWinnerTitle"),
+        icon: "handshake",
+        description: t("paymentModeWinnerDesc"),
+        tag: "",
+      },
+    ],
+    [t],
+  );
+  const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = useMemo(
+    () => ({
+      admin_collects: t("paymentHintUpfront"),
+      pay_winner: t("paymentHintWinner"),
+    }),
+    [t],
+  );
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
@@ -263,7 +268,7 @@ export default function CrearPollaPage() {
         if (groupBy === "date") {
           if (isPlaceholder) {
             key = "_tbd";
-            label = "Por confirmar";
+            label = t("tbd");
           } else {
             const d = new Date(m.scheduled_at);
             // Bogota TZ para AMBOS key y label. Antes usabamos
@@ -276,7 +281,8 @@ export default function CrearPollaPage() {
               timeZone: "America/Bogota",
               year: "numeric", month: "2-digit", day: "2-digit",
             }).format(d);
-            label = new Intl.DateTimeFormat("es-CO", {
+            const intlTag = locale === "en" ? "en-US" : "es-CO";
+            label = new Intl.DateTimeFormat(intlTag, {
               timeZone: "America/Bogota",
               weekday: "long", day: "numeric", month: "long",
             }).format(d);
@@ -318,19 +324,21 @@ export default function CrearPollaPage() {
   }, [matches, groupBy, form.tournaments]);
 
   function formatPhase(phase: string | null): string {
-    const labels: Record<string, string> = {
-      group_stage: "Fase de grupos",
-      league_stage: "Fase de liga",
-      regular_season: "Temporada regular",
-      round_of_32: "Dieciseisavos",
-      round_of_16: "Octavos de final",
-      quarter_finals: "Cuartos de final",
-      semi_finals: "Semifinales",
-      final: "Final",
-      third_place: "Tercer puesto",
-      playoff: "Playoffs",
+    const phaseKeys: Record<string, string> = {
+      group_stage: "phaseGroupStage",
+      league_stage: "phaseLeagueStage",
+      regular_season: "phaseRegularSeason",
+      round_of_32: "phaseRoundOf32",
+      round_of_16: "phaseRoundOf16",
+      quarter_finals: "phaseQuarterFinals",
+      semi_finals: "phaseSemiFinals",
+      final: "phaseFinal",
+      third_place: "phaseThirdPlace",
+      playoff: "phasePlayoff",
     };
-    return labels[phase || ""] || phase || "Otros";
+    const key = phaseKeys[phase || ""];
+    if (key) return t(key);
+    return phase || t("phaseOther");
   }
 
   function toggleMatch(id: string) {
@@ -367,12 +375,12 @@ export default function CrearPollaPage() {
     setError("");
     if (targetStep > step) {
       if (step === 1) {
-        if (form.name.trim().length < 3) { setError("El nombre debe tener al menos 3 caracteres"); return; }
-        if (form.tournaments.length === 0) { setError("Seleccioná al menos un torneo"); return; }
+        if (form.name.trim().length < 3) { setError(t("errNameMin")); return; }
+        if (form.tournaments.length === 0) { setError(t("errSelectTournament")); return; }
       }
       if (step === 2) {
         if (selectedMatchIds.size === 0) {
-          setError("Selecciona al menos 1 partido");
+          setError(t("errSelectMatches"));
           return;
         }
       }
@@ -383,19 +391,19 @@ export default function CrearPollaPage() {
   // Submit
   async function handleSubmit() {
     setError("");
-    if (form.buyInAmount < 1000) { setError("El valor mínimo es $1.000"); return; }
+    if (form.buyInAmount < 1000) { setError(t("errMinAmount")); return; }
     if (form.paymentMode === "admin_collects") {
       if (!form.adminPayoutMethod) {
-        setError("Elegí el método para recibir el pago (Nequi, Bancolombia u Otro)"); return;
+        setError(t("errPickMethod")); return;
       }
       if (!form.adminPayoutAccount.trim()) {
-        setError("Falta el número de cuenta o celular para recibir el pago"); return;
+        setError(t("errMissingAccount")); return;
       }
       if (form.adminPayoutMethod !== "nequi" && form.adminPayoutAccountName.trim().length < 2) {
-        setError(`Para ${form.adminPayoutMethod} hay que poner el nombre como aparece en la cuenta`); return;
+        setError(t("errMissingName", { method: form.adminPayoutMethod })); return;
       }
       if (form.adminPayoutMethod !== "nequi" && !form.adminPayoutAccountType) {
-        setError("Elegí si la cuenta es de ahorros o corriente"); return;
+        setError(t("errPickAccountType")); return;
       }
     }
 
@@ -432,13 +440,13 @@ export default function CrearPollaPage() {
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setError(e.response?.data?.error || "Error al crear la polla");
+      setError(e.response?.data?.error || t("errCreate"));
     } finally {
       setLoading(false);
     }
   }
 
-  const STEP_LABELS = ["Info", "Partidos", "Configuración"];
+  const STEP_LABELS = [t("stepInfo"), t("stepMatches"), t("stepConfig")];
 
   const primaryTournament = form.tournaments[0] ?? null;
   const tournamentMeta = primaryTournament
@@ -455,7 +463,7 @@ export default function CrearPollaPage() {
             <button onClick={() => (step === 1 ? router.back() : goToStep((step - 1) as Step))} className="text-text-secondary hover:text-gold transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-lg font-bold text-text-primary">Crear nueva polla</h1>
+            <h1 className="text-lg font-bold text-text-primary">{t("header")}</h1>
           </div>
 
           {/* Stepper — 3 steps. Each step is a circle+label column; the
@@ -487,16 +495,16 @@ export default function CrearPollaPage() {
         {step === 1 && (
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-              <h2 className="text-base font-bold text-text-primary">Información básica</h2>
+              <h2 className="text-base font-bold text-text-primary">{t("step1Title")}</h2>
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-1.5">Nombre <span className="text-red-alert">*</span></label>
-                <input type="text" value={form.name} onChange={(e) => updateForm("name", e.target.value)} placeholder="Ej: Polla Mundial Oficina"
+                <label className="block text-sm font-medium text-text-secondary mb-1.5">{t("labelName")} <span className="text-red-alert">*</span></label>
+                <input type="text" value={form.name} onChange={(e) => updateForm("name", e.target.value)} placeholder={t("namePlaceholder")}
                   className="w-full px-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted focus:ring-1 focus:ring-gold/40 focus:border-gold/50" />
               </div>
             </div>
 
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-              <h2 className="text-base font-bold text-text-primary">Torneos <span className="text-red-alert">*</span></h2>
+              <h2 className="text-base font-bold text-text-primary">{t("labelTournaments")} <span className="text-red-alert">*</span></h2>
               <div className="space-y-2">
                 {TOURNAMENTS.map((t) => {
                   const isSelected = form.tournaments.includes(t.slug);
@@ -538,17 +546,17 @@ export default function CrearPollaPage() {
               </div>
               {form.tournaments.length > 1 ? (
                 <p className="text-[11px] text-gold">
-                  Polla combinada · {form.tournaments.length} torneos seleccionados.
+                  {t("combinedNote", { count: form.tournaments.length })}
                 </p>
               ) : null}
             </div>
 
             {/* Tipo de polla: privada (closed) es el único modo soportado. */}
             <div className="rounded-2xl p-5 space-y-2 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-              <h2 className="text-base font-bold text-text-primary">Tipo de polla</h2>
+              <h2 className="text-base font-bold text-text-primary">{t("labelType")}</h2>
               <div className="flex items-center gap-2 text-text-secondary text-sm">
                 <Lock className="w-4 h-4 text-gold" aria-hidden="true" />
-                <span>Solo personas con el link o el código de invitación podrán unirse a tu polla.</span>
+                <span>{t("typeDescription")}</span>
               </div>
             </div>
 
@@ -561,9 +569,9 @@ export default function CrearPollaPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold text-text-primary">Selecciona los partidos</h2>
+                <h2 className="text-base font-bold text-text-primary">{t("step2Title")}</h2>
                 <p style={{ fontSize: 12, color: selectedMatchIds.size > 0 ? "#FFD700" : "#F5F7FA", fontWeight: selectedMatchIds.size > 0 ? 600 : 400 }}>
-                  {selectedMatchIds.size > 0 ? `${selectedMatchIds.size} partidos seleccionados` : "Ningún partido seleccionado"}
+                  {selectedMatchIds.size > 0 ? t("selectedCount", { count: selectedMatchIds.size }) : t("selectedNone")}
                 </p>
               </div>
               {tournamentMeta && <img src={tournamentMeta.logoPath} alt="" width={28} height={28} style={{ objectFit: "contain", opacity: 0.6 }} />}
@@ -577,7 +585,7 @@ export default function CrearPollaPage() {
                   background: groupBy === g ? "rgba(255,215,0,0.1)" : "#0e1420", color: groupBy === g ? "#FFD700" : "#4a5568",
                   border: groupBy === g ? "1px solid rgba(255,215,0,0.22)" : "1px solid rgba(255,255,255,0.06)", fontFamily: "'Outfit', sans-serif",
                 }}>
-                  {{ date: "Por fecha", phase: "Por fase" }[g]}
+                  {g === "date" ? t("groupByDate") : t("groupByPhase")}
                 </button>
               ))}
             </div>
@@ -585,18 +593,18 @@ export default function CrearPollaPage() {
             {/* Quick actions */}
             <div style={{ display: "flex", gap: 12, paddingTop: 4 }}>
               <button onClick={selectAll} style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline", textUnderlineOffset: 3 }}>
-                Seleccionar todo
+                {t("selectAll")}
               </button>
               <button onClick={deselectAll} style={{ fontSize: 14, fontWeight: 600, color: "#FFFFFF", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", textDecoration: "underline", textUnderlineOffset: 3 }}>
-                Deseleccionar todo
+                {t("deselectAll")}
               </button>
             </div>
 
             {matchesLoading ? (
-              <div className="flex flex-col items-center gap-2 py-8"><FootballLoader /><p className="text-text-muted text-sm">Cargando partidos...</p></div>
+              <div className="flex flex-col items-center gap-2 py-8"><FootballLoader /><p className="text-text-muted text-sm">{t("loadingMatches")}</p></div>
             ) : matches.length === 0 ? (
               <div className="text-center py-8 lp-card">
-                <p className="text-text-muted text-sm">No hay partidos programados para los torneos seleccionados.</p>
+                <p className="text-text-muted text-sm">{t("noMatchesAvailable")}</p>
               </div>
             ) : (
               tournamentBlocks.map((block) => {
@@ -664,8 +672,8 @@ export default function CrearPollaPage() {
                           <span style={{ fontSize: 11, color: "#AEB7C7" }}>
                             ·{" "}
                             {selectedInTournament > 0
-                              ? `${selectedInTournament}/${block.matchIds.length} sel`
-                              : `${block.matchIds.length} partidos`}
+                              ? t("tournamentSelectionShort", { selected: selectedInTournament, total: block.matchIds.length })
+                              : t("tournamentMatchesShort", { n: block.matchIds.length })}
                           </span>
                         </button>
                         <button
@@ -681,7 +689,7 @@ export default function CrearPollaPage() {
                             flexShrink: 0,
                           }}
                         >
-                          {allTournamentSelected ? "Quitar todo" : "Todo"}
+                          {allTournamentSelected ? t("removeAll") : t("all")}
                         </button>
                       </div>
                     ) : null}
@@ -697,12 +705,12 @@ export default function CrearPollaPage() {
                           }}>
                             <div>
                               <span style={{ fontSize: 12, fontWeight: 600, color: "#f0f4ff" }}>{group.label}</span>
-                              <span style={{ fontSize: 11, color: "#4a5568", marginLeft: 6 }}>· {group.matches.length} partidos</span>
+                              <span style={{ fontSize: 11, color: "#4a5568", marginLeft: 6 }}>{t("groupMatchCount", { count: group.matches.length })}</span>
                             </div>
                             <button onClick={() => toggleGroup(group.matchIds)} style={{
                               fontSize: 10, color: allGroupSelected ? "#ff3d57" : "#FFD700", background: "none", border: "none", cursor: "pointer", fontFamily: "'Outfit', sans-serif", fontWeight: 600,
                             }}>
-                              {allGroupSelected ? "Deseleccionar" : "Sel. todos"} →
+                              {allGroupSelected ? t("deselectGroup") : t("selectGroup")} →
                             </button>
                           </div>
 
@@ -710,15 +718,16 @@ export default function CrearPollaPage() {
                           {group.matches.map((m) => {
                       const isChecked = selectedMatchIds.has(m.id);
                       const isPlaceholder = m.home_team === "TBD" && m.away_team === "TBD";
+                      const intlTag = locale === "en" ? "en-US" : "es-CO";
                       const time = isPlaceholder
-                        ? "Por confirmar"
-                        : new Date(m.scheduled_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+                        ? t("tbd")
+                        : new Date(m.scheduled_at).toLocaleTimeString(intlTag, { hour: "2-digit", minute: "2-digit" });
                       // Para placeholders mostramos el label de la fase
                       // + slot ("Cuartos · #1") en vez de "TBD vs TBD"
                       // que no le dice nada al user. Cuando ESPN publica
                       // el matchup real, el row se promueve in-place.
                       const placeholderTitle = isPlaceholder
-                        ? `${formatPhase(m.phase)} · #${m.match_day ?? "?"}`
+                        ? t("placeholderTitle", { phase: formatPhase(m.phase), day: m.match_day ?? "?" })
                         : null;
                       return (
                         <div key={m.id} onClick={() => toggleMatch(m.id)} style={{
@@ -766,7 +775,7 @@ export default function CrearPollaPage() {
                                 </span>
                               </div>
 
-                              <span style={{ fontSize: 10, color: "#4a5568", flexShrink: 0 }}>vs</span>
+                              <span style={{ fontSize: 10, color: "#4a5568", flexShrink: 0 }}>{t("vs")}</span>
 
                               {/* Away team */}
                               <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
@@ -807,8 +816,8 @@ export default function CrearPollaPage() {
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <div>
                 <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
-                  Cuota de entrada <span className="text-red-alert">*</span>
-                  <span className="inline-flex items-center justify-center cursor-pointer" title="Cuota por persona" style={{ color: "#4a5568" }}>
+                  {t("step3FeeTitle")} <span className="text-red-alert">*</span>
+                  <span className="inline-flex items-center justify-center cursor-pointer" title={t("step3FeeTitleHint")} style={{ color: "#4a5568" }}>
                     <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>
                   </span>
                 </h2>
@@ -819,7 +828,7 @@ export default function CrearPollaPage() {
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  value={form.buyInAmount > 0 ? form.buyInAmount.toLocaleString("es-CO") : ""}
+                  value={form.buyInAmount > 0 ? form.buyInAmount.toLocaleString(locale === "en" ? "en-US" : "es-CO") : ""}
                   onChange={(e) => {
                     // Strip non-digits so the user can paste "10.000" or
                     // "10,000" and we still get a clean number. Limit to
@@ -827,7 +836,7 @@ export default function CrearPollaPage() {
                     const digits = e.target.value.replace(/\D/g, "").slice(0, 9);
                     updateForm("buyInAmount", digits ? parseInt(digits, 10) : 0);
                   }}
-                  placeholder="10000"
+                  placeholder={t("step3FeePlaceholder")}
                   className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted/40 focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
                 />
               </div>
@@ -835,7 +844,7 @@ export default function CrearPollaPage() {
 
             {/* Sección 2: Modo de pago */}
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
-              <h2 className="text-base font-bold text-text-primary">Modo de pago</h2>
+              <h2 className="text-base font-bold text-text-primary">{t("step3PaymentMode")}</h2>
               <>
                 <div className="space-y-3">
                   {PAYMENT_MODE_OPTIONS.map((option) => {
@@ -880,14 +889,14 @@ export default function CrearPollaPage() {
                   <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
                     <div className="flex items-start justify-between gap-2">
                       <h2 className="text-base font-bold text-text-primary min-w-0">
-                        Recibís pagos en
+                        {t("youReceiveAt")}
                       </h2>
                       <button
                         type="button"
                         onClick={() => setPayoutLocked(false)}
                         className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-border-subtle text-text-secondary hover:border-gold/40 hover:text-gold transition-colors flex-shrink-0"
                       >
-                        Cambiar
+                        {t("change")}
                       </button>
                     </div>
                     <div className="rounded-xl px-4 py-3 bg-bg-elevated border border-border-subtle">
@@ -899,13 +908,13 @@ export default function CrearPollaPage() {
                       </p>
                       <p className="text-[11px] text-text-muted truncate">
                         {form.adminPayoutAccountType
-                          ? `${form.adminPayoutAccountType === "ahorros" ? "Ahorros" : "Corriente"} `
+                          ? `${form.adminPayoutAccountType === "ahorros" ? t("accountTypeAhorros") : t("accountTypeCorriente")} `
                           : ""}
                         {form.adminPayoutMethod === "nequi"
-                          ? "Nequi"
+                          ? t("methodNequi")
                           : form.adminPayoutMethod === "bancolombia"
-                            ? "Bancolombia"
-                            : "Otro"}
+                            ? t("methodBancolombia")
+                            : t("methodOtro")}
                         {form.adminPayoutAccountName ? ` · ${form.adminPayoutAccountName}` : ""}
                       </p>
                     </div>
@@ -913,7 +922,7 @@ export default function CrearPollaPage() {
                 ) : (
                   <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
                     <h2 className="text-base font-bold text-text-primary">
-                      Tu cuenta para recibir pagos <span className="text-red-alert">*</span>
+                      {t("accountTitle")} <span className="text-red-alert">*</span>
                     </h2>
 
                     <div className="flex flex-wrap gap-1.5">
@@ -928,7 +937,7 @@ export default function CrearPollaPage() {
                               : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
                           }`}
                         >
-                          {m === "nequi" ? "Nequi" : m === "bancolombia" ? "Bancolombia" : "Otro"}
+                          {m === "nequi" ? t("methodNequi") : m === "bancolombia" ? t("methodBancolombia") : t("methodOtro")}
                         </button>
                       ))}
                     </div>
@@ -939,10 +948,10 @@ export default function CrearPollaPage() {
                       onChange={(e) => updateForm("adminPayoutAccount", e.target.value)}
                       placeholder={
                         form.adminPayoutMethod === "nequi"
-                          ? "Número de celular Nequi"
+                          ? t("phNequi")
                           : form.adminPayoutMethod === "bancolombia"
-                            ? "Número de cuenta Bancolombia"
-                            : "Banco + número de cuenta"
+                            ? t("phBancolombia")
+                            : t("phOtro")
                       }
                       className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
                     />
@@ -950,18 +959,18 @@ export default function CrearPollaPage() {
                     {form.adminPayoutMethod && form.adminPayoutMethod !== "nequi" ? (
                       <>
                         <div className="flex flex-wrap gap-1.5">
-                          {(["ahorros", "corriente"] as const).map((t) => (
+                          {(["ahorros", "corriente"] as const).map((accType) => (
                             <button
-                              key={t}
+                              key={accType}
                               type="button"
-                              onClick={() => updateForm("adminPayoutAccountType", t)}
+                              onClick={() => updateForm("adminPayoutAccountType", accType)}
                               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                                form.adminPayoutAccountType === t
+                                form.adminPayoutAccountType === accType
                                   ? "bg-gold text-bg-base border-gold"
                                   : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
                               }`}
                             >
-                              {t === "ahorros" ? "Ahorros" : "Corriente"}
+                              {accType === "ahorros" ? t("accountTypeAhorros") : t("accountTypeCorriente")}
                             </button>
                           ))}
                         </div>
@@ -969,7 +978,7 @@ export default function CrearPollaPage() {
                           type="text"
                           value={form.adminPayoutAccountName}
                           onChange={(e) => updateForm("adminPayoutAccountName", e.target.value)}
-                          placeholder="Nombre como aparece en la cuenta"
+                          placeholder={t("phNameOnAccount")}
                           className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
                         />
                       </>
@@ -984,9 +993,9 @@ export default function CrearPollaPage() {
             <div className="rounded-2xl p-5 space-y-3 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-gold" />
-                <h2 className="text-base font-bold text-text-primary">Premios</h2>
+                <h2 className="text-base font-bold text-text-primary">{t("prizesTitle")}</h2>
                 <span className="text-[10px] uppercase tracking-wide text-text-muted ml-auto">
-                  Opcional
+                  {t("optional")}
                 </span>
               </div>
               <PrizeDistributionForm
@@ -1001,10 +1010,12 @@ export default function CrearPollaPage() {
             <div className="rounded-xl p-4 flex items-start gap-2.5 bg-bg-elevated border border-border-subtle">
               <Info className="w-4 h-4 text-blue-info flex-shrink-0 mt-0.5" />
               <p className="text-sm text-text-secondary">
-                {selectedMatchIds.size} partidos seleccionados ·{" "}
-                {isCombined
-                  ? `${form.tournaments.length} torneos combinados`
-                  : (tournamentMeta?.name ?? form.tournaments[0] ?? "—")}
+                {t("summaryMatchesAndTournament", {
+                  matches: selectedMatchIds.size,
+                  tournament: isCombined
+                    ? t("summaryCombinedTournaments", { count: form.tournaments.length })
+                    : (tournamentMeta?.name ?? form.tournaments[0] ?? "—"),
+                })}
               </p>
             </div>
 
@@ -1040,7 +1051,7 @@ export default function CrearPollaPage() {
             onClick={() => router.push("/pollas")}
             className="px-4 py-2.5 rounded-xl text-text-muted hover:text-text-primary text-sm font-medium transition-colors"
           >
-            Cancelar
+            {t("footerCancel")}
           </button>
           {step > 1 && (
             <button
@@ -1048,7 +1059,7 @@ export default function CrearPollaPage() {
               onClick={() => goToStep((step - 1) as Step)}
               className="px-4 py-2.5 rounded-xl bg-bg-elevated text-text-secondary border border-border-subtle hover:border-gold/30 text-sm font-semibold inline-flex items-center gap-1"
             >
-              <ArrowLeft className="w-4 h-4" /> Atrás
+              <ArrowLeft className="w-4 h-4" /> {t("footerBack")}
             </button>
           )}
           <div className="flex-1" />
@@ -1060,7 +1071,7 @@ export default function CrearPollaPage() {
               className="px-5 py-2.5 rounded-xl bg-gold text-bg-base font-bold text-sm inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ boxShadow: "0 0 16px rgba(255,215,0,0.18)" }}
             >
-              Continuar <ChevronRight className="w-4 h-4" />
+              {t("footerContinue")} <ChevronRight className="w-4 h-4" />
             </button>
           ) : (
             <button
@@ -1070,9 +1081,9 @@ export default function CrearPollaPage() {
               className="px-5 py-2.5 rounded-xl bg-gold text-bg-base font-bold text-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.25)" }}
             >
-              {loading ? "Creando..." : (
+              {loading ? t("footerCreating") : (
                 <>
-                  Crear polla <Trophy className="w-4 h-4" />
+                  {t("footerCreate")} <Trophy className="w-4 h-4" />
                 </>
               )}
             </button>

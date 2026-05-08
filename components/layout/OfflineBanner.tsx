@@ -12,8 +12,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 export function OfflineBanner() {
+  const t = useTranslations("Offline");
   const [online, setOnline] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -74,7 +76,7 @@ export function OfflineBanner() {
         boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
       }}
     >
-      Sin conexión — algunas cosas pueden no actualizarse
+      {t("banner")}
     </div>
   );
 }

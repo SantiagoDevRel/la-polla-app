@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 import { KeyRound } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH } from "@/lib/pollas/join-code";
@@ -36,6 +37,7 @@ export function JoinByCodeSheet({
   onOpenChange,
   onSuccess,
 }: JoinByCodeSheetProps) {
+  const t = useTranslations("JoinCode");
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,9 +75,9 @@ export function JoinByCodeSheet({
         onSuccess(body.polla);
         return;
       }
-      setError(body.error ?? "No pudimos unirte a la polla");
+      setError(body.error ?? t("errFailed"));
     } catch {
-      setError("Error de red. Intenta de nuevo.");
+      setError(t("errNetwork"));
     } finally {
       setSubmitting(false);
     }
@@ -88,9 +90,9 @@ export function JoinByCodeSheet({
         <Drawer.Content
           className="fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border border-gold/25 bg-bg-card"
         >
-          <Drawer.Title className="sr-only">Únete con código</Drawer.Title>
+          <Drawer.Title className="sr-only">{t("drawerTitle")}</Drawer.Title>
           <Drawer.Description className="sr-only">
-            Ingresa el código de 6 letras para unirte a una polla.
+            {t("drawerDescription")}
           </Drawer.Description>
           <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-border-default" />
           <div className="p-5 pb-8">
@@ -100,16 +102,16 @@ export function JoinByCodeSheet({
               </div>
               <div>
                 <h3 className="font-display text-[22px] tracking-[0.04em] uppercase text-text-primary leading-none">
-                  Únete con código
+                  {t("title")}
                 </h3>
                 <p className="mt-1 font-body text-[13px] text-text-secondary">
-                  Pídele el código de 6 letras al admin de la polla.
+                  {t("subtitle")}
                 </p>
               </div>
             </div>
 
             <label className="block">
-              <span className="sr-only">Código de 6 caracteres</span>
+              <span className="sr-only">{t("ariaInput")}</span>
               <input
                 ref={inputRef}
                 value={code}
@@ -125,7 +127,7 @@ export function JoinByCodeSheet({
                 autoCorrect="off"
                 spellCheck={false}
                 maxLength={JOIN_CODE_LENGTH}
-                placeholder="XXXXXX"
+                placeholder={t("placeholder")}
                 className={cn(
                   "w-full h-14 rounded-md bg-bg-elevated border-2 text-center",
                   "font-mono text-[28px] tracking-[0.24em] uppercase text-gold",
@@ -154,7 +156,7 @@ export function JoinByCodeSheet({
                 disabled={!ready}
                 onClick={handleSubmit}
               >
-                Unirme a la polla
+                {t("submit")}
               </Button>
             </div>
           </div>

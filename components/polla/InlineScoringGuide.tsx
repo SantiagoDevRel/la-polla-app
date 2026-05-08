@@ -16,6 +16,7 @@
 
 import { useState } from "react";
 import { Info, ChevronDown } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export interface ScoringPoints {
   exact?: number;
@@ -33,54 +34,53 @@ interface Row {
   example: { pred: string; result: string };
 }
 
-function buildRows(p: ScoringPoints = {}): Row[] {
+function buildRows(
+  p: ScoringPoints,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): Row[] {
   const exact = p.exact ?? 5;
   const goalDiff = p.goalDiff ?? 3;
   const winner = p.winner ?? 2;
   const oneTeam = p.oneTeam ?? 1;
   return [
     {
-      label: "Resultado exacto",
+      label: t("tier1Label"),
       pts: exact,
-      ptsLabel: `${exact} pts`,
+      ptsLabel: t("ptsCount", { count: exact }),
       color: "#FFD700",
-      explanation: "Le clavaste al marcador exacto del partido.",
+      explanation: t("tier1Explanation"),
       example: { pred: "2-1", result: "2-1" },
     },
     {
-      label: "Ganador + diferencia",
+      label: t("tier2Label"),
       pts: goalDiff,
-      ptsLabel: `${goalDiff} pts`,
+      ptsLabel: t("ptsCount", { count: goalDiff }),
       color: "#f0f4ff",
-      explanation:
-        "Acertaste quién gana Y la misma diferencia de goles, pero no el marcador exacto.",
+      explanation: t("tier2Explanation"),
       example: { pred: "3-2", result: "2-1" },
     },
     {
-      label: "Ganador correcto",
+      label: t("tier3Label"),
       pts: winner,
-      ptsLabel: `${winner} pts`,
+      ptsLabel: t("ptsCount", { count: winner }),
       color: "#f0f4ff",
-      explanation:
-        "Acertaste quién gana el partido, pero no la diferencia de goles.",
+      explanation: t("tier3Explanation"),
       example: { pred: "3-0", result: "2-1" },
     },
     {
-      label: "Goles de un equipo",
+      label: t("tier4Label"),
       pts: oneTeam,
-      ptsLabel: oneTeam === 1 ? "1 pt" : `${oneTeam} pts`,
+      ptsLabel: t("ptsCount", { count: oneTeam }),
       color: "#f0f4ff",
-      explanation:
-        "Acertaste los goles de al menos uno de los dos equipos, así el otro resultado esté mal.",
+      explanation: t("tier4Explanation"),
       example: { pred: "2-3", result: "2-1" },
     },
     {
-      label: "Sin aciertos",
+      label: t("tier5Label"),
       pts: 0,
-      ptsLabel: "0 pts",
+      ptsLabel: t("ptsCount", { count: 0 }),
       color: "#4a5568",
-      explanation:
-        "No le achuntaste a nada: ni al ganador, ni a la diferencia, ni a los goles de ninguno.",
+      explanation: t("tier5Explanation"),
       example: { pred: "0-0", result: "2-1" },
     },
   ];
@@ -92,7 +92,8 @@ export interface InlineScoringGuideProps {
 }
 
 export function InlineScoringGuide({ points }: InlineScoringGuideProps) {
-  const rows = buildRows(points);
+  const t = useTranslations("Scoring");
+  const rows = buildRows(points ?? {}, t);
   const [expanded, setExpanded] = useState<number | null>(null);
 
   return (
@@ -199,7 +200,7 @@ export function InlineScoringGuide({ points }: InlineScoringGuideProps) {
                         color: "#AEB7C7",
                       }}
                     >
-                      Tu pronóstico
+                      {t("yourPred")}
                     </div>
                     <div
                       className="font-display"
@@ -222,7 +223,7 @@ export function InlineScoringGuide({ points }: InlineScoringGuideProps) {
                         color: "#AEB7C7",
                       }}
                     >
-                      Resultado
+                      {t("result")}
                     </div>
                     <div
                       className="font-display"

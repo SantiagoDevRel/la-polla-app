@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 
 /**
@@ -51,6 +52,7 @@ export function QuickPickStrip({
   locked = false,
   presets,
 }: QuickPickStripProps) {
+  const t = useTranslations("QuickPick");
   const router = useRouter();
   const { showToast } = useToast();
   const effectivePresets = presets && presets.length > 0 ? presets : DEFAULT_PRESETS;
@@ -79,16 +81,16 @@ export function QuickPickStrip({
         const data = await res.json().catch(() => ({}));
         const msg =
           data?.error === "payment_required"
-            ? "Paga la polla para pronosticar"
-            : data?.error || "No se pudo guardar el pronóstico";
+            ? t("errPaymentRequired")
+            : data?.error || t("errSaveFailed");
         showToast(msg, "error");
         return;
       }
       setSavedPred(selected);
-      showToast(`Apuntado ${selected.home}-${selected.away} en ${pollaName}`, "success");
+      showToast(t("savedToast", { home: selected.home, away: selected.away, pollaName }), "success");
       router.refresh();
     } catch {
-      showToast("Error de red. Inténtalo de nuevo.", "error");
+      showToast(t("errNetwork"), "error");
     } finally {
       setSaving(false);
     }
@@ -105,7 +107,7 @@ export function QuickPickStrip({
       {savedPred ? (
         <div className="flex items-center justify-between rounded-md bg-bg-elevated border border-gold/30 px-3 py-2 mb-2.5">
           <span className="font-body text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted">
-            Tu pronóstico
+            {t("yourPrediction")}
           </span>
           <span
             className="font-display text-[20px] leading-none text-gold tracking-[0.04em]"
@@ -119,18 +121,18 @@ export function QuickPickStrip({
       {locked ? (
         <div className="rounded-md border border-border-subtle bg-bg-elevated px-3 py-3 text-center">
           <p className="font-body text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted">
-            Pronóstico cerrado
+            {t("locked")}
           </p>
           <p className="font-body text-[12px] text-text-secondary mt-1">
             {savedPred
-              ? `Te quedaste con ${savedPred.home}-${savedPred.away}. Suerte.`
-              : "El partido ya arrancó o está por arrancar."}
+              ? t("lockedKept", { home: savedPred.home, away: savedPred.away })
+              : t("lockedStarted")}
           </p>
         </div>
       ) : (
         <>
           <p className="font-body text-[10px] font-semibold uppercase tracking-[0.1em] text-text-muted text-center mb-2">
-            {savedPred ? "Cambia tu pronóstico rápido" : "Pronóstico rápido"} · {pollaName}
+            {savedPred ? t("changeQuick") : t("quickPick")} · {pollaName}
           </p>
 
           <div className="flex gap-1.5 justify-center mb-2.5">
@@ -164,12 +166,12 @@ export function QuickPickStrip({
             className="w-full py-2.5 rounded-full font-body text-[13px] font-extrabold tracking-[0.04em] text-bg-base bg-gold hover:brightness-110 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving
-              ? "Apuntando…"
-              : lockedToSaved
-                ? `Ya apuntaste ${savedPred?.home}-${savedPred?.away}`
+              ? t("saving")
+              : lockedToSaved && savedPred
+                ? t("alreadySaved", { home: savedPred.home, away: savedPred.away })
                 : selected
-                  ? `Apuntar ${selected.home}-${selected.away}`
-                  : "Elige un marcador"}
+                  ? t("saveAction", { home: selected.home, away: selected.away })
+                  : t("pickScore")}
           </button>
         </>
       )}

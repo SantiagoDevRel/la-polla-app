@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Copy, RefreshCw, Trash2, UserMinus } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 import FootballLoader from "@/components/ui/FootballLoader";
 import EmptyState from "@/components/ui/EmptyState";
@@ -42,10 +43,6 @@ interface OrganizerPanelProps {
 const APP_URL =
   typeof window !== "undefined" ? window.location.origin : "https://lapollacolombiana.com";
 
-function fmtCOP(n: number): string {
-  return `$${n.toLocaleString("es-CO")}`;
-}
-
 export default function OrganizerPanel({
   pollaSlug,
   pollaName,
@@ -55,6 +52,10 @@ export default function OrganizerPanel({
   matchIds,
   joinCode,
 }: OrganizerPanelProps) {
+  const t = useTranslations("Organizer");
+  const locale = useLocale();
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  const fmtCOP = (n: number): string => `$${n.toLocaleString(intlTag)}`;
   const { showToast } = useToast();
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
@@ -80,11 +81,11 @@ export default function OrganizerPanel({
       setPredictionsCount(Object.keys(predMap).filter((k) => (predMap[k] ?? 0) > 0).length);
     } catch (err) {
       console.error("[OrganizerPanel] load failed:", err);
-      showToast("No pudimos cargar el panel del organizador", "error");
+      showToast(t("errLoad"), "error");
     } finally {
       setLoading(false);
     }
-  }, [pollaSlug, showToast]);
+  }, [pollaSlug, showToast, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -93,9 +94,9 @@ export default function OrganizerPanel({
     const url = `${APP_URL}/invites/polla/${token}`;
     try {
       await navigator.clipboard.writeText(url);
-      showToast("Link copiado", "success");
+      showToast(t("linkCopied"), "success");
     } catch {
-      showToast("No pudimos copiar — copialo a mano", "error");
+      showToast(t("linkCopyFail"), "error");
     }
   }
 
@@ -106,9 +107,9 @@ export default function OrganizerPanel({
         `/api/pollas/${pollaSlug}/invite-token`
       );
       setToken(data.token);
-      showToast("Link renovado — el anterior ya no funciona", "success");
+      showToast(t("linkRenewed"), "success");
     } catch {
-      showToast("No pudimos renovar el link", "error");
+      showToast(t("linkRenewFail"), "error");
     } finally {
       setBusy(null);
     }
@@ -118,9 +119,9 @@ export default function OrganizerPanel({
     if (!code) return;
     try {
       await navigator.clipboard.writeText(code);
-      showToast("Código copiado", "success");
+      showToast(t("codeCopied"), "success");
     } catch {
-      showToast("No pudimos copiar — copialo a mano", "error");
+      showToast(t("linkCopyFail"), "error");
     }
   }
 
@@ -131,9 +132,9 @@ export default function OrganizerPanel({
         `/api/pollas/${pollaSlug}/rotate-code`
       );
       setCode(data.code);
-      showToast("Código renovado", "success");
+      showToast(t("codeRenewed"), "success");
     } catch {
-      showToast("No se pudo renovar el código", "error");
+      showToast(t("codeRenewFail"), "error");
     } finally {
       setBusy(null);
     }
@@ -150,7 +151,7 @@ export default function OrganizerPanel({
       await load();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      showToast(e.response?.data?.error || "Error actualizando pago", "error");
+      showToast(e.response?.data?.error || t("errPaymentUpdate"), "error");
     } finally {
       setBusy(null);
     }
@@ -160,16 +161,12 @@ export default function OrganizerPanel({
     // Two-line confirm so the consequence is unambiguous before the
     // user clicks OK. Matches the existing expel() pattern (browser
     // confirm) — the codebase blocks alert() but confirm() is OK.
-    const ok = window.confirm(
-      `¿Estás seguro que deseas borrar "${pollaName}"?\n\n` +
-        `Todos los datos se perderán: participantes, pronósticos, ` +
-        `tabla y resultados. Esta acción no se puede deshacer.`,
-    );
+    const ok = window.confirm(t("confirmDelete", { name: pollaName }));
     if (!ok) return;
     setBusy("delete");
     try {
       await axios.delete(`/api/pollas/${pollaSlug}`);
-      showToast("Polla borrada", "success");
+      showToast(t("deletedToast"), "success");
       // Send the user out before the now-empty page re-fetches and
       // 404s on its own. router.replace so the back button doesn't
       // bring them to a dead URL.
@@ -177,7 +174,7 @@ export default function OrganizerPanel({
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       showToast(
-        e.response?.data?.error || "No se pudo borrar la polla",
+        e.response?.data?.error || t("errDelete"),
         "error",
       );
       setBusy(null);
@@ -186,17 +183,18 @@ export default function OrganizerPanel({
 
   async function expel(p: Participant) {
     if (p.role === "admin") return;
-    if (!confirm(`¿Expulsar a ${p.users?.display_name || p.users?.whatsapp_number || "este participante"}?`)) return;
+    const targetName = p.users?.display_name || p.users?.whatsapp_number || t("thisParticipant");
+    if (!confirm(t("confirmExpel", { name: targetName }))) return;
     setBusy(`expel:${p.id}`);
     try {
       await axios.patch(`/api/pollas/${pollaSlug}/participants/${p.id}`, {
         status: "rejected",
       });
       await load();
-      showToast("Participante expulsado", "success");
+      showToast(t("expelledToast"), "success");
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      showToast(e.response?.data?.error || "Error expulsando", "error");
+      showToast(e.response?.data?.error || t("errExpel"), "error");
     } finally {
       setBusy(null);
     }
@@ -206,7 +204,7 @@ export default function OrganizerPanel({
     return (
       <div className="rounded-2xl p-6 text-center lp-card flex flex-col items-center gap-2">
         <FootballLoader />
-        <p className="text-text-muted text-sm">Cargando panel del organizador…</p>
+        <p className="text-text-muted text-sm">{t("loadingPanel")}</p>
       </div>
     );
   }
@@ -225,9 +223,9 @@ export default function OrganizerPanel({
     <div className="space-y-4">
       {/* Section A.1 — Invite link */}
       <section className="rounded-2xl p-5 lp-card space-y-3">
-        <h3 className="text-sm font-bold text-text-primary">Link de invitación</h3>
+        <h3 className="text-sm font-bold text-text-primary">{t("linkSection")}</h3>
         <p className="text-xs text-text-muted">
-          Cualquier persona con este link puede unirse a tu polla.
+          {t("linkHelp")}
         </p>
         <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle text-xs break-all text-text-secondary">
           {inviteUrl}
@@ -237,23 +235,23 @@ export default function OrganizerPanel({
             onClick={copyLink}
             className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-gold text-bg-base font-semibold text-sm hover:brightness-110 transition-all"
           >
-            <Copy className="w-4 h-4" /> Copiar link
+            <Copy className="w-4 h-4" /> {t("copyLink")}
           </button>
           <button
             onClick={rotateLink}
             disabled={busy === "rotate"}
             className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-border-subtle text-text-secondary text-sm hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${busy === "rotate" ? "animate-spin" : ""}`} /> Renovar link
+            <RefreshCw className={`w-4 h-4 ${busy === "rotate" ? "animate-spin" : ""}`} /> {t("renewLink")}
           </button>
         </div>
       </section>
 
       {/* Section A.2 — Invite code (mirror of A.1 for the 6-char join code) */}
       <section className="rounded-2xl p-5 lp-card space-y-3">
-        <h3 className="text-sm font-bold text-text-primary">Código de invitación</h3>
+        <h3 className="text-sm font-bold text-text-primary">{t("codeSection")}</h3>
         <p className="text-xs text-text-muted">
-          Compártelo con tus amigos para que se unan rápido.
+          {t("codeHelp")}
         </p>
         <div className="rounded-xl p-4 bg-bg-elevated border border-border-subtle text-center">
           <p
@@ -269,14 +267,14 @@ export default function OrganizerPanel({
             disabled={!code}
             className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-gold text-bg-base font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-50"
           >
-            <Copy className="w-4 h-4" /> Copiar código
+            <Copy className="w-4 h-4" /> {t("copyCode")}
           </button>
           <button
             onClick={rotateCode}
             disabled={busy === "rotate-code"}
             className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-border-subtle text-text-secondary text-sm hover:border-gold/40 hover:text-gold transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${busy === "rotate-code" ? "animate-spin" : ""}`} /> Generar nuevo código de invitación
+            <RefreshCw className={`w-4 h-4 ${busy === "rotate-code" ? "animate-spin" : ""}`} /> {t("renewCode")}
           </button>
         </div>
       </section>
@@ -284,12 +282,12 @@ export default function OrganizerPanel({
       {/* Section B — Participants */}
       <section className="rounded-2xl p-5 lp-card space-y-3">
         <h3 className="text-sm font-bold text-text-primary">
-          Participantes <span className="text-text-muted font-normal">· {participants.length}</span>
+          {t("participantsSection")} <span className="text-text-muted font-normal">· {participants.length}</span>
         </h3>
         {participants.length === 0 ? (
           <EmptyState
-            title="Aún no hay participantes"
-            subtitle="Comparte tu link de invitación arriba para que se unan."
+            title={t("noParticipantsTitle")}
+            subtitle={t("noParticipantsBody")}
             size={80}
           />
         ) : (
@@ -297,9 +295,9 @@ export default function OrganizerPanel({
             {[...participants]
               .sort((a, b) => (a.status === b.status ? 0 : a.status === "approved" ? -1 : 1))
               .map((p) => {
-                const name = p.users?.display_name?.trim() || p.users?.whatsapp_number || "Participante";
+                const name = p.users?.display_name?.trim() || p.users?.whatsapp_number || t("participantFallback");
                 const sub = p.users?.display_name ? p.users?.whatsapp_number : null;
-                const joined = p.joined_at ? new Date(p.joined_at).toLocaleDateString("es-CO") : null;
+                const joined = p.joined_at ? new Date(p.joined_at).toLocaleDateString(intlTag) : null;
                 const isExpelled = p.status === "rejected";
                 return (
                   <li
@@ -309,11 +307,11 @@ export default function OrganizerPanel({
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-text-primary truncate">
                         {name}
-                        {p.role === "admin" && <span className="text-[10px] text-gold ml-1">· admin</span>}
-                        {isExpelled && <span className="text-[10px] text-red-alert ml-1">· expulsado</span>}
+                        {p.role === "admin" && <span className="text-[10px] text-gold ml-1">{t("tagAdmin")}</span>}
+                        {isExpelled && <span className="text-[10px] text-red-alert ml-1">{t("tagExpelled")}</span>}
                       </p>
                       <p className="text-[11px] text-text-muted truncate">
-                        {sub ? `${sub} · ` : ""}{joined ? `desde ${joined}` : ""}
+                        {sub ? `${sub} · ` : ""}{joined ? t("joinedAt", { date: joined }) : ""}
                       </p>
                     </div>
                     <div className="flex-shrink-0 flex items-center gap-2">
@@ -328,7 +326,7 @@ export default function OrganizerPanel({
                             style={p.paid ? { boxShadow: "0 0 5px rgba(0,230,118,0.6)" } : undefined}
                           />
                           <span className={`text-[11px] font-medium ${p.paid ? "text-green-live" : "text-text-muted"}`}>
-                            {p.paid ? "Pagado" : "Pendiente"}
+                            {p.paid ? t("paid") : t("pending")}
                           </span>
                         </>
                       )}
@@ -338,14 +336,14 @@ export default function OrganizerPanel({
                           disabled={busy === `pay:${p.id}`}
                           className="text-[11px] px-2 py-1 rounded-lg border border-border-subtle hover:border-gold/40 text-text-secondary hover:text-gold disabled:opacity-50"
                         >
-                          {busy === `pay:${p.id}` ? "…" : p.paid ? "Desmarcar" : "Marcar"}
+                          {busy === `pay:${p.id}` ? "…" : p.paid ? t("unmark") : t("mark")}
                         </button>
                       )}
                       {p.role !== "admin" && !isExpelled && (
                         <button
                           onClick={() => expel(p)}
                           disabled={busy === `expel:${p.id}`}
-                          title="Expulsar"
+                          title={t("expelTitle")}
                           className="text-[11px] px-2 py-1 rounded-lg border border-border-subtle hover:border-red-alert/40 text-text-muted hover:text-red-alert disabled:opacity-50"
                         >
                           <UserMinus className="w-3.5 h-3.5" />
@@ -361,25 +359,25 @@ export default function OrganizerPanel({
 
       {/* Section C — Polla status */}
       <section className="rounded-2xl p-5 lp-card space-y-3">
-        <h3 className="text-sm font-bold text-text-primary">Estado de la polla</h3>
+        <h3 className="text-sm font-bold text-text-primary">{t("statusSection")}</h3>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-xl p-3 bg-bg-elevated">
-            <p className="text-[10px] text-text-muted uppercase">Estado</p>
+            <p className="text-[10px] text-text-muted uppercase">{t("statusLabel")}</p>
             <p className="font-medium text-text-primary">
-              {pollaStatus === "ended" ? "Finalizada" : pollaName ? "Activa" : pollaStatus}
+              {pollaStatus === "ended" ? t("statusEnded") : pollaName ? t("statusActive") : pollaStatus}
             </p>
           </div>
           <div className="rounded-xl p-3 bg-bg-elevated">
-            <p className="text-[10px] text-text-muted uppercase">Pronósticos</p>
+            <p className="text-[10px] text-text-muted uppercase">{t("predictionsLabel")}</p>
             <p className="font-medium text-text-primary">
-              {predictionsCount} de {approved.length} {matchIds.length ? "han participado" : ""}
+              {t("predictionsValue", { count: predictionsCount, total: approved.length })} {matchIds.length ? t("haveParticipated") : ""}
             </p>
           </div>
           <div className="rounded-xl p-3 bg-bg-elevated col-span-2">
-            <p className="text-[10px] text-text-muted uppercase">Pozo</p>
+            <p className="text-[10px] text-text-muted uppercase">{t("potLabel")}</p>
             <p className="font-medium text-text-primary">
-              <span className="text-gold font-semibold">{fmtCOP(total)}</span> total{" "}
-              <span className="text-text-muted">({fmtCOP(buyInAmount)} por persona)</span>
+              <span className="text-gold font-semibold">{t("potTotal", { amount: fmtCOP(total) })}</span>{" "}
+              <span className="text-text-muted">{t("potPerPerson", { amount: fmtCOP(buyInAmount) })}</span>
             </p>
           </div>
         </div>
@@ -390,11 +388,10 @@ export default function OrganizerPanel({
           notifications e invites. */}
       <section className="rounded-2xl p-5 border border-red-alert/30 bg-red-alert/5 space-y-3">
         <h3 className="text-sm font-bold text-red-alert flex items-center gap-2">
-          <Trash2 className="w-4 h-4" /> Zona peligrosa
+          <Trash2 className="w-4 h-4" /> {t("dangerZone")}
         </h3>
         <p className="text-xs text-text-muted">
-          Borrar la polla elimina permanentemente todos los participantes,
-          pronósticos y resultados. No se puede deshacer.
+          {t("deleteWarning")}
         </p>
         <button
           onClick={deletePolla}
@@ -402,7 +399,7 @@ export default function OrganizerPanel({
           className="w-full inline-flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-red-alert text-white font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer"
         >
           <Trash2 className={`w-4 h-4 ${busy === "delete" ? "animate-pulse" : ""}`} />
-          {busy === "delete" ? "Borrando..." : "Borrar polla"}
+          {busy === "delete" ? t("deleting") : t("deletePolla")}
         </button>
       </section>
     </div>

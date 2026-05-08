@@ -1,18 +1,17 @@
 // app/(app)/unirse/[slug]/layout.tsx — OG meta tags para links de invitacion
 import { Metadata } from "next";
+import { getLocale, getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-const TRN: Record<string, string> = {
-  worldcup_2026: "Mundial 2026",
-  champions_2025: "Champions League",
-  liga_betplay_2025: "Liga BetPlay",
-};
+import { getTournamentName } from "@/lib/tournaments";
 
 export async function generateMetadata({
   params,
 }: {
   params: { slug: string };
 }): Promise<Metadata> {
+  const t = await getTranslations("Invites");
+  const locale = await getLocale();
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
   try {
     const supabase = createAdminClient();
     const { data: polla } = await supabase
@@ -21,7 +20,7 @@ export async function generateMetadata({
       .eq("slug", params.slug)
       .single();
 
-    if (!polla) return { title: "Unite a La Polla" };
+    if (!polla) return { title: t("ogFallback") };
 
     const { count } = await supabase
       .from("polla_participants")
@@ -29,9 +28,13 @@ export async function generateMetadata({
       .eq("polla_id", polla.id)
       .eq("status", "approved");
 
-    const trnLabel = TRN[polla.tournament] || polla.tournament;
-    const title = `Unite a ${polla.name} en La Polla`;
-    const description = `Torneo: ${trnLabel} | Valor: $${polla.buy_in_amount.toLocaleString("es-CO")} | ${count || 0} jugadores`;
+    const trnLabel = getTournamentName(polla.tournament) ?? polla.tournament;
+    const title = t("ogTitle", { name: polla.name });
+    const description = t("ogDescription", {
+      tournament: trnLabel,
+      amount: `$${polla.buy_in_amount.toLocaleString(intlTag)}`,
+      count: count ?? 0,
+    });
 
     return {
       title,
@@ -40,7 +43,7 @@ export async function generateMetadata({
         title,
         description,
         type: "website",
-        siteName: "La Polla",
+        siteName: t("ogSiteName"),
       },
       twitter: {
         card: "summary",
@@ -49,7 +52,7 @@ export async function generateMetadata({
       },
     };
   } catch {
-    return { title: "Unite a La Polla" };
+    return { title: t("ogFallback") };
   }
 }
 

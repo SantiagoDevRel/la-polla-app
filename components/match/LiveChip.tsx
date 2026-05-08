@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 
@@ -29,7 +30,12 @@ export interface LiveChipProps {
   predictionStatus?: "correct" | "wrong" | "pending";
 }
 
-function formatUpcoming(date: Date): string {
+function formatUpcoming(
+  date: Date,
+  locale: string,
+  todayLabel: string,
+  tomorrowLabel: string,
+): string {
   const now = new Date();
   const sameDay =
     date.getFullYear() === now.getFullYear() &&
@@ -42,14 +48,15 @@ function formatUpcoming(date: Date): string {
     date.getMonth() === tomorrow.getMonth() &&
     date.getDate() === tomorrow.getDate();
 
-  const time = new Intl.DateTimeFormat("es-CO", {
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  const time = new Intl.DateTimeFormat(intlTag, {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
 
-  if (sameDay) return `HOY · ${time}`;
-  if (sameTomorrow) return `MAÑANA · ${time}`;
-  const weekday = new Intl.DateTimeFormat("es-CO", { weekday: "short" })
+  if (sameDay) return `${todayLabel} · ${time}`;
+  if (sameTomorrow) return `${tomorrowLabel} · ${time}`;
+  const weekday = new Intl.DateTimeFormat(intlTag, { weekday: "short" })
     .format(date)
     .replace(".", "")
     .toUpperCase();
@@ -116,6 +123,8 @@ export function LiveChip(props: LiveChipProps) {
     predictionStatus,
   } = props;
 
+  const t = useTranslations("Match");
+  const locale = useLocale();
   const isLive = kind === "live";
 
   function renderTeam(
@@ -147,12 +156,12 @@ export function LiveChip(props: LiveChipProps) {
               <span className="absolute inset-0 rounded-full bg-red-alert" />
             </span>
             <span className="font-display text-[11px] tracking-[0.06em] uppercase text-red-alert">
-              Vivo{minuteLabel ? ` · ${minuteLabel}` : ""}
+              {t("live")}{minuteLabel ? ` · ${minuteLabel}` : ""}
             </span>
           </>
         ) : (
           <span className="font-display text-[11px] tracking-[0.06em] uppercase text-text-muted">
-            {kickoffAt ? formatUpcoming(kickoffAt) : "PRÓXIMO"}
+            {kickoffAt ? formatUpcoming(kickoffAt, locale, t("today"), t("tomorrow")) : t("upcoming")}
           </span>
         )}
       </div>
@@ -197,10 +206,10 @@ export function LiveChip(props: LiveChipProps) {
             )}
           >
             {myPrediction
-              ? `Pronóstico: ${myPrediction.home}-${myPrediction.away}${
-                  predictionStatus === "correct" ? " · vas bien" : ""
-                }`
-              : "Falta pronóstico"}
+              ? predictionStatus === "correct"
+                ? t("predictionLabelOnTrack", { home: myPrediction.home, away: myPrediction.away })
+                : t("predictionLabel", { home: myPrediction.home, away: myPrediction.away })
+              : t("predictionMissing")}
           </span>
         </div>
       ) : null}

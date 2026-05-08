@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   PodiumLeaderboard,
   type PodiumEntry,
@@ -37,6 +38,7 @@ export function PodiumCarousel({
   currentUserId,
   defaultIndex = 0,
 }: PodiumCarouselProps) {
+  const t = useTranslations("Podium");
   const scrollerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Array<HTMLElement | null>>([]);
   const [activeIndex, setActiveIndex] = useState(
@@ -104,7 +106,7 @@ export function PodiumCarousel({
                     href={`/pollas/${item.pollaSlug}`}
                     className="inline-flex items-center gap-2 rounded-full bg-gold text-bg-base font-display tracking-[0.06em] uppercase text-[14px] h-9 px-4 shadow-[0_8px_24px_-6px_rgba(255,215,0,0.4)] hover:-translate-y-px transition-transform"
                   >
-                    Ver polla
+                    {t("viewPolla")}
                     <ArrowRight
                       className="w-4 h-4"
                       strokeWidth={2.5}
@@ -119,14 +121,14 @@ export function PodiumCarousel({
       </div>
 
       {items.length > 1 ? (
-        <div className="mt-3 flex items-center justify-center gap-1.5" role="tablist" aria-label="Paginación del podio">
+        <div className="mt-3 flex items-center justify-center gap-1.5" role="tablist" aria-label={t("ariaPagination")}>
           {items.map((item, i) => (
             <button
               key={item.pollaSlug}
               type="button"
               role="tab"
               aria-selected={i === activeIndex}
-              aria-label={`Ir al podio de ${item.pollaName}`}
+              aria-label={t("ariaGoTo", { pollaName: item.pollaName })}
               onClick={() => {
                 const target = pageRefs.current[i];
                 if (target && scrollerRef.current) {

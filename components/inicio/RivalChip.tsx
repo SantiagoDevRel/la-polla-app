@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { getPollitoBase, DEFAULT_POLLITO } from "@/lib/pollitos";
 
 export interface RivalChipProps {
@@ -43,19 +44,20 @@ export function RivalChip({
   rivalPoints,
   mode,
 }: RivalChipProps) {
+  const t = useTranslations("Rival");
   const gap = Math.abs(userPoints - rivalPoints);
   const fill = pct(userPoints, rivalPoints, mode);
   const headline =
     mode === "chasing"
-      ? `${rivalName.toUpperCase()} te está pisando los talones`
-      : `Alcanzá a ${rivalName.toUpperCase()}`;
+      ? t("chasing", { name: rivalName.toUpperCase() })
+      : t("behind", { name: rivalName.toUpperCase() });
 
   return (
     <section className="px-4 pb-6">
       <Link
         href={pollaHref}
         className="lp-card max-w-lg mx-auto flex items-center gap-3 p-3 hover:border-gold/30 transition-colors"
-        aria-label={`Rival en ${pollaName}: ${rivalName}`}
+        aria-label={t("ariaLabel", { pollaName, name: rivalName })}
       >
         <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-bg-elevated">
           <Image
@@ -78,7 +80,7 @@ export function RivalChip({
           </div>
           <div className="flex justify-between font-body text-[10px] mt-1">
             <span className={mode === "chasing" ? "text-gold font-bold" : "text-text-secondary font-semibold"}>
-              Vos {userPoints} pts
+              {t("youPoints", { points: userPoints })}
             </span>
             <span className={mode === "behind" ? "text-turf font-bold" : "text-text-secondary font-semibold"}>
               {rivalName} {rivalPoints} pts

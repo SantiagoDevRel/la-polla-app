@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 interface MatchPredictionCardProps {
   matchId: number;
@@ -18,6 +19,7 @@ export default function MatchPredictionCard({
   date,
   onPredict,
 }: MatchPredictionCardProps) {
+  const t = useTranslations("MatchPrediction");
   const [homeScore, setHomeScore] = useState(0);
   const [awayScore, setAwayScore] = useState(0);
 
@@ -59,7 +61,7 @@ export default function MatchPredictionCard({
         onClick={handleSave}
         className="w-full mt-3 bg-gold text-bg-base py-2.5 rounded-lg text-sm font-bold hover:brightness-110 transition-all"
       >
-        Guardar pronóstico
+        {t("savePrediction")}
       </button>
     </div>
   );

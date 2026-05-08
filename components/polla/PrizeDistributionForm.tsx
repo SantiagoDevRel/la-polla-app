@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 
 export type PrizeMode = "percentage" | "cop";
 
@@ -28,16 +29,6 @@ interface Props {
   onChange?: (value: PrizeDistribution | null) => void;
   /** Cuando true, los warnings se muestran como "info" en vez de error (modo opcional). */
   optional?: boolean;
-}
-
-const ORDINAL_ES = ["1°", "2°", "3°", "4°", "5°", "6°", "7°", "8°", "9°", "10°"];
-function ordinal(p: number): string {
-  return ORDINAL_ES[p - 1] ?? `${p}°`;
-}
-
-function fmtCOP(n: number): string {
-  if (!Number.isFinite(n)) return "—";
-  return `$${Math.round(n).toLocaleString("es-CO")}`;
 }
 
 function buildInitialRows(initial: PrizeDistribution | null): { mode: PrizeMode; rows: PrizeRow[] } {
@@ -71,6 +62,14 @@ function placeholderFor(mode: PrizeMode, position: number): string {
 }
 
 export default function PrizeDistributionForm({ pot, initial, onChange, optional = false }: Props) {
+  const t = useTranslations("Prizes");
+  const locale = useLocale();
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  const ordinal = (p: number): string => t("ordSuffix", { n: p });
+  const fmtCOP = (n: number): string => {
+    if (!Number.isFinite(n)) return "—";
+    return `$${Math.round(n).toLocaleString(intlTag)}`;
+  };
   const init = buildInitialRows(initial);
   const [mode, setMode] = useState<PrizeMode>(init.mode);
   const [rows, setRows] = useState<PrizeRow[]>(init.rows);
@@ -180,7 +179,7 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
               : "bg-bg-elevated text-text-secondary border border-border-subtle hover:border-gold/30"
           }`}
         >
-          Porcentaje (%)
+          {t("modePercent")}
         </button>
         <button
           type="button"
@@ -191,7 +190,7 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
               : "bg-bg-elevated text-text-secondary border border-border-subtle hover:border-gold/30"
           }`}
         >
-          Monto fijo (COP)
+          {t("modeCOP")}
         </button>
       </div>
 
@@ -234,7 +233,7 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
                   type="button"
                   onClick={() => removeRow(idx)}
                   className="text-text-muted hover:text-red-alert transition-colors p-1"
-                  title="Quitar puesto"
+                  title={t("removeRow")}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -249,7 +248,7 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
         onClick={addRow}
         className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-dashed border-border-subtle text-text-secondary hover:border-gold/40 hover:text-gold transition-colors text-sm"
       >
-        <Plus className="w-4 h-4" /> Crear otro ganador
+        <Plus className="w-4 h-4" /> {t("addRow")}
       </button>
 
       <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle text-xs space-y-1">
@@ -258,14 +257,14 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
             <p
               className={`flex justify-between ${pctOff ? (pctOver ? "text-red-alert" : "text-amber") : "text-text-secondary"}`}
             >
-              <span>Suma total</span>
+              <span>{t("sumLabel")}</span>
               <span className="font-semibold">{percentSum.toFixed(2)}%</span>
             </p>
             {pctOff && (
               <p className={`text-[11px] ${pctOver ? "text-red-alert" : "text-amber"}`}>
                 {pctOver
-                  ? `Te pasaste por ${(percentSum - 100).toFixed(2)}%. La suma debe ser exactamente 100%.`
-                  : `Faltan ${(100 - percentSum).toFixed(2)}% para llegar a 100%.`}
+                  ? t("errPctOver", { pct: (percentSum - 100).toFixed(2) })
+                  : t("errPctUnder", { pct: (100 - percentSum).toFixed(2) })}
               </p>
             )}
           </>
@@ -274,20 +273,20 @@ export default function PrizeDistributionForm({ pot, initial, onChange, optional
             <p
               className={`flex justify-between ${copOff ? (copOver ? "text-red-alert" : "text-amber") : "text-text-secondary"}`}
             >
-              <span>Total a repartir</span>
+              <span>{t("totalToDistribute")}</span>
               <span className="font-semibold">{fmtCOP(total)}</span>
             </p>
             {pot > 0 && (
               <p className="flex justify-between text-text-muted">
-                <span>Pozo {optional ? "estimado" : "disponible"}</span>
+                <span>{optional ? t("potEstimated") : t("potAvailable")}</span>
                 <span>{fmtCOP(pot)}</span>
               </p>
             )}
             {copOff && !optional && (
               <p className={`text-[11px] ${copOver ? "text-red-alert" : "text-amber"}`}>
                 {copOver
-                  ? `Te pasaste por ${fmtCOP(total - pot)}. El total debe igualar el pozo (${fmtCOP(pot)}).`
-                  : `Faltan ${fmtCOP(pot - total)} para igualar el pozo.`}
+                  ? t("errCOPOver", { over: fmtCOP(total - pot), pot: fmtCOP(pot) })
+                  : t("errCOPUnder", { under: fmtCOP(pot - total) })}
               </p>
             )}
           </>

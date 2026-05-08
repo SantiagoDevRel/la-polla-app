@@ -14,8 +14,9 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 
 const SEEN_KEY = "lp_welcome_seen_v1";
@@ -25,36 +26,15 @@ const CHAR_FADE_MS = 160; // each char's fade-in; multiple chars overlap mid-fad
 // "physics". Acts close to easeOutExpo — soft landing, no overshoot.
 const SMOOTH: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-// Two long lines, hardcoded \n between them. Each line is ~44 chars
-// and fits comfortably in the 360px container on every modern phone
-// (iPhone 12+, all Android). On the rare iPhone SE-class device the
-// browser wraps a line in two, which still reads cleanly because
-// per-char spans keep every char at its final coordinate — the
-// reveal is identical regardless of how many visual lines the wrap
-// produces.
-const INTRO =
-  "La Polla Colombiana es para que juegues con\ntus amigos los principales torneos del mundo";
-// Pre-split once at module load so every render reuses the same
-// character array (and React keys stay stable across re-renders).
-const INTRO_CHARS = INTRO.split("");
-
 // Order curated for visual recognition: World Cup first (most universal),
 // then the three biggest club competitions. Premier removed — its white
 // background renders inconsistently inside Capacitor WebView (Android),
 // breaking the row alignment vs the dark-on-dark logos of the others.
-const TOURNAMENT_ORDER: Array<{ slug: keyof typeof TOURNAMENT_ICONS; name: string }> = [
-  { slug: "worldcup_2026", name: "Mundial" },
-  { slug: "champions_2025", name: "Champions" },
-  { slug: "laliga_2025", name: "La Liga" },
-  { slug: "seriea_2025", name: "Serie A" },
-];
-
-const STEPS = [
-  "Creas una polla",
-  "Invitas a tus amigos",
-  "Defines la distribución de premios",
-  "Marcas quién ha pagado y quién no",
-  "Y a pronosticar",
+const TOURNAMENT_ORDER: Array<{ slug: keyof typeof TOURNAMENT_ICONS; nameKey: "tournamentMundial" | "tournamentChampions" | "tournamentLaLiga" | "tournamentSerieA" }> = [
+  { slug: "worldcup_2026", nameKey: "tournamentMundial" },
+  { slug: "champions_2025", nameKey: "tournamentChampions" },
+  { slug: "laliga_2025", nameKey: "tournamentLaLiga" },
+  { slug: "seriea_2025", nameKey: "tournamentSerieA" },
 ];
 
 // Stage gates — ms between the previous beat finishing and the next
@@ -69,6 +49,15 @@ const STAGE_DELAYS: Record<Exclude<Stage, "intro">, number> = {
 };
 
 export function WelcomeIntro() {
+  const t = useTranslations("Welcome");
+  const tBrand = useTranslations("Brand");
+  const INTRO = t("introLine");
+  const INTRO_CHARS = useMemo(() => INTRO.split(""), [INTRO]);
+  const STEPS = useMemo(
+    () => [t("step1"), t("step2"), t("step3"), t("step4"), t("step5")],
+    [t],
+  );
+
   const [shouldShow, setShouldShow] = useState(false);
   const [typed, setTyped] = useState("");
   const [stage, setStage] = useState<Stage>("intro");
@@ -94,23 +83,26 @@ export function WelcomeIntro() {
       setStage("ready");
     }
     setShouldShow(true);
+    // INTRO depends on locale — but localStorage check should run only
+    // once on mount; if locale changes mid-session the user has bigger
+    // problems. eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Typewriter cadence for the intro line.
   useEffect(() => {
     if (!shouldShow || stage !== "intro") return;
     if (typed.length >= INTRO.length) {
-      const t = window.setTimeout(
+      const tm = window.setTimeout(
         () => setStage("tournaments"),
         STAGE_DELAYS.tournaments,
       );
-      return () => window.clearTimeout(t);
+      return () => window.clearTimeout(tm);
     }
-    const t = window.setTimeout(() => {
+    const tm = window.setTimeout(() => {
       setTyped(INTRO.slice(0, typed.length + 1));
     }, TYPE_MS);
-    return () => window.clearTimeout(t);
-  }, [typed, shouldShow, stage]);
+    return () => window.clearTimeout(tm);
+  }, [typed, shouldShow, stage, INTRO]);
 
   // Stage progression past the typewriter.
   useEffect(() => {
@@ -226,7 +218,7 @@ export function WelcomeIntro() {
               onClick={fastForward}
               className="absolute top-4 right-4 z-10 text-[11px] uppercase tracking-wider text-text-secondary hover:text-gold transition-colors px-3 py-1.5 rounded-full border border-border-subtle bg-bg-card/50 backdrop-blur-sm"
             >
-              Saltar
+              {t("skip")}
             </button>
           )}
 
@@ -258,9 +250,18 @@ export function WelcomeIntro() {
                   textShadow: "0 2px 6px rgba(0,0,0,0.55)",
                 }}
               >
-                <span style={{ color: "#FFD700" }}>LA</span>
-                <span style={{ color: "#2F6DF4" }}>POLLA</span>
-                <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
+                {tBrand("wordmarkPart3") ? (
+                  <>
+                    <span style={{ color: "#FFD700" }}>{tBrand("wordmarkPart1")}</span>
+                    <span style={{ color: "#2F6DF4" }}>{tBrand("wordmarkPart2")}</span>
+                    <span style={{ color: "#E4463A" }}>{tBrand("wordmarkPart3")}</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ color: "#FFD700" }}>{tBrand("wordmarkPart1")}</span>
+                    <span style={{ color: "#FFD700" }}>{tBrand("wordmarkPart2")}</span>
+                  </>
+                )}
               </span>
             </div>
 
@@ -309,9 +310,9 @@ export function WelcomeIntro() {
             {/* Tournament logos — slot reserved (min-h) from the start so
                 the rest of the column doesn't move when the row reveals. */}
             <div className="mt-6 w-full flex flex-wrap items-center justify-center gap-x-5 gap-y-3 min-h-[68px]">
-              {TOURNAMENT_ORDER.map((t, i) => (
+              {TOURNAMENT_ORDER.map((tournament, i) => (
                 <motion.div
-                  key={t.slug}
+                  key={tournament.slug}
                   initial={{
                     opacity: 0,
                     scale: 0.92,
@@ -331,14 +332,14 @@ export function WelcomeIntro() {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={TOURNAMENT_ICONS[t.slug]}
-                    alt={t.name}
+                    src={TOURNAMENT_ICONS[tournament.slug]}
+                    alt={t(tournament.nameKey)}
                     width={36}
                     height={36}
                     className="object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
                   />
                   <span className="text-[10px] uppercase tracking-wider text-text-secondary">
-                    {t.name}
+                    {t(tournament.nameKey)}
                   </span>
                 </motion.div>
               ))}
@@ -385,7 +386,7 @@ export function WelcomeIntro() {
               className="mt-8 text-text-primary text-[16px] font-semibold text-center"
               style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
             >
-              Todo esto es{" "}
+              {t("taglineBefore")}{" "}
               <motion.span
                 initial={{ scale: 0.7, opacity: 0 }}
                 animate={
@@ -401,7 +402,7 @@ export function WelcomeIntro() {
                 className="inline-block font-display text-gold text-[26px] tracking-wide align-[-0.05em]"
                 style={{ textShadow: "0 2px 8px rgba(255,215,0,0.35)" }}
               >
-                GRATIS
+                {t("taglineAccent")}
               </motion.span>
               .
             </motion.p>
@@ -421,7 +422,7 @@ export function WelcomeIntro() {
                 onClick={dismiss}
                 className="bg-gold text-bg-base font-bold px-10 py-3 rounded-full text-base hover:brightness-110 transition-all"
               >
-                Empezar
+                {t("start")}
               </button>
               <a
                 href="https://instagram.com/santiagotrujilloz"
@@ -429,7 +430,7 @@ export function WelcomeIntro() {
                 rel="noopener noreferrer"
                 className="text-[11px] text-text-muted hover:text-gold transition-colors inline-flex items-center gap-1.5"
               >
-                <span>hecho por santiago</span>
+                <span>{t("madeBy")}</span>
                 <span className="text-gold/80 underline underline-offset-2">
                   @santiagotrujilloz
                 </span>

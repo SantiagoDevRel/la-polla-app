@@ -14,6 +14,7 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { getPollitoByPosition, DEFAULT_POLLITO } from "@/lib/pollitos";
 
 export interface GreetingHeroProps {
@@ -45,6 +46,7 @@ export function GreetingHero({
   pollitoType,
   rankCallout,
 }: GreetingHeroProps) {
+  const t = useTranslations("Inicio");
   // Moods: lider for #1, peleando (fighting) for 2-3, base otherwise.
   const type = pollitoType || DEFAULT_POLLITO;
   const mood =
@@ -76,7 +78,7 @@ export function GreetingHero({
 
         <div className="flex-1 min-w-0 pt-1">
           <p className="font-body text-[11px] font-semibold text-text-muted leading-none">
-            Hola,
+            {t("greeting")}
           </p>
           <h1 className="font-display text-[32px] leading-none tracking-[0.02em] text-gold mt-1 mb-2">
             {firstName}
@@ -89,15 +91,17 @@ export function GreetingHero({
             >
               <TrophyGlyph className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="truncate">
-                Vas{" "}
-                <span className="font-extrabold">#{rankCallout.rank}</span>
-                {" en "}
-                <span className="font-bold">{rankCallout.pollaName}</span>
+                {t.rich("rankCallout", {
+                  rank: rankCallout.rank,
+                  pollaName: rankCallout.pollaName,
+                  rankBold: (chunks) => <span className="font-extrabold">{chunks}</span>,
+                  nameBold: (chunks) => <span className="font-bold">{chunks}</span>,
+                })}
               </span>
             </div>
           ) : (
             <p className="font-body text-[13px] text-text-secondary leading-tight">
-              ¿Listo pa&apos; pronosticar?
+              {t("predictPrompt")}
             </p>
           )}
         </div>

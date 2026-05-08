@@ -12,6 +12,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import axios from "axios";
 import { ChevronDown, CreditCard, Info, Target } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import FootballLoader from "@/components/ui/FootballLoader";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -55,14 +56,15 @@ interface MatchRow {
 
 type GroupMode = "phase" | "date";
 
-function formatMatchDate(iso: string): string {
+function formatMatchDate(iso: string, locale: string): string {
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
   const d = new Date(iso);
-  const date = d.toLocaleDateString("es-CO", {
+  const date = d.toLocaleDateString(intlTag, {
     weekday: "short",
     day: "numeric",
     month: "short",
   });
-  const time = d.toLocaleTimeString("es-CO", {
+  const time = d.toLocaleTimeString(intlTag, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -70,7 +72,7 @@ function formatMatchDate(iso: string): string {
   return `${date}, ${time}`;
 }
 
-function MatchRowView({ m }: { m: MatchRow }) {
+function MatchRowView({ m, locale, vsLabel }: { m: MatchRow; locale: string; vsLabel: string }) {
   return (
     <li className="rounded-lg p-3 bg-bg-elevated border border-border-subtle">
       <div className="flex items-center gap-2 text-sm text-text-primary min-w-0">
@@ -88,7 +90,7 @@ function MatchRowView({ m }: { m: MatchRow }) {
           />
         ) : null}
         <span className="truncate flex-1 min-w-0">{m.home_team}</span>
-        <span className="text-text-muted text-xs shrink-0">vs</span>
+        <span className="text-text-muted text-xs shrink-0">{vsLabel}</span>
         {m.away_team_flag ? (
           <Image
             src={m.away_team_flag}
@@ -105,13 +107,16 @@ function MatchRowView({ m }: { m: MatchRow }) {
         <span className="truncate flex-1 min-w-0">{m.away_team}</span>
       </div>
       <p className="text-[11px] text-text-muted mt-1">
-        {formatMatchDate(m.scheduled_at)}
+        {formatMatchDate(m.scheduled_at, locale)}
       </p>
     </li>
   );
 }
 
 export default function OpenInvitePage() {
+  const t = useTranslations("Invites");
+  const tCrear = useTranslations("Crear");
+  const locale = useLocale();
   const params = useParams();
   const router = useRouter();
   const { showToast } = useToast();
@@ -157,7 +162,7 @@ export default function OpenInvitePage() {
           }>(`/api/pollas/preview?token=${encodeURIComponent(token)}`);
           previewData = data;
         } catch {
-          setError("Link inválido o expirado. Pídele al organizador que te comparta el link actualizado.");
+          setError(t("errLink"));
           return;
         }
         const row = previewData.polla;
@@ -197,13 +202,13 @@ export default function OpenInvitePage() {
         setParticipantCount(previewData.participantCount);
         setMatches(matchesRes.data ?? []);
       } catch {
-        setError("Error cargando la invitación");
+        setError(t("errLoad"));
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [token, router]);
+  }, [token, router, t]);
 
   const groups = useMemo(() => {
     if (groupMode === "date") return groupMatchesByDate(matches);
@@ -242,15 +247,13 @@ export default function OpenInvitePage() {
         `/api/pollas/${polla.slug}/join`,
         { invite_token: token }
       );
-      showToast("¡Te uniste!", "success");
+      showToast(t("joinedToast"), "success");
       router.push(`/pollas/${polla.slug}`);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      const msg = e.response?.data?.error || "Error al unirse";
+      const msg = e.response?.data?.error || t("errJoinGeneric");
       showToast(
-        msg === "invite_required"
-          ? "Esta polla es privada. Necesitas un link de invitación válido del organizador."
-          : msg,
+        msg === "invite_required" ? t("errPrivatePolla") : msg,
         "error",
       );
     } finally {
@@ -271,12 +274,12 @@ export default function OpenInvitePage() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="rounded-2xl p-6 text-center max-w-sm w-full lp-card">
           <Info className="w-10 h-10 text-text-muted mx-auto mb-3" />
-          <p className="text-text-primary font-medium mb-4">{error || "Link inválido"}</p>
+          <p className="text-text-primary font-medium mb-4">{error || t("errLinkInvalid")}</p>
           <button
             onClick={() => router.push("/inicio")}
             className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold"
           >
-            Ir al inicio
+            {t("goHome")}
           </button>
         </div>
       </div>
@@ -290,16 +293,16 @@ export default function OpenInvitePage() {
         <div className="rounded-2xl p-6 text-center max-w-sm w-full lp-card">
           <Target className="w-10 h-10 text-gold mx-auto mb-3" />
           <h1 className="text-xl font-bold text-text-primary mb-1">
-            Ya estás en esta polla
+            {t("alreadyJoinedTitle")}
           </h1>
           <p className="text-text-secondary text-sm mb-4">
-            Ya te uniste a {polla.name} antes, parce.
+            {t("alreadyJoinedBody", { name: polla.name })}
           </p>
           <button
             onClick={() => router.push(`/pollas/${polla.slug}`)}
             className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all"
           >
-            Ir a la polla
+            {t("goToPolla")}
           </button>
         </div>
       </div>
@@ -327,7 +330,7 @@ export default function OpenInvitePage() {
           </div>
           {organizer ? (
             <div className="mt-2 flex items-center justify-center gap-2 text-text-secondary text-sm">
-              <span>Creada por</span>
+              <span>{t("createdBy")}</span>
               <UserAvatar
                 avatarUrl={organizer.avatar_url}
                 displayName={organizer.display_name}
@@ -345,20 +348,20 @@ export default function OpenInvitePage() {
           <div className={`grid ${polla.buy_in_amount > 0 ? "grid-cols-3" : "grid-cols-2"} gap-3 text-center`}>
             <div className="rounded-xl p-3 bg-bg-elevated">
               <p className="score-font text-2xl text-gold">{participantCount}</p>
-              <p className="text-[11px] text-text-muted">Participantes</p>
+              <p className="text-[11px] text-text-muted">{t("statParticipants")}</p>
             </div>
             <div className="rounded-xl p-3 bg-bg-elevated">
               <p className="score-font text-2xl text-gold">
-                {polla.buy_in_amount > 0 ? formatCOP(polla.buy_in_amount) : "Gratis"}
+                {polla.buy_in_amount > 0 ? formatCOP(polla.buy_in_amount) : t("free")}
               </p>
               <p className="text-[11px] text-text-muted">
-                {polla.buy_in_amount > 0 ? "Buy-in" : "Sin costo"}
+                {polla.buy_in_amount > 0 ? t("buyIn") : t("noCost")}
               </p>
             </div>
             {polla.buy_in_amount > 0 ? (
               <div className="rounded-xl p-3 bg-bg-elevated">
                 <p className="score-font text-2xl text-gold">{formatCOP(potTotal)}</p>
-                <p className="text-[11px] text-text-muted">Pozo</p>
+                <p className="text-[11px] text-text-muted">{t("pot")}</p>
               </div>
             ) : null}
           </div>
@@ -366,7 +369,7 @@ export default function OpenInvitePage() {
             <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
               <div className="flex items-center gap-2 mb-1.5">
                 <CreditCard className="w-4 h-4 text-gold" aria-hidden="true" />
-                <p className="text-sm font-semibold text-text-primary">Cómo pagar</p>
+                <p className="text-sm font-semibold text-text-primary">{t("howToPay")}</p>
               </div>
               <p className="text-xs text-text-secondary whitespace-pre-wrap leading-snug">
                 {polla.admin_payment_instructions}
@@ -379,14 +382,14 @@ export default function OpenInvitePage() {
         <div className="px-5 pt-2 pb-3 flex-1 min-h-0 flex flex-col">
           <div className="flex items-center justify-between mb-2 shrink-0 gap-2">
             <h2 className="text-sm font-semibold text-text-primary">
-              Partidos incluidos ({matches.length})
+              {t("matchesIncluded", { count: matches.length })}
             </h2>
           </div>
           {matches.length > 0 ? (
             <div className="flex gap-1 mb-2 shrink-0">
               {([
-                { val: "phase", label: "Por fase" },
-                { val: "date", label: "Por fecha" },
+                { val: "phase", label: t("byPhase") },
+                { val: "date", label: t("byDate") },
               ] as { val: GroupMode; label: string }[]).map((opt) => {
                 const active = groupMode === opt.val;
                 return (
@@ -408,7 +411,7 @@ export default function OpenInvitePage() {
           ) : null}
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1">
             {matches.length === 0 ? (
-              <p className="text-text-muted text-sm">Todavía no hay partidos asignados.</p>
+              <p className="text-text-muted text-sm">{t("noMatchesYet")}</p>
             ) : (
               <div className="space-y-2">
                 {groups.map((group) => {
@@ -438,7 +441,7 @@ export default function OpenInvitePage() {
                       {open ? (
                         <ul className="space-y-2 px-2 pb-2">
                           {group.matches.map((m) => (
-                            <MatchRowView key={m.id} m={m} />
+                            <MatchRowView key={m.id} m={m} locale={locale} vsLabel={tCrear("vs")} />
                           ))}
                         </ul>
                       ) : null}
@@ -459,8 +462,8 @@ export default function OpenInvitePage() {
         >
           {isEnded ? (
             <div className="rounded-xl p-3 text-center bg-bg-elevated border border-border-subtle">
-              <p className="text-text-primary font-semibold">Esta polla ya cerró.</p>
-              <p className="text-text-secondary text-sm mt-0.5">No puedes unirte.</p>
+              <p className="text-text-primary font-semibold">{t("pollaEnded")}</p>
+              <p className="text-text-secondary text-sm mt-0.5">{t("pollaEndedBody")}</p>
             </div>
           ) : authed === false ? (
             <>
@@ -468,7 +471,7 @@ export default function OpenInvitePage() {
                 onClick={goLogin}
                 className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all text-base"
               >
-                Iniciar sesión y unirse
+                {t("loginAndJoin")}
               </button>
               {polla.join_code ? (
                 <a
@@ -477,7 +480,7 @@ export default function OpenInvitePage() {
                   rel="noopener noreferrer"
                   className="w-full block text-center text-text-muted text-xs pt-3 hover:text-[#25D366] transition-colors"
                 >
-                  ¿Prefieres unirte por WhatsApp?
+                  {t("preferWhatsapp")}
                 </a>
               ) : null}
             </>
@@ -487,14 +490,14 @@ export default function OpenInvitePage() {
               disabled={joining}
               className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 text-base"
             >
-              {joining ? "Uniéndose..." : "Unirme"}
+              {joining ? t("joining") : t("join")}
             </button>
           )}
           <button
             onClick={() => router.push("/inicio")}
             className="w-full text-text-muted text-xs pt-2"
           >
-            Volver al inicio
+            {t("backHome")}
           </button>
         </div>
       </div>

@@ -1,6 +1,8 @@
 // app/layout.tsx — Layout raíz de la aplicación La Polla App con configuración PWA
 import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, Outfit } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import "./globals.css";
 import { SplashScreen } from "@/components/layout/SplashScreen";
 import { CapacitorReady } from "@/components/layout/CapacitorReady";
@@ -23,14 +25,16 @@ const outfit = Outfit({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "La Polla App — Polla Deportiva Colombiana",
-  description:
-    "La mejor polla deportiva de Colombia. Creá tu polla, invitá a tus parceros y ganá prediciendo resultados de fútbol.",
-  manifest: "/manifest.json",
-  // Icons resolved via Next.js file convention: app/icon.png and
-  // app/apple-icon.png. No explicit metadata.icons needed.
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("App");
+  return {
+    title: t("title"),
+    description: t("description"),
+    manifest: "/manifest.json",
+    // Icons resolved via Next.js file convention: app/icon.png and
+    // app/apple-icon.png. No explicit metadata.icons needed.
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#FCD116",
@@ -39,21 +43,26 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="es" className={`${bebas.variable} ${outfit.variable}`}>
+    <html lang={locale} className={`${bebas.variable} ${outfit.variable}`}>
       <body className="antialiased">
-        <CapacitorReady />
-        <CapacitorBackButton />
-        <CapacitorDeepLinks />
-        <CapacitorAppUpdate />
-        <OfflineBanner />
-        <SplashScreen />
-        {children}
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <CapacitorReady />
+          <CapacitorBackButton />
+          <CapacitorDeepLinks />
+          <CapacitorAppUpdate />
+          <OfflineBanner />
+          <SplashScreen />
+          {children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );

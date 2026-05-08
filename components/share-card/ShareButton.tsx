@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Share2, Download, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type SubistePayload = {
   type: "subiste";
@@ -60,17 +61,36 @@ function buildUrl(payload: SharePayload): string {
   return `/api/share-card?${params.toString()}`;
 }
 
-function captionFor(payload: SharePayload): string {
+function captionFor(
+  payload: SharePayload,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
+  const appName = t("appName");
   if (payload.type === "subiste") {
-    return `Subí a #${payload.rank} en ${payload.polla}. — La Polla App`;
+    return t("captionSubiste", { rank: payload.rank, polla: payload.polla, appName });
   }
   if (payload.type === "clavada") {
-    return `Clavada ${payload.homeTeam} ${payload.home}-${payload.away} ${payload.awayTeam} en ${payload.polla}. — La Polla App`;
+    return t("captionClavada", {
+      homeTeam: payload.homeTeam,
+      home: payload.home,
+      away: payload.away,
+      awayTeam: payload.awayTeam,
+      polla: payload.polla,
+      appName,
+    });
   }
-  return `${payload.rival} vs ${payload.name} en ${payload.polla}. — La Polla App`;
+  return t("captionRival", {
+    rival: payload.rival,
+    name: payload.name,
+    polla: payload.polla,
+    appName,
+  });
 }
 
-export function ShareButton({ payload, className, label = "Compartir" }: ShareButtonProps) {
+export function ShareButton({ payload, className, label }: ShareButtonProps) {
+  const t = useTranslations("Share");
+  const tCommon = useTranslations("Common");
+  const effectiveLabel = label ?? t("defaultLabel");
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const blobRef = useRef<Blob | null>(null);
@@ -94,7 +114,7 @@ export function ShareButton({ payload, className, label = "Compartir" }: ShareBu
       const blob = await res.blob();
       blobRef.current = blob;
       const file = new File([blob], `la-polla-${payload.type}.png`, { type: "image/png" });
-      const caption = captionFor(payload);
+      const caption = captionFor(payload, t);
 
       const nav = navigator as Navigator & {
         canShare?: (data: ShareData) => boolean;
@@ -110,7 +130,7 @@ export function ShareButton({ payload, className, label = "Compartir" }: ShareBu
       setPreviewUrl(objectUrl);
     } catch (err) {
       console.warn("[share-card] share failed", err);
-      alert("No se pudo generar la imagen. Inténtalo de nuevo.");
+      alert(t("errImage"));
     } finally {
       setBusy(false);
     }
@@ -143,17 +163,17 @@ export function ShareButton({ payload, className, label = "Compartir" }: ShareBu
           className ??
           "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-body text-[10px] font-semibold tracking-[0.06em] uppercase bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20 transition-colors disabled:opacity-60"
         }
-        aria-label={label}
+        aria-label={effectiveLabel}
       >
         <Share2 className="w-3 h-3" strokeWidth={2.5} aria-hidden="true" />
-        {busy ? "..." : label}
+        {busy ? "..." : effectiveLabel}
       </button>
 
       {previewUrl ? (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Previsualización"
+          aria-label={t("ariaPreview")}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
           onClick={closePreview}
         >
@@ -164,13 +184,13 @@ export function ShareButton({ payload, className, label = "Compartir" }: ShareBu
             <button
               type="button"
               onClick={closePreview}
-              aria-label="Cerrar"
+              aria-label={tCommon("close")}
               className="absolute top-2 right-2 w-8 h-8 rounded-full bg-bg-elevated border border-border-subtle grid place-items-center text-text-muted hover:text-text-primary"
             >
               <X className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
             </button>
             <h3 className="font-display text-[18px] tracking-[0.06em] uppercase text-gold leading-none pt-1 pr-10">
-              Lista para compartir
+              {t("previewTitle")}
             </h3>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -179,8 +199,7 @@ export function ShareButton({ payload, className, label = "Compartir" }: ShareBu
               className="w-full rounded-lg border border-border-subtle"
             />
             <p className="text-[11.5px] text-text-secondary leading-snug">
-              Descargá la imagen y la soltás en el chat de WhatsApp. En celular
-              aparece el selector nativo directo.
+              {t("downloadHint")}
             </p>
             <button
               type="button"
@@ -188,7 +207,7 @@ export function ShareButton({ payload, className, label = "Compartir" }: ShareBu
               className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-full font-body text-[13px] font-extrabold tracking-[0.04em] text-bg-base bg-gradient-to-b from-gold to-amber"
             >
               <Download className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
-              Descargar imagen
+              {t("downloadImage")}
             </button>
           </div>
         </div>

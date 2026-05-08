@@ -17,52 +17,12 @@
 //   - Después de guardar → vuelve a modo VIEW automáticamente.
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CreditCard, Pencil, Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export type PayoutMethod = "nequi" | "bancolombia" | "otro";
 export type PayoutAccountType = "ahorros" | "corriente";
-
-const METHOD_OPTIONS: Array<{
-  id: PayoutMethod;
-  label: string;
-  accountPlaceholder: string;
-  needsName: boolean;
-  needsAccountType: boolean;
-}> = [
-  {
-    id: "nequi",
-    label: "Nequi",
-    accountPlaceholder: "Número de celular (ej: 311 314 7831)",
-    needsName: false,
-    needsAccountType: false,
-  },
-  {
-    id: "bancolombia",
-    label: "Bancolombia",
-    accountPlaceholder: "Número de cuenta",
-    needsName: true,
-    needsAccountType: true,
-  },
-  {
-    id: "otro",
-    label: "Otro",
-    accountPlaceholder: "Banco + tipo + número",
-    needsName: true,
-    needsAccountType: true,
-  },
-];
-
-const METHOD_LABEL: Record<PayoutMethod, string> = {
-  nequi: "Nequi",
-  bancolombia: "Bancolombia",
-  otro: "Otro",
-};
-
-const ACCOUNT_TYPE_LABEL: Record<PayoutAccountType, string> = {
-  ahorros: "Ahorros",
-  corriente: "Corriente",
-};
 
 interface Props {
   initialMethod?: PayoutMethod | null;
@@ -86,6 +46,56 @@ export default function PayoutDefaultEditor({
   onSave,
   onClear,
 }: Props) {
+  const t = useTranslations("Payout");
+  const tCommon = useTranslations("Common");
+  const METHOD_OPTIONS = useMemo<Array<{
+    id: PayoutMethod;
+    label: string;
+    accountPlaceholder: string;
+    needsName: boolean;
+    needsAccountType: boolean;
+  }>>(
+    () => [
+      {
+        id: "nequi",
+        label: t("methodNequi"),
+        accountPlaceholder: t("placeholderPhoneExample"),
+        needsName: false,
+        needsAccountType: false,
+      },
+      {
+        id: "bancolombia",
+        label: t("methodBancolombia"),
+        accountPlaceholder: t("placeholderAccount"),
+        needsName: true,
+        needsAccountType: true,
+      },
+      {
+        id: "otro",
+        label: t("methodOtro"),
+        accountPlaceholder: t("placeholderBankCombo"),
+        needsName: true,
+        needsAccountType: true,
+      },
+    ],
+    [t],
+  );
+  const METHOD_LABEL: Record<PayoutMethod, string> = useMemo(
+    () => ({
+      nequi: t("methodNequi"),
+      bancolombia: t("methodBancolombia"),
+      otro: t("methodOtro"),
+    }),
+    [t],
+  );
+  const ACCOUNT_TYPE_LABEL: Record<PayoutAccountType, string> = useMemo(
+    () => ({
+      ahorros: t("accountTypeAhorros"),
+      corriente: t("accountTypeCorriente"),
+    }),
+    [t],
+  );
+
   const hasInitial = !!(initialMethod && initialAccount);
   const [mode, setMode] = useState<"view" | "edit">(hasInitial ? "view" : "edit");
   const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "nequi");
@@ -148,7 +158,7 @@ export default function PayoutDefaultEditor({
         <CreditCard className="w-5 h-5 text-gold flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-[10px] uppercase tracking-wide text-text-muted">
-            Cuenta para cobrar
+            {t("editorTitle")}
           </p>
           <p
             className="text-sm font-semibold text-text-primary truncate tabular-nums"
@@ -165,7 +175,7 @@ export default function PayoutDefaultEditor({
         <button
           type="button"
           onClick={startEdit}
-          aria-label="Editar cuenta"
+          aria-label={t("editorAriaEdit")}
           className="flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-border-subtle hover:border-gold/50 hover:bg-gold/5 transition-colors"
         >
           <Pencil className="w-4 h-4 text-text-secondary" />
@@ -178,7 +188,7 @@ export default function PayoutDefaultEditor({
   return (
     <section className="rounded-2xl p-5 lp-card space-y-3">
       <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-        <CreditCard className="w-5 h-5 text-gold" /> Cuenta para cobrar
+        <CreditCard className="w-5 h-5 text-gold" /> {t("editorTitle")}
       </h3>
 
       <div className="flex flex-wrap gap-1.5">
@@ -208,18 +218,18 @@ export default function PayoutDefaultEditor({
 
       {needsAccountType ? (
         <div className="flex flex-wrap gap-1.5">
-          {(["ahorros", "corriente"] as const).map((t) => (
+          {(["ahorros", "corriente"] as const).map((accType) => (
             <button
-              key={t}
+              key={accType}
               type="button"
-              onClick={() => setAccountType(t)}
+              onClick={() => setAccountType(accType)}
               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                accountType === t
+                accountType === accType
                   ? "bg-gold text-bg-base border-gold"
                   : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
               }`}
             >
-              {ACCOUNT_TYPE_LABEL[t]}
+              {ACCOUNT_TYPE_LABEL[accType]}
             </button>
           ))}
         </div>
@@ -230,7 +240,7 @@ export default function PayoutDefaultEditor({
           type="text"
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
-          placeholder="Nombre como aparece en la cuenta"
+          placeholder={t("placeholderNameSimple")}
           className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
         />
       ) : null}
@@ -242,7 +252,7 @@ export default function PayoutDefaultEditor({
           disabled={!canSave}
           className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gold text-bg-base font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-50"
         >
-          {saving ? "Guardando…" : (<><Check className="w-4 h-4" /> Guardar</>)}
+          {saving ? t("savingShort") : (<><Check className="w-4 h-4" /> {t("saveShort")}</>)}
         </button>
         {hasInitial ? (
           <button
@@ -255,7 +265,7 @@ export default function PayoutDefaultEditor({
             }}
             className="px-3 py-2 rounded-xl border border-border-subtle text-text-secondary text-sm hover:border-text-secondary/40 transition-colors"
           >
-            Cancelar
+            {tCommon("cancel")}
           </button>
         ) : null}
         {hasInitial && onClear ? (
@@ -264,7 +274,7 @@ export default function PayoutDefaultEditor({
             onClick={clearAccount}
             className="px-3 py-2 rounded-xl border border-border-subtle text-text-muted text-sm hover:border-red-alert/40 hover:text-red-alert transition-colors"
           >
-            Borrar
+            {t("delete")}
           </button>
         ) : null}
       </div>

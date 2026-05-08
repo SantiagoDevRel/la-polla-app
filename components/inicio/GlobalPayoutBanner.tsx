@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Banknote, Copy, X, Check, Paperclip, Image as ImageIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import WinnerPayoutModal, { type PayoutMethod } from "@/components/polla/WinnerPayoutModal";
 
 interface PendingPayout {
@@ -47,6 +48,8 @@ function fmtCOP(n: number): string {
 }
 
 export default function GlobalPayoutBanner() {
+  const t = useTranslations("Banners");
+  const tCommon = useTranslations("Common");
   const router = useRouter();
   const [items, setItems] = useState<PendingPayout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,19 +235,19 @@ export default function GlobalPayoutBanner() {
           <p className="text-[13px] font-semibold text-text-primary">
             {items.length === 1
               ? incoming.length === 1
-                ? "Te tienen que pagar"
-                : "Tienes un pago pendiente"
-              : `${items.length} pagos pendientes`}
+                ? t("globalCallToCollect")
+                : t("globalCallToPay")
+              : t("globalCallToMany", { count: items.length })}
           </p>
           <p className="text-[11px] text-text-secondary truncate">
             {incoming.length > 0 && outgoing.length > 0
-              ? `${incoming.length} por cobrar · ${outgoing.length} por pagar`
+              ? t("globalDetailMixed", { incoming: incoming.length, outgoing: outgoing.length })
               : incoming.length > 0
-              ? `Total a cobrar: ${fmtCOP(incoming.reduce((s, i) => s + i.amount, 0))}`
-              : `Total a pagar: ${fmtCOP(outgoing.reduce((s, i) => s + i.amount, 0))}`}
+              ? t("globalDetailIncoming", { amount: fmtCOP(incoming.reduce((s, i) => s + i.amount, 0)) })
+              : t("globalDetailOutgoing", { amount: fmtCOP(outgoing.reduce((s, i) => s + i.amount, 0)) })}
           </p>
         </div>
-        <span className="text-[11px] text-gold font-semibold">Ver →</span>
+        <span className="text-[11px] text-gold font-semibold">{t("viewAction")}</span>
       </button>
 
       {open ? (
@@ -255,7 +258,7 @@ export default function GlobalPayoutBanner() {
                 type="button"
                 onClick={() => setOpen(false)}
                 className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors p-1"
-                aria-label="Cerrar"
+                aria-label={tCommon("close")}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -263,18 +266,18 @@ export default function GlobalPayoutBanner() {
 
             <div className="mb-4 pr-6">
               <h2 className="font-display text-[20px] tracking-[0.04em] text-gold uppercase">
-                Pagos pendientes
+                {t("pendingPayments")}
               </h2>
               <p className="text-[12px] text-text-secondary mt-0.5">
-                De todas tus pollas finalizadas.
+                {t("fromAllFinished")}
               </p>
               {hasOutgoingPending ? (
                 <div className="mt-3 rounded-lg px-3 py-2 bg-red-alert/10 border border-red-alert/30">
                   <p className="text-[12px] text-red-alert font-semibold">
-                    Cumple con tus pagos para cerrar este aviso.
+                    {t("outgoingNagTitle")}
                   </p>
                   <p className="text-[11px] text-red-alert/80 mt-0.5">
-                    Sube el comprobante si pudiste — el ganador queda más tranquilo.
+                    {t("outgoingNagBody")}
                   </p>
                 </div>
               ) : null}
@@ -283,7 +286,7 @@ export default function GlobalPayoutBanner() {
             {incoming.length > 0 ? (
               <section className="mb-4">
                 <h3 className="text-[10px] uppercase tracking-[0.1em] text-turf mb-2">
-                  Te tienen que pagar
+                  {t("sectionToCollect")}
                 </h3>
                 <ul className="space-y-2">
                   {incoming.map((it) => (
@@ -316,8 +319,8 @@ export default function GlobalPayoutBanner() {
                         >
                           <ImageIcon className="w-3.5 h-3.5" />
                           {loadingProofId === it.transactionId
-                            ? "Cargando…"
-                            : "Ver comprobante"}
+                            ? t("viewProofLoading")
+                            : t("viewProof")}
                         </button>
                       ) : null}
                       <button
@@ -326,7 +329,7 @@ export default function GlobalPayoutBanner() {
                         disabled={actingId === it.transactionId}
                         className="w-full text-[12px] font-semibold py-1.5 rounded-lg bg-turf/15 border border-turf/30 text-turf hover:bg-turf/20 transition-colors disabled:opacity-50"
                       >
-                        {actingId === it.transactionId ? "…" : "Ya me pagaron"}
+                        {actingId === it.transactionId ? "…" : t("alreadyPaid")}
                       </button>
                     </li>
                   ))}
@@ -337,7 +340,7 @@ export default function GlobalPayoutBanner() {
             {outgoing.length > 0 ? (
               <section className="mb-4">
                 <h3 className="text-[10px] uppercase tracking-[0.1em] text-amber mb-2">
-                  Te toca pagar
+                  {t("sectionToPay")}
                 </h3>
                 <ul className="space-y-2">
                   {outgoing.map((it) => {
@@ -379,18 +382,18 @@ export default function GlobalPayoutBanner() {
                             >
                               {copied === it.transactionId ? (
                                 <>
-                                  <Check className="w-3 h-3" /> Copiado
+                                  <Check className="w-3 h-3" /> {tCommon("copied")}
                                 </>
                               ) : (
                                 <>
-                                  <Copy className="w-3 h-3" /> Copiar
+                                  <Copy className="w-3 h-3" /> {tCommon("copy")}
                                 </>
                               )}
                             </button>
                           </div>
                         ) : (
                           <p className="text-[11px] text-text-muted mb-2">
-                            Esperando que indique cómo cobrar…
+                            {t("awaitingAccount")}
                           </p>
                         )}
                         <input
@@ -417,10 +420,10 @@ export default function GlobalPayoutBanner() {
                           >
                             <Paperclip className="w-3.5 h-3.5" />
                             {uploadingId === it.transactionId
-                              ? "Subiendo…"
+                              ? t("uploading")
                               : it.hasProof
-                                ? "Cambiar"
-                                : "Comprobante"}
+                                ? t("changeProof")
+                                : t("uploadProofBtn")}
                           </button>
                           <button
                             type="button"
@@ -428,12 +431,12 @@ export default function GlobalPayoutBanner() {
                             disabled={actingId === it.transactionId}
                             className="text-[12px] font-semibold py-1.5 rounded-lg bg-turf/15 border border-turf/30 text-turf hover:bg-turf/20 transition-colors disabled:opacity-50"
                           >
-                            {actingId === it.transactionId ? "…" : "Ya pagué"}
+                            {actingId === it.transactionId ? "…" : t("iPaid")}
                           </button>
                         </div>
                         {it.hasProof ? (
                           <p className="text-[10px] text-gold/80 mt-1.5 text-center">
-                            ✓ Comprobante adjunto
+                            {t("proofAttached")}
                           </p>
                         ) : null}
                       </li>
@@ -449,7 +452,7 @@ export default function GlobalPayoutBanner() {
                 onClick={() => setOpen(false)}
                 className="w-full mt-3 px-3 py-2.5 rounded-xl border border-border-subtle text-text-secondary text-[13px] hover:border-text-secondary/40 transition-colors"
               >
-                Cerrar
+                {tCommon("close")}
               </button>
             )}
 
@@ -462,7 +465,7 @@ export default function GlobalPayoutBanner() {
                 }}
                 className="w-full mt-2 text-[11px] text-text-muted underline"
               >
-                Ir a la polla
+                {t("goToPolla")}
               </button>
             ) : null}
           </div>
@@ -488,7 +491,7 @@ export default function GlobalPayoutBanner() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={viewingProofUrl}
-            alt="Comprobante de pago"
+            alt={t("proofImageAlt")}
             className="max-w-full max-h-[90vh] object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />

@@ -30,6 +30,7 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Banknote, Check, ChevronDown, X, Trophy, AlertTriangle } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import WinnerPayoutModal, { CopyAccountButton, type PayoutMethod } from "./WinnerPayoutModal";
 
 interface SummaryTransaction {
@@ -89,30 +90,35 @@ interface Props {
   refreshKey?: number;
 }
 
-const METHOD_LABEL: Record<string, string> = {
-  nequi: "Nequi",
-  daviplata: "Daviplata",
-  bancolombia: "Bancolombia",
-  transfiya: "Transfiya",
-  otro: "Otro",
+const METHOD_LABEL_KEYS: Record<string, string> = {
+  nequi: "methodNequi",
+  daviplata: "methodDaviplata",
+  bancolombia: "methodBancolombia",
+  transfiya: "methodTransfiya",
+  otro: "methodOtro",
 };
-
-function fmtCOP(n: number): string {
-  return `$${Math.round(n).toLocaleString("es-CO")}`;
-}
-
-function ordinal(p: number): string {
-  if (p === 1) return "1°";
-  if (p === 2) return "2°";
-  if (p === 3) return "3°";
-  return `${p}°`;
-}
 
 function sessionKey(pollaId: string): string {
   return `payout-modal-shown-${pollaId}`;
 }
 
 export default function PollaPayoutFlow({ slug, refreshKey = 0 }: Props) {
+  const t = useTranslations("PayoutFlow");
+  const tPayout = useTranslations("Payout");
+  const locale = useLocale();
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  const fmtCOP = (n: number): string => `$${Math.round(n).toLocaleString(intlTag)}`;
+  const ordinal = (p: number): string => {
+    if (p === 1) return tPayout("winnerPlace1");
+    if (p === 2) return tPayout("winnerPlace2");
+    if (p === 3) return tPayout("winnerPlace3");
+    return tPayout("winnerPlaceN", { n: p });
+  };
+  const methodLabel = (method: string | null | undefined): string => {
+    if (!method) return "";
+    const key = METHOD_LABEL_KEYS[method];
+    return key ? tPayout(key) : method;
+  };
   const [summary, setSummary] = useState<PayoutSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -233,7 +239,7 @@ export default function PollaPayoutFlow({ slug, refreshKey = 0 }: Props) {
         <div className="rounded-xl px-4 py-3 bg-red-alert/10 border border-red-alert/30 text-[12px] text-red-alert flex items-start gap-2 mb-3">
           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <p className="font-semibold">No se pudo calcular la liquidación</p>
+            <p className="font-semibold">{t("errCalcTitle")}</p>
             {summary.errors.map((e, i) => (
               <p key={i}>{e}</p>
             ))}
@@ -251,23 +257,23 @@ export default function PollaPayoutFlow({ slug, refreshKey = 0 }: Props) {
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-text-primary">
               {summary.isAdmin
-                ? `${summary.pendingTransactionsCount} pago${summary.pendingTransactionsCount > 1 ? "s" : ""} pendiente${summary.pendingTransactionsCount > 1 ? "s" : ""}`
+                ? t("pendingPayments", { count: summary.pendingTransactionsCount })
                 : summary.myIncoming.length > 0 && summary.myOutgoing.length === 0
-                ? "Te tienen que pagar"
+                ? t("youGetPaid")
                 : summary.myOutgoing.length > 0
-                ? "Tienes un pago pendiente"
-                : "Pagos pendientes en esta polla"}
+                ? t("youHavePayment")
+                : t("pollaPaymentsPending")}
             </p>
-            <p className="text-[11px] text-text-secondary">Tocá para ver el detalle.</p>
+            <p className="text-[11px] text-text-secondary">{t("tapForDetail")}</p>
           </div>
-          <span className="text-[11px] text-gold font-semibold">Ver →</span>
+          <span className="text-[11px] text-gold font-semibold">{t("viewArrow")}</span>
         </button>
       ) : null}
 
       {allSettled ? (
         <div className="rounded-xl px-4 py-2 bg-turf/10 border border-turf/30 flex items-center gap-2 mb-3">
           <Check className="w-4 h-4 text-turf flex-shrink-0" />
-          <p className="text-[12px] text-turf font-medium">Todos los pagos quedaron saldados.</p>
+          <p className="text-[12px] text-turf font-medium">{t("allSettled")}</p>
         </div>
       ) : null}
 
@@ -302,6 +308,9 @@ export default function PollaPayoutFlow({ slug, refreshKey = 0 }: Props) {
           }}
           showAllAdmin={showAllAdmin}
           setShowAllAdmin={setShowAllAdmin}
+          fmtCOP={fmtCOP}
+          ordinal={ordinal}
+          methodLabel={methodLabel}
         />
       ) : null}
     </>
@@ -317,6 +326,9 @@ interface SettlementModalProps {
   onOpenWinner: () => void;
   showAllAdmin: boolean;
   setShowAllAdmin: (v: boolean) => void;
+  fmtCOP: (n: number) => string;
+  ordinal: (p: number) => string;
+  methodLabel: (method: string | null | undefined) => string;
 }
 
 function SettlementModal({
@@ -328,7 +340,12 @@ function SettlementModal({
   onOpenWinner,
   showAllAdmin,
   setShowAllAdmin,
+  fmtCOP,
+  ordinal,
+  methodLabel,
 }: SettlementModalProps) {
+  const t = useTranslations("PayoutFlow");
+  const tCommon = useTranslations("Common");
   const adminTxs = summary.transactions; // includes paid + unpaid
   const someoneOwesViewer = summary.myIncoming.length > 0;
   const viewerOwes = summary.myOutgoing.length > 0;
@@ -340,7 +357,7 @@ function SettlementModal({
           type="button"
           onClick={onClose}
           className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors p-1"
-          aria-label="Cerrar"
+          aria-label={tCommon("close")}
         >
           <X className="w-5 h-5" />
         </button>
@@ -348,14 +365,14 @@ function SettlementModal({
         <div className="flex items-center gap-2 mb-4">
           <Trophy className="w-5 h-5 text-gold flex-shrink-0" />
           <h2 className="font-display text-[20px] tracking-[0.04em] text-gold uppercase">
-            Pagos de la polla
+            {t("modalTitle")}
           </h2>
         </div>
 
         <p className="text-[12px] text-text-secondary mb-3">
           {summary.polla.payment_mode === "admin_collects"
-            ? "El admin tiene el pozo y le paga a cada ganador."
-            : "Cada perdedor le paga directo al ganador correspondiente."}
+            ? t("modeAdminCollects")
+            : t("modePayWinner")}
         </p>
 
         {summary.warnings.length > 0 ? (
@@ -373,14 +390,14 @@ function SettlementModal({
             onClick={onOpenWinner}
             className="w-full rounded-xl px-3 py-3 bg-gold text-bg-base font-semibold text-[13px] mb-3 hover:brightness-110 transition-all"
           >
-            Poner mi cuenta para cobrar
+            {t("putMyAccount")}
           </button>
         ) : null}
 
         {/* Per-position summary */}
         <section className="mb-4">
           <h3 className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60 mb-1.5">
-            Premios
+            {t("prizes")}
           </h3>
           <ul className="space-y-1.5">
             {summary.allocations
@@ -399,14 +416,14 @@ function SettlementModal({
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold text-text-primary truncate">
                       {a.display_name}
-                      {a.isTied ? <span className="text-[10px] text-text-secondary ml-1">(empate)</span> : null}
+                      {a.isTied ? <span className="text-[10px] text-text-secondary ml-1">{t("tied")}</span> : null}
                     </p>
                     {a.payout_account ? (
                       <p className="text-[11px] text-text-secondary truncate tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                        {METHOD_LABEL[a.payout_method ?? ""] ?? a.payout_method} · {a.payout_account}
+                        {methodLabel(a.payout_method)} · {a.payout_account}
                       </p>
                     ) : (
-                      <p className="text-[11px] text-text-muted truncate">Aún no dejó cuenta de cobro</p>
+                      <p className="text-[11px] text-text-muted truncate">{t("noAccount")}</p>
                     )}
                   </div>
                   <span className="font-display text-[14px] text-gold tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
@@ -422,17 +439,19 @@ function SettlementModal({
         {someoneOwesViewer ? (
           <section className="mb-4">
             <h3 className="text-[10px] uppercase tracking-[0.1em] text-turf mb-1.5">
-              Te tienen que pagar
+              {t("sectionToCollect")}
             </h3>
             <ul className="space-y-1.5">
-              {summary.myIncoming.map((t) => (
+              {summary.myIncoming.map((tx) => (
                 <TxRow
-                  key={t.id}
-                  tx={t}
-                  label={`${t.from_display_name} → vos`}
-                  onMark={() => onMarkPaid(t.id)}
-                  busy={actingTxId === t.id}
-                  ctaLabel="Ya me pagaron"
+                  key={tx.id}
+                  tx={tx}
+                  label={t("youArrowFrom", { name: tx.from_display_name })}
+                  onMark={() => onMarkPaid(tx.id)}
+                  busy={actingTxId === tx.id}
+                  ctaLabel={t("ctaIGotPaid")}
+                  fmtCOP={fmtCOP}
+                  methodLabel={methodLabel}
                 />
               ))}
             </ul>
@@ -443,17 +462,19 @@ function SettlementModal({
         {viewerOwes ? (
           <section className="mb-4">
             <h3 className="text-[10px] uppercase tracking-[0.1em] text-amber mb-1.5">
-              Te toca pagar
+              {t("sectionToPay")}
             </h3>
             <ul className="space-y-1.5">
-              {summary.myOutgoing.map((t) => (
+              {summary.myOutgoing.map((tx) => (
                 <TxRow
-                  key={t.id}
-                  tx={t}
-                  label={`Vos → ${t.to_display_name}`}
-                  onMark={() => onMarkPaid(t.id)}
-                  busy={actingTxId === t.id}
-                  ctaLabel="Ya pagué"
+                  key={tx.id}
+                  tx={tx}
+                  label={t("youArrowTo", { name: tx.to_display_name })}
+                  onMark={() => onMarkPaid(tx.id)}
+                  busy={actingTxId === tx.id}
+                  ctaLabel={t("ctaIPaid")}
+                  fmtCOP={fmtCOP}
+                  methodLabel={methodLabel}
                 />
               ))}
             </ul>
@@ -469,7 +490,7 @@ function SettlementModal({
               className="w-full flex items-center justify-between text-left mb-2"
             >
               <h3 className="text-[10px] uppercase tracking-[0.1em] text-text-primary/70">
-                Todos los pagos · admin
+                {t("sectionAllAdmin")}
               </h3>
               <ChevronDown
                 className={`w-4 h-4 text-text-primary/70 transition-transform ${
@@ -479,49 +500,49 @@ function SettlementModal({
             </button>
             {showAllAdmin ? (
               <ul className="space-y-1.5">
-                {adminTxs.map((t) => (
+                {adminTxs.map((tx) => (
                   <li
-                    key={t.id}
+                    key={tx.id}
                     className={`rounded-lg px-3 py-2 border flex items-center gap-2 ${
-                      t.paid_at
+                      tx.paid_at
                         ? "bg-turf/5 border-turf/20"
                         : "bg-bg-elevated border-border-subtle"
                     }`}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] font-semibold text-text-primary truncate">
-                        {t.from_display_name} → {t.to_display_name}
+                        {tx.from_display_name} → {tx.to_display_name}
                       </p>
-                      {t.to_payout_account ? (
+                      {tx.to_payout_account ? (
                         <p className="text-[11px] text-text-secondary truncate tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                          {METHOD_LABEL[t.to_payout_method ?? ""] ?? t.to_payout_method} · {t.to_payout_account}
+                          {methodLabel(tx.to_payout_method)} · {tx.to_payout_account}
                         </p>
                       ) : (
                         <p className="text-[11px] text-text-muted truncate">
-                          Sin cuenta — admin puede marcar igual.
+                          {t("noAccountAdminMark")}
                         </p>
                       )}
                     </div>
                     <span className="font-display text-[13px] text-text-primary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                      {fmtCOP(t.amount)}
+                      {fmtCOP(tx.amount)}
                     </span>
-                    {t.paid_at ? (
+                    {tx.paid_at ? (
                       <button
                         type="button"
-                        onClick={() => onUnmarkPaid(t.id)}
-                        disabled={actingTxId === t.id}
+                        onClick={() => onUnmarkPaid(tx.id)}
+                        disabled={actingTxId === tx.id}
                         className="text-[10px] px-2 py-1 rounded-md border border-border-subtle text-text-muted hover:border-amber/40 hover:text-amber transition-colors disabled:opacity-50"
                       >
-                        {actingTxId === t.id ? "…" : "Deshacer"}
+                        {actingTxId === tx.id ? "…" : t("undo")}
                       </button>
                     ) : (
                       <button
                         type="button"
-                        onClick={() => onMarkPaid(t.id)}
-                        disabled={actingTxId === t.id}
+                        onClick={() => onMarkPaid(tx.id)}
+                        disabled={actingTxId === tx.id}
                         className="text-[10px] px-2 py-1 rounded-md bg-turf/15 border border-turf/30 text-turf hover:bg-turf/20 transition-colors disabled:opacity-50"
                       >
-                        {actingTxId === t.id ? "…" : "Pagado"}
+                        {actingTxId === tx.id ? "…" : t("paid")}
                       </button>
                     )}
                   </li>
@@ -536,7 +557,7 @@ function SettlementModal({
           onClick={onClose}
           className="w-full mt-3 px-3 py-2.5 rounded-xl border border-border-subtle text-text-secondary text-[13px] hover:border-text-secondary/40 transition-colors"
         >
-          Cerrar
+          {t("close")}
         </button>
       </div>
     </div>
@@ -549,9 +570,12 @@ interface TxRowProps {
   onMark: () => void;
   busy: boolean;
   ctaLabel: string;
+  fmtCOP: (n: number) => string;
+  methodLabel: (m: string | null | undefined) => string;
 }
 
-function TxRow({ tx, label, onMark, busy, ctaLabel }: TxRowProps) {
+function TxRow({ tx, label, onMark, busy, ctaLabel, fmtCOP, methodLabel }: TxRowProps) {
+  const t = useTranslations("PayoutFlow");
   return (
     <li className="rounded-lg px-3 py-2 bg-bg-elevated border border-border-subtle">
       <div className="flex items-center gap-2">
@@ -559,11 +583,11 @@ function TxRow({ tx, label, onMark, busy, ctaLabel }: TxRowProps) {
           <p className="text-[12px] font-semibold text-text-primary truncate">{label}</p>
           {tx.to_payout_account ? (
             <p className="text-[11px] text-text-secondary truncate tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-              {METHOD_LABEL[tx.to_payout_method ?? ""] ?? tx.to_payout_method} · {tx.to_payout_account}
+              {methodLabel(tx.to_payout_method)} · {tx.to_payout_account}
             </p>
           ) : (
             <p className="text-[11px] text-text-muted">
-              Esperando que indique cómo cobrar…
+              {t("awaitingAccount")}
             </p>
           )}
         </div>
@@ -581,7 +605,7 @@ function TxRow({ tx, label, onMark, busy, ctaLabel }: TxRowProps) {
         disabled={busy}
         className="mt-2 w-full text-[12px] font-semibold py-1.5 rounded-lg bg-turf/15 border border-turf/30 text-turf hover:bg-turf/20 transition-colors disabled:opacity-50"
       >
-        {busy ? "Guardando…" : ctaLabel}
+        {busy ? t("savingShort") : ctaLabel}
       </button>
     </li>
   );
