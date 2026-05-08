@@ -229,12 +229,13 @@ function phaseLabel(
   tournamentSlug: string,
   matchDay: number | null | undefined,
   t: (key: string, values?: Record<string, string | number>) => string,
+  locale: string,
 ): string {
   // League-format matches carry a match_day number (jornada). Surface it
   // so the user sees "Jornada 33" / "Match day 33".
   if (!phase || isLeagueFormatPhase(phase)) {
     if (matchDay) return t("phaseMatchDay", { n: matchDay });
-    return getTournamentName(tournamentSlug) ?? t("phaseLeague");
+    return getTournamentName(tournamentSlug, locale) || t("phaseLeague");
   }
   const normalised = phase.toLowerCase();
   const key = PHASE_KEYS[normalised];
@@ -349,7 +350,7 @@ function MatchRow({
                 className="object-contain flex-shrink-0"
               />
             ) : null}
-            <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day, t)}</span>
+            <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day, t, locale)}</span>
             {editable && !pred && !touched ? (
               <span className="inline-flex items-center gap-0.5 text-[9px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md bg-red-alert/15 text-red-alert border border-red-alert/30 whitespace-nowrap">
                 <span aria-hidden="true">*</span>
@@ -1041,7 +1042,7 @@ export default function PollaSlugPage() {
                   padding: "4px 8px",
                 }}
                 title={polla.tournaments
-                  .map((s) => getTournamentName(s) ?? s)
+                  .map((s) => getTournamentName(s, locale))
                   .join(" · ")}
               >
                 {polla.tournaments.map((slug) =>
@@ -1052,7 +1053,7 @@ export default function PollaSlugPage() {
                     >
                       <Image
                         src={TOURNAMENT_ICONS[slug]!}
-                        alt={getTournamentName(slug) ?? slug}
+                        alt={getTournamentName(slug, locale)}
                         width={20}
                         height={20}
                         className="object-contain"

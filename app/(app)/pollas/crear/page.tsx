@@ -12,7 +12,7 @@ import { motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Handshake, Lock } from "lucide-react";
-import { TOURNAMENTS } from "@/lib/tournaments";
+import { TOURNAMENTS, getTournamentName } from "@/lib/tournaments";
 import FootballLoader from "@/components/ui/FootballLoader";
 import PrizeDistributionForm, {
   type PrizeDistribution,
@@ -314,7 +314,7 @@ export default function CrearPollaPage() {
 
       blocks.push({
         tournamentSlug: tSlug,
-        tournamentName: meta?.name ?? tSlug,
+        tournamentName: getTournamentName(tSlug, locale),
         tournamentLogo: meta?.logoPath ?? null,
         matchIds: list.map((m) => m.id),
         subgroups,
@@ -490,7 +490,7 @@ export default function CrearPollaPage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto p-4">
+      <main className="max-w-lg mx-auto p-4 pb-[120px]">
         {/* ═══ PASO 1 — Info ═══ */}
         {step === 1 && (
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
@@ -530,8 +530,8 @@ export default function CrearPollaPage() {
                           : "border-border-subtle hover:border-gold/20 bg-bg-elevated"
                       }`}
                     >
-                      <img src={t.logoPath} alt={t.name} width={24} height={24} style={{ objectFit: "contain", borderRadius: 4 }} />
-                      <span className="font-medium text-text-primary flex-1">{t.name}</span>
+                      <img src={t.logoPath} alt={getTournamentName(t.slug, locale)} width={24} height={24} style={{ objectFit: "contain", borderRadius: 4 }} />
+                      <span className="font-medium text-text-primary flex-1">{getTournamentName(t.slug, locale)}</span>
                       {/* Checkbox cuadrado para señalar multi-select */}
                       <div
                         className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -1036,20 +1036,23 @@ export default function CrearPollaPage() {
           right: 0,
           background: "#080c10",
           borderTop: "1px solid #1a2540",
-          padding: "12px 16px env(safe-area-inset-bottom, 12px)",
+          // Padding tighter para que el footer entero quepa cómodo en
+          // viewports cortos (DevTools emulation, ventanas pequeñas en
+          // laptop). En iOS el max() respeta el home indicator.
+          padding: "8px 12px max(env(safe-area-inset-bottom, 0px), 8px)",
           zIndex: 40,
         }}
       >
         {error && (
-          <div className="max-w-lg mx-auto mb-2">
-            <p className="text-red-alert text-xs text-center bg-red-dim rounded-lg py-1.5 px-3">{error}</p>
+          <div className="max-w-lg mx-auto mb-1.5">
+            <p className="text-red-alert text-xs text-center bg-red-dim rounded-lg py-1 px-3">{error}</p>
           </div>
         )}
         <div className="max-w-lg mx-auto flex items-center gap-2">
           <button
             type="button"
             onClick={() => router.push("/pollas")}
-            className="px-4 py-2.5 rounded-xl text-text-muted hover:text-text-primary text-sm font-medium transition-colors"
+            className="px-3 py-2 rounded-xl text-text-muted hover:text-text-primary text-sm font-medium transition-colors"
           >
             {t("footerCancel")}
           </button>
@@ -1057,7 +1060,7 @@ export default function CrearPollaPage() {
             <button
               type="button"
               onClick={() => goToStep((step - 1) as Step)}
-              className="px-4 py-2.5 rounded-xl bg-bg-elevated text-text-secondary border border-border-subtle hover:border-gold/30 text-sm font-semibold inline-flex items-center gap-1"
+              className="px-3 py-2 rounded-xl bg-bg-elevated text-text-secondary border border-border-subtle hover:border-gold/30 text-sm font-semibold inline-flex items-center gap-1"
             >
               <ArrowLeft className="w-4 h-4" /> {t("footerBack")}
             </button>
@@ -1068,7 +1071,7 @@ export default function CrearPollaPage() {
               type="button"
               onClick={() => goToStep((step + 1) as Step)}
               disabled={step === 2 && selectedMatchIds.size === 0}
-              className="px-5 py-2.5 rounded-xl bg-gold text-bg-base font-bold text-sm inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-xl bg-gold text-bg-base font-bold text-sm inline-flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ boxShadow: "0 0 16px rgba(255,215,0,0.18)" }}
             >
               {t("footerContinue")} <ChevronRight className="w-4 h-4" />
@@ -1078,7 +1081,7 @@ export default function CrearPollaPage() {
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-gold text-bg-base font-bold text-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-xl bg-gold text-bg-base font-bold text-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ boxShadow: "0 0 20px rgba(255,215,0,0.25)" }}
             >
               {loading ? t("footerCreating") : (

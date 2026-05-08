@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import PollaCard from "@/components/polla/PollaCard";
 import { PollitoMoment } from "@/components/pollito/PollitoMoment";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
@@ -47,6 +47,7 @@ import { formatPhone } from "@/lib/format-phone";
 function adaptPolla(
   raw: PollaData,
   unknownLabel: string,
+  locale: string,
 ): React.ComponentProps<typeof PollaCard>["polla"] {
   // Para pollas combinadas (>= 2 torneos), pasamos el array de logos
   // a PollaCard. Para single-tournament queda sin competitionLogos y
@@ -61,7 +62,7 @@ function adaptPolla(
     id: raw.id,
     slug: raw.slug,
     name: raw.name,
-    competitionName: getTournamentName(raw.tournament) ?? unknownLabel,
+    competitionName: getTournamentName(raw.tournament, locale) || unknownLabel,
     competitionLogoUrl: TOURNAMENT_ICONS[raw.tournament],
     competitionLogos: logos,
     participantCount: raw.participant_count ?? 0,
@@ -74,6 +75,7 @@ function adaptPolla(
 
 export default function MisPollasPage() {
   const t = useTranslations("Pollas");
+  const locale = useLocale();
   const tNav = useTranslations("Nav");
   const router = useRouter();
   const { showToast } = useToast();
@@ -154,7 +156,7 @@ export default function MisPollasPage() {
                     {invite.inviter?.display_name && (
                       <>{t("invitedBy", { name: formatPhone(invite.inviter.display_name) })}</>
                     )}{" "}
-                    {invite.polla?.tournament ? `· ${getTournamentName(invite.polla.tournament)}` : ""}
+                    {invite.polla?.tournament ? `· ${getTournamentName(invite.polla.tournament, locale)}` : ""}
                   </p>
                 </div>
                 <button
@@ -186,7 +188,7 @@ export default function MisPollasPage() {
               {active.map((polla) => (
                 <AnimatedItem key={polla.id}>
                   <PollaCard
-                    polla={adaptPolla(polla, t("tournamentUnknown"))}
+                    polla={adaptPolla(polla, t("tournamentUnknown"), locale)}
                     userContext={
                       polla.user_rank != null
                         ? {
@@ -233,7 +235,7 @@ export default function MisPollasPage() {
                 {ended.map((polla) => (
                   <AnimatedItem key={polla.id}>
                     <PollaCard
-                      polla={adaptPolla(polla, t("tournamentUnknown"))}
+                      polla={adaptPolla(polla, t("tournamentUnknown"), locale)}
                       endedState={
                         polla.winner
                           ? {

@@ -153,16 +153,21 @@ export async function ensurePlaceholders(
 }
 
 /**
- * Promueve un placeholder al matchup real cuando ESPN publica un
- * partido para la misma fase. Devuelve el match_id resultante (sea
- * promovido o nuevo). Si no hay placeholder libre, inserta un row
- * normal vía upsert_match_safe.
+ * Inserta o actualiza un fixture descubierto vía ESPN.
  *
- * "Libre" = home_team='TBD' (la promoción cambia esto a nombre real).
- * Asignamos por orden de match_day ascendente — el primer slot libre
- * recibe el primer match real publicado.
+ * Toda la lógica de dedup + promoción de placeholders vive ahora en el
+ * RPC `upsert_match_safe` (migration 048). Quad-lookup en orden:
+ *   1. external_id exacto
+ *   2. espn_id (atrapa el caso "antes entró como FD, ahora ESPN")
+ *   3. semantic dedup (tournament + scheduled_at±2h + teams normalizados)
+ *   4. promoción de placeholder TBD libre del mismo (tournament, phase)
+ *
+ * Antes esto vivía partido en app code (promoteOrInsert) + RPC, y el
+ * primer path no chequeaba el segundo → cuando ESPN llegaba después
+ * de football-data, el placeholder-grab generaba duplicados. Single
+ * source of truth = no hay forma de bypassear dedup.
  */
-async function promoteOrInsert(
+async function upsertMatch(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   tournamentSlug: string,
@@ -183,46 +188,7 @@ async function promoteOrInsert(
     elapsed: number | null;
     match_day: number | null;
   },
-): Promise<"promoted" | "inserted" | "error"> {
-  // Buscar placeholder libre para esta fase.
-  if (phase) {
-    const { data: free } = await supabase
-      .from("matches")
-      .select("id, match_day")
-      .eq("tournament", tournamentSlug)
-      .eq("phase", phase)
-      .eq("home_team", "TBD")
-      .like("external_id", "placeholder:%")
-      .order("match_day", { ascending: true })
-      .limit(1);
-    const placeholder = (free as Array<{ id: string; match_day: number | null }> | null)?.[0];
-    if (placeholder) {
-      // Promoción: UPDATE in-place del placeholder. UUID preservado,
-      // predicciones mantienen su match_id. Conservamos match_day del
-      // placeholder (slot index) — sirve como pista de orden.
-      const { error } = await supabase
-        .from("matches")
-        .update({
-          external_id: payload.external_id,
-          home_team: payload.home_team,
-          away_team: payload.away_team,
-          home_team_flag: payload.home_team_flag,
-          away_team_flag: payload.away_team_flag,
-          home_team_abbr: payload.home_team_abbr,
-          away_team_abbr: payload.away_team_abbr,
-          scheduled_at: payload.scheduled_at,
-          venue: payload.venue,
-          status: payload.status,
-          home_score: payload.home_score,
-          away_score: payload.away_score,
-          elapsed: payload.elapsed,
-        })
-        .eq("id", placeholder.id);
-      return error ? "error" : "promoted";
-    }
-  }
-
-  // Sin placeholder libre: insertar normalmente vía upsert seguro.
+): Promise<"ok" | "error"> {
   const { error } = await supabase.rpc("upsert_match_safe", {
     p_external_id: payload.external_id,
     p_tournament: tournamentSlug,
@@ -241,7 +207,7 @@ async function promoteOrInsert(
     p_status: payload.status,
     p_elapsed: payload.elapsed,
   });
-  return error ? "error" : "inserted";
+  return error ? "error" : "ok";
 }
 
 export interface DiscoverResult {
@@ -381,12 +347,11 @@ export async function discoverTournament(
       const elapsed = parseEspnMinute(event.status.displayClock, event.status.period);
       const phase = mapEspnPhase(event, tournamentSlug);
 
-      // Si la fase tiene placeholders sin promover (cuartos / semis /
-      // final / etc), promovemos el primero disponible. Si ya están
-      // todos promovidos o la fase no tiene slots conocidos, insertamos
-      // como row normal. Predicciones quedan ligadas al UUID en ambos
-      // casos.
-      const promotion = await promoteOrInsert(supabase, tournamentSlug, phase, {
+      // Single path: upsert_match_safe RPC maneja todo (dedup por
+      // external_id/espn_id, semantic dedup, y promoción de placeholders
+      // como último resort). Predicciones quedan ligadas al UUID
+      // resultante sin importar qué path tomó el RPC.
+      const upsert = await upsertMatch(supabase, tournamentSlug, phase, {
         external_id: `espn:${event.id}`,
         home_team: home.team.displayName,
         away_team: away.team.displayName,
@@ -403,8 +368,8 @@ export async function discoverTournament(
         match_day: null,
       });
 
-      if (promotion === "error") {
-        console.error(`[discover] promoteOrInsert ${event.id} failed`);
+      if (upsert === "error") {
+        console.error(`[discover] upsert_match_safe ${event.id} failed`);
         result.errors++;
       } else {
         result.inserted_or_updated++;

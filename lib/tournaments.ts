@@ -70,12 +70,28 @@ export const TOURNAMENTS = [
 
 export type TournamentSlug = (typeof TOURNAMENTS)[number]["slug"];
 
+// Nombres localizados. Para EN: Champions/PL/Serie A son universales
+// (no se traducen). Solo cambian Mundial→World Cup, Copa→Cup, Liga.
+const TOURNAMENT_NAMES_EN: Record<string, string> = {
+  champions_2025: "Champions League",
+  worldcup_2026: "World Cup 2026",
+  laliga_2025: "La Liga",
+  premier_2025: "Premier League",
+  seriea_2025: "Serie A",
+  libertadores_2026: "Copa Libertadores",
+  sudamericana_2026: "Copa Sudamericana",
+  betplay_2026: "BetPlay League",
+};
+
 export function getTournamentBySlug(slug: string) {
   return TOURNAMENTS.find((t) => t.slug === slug);
 }
 
-export function getTournamentName(slug: string): string {
-  return getTournamentBySlug(slug)?.name || slug;
+export function getTournamentName(slug: string, locale: string = "es"): string {
+  if (locale === "en") {
+    return TOURNAMENT_NAMES_EN[slug] ?? getTournamentBySlug(slug)?.name ?? slug;
+  }
+  return getTournamentBySlug(slug)?.name ?? slug;
 }
 
 export function getTournamentLogo(slug: string): string {
