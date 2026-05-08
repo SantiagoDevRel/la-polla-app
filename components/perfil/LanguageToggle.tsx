@@ -69,20 +69,41 @@ export default function LanguageToggle() {
     return () => window.clearTimeout(timer);
   }, [switching]);
 
-  function pick(next: Locale) {
+  async function pick(next: Locale) {
     if (next === current || switching !== null) return;
     setSwitching(next);
 
     const host = window.location.hostname.toLowerCase();
     if (isProductionHost(host)) {
-      // Producción: redirect al otro dominio. NO setea cookie — el dominio
-      // dicta el locale y una cookie en el dominio actual quedaría inerte
-      // (peor: si cambian de opinión y vuelven al dominio original, la
-      // cookie vieja confundiría todo).
       const target = next === "es" ? HOST_ES : HOST_EN;
       if (host !== target) {
-        // `switching` se queda truthy hasta que el browser navega — el
-        // loader se ve durante ese gap.
+        // SSO handoff: pedimos al backend un token firmado con la sesión
+        // actual y navegamos al endpoint /consume del dominio destino.
+        // El destino valida + setSession + redirect al path original →
+        // el user llega ya logueado, sin re-loguear.
+        try {
+          const res = await fetch("/api/auth/handoff", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              target: next,
+              path: window.location.pathname + window.location.search,
+            }),
+          });
+          if (res.ok) {
+            const data = (await res.json()) as { url?: string };
+            if (data.url) {
+              window.location.href = data.url;
+              return;
+            }
+          }
+          // Si el handoff falla (no estaba logueado, server error, etc.):
+          // fallback al redirect simple. El user va a tener que re-loguearse
+          // en el dominio destino, pero al menos llega allí.
+        } catch {
+          /* network error → fallback */
+        }
         window.location.href = `https://${target}${window.location.pathname}${window.location.search}`;
         return;
       }
