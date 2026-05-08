@@ -155,6 +155,7 @@
     "step3FeeTitle": "Cuota de entrada",
     "step3FeeTitleHint": "Cuota por persona",
     "step3FeePlaceholder": "10000",
+    "step3CurrencyLabel": "Moneda",
     "step3PaymentMode": "Modo de pago",
     "paymentModeUpfrontTitle": "Pago al principio",
     "paymentModeUpfrontDesc": "Cada participante le paga al organizador (tú) antes de entrar a la polla.",

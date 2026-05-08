@@ -30,6 +30,8 @@ interface FormState {
   tournaments: string[];
   type: "closed";
   buyInAmount: number;
+  /** Moneda de la polla. Default COP para usuarios CO; USD para resto. */
+  currency: "COP" | "USD" | "EUR" | "MXN" | "ARS";
   paymentMode: PaymentMode;
   // Cuenta estructurada del admin para AI-assist screenshot (solo
   // aplica cuando paymentMode === 'admin_collects'). Pre-llenado de
@@ -102,6 +104,10 @@ export default function CrearPollaPage() {
     // 0 = vacío. El input formatea "" cuando es 0 y muestra el placeholder
     // "10000" en gris para sugerir el mínimo sin pre-llenarlo.
     buyInAmount: 0,
+    // Default por locale: usuarios EN (afuera de CO) van a USD, ES → COP.
+    // Cuando agreguemos detección por geo header del middleware, se puede
+    // refinar (ej. usuarios EN en CA → CAD si lo soportamos).
+    currency: locale === "en" ? "USD" : "COP",
     paymentMode: "pay_winner",
     adminPayoutMethod: null,
     adminPayoutAccount: "",
@@ -391,7 +397,13 @@ export default function CrearPollaPage() {
   // Submit
   async function handleSubmit() {
     setError("");
-    if (form.buyInAmount < 1000) { setError(t("errMinAmount")); return; }
+    // Mínimo por currency: COP 1000 vs USD/EUR 1 vs MXN 20. Valida que
+    // el form coincida con el server-side check del Zod schema.
+    const minByCurrency: Record<string, number> = {
+      COP: 1000, USD: 1, EUR: 1, MXN: 20, ARS: 1000,
+    };
+    const minAmount = minByCurrency[form.currency] ?? 1;
+    if (form.buyInAmount < minAmount) { setError(t("errMinAmount")); return; }
     if (form.paymentMode === "admin_collects") {
       if (!form.adminPayoutMethod) {
         setError(t("errPickMethod")); return;
@@ -420,6 +432,7 @@ export default function CrearPollaPage() {
         tournaments: form.tournaments,
         type: form.type,
         buyInAmount: form.buyInAmount,
+        currency: form.currency,
         paymentMode: form.paymentMode,
         adminPayoutMethod: form.adminPayoutMethod ?? undefined,
         adminPayoutAccount: form.adminPayoutAccount.trim() || undefined,
@@ -822,23 +835,40 @@ export default function CrearPollaPage() {
                   </span>
                 </h2>
               </div>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">$</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={form.buyInAmount > 0 ? form.buyInAmount.toLocaleString(locale === "en" ? "en-US" : "es-CO") : ""}
-                  onChange={(e) => {
-                    // Strip non-digits so the user can paste "10.000" or
-                    // "10,000" and we still get a clean number. Limit to
-                    // 9 digits so nobody types a billion-peso polla.
-                    const digits = e.target.value.replace(/\D/g, "").slice(0, 9);
-                    updateForm("buyInAmount", digits ? parseInt(digits, 10) : 0);
-                  }}
-                  placeholder={t("step3FeePlaceholder")}
-                  className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted/40 focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
-                />
+              <div className="flex gap-2">
+                {/* Currency picker. COP es default para CO; resto del mundo arranca en USD.
+                    Cambia el formato del input (separadores) y el mínimo de cuota. */}
+                <select
+                  value={form.currency}
+                  onChange={(e) => updateForm("currency", e.target.value as FormState["currency"])}
+                  className="px-3 py-3 rounded-xl outline-none bg-bg-elevated border border-border-subtle text-text-primary text-sm font-semibold focus:ring-1 focus:ring-gold/40 focus:border-gold/50 cursor-pointer"
+                  style={{ minWidth: 80 }}
+                  aria-label={t("step3CurrencyLabel")}
+                >
+                  <option value="COP">COP</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="MXN">MXN</option>
+                  <option value="ARS">ARS</option>
+                </select>
+                <div className="relative flex-1">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted font-medium">$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={form.buyInAmount > 0 ? form.buyInAmount.toLocaleString(locale === "en" ? "en-US" : "es-CO") : ""}
+                    onChange={(e) => {
+                      // Strip non-digits so the user can paste "10.000" or
+                      // "10,000" and we still get a clean number. Limit to
+                      // 9 digits so nobody types a billion-peso polla.
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 9);
+                      updateForm("buyInAmount", digits ? parseInt(digits, 10) : 0);
+                    }}
+                    placeholder={t("step3FeePlaceholder")}
+                    className="w-full pl-8 pr-4 py-3 rounded-xl outline-none transition-colors bg-bg-elevated border border-border-subtle text-text-primary placeholder:text-text-muted/40 focus:ring-1 focus:ring-gold/40 focus:border-gold/50"
+                  />
+                </div>
               </div>
             </div>
 

@@ -29,6 +29,10 @@ const createPollaSchema = z
     scope: z.enum(["full", "group_stage", "knockouts", "custom"]).default("full"),
     type: z.literal("closed").default("closed"),
     buyInAmount: z.number().min(0, "El valor de entrada no puede ser negativo"),
+    // Multi-currency: pollas internacionales usan USD/EUR/MXN/ARS, las
+    // colombianas (default) siguen en COP. La columna ya existe desde
+    // migration 001 con default 'COP'.
+    currency: z.enum(["COP", "USD", "EUR", "MXN", "ARS"]).default("COP"),
     paymentMode: z.enum(paymentModes),
     matchIds: z.array(z.string()).optional(),
     // Solo requerido cuando paymentMode === 'admin_collects'
@@ -74,11 +78,18 @@ const createPollaSchema = z
       path: ["adminPayoutMethod"],
     },
   )
-  // Validación: buy_in_amount debe ser >= 1000
+  // Validación: buy_in_amount tiene mínimo por currency. Evita pollas
+  // por debajo del valor de un café — y en USD/EUR el mínimo es mucho
+  // más bajo en valor absoluto que en COP.
   .refine(
-    (data) => data.buyInAmount >= 1000,
+    (data) => {
+      const minByCurrency: Record<string, number> = {
+        COP: 1000, USD: 1, EUR: 1, MXN: 20, ARS: 1000,
+      };
+      return data.buyInAmount >= (minByCurrency[data.currency] ?? 1);
+    },
     {
-      message: "El valor minimo es $1.000",
+      message: "El valor por debajo del mínimo permitido",
       path: ["buyInAmount"],
     }
   )
@@ -389,7 +400,7 @@ export async function POST(request: NextRequest) {
         scope: parsed.data.scope,
         type: parsed.data.type,
         buy_in_amount: parsed.data.buyInAmount,
-        currency: "COP",
+        currency: parsed.data.currency,
         payment_mode: parsed.data.paymentMode,
         admin_payment_instructions:
           parsed.data.paymentMode === "admin_collects"

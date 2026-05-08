@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Users, Trophy } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatCOP } from "@/lib/formatCurrency";
+import { useLocale } from "next-intl";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 export interface PollaCardProps {
   polla: {
@@ -19,6 +20,8 @@ export interface PollaCardProps {
     competitionLogos?: string[];
     participantCount: number;
     buyInAmount: number;
+    /** Currency code (COP, USD, etc.). Default COP para legacy rows. */
+    currency?: string;
     /** Pozo total acumulado (buy_in × seats que ya cuentan según
      *  payment_mode). Se muestra al lado de la cuota individual. */
     potTotal?: number;
@@ -45,6 +48,7 @@ export function PollaCard({
   variant = "grid",
   onTap,
 }: PollaCardProps) {
+  const locale = useLocale();
   const isLeader = !!userContext?.isLeader && !endedState;
   const isCarousel = variant === "carousel";
   const hasMatchProgress = polla.totalMatches > 0;
@@ -115,7 +119,7 @@ export function PollaCard({
             {polla.buyInAmount > 0 ? (
               <>
                 <span className="text-text-muted/50" aria-hidden="true">·</span>
-                <span>{formatCOP(polla.buyInAmount)} c/u</span>
+                <span>{formatCurrency(polla.buyInAmount, polla.currency ?? "COP", locale)} c/u</span>
               </>
             ) : null}
           </div>
@@ -131,7 +135,7 @@ export function PollaCard({
                   Pozo
                 </span>
                 <span className="text-[14px] font-semibold">
-                  {formatCOP(polla.potTotal)}
+                  {formatCurrency(polla.potTotal, polla.currency ?? "COP", locale)}
                 </span>
               </div>
             ) : null
