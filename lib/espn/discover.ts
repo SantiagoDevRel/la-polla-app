@@ -321,13 +321,14 @@ export async function discoverTournament(
   }
   result.fetched = events.length;
 
-  // Asegurar placeholder rows para fases de bracket conocidas (cuartos,
-  // semis, final, etc.). Antes de insertar matches reales, así el
-  // promote-or-insert tiene slots disponibles. Idempotente.
-  const ph = await ensurePlaceholders(supabase, tournamentSlug);
-  if (ph.created > 0) {
-    result.warnings.push(`creados ${ph.created} placeholders`);
-  }
+  // NO pre-creamos placeholders TBD vs TBD. Se decidió en 2026-05-08
+  // tras descubrir que cuando una fase de bracket aún no tenía matchups
+  // publicados, los TBDs cluttereaban /pollas/crear y solo se promovían
+  // tarde. Ahora la UI muestra "fase pendiente" usando TOURNAMENT_STRUCTURE
+  // sin necesidad de rows en DB. Si necesitamos predictions a ciegas
+  // sobre una final futura, lo modelamos con UN row específico, no con
+  // pre-creación masiva. (Lookup #4 en upsert_match_safe queda por compat
+  // con cualquier TBD legacy que aún tenga predictions vivas.)
 
   if (events.length === 0) return result;
 
