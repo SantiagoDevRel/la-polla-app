@@ -572,114 +572,13 @@ export async function handlePronosticar(
     );
   }
 
-  // Grouping gate. When the polla spans multiple phases OR multiple dates
-  // we route the user through an interactive toggle + group selector before
-  // showing the paginated match list. State carries the current choice so
-  // pagination ("Ver más") stays inside the selected group.
-  const baseMatches = unpredicted.length > 0 ? unpredicted : matches;
-  const uniquePhases = new Set(
-    baseMatches.map((m) => (m as { phase: string | null }).phase ?? "__none__")
-  );
-  const uniqueDateKeys = new Set(
-    baseMatches.map((m) =>
-      new Date(m.scheduled_at).toISOString().slice(0, 10)
-    )
-  );
-  const groupingUseful = uniquePhases.size > 1 || uniqueDateKeys.size > 1;
-  const existingState = await getState(phone);
-  const stateMode = existingState?.predictGroupMode ?? null;
-  const stateKey = existingState?.predictGroupKey ?? null;
-
-  let targetMatches = baseMatches;
-  if (groupingUseful && page === 0 && !specificMatchId) {
-    if (!stateMode) {
-      // Ask the user how to group. setState parks them in picking_group so
-      // any stray text ends up ignored instead of interpreted as a score.
-      await setState(phone, { action: "picking_group", pollaId });
-      await sendReplyButtons(
-        phone,
-        "¿Cómo quieres ver los partidos?",
-        [
-          { id: `predgrp_phase_${pollaId}`, title: "Por fase" },
-          { id: `predgrp_date_${pollaId}`, title: "Por fecha" },
-        ],
-        `🎯 ${polla.name}`,
-        FOOTER
-      );
-      return;
-    }
-    if (!stateKey) {
-      const groups =
-        stateMode === "phase"
-          ? groupMatchesByPhase(baseMatches as GroupableMatch[])
-          : groupMatchesByDate(baseMatches as GroupableMatch[]);
-      // If the chosen mode only produces a single group, skip the selector
-      // and fall through to the flat list with every match visible.
-      if (groups.length > 1) {
-        const GROUP_PAGE_SIZE = 9; // 1 slot reserved for "Ver más"
-        const groupPage = existingState?.predictGroupPage ?? 0;
-        const groupStart = groupPage * GROUP_PAGE_SIZE;
-        const pageGroups = groups.slice(groupStart, groupStart + GROUP_PAGE_SIZE);
-        const hasMoreGroups = groupStart + GROUP_PAGE_SIZE < groups.length;
-
-        const rows: { id: string; title: string; description: string }[] = pageGroups.map((g) => ({
-          id: `pgsel|${pollaId}|${g.key}`,
-          title: `${g.label} (${g.matches.length})`.slice(0, 24),
-          description: g.matches.length === 1 ? "1 partido" : `${g.matches.length} partidos`,
-        }));
-        if (hasMoreGroups) {
-          const remaining = groups.length - (groupStart + GROUP_PAGE_SIZE);
-          rows.push({
-            id: `pgmore|${pollaId}|${groupPage + 1}`,
-            title: stateMode === "phase"
-              ? `Ver más fases (${remaining}) →`.slice(0, 24)
-              : `Ver más fechas (${remaining}) →`.slice(0, 24),
-            description: `Mostrar los siguientes ${Math.min(GROUP_PAGE_SIZE, remaining)}`,
-          });
-        } else {
-          // Last page only: offer an escape hatch to re-pick the grouping
-          // mode. If there is still a "Ver más" row we skip this to keep
-          // the 10-row WhatsApp cap; the user will see the option once
-          // they reach the final page.
-          rows.push({
-            id: `pgreset|${pollaId}`,
-            title: "🔄 Cambiar agrupación".slice(0, 24),
-            description: "Volver a elegir por fase o por fecha",
-          });
-        }
-
-        // Persist the page so pagination taps can increment it.
-        await setState(phone, {
-          action: "picking_group",
-          pollaId,
-          predictGroupMode: stateMode,
-          predictGroupPage: groupPage,
-        });
-
-        await sendListMessage(
-          phone,
-          stateMode === "phase"
-            ? `¿Qué fase quieres pronosticar?${groupPage > 0 ? ` _(página ${groupPage + 1})_` : ""}`
-            : `¿Qué fecha quieres pronosticar?${groupPage > 0 ? ` _(página ${groupPage + 1})_` : ""}`,
-          "Ver grupos",
-          [{ title: "Grupos", rows }],
-          `🎯 ${polla.name}`,
-          FOOTER
-        );
-        return;
-      }
-    } else {
-      // Filter matches to the selected group.
-      const groups =
-        stateMode === "phase"
-          ? groupMatchesByPhase(baseMatches as GroupableMatch[])
-          : groupMatchesByDate(baseMatches as GroupableMatch[]);
-      const chosen = groups.find((g) => g.key === stateKey);
-      if (chosen) {
-        targetMatches = chosen.matches as typeof baseMatches;
-      }
-    }
-  }
+  // Decisión 2026-05-08: en WhatsApp NO mostramos el gate "¿por fase o
+  // por fecha?". Caemos directo a la lista plana paginada de partidos
+  // sin pronosticar (orden cronológico). Razón UX: el user en chat
+  // quiere tap-tap, no un picker más antes de ver los partidos. La
+  // paginación de WhatsApp (10 rows + "Ver más") cubre cualquier
+  // tamaño de polla.
+  const targetMatches = unpredicted.length > 0 ? unpredicted : matches;
 
   // List view with pagination (WhatsApp lists are capped at 10 rows).
   const startIdx = page * PAGE_SIZE;
@@ -690,8 +589,6 @@ export async function handlePronosticar(
     action: "picking_match",
     pollaId,
     page,
-    ...(stateMode ? { predictGroupMode: stateMode } : {}),
-    ...(stateKey ? { predictGroupKey: stateKey } : {}),
   });
 
   const rows = pageMatches.map((m) => {

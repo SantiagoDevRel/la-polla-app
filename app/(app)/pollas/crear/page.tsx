@@ -175,7 +175,10 @@ export default function CrearPollaPage() {
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [selectedMatchIds, setSelectedMatchIds] = useState<Set<string>>(new Set());
-  const [groupBy, setGroupBy] = useState<GroupBy>("date");
+  // Decisión 2026-05-08: el grouping por fase fue eliminado para
+  // simplificar UX. Siempre agrupamos por fecha. La constante se queda
+  // en lugar de la state var para no tocar el resto del flujo.
+  const groupBy: GroupBy = "date";
   // Collapsed state por torneo en el picker — para que el organizador
   // pueda esconder un torneo después de elegir matches y no tenga que
   // scrollear todo. Solo aplica en pollas combinadas.
@@ -590,18 +593,7 @@ export default function CrearPollaPage() {
               {tournamentMeta && <img src={tournamentMeta.logoPath} alt="" width={28} height={28} style={{ objectFit: "contain", opacity: 0.6 }} />}
             </div>
 
-            {/* Group filters */}
-            <div className="hide-scrollbar" style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
-              {(["date", "phase"] as GroupBy[]).map((g) => (
-                <button key={g} onClick={() => setGroupBy(g)} style={{
-                  borderRadius: 20, padding: "4px 10px", fontSize: 11, fontWeight: groupBy === g ? 600 : 500, cursor: "pointer", whiteSpace: "nowrap",
-                  background: groupBy === g ? "rgba(255,215,0,0.1)" : "#0e1420", color: groupBy === g ? "#FFD700" : "#4a5568",
-                  border: groupBy === g ? "1px solid rgba(255,215,0,0.22)" : "1px solid rgba(255,255,255,0.06)", fontFamily: "'Outfit', sans-serif",
-                }}>
-                  {g === "date" ? t("groupByDate") : t("groupByPhase")}
-                </button>
-              ))}
-            </div>
+            {/* Group filters removidos — siempre por fecha. */}
 
             {/* Quick actions */}
             <div style={{ display: "flex", gap: 12, paddingTop: 4 }}>

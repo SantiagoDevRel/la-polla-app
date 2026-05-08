@@ -4,8 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ESPN_LEAGUE_BY_TOURNAMENT } from "@/lib/espn/client";
-import { discoverTournament, ensurePlaceholders } from "@/lib/espn/discover";
-import { TOURNAMENT_STRUCTURE } from "@/lib/tournaments/structure";
+import { discoverTournament } from "@/lib/espn/discover";
 
 const DISCOVER_TTL_MS = 30 * 60 * 1000; // re-discover max cada 30 min por torneo
 
@@ -67,15 +66,11 @@ export async function GET(request: NextRequest) {
       return query;
     };
 
-    // Asegurar placeholders ANTES de la primera query — así el picker
-    // de crear-polla muestra los slots de cuartos/semis/final aunque
-    // ESPN aún no haya publicado los matchups. NO hace requests
-    // externos, solo SQL en nuestra DB. Idempotente.
-    if (tournament && TOURNAMENT_STRUCTURE[tournament]) {
-      await ensurePlaceholders(admin, tournament).catch((err) => {
-        console.warn("[matches] ensurePlaceholders failed:", err);
-      });
-    }
+    // Antes hacíamos ensurePlaceholders acá para crear filas TBD vs TBD
+    // por cada slot de bracket. Eliminado 2026-05-08 — generaba TBDs
+    // stale en /pollas/crear cuando ESPN tardaba en publicar matchups.
+    // La UI ahora deriva las fases pendientes de TOURNAMENT_STRUCTURE
+    // sin tocar la DB.
 
     const initial = await runQuery();
     if (initial.error) {
