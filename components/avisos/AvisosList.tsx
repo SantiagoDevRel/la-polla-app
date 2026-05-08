@@ -15,6 +15,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Trophy, Flag, Bell, Check, LogIn } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { getPollitoBase } from "@/lib/pollitos";
 
 type NotificationType =
@@ -112,17 +113,22 @@ const TYPE_VISUALS: Record<NotificationType, TypeVisual> = {
   },
 };
 
-function timeAgo(iso: string): string {
+function timeAgo(
+  iso: string,
+  locale: string,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
   const ms = Date.now() - new Date(iso).getTime();
   const s = Math.floor(ms / 1000);
-  if (s < 60) return "ahora";
+  if (s < 60) return t("timeNow");
   const m = Math.floor(s / 60);
-  if (m < 60) return `hace ${m} min`;
+  if (m < 60) return t("timeMinAgo", { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `hace ${h} h`;
+  if (h < 24) return t("timeHrAgo", { n: h });
   const d = Math.floor(h / 24);
-  if (d < 7) return `hace ${d} d`;
-  return new Date(iso).toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
+  if (d < 7) return t("timeDayAgo", { n: d });
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  return new Date(iso).toLocaleDateString(intlTag, { day: "2-digit", month: "short" });
 }
 
 export interface AvisosListProps {
@@ -131,6 +137,8 @@ export interface AvisosListProps {
 }
 
 export function AvisosList({ initialItems, initialUnread }: AvisosListProps) {
+  const t = useTranslations("Avisos");
+  const locale = useLocale();
   const router = useRouter();
   const [items, setItems] = useState<AvisoItem[]>(initialItems);
   const [unread, setUnread] = useState<number>(initialUnread);
@@ -189,7 +197,7 @@ export function AvisosList({ initialItems, initialUnread }: AvisosListProps) {
             ) : null}
           </div>
           <h1 className="font-display text-[26px] tracking-[0.06em] uppercase text-text-primary leading-none">
-            Avisos
+            {t("header")}
           </h1>
         </div>
         {unread > 0 ? (
@@ -199,7 +207,7 @@ export function AvisosList({ initialItems, initialUnread }: AvisosListProps) {
             className="flex items-center gap-1 font-body text-[11px] font-semibold tracking-[0.06em] uppercase text-text-primary hover:text-gold transition-colors"
           >
             <Check className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
-            Leer todas
+            {t("markAll")}
           </button>
         ) : null}
       </header>
@@ -222,6 +230,8 @@ export function AvisosList({ initialItems, initialUnread }: AvisosListProps) {
                   item={n}
                   onMarkRead={markRead}
                   animateIcon={isTopUnread}
+                  locale={locale}
+                  t={t}
                 />
               );
             });
@@ -236,10 +246,14 @@ function Aviso({
   item,
   onMarkRead,
   animateIcon = false,
+  locale,
+  t,
 }: {
   item: AvisoItem;
   onMarkRead: (id: string) => void;
   animateIcon?: boolean;
+  locale: string;
+  t: (key: string, values?: Record<string, string | number>) => string;
 }) {
   const visual = TYPE_VISUALS[item.type];
   const unread = !item.read_at;
@@ -316,7 +330,7 @@ function Aviso({
             {item.title}
           </p>
           <span className="font-body text-[10px] text-text-muted flex-shrink-0 pt-0.5">
-            {timeAgo(item.created_at)}
+            {timeAgo(item.created_at, locale, t)}
           </span>
         </div>
         {item.body ? (
@@ -328,7 +342,7 @@ function Aviso({
 
       {unread ? (
         <span
-          aria-label="Sin leer"
+          aria-label={t("ariaUnread")}
           className="w-2 h-2 rounded-full bg-gold flex-shrink-0 mt-1"
         />
       ) : null}
@@ -367,6 +381,7 @@ function Aviso({
 }
 
 function EmptyState() {
+  const t = useTranslations("Avisos");
   return (
     <div className="mt-8 flex flex-col items-center text-center gap-3 px-6">
       <div className="relative w-24 h-24">
@@ -379,7 +394,7 @@ function EmptyState() {
         />
       </div>
       <p className="font-body text-[13px] text-text-secondary max-w-[240px]">
-        Todavía no hay avisos. Cuando pase algo en tus pollas lo ves acá.
+        {t("empty")}
       </p>
     </div>
   );

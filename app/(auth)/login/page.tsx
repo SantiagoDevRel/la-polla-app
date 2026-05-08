@@ -11,6 +11,7 @@ import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import axios from "axios";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
@@ -41,6 +42,8 @@ interface PollaPreview {
 }
 
 function LoginInner() {
+  const t = useTranslations("Login");
+  const tc = useTranslations("Common");
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
 
@@ -146,14 +149,14 @@ function LoginInner() {
     // the user clicks fast, the disabled state on the button covers the
     // happy path; this is the safety net (e.g. Enter key on the form).
     if (cooldownRemaining > 0) {
-      setError(`Espera ${cooldownRemaining}s para reenviar el código`);
+      setError(t("errCooldown", { seconds: cooldownRemaining }));
       return;
     }
     const phone = buildPhone();
     // Smallest plausible E.164 is "+CCNNNNNNN" (~9 chars total). Twilio
     // Verify itself will reject anything malformed.
     if (!phone.startsWith("+") || phone.replace(/\D/g, "").length < 8) {
-      setError("Ingresa un número válido con código de país");
+      setError(t("errInvalidPhone"));
       return;
     }
     setSending(true);
@@ -169,7 +172,7 @@ function LoginInner() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(json.error || "No pudimos enviar el código");
+        setError(json.error || t("errSendFailed"));
         return;
       }
       // Arm the cooldown only after a successful send — failures don't
@@ -181,7 +184,7 @@ function LoginInner() {
       }
       setStep("otp");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error de red");
+      setError(err instanceof Error ? err.message : t("errNetwork"));
     } finally {
       setSending(false);
     }
@@ -191,7 +194,7 @@ function LoginInner() {
     e.preventDefault();
     setError(null);
     if (otp.length !== 6) {
-      setError("El código tiene 6 dígitos");
+      setError(t("errOtpLength"));
       return;
     }
     setVerifying(true);
@@ -210,7 +213,7 @@ function LoginInner() {
         const body = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(body?.error ?? "Código inválido o vencido");
+        setError(body?.error ?? t("errOtpInvalid"));
         return;
       }
       const body = (await res.json()) as { newUser?: boolean };
@@ -223,7 +226,7 @@ function LoginInner() {
       // siguiente request (router.push a veces las pierde en middleware).
       window.location.href = body?.newUser ? "/onboarding" : rt || "/inicio";
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error de red");
+      setError(err instanceof Error ? err.message : t("errNetwork"));
     } finally {
       setVerifying(false);
     }
@@ -243,7 +246,7 @@ function LoginInner() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/pollitos/logo_realistic.webp"
-                alt="La Polla"
+                alt={t("brand")}
                 width={80}
                 height={80}
                 style={{
@@ -261,17 +264,17 @@ function LoginInner() {
                 textShadow: "0 0 24px rgba(255,215,0,0.35)",
               }}
             >
-              LA POLLA
+              {t("brand")}
             </h1>
             <p className="text-text-muted text-sm">
-              La polla deportiva de tus amigos
+              {t("tagline")}
             </p>
           </div>
 
           {preview && (
             <div className="rounded-2xl p-4 border border-gold/30 bg-gold/5 space-y-1.5 text-center">
               <p className="text-[11px] uppercase tracking-wider text-text-muted">
-                Te invitaron a unirte a
+                {t("invitedTo")}
               </p>
               <p className="font-display text-2xl text-text-primary tracking-wide">
                 {preview.name}
@@ -283,11 +286,10 @@ function LoginInner() {
                 />
               </div>
               <p className="text-xs text-text-secondary">
-                {preview.participantCount} participante
-                {preview.participantCount === 1 ? "" : "s"}
+                {t("participants", { count: preview.participantCount })}
                 {preview.buy_in_amount > 0
-                  ? ` · ${fmtCOP(preview.buy_in_amount)} por persona`
-                  : " · gratis"}
+                  ? ` · ${t("perPerson", { amount: fmtCOP(preview.buy_in_amount) })}`
+                  : ` · ${t("free")}`}
               </p>
             </div>
           )}
@@ -298,7 +300,7 @@ function LoginInner() {
                 htmlFor="phone"
                 className="block text-sm font-medium text-text-secondary mb-1.5"
               >
-                Tu número de celular
+                {t("phoneLabel")}
               </label>
               <PhoneInput onChange={setPhoneE164} />
             </div>
@@ -328,20 +330,20 @@ function LoginInner() {
                 {sending ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Enviando…
+                    {t("btnSending")}
                   </>
                 ) : cooldownRemaining > 0 ? (
-                  <>Espera {cooldownRemaining}s</>
+                  <>{t("btnWaitSeconds", { seconds: cooldownRemaining })}</>
                 ) : (
                   <>
                     <MessageSquare className="w-5 h-5" />
-                    SMS
+                    {t("btnSms")}
                   </>
                 )}
               </button>
 
               <a
-                href={botDeepLink("Hola parce! 🐥 quiero entrar a la polla")}
+                href={botDeepLink(tc("whatsappBotMessage"))}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold py-3.5 px-3 rounded-xl hover:brightness-110 transition-all text-base inline-flex items-center justify-center gap-2"
@@ -350,7 +352,7 @@ function LoginInner() {
                   color: "#080c10",
                   boxShadow: "0 0 20px rgba(37,211,102,0.18)",
                 }}
-                aria-label="Recibir código por WhatsApp"
+                aria-label={t("whatsappAria")}
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -360,13 +362,13 @@ function LoginInner() {
                 >
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
                 </svg>
-                WhatsApp
+                {t("btnWhatsapp")}
               </a>
             </div>
           </form>
 
           <p className="text-[10px] text-text-muted/70 text-center pt-1">
-            Al continuar, aceptas nuestros términos y condiciones
+            {t("termsHint")}
           </p>
         </div>
       )}
@@ -375,10 +377,10 @@ function LoginInner() {
         <div className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
           <div className="text-center space-y-2">
             <h2 className="font-display text-2xl text-gold tracking-wide">
-              INGRESA TU CÓDIGO
+              {t("otpTitle")}
             </h2>
             <p className="text-text-secondary text-sm">
-              Enviado a{" "}
+              {t("otpSentTo")}{" "}
               <span className="text-text-primary font-semibold">
                 {buildPhone()}
               </span>
@@ -392,7 +394,7 @@ function LoginInner() {
               }}
               className="text-xs text-gold/70 hover:text-gold transition-colors"
             >
-              ← Cambiar número
+              {t("otpChangePhone")}
             </button>
           </div>
 
@@ -426,10 +428,10 @@ function LoginInner() {
               {verifying ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Verificando...
+                  {t("otpVerifying")}
                 </>
               ) : (
-                "Verificar código"
+                t("otpVerify")
               )}
             </button>
 
@@ -442,7 +444,7 @@ function LoginInner() {
               }}
               className="w-full text-text-secondary font-medium py-2 hover:text-gold transition-colors flex items-center justify-center gap-1.5 text-sm"
             >
-              <ArrowLeft className="w-4 h-4" /> Reenviar código o cambiar número
+              <ArrowLeft className="w-4 h-4" /> {t("otpResend")}
             </button>
           </form>
 
@@ -453,12 +455,12 @@ function LoginInner() {
               on purpose — gold is reserved for the primary CTA. */}
           <div className="text-center pt-1">
             <a
-              href={botDeepLink("Hola parce! 🐥 quiero entrar a la polla")}
+              href={botDeepLink(tc("whatsappBotMessage"))}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-text-muted hover:text-gold transition-colors inline-flex items-center gap-1"
             >
-              ¿No te llegó? <span className="underline">Prueba con WhatsApp</span>
+              {t("otpDidntArrive")} <span className="underline">{t("otpTryWhatsapp")}</span>
             </a>
           </div>
         </div>

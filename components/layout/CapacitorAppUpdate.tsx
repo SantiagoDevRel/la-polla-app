@@ -17,6 +17,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 const DISMISS_KEY = "lp_app_update_dismissed_v1";
 
@@ -25,6 +26,7 @@ const DISMISS_KEY = "lp_app_update_dismissed_v1";
 const AVAILABILITY_AVAILABLE = 2;
 
 export function CapacitorAppUpdate() {
+  const t = useTranslations("AppUpdate");
   const [show, setShow] = useState(false);
   const [updating, setUpdating] = useState(false);
 
@@ -102,11 +104,10 @@ export function CapacitorAppUpdate() {
           className="font-display text-3xl tracking-wide mb-3"
           style={{ color: "#FFD700" }}
         >
-          NUEVA VERSIÓN
+          {t("title")}
         </h2>
         <p className="text-sm leading-relaxed mb-6" style={{ color: "#AEB7C7" }}>
-          Hay una versión más nueva de La Polla Colombiana en Play Store. Actualizá
-          para tener las últimas mejoras y correcciones.
+          {t("body")}
         </p>
         <div className="flex gap-3">
           <button
@@ -116,7 +117,7 @@ export function CapacitorAppUpdate() {
             className="flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-colors disabled:opacity-40"
             style={{ color: "#AEB7C7", border: "1px solid rgba(174,183,199,0.2)" }}
           >
-            Después
+            {t("later")}
           </button>
           <button
             type="button"
@@ -129,7 +130,7 @@ export function CapacitorAppUpdate() {
               boxShadow: "0 0 20px rgba(255,215,0,0.25)",
             }}
           >
-            {updating ? "Abriendo..." : "Actualizar"}
+            {updating ? t("opening") : t("update")}
           </button>
         </div>
       </div>

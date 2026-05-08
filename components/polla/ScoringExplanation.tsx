@@ -1,56 +1,9 @@
 // components/polla/ScoringExplanation.tsx — Modal que explica el sistema de puntaje
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { HelpCircle, X } from "lucide-react";
-
-const TIERS = [
-  {
-    points: 5,
-    label: "Resultado exacto",
-    pred: "2-1",
-    result: "2-1",
-    desc: "Adivinaste el marcador perfecto",
-    color: "text-gold",
-    bg: "bg-gold/10 border-gold/20",
-  },
-  {
-    points: 3,
-    label: "Ganador + diferencia de gol",
-    pred: "3-2",
-    result: "2-1",
-    desc: "Acertaste quien gana y la diferencia de goles es la misma",
-    color: "text-green-live",
-    bg: "bg-green-live/10 border-green-live/20",
-  },
-  {
-    points: 2,
-    label: "Ganador correcto",
-    pred: "3-0",
-    result: "2-1",
-    desc: "Acertaste quien gana pero la diferencia de goles es diferente",
-    color: "text-blue-info",
-    bg: "bg-blue-info/10 border-blue-info/20",
-  },
-  {
-    points: 1,
-    label: "Acertar goles de un equipo",
-    pred: "2-3",
-    result: "2-1",
-    desc: "Adivinaste los goles de al menos un equipo",
-    color: "text-text-secondary",
-    bg: "bg-bg-elevated border-border-subtle",
-  },
-  {
-    points: 0,
-    label: "Nada",
-    pred: "0-0",
-    result: "2-1",
-    desc: "No acertaste nada",
-    color: "text-text-muted",
-    bg: "bg-bg-card border-border-subtle",
-  },
-];
+import { useTranslations } from "next-intl";
 
 export default function ScoringExplanation({
   compact = false,
@@ -60,6 +13,57 @@ export default function ScoringExplanation({
    *  pot copy without fighting for space. */
   compact?: boolean;
 } = {}) {
+  const t = useTranslations("Scoring");
+  const TIERS = useMemo(
+    () => [
+      {
+        points: 5,
+        label: t("tier1Label"),
+        pred: "2-1",
+        result: "2-1",
+        desc: t("expDescTier1"),
+        color: "text-gold",
+        bg: "bg-gold/10 border-gold/20",
+      },
+      {
+        points: 3,
+        label: t("tier2Label"),
+        pred: "3-2",
+        result: "2-1",
+        desc: t("expDescTier2"),
+        color: "text-green-live",
+        bg: "bg-green-live/10 border-green-live/20",
+      },
+      {
+        points: 2,
+        label: t("tier3Label"),
+        pred: "3-0",
+        result: "2-1",
+        desc: t("expDescTier3"),
+        color: "text-blue-info",
+        bg: "bg-blue-info/10 border-blue-info/20",
+      },
+      {
+        points: 1,
+        label: t("tier4Label"),
+        pred: "2-3",
+        result: "2-1",
+        desc: t("expDescTier4"),
+        color: "text-text-secondary",
+        bg: "bg-bg-elevated border-border-subtle",
+      },
+      {
+        points: 0,
+        label: t("expLabelTier5"),
+        pred: "0-0",
+        result: "2-1",
+        desc: t("expDescTier5"),
+        color: "text-text-muted",
+        bg: "bg-bg-card border-border-subtle",
+      },
+    ],
+    [t],
+  );
   const [open, setOpen] = useState(false);
 
   // Lock body scroll mientras el card está abierto. overscroll-contain en el
@@ -78,7 +82,7 @@ export default function ScoringExplanation({
     <>
       <button
         onClick={() => setOpen(true)}
-        aria-label="Cómo se puntúa"
+        aria-label={t("expModalAria")}
         className={
           compact
             ? "inline-flex items-center justify-center w-5 h-5 rounded-full text-text-primary hover:text-gold transition-colors cursor-pointer"
@@ -86,14 +90,14 @@ export default function ScoringExplanation({
         }
       >
         <HelpCircle className="w-4 h-4" />
-        {compact ? null : "Cómo se puntúa?"}
+        {compact ? null : t("expModalCTA")}
       </button>
 
       {open && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-bg-base/80 backdrop-blur-sm">
           <div className="w-full max-w-md lp-card max-h-[85vh] overflow-y-auto overscroll-contain">
             <div className="sticky top-0 flex items-center justify-between p-4 bg-bg-card border-b border-border-subtle">
-              <h2 className="font-display text-xl text-gold tracking-wide">Sistema de Puntaje</h2>
+              <h2 className="font-display text-xl text-gold tracking-wide">{t("expModalTitle")}</h2>
               <button onClick={() => setOpen(false)} className="text-text-muted hover:text-text-primary transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
@@ -104,11 +108,11 @@ export default function ScoringExplanation({
                 <div key={tier.points} className={`rounded-xl p-3 border ${tier.bg}`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className={`font-bold text-sm ${tier.color}`}>{tier.label}</span>
-                    <span className={`font-display text-lg tabular-nums ${tier.color}`}>{tier.points} pts</span>
+                    <span className={`font-display text-lg tabular-nums ${tier.color}`}>{t("ptsCount", { count: tier.points })}</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs mb-1.5">
-                    <span className="text-text-muted">Tu pronostico: <strong className="text-text-primary">{tier.pred}</strong></span>
-                    <span className="text-text-muted">Resultado: <strong className="text-text-primary">{tier.result}</strong></span>
+                    <span className="text-text-muted">{t("yourPred")}: <strong className="text-text-primary">{tier.pred}</strong></span>
+                    <span className="text-text-muted">{t("result")}: <strong className="text-text-primary">{tier.result}</strong></span>
                   </div>
                   <p className="text-xs text-text-secondary">{tier.desc}</p>
                 </div>

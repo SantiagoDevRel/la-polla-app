@@ -6,10 +6,15 @@
 // /perfil, etc.
 "use client";
 
+import { useTranslations } from "next-intl";
 import WhatsAppBubble from "@/components/shared/WhatsAppBubble";
 import ReportProblemBubble from "@/components/shared/ReportProblemBubble";
 
 export default function BrandHeader() {
+  const t = useTranslations("Brand");
+  const part1 = t("wordmarkPart1");
+  const part2 = t("wordmarkPart2");
+  const part3 = t("wordmarkPart3");
   return (
     <header
       className="sticky top-0 z-40 px-4 pt-4 pb-3 backdrop-blur-md"
@@ -36,9 +41,20 @@ export default function BrandHeader() {
               textShadow: "0 2px 6px rgba(0,0,0,0.55)",
             }}
           >
-            <span style={{ color: "#FFD700" }}>LA</span>
-            <span style={{ color: "#2F6DF4" }}>POLLA</span>
-            <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
+            {part3 ? (
+              <>
+                {/* Tricolor wordmark — Colombian flag colors. */}
+                <span style={{ color: "#FFD700" }}>{part1}</span>
+                <span style={{ color: "#2F6DF4" }}>{part2}</span>
+                <span style={{ color: "#E4463A" }}>{part3}</span>
+              </>
+            ) : (
+              <>
+                {/* Single-color wordmark (locales sin la metáfora bandera). */}
+                <span style={{ color: "#FFD700" }}>{part1}</span>
+                <span style={{ color: "#FFD700" }}>{part2}</span>
+              </>
+            )}
           </span>
         </div>
         <div className="flex items-center gap-2">

@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { MessageSquareWarning, Send, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 
 interface Props {
@@ -17,6 +18,8 @@ interface Props {
 }
 
 export default function ReportProblemBubble({ size = 34, className = "" }: Props) {
+  const t = useTranslations("Report");
+  const tCommon = useTranslations("Common");
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -59,21 +62,18 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
         // Inline error: el toast queda tapado por el modal (z-index), por
         // eso lo mostramos dentro del propio modal mientras siga abierto.
         if (res.status === 401) {
-          setError("Tienes que iniciar sesión para reportar.");
+          setError(t("errAuth"));
         } else {
-          setError("No pudimos enviar tu reporte. Inténtalo de nuevo.");
+          setError(t("errSend"));
         }
         return;
       }
       // Cerramos primero, después el toast — así el toast queda visible.
       setMessage("");
       setOpen(false);
-      showToast(
-        "¡Gracias por reportar el problema/feedback! Lo solucionaremos pronto",
-        "success",
-      );
+      showToast(t("successToast"), "success");
     } catch {
-      setError("Error de red. Inténtalo de nuevo.");
+      setError(t("errNetwork"));
     } finally {
       setSubmitting(false);
     }
@@ -90,7 +90,7 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Reportar un problema"
+        aria-label={t("ariaButton")}
         className={`inline-flex items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 ${className}`}
         style={{
           width: size,
@@ -129,12 +129,12 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
                 className="font-display text-lg leading-none"
                 style={{ color: "var(--text-primary)" }}
               >
-                Reportar un problema/feedback
+                {t("title")}
               </h2>
               <button
                 type="button"
                 onClick={close}
-                aria-label="Cerrar"
+                aria-label={tCommon("close")}
                 disabled={submitting}
                 className="p-1 rounded-full hover:bg-white/10 disabled:opacity-50 transition-colors shrink-0"
               >
@@ -164,7 +164,7 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
               }}
               maxLength={4000}
               rows={6}
-              placeholder="Contanos qué pasó…"
+              placeholder={t("placeholder")}
               className="w-full rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--green-live)]"
               style={{
                 backgroundColor: "var(--bg-base)",
@@ -193,7 +193,7 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
                 }}
               >
                 <Send size={16} strokeWidth={2.5} />
-                {submitting ? "Enviando…" : "Enviar"}
+                {submitting ? t("sending") : t("send")}
               </button>
             </div>
           </div>

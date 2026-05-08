@@ -11,6 +11,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Drawer } from "vaul";
 import { Home, Bell, Bookmark, User, Plus, KeyRound } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/components/ui/Toast";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
@@ -30,11 +31,11 @@ export interface BottomNavProps {
   pollasPending?: number;
 }
 
-const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; label: string }> = [
-  { key: "inicio", href: "/inicio", Icon: Home, label: "Inicio" },
-  { key: "pollas", href: "/pollas", Icon: Bookmark, label: "Pollas" },
-  { key: "avisos", href: "/avisos", Icon: Bell, label: "Avisos" },
-  { key: "perfil", href: "/perfil", Icon: User, label: "Perfil" },
+const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; labelKey: "tabInicio" | "tabPollas" | "tabAvisos" | "tabPerfil" }> = [
+  { key: "inicio", href: "/inicio", Icon: Home, labelKey: "tabInicio" },
+  { key: "pollas", href: "/pollas", Icon: Bookmark, labelKey: "tabPollas" },
+  { key: "avisos", href: "/avisos", Icon: Bell, labelKey: "tabAvisos" },
+  { key: "perfil", href: "/perfil", Icon: User, labelKey: "tabPerfil" },
 ];
 
 function deriveActive(pathname: string | null): NavKey | undefined {
@@ -65,10 +66,11 @@ function TabItem({
   badge?: number;
   /** "red" para avisos sin leer; "gold" para acciones pendientes (pronósticos). */
   badgeTone?: "red" | "gold";
-  /** Prefijo del aria-label del badge. Default "sin leer". */
+  /** Prefijo del aria-label del badge. Default es "sin leer" / "unread". */
   badgeLabelPrefix?: string;
 }) {
-  const { Icon, label, href } = tab;
+  const t = useTranslations("Nav");
+  const { Icon, labelKey, href } = tab;
   const showBadge = typeof badge === "number" && badge > 0;
   const badgeLabel = showBadge ? (badge! > 9 ? "9+" : String(badge)) : null;
   const badgeBg = badgeTone === "gold" ? "bg-gold text-bg-base" : "bg-red-alert text-white";
@@ -88,13 +90,13 @@ function TabItem({
               "absolute -top-1 -right-2 min-w-[14px] h-[14px] px-[3px] rounded-full text-[9px] font-bold leading-[14px] text-center border-[2px] border-bg-base",
               badgeBg,
             )}
-            aria-label={`${badge} ${badgeLabelPrefix ?? "sin leer"}`}
+            aria-label={`${badge} ${badgeLabelPrefix ?? t("ariaUnread")}`}
           >
             {badgeLabel}
           </span>
         )}
       </span>
-      <span className="font-body text-[10px] font-semibold">{label}</span>
+      <span className="font-body text-[10px] font-semibold">{t(labelKey)}</span>
     </Link>
   );
 }
@@ -106,6 +108,7 @@ export function BottomNav({
   notifUnread = 0,
   pollasPending = 0,
 }: BottomNavProps) {
+  const t = useTranslations("Nav");
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast();
@@ -142,7 +145,7 @@ export function BottomNav({
   return (
     <>
       <nav
-        aria-label="Navegación inferior"
+        aria-label={t("ariaNav")}
         className="fixed left-[14px] right-[14px] bottom-[14px] z-50 rounded-full backdrop-blur-md border border-border-subtle h-[76px] max-w-[480px] mx-auto"
         style={{ background: "rgba(14, 20, 32, 0.92)" }}
       >
@@ -154,7 +157,7 @@ export function BottomNav({
               active={resolvedActive === middleLeft.key}
               badge={pollasPending}
               badgeTone="gold"
-              badgeLabelPrefix="por pronosticar"
+              badgeLabelPrefix={t("ariaToPredict")}
             />
           </div>
 
@@ -174,7 +177,7 @@ export function BottomNav({
               e.currentTarget.blur();
               setChoiceOpen(true);
             }}
-            aria-label="Crear o unirme a una polla"
+            aria-label={t("ariaCreateJoin")}
             className={fabClass}
             style={fabStyle}
           >
@@ -195,14 +198,14 @@ export function BottomNav({
           <Drawer.Content
             className="fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border border-border-default bg-bg-card"
           >
-            <Drawer.Title className="sr-only">Nueva polla</Drawer.Title>
+            <Drawer.Title className="sr-only">{t("newPolla")}</Drawer.Title>
             <Drawer.Description className="sr-only">
-              Crea una polla nueva o únete a una existente con un código.
+              {t("newPollaDescription")}
             </Drawer.Description>
             <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-border-default" />
             <div className="p-5 pb-8 flex flex-col gap-3">
               <h3 className="font-display text-[22px] tracking-[0.04em] uppercase text-text-primary leading-none mb-1">
-                Nueva polla
+                {t("newPolla")}
               </h3>
               <Link
                 href={effectiveCreateHref}
@@ -213,7 +216,7 @@ export function BottomNav({
                 className="flex items-center gap-3 rounded-full bg-gold text-bg-base font-display tracking-[0.06em] uppercase text-[16px] h-[52px] px-5 shadow-[0_8px_24px_-6px_rgba(255,215,0,0.4)]"
               >
                 <Plus className="w-5 h-5" strokeWidth={3} aria-hidden="true" />
-                Crear polla nueva
+                {t("createNew")}
               </Link>
               <button
                 type="button"
@@ -226,7 +229,7 @@ export function BottomNav({
                 className="flex items-center gap-3 rounded-full bg-bg-elevated border border-border-default text-text-primary font-display tracking-[0.06em] uppercase text-[16px] h-[52px] px-5"
               >
                 <KeyRound className="w-5 h-5 text-gold" strokeWidth={2} aria-hidden="true" />
-                Unirme con código
+                {t("joinWithCode")}
               </button>
             </div>
           </Drawer.Content>
@@ -238,7 +241,7 @@ export function BottomNav({
         onOpenChange={setJoinOpen}
         onSuccess={(polla) => {
           setJoinOpen(false);
-          showToast(`Te uniste a ${polla.name}`, "success");
+          showToast(t("joinedToast", { name: polla.name }), "success");
           router.push(`/pollas/${polla.slug}`);
         }}
       />

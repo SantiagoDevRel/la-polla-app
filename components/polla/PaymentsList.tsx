@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import axios from "axios";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 import EmptyState from "@/components/ui/EmptyState";
 
@@ -34,13 +35,13 @@ interface PaymentsListProps {
   onChanged: () => void;
 }
 
-function displayLabel(p: PaymentParticipant): string {
+function displayLabel(p: PaymentParticipant, fallback: string): string {
   const name = p.users?.display_name?.trim();
   if (name) return name;
   // Onboarding now requires a real name, but legacy rows or rows mid-
   // creation may still be missing one. Show a neutral placeholder
   // instead of the phone — phones are PII and never appear publicly.
-  return "Participante";
+  return fallback;
 }
 
 // Phone sub-label is only ever rendered to the polla admin (organizer).
@@ -60,14 +61,16 @@ export default function PaymentsList({
   currentUserId,
   onChanged,
 }: PaymentsListProps) {
+  const t = useTranslations("Payments");
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   const canToggle = isAdmin && paymentMode === "admin_collects";
+  const fallback = t("participantFallback");
 
   const rows = [...payments].sort((a, b) => {
     if (a.paid !== b.paid) return a.paid ? -1 : 1;
-    return displayLabel(a).localeCompare(displayLabel(b));
+    return displayLabel(a, fallback).localeCompare(displayLabel(b, fallback));
   });
 
   async function togglePaid(p: PaymentParticipant) {
@@ -81,7 +84,7 @@ export default function PaymentsList({
       onChanged();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      showToast(e.response?.data?.error || "Error actualizando pago", "error");
+      showToast(e.response?.data?.error || t("errPaymentUpdate"), "error");
     } finally {
       setTogglingId(null);
     }
@@ -96,24 +99,24 @@ export default function PaymentsList({
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
         <h3 className="lp-section-title" style={{ fontSize: 14 }}>
-          Pagos
+          {t("listHeader")}
           <span className="text-text-primary/60 font-normal ml-1.5">· {rows.length}</span>
         </h3>
         <span className="text-[11px] text-text-primary/70">
-          {paymentMode === "admin_collects" ? "Pago al principio" : "Pago al final"}
+          {paymentMode === "admin_collects" ? t("modeUpfrontShort") : t("modeWinnerShort")}
         </span>
       </div>
 
       {paymentMode === "pay_winner" && rows.length > 0 && (
         <div className="lp-card px-3 py-2 text-xs text-text-primary/80 text-center">
-          Pendiente hasta que haya ganador — al final, todos le pagan directamente.
+          {t("pendingWinnerHint")}
         </div>
       )}
 
       {rows.length === 0 ? (
         <EmptyState
-          title="Aún no hay participantes"
-          subtitle="Cuando alguien se una, vas a verlo acá."
+          title={t("noParticipantsTitle")}
+          subtitle={t("noParticipantsBody")}
           size={80}
         />
       ) : (
@@ -131,10 +134,10 @@ export default function PaymentsList({
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-text-primary truncate">
-                    {displayLabel(p)}
-                    {isMe && <span className="text-[10px] text-text-muted ml-1">(tú)</span>}
+                    {displayLabel(p, fallback)}
+                    {isMe && <span className="text-[10px] text-text-muted ml-1">{t("youParen")}</span>}
                     {p.role === "admin" && (
-                      <span className="text-[10px] text-gold ml-1">· admin</span>
+                      <span className="text-[10px] text-gold ml-1">{t("tagAdmin")}</span>
                     )}
                   </p>
                   {sub && <p className="text-[11px] text-text-muted truncate">{sub}</p>}
@@ -152,7 +155,7 @@ export default function PaymentsList({
                       p.paid ? "text-green-live" : "text-text-muted"
                     }`}
                   >
-                    {p.paid ? "Pagado" : "Pendiente"}
+                    {p.paid ? t("paid") : t("pending")}
                   </span>
                   {canToggle && p.role !== "admin" && (
                     <button
@@ -161,7 +164,7 @@ export default function PaymentsList({
                       onClick={() => togglePaid(p)}
                       className="text-[11px] ml-1 px-2 py-1 rounded-lg border border-border-subtle hover:border-gold/40 text-text-secondary hover:text-gold disabled:opacity-50 transition-colors"
                     >
-                      {busy ? "…" : p.paid ? "Desmarcar" : "Marcar"}
+                      {busy ? "…" : p.paid ? t("unmark") : t("mark")}
                     </button>
                   )}
                 </div>

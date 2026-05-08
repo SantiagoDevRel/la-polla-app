@@ -5,6 +5,7 @@
 "use client";
 
 import { Trophy } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import type { PrizeDistribution } from "@/components/polla/PrizeDistributionForm";
 
 interface Props {
@@ -12,27 +13,26 @@ interface Props {
   distribution: PrizeDistribution | null;
 }
 
-const ORDINAL_ES = ["1°", "2°", "3°", "4°", "5°", "6°", "7°", "8°", "9°", "10°"];
-function ordinal(p: number): string {
-  return ORDINAL_ES[p - 1] ?? `${p}°`;
-}
-
-function fmtCOP(n: number): string {
-  if (!Number.isFinite(n)) return "—";
-  return `$${Math.round(n).toLocaleString("es-CO")}`;
-}
-
 export default function PrizeDistributionView({ pot, distribution }: Props) {
+  const t = useTranslations("Prizes");
+  const locale = useLocale();
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  const ordinal = (p: number): string => t("ordSuffix", { n: p });
+  const fmtCOP = (n: number): string => {
+    if (!Number.isFinite(n)) return "—";
+    return `$${Math.round(n).toLocaleString(intlTag)}`;
+  };
+
   return (
     <section className="rounded-2xl p-5 lp-card space-y-3">
       <div className="flex items-center gap-2">
         <Trophy className="w-5 h-5 text-gold flex-shrink-0" />
-        <h3 className="text-sm font-bold text-text-primary">Premios</h3>
+        <h3 className="text-sm font-bold text-text-primary">{t("viewTitle")}</h3>
       </div>
 
       {!distribution || distribution.prizes.length === 0 ? (
         <p className="text-xs text-text-muted">
-          El organizador aún no definió la distribución de premios.
+          {t("viewEmpty")}
         </p>
       ) : (
         <ul className="space-y-2">

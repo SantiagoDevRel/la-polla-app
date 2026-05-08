@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { Type } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   applyScale,
   getStoredScale,
@@ -22,6 +23,7 @@ const OPTIONS: { value: FontScale; label: string; size: number }[] = [
 ];
 
 export default function FontScalePicker() {
+  const t = useTranslations("Settings");
   // SSR-safe init: render the default ("md") on the server, then sync to
   // the actual stored value on mount. Avoids a hydration mismatch when
   // the user has a non-default preference.
@@ -51,11 +53,11 @@ export default function FontScalePicker() {
         }}
       >
         <Type className="w-3.5 h-3.5" style={{ color: "#FFD700" }} />
-        Tamaño del texto
+        {t("fontSizeLabel")}
       </div>
       <div
         role="radiogroup"
-        aria-label="Tamaño del texto"
+        aria-label={t("fontSizeLabel")}
         style={{ display: "flex", gap: 8 }}
       >
         {OPTIONS.map((opt) => {

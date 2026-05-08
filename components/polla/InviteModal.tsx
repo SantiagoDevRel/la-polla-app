@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { Drawer } from "vaul";
+import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 
 interface InviteModalProps {
@@ -30,6 +31,7 @@ export default function InviteModal({
   joinCode,
   canRotate,
 }: InviteModalProps) {
+  const t = useTranslations("Invite");
   const { showToast } = useToast();
   const [token, setToken] = useState<string | null>(null);
   const [loadingToken, setLoadingToken] = useState(false);
@@ -62,16 +64,16 @@ export default function InviteModal({
     ? `${origin}/invites/polla/${token}`
     : `${origin}/pollas/${pollaSlug}`;
   const whatsappText = code
-    ? `Únete a mi polla "${pollaName}": ${link}\nO usa el código ${code} en la app.`
-    : `Únete a mi polla "${pollaName}": ${link}`;
+    ? t("whatsappTextWithCode", { pollaName, link, code })
+    : t("whatsappTextNoCode", { pollaName, link });
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(whatsappText)}`;
 
   async function handleCopyLink() {
     try {
       await navigator.clipboard.writeText(link);
-      showToast("Link copiado", "success");
+      showToast(t("linkCopied"), "success");
     } catch {
-      showToast("No se pudo copiar", "error");
+      showToast(t("errCopy"), "error");
     }
   }
 
@@ -79,9 +81,9 @@ export default function InviteModal({
     if (!code) return;
     try {
       await navigator.clipboard.writeText(code);
-      showToast("Código copiado", "success");
+      showToast(t("codeCopied"), "success");
     } catch {
-      showToast("No se pudo copiar", "error");
+      showToast(t("errCopy"), "error");
     }
   }
 
@@ -93,9 +95,9 @@ export default function InviteModal({
       );
       setCode(data.code);
       setConfirmRotate(false);
-      showToast("Código renovado", "success");
+      showToast(t("codeRenewed"), "success");
     } catch {
-      showToast("No se pudo rotar el código", "error");
+      showToast(t("errRotateCode"), "error");
     } finally {
       setRotating(false);
     }
@@ -111,22 +113,22 @@ export default function InviteModal({
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60 z-[55]" />
         <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border border-border-medium bg-bg-card">
-          <Drawer.Title className="sr-only">Invitar amigos a {pollaName}</Drawer.Title>
+          <Drawer.Title className="sr-only">{t("drawerTitle", { pollaName })}</Drawer.Title>
           <Drawer.Description className="sr-only">
-            Comparte el código o el link para que otros se unan a la polla.
+            {t("drawerDescription")}
           </Drawer.Description>
           <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-border-default" />
           <div className="w-full max-w-lg mx-auto p-6 space-y-4 safe-bottom">
 
         <h3 className="text-lg font-bold text-text-primary text-center">
-          Invitar amigos a {pollaName}
+          {t("title", { pollaName })}
         </h3>
 
         {/* Join code block */}
         {code ? (
           <div className="rounded-xl p-4 space-y-3 bg-gold/5 border border-gold/25">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gold text-center">
-              Código para unirse
+              {t("joinCodeLabel")}
             </p>
             <p
               className="text-center font-mono text-[32px] tracking-[0.32em] text-gold"
@@ -139,7 +141,7 @@ export default function InviteModal({
                 onClick={handleCopyCode}
                 className="flex-1 bg-bg-elevated text-text-primary border border-border-default font-semibold py-2 rounded-lg text-sm hover:border-gold/40 transition-colors"
               >
-                Copiar código
+                {t("copyCode")}
               </button>
               {canRotate ? (
                 <button
@@ -147,7 +149,7 @@ export default function InviteModal({
                   disabled={rotating}
                   className="flex-1 bg-transparent text-text-secondary border border-border-default font-semibold py-2 rounded-lg text-sm hover:text-red-alert hover:border-red-alert/40 transition-colors disabled:opacity-50"
                 >
-                  Generar nuevo código de invitación
+                  {t("renewCode")}
                 </button>
               ) : null}
             </div>
@@ -158,7 +160,7 @@ export default function InviteModal({
         {confirmRotate ? (
           <div className="rounded-xl p-3 bg-red-alert/10 border border-red-alert/25 space-y-2">
             <p className="text-sm text-text-primary text-center">
-              ¿Generar un nuevo código? El actual dejará de funcionar.
+              {t("confirmRotate")}
             </p>
             <div className="flex gap-2">
               <button
@@ -166,14 +168,14 @@ export default function InviteModal({
                 disabled={rotating}
                 className="flex-1 bg-bg-elevated text-text-secondary border border-border-default font-semibold py-2 rounded-lg text-sm disabled:opacity-50"
               >
-                Cancelar
+                {t("cancel")}
               </button>
               <button
                 onClick={handleRotate}
                 disabled={rotating}
                 className="flex-1 bg-red-alert text-bg-base font-semibold py-2 rounded-lg text-sm disabled:opacity-60"
               >
-                {rotating ? "Rotando..." : "Sí, rotar"}
+                {rotating ? t("rotating") : t("yesRotate")}
               </button>
             </div>
           </div>
@@ -186,10 +188,10 @@ export default function InviteModal({
         <div className="rounded-xl p-3 text-sm break-all text-center"
           style={{ backgroundColor: "var(--bg-card-elevated)", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)" }}>
           {loadingToken && !token
-            ? "Generando link..."
+            ? t("generatingLink")
             : token
               ? link
-              : "Link no disponible"}
+              : t("linkUnavailable")}
         </div>
 
         <div className="space-y-2">
@@ -201,7 +203,7 @@ export default function InviteModal({
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
             </svg>
-            {!loadingToken && !token ? "Link no disponible" : "Copiar link"}
+            {!loadingToken && !token ? t("linkUnavailable") : t("copyLink")}
           </button>
           {token ? (
             <a href={whatsappUrl} target="_blank" rel="noopener noreferrer"
@@ -210,7 +212,7 @@ export default function InviteModal({
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.002-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
               </svg>
-              Compartir por WhatsApp
+              {t("shareWhatsapp")}
             </a>
           ) : (
             <button
@@ -220,10 +222,10 @@ export default function InviteModal({
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.002-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
               </svg>
-              Compartir por WhatsApp
+              {t("shareWhatsapp")}
             </button>
           )}
-          <button onClick={onClose} className="w-full text-text-muted font-medium py-2 text-sm">Cerrar</button>
+          <button onClick={onClose} className="w-full text-text-muted font-medium py-2 text-sm">{t("close")}</button>
         </div>
           </div>
         </Drawer.Content>

@@ -1,5 +1,6 @@
 // app/(app)/invites/[token]/page.tsx — Accept a polla invite via token
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -17,6 +18,7 @@ export default async function AcceptInvitePage({
     redirect("/login");
   }
 
+  const t = await getTranslations("Invites");
   const admin = createAdminClient();
 
   // Look up invite
@@ -27,15 +29,15 @@ export default async function AcceptInvitePage({
     .single();
 
   if (inviteError || !invite) {
-    return <InviteError message="Invitación no encontrada" />;
+    return <InviteError message={t("errNotFound")} />;
   }
 
   if (invite.status !== "pending") {
-    return <InviteError message="Esta invitación ya fue usada" />;
+    return <InviteError message={t("errAlreadyUsed")} />;
   }
 
   if (new Date(invite.expires_at) < new Date()) {
-    return <InviteError message="Esta invitación expiró" />;
+    return <InviteError message={t("errExpired")} />;
   }
 
   // Get polla slug for redirect
@@ -46,7 +48,7 @@ export default async function AcceptInvitePage({
     .single();
 
   if (!polla) {
-    return <InviteError message="La polla ya no existe" />;
+    return <InviteError message={t("errPollaGone")} />;
   }
 
   // Check if user is already a participant
@@ -78,7 +80,7 @@ export default async function AcceptInvitePage({
 
   if (insertError) {
     console.error("[invite accept] Error inserting participant:", insertError);
-    return <InviteError message="Error al unirse. Intenta de nuevo." />;
+    return <InviteError message={t("errJoin")} />;
   }
 
   // Mark invite as accepted
@@ -90,20 +92,21 @@ export default async function AcceptInvitePage({
   redirect(`/pollas/${polla.slug}`);
 }
 
-function InviteError({ message }: { message: string }) {
+async function InviteError({ message }: { message: string }) {
+  const t = await getTranslations("Invites");
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="rounded-2xl p-8 text-center lp-card max-w-sm w-full">
         <p className="text-4xl mb-4">😕</p>
         <h2 className="text-lg font-bold text-text-primary mb-2">
-          Invitación inválida
+          {t("errInvalidTitle")}
         </h2>
         <p className="text-sm text-text-secondary mb-6">{message}</p>
         <a
           href="/inicio"
           className="inline-block bg-gold text-bg-base font-semibold py-3 px-6 rounded-xl hover:brightness-110 transition-all"
         >
-          Ir al inicio
+          {t("goHome")}
         </a>
       </div>
     </div>

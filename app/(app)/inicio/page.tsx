@@ -26,6 +26,7 @@
 
 import { redirect } from "next/navigation";
 import { Clock } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPollitoBase } from "@/lib/pollitos";
@@ -101,7 +102,10 @@ interface MatchLite {
 // Fetch every polla the user belongs to (creator or participant) and
 // enrich each row with Phase 3b contract fields plus a soonest-upcoming
 // key for the Inicio sort order.
-async function fetchEnrichedPollas(userId: string): Promise<EnrichedPolla[]> {
+async function fetchEnrichedPollas(
+  userId: string,
+  fallbacks: { winner: string },
+): Promise<EnrichedPolla[]> {
   const admin = createAdminClient();
 
   // Step 1: fetch the user's participant rows. Supabase anon/SSR client
@@ -253,7 +257,7 @@ async function fetchEnrichedPollas(userId: string): Promise<EnrichedPolla[]> {
     }[]) {
       const u = Array.isArray(w.users) ? w.users[0] : w.users;
       winnerByPolla[w.polla_id] = {
-        winner_name: u?.display_name || "Ganador",
+        winner_name: u?.display_name || fallbacks.winner,
         winner_points: w.total_points ?? 0,
       };
     }
@@ -344,7 +348,10 @@ function sortPollasForCarousel(pollas: EnrichedPolla[]): EnrichedPolla[] {
 // with no results yet) the ranking falls back to "first to join wins" —
 // intentional, so the podium always has a visible #1 for the pollito to
 // sit on even before any match plays.
-async function fetchPodiumTop3(pollaId: string): Promise<PodiumEntry[]> {
+async function fetchPodiumTop3(
+  pollaId: string,
+  playerFallback: string,
+): Promise<PodiumEntry[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("polla_participants")
@@ -371,7 +378,7 @@ async function fetchPodiumTop3(pollaId: string): Promise<PodiumEntry[]> {
     const u = Array.isArray(r.users) ? r.users[0] : r.users;
     return {
       userId: r.user_id,
-      name: u?.display_name || "Jugador",
+      name: u?.display_name || playerFallback,
       // Pollito image source for the podium avatar slot. Falls back to the
       // generic waiting pollito when the user has not picked a character.
       avatarUrl: getPollitoBase(u?.avatar_url ?? null),
@@ -385,8 +392,9 @@ async function fetchPodiumTop3(pollaId: string): Promise<PodiumEntry[]> {
 // default visible page (e.g. polla with the soonest upcoming match).
 async function fetchPodiumsForPollas(
   pollas: EnrichedPolla[],
+  playerFallback: string,
 ): Promise<Array<{ pollaSlug: string; pollaName: string; top3: PodiumEntry[] }>> {
-  const top3s = await Promise.all(pollas.map((p) => fetchPodiumTop3(p.id)));
+  const top3s = await Promise.all(pollas.map((p) => fetchPodiumTop3(p.id, playerFallback)));
   return pollas.map((p, i) => ({
     pollaSlug: p.slug,
     pollaName: p.name,
@@ -415,6 +423,7 @@ interface RivalPayload {
 async function findRivalForUser(
   userId: string,
   activePollas: EnrichedPolla[],
+  rivalFallback: string,
 ): Promise<RivalPayload | null> {
   const ranked = activePollas.filter((p) => p.user_rank != null);
   if (ranked.length === 0) return null;
@@ -484,7 +493,7 @@ async function findRivalForUser(
     const rivalPoints = best.row.total_points ?? 0;
     const rivalRank = best.row.rank ?? 0;
     const mode: "chasing" | "behind" = rivalRank > userRank ? "chasing" : "behind";
-    const displayName = u.display_name || "Tu rival";
+    const displayName = u.display_name || rivalFallback;
     const firstName = displayName.split(" ")[0];
 
     return {
@@ -592,6 +601,15 @@ export default async function InicioPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const tCommon = await getTranslations("Common");
+  const tInicio = await getTranslations("Inicio");
+  const fallbacks = {
+    user: tCommon("userFallback"),
+    winner: tCommon("winnerFallback"),
+    player: tCommon("playerFallback"),
+    rival: tCommon("rivalFallback"),
+  };
+
   const admin = createAdminClient();
 
   // Fetch profile: display_name for the greeting, avatar_url for the pollito
@@ -602,7 +620,7 @@ export default async function InicioPage() {
     .eq("id", user.id)
     .single();
 
-  const displayName = publicUser?.display_name || user.phone || "Usuario";
+  const displayName = publicUser?.display_name || user.phone || fallbacks.user;
   const firstName = displayName.split(" ")[0];
 
   // Resumen de pronósticos pendientes — dedupe-ado con el cálculo del
@@ -610,7 +628,7 @@ export default async function InicioPage() {
   const pendingSummary = await getPendingPredictionsSummary(user.id);
 
   // Enriched pollas + sort + cap.
-  const allPollas = await fetchEnrichedPollas(user.id);
+  const allPollas = await fetchEnrichedPollas(user.id, { winner: fallbacks.winner });
   const sortedPollas = sortPollasForCarousel(allPollas);
   // Active-only filter (Phase 3c follow-up: ended pollas do not appear on
   // Inicio — users see them on /pollas). This is the canonical source
@@ -629,7 +647,7 @@ export default async function InicioPage() {
   // already fetched above. The rival lookup makes one tiny extra query
   // (adjacent ranks in the user's best polla); the callout is pure.
   const rankCallout = pickRankCallout(activePollas);
-  const rival = isActiveEmpty ? null : await findRivalForUser(user.id, activePollas);
+  const rival = isActiveEmpty ? null : await findRivalForUser(user.id, activePollas, fallbacks.rival);
   // Podium carousel: one card per active polla, ordered by created_at via
   // activePollas' existing sort. Default visible page = the polla with
   // the soonest upcoming match (smallest soonest_upcoming_ms). When every
@@ -637,7 +655,7 @@ export default async function InicioPage() {
   // wins by index.
   const podiumItems = isActiveEmpty
     ? []
-    : await fetchPodiumsForPollas(activePollas);
+    : await fetchPodiumsForPollas(activePollas, fallbacks.player);
   const podiumDefaultIndex = isActiveEmpty
     ? 0
     : activePollas.reduce(
@@ -855,7 +873,7 @@ export default async function InicioPage() {
             <section>
               <h2 className="lp-section-title px-4 mb-3 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-alert animate-pulse" aria-hidden="true" />
-                En vivo
+                {tInicio("liveSection")}
               </h2>
               <div className="overflow-x-auto hide-scrollbar">
                 <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
@@ -918,7 +936,7 @@ export default async function InicioPage() {
             <section>
               <h2 className="lp-section-title px-4 mb-3 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-gold" aria-hidden="true" />
-                Próximos
+                {tInicio("upcomingSection")}
               </h2>
               <div className="overflow-x-auto hide-scrollbar">
                 <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
@@ -974,7 +992,7 @@ export default async function InicioPage() {
           {!isActiveEmpty && podiumItems.length > 0 ? (
             <section>
               <h2 className="lp-section-title px-4 mb-3">
-                Podio
+                {tInicio("podiumSection")}
               </h2>
               <PodiumCarousel
                 items={podiumItems}

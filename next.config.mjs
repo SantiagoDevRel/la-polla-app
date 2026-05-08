@@ -3,6 +3,9 @@
 // mantenido del mismo modelo Workbox; las reglas de cache viven en
 // app/sw.ts en lugar de inferirse del config.
 import withSerwistInit from "@serwist/next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
@@ -84,4 +87,4 @@ const nextConfig = {
   },
 };
 
-export default withSerwist(nextConfig);
+export default withNextIntl(withSerwist(nextConfig));

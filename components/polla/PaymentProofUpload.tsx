@@ -10,6 +10,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { Upload, Check, AlertTriangle, X as XIcon, Copy, ShieldCheck, Clock } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { preprocessImageForVision } from "@/lib/vision/preprocess-image";
 
 type SubmitStatus = {
@@ -30,20 +31,16 @@ interface Props {
   onPendingReview: (rejectionReason: string | null) => void;
 }
 
-const METHOD_LABEL: Record<string, string> = {
-  nequi: "Nequi",
-  bancolombia: "Bancolombia",
-  otro: "Otro",
+const METHOD_LABEL_KEYS: Record<string, string> = {
+  nequi: "methodNequi",
+  bancolombia: "methodBancolombia",
+  otro: "methodOtro",
 };
 
-const ACCOUNT_TYPE_LABEL: Record<string, string> = {
-  ahorros: "Ahorros",
-  corriente: "Corriente",
+const ACCOUNT_TYPE_LABEL_KEYS: Record<string, string> = {
+  ahorros: "accountTypeAhorros",
+  corriente: "accountTypeCorriente",
 };
-
-function fmtCOP(n: number): string {
-  return `$${Math.round(n).toLocaleString("es-CO")}`;
-}
 
 export default function PaymentProofUpload({
   pollaSlug,
@@ -55,6 +52,21 @@ export default function PaymentProofUpload({
   onApproved,
   onPendingReview,
 }: Props) {
+  const t = useTranslations("Payments");
+  const tPayout = useTranslations("Payout");
+  const locale = useLocale();
+  const intlTag = locale === "en" ? "en-US" : "es-CO";
+  const fmtCOP = (n: number): string => `$${Math.round(n).toLocaleString(intlTag)}`;
+  const methodLabel = (m: string | null | undefined): string => {
+    if (!m) return "";
+    const key = METHOD_LABEL_KEYS[m];
+    return key ? tPayout(key) : m;
+  };
+  const accountTypeLabel = (a: string | null | undefined): string => {
+    if (!a) return "";
+    const key = ACCOUNT_TYPE_LABEL_KEYS[a];
+    return key ? tPayout(key) : a;
+  };
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -118,7 +130,7 @@ export default function PaymentProofUpload({
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
         (err as Error).message ??
-        "Error subiendo el comprobante";
+        t("errUpload");
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -134,14 +146,14 @@ export default function PaymentProofUpload({
   return (
     <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 border border-gold/30">
       <h3 className="font-bold text-text-primary flex items-center gap-2">
-        <ShieldCheck className="w-5 h-5 text-gold" /> Subir comprobante
+        <ShieldCheck className="w-5 h-5 text-gold" /> {t("uploadTitle")}
       </h3>
 
       {/* Datos del admin a quien transferir — minimal: cuenta + monto.
           Si es Bancolombia/Otro mostramos "Ahorros · Bancolombia" debajo
           del número para que el pagador no se confunda con el tipo. */}
       <div className="rounded-xl px-3 py-3 bg-bg-elevated border border-border-subtle space-y-2">
-        <p className="text-[10px] uppercase tracking-wide text-text-muted">Pagale a</p>
+        <p className="text-[10px] uppercase tracking-wide text-text-muted">{t("payTo")}</p>
         <div className="flex items-center justify-between gap-2">
           <p className="min-w-0 flex-1 text-[16px] font-semibold text-text-primary tabular-nums truncate" style={{ fontFeatureSettings: '"tnum"' }}>
             {payoutAccount}
@@ -151,13 +163,13 @@ export default function PaymentProofUpload({
             onClick={copyAccount}
             className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-border-subtle hover:border-gold/40 text-text-secondary hover:text-gold transition-colors flex-shrink-0"
           >
-            {copied ? (<><Check className="w-3 h-3" /> Copiado</>) : (<><Copy className="w-3 h-3" /> Copiar</>)}
+            {copied ? (<><Check className="w-3 h-3" /> {t("uploadCopied")}</>) : (<><Copy className="w-3 h-3" /> {t("uploadCopy")}</>)}
           </button>
         </div>
         {payoutMethod ? (
           <p className="text-[12px] text-text-secondary">
-            {payoutAccountType ? `${ACCOUNT_TYPE_LABEL[payoutAccountType]} ` : ""}
-            {METHOD_LABEL[payoutMethod] ?? payoutMethod}
+            {payoutAccountType ? `${accountTypeLabel(payoutAccountType)} ` : ""}
+            {methodLabel(payoutMethod)}
           </p>
         ) : null}
         <p
@@ -178,10 +190,10 @@ export default function PaymentProofUpload({
       {status ? (
         <div className="rounded-xl px-3 py-3 bg-amber/10 border border-amber/40 space-y-1">
           <p className="text-[14px] text-amber font-bold flex items-center gap-1.5">
-            <Clock className="w-4 h-4" /> Comprobante recibido
+            <Clock className="w-4 h-4" /> {t("proofReceived")}
           </p>
           <p className="text-[12px] text-text-secondary leading-snug">
-            El organizador va a revisarlo y aprobarte manualmente.
+            {t("willReviewManually")}
           </p>
         </div>
       ) : null}
@@ -191,7 +203,7 @@ export default function PaymentProofUpload({
         <label className="flex flex-col items-center justify-center gap-2 w-full bg-gold/10 border-2 border-dashed border-gold/50 rounded-2xl px-4 py-7 cursor-pointer hover:bg-gold/15 transition-colors">
           <Upload className="w-7 h-7 text-gold" />
           <span className="font-display text-[16px] tracking-wide text-gold uppercase text-center">
-            Sube tu screenshot aquí
+            {t("uploadHere")}
           </span>
           <input
             type="file"
@@ -211,13 +223,13 @@ export default function PaymentProofUpload({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={previewUrl}
-            alt="comprobante"
+            alt={t("altProof")}
             style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
           />
           <button
             type="button"
             onClick={() => pickFile(null)}
-            aria-label="Cambiar"
+            aria-label={t("ariaChange")}
             className="absolute top-2 right-2 inline-flex items-center justify-center w-8 h-8 rounded-full bg-bg-base/90 border border-border-subtle text-text-muted hover:text-text-primary"
           >
             <XIcon className="w-4 h-4" />
@@ -237,7 +249,7 @@ export default function PaymentProofUpload({
         disabled={!file || submitting}
         className="w-full bg-gold text-bg-base font-display text-base tracking-wide py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(255,215,0,0.2)]"
       >
-        {submitting ? "VERIFICANDO…" : "SUBIR Y VERIFICAR"}
+        {submitting ? t("verifying") : t("uploadAndVerify")}
       </button>
     </div>
   );

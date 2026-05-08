@@ -11,6 +11,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 const SEEN_KEY = "lp_splash_seen_v2";
 const TOTAL_MS = 3200;
@@ -19,6 +20,7 @@ const FADE_MS = 500;
 type Phase = "idle" | "playing" | "fading";
 
 export function SplashScreen() {
+  const t = useTranslations("Brand");
   const [phase, setPhase] = useState<Phase>("idle");
 
   useEffect(() => {
@@ -48,6 +50,10 @@ export function SplashScreen() {
   }, []);
 
   if (phase === "idle") return null;
+
+  const part1 = t("wordmarkPart1");
+  const part2 = t("wordmarkPart2");
+  const part3 = t("wordmarkPart3");
 
   return (
     <div
@@ -88,9 +94,18 @@ export function SplashScreen() {
             paintOrder: "stroke fill",
           }}
         >
-          <span style={{ color: "#FFD700" }}>LA</span>
-          <span style={{ color: "#2F6DF4" }}>POLLA</span>
-          <span style={{ color: "#E4463A" }}>COLOMBIANA</span>
+          {part3 ? (
+            <>
+              <span style={{ color: "#FFD700" }}>{part1}</span>
+              <span style={{ color: "#2F6DF4" }}>{part2}</span>
+              <span style={{ color: "#E4463A" }}>{part3}</span>
+            </>
+          ) : (
+            <>
+              <span style={{ color: "#FFD700" }}>{part1}</span>
+              <span style={{ color: "#FFD700" }}>{part2}</span>
+            </>
+          )}
         </span>
       </div>
       <div

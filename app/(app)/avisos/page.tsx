@@ -5,13 +5,19 @@
 // for tabs + optimistic mark-as-read. Metadata keeps this dynamic so
 // unread counts never stale between /inicio round-trips.
 
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AvisosList, type AvisoItem } from "@/components/avisos/AvisosList";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Avisos · La Polla" };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("Avisos");
+  return { title: t("metadataTitle") };
+}
 
 export default async function AvisosPage() {
   const supabase = createClient();

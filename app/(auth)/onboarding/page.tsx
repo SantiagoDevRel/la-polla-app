@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import {
   POLLITO_TYPES,
@@ -16,9 +17,17 @@ import {
 import FootballLoader from "@/components/ui/FootballLoader";
 import { needsName } from "@/lib/users/needs-name";
 
-function StepDots({ total, current }: { total: number; current: number }) {
+function StepDots({
+  total,
+  current,
+  ariaLabel,
+}: {
+  total: number;
+  current: number;
+  ariaLabel: string;
+}) {
   return (
-    <div className="flex gap-1 mb-3" aria-label={`Paso ${current} de ${total}`}>
+    <div className="flex gap-1 mb-3" aria-label={ariaLabel}>
       {Array.from({ length: total }).map((_, i) => (
         <div
           key={i}
@@ -33,6 +42,8 @@ function StepDots({ total, current }: { total: number; current: number }) {
 }
 
 export default function OnboardingPage() {
+  const t = useTranslations("Onboarding");
+  const tc = useTranslations("Common");
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState("");
@@ -89,7 +100,7 @@ export default function OnboardingPage() {
     setError("");
     const trimmed = name.trim();
     if (trimmed.length < 2) {
-      setError("El nombre debe tener al menos 2 caracteres");
+      setError(t("errNameMin"));
       return;
     }
     setStep(2);
@@ -109,7 +120,7 @@ export default function OnboardingPage() {
       if (rt) window.sessionStorage.removeItem("lp_returnTo");
       router.push(rt || "/inicio");
     } catch {
-      setError("Error guardando tu perfil. Intenta de nuevo.");
+      setError(t("errSaveProfile"));
     } finally {
       setLoading(false);
     }
@@ -120,7 +131,7 @@ export default function OnboardingPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-2">
           <FootballLoader />
-          <p className="text-text-muted text-sm">Cargando...</p>
+          <p className="text-text-muted text-sm">{tc("loading")}</p>
         </div>
       </div>
     );
@@ -137,10 +148,10 @@ export default function OnboardingPage() {
             boxShadow: "0 0 60px rgba(255,215,0,0.05)",
           }}
         >
-          <StepDots total={2} current={1} />
+          <StepDots total={2} current={1} ariaLabel={t("stepLabel", { current: 1, total: 2 })} />
           <div className="text-center">
             <div className="text-[10px] font-bold tracking-[0.14em] text-text-muted uppercase">
-              Paso 1 de 2
+              {t("stepLabel", { current: 1, total: 2 })}
             </div>
             <motion.img
               src={getPollitoBase(DEFAULT_POLLITO)}
@@ -150,10 +161,10 @@ export default function OnboardingPage() {
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
             />
             <h1 className="font-display text-gold" style={{ fontSize: 28, letterSpacing: "0.1em" }}>
-              ¿Cómo te llamas?
+              {t("step1Title")}
             </h1>
             <p style={{ color: "#F5F7FA", fontSize: 13, marginTop: 4 }}>
-              Los demás participantes verán este nombre
+              {t("step1Subtitle")}
             </p>
           </div>
 
@@ -162,7 +173,7 @@ export default function OnboardingPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Tu nombre"
+              placeholder={t("namePlaceholder")}
               autoFocus
               maxLength={50}
               style={{
@@ -204,7 +215,7 @@ export default function OnboardingPage() {
                 boxShadow: "0 0 20px rgba(255,215,0,0.15)",
               }}
             >
-              Continuar
+              {tc("continue")}
             </button>
           </form>
         </div>
@@ -221,19 +232,19 @@ export default function OnboardingPage() {
             overflowY: "auto",
           }}
         >
-          <StepDots total={2} current={2} />
+          <StepDots total={2} current={2} ariaLabel={t("stepLabel", { current: 2, total: 2 })} />
           <div className="text-center">
             <div className="text-[10px] font-bold tracking-[0.14em] text-text-muted uppercase">
-              Paso 2 de 2
+              {t("stepLabel", { current: 2, total: 2 })}
             </div>
             <h1
               className="font-display text-gold mt-1"
               style={{ fontSize: 28, letterSpacing: "0.06em", lineHeight: 1 }}
             >
-              ELEGÍ TU POLLITO
+              {t("step2Title")}
             </h1>
             <p style={{ color: "#F5F7FA", fontSize: 13, marginTop: 4 }}>
-              Tu avatar en todas las pollas
+              {t("step2Subtitle")}
             </p>
           </div>
 
@@ -349,7 +360,7 @@ export default function OnboardingPage() {
                 fontSize: 14,
               }}
             >
-              Atrás
+              {tc("back")}
             </button>
             <button
               type="button"
@@ -370,7 +381,7 @@ export default function OnboardingPage() {
                 boxShadow: "0 0 20px rgba(255,215,0,0.15)",
               }}
             >
-              {loading ? "Guardando..." : "¡DALE, LISTO!"}
+              {loading ? tc("saving") : t("finish")}
             </button>
           </div>
         </div>

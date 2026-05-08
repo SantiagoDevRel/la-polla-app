@@ -4,6 +4,7 @@
 // the login flow needing to push them through it.
 "use client";
 
+import { useTranslations } from "next-intl";
 import { botDeepLink } from "@/lib/whatsapp/bot-phone";
 
 interface WhatsAppBubbleProps {
@@ -19,22 +20,21 @@ interface WhatsAppBubbleProps {
   className?: string;
 }
 
-const DEFAULT_PRETEXT =
-  "Hola parce! muestrame el menu de La Polla porfa";
-
 export default function WhatsAppBubble({
-  prefilledText = DEFAULT_PRETEXT,
+  prefilledText,
   size = 32,
   className = "",
 }: WhatsAppBubbleProps) {
-  const href = botDeepLink(prefilledText);
+  const t = useTranslations("Common");
+  const text = prefilledText ?? t("whatsappBubbleText");
+  const href = botDeepLink(text);
 
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Abrir el bot de La Polla en WhatsApp"
+      aria-label={t("whatsappBubbleAria")}
       className={`inline-flex items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 ${className}`}
       style={{
         width: size,

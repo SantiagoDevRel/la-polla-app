@@ -11,21 +11,11 @@
 //   - otro:         cuenta + nombre completo.
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CreditCard, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export type PayoutMethod = "nequi" | "bancolombia" | "otro";
-
-const METHOD_OPTIONS: Array<{
-  id: PayoutMethod;
-  label: string;
-  accountPlaceholder: string;
-  needsName: boolean;
-}> = [
-  { id: "nequi", label: "Nequi", accountPlaceholder: "Número de celular", needsName: false },
-  { id: "bancolombia", label: "Bancolombia", accountPlaceholder: "Número de cuenta", needsName: true },
-  { id: "otro", label: "Otro", accountPlaceholder: "Banco + tipo + número", needsName: true },
-];
 
 interface Props {
   open: boolean;
@@ -48,6 +38,21 @@ export default function DefaultPayoutPromptModal({
   onSubmit,
   onSkip,
 }: Props) {
+  const t = useTranslations("Payout");
+  const tCommon = useTranslations("Common");
+  const METHOD_OPTIONS = useMemo<Array<{
+    id: PayoutMethod;
+    label: string;
+    accountPlaceholder: string;
+    needsName: boolean;
+  }>>(
+    () => [
+      { id: "nequi", label: t("methodNequi"), accountPlaceholder: t("placeholderPhone"), needsName: false },
+      { id: "bancolombia", label: t("methodBancolombia"), accountPlaceholder: t("placeholderAccount"), needsName: true },
+      { id: "otro", label: t("methodOtro"), accountPlaceholder: t("placeholderBankCombo"), needsName: true },
+    ],
+    [t],
+  );
   const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "nequi");
   const [account, setAccount] = useState(initialAccount ?? "");
   const [accountName, setAccountName] = useState(initialAccountName ?? "");
@@ -77,7 +82,7 @@ export default function DefaultPayoutPromptModal({
           type="button"
           onClick={onSkip}
           className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors p-1"
-          aria-label="Cerrar"
+          aria-label={tCommon("close")}
         >
           <X className="w-5 h-5" />
         </button>
@@ -87,10 +92,10 @@ export default function DefaultPayoutPromptModal({
             <CreditCard className="w-7 h-7 text-gold" />
           </div>
           <h2 className="font-display text-[22px] tracking-[0.04em] text-gold uppercase">
-            Tu cuenta para cobrar
+            {t("promptTitle")}
           </h2>
           <p className="text-[13px] text-text-secondary mt-1.5 leading-snug">
-            Cuando ganes una polla, todos te pagarán directamente a esta cuenta.
+            {t("promptHelp")}
           </p>
         </div>
 
@@ -125,16 +130,14 @@ export default function DefaultPayoutPromptModal({
             type="text"
             value={accountName}
             onChange={(e) => setAccountName(e.target.value)}
-            placeholder="Nombre completo como aparece en la cuenta"
+            placeholder={t("placeholderFullName")}
             className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 mb-2"
           />
         ) : null}
 
         <p className="text-[11px] text-text-muted text-center mb-3">
-          {needsName
-            ? "El nombre tiene que ser EXACTAMENTE como aparece en tu cuenta."
-            : "Nequi solo se identifica por celular."}
-          {" "}Solo lo ven los participantes de pollas donde ganes.
+          {needsName ? t("nameWarning") : t("nequiHint")}
+          {" "}{t("privacyHint")}
         </p>
 
         <button
@@ -143,7 +146,7 @@ export default function DefaultPayoutPromptModal({
           disabled={!canSave}
           className="w-full bg-gold text-bg-base font-display text-base tracking-wide py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(255,215,0,0.2)]"
         >
-          {saving ? "GUARDANDO…" : "GUARDAR"}
+          {saving ? t("saving") : t("save")}
         </button>
 
         <button
@@ -151,7 +154,7 @@ export default function DefaultPayoutPromptModal({
           onClick={onSkip}
           className="w-full mt-2 text-[12px] text-text-muted hover:text-text-secondary transition-colors py-2"
         >
-          Saltar por ahora
+          {t("skipForNow")}
         </button>
       </div>
     </div>

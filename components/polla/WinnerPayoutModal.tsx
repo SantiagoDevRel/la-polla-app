@@ -4,21 +4,11 @@
 // viewer es ganador y todavía no llenó payout_account.
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Trophy, Copy, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export type PayoutMethod = "nequi" | "bancolombia" | "otro";
-
-const METHOD_OPTIONS: Array<{
-  id: PayoutMethod;
-  label: string;
-  placeholder: string;
-  needsName: boolean;
-}> = [
-  { id: "nequi", label: "Nequi", placeholder: "Número de celular (ej: 311 314 7831)", needsName: false },
-  { id: "bancolombia", label: "Bancolombia", placeholder: "Número de cuenta de ahorros", needsName: true },
-  { id: "otro", label: "Otro", placeholder: "Banco + tipo + número (ej: Davivienda 0011-...)", needsName: true },
-];
 
 function fmtCOP(n: number): string {
   return `$${Math.round(n).toLocaleString("es-CO")}`;
@@ -52,6 +42,21 @@ export default function WinnerPayoutModal({
   onSubmit,
   onClose,
 }: Props) {
+  const t = useTranslations("Payout");
+  const tCommon = useTranslations("Common");
+  const METHOD_OPTIONS = useMemo<Array<{
+    id: PayoutMethod;
+    label: string;
+    placeholder: string;
+    needsName: boolean;
+  }>>(
+    () => [
+      { id: "nequi", label: t("methodNequi"), placeholder: t("placeholderPhoneExample"), needsName: false },
+      { id: "bancolombia", label: t("methodBancolombia"), placeholder: t("placeholderSavingsAccount"), needsName: true },
+      { id: "otro", label: t("methodOtro"), placeholder: t("placeholderBankComboExample"), needsName: true },
+    ],
+    [t],
+  );
   const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "nequi");
   const [account, setAccount] = useState(initialAccount ?? "");
   const [accountName, setAccountName] = useState(initialAccountName ?? "");
@@ -60,7 +65,11 @@ export default function WinnerPayoutModal({
   if (!open) return null;
   const cur = METHOD_OPTIONS.find((m) => m.id === method)!;
   const needsName = cur.needsName;
-  const ord = position === 1 ? "1°" : position === 2 ? "2°" : position === 3 ? "3°" : `${position}°`;
+  const ord =
+    position === 1 ? t("winnerPlace1")
+    : position === 2 ? t("winnerPlace2")
+    : position === 3 ? t("winnerPlace3")
+    : t("winnerPlaceN", { n: position });
   const canSubmit =
     !!account.trim() && !submitting && (!needsName || accountName.trim().length >= 2);
 
@@ -110,7 +119,7 @@ export default function WinnerPayoutModal({
             type="button"
             onClick={onClose}
             className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors p-1"
-            aria-label="Cerrar"
+            aria-label={tCommon("close")}
           >
             <X className="w-5 h-5" />
           </button>
@@ -121,16 +130,16 @@ export default function WinnerPayoutModal({
             <Trophy className="w-7 h-7 text-gold" />
           </div>
           <h2 className="font-display text-[26px] tracking-[0.04em] text-gold uppercase">
-            ¡Ganaste!
+            {t("winnerTitle")}
           </h2>
           <p className="text-[13px] text-text-secondary mt-0.5">
-            {ord} puesto en <span className="font-semibold text-text-primary">{pollaName}</span>
+            {t("winnerPlace", { ord })} <span className="font-semibold text-text-primary">{pollaName}</span>
           </p>
           <p className="font-display text-[36px] tracking-[0.04em] text-gold mt-1 tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
             {fmtCOP(prizeAmount)}
           </p>
           <p className="text-[12px] text-text-secondary mt-1.5 max-w-[90%]">
-            Dinos a qué cuenta te enviamos el premio.
+            {t("winnerWherePay")}
           </p>
         </div>
 
@@ -167,15 +176,13 @@ export default function WinnerPayoutModal({
             type="text"
             value={accountName}
             onChange={(e) => setAccountName(e.target.value)}
-            placeholder="Nombre completo como aparece en la cuenta"
+            placeholder={t("placeholderFullName")}
             className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 mb-2"
           />
         ) : null}
 
         <p className="text-[11px] text-text-muted mb-3">
-          {needsName
-            ? "El nombre tiene que ser EXACTAMENTE como aparece en tu cuenta del banco."
-            : "Nequi solo se identifica por celular."}
+          {needsName ? t("nameWarningBank") : t("nequiHint")}
         </p>
 
         <button
@@ -184,11 +191,11 @@ export default function WinnerPayoutModal({
           disabled={!canSubmit}
           className="w-full bg-gold text-bg-base font-display text-lg tracking-wide py-3.5 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_24px_rgba(255,215,0,0.25)]"
         >
-          {submitting ? "GUARDANDO…" : "GUARDAR CUENTA"}
+          {submitting ? t("saving") : t("saveAccount")}
         </button>
 
         <p className="text-[11px] text-text-muted text-center mt-3">
-          Solo los participantes de {pollaName} verán esta info.
+          {t("winnerOnlyParticipants", { pollaName })}
         </p>
       </div>
     </div>
@@ -197,6 +204,7 @@ export default function WinnerPayoutModal({
 
 // Helper utilitario reutilizable por otras vistas (Tabla post-ended).
 export function CopyAccountButton({ value }: { value: string }) {
+  const tCommon = useTranslations("Common");
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -212,7 +220,7 @@ export function CopyAccountButton({ value }: { value: string }) {
       }}
       className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-border-subtle hover:border-gold/40 text-text-secondary hover:text-gold transition-colors"
     >
-      <Copy className="w-3 h-3" /> {copied ? "Copiado" : "Copiar"}
+      <Copy className="w-3 h-3" /> {copied ? tCommon("copied") : tCommon("copy")}
     </button>
   );
 }

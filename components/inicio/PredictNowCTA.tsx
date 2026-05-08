@@ -11,6 +11,7 @@
 
 import Link from "next/link";
 import { ChevronRight, Pencil } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import type { PendingFirst } from "@/lib/predictions/pending";
 
 interface Props {
@@ -18,9 +19,10 @@ interface Props {
   first: PendingFirst | null;
 }
 
-export default function PredictNowCTA({ count, first }: Props) {
+export default async function PredictNowCTA({ count, first }: Props) {
   if (count <= 0 || !first) return null;
-  const label = count === 1 ? "1 pronóstico pendiente" : `${count} pronósticos pendientes`;
+  const t = await getTranslations("Inicio");
+  const label = t("predictPending", { count });
   return (
     <section className="px-4">
       <Link
@@ -32,7 +34,7 @@ export default function PredictNowCTA({ count, first }: Props) {
         </span>
         <span className="flex-1 min-w-0">
           <p className="font-display tracking-[0.04em] uppercase text-[16px] leading-none">
-            Pronosticar
+            {t("predictAction")}
           </p>
           <p className="text-[12px] font-semibold opacity-80 mt-0.5 truncate">
             {label} · {first.pollaName}
