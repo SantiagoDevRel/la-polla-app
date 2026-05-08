@@ -1,6 +1,11 @@
 // components/perfil/LanguageToggle.tsx — Selector de idioma (ES/EN) en /perfil.
-// Setea la cookie NEXT_LOCALE; en producción salta al dominio correspondiente
-// (lapollacolombiana.com ↔ chickenpicks.app); en dev solo refresca.
+//
+// En producción: redirige al otro dominio (lapollacolombiana.com ↔
+// chickenpicks.app). NO setea cookie en prod — el dominio dicta el locale,
+// la cookie quedaría inerte.
+//
+// En localhost / Vercel preview: setea la cookie NEXT_LOCALE y refresca
+// la ruta para que el middleware re-renderee con el nuevo locale.
 //
 // Loader: si el cambio se demora más de 200 ms se muestra un FootballLoader
 // (pollito rebotando). Si es instantáneo, no aparece nada — evita flash.
@@ -67,20 +72,31 @@ export default function LanguageToggle() {
   function pick(next: Locale) {
     if (next === current || switching !== null) return;
     setSwitching(next);
-    setLocaleCookie(next);
 
     const host = window.location.hostname.toLowerCase();
     if (isProductionHost(host)) {
+      // Producción: redirect al otro dominio. NO setea cookie — el dominio
+      // dicta el locale y una cookie en el dominio actual quedaría inerte
+      // (peor: si cambian de opinión y vuelven al dominio original, la
+      // cookie vieja confundiría todo).
       const target = next === "es" ? HOST_ES : HOST_EN;
       if (host !== target) {
-        // El switch a otro dominio mantiene `switching` truthy hasta que
-        // el browser navega — el loader se ve durante ese gap.
+        // `switching` se queda truthy hasta que el browser navega — el
+        // loader se ve durante ese gap.
         window.location.href = `https://${target}${window.location.pathname}${window.location.search}`;
         return;
       }
+      // Mismo dominio en prod (caso raro: ya están donde quieren) → refresh.
+      startTransition(() => {
+        router.refresh();
+      });
+      return;
     }
-    // Dev / Vercel preview / mismo dominio → refresh para que el middleware
-    // lea la cookie y el RSC re-renderice con el nuevo locale.
+
+    // Localhost / Vercel preview: cookie + refresh. El middleware en
+    // non-prod respeta la cookie, así que el RSC re-renderiza con el
+    // nuevo locale al refresh.
+    setLocaleCookie(next);
     startTransition(() => {
       router.refresh();
     });

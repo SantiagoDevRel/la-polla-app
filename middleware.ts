@@ -1,7 +1,20 @@
-// middleware.ts — Resolución de locale (cookie > geo > Accept-Language > default)
-// + soft-redirect entre dominios (lapollacolombiana.com ↔ chickenpicks.app)
-// + delegación a updateSession() de Supabase para auth/onboarding gates.
-import { NextResponse, type NextRequest } from "next/server";
+// middleware.ts — Resolución de locale por dominio (host-pinned).
+//
+// Diseño:
+//   - lapollacolombiana.com → siempre 'es'. Punto.
+//   - chickenpicks.app → siempre 'en'. Punto.
+//   - Sin auto-redirect por geo. Si el user tipea chickenpicks.app, ve EN
+//     aunque esté en Colombia. Lo opuesto también.
+//   - Sin set-cookie en redirects. La cookie quedó en producción solo
+//     para localhost/preview/Capacitor (donde no hay un dominio "natural"
+//     que dicte el locale).
+//   - El toggle en /perfil es el ÚNICO mecanismo de cambio de locale en
+//     producción: redirige al otro dominio. Cero magia con cookies en prod.
+//
+// Razón: el diseño previo (geo-redirect + set-cookie en chickenpicks.app)
+// envenenaba el dominio EN con una cookie 'es' para visitantes desde CO,
+// haciendo que próximas visitas a chickenpicks.app vieran ES en vez de EN.
+import { type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 type Locale = "es" | "en";
@@ -9,8 +22,8 @@ type Locale = "es" | "en";
 const HOST_ES = "lapollacolombiana.com";
 const HOST_EN = "chickenpicks.app";
 
-// Países hispanoparlantes — locale 'es' por geo.
-// Resto del mundo (anglos + no-hispanos) → 'en'.
+// Países hispanoparlantes — usado solo en non-prod (localhost/preview)
+// como fallback cuando no hay cookie ni Accept-Language.
 const ES_COUNTRIES = new Set([
   "CO", "MX", "AR", "CL", "PE", "VE", "EC", "GT", "CU", "DO",
   "BO", "HN", "PY", "SV", "NI", "CR", "PR", "UY", "PA", "ES", "GQ",
@@ -20,63 +33,35 @@ function isLocale(value: string | undefined | null): value is Locale {
   return value === "es" || value === "en";
 }
 
-function resolveLocale(request: NextRequest): Locale {
-  // 1. Cookie del usuario (set por /perfil) gana sobre todo.
+function resolveLocale(request: NextRequest, host: string): Locale {
+  // 1. Producción: dominio dicta el locale, sin excepciones. La cookie
+  //    NO override en prod porque el user tipeó la URL — su intención
+  //    está clara.
+  if (host === HOST_EN) return "en";
+  if (host === HOST_ES) return "es";
+
+  // 2. Non-prod (localhost / Vercel preview / Capacitor WebView con host
+  //    no estándar): cookie → geo → Accept-Language → 'en'.
   const cookie = request.cookies.get("NEXT_LOCALE")?.value;
   if (isLocale(cookie)) return cookie;
 
-  // 2. Geo (Vercel inyecta x-vercel-ip-country en producción).
   const country = (request.headers.get("x-vercel-ip-country") ?? "").toUpperCase();
   if (country && ES_COUNTRIES.has(country)) return "es";
 
-  // 3. Fallback browser. Útil en desarrollo y en países sin geo conocido.
   const accept = request.headers.get("accept-language") ?? "";
   if (/^\s*es\b/i.test(accept)) return "es";
 
-  // 4. Default global → en.
   return "en";
-}
-
-function isProductionHost(host: string): boolean {
-  if (!host) return false;
-  if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) return false;
-  if (host.endsWith(".vercel.app")) return false;
-  return host === HOST_ES || host === HOST_EN;
-}
-
-function targetHostFor(locale: Locale): string {
-  return locale === "es" ? HOST_ES : HOST_EN;
 }
 
 export async function middleware(request: NextRequest) {
   const host = (request.headers.get("host") ?? "").toLowerCase();
-  const locale = resolveLocale(request);
-  const hasCookie = !!request.cookies.get("NEXT_LOCALE");
+  const locale = resolveLocale(request, host);
 
-  // Soft-redirect: solo en producción, solo en primera visita (sin cookie),
-  // y solo si el host actual no coincide con el locale resuelto.
-  if (isProductionHost(host) && !hasCookie) {
-    const target = targetHostFor(locale);
-    if (host !== target) {
-      const url = request.nextUrl.clone();
-      url.host = target;
-      url.protocol = "https:";
-      url.port = "";
-      const response = NextResponse.redirect(url);
-      // Persistir la elección (también para no entrar en bucle de redirects).
-      response.cookies.set("NEXT_LOCALE", locale, {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
-        sameSite: "lax",
-        secure: true,
-      });
-      return response;
-    }
-  }
-
-  // Stamp del locale en headers del request para que i18n/request.ts lo lea
-  // al render de RSC. Mutamos en el sitio porque updateSession() pasa el
-  // mismo request a NextResponse.next({ request }).
+  // Stamp del locale en headers del request para que i18n/request.ts lo
+  // lea al render de RSC. Mutamos request.headers in-place — updateSession
+  // pasa el mismo request a NextResponse.next({ request }) y la mutación
+  // se propaga al downstream RSC.
   request.headers.set("x-locale", locale);
 
   return await updateSession(request);
