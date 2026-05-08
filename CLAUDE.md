@@ -715,25 +715,39 @@ await supabase.rpc("upsert_match_safe", {
 });
 ```
 
-**Por qué:** `upsert_match_safe` hace 3 lookups en orden:
+**Por qué:** `upsert_match_safe` (v3 desde migration 048) hace 4 lookups en orden:
 1. `external_id` exacto (path rápido cuando es el mismo proveedor de antes).
 2. `espn_id` numérico extraído (cuando ESPN re-encuentra un row pre-existente).
 3. **Match por teams normalizados** (`tournament + scheduled_at ±2h + normalize_team_name(home/away)`) — esto atrapa cuando OTRO proveedor ya creó el partido con un `external_id` distinto.
+4. **Promoción de placeholder TBD libre** del mismo `(tournament, phase)` — solo si los 3 lookups anteriores fallaron. Esto evita que se cree un row paralelo a un placeholder pre-existente para fases con bracket conocido (round_of_16, quarter_finals, etc.).
 
 Sin el lookup #3, dos syncs distintos crean rows paralelos para el MISMO
 partido real. Resultado: el user ve "Bayern Munich vs PSG" duplicado en
 la pantalla, con dos sets de scores que se contradicen, y predictions
 fragmentadas entre los dos rows.
 
-**Bug real ya pasado (2026-05-06):** descubrí que `lib/api-football/sync.ts`
-y `lib/api-football/sync-worldcup.ts` hacían `.from("matches").upsert(row,
-{onConflict: "external_id"})` directo, bypaseando el RPC. Resultado: 60
-duplicados en pollas del Mundial 2026 + Champions, cada partido aparecía
-2-3 veces. Cleanup masivo + ambos archivos refactoreados al RPC. Si NUNCA
-querés que vuelva a pasar:
+**Bug real ya pasado (2026-05-06):** `lib/api-football/sync.ts` y
+`sync-worldcup.ts` hacían `.from("matches").upsert(row, {onConflict:
+"external_id"})` directo, bypaseando el RPC. Resultado: 60 duplicados en
+pollas del Mundial 2026 + Champions. Cleanup + refactor de ambos archivos
+al RPC. Migration 045 agregó el lookup #3 y `normalize_team_name`.
 
-- Antes de mergear código que toca `matches`, hacer `grep -rn '\.from("matches")\.\(upsert\|insert\)' lib/ app/` y verificar que devuelva CERO matches en `lib/` y `app/`.
-- Excepción permitida: `lib/espn/discover.ts` para insert de placeholders TBD-vs-TBD bulk (esos no causan dups porque son rows TBD que se promueven después).
+**Bug real ya pasado (2026-05-08):** `lib/espn/discover.ts:promoteOrInsert`
+promovía un placeholder TBD libre SIN chequear primero el dedup semántico.
+Cuando football-data sync corría primero (creando rows reales) y ESPN venía
+después, el promote agarraba un placeholder libre por evento → 30+ duplicados
+en `worldcup_2026` visibles al user en /pollas/crear ("Mexico vs South
+Africa" 2 veces, "Brazil vs Morocco" 2 veces, etc.). Cleanup + migration 048:
+**movimos la promoción de placeholder al RPC como lookup #4** (después del
+semantic dedup) y refactorizamos `discover.ts` para llamar `upsert_match_safe`
+directamente (función `upsertMatch` reemplaza la vieja `promoteOrInsert`). Single
+source of truth = imposible de bypassear.
+
+Si NUNCA querés que vuelva a pasar:
+
+- Antes de mergear código que toca `matches`, hacer `grep -rn '\.from("matches")\.\(upsert\|insert\|update\)' lib/ app/` y verificar que devuelva CERO matches relacionados a fixtures externos.
+- ❌ CERO lógica de "promover placeholder" en app code. Si existe, va DENTRO del RPC.
+- Excepción permitida: `ensurePlaceholders` en `lib/espn/discover.ts` hace bulk insert de filas TBD-vs-TBD (no son fixtures reales, son slots).
 - Si necesitás un sync nuevo, **importás el RPC y se acabó.** No hay shortcut.
 
 ### Matches: NUNCA usar `(tournament, scheduled_at)` como clave de unicidad

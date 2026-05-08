@@ -26,7 +26,7 @@
 
 import { redirect } from "next/navigation";
 import { Clock } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPollitoBase } from "@/lib/pollitos";
@@ -558,22 +558,25 @@ function sampleQuickPickPresets(n = 4): Array<{ home: number; away: number }> {
   return out;
 }
 
-function heroPropsFromDb(m: {
-  home_team: string;
-  away_team: string;
-  home_team_flag: string | null;
-  away_team_flag: string | null;
-  scheduled_at: string;
-  status: string;
-  tournament: string;
-}): React.ComponentProps<typeof MatchHero> {
+function heroPropsFromDb(
+  m: {
+    home_team: string;
+    away_team: string;
+    home_team_flag: string | null;
+    away_team_flag: string | null;
+    scheduled_at: string;
+    status: string;
+    tournament: string;
+  },
+  locale: string,
+): React.ComponentProps<typeof MatchHero> {
   const kickoffAt = new Date(m.scheduled_at);
   const lockAt = m.status === "scheduled"
     ? new Date(kickoffAt.getTime() - 5 * 60 * 1000)
     : undefined;
   return {
     competition: {
-      name: getTournamentName(m.tournament) ?? m.tournament,
+      name: getTournamentName(m.tournament, locale),
       logoUrl: TOURNAMENT_ICONS[m.tournament],
     },
     kickoffAt,
@@ -603,6 +606,7 @@ export default async function InicioPage() {
 
   const tCommon = await getTranslations("Common");
   const tInicio = await getTranslations("Inicio");
+  const locale = await getLocale();
   const fallbacks = {
     user: tCommon("userFallback"),
     winner: tCommon("winnerFallback"),
@@ -948,7 +952,7 @@ export default async function InicioPage() {
                         className="snap-center shrink-0 w-[88vw] max-w-[420px]"
                       >
                         <MatchHero
-                          {...heroPropsFromDb(m)}
+                          {...heroPropsFromDb(m, locale)}
                           myPrediction={myPred ?? undefined}
                           quickPickSlot={
                             <QuickPickStrip

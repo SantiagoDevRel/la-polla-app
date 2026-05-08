@@ -28,7 +28,7 @@ export async function generateMetadata({
       .eq("polla_id", polla.id)
       .eq("status", "approved");
 
-    const trnLabel = getTournamentName(polla.tournament) ?? polla.tournament;
+    const trnLabel = getTournamentName(polla.tournament, locale);
     const title = t("ogTitle", { name: polla.name });
     const description = t("ogDescription", {
       tournament: trnLabel,
