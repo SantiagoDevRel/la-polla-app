@@ -67,6 +67,7 @@ function adaptPolla(
     competitionLogos: logos,
     participantCount: raw.participant_count ?? 0,
     buyInAmount: raw.buy_in_amount ?? 0,
+    currency: raw.currency,
     potTotal: raw.pot_total ?? 0,
     totalMatches: raw.total_matches ?? 0,
     finishedMatches: raw.finished_matches ?? 0,

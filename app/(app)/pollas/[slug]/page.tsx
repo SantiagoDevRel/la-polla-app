@@ -21,6 +21,7 @@ import InlineScoringGuide from "@/components/polla/InlineScoringGuide";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/tournaments";
+import { formatCurrency } from "@/lib/formatCurrency";
 import { getPollitoByPosition } from "@/lib/pollitos";
 import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock } from "lucide-react";
 
@@ -1102,10 +1103,10 @@ export default function PollaSlugPage() {
               <span>
                 {t("potLabel")}{" "}
                 <span className="font-semibold text-gold">
-                  {t("potTotal", { amount: `$${total.toLocaleString(intlTag)}` })}
+                  {t("potTotal", { amount: formatCurrency(total, polla.currency, locale) })}
                 </span>{" "}
                 <span className="text-text-primary/70">
-                  {t("potPerPerson", { amount: `$${polla.buy_in_amount.toLocaleString(intlTag)}` })}
+                  {t("potPerPerson", { amount: formatCurrency(polla.buy_in_amount, polla.currency, locale) })}
                 </span>
               </span>
               <ScoringExplanation compact />
