@@ -28,7 +28,7 @@ const createPollaSchema = z
     tournaments: z.array(z.string().min(1)).min(1).optional(),
     scope: z.enum(["full", "group_stage", "knockouts", "custom"]).default("full"),
     type: z.literal("closed").default("closed"),
-    buyInAmount: z.number().min(0, "El valor de entrada no puede ser negativo"),
+    buyInAmount: z.number().min(1, "El valor mínimo es 1"),
     // Multi-currency: pollas internacionales usan USD/EUR/MXN/ARS, las
     // colombianas (default) siguen en COP. La columna ya existe desde
     // migration 001 con default 'COP'.
@@ -52,7 +52,7 @@ const createPollaSchema = z
           .array(
             z.object({
               position: z.number().int().min(1),
-              value: z.number().positive(),
+              value: z.number().nonnegative(),
             }),
           )
           .min(1),
@@ -78,21 +78,9 @@ const createPollaSchema = z
       path: ["adminPayoutMethod"],
     },
   )
-  // Validación: buy_in_amount tiene mínimo por currency. Evita pollas
-  // por debajo del valor de un café — y en USD/EUR el mínimo es mucho
-  // más bajo en valor absoluto que en COP.
-  .refine(
-    (data) => {
-      const minByCurrency: Record<string, number> = {
-        COP: 1000, USD: 1, EUR: 1, MXN: 20, ARS: 1000,
-      };
-      return data.buyInAmount >= (minByCurrency[data.currency] ?? 1);
-    },
-    {
-      message: "El valor por debajo del mínimo permitido",
-      path: ["buyInAmount"],
-    }
-  )
+  // Buy-in mínimo: 1 (cualquier moneda). Antes había mínimos por
+  // currency (COP 1000, MXN 20, etc.) pero el user pidió simplificar
+  // a >=1 global — la cuenta del organizador ajusta a lo que él quiera.
   // Validación: si hay prizeDistribution con modo porcentaje, suma <= 100;
   // posiciones únicas en cualquier modo.
   .refine(
