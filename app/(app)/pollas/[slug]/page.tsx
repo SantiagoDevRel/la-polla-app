@@ -1021,8 +1021,6 @@ export default function PollaSlugPage() {
     { key: "info", label: t("tabInfo"), icon: <Info className="w-4 h-4" />, show: true },
   ];
 
-  const intlTag = locale === "en" ? "en-US" : "es-CO";
-
   return (
     <div className="min-h-screen">
       {/* Header */}

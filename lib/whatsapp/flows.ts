@@ -11,11 +11,6 @@ import { clearState, getState, setState } from "./state";
 import { formatTablaWA } from "./tabla";
 import { shortMatchTitle } from "./format";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
-import {
-  groupMatchesByDate,
-  groupMatchesByPhase,
-  type GroupableMatch,
-} from "@/lib/matches/grouping";
 import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
 
