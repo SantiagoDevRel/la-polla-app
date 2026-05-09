@@ -400,13 +400,8 @@ export default function CrearPollaPage() {
   // Submit
   async function handleSubmit() {
     setError("");
-    // Mínimo por currency: COP 1000 vs USD/EUR 1 vs MXN 20. Valida que
-    // el form coincida con el server-side check del Zod schema.
-    const minByCurrency: Record<string, number> = {
-      COP: 1000, USD: 1, EUR: 1, MXN: 20, ARS: 1000,
-    };
-    const minAmount = minByCurrency[form.currency] ?? 1;
-    if (form.buyInAmount < minAmount) { setError(t("errMinAmount")); return; }
+    // Mínimo global: 1 (cualquier currency). Match con el Zod del API.
+    if (form.buyInAmount < 1) { setError(t("errMinAmount")); return; }
     if (form.paymentMode === "admin_collects") {
       if (!form.adminPayoutMethod) {
         setError(t("errPickMethod")); return;
