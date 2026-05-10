@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { collectPollaHealth } from "@/app/api/admin/polla-health/route";
+import { collectPollaHealth } from "@/lib/admin/polla-health";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
