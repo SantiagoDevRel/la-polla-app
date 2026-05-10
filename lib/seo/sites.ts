@@ -67,9 +67,14 @@ const EN: SiteConfig = {
   description:
     "Create your World Cup 2026, Champions League, Copa Libertadores, Sudamericana or Liga BetPlay pool. Invite your friends, predict scores and win. Free.",
   alternate: { hrefLang: "es-CO", origin: "https://lapollacolombiana.com" },
-  // Pendiente: verificar también chickenpicks.app en Google y Bing.
-  // Cada property necesita su propio token (los de ES no aplican acá).
-  verification: {},
+  verification: {
+    // Google emite un token único por property — el de chickenpicks.app
+    // es distinto al de lapollacolombiana.com.
+    google: "Hf_sx72dMXqAN8tRODgG-j6bAkSwlH30EF-rdOGDvGw",
+    // Bing usa el MISMO msvalidate.01 token para todos los sitios de
+    // una cuenta de Webmaster Tools — coincide con el de ES a propósito.
+    bing: "2B290F006523F609108E2BD0EAF6DD11",
+  },
 };
 
 const HOST_TO_SITE: Record<string, SiteConfig> = {
