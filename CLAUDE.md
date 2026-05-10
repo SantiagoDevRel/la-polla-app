@@ -204,6 +204,78 @@ Files: `app/(auth)/{login,onboarding}/page.tsx`,
 
 ---
 
+## SEO surface (public landings, sitemap, OG, verifications)
+
+The repo serves **two domains** from the same Next app:
+`lapollacolombiana.com` (es-CO) and `chickenpicks.app` (en). Locale is
+host-pinned in `middleware.ts`. SEO is host-aware: each domain emits its
+own sitemap, robots, llms.txt, OG, JSON-LD, hreflang, and search-engine
+verification tokens.
+
+### Files map
+- `lib/seo/sites.ts` — `SiteConfig` per domain (origin, name, locale,
+  description, hreflang alternates, verification tokens). `getSiteFromHeaders()`
+  resolves the active site from the request `Host` header.
+  `pathForLocale(locale, kind, slug?)` returns the locale-correct path
+  (`/torneos` vs `/tournaments`, `/partidos` vs `/matches`).
+- `lib/seo/tournaments.ts` — `TOURNAMENTS_SEO` array maps internal
+  tournament slugs (`worldcup_2026`) to public SEO slugs (`mundial-2026`)
+  + bilingual name/description/heading/keywords. **Add a new tournament
+  here when you add it to `TOURNAMENT_STRUCTURE`** so it gets a landing.
+- `lib/seo/match-slug.ts` — slug `<home>-vs-<away>-YYYY-MM-DD-<6hex>`
+  for `/partidos/[slug]` URLs.
+- `app/robots.ts`, `app/sitemap.ts`, `app/llms.txt/route.ts` — all
+  host-aware. Sitemap reads upcoming matches read-only from Supabase
+  admin (60-day window), falls back to static URLs if DB unreachable.
+- `app/torneos/`, `app/partidos/` — Spanish landings (canonical for
+  lapollacolombiana.com).
+- `app/tournaments/`, `app/matches/` — English alias pages that
+  re-export from the Spanish ones. Canonical for chickenpicks.app.
+  **Don't duplicate logic** — alias files are 5-line re-exports.
+- `app/opengraph-image.tsx` + `app/torneos/[slug]/opengraph-image.tsx`
+  + `app/partidos/[slug]/opengraph-image.tsx` — dynamic OG cards via
+  `@vercel/og` on **edge runtime** (Windows nodejs runtime has a font
+  path bug). EN aliases declare `runtime = "edge"` locally because
+  Next can't track it through re-exports.
+
+### Hard rules
+- **Public SEO routes must be whitelisted in `lib/supabase/middleware.ts`
+  `publicRoutes`**. New surface (`/blog/*`, `/guias/*`, etc.) defaults
+  to redirect-to-login otherwise — Googlebot lands on `/login` and
+  the page never indexes.
+- **Canonical = locale-correct path**. Use `pathForLocale(site.locale, ...)`
+  in every landing's `generateMetadata`. Never hard-code `/torneos`.
+- **Hreflang must cross domains**: `es-CO → lapollacolombiana.com/<es-path>`,
+  `en → chickenpicks.app/<en-path>`. Both EN alias and ES original emit
+  the same alternates so Google consolidates by canonical.
+- **Sitemap emits only the locale-correct path per host**. ES sitemap
+  lists `/torneos/...`, EN lists `/tournaments/...`. Don't list both
+  in the same sitemap.
+- **No new exports from `route.ts` files beyond HTTP handlers + Next
+  metadata** (`dynamic`, `runtime`, `revalidate`). Helpers shared
+  with crons go in `lib/`. Violating this fails the prod build with
+  `"X is not a valid Route export field"` — see `lib/admin/polla-health.ts`
+  for the pattern.
+
+### Verification tokens
+Stored in `SiteConfig.verification.{google, bing}` per host. The Bing
+`msvalidate.01` token is **the same across both domains on purpose**
+— Bing emits one token per Webmaster Tools account, not per site.
+Google `google-site-verification` is unique per property.
+
+Search Console / Bing Webmaster have both domains verified and
+`/sitemap.xml` submitted on each.
+
+### Adding a new tournament
+1. Add it to `TOURNAMENT_STRUCTURE` (`lib/tournaments/structure.ts`)
+   with phases.
+2. Add it to `TOURNAMENTS_SEO` (`lib/seo/tournaments.ts`) with public
+   slug + bilingual copy.
+3. That's it. Sitemap, both landings, both OGs, JSON-LD all
+   auto-generate. Don't touch `app/torneos/` or `app/tournaments/`.
+
+---
+
 ## Stack
 
 ```bash
