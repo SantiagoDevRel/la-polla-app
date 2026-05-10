@@ -105,5 +105,27 @@ export async function PATCH(
     );
   }
 
+  // Propagar a users.default_payout_* si el user todavía no tiene un
+  // default. Así, la próxima polla que gane ya pre-llena con esto y el
+  // que le tiene que pagar ve la cuenta sin que el ganador deba volver
+  // a tipearla. Solo cuando default está vacío — no pisamos un default
+  // que el user haya elegido conscientemente.
+  const { data: userRow } = await admin
+    .from("users")
+    .select("default_payout_account")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!userRow?.default_payout_account) {
+    await admin
+      .from("users")
+      .update({
+        default_payout_method: parsed.data.method,
+        default_payout_account: parsed.data.account,
+        default_payout_account_name: accountNameToStore,
+        default_payout_set_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
+  }
+
   return NextResponse.json({ ok: true });
 }

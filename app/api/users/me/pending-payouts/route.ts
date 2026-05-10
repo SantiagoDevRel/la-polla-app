@@ -50,6 +50,12 @@ interface ParticipantRow {
 interface UserRow {
   id: string;
   display_name: string | null;
+  // Default payout — fallback cuando el participant row no tiene cuenta
+  // por-polla. El user puede haber guardado su cuenta de cobro a nivel
+  // perfil (DefaultPayoutPromptModal o /perfil) sin haber pasado nunca
+  // por el WinnerPayoutModal específico de esta polla.
+  default_payout_method: string | null;
+  default_payout_account: string | null;
 }
 
 export async function GET() {
@@ -123,7 +129,7 @@ export async function GET() {
       .in("polla_id", involvedPollaIds),
     admin
       .from("users")
-      .select("id, display_name")
+      .select("id, display_name, default_payout_method, default_payout_account")
       .in("id", involvedUserIds),
   ]);
 
@@ -160,16 +166,29 @@ export async function GET() {
       // tiene row en polla_participants (caso admin_collects con
       // admin no participante), su cuenta de cobro no aplica acá —
       // el admin paga, no recibe.
+      // Fallback al default_payout_* del user si el participant row de
+      // esta polla no tiene cuenta. Cubre el caso: ganador ya guardó
+      // cuenta a nivel perfil (en otra polla o desde /perfil) y el
+      // payout_method/account a nivel polla nunca se llenó.
       const counterpartyAccount =
         direction === "outgoing"
           ? {
-              method: counterpartyPart?.payout_method ?? null,
-              account: counterpartyPart?.payout_account ?? null,
+              method:
+                counterpartyPart?.payout_method ??
+                counterparty?.default_payout_method ??
+                null,
+              account:
+                counterpartyPart?.payout_account ??
+                counterparty?.default_payout_account ??
+                null,
             }
           : null;
-      const viewerNeedsAccount =
-        direction === "incoming" &&
-        (!viewerPart?.payout_method || !viewerPart?.payout_account);
+      const viewer = userById.get(user.id);
+      const viewerHasAccount = Boolean(
+        (viewerPart?.payout_method && viewerPart?.payout_account) ||
+          (viewer?.default_payout_method && viewer?.default_payout_account),
+      );
+      const viewerNeedsAccount = direction === "incoming" && !viewerHasAccount;
       return {
         transactionId: t.id,
         pollaId: t.polla_id,
