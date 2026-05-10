@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { ArrowLeft, AlertTriangle, Check } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Check, Wrench } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import FootballLoader from "@/components/ui/FootballLoader";
 
@@ -31,6 +31,24 @@ interface Discrepancy {
   alerted_at: string | null;
 }
 
+interface StuckPolla {
+  id: string;
+  slug: string;
+  name: string;
+  matchCount: number;
+  participantCount: number;
+  buyIn: number;
+}
+
+interface EndedNoPayouts {
+  id: string;
+  slug: string;
+  name: string;
+  paymentMode: string;
+  buyIn: number;
+  participantCount: number;
+}
+
 function fmtDate(iso: string): string {
   return new Intl.DateTimeFormat("es-CO", {
     day: "2-digit",
@@ -44,21 +62,53 @@ export default function AdminDiscrepanciasPage() {
   const router = useRouter();
   const { showToast } = useToast();
   const [items, setItems] = useState<Discrepancy[]>([]);
+  const [stuckPollas, setStuckPollas] = useState<StuckPolla[]>([]);
+  const [endedNoPayouts, setEndedNoPayouts] = useState<EndedNoPayouts[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [fixingPollaId, setFixingPollaId] = useState<string | null>(null);
   const [manualDraft, setManualDraft] = useState<Record<string, { home: string; away: string }>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get<{ matches: Discrepancy[] }>("/api/admin/discrepancies");
-      setItems(res.data.matches);
+      const [matchesRes, healthRes] = await Promise.all([
+        axios.get<{ matches: Discrepancy[] }>("/api/admin/discrepancies"),
+        axios.get<{ stuckPollas: StuckPolla[]; endedNoPayouts: EndedNoPayouts[] }>(
+          "/api/admin/polla-health",
+        ),
+      ]);
+      setItems(matchesRes.data.matches);
+      setStuckPollas(healthRes.data.stuckPollas);
+      setEndedNoPayouts(healthRes.data.endedNoPayouts);
     } catch {
       showToast("No se pudieron cargar las discrepancias", "error");
     } finally {
       setLoading(false);
     }
   }, [showToast]);
+
+  async function fixPolla(pollaId: string) {
+    setFixingPollaId(pollaId);
+    try {
+      const res = await axios.post<{
+        ok: boolean;
+        closed: boolean;
+        materialized: number;
+      }>(`/api/admin/polla-health/${pollaId}/fix`);
+      const parts: string[] = [];
+      if (res.data.closed) parts.push("polla cerrada");
+      if (res.data.materialized > 0) parts.push("payouts materializados");
+      showToast(parts.length > 0 ? parts.join(" + ") : "Sin cambios", "success");
+      await load();
+    } catch (err) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? "Error al reparar";
+      showToast(msg, "error");
+    } finally {
+      setFixingPollaId(null);
+    }
+  }
 
   useEffect(() => {
     load();
@@ -111,20 +161,108 @@ export default function AdminDiscrepanciasPage() {
             <FootballLoader />
             <p className="text-text-muted text-sm">Cargando…</p>
           </div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && stuckPollas.length === 0 && endedNoPayouts.length === 0 ? (
           <div className="rounded-2xl p-6 lp-card text-center space-y-2">
             <Check className="w-8 h-8 text-turf mx-auto" />
             <p className="text-sm text-text-primary font-semibold">Sin discrepancias</p>
             <p className="text-[12px] text-text-muted">
-              Todos los partidos finalizados están verificados. El scoring corre solo.
+              Todos los partidos finalizados están verificados y todas las pollas
+              cerradas tienen payouts. El scoring corre solo.
             </p>
           </div>
         ) : (
           <>
-            <p className="text-[12px] text-text-secondary mb-1">
-              {items.length} partido{items.length > 1 ? "s" : ""} esperan tu confirmación.
-              Mientras no resuelvas la discrepancia, el scoring no se ejecuta.
-            </p>
+            {(stuckPollas.length > 0 || endedNoPayouts.length > 0) && (
+              <section className="space-y-2">
+                <h2 className="text-[12px] uppercase tracking-[0.1em] text-amber font-semibold flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5" />
+                  Pollas con problemas ({stuckPollas.length + endedNoPayouts.length})
+                </h2>
+                {stuckPollas.map((p) => (
+                  <article
+                    key={p.id}
+                    className="lp-card p-3 border border-amber/30 space-y-2"
+                  >
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-amber/80">
+                        Trabada · active con todos los matches terminales
+                      </p>
+                      <p className="text-sm font-semibold text-text-primary truncate">
+                        {p.name}
+                      </p>
+                      <p className="text-[11px] text-text-muted">
+                        {p.matchCount} matches · {p.participantCount} participantes pagados · ${p.buyIn.toLocaleString("es-CO")} buy-in
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/pollas/${p.slug}`)}
+                        className="flex-1 text-[11px] py-1.5 rounded-lg border border-border-subtle text-text-secondary hover:border-gold/40 hover:text-gold transition-colors"
+                      >
+                        Ver polla
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fixPolla(p.id)}
+                        disabled={fixingPollaId === p.id}
+                        className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-amber/15 border border-amber/30 text-amber hover:bg-amber/20 transition-colors disabled:opacity-50"
+                      >
+                        {fixingPollaId === p.id ? "…" : "Cerrar + materializar"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+                {endedNoPayouts.map((p) => (
+                  <article
+                    key={p.id}
+                    className="lp-card p-3 border border-amber/30 space-y-2"
+                  >
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-amber/80">
+                        Ended sin payouts materializados
+                      </p>
+                      <p className="text-sm font-semibold text-text-primary truncate">
+                        {p.name}
+                      </p>
+                      <p className="text-[11px] text-text-muted">
+                        {p.paymentMode} · {p.participantCount} participantes · ${p.buyIn.toLocaleString("es-CO")} buy-in
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/pollas/${p.slug}`)}
+                        className="flex-1 text-[11px] py-1.5 rounded-lg border border-border-subtle text-text-secondary hover:border-gold/40 hover:text-gold transition-colors"
+                      >
+                        Ver polla
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fixPolla(p.id)}
+                        disabled={fixingPollaId === p.id}
+                        className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg bg-amber/15 border border-amber/30 text-amber hover:bg-amber/20 transition-colors disabled:opacity-50"
+                      >
+                        {fixingPollaId === p.id ? "…" : "Materializar payouts"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </section>
+            )}
+
+            {items.length > 0 && (
+              <section className="space-y-2 pt-2">
+                <h2 className="text-[12px] uppercase tracking-[0.1em] text-amber font-semibold flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Scores ESPN ↔ DB ({items.length})
+                </h2>
+                <p className="text-[11px] text-text-secondary">
+                  {items.length} partido{items.length > 1 ? "s" : ""} esperan tu confirmación.
+                  Mientras no resuelvas la discrepancia, el scoring no se ejecuta.
+                </p>
+              </section>
+            )}
             {items.map((m) => {
               const fd = { h: m.home_score, a: m.away_score };
               const espn = { h: m.espn_home, a: m.espn_away };
