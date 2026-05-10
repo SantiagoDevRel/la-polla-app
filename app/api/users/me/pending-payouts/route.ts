@@ -107,19 +107,44 @@ export async function GET() {
   // Idempotente — si ya hay filas, no hace nada.
   await materializePayoutsIfNeeded(admin, Array.from(pollaIds));
 
-  // 3. Transacciones de esas pollas: pendientes (paid_at IS NULL) +
-  // pagadas-recientemente (paid_at >= 30 días atrás) para que el
-  // receptor pueda ver el comprobante de las que ya le pagaron.
-  const cutoff30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  // 3. Transacciones de esas pollas (TODAS, paid + unpaid). Después
+  // filtramos: una tx paid se incluye solo si la POLLA todavía tiene
+  // al menos 1 tx pendiente que involucre al viewer. Así Casvi ve los
+  // pagos de "primos-polla-2" (pendientes + recibidos) mientras esa
+  // polla esté abierta de pagos. Cuando todos pagaron, la polla
+  // entera desaparece del modal de /inicio. El histórico de pollas
+  // viejas se ve dentro de /pollas/[slug], no acá.
   const { data: txs } = await admin
     .from("polla_payouts")
     .select(
       "id, polla_id, from_user_id, to_user_id, amount, paid_at, proof_storage_path, proof_uploaded_at",
     )
-    .in("polla_id", Array.from(pollaIds))
-    .or(`paid_at.is.null,paid_at.gte.${cutoff30d}`);
+    .in("polla_id", Array.from(pollaIds));
 
-  const transactions = (txs ?? []) as PayoutRow[];
+  const allTxs = (txs ?? []) as PayoutRow[];
+  if (allTxs.length === 0) {
+    return NextResponse.json({ pending: [] });
+  }
+
+  // Set de pollaIds donde el viewer tiene al menos 1 tx pendiente
+  // (incoming u outgoing). Solo de esas pollas mostramos las paid.
+  const pollasWithViewerPending = new Set<string>();
+  for (const t of allTxs) {
+    if (t.paid_at) continue;
+    if (t.from_user_id === user.id || t.to_user_id === user.id) {
+      pollasWithViewerPending.add(t.polla_id);
+    }
+  }
+
+  const transactions = allTxs.filter((t) => {
+    const involvesViewer = t.from_user_id === user.id || t.to_user_id === user.id;
+    if (!involvesViewer) return false;
+    // Pendiente del viewer → siempre.
+    if (!t.paid_at) return true;
+    // Pagada → solo si la polla todavía tiene pendientes del viewer.
+    return pollasWithViewerPending.has(t.polla_id);
+  });
+
   if (transactions.length === 0) {
     return NextResponse.json({ pending: [] });
   }
@@ -163,9 +188,9 @@ export async function GET() {
   //    de la lista regular.
   //    Para outgoing agregamos counterpartyAccount (la cuenta del que
   //    cobra, para que el que paga la pueda copiar).
-  const pending = transactions
-    .filter((t) => t.from_user_id === user.id || t.to_user_id === user.id)
-    .map((t) => {
+  // Las tx ya fueron filtradas a las que involucran al viewer (paid se
+  // incluye solo si la polla aún tiene pendientes). Acá solo enriquecemos.
+  const pending = transactions.map((t) => {
       const polla = pollaById.get(t.polla_id);
       const direction: "incoming" | "outgoing" =
         t.to_user_id === user.id ? "incoming" : "outgoing";

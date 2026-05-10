@@ -98,19 +98,40 @@ export async function GET(_request: Request, { params }: Params) {
   // Lazy materialize por si alguna polla cerrada todavía no tiene tx.
   await materializePayoutsIfNeeded(admin, Array.from(pollaIds));
 
-  // Mismo criterio que /api/users/me/pending-payouts: pendientes +
-  // pagadas en últimos 30 días, para que el admin vea también la lista
-  // de "ya pagadas" con sus comprobantes.
-  const cutoff30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  // Mismo criterio que /api/users/me/pending-payouts: traemos TODAS y
+  // filtramos a las que involucran al target. Las paid solo se incluyen
+  // si la polla todavía tiene pendientes del target — así el admin ve
+  // exactamente lo mismo que vería el target en su /inicio.
   const { data: txs } = await admin
     .from("polla_payouts")
     .select(
       "id, polla_id, from_user_id, to_user_id, amount, paid_at, proof_storage_path, proof_uploaded_at",
     )
-    .in("polla_id", Array.from(pollaIds))
-    .or(`paid_at.is.null,paid_at.gte.${cutoff30d}`);
+    .in("polla_id", Array.from(pollaIds));
 
-  const transactions = (txs ?? []) as PayoutRow[];
+  const allTxs = (txs ?? []) as PayoutRow[];
+  if (allTxs.length === 0) {
+    return NextResponse.json({
+      target: { id: target.id, displayName: target.display_name },
+      pending: [],
+    });
+  }
+
+  const pollasWithTargetPending = new Set<string>();
+  for (const t of allTxs) {
+    if (t.paid_at) continue;
+    if (t.from_user_id === targetUserId || t.to_user_id === targetUserId) {
+      pollasWithTargetPending.add(t.polla_id);
+    }
+  }
+
+  const transactions = allTxs.filter((t) => {
+    const involves = t.from_user_id === targetUserId || t.to_user_id === targetUserId;
+    if (!involves) return false;
+    if (!t.paid_at) return true;
+    return pollasWithTargetPending.has(t.polla_id);
+  });
+
   if (transactions.length === 0) {
     return NextResponse.json({
       target: { id: target.id, displayName: target.display_name },
@@ -149,9 +170,7 @@ export async function GET(_request: Request, { params }: Params) {
     partByKey.set(`${p.polla_id}|${p.user_id}`, p);
   }
 
-  const pending = transactions
-    .filter((t) => t.from_user_id === targetUserId || t.to_user_id === targetUserId)
-    .map((t) => {
+  const pending = transactions.map((t) => {
       const polla = pollaById.get(t.polla_id);
       const direction: "incoming" | "outgoing" =
         t.to_user_id === targetUserId ? "incoming" : "outgoing";
