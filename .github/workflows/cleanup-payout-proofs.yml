@@ -1,17 +1,24 @@
-# Daily cleanup de screenshots peer-to-peer >7 dias.
+# Cleanup semanal de TODOS los comprobantes (peer-to-peer + admin_collects)
+# que tienen >=7 dias.
 #
-# POST a /api/cron/cleanup-payout-proofs todos los dias a las 09:00 UTC
-# (4:00 am Bogota, UTC-5). Borra del bucket payout-proofs los archivos
-# subidos hace mas de 7 dias y nullifica las columnas en polla_payouts.
+# POST a /api/cron/cleanup-payout-proofs los DOMINGOS a las 09:00 UTC
+# (4:00 am Bogota). El endpoint borra todo lo que tiene uploaded_at /
+# created_at >7 dias, asi que un comprobante subido cualquier dia de la
+# semana queda esperando al domingo siguiente (vida 7-13 dias).
+#
+# Decision 2026-05-09: cron semanal en vez de diario porque (a) el costo
+# Vercel es despreciable de cualquier forma (4 vs 30 inv/mes, ambos <0.05%
+# free tier), (b) agrupar el cleanup en domingos hace el comportamiento
+# mas predecible para el user.
 #
 # Free tier: GitHub Actions schedule en repos publicos.
 
-name: Cleanup Payout Proofs Daily
+name: Cleanup All Proofs Weekly (Sundays)
 
 on:
   schedule:
-    # 09:00 UTC = 4:00 AM Bogota
-    - cron: "0 9 * * *"
+    # 09:00 UTC domingo = 4:00 AM Bogota domingo
+    - cron: "0 9 * * 0"
   workflow_dispatch: {}
 
 jobs:
