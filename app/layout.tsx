@@ -93,6 +93,12 @@ export async function generateMetadata(): Promise<Metadata> {
         "max-snippet": -1,
       },
     },
+    verification: {
+      ...(site.verification.google ? { google: site.verification.google } : {}),
+      ...(site.verification.bing
+        ? { other: { "msvalidate.01": site.verification.bing } }
+        : {}),
+    },
     // Icons resolved via Next.js file convention: app/icon.png and
     // app/apple-icon.png. No explicit metadata.icons needed.
   };
