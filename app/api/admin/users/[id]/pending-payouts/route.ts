@@ -47,6 +47,8 @@ interface ParticipantRow {
 interface UserRow {
   id: string;
   display_name: string | null;
+  default_payout_method: string | null;
+  default_payout_account: string | null;
 }
 
 export async function GET(_request: Request, { params }: Params) {
@@ -96,13 +98,17 @@ export async function GET(_request: Request, { params }: Params) {
   // Lazy materialize por si alguna polla cerrada todavía no tiene tx.
   await materializePayoutsIfNeeded(admin, Array.from(pollaIds));
 
+  // Mismo criterio que /api/users/me/pending-payouts: pendientes +
+  // pagadas en últimos 30 días, para que el admin vea también la lista
+  // de "ya pagadas" con sus comprobantes.
+  const cutoff30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data: txs } = await admin
     .from("polla_payouts")
     .select(
       "id, polla_id, from_user_id, to_user_id, amount, paid_at, proof_storage_path, proof_uploaded_at",
     )
     .in("polla_id", Array.from(pollaIds))
-    .is("paid_at", null);
+    .or(`paid_at.is.null,paid_at.gte.${cutoff30d}`);
 
   const transactions = (txs ?? []) as PayoutRow[];
   if (transactions.length === 0) {
@@ -128,7 +134,7 @@ export async function GET(_request: Request, { params }: Params) {
       .in("polla_id", involvedPollaIds),
     admin
       .from("users")
-      .select("id, display_name")
+      .select("id, display_name, default_payout_method, default_payout_account")
       .in("id", involvedUserIds),
   ]);
 
@@ -153,11 +159,18 @@ export async function GET(_request: Request, { params }: Params) {
         direction === "incoming" ? t.from_user_id : t.to_user_id;
       const counterparty = userById.get(counterpartyId);
       const counterpartyPart = partByKey.get(`${t.polla_id}|${counterpartyId}`);
+      // Mismo fallback al users.default_payout_* que pending-payouts del viewer.
       const counterpartyAccount =
         direction === "outgoing"
           ? {
-              method: counterpartyPart?.payout_method ?? null,
-              account: counterpartyPart?.payout_account ?? null,
+              method:
+                counterpartyPart?.payout_method ??
+                counterparty?.default_payout_method ??
+                null,
+              account:
+                counterpartyPart?.payout_account ??
+                counterparty?.default_payout_account ??
+                null,
             }
           : null;
       return {
@@ -171,6 +184,7 @@ export async function GET(_request: Request, { params }: Params) {
         counterpartyAccount,
         hasProof: Boolean(t.proof_storage_path),
         proofUploadedAt: t.proof_uploaded_at,
+        paidAt: t.paid_at,
       };
     });
 

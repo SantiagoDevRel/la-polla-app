@@ -33,6 +33,7 @@ interface PendingPayout {
   viewerNeedsAccount: boolean;
   hasProof: boolean;
   proofUploadedAt: string | null;
+  paidAt: string | null;
 }
 
 const METHOD_LABEL: Record<string, string> = {
@@ -91,11 +92,13 @@ export default function GlobalPayoutBanner() {
   // Auto-open: al cargar la lista decidimos qué mostrar primero.
   //   - Si hay incoming con viewerNeedsAccount → priorizamos el winner
   //     modal (de a uno).
-  //   - Si no hay accounts pendientes pero sí hay tx → abre el modal
-  //     regular cada vez que el user entre a /inicio. La X siempre lo
-  //     cierra y vuelve a aparecer al próximo mount (decisión deliberada
-  //     del owner — quería que sirva de recordatorio insistente hasta
-  //     que se resuelva el último pago).
+  //   - Si hay tx PENDIENTES (paidAt=null) → abre el modal cada vez que
+  //     el user entre a /inicio (decisión deliberada del owner — quería
+  //     que sirva de recordatorio insistente hasta que se resuelva el
+  //     último pago).
+  //   - Si solo hay tx pagadas-recientemente (paidAt!=null) → NO abre
+  //     auto. El banner está ahí para que el receptor pueda revisar
+  //     el comprobante cuando quiera, pero no es nag.
   useEffect(() => {
     if (loading || items.length === 0) return;
     if (typeof window === "undefined") return;
@@ -106,7 +109,8 @@ export default function GlobalPayoutBanner() {
       return;
     }
 
-    setOpen(true);
+    const hasPending = items.some((i) => !i.paidAt);
+    if (hasPending) setOpen(true);
   }, [loading, items]);
 
   async function saveWinnerAccount(
@@ -197,16 +201,24 @@ export default function GlobalPayoutBanner() {
 
   if (loading || items.length === 0) return null;
 
-  const incoming = items.filter((i) => i.direction === "incoming");
-  const outgoing = items.filter((i) => i.direction === "outgoing");
+  // 4 buckets:
+  //   - pendingIncoming  → "te tienen que pagar" + botón "Ya cobré"
+  //   - paidIncoming     → "X te pagó" + botón "Ver comprobante" (si hay)
+  //   - pendingOutgoing  → "tenés que pagar" + cuenta + botones
+  //   - paidOutgoing     → "ya pagaste" + comprobante (si subiste)
+  const pendingIncoming = items.filter((i) => i.direction === "incoming" && !i.paidAt);
+  const paidIncoming = items.filter((i) => i.direction === "incoming" && i.paidAt);
+  const pendingOutgoing = items.filter((i) => i.direction === "outgoing" && !i.paidAt);
+  const paidOutgoing = items.filter((i) => i.direction === "outgoing" && i.paidAt);
 
-  // Si tiene pagos OUTGOING pendientes, el modal queda bloqueado: no se
+  // Si tiene pagos OUTGOING PENDIENTES, el modal queda bloqueado: no se
   // puede cerrar hasta que marque cada uno como pagado. Decisión del
   // owner para forzar que la gente cumpla con los ganadores antes de
   // seguir usando la app. Solo aplica al modal regular — el winner-
   // needs-account modal sí sigue siendo cerrable porque ese es del
   // viewer hacia adentro (sus datos), no responsabilidad con terceros.
-  const hasOutgoingPending = outgoing.length > 0;
+  // Las pagadas no lockean — son solo info.
+  const hasOutgoingPending = pendingOutgoing.length > 0;
 
   return (
     <>
@@ -233,18 +245,31 @@ export default function GlobalPayoutBanner() {
         <Banknote className="w-5 h-5 text-gold flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-semibold text-text-primary">
-            {items.length === 1
-              ? incoming.length === 1
-                ? t("globalCallToCollect")
-                : t("globalCallToPay")
-              : t("globalCallToMany", { count: items.length })}
+            {pendingIncoming.length + pendingOutgoing.length === 0
+              ? t("globalCallToReview")
+              : pendingIncoming.length + pendingOutgoing.length === 1
+                ? pendingIncoming.length === 1
+                  ? t("globalCallToCollect")
+                  : t("globalCallToPay")
+                : t("globalCallToMany", {
+                    count: pendingIncoming.length + pendingOutgoing.length,
+                  })}
           </p>
           <p className="text-[11px] text-text-secondary truncate">
-            {incoming.length > 0 && outgoing.length > 0
-              ? t("globalDetailMixed", { incoming: incoming.length, outgoing: outgoing.length })
-              : incoming.length > 0
-              ? t("globalDetailIncoming", { amount: fmtCOP(incoming.reduce((s, i) => s + i.amount, 0)) })
-              : t("globalDetailOutgoing", { amount: fmtCOP(outgoing.reduce((s, i) => s + i.amount, 0)) })}
+            {pendingIncoming.length > 0 && pendingOutgoing.length > 0
+              ? t("globalDetailMixed", {
+                  incoming: pendingIncoming.length,
+                  outgoing: pendingOutgoing.length,
+                })
+              : pendingIncoming.length > 0
+                ? t("globalDetailIncoming", {
+                    amount: fmtCOP(pendingIncoming.reduce((s, i) => s + i.amount, 0)),
+                  })
+                : pendingOutgoing.length > 0
+                  ? t("globalDetailOutgoing", {
+                      amount: fmtCOP(pendingOutgoing.reduce((s, i) => s + i.amount, 0)),
+                    })
+                  : t("globalDetailReview", { count: paidIncoming.length + paidOutgoing.length })}
           </p>
         </div>
         <span className="text-[11px] text-gold font-semibold">{t("viewAction")}</span>
@@ -283,13 +308,13 @@ export default function GlobalPayoutBanner() {
               ) : null}
             </div>
 
-            {incoming.length > 0 ? (
+            {pendingIncoming.length > 0 ? (
               <section className="mb-4">
                 <h3 className="text-[10px] uppercase tracking-[0.1em] text-turf mb-2">
                   {t("sectionToCollect")}
                 </h3>
                 <ul className="space-y-2">
-                  {incoming.map((it) => (
+                  {pendingIncoming.map((it) => (
                     <li
                       key={it.transactionId}
                       className="rounded-lg px-3 py-2.5 bg-bg-elevated border border-border-subtle"
@@ -337,13 +362,63 @@ export default function GlobalPayoutBanner() {
               </section>
             ) : null}
 
-            {outgoing.length > 0 ? (
+            {paidIncoming.length > 0 ? (
+              <section className="mb-4">
+                <h3 className="text-[10px] uppercase tracking-[0.1em] text-turf/70 mb-2">
+                  {t("sectionReceived")}
+                </h3>
+                <ul className="space-y-2">
+                  {paidIncoming.map((it) => (
+                    <li
+                      key={it.transactionId}
+                      className="rounded-lg px-3 py-2.5 bg-turf/5 border border-turf/20"
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-semibold text-text-primary truncate">
+                            {it.counterpartyName}
+                          </p>
+                          <p className="text-[11px] text-text-muted truncate">
+                            {it.pollaName} · {t("paidLabel")}
+                          </p>
+                        </div>
+                        <span
+                          className="font-display text-[16px] text-turf tabular-nums"
+                          style={{ fontFeatureSettings: '"tnum"' }}
+                        >
+                          {fmtCOP(it.amount)}
+                        </span>
+                      </div>
+                      {it.hasProof ? (
+                        <button
+                          type="button"
+                          onClick={() => viewProof(it)}
+                          disabled={loadingProofId === it.transactionId}
+                          className="w-full text-[12px] font-semibold py-1.5 rounded-lg bg-bg-base border border-gold/40 text-gold hover:bg-gold/10 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          {loadingProofId === it.transactionId
+                            ? t("viewProofLoading")
+                            : t("viewProof")}
+                        </button>
+                      ) : (
+                        <p className="text-[11px] text-text-muted text-center italic">
+                          {t("noProofUploaded")}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {pendingOutgoing.length > 0 ? (
               <section className="mb-4">
                 <h3 className="text-[10px] uppercase tracking-[0.1em] text-amber mb-2">
                   {t("sectionToPay")}
                 </h3>
                 <ul className="space-y-2">
-                  {outgoing.map((it) => {
+                  {pendingOutgoing.map((it) => {
                     const acct = it.counterpartyAccount;
                     const hasAccount = acct?.method && acct?.account;
                     return (
@@ -442,6 +517,56 @@ export default function GlobalPayoutBanner() {
                       </li>
                     );
                   })}
+                </ul>
+              </section>
+            ) : null}
+
+            {paidOutgoing.length > 0 ? (
+              <section className="mb-4">
+                <h3 className="text-[10px] uppercase tracking-[0.1em] text-amber/70 mb-2">
+                  {t("sectionPaidOut")}
+                </h3>
+                <ul className="space-y-2">
+                  {paidOutgoing.map((it) => (
+                    <li
+                      key={it.transactionId}
+                      className="rounded-lg px-3 py-2.5 bg-amber/5 border border-amber/20"
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-semibold text-text-primary truncate">
+                            {it.counterpartyName}
+                          </p>
+                          <p className="text-[11px] text-text-muted truncate">
+                            {it.pollaName} · {t("paidLabel")}
+                          </p>
+                        </div>
+                        <span
+                          className="font-display text-[16px] text-amber tabular-nums"
+                          style={{ fontFeatureSettings: '"tnum"' }}
+                        >
+                          {fmtCOP(it.amount)}
+                        </span>
+                      </div>
+                      {it.hasProof ? (
+                        <button
+                          type="button"
+                          onClick={() => viewProof(it)}
+                          disabled={loadingProofId === it.transactionId}
+                          className="w-full text-[12px] font-semibold py-1.5 rounded-lg bg-bg-base border border-gold/40 text-gold hover:bg-gold/10 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          {loadingProofId === it.transactionId
+                            ? t("viewProofLoading")
+                            : t("viewProof")}
+                        </button>
+                      ) : (
+                        <p className="text-[11px] text-text-muted text-center italic">
+                          {t("noProofUploaded")}
+                        </p>
+                      )}
+                    </li>
+                  ))}
                 </ul>
               </section>
             ) : null}

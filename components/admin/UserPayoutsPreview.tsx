@@ -28,6 +28,7 @@ interface PendingPayout {
   } | null;
   hasProof: boolean;
   proofUploadedAt: string | null;
+  paidAt: string | null;
 }
 
 interface Payload {
@@ -88,6 +89,7 @@ export default function UserPayoutsPreview({
     data?.pending.filter((p) => p.direction === "incoming") ?? [];
   const outgoing =
     data?.pending.filter((p) => p.direction === "outgoing") ?? [];
+  const pendingOutgoing = outgoing.filter((p) => !p.paidAt);
   const targetName = data?.target.displayName ?? "este usuario";
 
   return (
@@ -145,11 +147,16 @@ export default function UserPayoutsPreview({
                     <li
                       key={it.transactionId}
                       className="rounded-lg px-3 py-2 text-[12px]"
-                      style={{ background: "#131d2e" }}
+                      style={{ background: it.paidAt ? "#0f1a14" : "#131d2e" }}
                     >
                       <div className="flex items-center justify-between gap-2 mb-0.5">
                         <p className="text-text-primary truncate flex-1">
                           {it.counterpartyName}
+                          {it.paidAt ? (
+                            <span className="ml-1 text-turf text-[10px] font-semibold">
+                              ✓ ya pagó
+                            </span>
+                          ) : null}
                         </p>
                         <span
                           className="font-display text-gold tabular-nums flex-shrink-0"
@@ -176,11 +183,17 @@ export default function UserPayoutsPreview({
               <section className="mb-2">
                 <h3 className="text-[10px] uppercase tracking-[0.1em] text-amber mb-2 flex items-center gap-1">
                   <ArrowUp className="w-3 h-3" />
-                  Le toca pagar ({outgoing.length})
+                  Le toca pagar ({pendingOutgoing.length}
+                  {outgoing.length !== pendingOutgoing.length
+                    ? ` / ${outgoing.length}`
+                    : ""}
+                  )
                 </h3>
-                <p className="text-[10px] text-red-alert/80 mb-2">
-                  Modal bloqueado para {targetName} hasta que marque cada uno.
-                </p>
+                {pendingOutgoing.length > 0 ? (
+                  <p className="text-[10px] text-red-alert/80 mb-2">
+                    Modal bloqueado para {targetName} hasta que marque cada uno.
+                  </p>
+                ) : null}
                 <ul className="space-y-1.5">
                   {outgoing.map((it) => {
                     const acct = it.counterpartyAccount;
@@ -189,11 +202,16 @@ export default function UserPayoutsPreview({
                       <li
                         key={it.transactionId}
                         className="rounded-lg px-3 py-2 text-[12px]"
-                        style={{ background: "#131d2e" }}
+                        style={{ background: it.paidAt ? "#1f1606" : "#131d2e" }}
                       >
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <p className="text-text-primary truncate flex-1">
                             {it.counterpartyName}
+                            {it.paidAt ? (
+                              <span className="ml-1 text-amber text-[10px] font-semibold">
+                                ✓ pagado
+                              </span>
+                            ) : null}
                           </p>
                           <span
                             className="font-display text-gold tabular-nums flex-shrink-0"
