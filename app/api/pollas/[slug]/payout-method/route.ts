@@ -1,9 +1,16 @@
 // app/api/pollas/[slug]/payout-method/route.ts
 //
 // PATCH — el ganador (o cualquier participante) guarda su método +
-// cuenta + nombre de cobro EN ESTA POLLA. Se persiste en
-// polla_participants.payout_method / payout_account /
-// payout_account_name / payout_set_at.
+// cuenta + nombre de cobro. Se persiste a nivel PERFIL en
+// users.default_payout_*. El trigger DB
+// (sync_user_default_payout_to_participants, migration 053) replica
+// automáticamente a polla_participants en TODAS las pollas del user,
+// presentes y futuras.
+//
+// El path /pollas/[slug]/payout-method se mantiene como entry point
+// porque el WinnerPayoutModal lo invoca cuando el ganador llena su
+// cuenta desde una polla específica — el chequeo "es participante de
+// esta polla" sigue actuando como gate de auth.
 //
 // Reglas por método (alineadas al verifier AI):
 //   - nequi:        account=celular. account_name no se usa (ignorado).
@@ -88,43 +95,23 @@ export async function PATCH(
   const accountNameToStore =
     parsed.data.method === "nequi" ? null : (parsed.data.accountName ?? null);
 
-  const { error: updateErr } = await admin
-    .from("polla_participants")
-    .update({
-      payout_method: parsed.data.method,
-      payout_account: parsed.data.account,
-      payout_account_name: accountNameToStore,
-      payout_set_at: new Date().toISOString(),
-    })
-    .eq("id", participant.id);
-  if (updateErr) {
-    console.error("[payout-method] update failed:", updateErr);
-    return NextResponse.json(
-      { error: "No se pudo guardar" },
-      { status: 500 },
-    );
-  }
-
-  // Propagar a users.default_payout_* si el user todavía no tiene un
-  // default. Así, la próxima polla que gane ya pre-llena con esto y el
-  // que le tiene que pagar ve la cuenta sin que el ganador deba volver
-  // a tipearla. Solo cuando default está vacío — no pisamos un default
-  // que el user haya elegido conscientemente.
-  const { data: userRow } = await admin
+  // Decisión 2026-05-09: la cuenta vive a nivel perfil. Si guardo acá,
+  // se actualiza users.default_payout_* y un trigger DB
+  // (sync_user_default_payout_to_participants, migration 053) replica
+  // a TODOS los polla_participants del user. Así una sola cuenta sirve
+  // para TODAS las pollas — el user no maneja cuentas distintas por polla.
+  const { error: userErr } = await admin
     .from("users")
-    .select("default_payout_account")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!userRow?.default_payout_account) {
-    await admin
-      .from("users")
-      .update({
-        default_payout_method: parsed.data.method,
-        default_payout_account: parsed.data.account,
-        default_payout_account_name: accountNameToStore,
-        default_payout_set_at: new Date().toISOString(),
-      })
-      .eq("id", user.id);
+    .update({
+      default_payout_method: parsed.data.method,
+      default_payout_account: parsed.data.account,
+      default_payout_account_name: accountNameToStore,
+      default_payout_set_at: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+  if (userErr) {
+    console.error("[payout-method] users update failed:", userErr);
+    return NextResponse.json({ error: "No se pudo guardar" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
