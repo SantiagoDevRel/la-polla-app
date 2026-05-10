@@ -29,6 +29,16 @@ export interface SiteConfig {
   description: string;
   /** Sitio alterno (otro idioma) para hreflang. */
   alternate: { hrefLang: string; origin: string };
+  /**
+   * Verification tokens emitidos por search engines para probar
+   * ownership del dominio. Solo se renderean en SU dominio para que
+   * cada property (lapollacolombiana.com vs chickenpicks.app) tenga
+   * su token correcto en HTML.
+   */
+  verification: {
+    google?: string;
+    bing?: string;
+  };
 }
 
 const ES: SiteConfig = {
@@ -41,6 +51,10 @@ const ES: SiteConfig = {
   description:
     "Crea tu polla del Mundial 2026, Champions League, Copa Libertadores, Sudamericana o Liga BetPlay. Invita a tus amigos, predice resultados y gana. Gratis y en español.",
   alternate: { hrefLang: "en", origin: "https://chickenpicks.app" },
+  verification: {
+    google: "tbazUHUuL8rLc_PIdy50ONQNnf38oMZRHQ0P0NlgrQE",
+    bing: "2B290F006523F609108E2BD0EAF6DD11",
+  },
 };
 
 const EN: SiteConfig = {
@@ -53,6 +67,9 @@ const EN: SiteConfig = {
   description:
     "Create your World Cup 2026, Champions League, Copa Libertadores, Sudamericana or Liga BetPlay pool. Invite your friends, predict scores and win. Free.",
   alternate: { hrefLang: "es-CO", origin: "https://lapollacolombiana.com" },
+  // Pendiente: verificar también chickenpicks.app en Google y Bing.
+  // Cada property necesita su propio token (los de ES no aplican acá).
+  verification: {},
 };
 
 const HOST_TO_SITE: Record<string, SiteConfig> = {
