@@ -1,11 +1,20 @@
 // app/api/users/me/pending-payouts/route.ts
 //
-// GET → todas las transacciones pendientes (paid_at IS NULL) en las
-// que el viewer está involucrado:
-//   - como from_user_id (debe pagar)  → outgoing
-//   - como to_user_id   (le tienen que pagar) → incoming
+// GET → transacciones donde el viewer está involucrado, pendientes y
+// pagadas-recientemente (últimos 30 días):
+//   - como from_user_id (debe pagar / pagó)  → outgoing
+//   - como to_user_id   (le pagan / le pagaron) → incoming
 //
-// Y para admins de pollas finalizadas con tx pendientes que no
+// El cliente filtra por `paidAt`:
+//   - paidAt=null  → acción posible (marcar pagado / cobrar)
+//   - paidAt!=null → solo info + botón "Ver comprobante"
+//
+// Por qué incluir las pagadas: el receptor necesita ver "X ya te pagó"
+// para confirmar visualmente y revisar el comprobante. Si solo
+// devolvieramos pendientes, las tx desaparecerían apenas el otro lado
+// las marca y el receptor nunca ve el comprobante.
+//
+// Para admins de pollas finalizadas con tx pendientes que no
 // involucran al admin directamente (admin_collects mode con admin no
 // participante, raro pero posible) — esas también van.
 //
@@ -98,14 +107,17 @@ export async function GET() {
   // Idempotente — si ya hay filas, no hace nada.
   await materializePayoutsIfNeeded(admin, Array.from(pollaIds));
 
-  // 3. Transacciones unpaid en esas pollas.
+  // 3. Transacciones de esas pollas: pendientes (paid_at IS NULL) +
+  // pagadas-recientemente (paid_at >= 30 días atrás) para que el
+  // receptor pueda ver el comprobante de las que ya le pagaron.
+  const cutoff30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data: txs } = await admin
     .from("polla_payouts")
     .select(
       "id, polla_id, from_user_id, to_user_id, amount, paid_at, proof_storage_path, proof_uploaded_at",
     )
     .in("polla_id", Array.from(pollaIds))
-    .is("paid_at", null);
+    .or(`paid_at.is.null,paid_at.gte.${cutoff30d}`);
 
   const transactions = (txs ?? []) as PayoutRow[];
   if (transactions.length === 0) {
@@ -202,6 +214,7 @@ export async function GET() {
         viewerNeedsAccount,
         hasProof: Boolean(t.proof_storage_path),
         proofUploadedAt: t.proof_uploaded_at,
+        paidAt: t.paid_at,
       };
     });
 
