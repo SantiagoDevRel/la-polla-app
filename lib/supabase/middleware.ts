@@ -70,6 +70,18 @@ export async function updateSession(request: NextRequest) {
     "/invites/polla",
     "/privacy",
     "/soporte",
+    // SEO public surfaces — landings + crawler artifacts. No data-leak
+    // risk: torneos/partidos sólo exponen fixtures públicos (mismos que
+    // un usuario logueado ve) y los archivos .txt/.xml describen el sitio.
+    "/torneos",
+    "/partidos",
+    "/tournaments",
+    "/matches",
+    "/sitemap.xml",
+    "/robots.txt",
+    "/llms.txt",
+    "/opengraph-image",
+    "/twitter-image",
   ];
   const isPublicRoute = publicRoutes.some((route) => path.startsWith(route));
 
