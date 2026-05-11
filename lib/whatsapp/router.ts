@@ -110,7 +110,7 @@ export async function processIncomingMessage(
         });
       }
     }
-    await routeOnboarding(from, user, type, text, interactive);
+    await routeOnboarding(from, type, text, interactive);
     return;
   }
 
@@ -499,7 +499,6 @@ async function routePayload(
 //     onbpoll_<id> guarda pollito, onbpoll_more_<page> pagina la lista.
 async function routeOnboarding(
   from: string,
-  user: { id: string; display_name: string | null; avatar_url: string | null },
   type: string,
   text?: { body?: string },
   interactive?: {
@@ -517,7 +516,7 @@ async function routeOnboarding(
     // onbname_yes|<name>
     if (payload.startsWith("onbname_yes|")) {
       const name = payload.slice("onbname_yes|".length);
-      await handleNameConfirmed(from, user.id, name);
+      await handleNameConfirmed(from, name);
       return;
     }
     if (payload === "onbname_no") {

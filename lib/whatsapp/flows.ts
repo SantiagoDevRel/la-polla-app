@@ -232,61 +232,17 @@ export async function handleMainMenu(
  */
 export async function handleUnknownUser(phone: string, messageBody?: string) {
   const { handleAskName } = await import("./onboarding");
-  const { normalizePhone, emailForPhone } = await import("@/lib/auth/phone");
   const { setState } = await import("./state");
 
-  const phoneNormalized = normalizePhone(phone);
-  const phoneE164 = `+${phoneNormalized}`;
-  const syntheticEmail = emailForPhone(phoneNormalized);
-
-  const supabase = createAdminClient();
-
-  // Buscar usuario por phone (puede ya existir en auth.users sin row en
-  // public.users — el trigger debería crearlo, pero por seguridad).
-  let authUserId: string | null = null;
-  const { data: rpcId } = await supabase.rpc("find_auth_user_id_by_phone", {
-    p_phone: phoneE164,
-  });
-  if (typeof rpcId === "string" && rpcId.length > 0) {
-    authUserId = rpcId;
-  }
-
-  if (!authUserId) {
-    const { data: created, error: createErr } =
-      await supabase.auth.admin.createUser({
-        phone: phoneE164,
-        phone_confirm: true,
-        email: syntheticEmail,
-        email_confirm: true,
-      });
-    if (createErr || !created.user) {
-      console.error("[wa-unknown] createUser failed:", createErr);
-      await sendTextMessage(
-        phone,
-        "No pude crear tu cuenta, parce. Inténtalo en un minuto.",
-      );
-      return;
-    }
-    authUserId = created.user.id;
-  }
-
-  // Asegurar que public.users existe (el trigger normalmente lo crea, pero
-  // si estamos en una race lo upserteamos manualmente).
-  await supabase
-    .from("users")
-    .upsert(
-      {
-        id: authUserId,
-        whatsapp_number: phoneNormalized,
-        whatsapp_verified: true,
-      },
-      { onConflict: "id" },
-    );
-
-  // Si el primer mensaje vino con "unirse XXXXXX" (tap desde link wa.me
-  // pre-llenado), guardar el code para auto-join al final del onboarding.
-  // Aceptamos también el formato "unirse a la polla CODE" o solo el code
-  // bare (6 chars) por flexibilidad.
+  // IMPORTANTE: NO creamos auth.users / public.users acá. Si lo hicieramos,
+  // cualquier numero curioso que mande "hola" al bot quedaria como shell
+  // sin display_name si no termina el onboarding. La cuenta se crea recien
+  // cuando confirma su nombre (handleNameConfirmed) — find-or-create
+  // atomico al final del flow.
+  //
+  // Si el primer mensaje contiene "unirse XXXXXX" (caso wa.me link de
+  // invitacion pre-llenado), preservamos el code en state para auto-join
+  // despues que termine el onboarding.
   let pendingCode: string | undefined;
   if (messageBody) {
     const trimmed = messageBody.trim().toUpperCase();
@@ -294,9 +250,6 @@ export async function handleUnknownUser(phone: string, messageBody?: string) {
     if (m) pendingCode = m[1];
   }
 
-  // Arrancar onboarding en WA: pedir el nombre. handleAskName setea state
-  // action="onboarding_ask_name" — sobrescribimos despues con el pending
-  // code para no perderlo.
   await handleAskName(phone);
   if (pendingCode) {
     await setState(phone, {

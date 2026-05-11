@@ -95,10 +95,16 @@ export async function handleNameSubmit(
 
 export async function handleNameConfirmed(
   phone: string,
-  userId: string,
   name: string,
 ): Promise<void> {
   const supabase = createAdminClient();
+  const { normalizePhone, emailForPhone } = await import("@/lib/auth/phone");
+
+  const phoneNormalized = normalizePhone(phone);
+  const phoneE164 = `+${phoneNormalized}`;
+  const syntheticEmail = emailForPhone(phoneNormalized);
+  const finalName = name.trim().slice(0, 50);
+
   // Asignar pollito aleatorio. Excluimos los "hincha de equipo" (dim,
   // millos, verde, envigado) para no asumir afinidad de equipo de un
   // user nuevo — sería raro que a un hincha del Nacional le toque el
@@ -108,15 +114,66 @@ export async function handleNameConfirmed(
   );
   const randomPollito = generic[Math.floor(Math.random() * generic.length)];
 
-  const { error } = await supabase
+  // FIND-OR-CREATE atomico. Acá es donde realmente nace la cuenta — si el
+  // user llego via handleUnknownUser y ahora confirma el nombre, creamos
+  // auth.users + public.users en este momento. Si ya existe (caso "user
+  // legacy con shell sin nombre que vuelve a hablarle al bot"), solo
+  // actualizamos su row.
+  let authUserId: string | null = null;
+  const { data: rpcId } = await supabase.rpc("find_auth_user_id_by_phone", {
+    p_phone: phoneE164,
+  });
+  if (typeof rpcId === "string" && rpcId.length > 0) {
+    authUserId = rpcId;
+  }
+
+  if (!authUserId) {
+    const { data: created, error: createErr } =
+      await supabase.auth.admin.createUser({
+        phone: phoneE164,
+        phone_confirm: true,
+        email: syntheticEmail,
+        email_confirm: true,
+      });
+    if (createErr || !created.user) {
+      // Race: SMS OTP o magic-link tap concurrente pudo haber creado el
+      // user entre el RPC y el createUser. Re-leemos.
+      const { data: retryId } = await supabase.rpc("find_auth_user_id_by_phone", {
+        p_phone: phoneE164,
+      });
+      if (typeof retryId === "string" && retryId.length > 0) {
+        authUserId = retryId;
+      } else {
+        console.error("[onboarding] createUser failed:", createErr);
+        await sendTextMessage(
+          phone,
+          "Algo falló creando tu cuenta, parce. Intenta de nuevo en un minuto.",
+        );
+        return;
+      }
+    } else {
+      authUserId = created.user.id;
+    }
+  }
+
+  // Upsert public.users con nombre + pollito + phone. El trigger
+  // auth.users → public.users normalmente ya creo una row vacia al
+  // momento del createUser de arriba; el upsert la completa con todo
+  // de una vez. onConflict=id la convierte en UPDATE para users legacy.
+  const { error: upsertErr } = await supabase
     .from("users")
-    .update({
-      display_name: name.trim().slice(0, 50),
-      avatar_url: randomPollito.id,
-    })
-    .eq("id", userId);
-  if (error) {
-    console.error("[onboarding] save profile failed:", error);
+    .upsert(
+      {
+        id: authUserId,
+        whatsapp_number: phoneNormalized,
+        whatsapp_verified: true,
+        display_name: finalName,
+        avatar_url: randomPollito.id,
+      },
+      { onConflict: "id" },
+    );
+  if (upsertErr) {
+    console.error("[onboarding] save profile failed:", upsertErr);
     await sendTextMessage(
       phone,
       "Algo falló guardando tu perfil, parce. Intenta de nuevo en un minuto.",
@@ -137,7 +194,7 @@ export async function handleNameConfirmed(
       "¡Listo parce! 🎉 Tu perfil está armado.\n\n" +
         "Te uno a la polla 👇",
     );
-    await handleJoinByCode(phone, userId, pendingCode);
+    await handleJoinByCode(phone, authUserId, pendingCode);
     return;
   }
 
