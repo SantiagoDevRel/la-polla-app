@@ -64,7 +64,10 @@ design-handoff/
 # actualizar la app en Play Store. Backup va a un password manager
 # o disco encriptado, no a git.
 *.keystore
+keystore*
 *.jks
+*.key
+keys/
 keystore.properties
 !debug.keystore
 
