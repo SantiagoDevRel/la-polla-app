@@ -183,9 +183,9 @@ function verifySignature(request: NextRequest, raw: string): boolean {
   const secret = process.env.META_WA_APP_SECRET;
   if (!secret) {
     console.warn(
-      "[wa-webhook] META_WA_APP_SECRET unset — skipping signature check",
+      "[wa-webhook] META_WA_APP_SECRET unset — rejecting webhook (fail-closed)",
     );
-    return true;
+    return false;
   }
   const header = request.headers.get("x-hub-signature-256") ?? "";
   if (!header.startsWith("sha256=")) return false;
