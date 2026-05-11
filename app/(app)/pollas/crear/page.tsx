@@ -543,9 +543,10 @@ export default function CrearPollaPage() {
                     >
                       <img src={t.logoPath} alt={getTournamentName(t.slug, locale)} width={24} height={24} style={{ objectFit: "contain", borderRadius: 4 }} />
                       <span className="font-medium text-text-primary flex-1">{getTournamentName(t.slug, locale)}</span>
-                      {/* Checkbox cuadrado para señalar multi-select */}
+                      {/* Checkbox cuadrado (rounded-sm = casi recto) para
+                          que se lea claro como multi-select, no radio. */}
                       <div
-                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        className={`w-5 h-5 rounded-sm border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
                           isSelected ? "border-gold bg-gold" : "border-border-medium"
                         }`}
                       >
