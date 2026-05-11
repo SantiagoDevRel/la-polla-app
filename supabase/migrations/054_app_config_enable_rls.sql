@@ -1,0 +1,30 @@
+-- ─────────────────────────────────────────────────────────────────────
+-- Migration 054: enable RLS on public.app_config (service-role only)
+-- ─────────────────────────────────────────────────────────────────────
+--
+-- Por qué:
+--   La tabla `app_config` (creada en migración 028) guarda valores como
+--   `app_base_url` que `trigger_sync_live()` y `discover_tournaments_cron()`
+--   leen para construir el URL del endpoint al que el pg_cron postea con
+--   CRON_SECRET en el header.
+--
+--   Quedó SIN `ENABLE ROW LEVEL SECURITY`. PostgREST expone `public` por
+--   default, así que si alguien (futuro grant accidental a `authenticated`,
+--   o un bug en el grant del rol) consigue SELECT/UPDATE, puede reescribir
+--   `app_base_url` y redirigir los crons (con el CRON_SECRET adjunto) a
+--   un endpoint atacante.
+--
+-- Qué hace este migration:
+--   - `ENABLE ROW LEVEL SECURITY` en `public.app_config`.
+--   - NO crea policies → default-deny para `anon` y `authenticated`.
+--   - Solo `service_role` puede leer/escribir vía PostgREST.
+--   - Las funciones pg_cron `trigger_sync_live` y `discover_tournaments_cron`
+--     son `SECURITY DEFINER` → bypassan RLS de todas formas.
+--   - El código de la app (`app/api/matches/route.ts`,
+--     `lib/api-football/sync.ts`) ya usa `createAdminClient()` /
+--     `getSupabaseAdmin()` (service_role), así que no hay impacto runtime.
+--
+-- Validado 2026-05-11: grep app_config en lib/ + app/ → todos los call sites
+-- usan admin client. RLS enable es invisible en producción.
+
+ALTER TABLE public.app_config ENABLE ROW LEVEL SECURITY;
