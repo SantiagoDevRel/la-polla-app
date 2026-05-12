@@ -295,6 +295,18 @@ export async function discoverTournament(
     return result;
   }
 
+  // 2026-05-12: Mundial 2026 esta cubierto end-to-end por
+  // openfootball/api-football (lib/api-football/sync-worldcup.ts) — los 104
+  // partidos con sus phases correctos. ESPN para el Mundial introduce
+  // duplicados (group stage real-team con naming distinto) + placeholders
+  // mal etiquetados (phase=group_stage cuando deberia ser knockout). Mejor
+  // skipear el discover ESPN para worldcup_2026. ESPN sigue siendo util
+  // para live scores via lib/espn/sync.ts (que solo updates rows existentes).
+  if (tournamentSlug === "worldcup_2026") {
+    result.warnings.push("Skip ESPN discover para worldcup_2026 (api-football canonico)");
+    return result;
+  }
+
   const supabase = createAdminClient();
   const daysAhead = opts.daysAhead ?? 90;
   const daysBack = opts.daysBack ?? 7;
