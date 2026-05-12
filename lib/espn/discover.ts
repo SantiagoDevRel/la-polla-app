@@ -29,6 +29,7 @@ import {
   parseEspnMinute,
 } from "./client";
 import { TOURNAMENT_STRUCTURE } from "@/lib/tournaments/structure";
+import { hasPlaceholderTeam } from "@/lib/matches/is-placeholder";
 
 /**
  * Asegura placeholder rows ('TBD vs TBD') para cada fase con slots
@@ -339,6 +340,16 @@ export async function discoverTournament(
       const away = competition?.competitors.find((c) => c.homeAway === "away");
       if (!home || !away) {
         result.warnings.push(`Evento sin home/away: ${event.id}`);
+        continue;
+      }
+
+      // REGLA #2: skip si los teams son placeholders del bracket (ej:
+      // "Round of 32 1 Winner", "Group A 2nd Place"). ESPN devuelve esto
+      // para knockouts aun sin resolver — no entran en matches.
+      if (hasPlaceholderTeam(home.team.displayName, away.team.displayName)) {
+        result.warnings.push(
+          `Skip placeholder ${event.id}: ${home.team.displayName} vs ${away.team.displayName}`,
+        );
         continue;
       }
 

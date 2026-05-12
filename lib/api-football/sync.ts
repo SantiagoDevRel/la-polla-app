@@ -13,6 +13,7 @@
 
 import { apiFootballGet } from './client';
 import { createAdminClient } from '../supabase/admin';
+import { hasPlaceholderTeam } from '@/lib/matches/is-placeholder';
 import {
   ApiFootballFixture,
   MatchRow,
@@ -147,6 +148,16 @@ export async function syncLeague(
     // 3. Mapear al schema de Supabase
     const matchRow: MatchRow = mapFixtureToMatch(fixture, tournament);
 
+    // REGLA #2: skip si home/away son placeholders del bracket (ej: "1A",
+    // "W73", "L101"). API-Football devuelve esto para knockout slots aun
+    // sin resolver — no entran en matches.
+    if (hasPlaceholderTeam(matchRow.home_team, matchRow.away_team)) {
+      console.warn(
+        `[sync] Skip placeholder ${matchRow.external_id}: ${matchRow.home_team} vs ${matchRow.away_team}`,
+      );
+      continue;
+    }
+
     try {
       // 4. CRITICAL: usar upsert_match_safe (no upsert directo) para que
       // el dedup cross-provider funcione. Bug fixed 2026-05-06: antes
@@ -248,6 +259,14 @@ export async function importMatches(): Promise<{
 
     // 3. Mapear al schema de Supabase
     const matchRow: MatchRow = mapFixtureToMatch(fixture, TOURNAMENT_ID);
+
+    // REGLA #2: skip placeholders del bracket. Mismo guard que arriba.
+    if (hasPlaceholderTeam(matchRow.home_team, matchRow.away_team)) {
+      console.warn(
+        `[sync] Skip placeholder ${matchRow.external_id}: ${matchRow.home_team} vs ${matchRow.away_team}`,
+      );
+      continue;
+    }
 
     try {
       // 4. CRITICAL: usar upsert_match_safe (no insert/update directo)

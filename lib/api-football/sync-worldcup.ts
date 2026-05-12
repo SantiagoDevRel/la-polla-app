@@ -6,6 +6,7 @@
 // a partir de (round, team1, team2). El upsert usa external_id como onConflict.
 import crypto from "crypto";
 import { createAdminClient } from "../supabase/admin";
+import { hasPlaceholderTeam } from "@/lib/matches/is-placeholder";
 
 const SOURCE_URL =
   "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json";
@@ -233,6 +234,15 @@ export async function syncWorldCup2026(): Promise<{
       match_day: parseMatchDay(roundName),
       venue: null,
     };
+
+    // REGLA #2: skip placeholders del bracket (ej: "1A", "W73", "L101").
+    // openfootball/api-football devuelven esto para knockouts no resueltos
+    // — no entran en matches. La unica excepcion son las "blind prediction"
+    // rows que vienen con external_id='blind:...' y se manejan aparte.
+    if (hasPlaceholderTeam(row.home_team, row.away_team)) {
+      console.warn(`[wc2026] Skip placeholder ${externalId}: ${home} vs ${away}`);
+      continue;
+    }
 
     try {
       // CRITICAL: usar upsert_match_safe (no upsert directo) para que el
