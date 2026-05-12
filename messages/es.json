@@ -125,8 +125,9 @@
     "step2Title": "Selecciona los partidos",
     "selectedCount": "{count, plural, one {# partido seleccionado} other {# partidos seleccionados}}",
     "selectedNone": "Ningún partido seleccionado",
+    "groupByLabel": "Agrupar partidos",
     "groupByDate": "Por fecha",
-    "groupByPhase": "Por fase",
+    "groupByPhase": "Por jornada",
     "selectAll": "Seleccionar todo",
     "deselectAll": "Deseleccionar todo",
     "loadingMatches": "Cargando partidos...",
@@ -263,8 +264,12 @@
     "phaseFinal": "Final",
     "phaseThirdPlace": "Tercer puesto",
     "phasePlayoff": "Repechaje",
+    "phaseOther": "Otros",
     "phaseMatchDay": "Jornada {n}",
-    "phaseLeague": "Liga"
+    "phaseLeague": "Liga",
+    "groupByLabel": "Agrupar partidos",
+    "groupByDate": "Por fecha",
+    "groupByPhase": "Por jornada"
   },
   "Prizes": {
     "title": "Premios",

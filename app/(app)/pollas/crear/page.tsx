@@ -175,10 +175,13 @@ export default function CrearPollaPage() {
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
   const [selectedMatchIds, setSelectedMatchIds] = useState<Set<string>>(new Set());
-  // Decisión 2026-05-08: el grouping por fase fue eliminado para
-  // simplificar UX. Siempre agrupamos por fecha. La constante se queda
-  // en lugar de la state var para no tocar el resto del flujo.
-  const groupBy: GroupBy = "date";
+  // Group toggle: solo se muestra para el Mundial single-tournament
+  // (worldcup_2026). Resto de torneos siempre agrupa por fecha — el
+  // toggle por fase agrega ruido en ligas regulares con 1 fase unica.
+  // Pedido user 2026-05-12: en pollas del Mundial el organizador y
+  // el pronosticador necesitan ver "fase de grupos / 16avos / octavos /
+  // ..." porque la estructura de fases del bracket es relevante.
+  const [groupBy, setGroupBy] = useState<GroupBy>("date");
   // Collapsed state por torneo en el picker — para que el organizador
   // pueda esconder un torneo después de elegir matches y no tenga que
   // scrollear todo. Solo aplica en pollas combinadas.
@@ -589,7 +592,35 @@ export default function CrearPollaPage() {
               {tournamentMeta && <img src={tournamentMeta.logoPath} alt="" width={28} height={28} style={{ objectFit: "contain", opacity: 0.6 }} />}
             </div>
 
-            {/* Group filters removidos — siempre por fecha. */}
+            {/* Group toggle: solo Mundial single-tournament. */}
+            {form.tournaments.length === 1 && form.tournaments[0] === "worldcup_2026" && (
+              <div className="flex gap-2" role="tablist" aria-label={t("groupByLabel")}>
+                <button
+                  role="tab"
+                  aria-selected={groupBy === "date"}
+                  onClick={() => setGroupBy("date")}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                    groupBy === "date"
+                      ? "bg-gold/10 text-gold border border-gold/30"
+                      : "bg-card border border-subtle text-text-secondary hover:border-gold/20"
+                  }`}
+                >
+                  {t("groupByDate")}
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={groupBy === "phase"}
+                  onClick={() => setGroupBy("phase")}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                    groupBy === "phase"
+                      ? "bg-gold/10 text-gold border border-gold/30"
+                      : "bg-card border border-subtle text-text-secondary hover:border-gold/20"
+                  }`}
+                >
+                  {t("groupByPhase")}
+                </button>
+              </div>
+            )}
 
             {/* Quick actions */}
             <div style={{ display: "flex", gap: 12, paddingTop: 4 }}>
