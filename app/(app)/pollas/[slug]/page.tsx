@@ -653,6 +653,11 @@ export default function PollaSlugPage() {
   // can collapse days they do not care about and expand the rest.
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
+  // Group toggle (date vs phase). Solo aparece en pollas single-tournament
+  // del Mundial — para ligas regulares "por fase" no aporta (todo es
+  // regular_season). Pedido user 2026-05-12.
+  const [groupBy, setGroupBy] = useState<"date" | "phase">("date");
+
   // Status-grouped partitions driving the Partidos tab. Timeline order:
   // Finalizados (collapsed history) → En vivo (locked display) →
   // Próximos (editable with auto-jump). Locked scheduled matches (kickoff
@@ -678,10 +683,31 @@ export default function PollaSlugPage() {
     [matches],
   );
 
-  // Upcoming matches bucketed by local calendar date, in chronological
-  // order. Each group gets a collapsible header in the Próximos section.
+  // Upcoming matches bucketed segun groupBy. Cada grupo trae label propio
+  // (header) — date headers se calculan inline desde el primer scheduled_at;
+  // phase labels se resuelven desde PHASE_KEYS via t().
   const upcomingByDate = useMemo(() => {
     const bucketMap = new Map<string, Match[]>();
+    if (groupBy === "phase") {
+      for (const m of upcomingMatches) {
+        const key = m.phase || "unknown";
+        const list = bucketMap.get(key);
+        if (list) list.push(m);
+        else bucketMap.set(key, [m]);
+      }
+      const entries = Array.from(bucketMap.entries()).map(([key, list]) => ({
+        key,
+        label: PHASE_KEYS[key.toLowerCase()] ? t(PHASE_KEYS[key.toLowerCase()]) : t("phaseOther"),
+        matches: list.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)),
+      }));
+      // Orden cronologico por primer match del grupo (group_stage primero,
+      // final ultimo).
+      entries.sort((a, b) =>
+        (a.matches[0]?.scheduled_at ?? "").localeCompare(b.matches[0]?.scheduled_at ?? ""),
+      );
+      return entries;
+    }
+    // date grouping (default)
     for (const m of upcomingMatches) {
       const key = dateKey(m.scheduled_at);
       const list = bucketMap.get(key);
@@ -690,9 +716,10 @@ export default function PollaSlugPage() {
     }
     return Array.from(bucketMap.entries()).map(([key, list]) => ({
       key,
+      label: null as string | null,
       matches: list,
     }));
-  }, [upcomingMatches]);
+  }, [upcomingMatches, groupBy, t]);
 
   // Default state: el grupo de la PRÓXIMA fecha (la más cercana en el
   // tiempo, sea hoy / mañana / pasado mañana / dentro de una semana)
@@ -1262,6 +1289,35 @@ export default function PollaSlugPage() {
                       {t("upcomingSection")}
                       <span className="text-text-primary/60 font-normal">· {upcomingMatches.length}</span>
                     </h3>
+                    {/* Toggle date/phase: solo Mundial single-tournament. */}
+                    {polla.tournament === "worldcup_2026" && (polla.tournaments?.length ?? 1) === 1 && (
+                      <div className="flex gap-2 px-1" role="tablist" aria-label={t("groupByLabel")}>
+                        <button
+                          role="tab"
+                          aria-selected={groupBy === "date"}
+                          onClick={() => setGroupBy("date")}
+                          className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                            groupBy === "date"
+                              ? "bg-gold/10 text-gold border border-gold/30"
+                              : "bg-card border border-subtle text-text-secondary hover:border-gold/20"
+                          }`}
+                        >
+                          {t("groupByDate")}
+                        </button>
+                        <button
+                          role="tab"
+                          aria-selected={groupBy === "phase"}
+                          onClick={() => setGroupBy("phase")}
+                          className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                            groupBy === "phase"
+                              ? "bg-gold/10 text-gold border border-gold/30"
+                              : "bg-card border border-subtle text-text-secondary hover:border-gold/20"
+                          }`}
+                        >
+                          {t("groupByPhase")}
+                        </button>
+                      </div>
+                    )}
                     {upcomingByDate.map((group) => {
                       const open = expandedDates.has(group.key);
                       return (
@@ -1273,7 +1329,7 @@ export default function PollaSlugPage() {
                             aria-expanded={open}
                           >
                             <span className="text-[11px] font-bold tracking-[0.08em] uppercase text-text-primary/80">
-                              {formatDateHeader(
+                              {group.label ?? formatDateHeader(
                                 group.matches[0].scheduled_at,
                                 locale,
                                 tDateLabels.today,

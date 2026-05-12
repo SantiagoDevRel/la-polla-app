@@ -125,8 +125,9 @@
     "step2Title": "Select the matches",
     "selectedCount": "{count, plural, one {# match selected} other {# matches selected}}",
     "selectedNone": "No matches selected",
+    "groupByLabel": "Group matches",
     "groupByDate": "By date",
-    "groupByPhase": "By phase",
+    "groupByPhase": "By round",
     "selectAll": "Select all",
     "deselectAll": "Deselect all",
     "loadingMatches": "Loading matches...",
@@ -263,8 +264,12 @@
     "phaseFinal": "Final",
     "phaseThirdPlace": "Third place",
     "phasePlayoff": "Playoff",
+    "phaseOther": "Other",
     "phaseMatchDay": "Match day {n}",
-    "phaseLeague": "League"
+    "phaseLeague": "League",
+    "groupByLabel": "Group matches",
+    "groupByDate": "By date",
+    "groupByPhase": "By round"
   },
   "Prizes": {
     "title": "Prizes",
