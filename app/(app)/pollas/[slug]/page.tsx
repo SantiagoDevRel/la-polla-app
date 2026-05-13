@@ -97,7 +97,7 @@ interface Prediction {
   locked: boolean; visible: boolean; points_earned: number;
 }
 
-type TabType = "partidos" | "ranking" | "pagos" | "info" | "organizar";
+type TabType = "partidos" | "ranking" | "pagos" | "info" | "organizar" | "invitar";
 
 // TeamCrest — renders flag URL via next/image proxy, falls back to 3-letter abbreviation
 function PaymentPendingBanner({ onGo }: { onGo: () => void }) {
@@ -609,16 +609,19 @@ export default function PollaSlugPage() {
 
   // Honor ?tab= on entry so deep-links from Inicio (RivalChip) land
   // directly on Tabla/Pagos/etc instead of the default Partidos view.
+  // 'invitar' no es un tab con contenido (es un trigger de modal) — si
+  // viene como deep-link fallback a 'partidos' y abrimos el sheet con
+  // un useEffect mas abajo.
+  const rawTab = searchParams.get("tab");
   const initialTab: TabType = (() => {
-    const raw = searchParams.get("tab");
     const allowed: TabType[] = ["partidos", "ranking", "pagos", "info", "organizar"];
-    return (allowed as string[]).includes(raw ?? "") ? (raw as TabType) : "partidos";
+    return (allowed as string[]).includes(rawTab ?? "") ? (rawTab as TabType) : "partidos";
   })();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(rawTab === "invitar");
 
   const [polla, setPolla] = useState<Polla | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -1043,6 +1046,11 @@ export default function PollaSlugPage() {
   const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
     { key: "partidos", label: t("tabPartidos"), icon: <PitchIcon className="w-4 h-4" />, show: true },
     { key: "ranking", label: t("tabRanking"), icon: <Trophy className="w-4 h-4" />, show: true },
+    // Invitar — visible para TODOS los participantes (no solo organizador).
+    // Cualquier miembro puede compartir link/codigo de la polla. Click abre
+    // el InviteModal sheet directamente — no es un tab con contenido, es
+    // un trigger inline (handler especial mas abajo en setActiveTab).
+    { key: "invitar", label: t("tabInvitar"), icon: <Share2 className="w-4 h-4" />, show: true },
     { key: "pagos", label: t("tabPagos"), icon: <Banknote className="w-4 h-4" />, show: polla.payment_mode !== "pay_winner" },
     { key: "organizar", label: t("tabOrganizar"), icon: <Settings className="w-4 h-4" />, show: isOrganizer },
     { key: "info", label: t("tabInfo"), icon: <Info className="w-4 h-4" />, show: true },
@@ -1144,7 +1152,18 @@ export default function PollaSlugPage() {
       <div className="max-w-lg mx-auto px-4 pt-3">
         <div className="flex overflow-x-auto gap-0 border-b border-border-subtle" style={{ scrollbarWidth: "none" }}>
           {TABS.filter((t) => t.show).map((t) => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
+            <button
+              key={t.key}
+              onClick={() => {
+                // "invitar" no es un tab con contenido — abre el sheet
+                // directamente y deja activeTab donde estaba para que el
+                // user vuelva al contexto previo al cerrar.
+                if (t.key === "invitar") {
+                  setShowInviteModal(true);
+                  return;
+                }
+                setActiveTab(t.key);
+              }}
               className={`flex-shrink-0 px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
                 activeTab === t.key ? "text-gold border-gold" : "text-text-muted border-transparent hover:text-text-secondary"
               }`}
