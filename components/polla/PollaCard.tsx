@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Users, Trophy } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { formatCurrency } from "@/lib/formatCurrency";
 
 export interface PollaCardProps {
@@ -39,6 +39,12 @@ export interface PollaCardProps {
   };
   variant?: "carousel" | "grid";
   onTap?: () => void;
+  /** True si el viewer es el organizador (creo la polla). Habilita el
+   *  share icon flotante para invitar amigos sin navegar al detalle. */
+  isOrganizer?: boolean;
+  /** Callback cuando el organizador tappea el share icon. Si no se
+   *  define, el icono no se renderea (defense). */
+  onInviteTap?: () => void;
 }
 
 export function PollaCard({
@@ -47,8 +53,12 @@ export function PollaCard({
   endedState,
   variant = "grid",
   onTap,
+  isOrganizer,
+  onInviteTap,
 }: PollaCardProps) {
   const locale = useLocale();
+  const tInvite = useTranslations("Invite");
+  const showInviteIcon = !!(isOrganizer && onInviteTap && !endedState);
   const isLeader = !!userContext?.isLeader && !endedState;
   const isCarousel = variant === "carousel";
   const hasMatchProgress = polla.totalMatches > 0;
@@ -85,6 +95,26 @@ export function PollaCard({
               "linear-gradient(90deg, transparent, var(--gold), transparent)",
           }}
         />
+      ) : null}
+
+      {/* "Compartir" chip — solo visible para el organizador. Texto en
+          vez de icono porque no todo el mundo entiende el icono share.
+          Posicion absoluta top-right para no robar lugar del titulo.
+          e.preventDefault + e.stopPropagation evitan que el tap-to-open
+          del card (el Link wrapper) se dispare junto con el handler. */}
+      {showInviteIcon ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onInviteTap?.();
+          }}
+          aria-label={tInvite("ariaShare")}
+          className="absolute top-2 right-2 inline-flex items-center px-2.5 py-1 rounded-full bg-gold/10 hover:bg-gold/20 border border-gold/30 hover:border-gold/50 transition-colors text-gold text-[11px] font-semibold tracking-tight z-10 cursor-pointer"
+        >
+          {tInvite("shareChip")}
+        </button>
       ) : null}
 
       {/* Polla name — primer header. Antes había una row separada con

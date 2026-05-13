@@ -206,6 +206,7 @@
     "saveSuffix": "{count, plural, one {prediction saved} other {predictions saved}}",
     "tabPartidos": "Matches",
     "tabRanking": "Standings",
+    "tabInvitar": "Invite",
     "tabPagos": "Payments",
     "tabOrganizar": "Admin",
     "tabInfo": "Info",
@@ -403,6 +404,8 @@
     "noResults": "No countries found"
   },
   "Invite": {
+    "ariaShare": "Invite friends to this pool",
+    "shareChip": "Share",
     "drawerTitle": "Invite friends to {pollaName}",
     "drawerDescription": "Share the code or link so others can join the pool.",
     "title": "Invite friends to {pollaName}",

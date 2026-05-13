@@ -8,6 +8,7 @@ import { useLocale, useTranslations } from "next-intl";
 import PollaCard from "@/components/polla/PollaCard";
 import { PollitoMoment } from "@/components/pollito/PollitoMoment";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
+import InviteModal from "@/components/polla/InviteModal";
 import { useToast } from "@/components/ui/Toast";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
@@ -31,6 +32,9 @@ interface PollaData {
   user_rank?: number | null;
   user_total_points?: number;
   is_leader?: boolean;
+  // Organizer + invite data — habilita el share icon en PollaCard.
+  is_organizer?: boolean;
+  join_code?: string | null;
 }
 
 interface PendingInvite {
@@ -85,6 +89,10 @@ export default function MisPollasPage() {
   const [loading, setLoading] = useState(true);
   const [endedOpen, setEndedOpen] = useState(true);
   const [joinOpen, setJoinOpen] = useState(false);
+  // Polla actualmente siendo invitada via share icon. null cuando el
+  // InviteModal esta cerrado. Cambia cuando el organizador tappea el
+  // icono en cualquier PollaCard.
+  const [inviteForPolla, setInviteForPolla] = useState<PollaData | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -199,6 +207,8 @@ export default function MisPollasPage() {
                           }
                         : undefined
                     }
+                    isOrganizer={polla.is_organizer ?? false}
+                    onInviteTap={() => setInviteForPolla(polla)}
                     onTap={() => router.push(`/pollas/${polla.slug}`)}
                   />
                 </AnimatedItem>
@@ -273,6 +283,21 @@ export default function MisPollasPage() {
           router.push(`/pollas/${polla.slug}`);
         }}
       />
+
+      {/* InviteModal portal — re-usa el sheet existente del detalle de
+          polla. Solo se monta cuando el organizador tappea el share icon
+          en alguna PollaCard. canRotate=true porque solo organizadores
+          pueden abrirlo desde aca (is_organizer === true). */}
+      {inviteForPolla && (
+        <InviteModal
+          pollaSlug={inviteForPolla.slug}
+          pollaName={inviteForPolla.name}
+          isOpen={true}
+          onClose={() => setInviteForPolla(null)}
+          joinCode={inviteForPolla.join_code ?? null}
+          canRotate={true}
+        />
+      )}
     </div>
   );
 }

@@ -206,6 +206,7 @@
     "saveSuffix": "{count, plural, one {pronóstico guardado} other {pronósticos guardados}}",
     "tabPartidos": "Partidos",
     "tabRanking": "Tabla",
+    "tabInvitar": "Invitar",
     "tabPagos": "Pagos",
     "tabOrganizar": "Admin",
     "tabInfo": "Info",
@@ -403,6 +404,8 @@
     "noResults": "No se encontraron países"
   },
   "Invite": {
+    "ariaShare": "Invitar amigos a esta polla",
+    "shareChip": "Compartir",
     "drawerTitle": "Invitar amigos a {pollaName}",
     "drawerDescription": "Comparte el código o el link para que otros se unan a la polla.",
     "title": "Invitar amigos a {pollaName}",

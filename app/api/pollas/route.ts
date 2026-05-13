@@ -311,6 +311,10 @@ export async function GET() {
         user_rank: myRow?.rank ?? null,
         user_total_points: myRow?.total_points ?? 0,
         is_leader: myRow?.rank === 1,
+        // Quien creo la polla puede invitar amigos directamente desde el
+        // listado /pollas (share icon en PollaCard) sin tener que entrar
+        // al detalle. Usado por el flag PollaCard.isOrganizer.
+        is_organizer: p.created_by === user.id,
       };
     });
 
