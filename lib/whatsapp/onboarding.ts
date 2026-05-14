@@ -115,10 +115,10 @@ export async function handleNameConfirmed(
   const randomPollito = generic[Math.floor(Math.random() * generic.length)];
 
   // FIND-OR-CREATE atomico. Acá es donde realmente nace la cuenta — si el
-  // user llego via handleUnknownUser y ahora confirma el nombre, creamos
-  // auth.users + public.users en este momento. Si ya existe (caso "user
-  // legacy con shell sin nombre que vuelve a hablarle al bot"), solo
-  // actualizamos su row.
+  // user llego como telefono desconocido (router.ts → routeOnboarding) y
+  // ahora confirma el nombre, creamos auth.users + public.users en este
+  // momento. Si ya existe (caso "user legacy con shell sin nombre que vuelve
+  // a hablarle al bot"), solo actualizamos su row.
   let authUserId: string | null = null;
   const { data: rpcId } = await supabase.rpc("find_auth_user_id_by_phone", {
     p_phone: phoneE164,

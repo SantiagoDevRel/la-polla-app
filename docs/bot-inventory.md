@@ -1,5 +1,15 @@
 # Bot Inventory
 
+> ⚠️ **STALE (pre-2026-05).** This is a historical audit snapshot. The bot has
+> since changed substantially: the router moved to `lib/whatsapp/router.ts`,
+> conversation state moved to `public.whatsapp_conversation_state` (migration
+> 026), the OTP and `rotate_*` flows were removed, `digital_pool` was removed,
+> onboarding for unknown phones is now `routeOnboarding`, and the predict flow
+> jumps straight to the next match (no `handleUnknownUser`, no phase/date
+> grouping). Line numbers and `bot.ts:*` references below are no longer
+> accurate. Treat `CLAUDE.md` → "WhatsApp Bot Architecture" as the source of
+> truth; this file is kept only for historical context.
+
 Audit snapshot of the La Polla WhatsApp bot. Regenerated as part of Batch 4 Phase 1 (Supabase state migration audit). This document is a static map of the current bot surface, not a design spec. For the migration plan see `docs/batch-4-audit.md`.
 
 Scope: every code path reachable from the WhatsApp webhook, every function that reads or writes conversation state, and every helper shared with the web app.
