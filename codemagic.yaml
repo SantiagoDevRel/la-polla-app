@@ -1,0 +1,129 @@
+# Codemagic CI/CD config — La Polla Colombiana (iOS)
+#
+# Pipeline: build IPA + auto-publish a TestFlight.
+#
+# Funcionamiento general:
+# - La app es un wrapper Capacitor de https://lapollacolombiana.com.
+# - Por eso NO necesitamos buildear Next.js acá. Solo sync Capacitor
+#   (para que el `ios/App/App/capacitor.config.json` esté al día) y
+#   compilar el .ipa en Xcode.
+# - El versionado (CFBundleVersion) se autoincrementa con el latest
+#   build number de TestFlight + 1 — evita "version already exists"
+#   en App Store Connect.
+#
+# Requiere en Codemagic:
+# - Integración "App Store Connect API key" cargada (Issuer ID + Key
+#   ID + .p8). El nombre de referencia debe matchear `api_key` abajo.
+#
+# Workflows:
+# - ios-workflow: build + publish a TestFlight (default).
+#
+# Trigger: manual (Start new build desde el dashboard). Si querés que
+# corra auto en cada push a main, descomenta el bloque `triggering`.
+
+workflows:
+  ios-workflow:
+    name: iOS · La Polla → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    environment:
+      groups:
+        # Variables sensibles (BUNDLE_ID, APP_STORE_APPLE_ID, etc.)
+        # se inyectan desde un Environment Group llamado "lapolla-ios"
+        # en Codemagic (Teams → Environment variables).
+        - lapolla-ios
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
+        XCODE_SCHEME: "App"
+        # Bundle ID iOS (debe matchear el registrado en Apple Developer
+        # Portal + el creado en App Store Connect).
+        BUNDLE_ID: "com.lapollacolombiana.app"
+      node: 22.22.3
+      xcode: latest
+
+    integrations:
+      # Nombre de la integración configurada en Codemagic UI
+      # (Teams → Integrations → Developer Portal). Setealo con el nombre
+      # que le pongas allá cuando subas la API key de App Store Connect.
+      app_store_connect: codemagic_asc_key
+
+    # Trigger manual por defecto. Descomenta para auto-build en push:
+    # triggering:
+    #   events:
+    #     - push
+    #   branch_patterns:
+    #     - pattern: main
+    #       include: true
+    #   watched_file_patterns:
+    #     # Solo dispara build cuando hay cambios que afectan al binario
+    #     # iOS — para cambios de la web sola NO hace falta nuevo build.
+    #     - "ios/**"
+    #     - "capacitor.config.ts"
+    #     - "package.json"
+    #     - "codemagic.yaml"
+
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm ci
+
+      # Capacitor 8 usa SPM (Swift Package Manager). No hace falta
+      # `pod install` ni nada de CocoaPods.
+      - name: Sync Capacitor iOS
+        script: |
+          npx cap sync ios
+
+      # Setup keychain con cert de Apple Distribution (auto-managed
+      # por Codemagic via la integración app_store_connect).
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      # Increment build number: latestBuildNumber de TestFlight + 1.
+      # Mantiene el versionado siempre subiendo, evita el error
+      # "build number already exists" en App Store Connect.
+      - name: Increment build number
+        script: |
+          cd $CM_BUILD_DIR/ios/App
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" || echo "0")
+          NEW_BUILD_NUMBER=$(($LATEST_BUILD_NUMBER + 1))
+          echo "Setting build number to $NEW_BUILD_NUMBER"
+          agvtool new-version -all $NEW_BUILD_NUMBER
+
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "$CM_BUILD_DIR/$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        # Misma referencia que `integrations.app_store_connect` arriba.
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+
+        # Sube a TestFlight automáticamente cuando el build pasa.
+        submit_to_testflight: true
+        # Grupos de beta testers a notificar. Configurá un grupo
+        # "Internal Testing" en App Store Connect y mete a tu email.
+        # Comentado por ahora — apenas creamos el grupo lo activamos:
+        # beta_groups:
+        #   - "Internal Testing"
+
+        # NO sometemos auto a App Store Review todavía. Eso lo hacemos
+        # manualmente desde App Store Connect cuando estemos listos:
+        submit_to_app_store: false
