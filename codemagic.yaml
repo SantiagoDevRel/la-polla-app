@@ -9,25 +9,31 @@
 #   compilar el .ipa en Xcode.
 # - Versionado: usamos $BUILD_NUMBER de Codemagic (auto-incrementa por
 #   build, único dentro del proyecto). Cero dependencia de config de
-#   Apple → el primer build funciona sin tener el numeric App ID a mano.
+#   Apple → no necesitamos el numeric App ID a mano.
 #
-# ─── SETUP REQUERIDO EN CODEMAGIC (una vez) ──────────────────────────
-# 1. Subir la App Store Connect API key como INTEGRACIÓN (no env var):
-#       Team settings → Team integrations → Developer Portal →
-#       Manage keys → Add key.
-#    Ponerle de nombre EXACTAMENTE: codemagic_asc_key
-#    (Issuer ID + Key ID + archivo .p8).
-# 2. Eso es todo. El step "Set up code signing" abajo usa esa key para
-#    CREAR el distribution certificate + provisioning profile si no
-#    existen (cuenta Apple nueva sin signing files previos).
+# ─── SETUP REQUERIDO EN CODEMAGIC (una vez, en la UI) ────────────────
+# 1. App Store Connect API key como INTEGRACIÓN:
+#       Team settings → Team integrations → Developer Portal → Add key
+#    Nombre EXACTO: codemagic_asc_key
+#
+# 2. Code signing identities (cuenta Apple nueva = sin cert/profile):
+#       Team settings → Code signing identities
+#    a. iOS certificates → Generate certificate
+#         type: Apple Distribution  (usa la API key)
+#    b. iOS provisioning profiles → Generate profile
+#         bundle id: com.lapollacolombiana.app
+#         type: App Store
+#         certificate: el Apple Distribution recién creado
+#    → Debe quedar un check verde. ESTE paso es el que faltaba en los
+#      builds 1-3: el bloque `ios_signing` de abajo FETCHEA el cert +
+#      profile, no los crea. Tienen que existir primero.
 #
 # Prerequisitos del lado de Apple:
-# - Bundle ID `com.lapollacolombiana.app` registrado en Apple Developer
-#   Portal (Identifiers).
+# - Bundle ID `com.lapollacolombiana.app` en Apple Developer Portal.
 # - App creada en App Store Connect con ese Bundle ID.
 #
-# Trigger: manual (Start new build desde el dashboard). Para auto-build
-# en push a main, descomentar el bloque `triggering`.
+# Trigger: manual. Para auto-build en push a main, descomentar
+# `triggering`.
 
 workflows:
   ios-workflow:
@@ -35,24 +41,27 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
 
-    # Integración de App Store Connect API key. El nombre debe matchear
-    # el que configuraste en Team integrations → Developer Portal.
-    # Autentica los comandos `app-store-connect` del step de signing.
+    # API key — autentica el fetch de signing files + el publish.
     integrations:
       app_store_connect: codemagic_asc_key
 
     environment:
+      # Code signing automático de Codemagic: con la integración de
+      # arriba + este bloque, Codemagic FETCHEA el distribution cert +
+      # el provisioning profile App Store que generaste en la UI
+      # (Code signing identities) y los pone en la build machine.
+      # `xcode-project use-profiles` (en scripts) los aplica al .xcodeproj.
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.lapollacolombiana.app
       vars:
         # Capacitor 8 con SPM genera App.xcodeproj — NO App.xcworkspace
         # (el .xcworkspace lo generaba CocoaPods, que ya no usamos).
-        # Por eso build-ipa apunta a --project, no --workspace.
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
-        BUNDLE_ID: "com.lapollacolombiana.app"
       node: 22.22.3
       xcode: latest
 
-    # Trigger manual por defecto. Descomentar para auto-build en push:
     # triggering:
     #   events:
     #     - push
@@ -60,8 +69,6 @@ workflows:
     #     - pattern: main
     #       include: true
     #   watched_file_patterns:
-    #     # Solo dispara build cuando cambian cosas que afectan el binario
-    #     # iOS — para cambios de la web sola NO hace falta nuevo build.
     #     - "ios/**"
     #     - "capacitor.config.ts"
     #     - "package.json"
@@ -75,24 +82,11 @@ workflows:
       - name: Sync Capacitor iOS
         script: npx cap sync ios
 
-      # Code signing automático desde cero:
-      # - `keychain initialize` → keychain limpio en la build machine.
-      # - `fetch-signing-files ... --create` → busca el distribution
-      #   certificate + provisioning profile del bundle ID; si NO existen
-      #   (cuenta Apple nueva), los CREA usando la API key. El flag
-      #   --create es la diferencia clave vs el bloque environment.ios_signing,
-      #   que solo fetchea y NO crea.
-      # - `keychain add-certificates` → mete el cert descargado al keychain.
-      # - `xcode-project use-profiles` → configura el .xcodeproj para
-      #   firmar con el profile correcto.
+      # Aplica al .xcodeproj los signing files que Codemagic fetcheó
+      # via el bloque environment.ios_signing. Patrón idéntico al sample
+      # oficial de Codemagic para Capacitor.
       - name: Set up code signing
-        script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
-          xcode-project use-profiles
+        script: xcode-project use-profiles
 
       # Versionado: $BUILD_NUMBER lo provee Codemagic y auto-incrementa
       # por cada build. iOS/TestFlight solo exige que CFBundleVersion
@@ -116,18 +110,8 @@ workflows:
     publishing:
       app_store_connect:
         # auth: integration → usa la integración codemagic_asc_key.
-        # No hace falta repetir api_key / key_id / issuer_id acá.
         auth: integration
-
-        # Sube a TestFlight automáticamente cuando el build pasa.
         submit_to_testflight: true
-        # Grupos de beta testers a notificar. Crear un grupo
-        # "Internal Testing" en App Store Connect → TestFlight y
-        # descomentar. Sin esto el build llega a TestFlight igual,
-        # solo que no notifica a un grupo.
         # beta_groups:
         #   - Internal Testing
-
-        # NO sometemos auto a App Store Review. Eso se hace manual
-        # desde App Store Connect cuando estemos listos:
         submit_to_app_store: false
