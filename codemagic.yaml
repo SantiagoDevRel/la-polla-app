@@ -17,8 +17,9 @@
 #       Manage keys → Add key.
 #    Ponerle de nombre EXACTAMENTE: codemagic_asc_key
 #    (Issuer ID + Key ID + archivo .p8).
-# 2. Eso es todo. La integración maneja code signing Y publishing.
-#    No hace falta cargar nada como environment variable.
+# 2. Eso es todo. El step "Set up code signing" abajo usa esa key para
+#    CREAR el distribution certificate + provisioning profile si no
+#    existen (cuenta Apple nueva sin signing files previos).
 #
 # Prerequisitos del lado de Apple:
 # - Bundle ID `com.lapollacolombiana.app` registrado en Apple Developer
@@ -36,19 +37,15 @@ workflows:
 
     # Integración de App Store Connect API key. El nombre debe matchear
     # el que configuraste en Team integrations → Developer Portal.
+    # Autentica los comandos `app-store-connect` del step de signing.
     integrations:
       app_store_connect: codemagic_asc_key
 
     environment:
-      # Code signing automático: Codemagic usa la integración de arriba
-      # para fetch/crear el cert de distribution + provisioning profile
-      # del bundle ID. distribution_type app_store cubre TestFlight.
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.lapollacolombiana.app
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
+        BUNDLE_ID: "com.lapollacolombiana.app"
       node: 22.22.3
       xcode: latest
 
@@ -75,10 +72,24 @@ workflows:
       - name: Sync Capacitor iOS
         script: npx cap sync ios
 
-      # Aplica los provisioning profiles que Codemagic fetcheó via la
-      # integración (gracias al bloque environment.ios_signing).
+      # Code signing automático desde cero:
+      # - `keychain initialize` → keychain limpio en la build machine.
+      # - `fetch-signing-files ... --create` → busca el distribution
+      #   certificate + provisioning profile del bundle ID; si NO existen
+      #   (cuenta Apple nueva), los CREA usando la API key. El flag
+      #   --create es la diferencia clave vs el bloque environment.ios_signing,
+      #   que solo fetchea y NO crea.
+      # - `keychain add-certificates` → mete el cert descargado al keychain.
+      # - `xcode-project use-profiles` → configura el .xcodeproj para
+      #   firmar con el profile correcto.
       - name: Set up code signing
-        script: xcode-project use-profiles
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
 
       # Versionado: $BUILD_NUMBER lo provee Codemagic y auto-incrementa
       # por cada build. iOS/TestFlight solo exige que CFBundleVersion
