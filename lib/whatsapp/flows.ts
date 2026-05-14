@@ -7,7 +7,7 @@ import {
   sendListMessage,
   sendCTAButton,
 } from "./interactive";
-import { clearState, getState, setState } from "./state";
+import { clearState, setState } from "./state";
 import { formatTablaWA } from "./tabla";
 import { shortMatchTitle } from "./format";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
@@ -172,7 +172,14 @@ async function verifyMemberAndPolla(
     return null;
   }
 
-  if (polla.payment_mode === "admin_collects" && !participant.paid) {
+  // Payment gate only applies to admin_collects pollas that actually charge
+  // a buy-in. A free polla (buy_in = 0) has nothing to collect, so gating it
+  // on participant.paid would lock the player out forever.
+  if (
+    polla.payment_mode === "admin_collects" &&
+    Number(polla.buy_in_amount) > 0 &&
+    !participant.paid
+  ) {
     await sendTextMessage(
       phone,
       "Tu pago aún no ha sido aprobado por el organizador. Esperá a que confirme y volvé a intentar."
@@ -210,56 +217,11 @@ export async function handleMainMenu(
   await handleMisPollas(phone, user.id);
 }
 
-// ─── FLOW 2: Unknown User ───
-
-/**
- * Cuando el bot recibe un mensaje desde un número que NO tiene cuenta:
- * creamos auth.users + public.users sobre la marcha (la WA delivery es
- * proof-of-ownership del número) y disparamos el flujo de onboarding 100%
- * en WhatsApp. Después de esto el siguiente mensaje del user encuentra
- * un perfil en DB y entra al gate de onboarding del router normal.
- *
- * Mismo patrón que /api/auth/wa-magic crea cuentas para users sin row,
- * pero acá iniciado por el primer "hola" al bot en vez de por tap a un
- * magic link.
- *
- * `messageBody` (opcional): si la primera interacción del usuario
- * desconocido fue tapear un wa.me link con texto pre-llenado tipo
- * "unirse ABCD23", extraemos el código y lo guardamos en
- * pending_join_code para auto-unirlo al final del onboarding. Esto cubre
- * el caso "abuela": user recibe link, lo tapéa, llega a WhatsApp ya
- * pre-llenado, lo manda, y termina en la polla sin ver la web.
- */
-export async function handleUnknownUser(phone: string, messageBody?: string) {
-  const { handleAskName } = await import("./onboarding");
-  const { setState } = await import("./state");
-
-  // IMPORTANTE: NO creamos auth.users / public.users acá. Si lo hicieramos,
-  // cualquier numero curioso que mande "hola" al bot quedaria como shell
-  // sin display_name si no termina el onboarding. La cuenta se crea recien
-  // cuando confirma su nombre (handleNameConfirmed) — find-or-create
-  // atomico al final del flow.
-  //
-  // Si el primer mensaje contiene "unirse XXXXXX" (caso wa.me link de
-  // invitacion pre-llenado), preservamos el code en state para auto-join
-  // despues que termine el onboarding.
-  let pendingCode: string | undefined;
-  if (messageBody) {
-    const trimmed = messageBody.trim().toUpperCase();
-    const m = trimmed.match(/(?:^|\s)([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})(?:\s|$)/);
-    if (m) pendingCode = m[1];
-  }
-
-  await handleAskName(phone);
-  if (pendingCode) {
-    await setState(phone, {
-      action: "onboarding_ask_name",
-      pendingJoinCode: pendingCode,
-    });
-  }
-}
-
-// ─── FLOW 3: Mis Pollas ───
+// ─── FLOW 2: Mis Pollas ───
+//
+// Onboarding for unknown phones lives entirely in router.ts → routeOnboarding
+// + lib/whatsapp/onboarding.ts. The account is created find-or-create style
+// in handleNameConfirmed once the user confirms their name — see those files.
 
 export async function handleMisPollas(phone: string, userId: string) {
   const supabase = createAdminClient();
@@ -417,13 +379,20 @@ export async function handlePollaMenu(
 }
 
 // ─── FLOW 5: Pronosticar ───
+//
+// UX (decisión del user, 2026-05-14): NADA de "filtrá por fecha o jornada".
+// Un tap en "Pronosticar" (o "Siguiente") cae DIRECTO en el próximo partido
+// sin pronosticar — el user solo ve el partido y escribe el marcador. La
+// lista plana cronológica queda a un tap de distancia ("Ver partidos") como
+// escape para saltarse partidos o buscar uno específico.
 
 export async function handlePronosticar(
   phone: string,
   userId: string,
   pollaId: string,
   specificMatchId?: string,
-  page: number = 0
+  page: number = 0,
+  forceList: boolean = false
 ) {
   void ensureMatchesFresh();
   const check = await verifyMemberAndPolla(phone, userId, pollaId);
@@ -464,9 +433,10 @@ export async function handlePronosticar(
   if (!matches || matches.length === 0) {
     await sendReplyButtons(
       phone,
-      "😴 No hay partidos pendientes para pronosticar parce.\n\n_Pilas, te aviso cuando haya nuevos_",
+      "😴 No hay partidos abiertos para pronosticar en este momento.\n\n_Apenas se programen nuevos, te aviso._",
       [
-        { id: `polla_${pollaId}`, title: "⬅️ Volver" },
+        { id: `rank_${pollaId}`, title: "Ver Tabla 📊" },
+        { id: `results_${pollaId}`, title: "Resultados ⚽" },
         { id: "menu", title: "🏠 Menú" },
       ],
       polla.name,
@@ -484,15 +454,15 @@ export async function handlePronosticar(
 
   const predictedMatchIds = new Set(predictions?.map((p) => p.match_id) || []);
 
-  // Specific match requested — validate it's in the polla scope
+  // Specific match requested (tapped a row in the list) — validate scope.
   if (specificMatchId) {
     const match = matches.find((m) => m.id === specificMatchId);
     if (!match) {
       await sendTextMessage(
         phone,
-        "Ese partido no está en esta polla parce, seleccioná uno de la lista."
+        "Ese partido ya no está abierto parce, elegí uno de la lista."
       );
-      return handlePronosticar(phone, userId, pollaId, undefined, 0);
+      return handlePronosticar(phone, userId, pollaId, undefined, 0, true);
     }
     return showPredictionPrompt(
       phone,
@@ -505,9 +475,28 @@ export async function handlePronosticar(
     );
   }
 
-  // Auto-advance if only one unpredicted match
   const unpredicted = matches.filter((m) => !predictedMatchIds.has(m.id));
-  if (unpredicted.length === 1 && page === 0) {
+
+  // Everything predicted — celebrate, don't dump a useless list of done ones.
+  if (unpredicted.length === 0) {
+    await sendReplyButtons(
+      phone,
+      `✅ ¡Eso es! Ya pronosticaste los *${matches.length}* partidos abiertos de *${polla.name}*.\n\n_Te aviso apenas se programen nuevos._`,
+      [
+        { id: `rank_${pollaId}`, title: "Ver Tabla 📊" },
+        { id: `results_${pollaId}`, title: "Resultados ⚽" },
+        { id: "menu", title: "🏠 Menú" },
+      ],
+      polla.name,
+      FOOTER
+    );
+    return;
+  }
+
+  // Default entry (tap on "Pronosticar" / "Siguiente"): jump STRAIGHT to the
+  // next match that needs a prediction. No list to scroll, no date/phase
+  // picker — just a match and a score box.
+  if (!forceList && page === 0) {
     const match = unpredicted[0];
     return showPredictionPrompt(
       phone,
@@ -520,18 +509,12 @@ export async function handlePronosticar(
     );
   }
 
-  // Decisión 2026-05-08: en WhatsApp NO mostramos el gate "¿por fase o
-  // por fecha?". Caemos directo a la lista plana paginada de partidos
-  // sin pronosticar (orden cronológico). Razón UX: el user en chat
-  // quiere tap-tap, no un picker más antes de ver los partidos. La
-  // paginación de WhatsApp (10 rows + "Ver más") cubre cualquier
-  // tamaño de polla.
-  const targetMatches = unpredicted.length > 0 ? unpredicted : matches;
-
-  // List view with pagination (WhatsApp lists are capped at 10 rows).
+  // Explicit list view ("Ver partidos" / pagination): flat, chronological,
+  // only the matches still missing a prediction. WhatsApp lists cap at 10
+  // rows, so we paginate with a trailing "Ver más" row.
   const startIdx = page * PAGE_SIZE;
-  const pageMatches = targetMatches.slice(startIdx, startIdx + PAGE_SIZE);
-  const hasMore = startIdx + PAGE_SIZE < targetMatches.length;
+  const pageMatches = unpredicted.slice(startIdx, startIdx + PAGE_SIZE);
+  const hasMore = startIdx + PAGE_SIZE < unpredicted.length;
 
   await setState(phone, {
     action: "picking_match",
@@ -545,18 +528,14 @@ export async function handlePronosticar(
       month: "short",
       day: "numeric",
     });
-    const predicted = predictedMatchIds.has(m.id);
     return {
       id: `match_${m.id}`,
       // Title is capped at 24 chars by WhatsApp, so we abbreviate here.
-      // Description (72 char cap) carries the full names + date so tappers
-      // see the unambiguous matchup. If that combo would overflow, fall
-      // back to the original date-only description.
+      // Description (72 char cap) carries the full names + date.
       title: shortMatchTitle(m.home_team, m.away_team),
       description: (() => {
-        const full = `${m.home_team} vs ${m.away_team} · ${dateStr}${predicted ? " · ✅" : ""}`;
-        if (full.length <= 72) return full;
-        return `${dateStr}${predicted ? " · ✅ Ya pronosticaste" : ""}`;
+        const full = `${m.home_team} vs ${m.away_team} · ${dateStr}`;
+        return full.length <= 72 ? full : dateStr;
       })(),
     };
   });
@@ -565,91 +544,18 @@ export async function handlePronosticar(
     rows.push({
       id: `more_${pollaId}_${page + 1}`,
       title: "Ver más partidos →",
-      description: `Mostrar los siguientes ${Math.min(
-        PAGE_SIZE,
-        targetMatches.length - (startIdx + PAGE_SIZE)
-      )}`,
+      description: `Faltan ${unpredicted.length - (startIdx + PAGE_SIZE)} por mostrar`,
     });
   }
 
   await sendListMessage(
     phone,
-    `¿Cuál partido quieres predecir? ⚽${page > 0 ? ` _(página ${page + 1})_` : ""}`,
+    `Estos son los partidos que te faltan pronosticar 👇${page > 0 ? ` _(pág. ${page + 1})_` : ""}`,
     "Ver partidos",
-    [{ title: "Partidos disponibles", rows }],
+    [{ title: "Toca para pronosticar", rows }],
     `🎯 ${polla.name}`,
     FOOTER
   );
-}
-
-// Group-mode picker: the user tapped "Por fase" or "Por fecha" from the
-// toggle. Persist the choice and re-enter handlePronosticar so the gate
-// above advances to the group list (or skips straight to the flat list
-// when only one group exists).
-export async function handlePredictGroupMode(
-  phone: string,
-  userId: string,
-  pollaId: string,
-  mode: "phase" | "date"
-) {
-  await setState(phone, {
-    action: "picking_group",
-    pollaId,
-    predictGroupMode: mode,
-  });
-  await handlePronosticar(phone, userId, pollaId);
-}
-
-// Reset grouping choice mid-flow: the user tapped "Cambiar agrupación"
-// from the group list. Clear the mode/key/page so the gate re-renders the
-// "¿Por fase o por fecha?" button message.
-export async function handlePredictGroupReset(
-  phone: string,
-  userId: string,
-  pollaId: string
-) {
-  await setState(phone, { action: "picking_group", pollaId });
-  await handlePronosticar(phone, userId, pollaId);
-}
-
-// Group-list pagination: the user tapped "Ver más fases/fechas" on the
-// group selector. Bump the page index in state and re-enter
-// handlePronosticar so the gate renders the next slice.
-export async function handlePredictGroupPage(
-  phone: string,
-  userId: string,
-  pollaId: string,
-  page: number
-) {
-  const current = await getState(phone);
-  const mode = current?.predictGroupMode ?? "phase";
-  await setState(phone, {
-    action: "picking_group",
-    pollaId,
-    predictGroupMode: mode,
-    predictGroupPage: page,
-  });
-  await handlePronosticar(phone, userId, pollaId);
-}
-
-// Group selection: the user tapped a row in the group list. Persist the
-// key and re-enter handlePronosticar; the gate reads the state and filters
-// matches to the chosen group before rendering the paginated list.
-export async function handlePredictGroupSelect(
-  phone: string,
-  userId: string,
-  pollaId: string,
-  groupKey: string
-) {
-  const current = await getState(phone);
-  const mode = current?.predictGroupMode ?? "phase";
-  await setState(phone, {
-    action: "picking_match",
-    pollaId,
-    predictGroupMode: mode,
-    predictGroupKey: groupKey,
-  });
-  await handlePronosticar(phone, userId, pollaId);
 }
 
 // Helper: Show prediction input prompt for a specific match.
@@ -700,22 +606,36 @@ async function showPredictionPrompt(
     `🏆 ${polla.name} — Partido ${matchIndex}/${totalMatches}\n` +
     `📅 ${dateStr}\n`;
 
+  // Buttons are escape hatches only — the user answers by TYPING the score
+  // (handled by the waiting_prediction state, set above). WhatsApp lets them
+  // tap a button OR type, so the score box stays the primary action.
+  const buttons = [
+    { id: `predlist_${pollaId}`, title: "📋 Ver partidos" },
+    { id: "menu", title: "🏠 Menú" },
+  ];
+
   if (existing) {
-    await sendTextMessage(
+    await sendReplyButtons(
       phone,
       header +
         `\nYa pronosticaste este partido parce.\n` +
         `Tu pronóstico actual: *${match.home_team} ${existing.predicted_home} - ${existing.predicted_away} ${match.away_team}*\n\n` +
-        `Escribí un nuevo marcador para actualizarlo (ejemplo: 2-2), o mandá *cancelar* para dejarlo igual.`
+        `Escribí un nuevo marcador para cambiarlo (ej: *2-2*), o *cancelar* para dejarlo igual.`,
+      buttons,
+      undefined,
+      FOOTER
     );
     return;
   }
 
-  await sendTextMessage(
+  await sendReplyButtons(
     phone,
     header +
-      `\nEscribe el resultado así:\n*2-1* _(local primero)_\n\n` +
-      `_Tienes hasta ${dateStr} para predecir_ ⏰`
+      `\n¿Cómo va a quedar? Escribí el marcador así:\n*2-1* _(local primero)_\n\n` +
+      `_Tienes hasta ${dateStr} para pronosticar_ ⏰`,
+    buttons,
+    undefined,
+    FOOTER
   );
 }
 

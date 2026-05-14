@@ -45,14 +45,9 @@ import {
   handleMainMenu,
   handleMisPollas,
   handlePollaMenu,
-  handlePredictGroupMode,
-  handlePredictGroupPage,
-  handlePredictGroupReset,
-  handlePredictGroupSelect,
   handlePredictionInput,
   handleProfile,
   handleResults,
-  handleUnknownUser,
   handlePronosticar,
 } from "./flows";
 
@@ -77,39 +72,26 @@ export async function processIncomingMessage(
   const { from, type, text, interactive, image } = message;
 
   const supabase = createAdminClient();
-  const { data: user } = await supabase
+
+  // Robust user lookup. Meta delivers the wa_id as bare digits, but a row
+  // created by web SMS-OTP (the auth.users → public.users trigger, pre-
+  // migration 058) can still carry the legacy "+"-prefixed form. Match both
+  // so those users aren't mis-classified as brand-new and dropped back into
+  // the name prompt on every message. Migration 058 normalizes the column
+  // going forward; this lookup stays as defense-in-depth.
+  const fromDigits = from.replace(/\D/g, "");
+  const { data: userMatches } = await supabase
     .from("users")
     .select("id, display_name, whatsapp_number, avatar_url")
-    .eq("whatsapp_number", from)
-    .maybeSingle();
+    .in("whatsapp_number", [fromDigits, `+${fromDigits}`]);
+  const user = userMatches?.[0] ?? null;
 
-  if (!user) {
-    // Pass the message body so handleUnknownUser puede detectar "unirse
-    // XXXXXX" en el primer mensaje (caso wa.me link de invite) y lo
-    // guarda en pending_join_code para auto-join al final del onboarding.
-    await handleUnknownUser(from, text?.body);
-    return;
-  }
-
-  // ONBOARDING GATE — usuario existe pero le falta display_name o pollito.
-  // Interceptamos antes que cualquier otra cosa para que el bot no muestre
-  // mis-pollas / menú principal con un perfil incompleto.
-  if (userNeedsOnboarding(user)) {
-    // Si el primer mensaje contiene "unirse XXXXXX" (caso wa.me link de
-    // invitación con perfil aún incompleto), preservamos el code para
-    // auto-join al terminar onboarding. Mismo patrón que handleUnknownUser.
-    if (text?.body) {
-      const upper = text.body.trim().toUpperCase();
-      const m = upper.match(/(?:^|\s)([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})(?:\s|$)/);
-      if (m) {
-        const existing = await getState(from);
-        await setState(from, {
-          action: existing?.action ?? "onboarding_ask_name",
-          ...existing,
-          pendingJoinCode: m[1],
-        });
-      }
-    }
+  // ONBOARDING — single entry point for BOTH (a) phones with no users row
+  // yet and (b) rows with an incomplete profile (no real name / no pollito).
+  // Routing both through the same state machine is what fixes the "keeps
+  // asking my name" loop: unknown phones previously never reached the name
+  // handlers at all — handleUnknownUser just re-greeted them forever.
+  if (!user || userNeedsOnboarding(user)) {
     await routeOnboarding(from, type, text, interactive);
     return;
   }
@@ -283,10 +265,6 @@ async function routePayload(
     payload.startsWith("pred_next_") ||
     payload.startsWith("match_") ||
     payload.startsWith("more_") ||
-    payload.startsWith("predgrp_") ||
-    payload.startsWith("pgsel|") ||
-    payload.startsWith("pgmore|") ||
-    payload.startsWith("pgreset|") ||
     payload === "confirm_yes" ||
     payload === "confirm_no" ||
     payload === "join_code_yes" ||
@@ -369,40 +347,11 @@ async function routePayload(
     return;
   }
 
-  if (payload.startsWith("predgrp_phase_")) {
-    const pollaId = payload.replace("predgrp_phase_", "");
-    await handlePredictGroupMode(from, user.id, pollaId, "phase");
-    return;
-  }
-  if (payload.startsWith("predgrp_date_")) {
-    const pollaId = payload.replace("predgrp_date_", "");
-    await handlePredictGroupMode(from, user.id, pollaId, "date");
-    return;
-  }
-
-  if (payload.startsWith("pgreset|")) {
-    const parts = payload.split("|");
-    if (parts.length >= 2) {
-      await handlePredictGroupReset(from, user.id, parts[1]);
-    }
-    return;
-  }
-
-  if (payload.startsWith("pgmore|")) {
-    const parts = payload.split("|");
-    if (parts.length >= 3) {
-      const page = parseInt(parts[2], 10) || 0;
-      await handlePredictGroupPage(from, user.id, parts[1], page);
-    }
-    return;
-  }
-
-  if (payload.startsWith("pgsel|")) {
-    const parts = payload.split("|");
-    if (parts.length >= 3) {
-      const groupKey = parts.slice(2).join("|");
-      await handlePredictGroupSelect(from, user.id, parts[1], groupKey);
-    }
+  // "Ver partidos" — the escape hatch from the one-match-at-a-time prompt
+  // into the full flat list of pending matches.
+  if (payload.startsWith("predlist_")) {
+    const pollaId = payload.replace("predlist_", "");
+    await handlePronosticar(from, user.id, pollaId, undefined, 0, true);
     return;
   }
 
@@ -411,7 +360,7 @@ async function routePayload(
     const lastUnderscore = rest.lastIndexOf("_");
     const pollaId = rest.substring(0, lastUnderscore);
     const page = parseInt(rest.substring(lastUnderscore + 1), 10) || 0;
-    await handlePronosticar(from, user.id, pollaId, undefined, page);
+    await handlePronosticar(from, user.id, pollaId, undefined, page, true);
     return;
   }
 
@@ -492,11 +441,19 @@ async function routePayload(
 
 // ─── Onboarding routing ───
 //
-// Sólo se llama cuando userNeedsOnboarding(user) === true. Maneja:
-//   - Texto libre: intent "ask_name" recibe nombre, "pick_pollito" pide
-//     re-tap del botón.
-//   - Payloads: onbname_yes|<name> guarda nombre, onbname_no re-pregunta,
-//     onbpoll_<id> guarda pollito, onbpoll_more_<page> pagina la lista.
+// The ONLY path for users who still need a profile — whether they have no
+// public.users row at all or just an incomplete one (no real name / no
+// pollito). Both cases go through this same state machine, which is what
+// fixes the "keeps asking my name" loop. State-machine:
+//   • interactive onbname_yes|<name>      → create/complete the account
+//   • interactive onbname_no / stale      → re-prompt for the name
+//   • text while action=onboarding_ask_name → treat as the submitted name
+//   • text with no live state             → a greeting re-prompts; anything
+//                                            name-shaped is taken as the
+//                                            name, so onboarding survives
+//                                            the 10-min state TTL
+//   • text carrying an explicit invite code → stash it for auto-join, then
+//                                             re-prompt for the name
 async function routeOnboarding(
   from: string,
   type: string,
@@ -506,42 +463,73 @@ async function routeOnboarding(
     list_reply?: { id: string; title?: string };
   },
 ): Promise<void> {
-  const state = await getState(from);
-
+  // Interactive: the name-confirm buttons. Deliberately state-independent —
+  // the candidate name rides in the payload, so a tap still works even if
+  // the conversation state TTL'd out between the prompt and the tap.
   if (type === "interactive" && interactive) {
     const payload =
       interactive.button_reply?.id || interactive.list_reply?.id || "";
-    if (!payload) return;
-
-    // onbname_yes|<name>
     if (payload.startsWith("onbname_yes|")) {
-      const name = payload.slice("onbname_yes|".length);
-      await handleNameConfirmed(from, name);
+      await handleNameConfirmed(from, payload.slice("onbname_yes|".length));
       return;
     }
-    if (payload === "onbname_no") {
-      await handleAskName(from);
-      return;
-    }
-    // Stale payload from un flujo anterior → re-prompt onboarding.
+    // onbname_no, or any stale payload from a previous flow → re-prompt.
     await handleAskName(from);
     return;
   }
 
+  // Text.
   if (type === "text" && text?.body) {
     const body = text.body.trim();
 
+    // An explicit invite code ("unirse XXXXXX" from the bot deep link, or
+    // "...código XXXXXX..." from the share-sheet text) is never the user's
+    // name. Stash it for auto-join after onboarding, then ask the name.
+    const code = extractInviteCode(body);
+    if (code) {
+      await handleAskName(from);
+      await setState(from, {
+        action: "onboarding_ask_name",
+        pendingJoinCode: code,
+      });
+      return;
+    }
+
+    const state = await getState(from);
+
+    // Mid-flow: we already asked for the name → this message IS the name.
     if (state?.action === "onboarding_ask_name") {
       await handleNameSubmit(from, body);
       return;
     }
 
-    // No state set yet — start from the top (pedir nombre).
-    await handleAskName(from);
+    // No live state (first contact, or the 10-min TTL expired). A greeting
+    // or a message that doesn't look like a name → (re-)send the welcome.
+    // Anything name-shaped → take it as the name, so a name reply makes
+    // progress even when the state row already expired.
+    const plausibleName =
+      body.length >= 2 && body.length <= 40 && body.split(/\s+/).length <= 5;
+    if (looksLikeMenuIntent(body) || !plausibleName) {
+      await handleAskName(from);
+      return;
+    }
+    await handleNameSubmit(from, body);
     return;
   }
 
-  // Anything else (sticker, audio) → restart prompt.
+  // Image / sticker / audio while onboarding → (re-)prompt for the name.
   await handleAskName(from);
+}
+
+// Extracts an EXPLICIT invite code from an onboarding message. Matches only
+// "unirse XXXXXX" / "código XXXXXX" — never a bare 6-char token, because many
+// real first names (Andrés, Manuel, Walter…) are 6 letters in the join-code
+// alphabet and would be mistaken for codes, trapping those users in a loop.
+function extractInviteCode(body: string): string | undefined {
+  const m = body
+    .trim()
+    .toUpperCase()
+    .match(/(?:UNIRSE|C[OÓ]DIGO)[\s:]+([ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6})/);
+  return m ? m[1] : undefined;
 }
 

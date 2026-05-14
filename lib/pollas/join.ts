@@ -82,10 +82,14 @@ export async function joinByCode(
   if (existing) return { ok: false, code: "already_member" };
 
   // paid semantics per payment mode. Mirrors the invite-link join route:
-  //   admin_collects → paid=false until the organizer approves the comprobante.
-  //   pay_winner     → paid=true on join (nothing to collect upfront).
+  //   admin_collects + buy_in > 0 → paid=false until the organizer approves
+  //                                 the comprobante.
+  //   admin_collects + buy_in = 0 → paid=true (free polla, nothing to collect
+  //                                 — otherwise the player is locked out).
+  //   pay_winner                  → paid=true on join (nothing upfront).
   const isAdminCollects = polla.payment_mode === "admin_collects";
-  const initialPaid = !isAdminCollects;
+  const hasBuyIn = Number(polla.buy_in_amount) > 0;
+  const initialPaid = !isAdminCollects || !hasBuyIn;
 
   const { error: insertErr } = await admin.from("polla_participants").insert({
     polla_id: polla.id,

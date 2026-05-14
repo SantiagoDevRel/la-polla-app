@@ -136,11 +136,13 @@ async function logMessage(
 ) {
   try {
     const supabase = createAdminClient();
+    // maybeSingle: phone may have no users row yet (mid-onboarding). single()
+    // would throw on 0 rows and spam the logs for every unknown-user message.
     const { data: user } = await supabase
       .from("users")
       .select("id")
       .eq("whatsapp_number", phone)
-      .single();
+      .maybeSingle();
 
     await supabase.from("whatsapp_messages").insert({
       user_id: user?.id || null,

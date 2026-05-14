@@ -724,11 +724,29 @@ Two-channel inbound:
   (signature verified via `META_WA_APP_SECRET`); splits magic-link vs
   router.
 
+### Onboarding (unknown phones + incomplete profiles)
+`router.ts → routeOnboarding` is the SINGLE entry for both a phone with no
+`public.users` row AND a row with an incomplete profile. `processIncomingMessage`
+short-circuits to it whenever `!user || userNeedsOnboarding(user)`. It is a
+TTL-resilient state machine: the `onbname_yes|<name>` confirm button carries
+the name in its payload (works even after the 10-min state TTL), and a text
+reply with no live state is taken as the name unless it looks like a greeting.
+The account is created find-or-create in `handleNameConfirmed`. **Do not add a
+second un-onboarded path** — the old `handleUnknownUser` re-greeted forever
+because it never reached the name handlers (fixed 2026-05-14).
+
+### Predict flow (no date/phase picker)
+A tap on "Pronosticar" / "Siguiente" lands STRAIGHT on the next match without a
+prediction — `handlePronosticar` jumps to `showPredictionPrompt`, the user just
+types the score. The flat chronological list of pending matches is one tap away
+via the "📋 Ver partidos" button (`predlist_{id}`). There is **no "por fase / por
+fecha" grouping** — that picker and its `handlePredictGroup*` handlers were
+removed 2026-05-14. Don't reintroduce a grouping gate in the bot.
+
 ### Conversation state
 `public.whatsapp_conversation_state` (migration 026). Keyed by `phone`,
 TTL 10 min via `expires_at`. RLS enabled with no policies — service
-role only. Persists action, polla_id, match_id, prediction draft,
-join code, and predict-by-group cursors.
+role only. Persists action, polla_id, match_id, and prediction draft.
 
 ### Button ID → Flow
 Main menu:    `menu_mis_pollas`, `menu_predecir`, `menu_tabla`
@@ -739,10 +757,9 @@ Invite (CTA URL, no callback): `wa.me/?text=…` opens the user's WhatsApp
               follow-up message to every polla menu so any member can
               invite — admin-only rotate-code was retired from the bot
               (still available in the web admin panel).
-Predict:      `match_{id}`, `more_{pollaId}_{page}`, `pred_next_{id}`
-Predict-by-group: `predgrp_phase_{id}`, `predgrp_date_{id}`,
-              `pgsel|{pollaId}|{groupKey}`, `pgmore|{pollaId}|{page}`,
-              `pgreset|{pollaId}`
+Onboarding:   `onbname_yes|{name}`, `onbname_no`
+Predict:      `match_{id}`, `more_{pollaId}_{page}`, `pred_next_{id}`,
+              `predlist_{id}` (open the flat list)
 Confirmation: `confirm_yes`, `confirm_no`
 Join code:    `join_code_yes`, `join_code_no`
 Navigation:   `menu`, `polla_{id}`, `match_{id}`
