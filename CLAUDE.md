@@ -148,6 +148,70 @@ session, designed to be picked up cold.
 
 ---
 
+## 🚨 New table boilerplate (Supabase Oct-30-2026 deadline)
+
+Desde **30-oct-2026** Supabase deja de auto-grantear permisos sobre
+nuevas tablas en `public`. Si creamos una tabla después de esa fecha sin
+los GRANT explícitos abajo, supabase-js / PostgREST / GraphQL devuelven
+error 42501 — y vamos a perder tiempo debuggeando por qué un endpoint
+recién pusheado "no encuentra" la tabla.
+
+**Toda nueva migration que cree una tabla en `public` debe incluir
+este bloque al final** (ajustando qué roles necesitan qué privilegios):
+
+```sql
+CREATE TABLE public.my_table (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  -- ... columnas
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- RLS ENABLE primero (regla de seguridad #1 — siempre, sin excepción).
+ALTER TABLE public.my_table ENABLE ROW LEVEL SECURITY;
+
+-- GRANT explícitos para la Data API. Sin esto, supabase-js falla post-30-oct.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.my_table TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.my_table TO service_role;
+-- anon: solo si la tabla es pública (catálogos). Omitir si requiere auth.
+-- GRANT SELECT ON public.my_table TO anon;
+
+-- Policies. Si la tabla es service-role-only, agregá un deny-all explícito
+-- para silenciar el Security Advisor:
+CREATE POLICY users_own_rows ON public.my_table
+  FOR ALL TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- Trigger updated_at si la tabla lo tiene:
+-- CREATE TRIGGER set_my_table_updated_at BEFORE UPDATE ON public.my_table
+--   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+```
+
+**Para SECURITY DEFINER functions (RPCs / triggers):**
+
+```sql
+CREATE OR REPLACE FUNCTION public.my_fn(...) RETURNS ...
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp   -- siempre, defense-in-depth
+AS $$ ... $$;
+
+-- REVOKE de PUBLIC primero (anon/authenticated heredan de PUBLIC):
+REVOKE EXECUTE ON FUNCTION public.my_fn(...) FROM PUBLIC;
+-- Luego GRANT solo a los roles que la necesitan:
+GRANT EXECUTE ON FUNCTION public.my_fn(...) TO service_role;
+-- GRANT a authenticated solo si la app la llama via .rpc():
+-- GRANT EXECUTE ON FUNCTION public.my_fn(...) TO authenticated;
+```
+
+**Validación pre-merge** (ya documentada en regla #1 de auto memory):
+después de aplicar la migration, correr `mcp get_advisors(security)` —
+no debería aparecer NUEVA ERROR-level o INFO-level. WARN intencionales
+están documentadas en migration 056-057.
+
+---
+
 ## Auth model (current — 2026-04)
 
 - Login: phone (any country, E.164 via `components/ui/PhoneInput`) →
