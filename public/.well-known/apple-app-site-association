@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "F87MQRD3X7.com.lapollacolombiana.app",
+        "paths": [
+          "/api/auth/wa-magic",
+          "/api/auth/wa-magic*",
+          "/unirse/*",
+          "/invites/*"
+        ]
+      }
+    ]
+  }
+}
