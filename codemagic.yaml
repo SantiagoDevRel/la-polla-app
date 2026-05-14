@@ -43,7 +43,10 @@ workflows:
 
     environment:
       vars:
-        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        # Capacitor 8 con SPM genera App.xcodeproj — NO App.xcworkspace
+        # (el .xcworkspace lo generaba CocoaPods, que ya no usamos).
+        # Por eso build-ipa apunta a --project, no --workspace.
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
         BUNDLE_ID: "com.lapollacolombiana.app"
       node: 22.22.3
@@ -102,7 +105,7 @@ workflows:
       - name: Build IPA
         script: |
           xcode-project build-ipa \
-            --workspace "$CM_BUILD_DIR/$XCODE_WORKSPACE" \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
 
     artifacts:
