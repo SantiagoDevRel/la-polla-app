@@ -7,6 +7,12 @@
 // En localhost / Vercel preview: setea la cookie NEXT_LOCALE y refresca
 // la ruta para que el middleware re-renderee con el nuevo locale.
 //
+// Dentro de la app nativa (Capacitor): NO se renderiza. El wrapper apunta
+// solo a lapollacolombiana.com — chickenpicks.app no está en
+// `allowNavigation`, así que tocar "English" abriría Safari en vez de
+// cambiar de idioma. No hay app nativa en inglés, el toggle cross-domain
+// no aplica acá.
+//
 // Loader: si el cambio se demora más de 200 ms se muestra un FootballLoader
 // (pollito rebotando). Si es instantáneo, no aparece nada — evita flash.
 "use client";
@@ -48,6 +54,20 @@ export default function LanguageToggle() {
   const [pending, startTransition] = useTransition();
   const [switching, setSwitching] = useState<Locale | null>(null);
   const [showLoader, setShowLoader] = useState(false);
+  // Dentro de la app nativa el toggle no se muestra (ver header del archivo).
+  // Detección client-side: el SSR no sabe que es Capacitor, así que el
+  // toggle puede aparecer ~1 frame antes de ocultarse — aceptable en una
+  // pantalla de settings.
+  const [isNativeApp, setIsNativeApp] = useState(false);
+
+  useEffect(() => {
+    const cap = (
+      window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }
+    ).Capacitor;
+    if (cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) {
+      setIsNativeApp(true);
+    }
+  }, []);
 
   // Limpia el flag de switching cuando la transición de RSC termina.
   // (En el path de redirect a otro dominio, switching se queda hasta que
@@ -122,6 +142,9 @@ export default function LanguageToggle() {
       router.refresh();
     });
   }
+
+  // App nativa: el selector de idioma cross-domain no aplica. Ver header.
+  if (isNativeApp) return null;
 
   return (
     <section className="lp-card relative" style={{ padding: 14 }}>

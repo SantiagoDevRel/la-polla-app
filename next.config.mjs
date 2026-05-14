@@ -37,6 +37,17 @@ const nextConfig = {
   },
   async headers() {
     return [
+      // iOS Universal Links — el archivo apple-app-site-association NO tiene
+      // extensión, así que Next lo serviría como octet-stream. Apple exige
+      // Content-Type: application/json y acceso público sin redirect (el
+      // matcher del middleware ya excluye /.well-known/). Sin este header,
+      // iOS ignora el archivo y los magic-links abren Safari en vez de la app.
+      {
+        source: "/.well-known/apple-app-site-association",
+        headers: [
+          { key: "Content-Type", value: "application/json" },
+        ],
+      },
       // Existing cache headers
       {
         source: "/tournaments/:path*",
