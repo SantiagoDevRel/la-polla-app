@@ -72,3 +72,22 @@ keystore.properties
 !debug.keystore
 
 .env*.local
+
+# Capacitor iOS — el folder `ios/` SI se commitea (igual que `android/`),
+# pero estos son outputs de Xcode + SPM que se regeneran en cada build
+# y NO deben ir al repo.
+/ios/App/build/
+/ios/App/Pods/
+/ios/DerivedData/
+/ios/App/output/
+/ios/App/App.xcworkspace/xcuserdata/
+/ios/App/App.xcodeproj/xcuserdata/
+/ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+*.ipa
+*.dSYM.zip
+*.mobileprovision
+*.p12
+*.p8
+
+# Codemagic local artifacts
+/build/ios/
