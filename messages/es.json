@@ -631,7 +631,15 @@
     "pointsLabel": "pts",
     "scoringTitle": "¿Cómo se puntúa?",
     "adminPanel": "Panel de administración",
-    "logout": "Cerrar sesión"
+    "logout": "Cerrar sesión",
+    "deleteAccount": "Eliminar mi cuenta",
+    "deleteConfirmTitle": "¿Eliminar tu cuenta?",
+    "deleteConfirmBody": "Esto borra tu perfil, tus pronósticos y tu participación en las pollas, de forma permanente. Las pollas que creaste seguirán existiendo para los demás participantes. Esta acción no se puede deshacer.",
+    "deleteConfirmYes": "Sí, eliminar mi cuenta",
+    "deleteConfirmCancel": "Cancelar",
+    "deleting": "Eliminando…",
+    "deleteSuccess": "Tu cuenta fue eliminada",
+    "deleteError": "No se pudo eliminar la cuenta. Intenta de nuevo."
   },
   "Avisos": {
     "metadataTitle": "Avisos · La Polla",

@@ -631,7 +631,15 @@
     "pointsLabel": "pts",
     "scoringTitle": "How does scoring work?",
     "adminPanel": "Admin panel",
-    "logout": "Log out"
+    "logout": "Log out",
+    "deleteAccount": "Delete my account",
+    "deleteConfirmTitle": "Delete your account?",
+    "deleteConfirmBody": "This permanently deletes your profile, your predictions and your participation in pools. Pools you created will stay available for the other participants. This action cannot be undone.",
+    "deleteConfirmYes": "Yes, delete my account",
+    "deleteConfirmCancel": "Cancel",
+    "deleting": "Deleting…",
+    "deleteSuccess": "Your account was deleted",
+    "deleteError": "Couldn't delete the account. Please try again."
   },
   "Avisos": {
     "metadataTitle": "Alerts · Chicken Picks",
