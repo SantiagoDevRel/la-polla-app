@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     // Map legacy API-Football IDs to football-data.org
     const legacyMap: Record<number, { id: number; tournament: string }> = {
       2: { id: 2001, tournament: "champions_2025" },   // UCL
-      1: { id: 2000, tournament: "worldcup_2026" },     // World Cup (FIFA ID in football-data)
+      1: { id: 2000, tournament: "worldcup_2026" },     // World Cup (league ID in football-data)
     };
     const mapped = legacyMap[legacyLeagueId];
     if (mapped) {

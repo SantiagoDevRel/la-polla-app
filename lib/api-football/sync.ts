@@ -36,7 +36,7 @@ function getSupabaseAdmin() {
 // Constantes
 // ─────────────────────────────────────────
 
-/** FIFA World Cup league ID en API-Football */
+/** World Cup league ID en API-Football */
 const WORLD_CUP_LEAGUE_ID = 1;
 
 /** Identificador del torneo en nuestra DB */
@@ -209,7 +209,7 @@ export async function syncLeague(
  * Importa TODOS los partidos del Mundial 2026 desde API-Football a Supabase.
  *
  * Endpoint de API-Football: GET /fixtures?league=1&season=2026
- * - league=1 es FIFA World Cup
+ * - league=1 es World Cup
  * - season=2026 es la edición 2026
  *
  * Comportamiento:
