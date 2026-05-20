@@ -5,7 +5,7 @@ import { fetchCompetitionMatches, rateLimitDelay, FDMatch } from "./client";
 // Competiciones activas — slug must match what crear polla + pollas table use
 const COMPETITIONS = [
   { id: 2001, tournament: "champions_2025", label: "Champions League" },
-  { id: 2000, tournament: "worldcup_2026", label: "FIFA World Cup 2026" },
+  { id: 2000, tournament: "worldcup_2026", label: "Mundial 2026" },
   { id: 2014, tournament: "laliga_2025", label: "La Liga" },
   { id: 2021, tournament: "premier_2025", label: "Premier League" },
   { id: 2019, tournament: "seriea_2025", label: "Serie A" },
@@ -49,7 +49,7 @@ function mapPhase(stage: string): string {
 }
 
 function mapMatchToRow(match: FDMatch, tournament: string) {
-  // football-data usa `tla` (3-letter code FIFA-style). Si falta,
+  // football-data usa `tla` (3-letter country/team code). Si falta,
   // dejamos null y el cliente cae al displayName.
   const homeAbbr =
     (match.homeTeam as { tla?: string; shortName?: string }).tla ??

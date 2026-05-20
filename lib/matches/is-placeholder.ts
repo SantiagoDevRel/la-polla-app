@@ -64,7 +64,7 @@ export function hasPlaceholderTeam(
  * "1A" = ganador grupo A, "W73" = ganador del partido 73, etc.
  *
  * Esta funcion INFIERE la fase a partir del nombre del team siguiendo la
- * numeracion oficial FIFA del Mundial 2026:
+ * numeracion oficial del Mundial 2026:
  *   - Group stage: matches 1-72.
  *   - Round of 32 (16 partidos):  73-88. Teams: "1A", "2B", "3X/Y/Z".
  *   - Round of 16  (8 partidos):  89-96. Teams: "W73"-"W88".
