@@ -46,6 +46,9 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  // Account deletion (Apple 5.1.1(v)): confirm modal + delete flow.
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -83,6 +86,22 @@ export default function PerfilPage() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    try {
+      await axios.post("/api/users/me/delete");
+      // El endpoint ya cerro la sesion server-side; cerramos tambien el
+      // cliente para limpiar cualquier cookie/estado local y mandamos a login.
+      const supabase = createClient();
+      await supabase.auth.signOut().catch(() => {});
+      showToast(t("deleteSuccess"), "success");
+      router.push("/login");
+    } catch {
+      showToast(t("deleteError"), "error");
+      setDeleting(false);
+    }
   }
 
   async function handleAvatarChange(pollitoId: string) {
@@ -329,8 +348,52 @@ export default function PerfilPage() {
           {t("logout")}
         </button>
 
+        {/* Eliminar cuenta — Apple 5.1.1(v). Borrado self-service in-app. */}
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="w-full py-2.5 text-sm font-medium text-text-muted hover:text-red-alert transition-colors"
+        >
+          {t("deleteAccount")}
+        </button>
+
         <div className="h-4" />
       </main>
+
+      {/* Confirmación de borrado de cuenta */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => !deleting && setShowDeleteConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm lp-card p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-bold text-text-primary">
+              {t("deleteConfirmTitle")}
+            </h2>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              {t("deleteConfirmBody")}
+            </p>
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="w-full py-3 rounded-xl font-semibold bg-red-alert text-white hover:bg-red-alert/90 disabled:opacity-50 transition-colors"
+              >
+                {deleting ? t("deleting") : t("deleteConfirmYes")}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="w-full py-3 rounded-xl font-medium text-text-secondary border border-subtle hover:bg-card-hover disabled:opacity-50 transition-colors"
+              >
+                {t("deleteConfirmCancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
