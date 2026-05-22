@@ -4,7 +4,7 @@
 // Cache-bust version para los logos de torneos. Incrementar (por ejemplo
 // "2" -> "3") cada vez que se reemplace el archivo fuente de un logo
 // para forzar a los clientes y al service worker a pedirlo de nuevo.
-const LOGO_V = "6";
+const LOGO_V = "7";
 
 export const TOURNAMENTS = [
   {
@@ -18,7 +18,7 @@ export const TOURNAMENTS = [
     slug: "worldcup_2026",
     name: "Mundial 2026",
     apiCode: "WC",
-    logoPath: `/tournaments/world_cup_v2.png?v=${LOGO_V}`,
+    logoPath: `/tournaments/mundial-2026.svg?v=${LOGO_V}`,
     color: "#c0392b",
   },
   {
@@ -103,7 +103,7 @@ export function getTournamentLogo(slug: string): string {
 // component file.
 export const TOURNAMENT_ICONS: Record<string, string> = {
   champions_2025: `/tournaments/champions_league.svg?v=${LOGO_V}`,
-  worldcup_2026: `/tournaments/world_cup_v2.png?v=${LOGO_V}`,
+  worldcup_2026: `/tournaments/mundial-2026.svg?v=${LOGO_V}`,
   laliga_2025: `/tournaments/la_liga.png?v=${LOGO_V}`,
   premier_2025: `/tournaments/premier_league.webp?v=${LOGO_V}`,
   seriea_2025: `/tournaments/seria_a.png?v=${LOGO_V}`,
