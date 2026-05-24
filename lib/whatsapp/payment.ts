@@ -143,6 +143,7 @@ export async function handlePaymentAccountSubmit(
       await sendTextMessage(
         phone,
         "Eso no parece info válida parce. Mandame algo como *Bancolombia ahorros 379...*",
+        { userId },
       );
       return;
     }
@@ -153,6 +154,7 @@ export async function handlePaymentAccountSubmit(
       `✅ Listo. Guardé tu info de pago:\n*${trimmed}*\n\n` +
         `_Para cambiarla, escribe_ *pago* _en cualquier momento._\n` +
         `_Escribe_ *menu* _para volver al menú principal._`,
+      { userId },
     );
     return;
   }
@@ -165,6 +167,7 @@ export async function handlePaymentAccountSubmit(
       phone,
       `Necesito solo *números*, sin espacios ni letras (entre 8 y 15 dígitos).\n\n` +
         `Mandame tu número de *${method.label}* otra vez.`,
+      { userId },
     );
     return;
   }
@@ -176,6 +179,7 @@ export async function handlePaymentAccountSubmit(
     `✅ Listo parce. Guardé tu *${method.label}* al *${digits}*.\n\n` +
       `_Para cambiarla, escribe_ *pago* _en cualquier momento._\n` +
       `_Escribe_ *menu* _para volver al menú principal._`,
+    { userId },
   );
 }
 
@@ -258,6 +262,7 @@ export async function handlePaymentProofImage(
     await sendTextMessage(
       phone,
       "No tengo claro a qué polla pertenece este comprobante, parce. Escribe *menu* y elige tu polla primero.",
+      { userId },
     );
     await clearState(phone);
     return;
@@ -274,12 +279,12 @@ export async function handlePaymentProofImage(
     .eq("id", pollaId)
     .maybeSingle();
   if (!polla) {
-    await sendTextMessage(phone, "No encontré esa polla.");
+    await sendTextMessage(phone, "No encontré esa polla.", { userId });
     await clearState(phone);
     return;
   }
   if (polla.payment_mode !== "admin_collects") {
-    await sendTextMessage(phone, "Esta polla no necesita comprobante.");
+    await sendTextMessage(phone, "Esta polla no necesita comprobante.", { userId });
     await clearState(phone);
     return;
   }
@@ -291,6 +296,7 @@ export async function handlePaymentProofImage(
     await sendTextMessage(
       phone,
       "El organizador no terminó de configurar la cuenta. Pídele que la complete.",
+      { userId },
     );
     await clearState(phone);
     return;
@@ -304,12 +310,12 @@ export async function handlePaymentProofImage(
     .eq("user_id", userId)
     .maybeSingle();
   if (!participant) {
-    await sendTextMessage(phone, "No estás como participante de esta polla.");
+    await sendTextMessage(phone, "No estás como participante de esta polla.", { userId });
     await clearState(phone);
     return;
   }
   if (participant.paid) {
-    await sendTextMessage(phone, "Tu pago ya está aprobado. ¡Ya puedes pronosticar!");
+    await sendTextMessage(phone, "Tu pago ya está aprobado. ¡Ya puedes pronosticar!", { userId });
     await clearState(phone);
     return;
   }
@@ -324,6 +330,7 @@ export async function handlePaymentProofImage(
     await sendTextMessage(
       phone,
       `Ya mandaste ${MAX_PROOFS_PER_POLLA} comprobantes de esta polla. Pídele al organizador que apruebe el pago manual.`,
+      { userId },
     );
     await clearState(phone);
     return;
@@ -341,6 +348,7 @@ export async function handlePaymentProofImage(
     await sendTextMessage(
       phone,
       "Mandaste muchos comprobantes hoy. Si es un error, contacta al organizador para que apruebe manual.",
+      { userId },
     );
     await clearState(phone);
     return;
@@ -355,6 +363,7 @@ export async function handlePaymentProofImage(
     await sendTextMessage(
       phone,
       "No pude descargar la foto, parce. Intenta enviarla de nuevo.",
+      { userId },
     );
     return;
   }
@@ -369,11 +378,12 @@ export async function handlePaymentProofImage(
     await sendTextMessage(
       phone,
       "Solo acepto fotos JPG, PNG o WebP. Manda el comprobante en otro formato.",
+      { userId },
     );
     return;
   }
   if (media.size > 10 * 1024 * 1024) {
-    await sendTextMessage(phone, "La foto es muy pesada (>10 MB). Intenta otra.");
+    await sendTextMessage(phone, "La foto es muy pesada (>10 MB). Intenta otra.", { userId });
     return;
   }
 
@@ -392,6 +402,7 @@ export async function handlePaymentProofImage(
     await sendTextMessage(
       phone,
       "No pude guardar el comprobante. Intenta de nuevo.",
+      { userId },
     );
     return;
   }
@@ -441,6 +452,7 @@ export async function handlePaymentProofImage(
       phone,
       "El verificador automático no está disponible ahora. El organizador revisará tu comprobante manualmente.\n\n" +
         "_Escribe_ *menu* _para volver al menú principal._",
+      { userId },
     );
     return;
   }
@@ -508,6 +520,7 @@ export async function handlePaymentProofImage(
     `❌ No pude aprobar el comprobante.\n\n` +
       `Pídele al organizador de *${polla.name}* que apruebe tu pago manualmente.\n\n` +
       `_Escribe_ *menu* _para volver al menú principal._`,
+    { userId },
   );
 }
 
@@ -542,5 +555,6 @@ export async function handleShowPaymentInfo(
     phone,
     `💳 *Tu medio de pago actual:*\n\n${display}\n\n` +
       `_Para cambiarlo, escribe_ *cambiar pago*`,
+    { userId },
   );
 }

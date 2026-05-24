@@ -242,5 +242,19 @@ export async function GET(request: NextRequest) {
     !profile.avatar_url;
 
   const target = needsOnboarding ? "/onboarding" : "/inicio";
-  return NextResponse.redirect(new URL(target, request.url));
+  const response = NextResponse.redirect(new URL(target, request.url));
+
+  // Fast-path cookie para el middleware: si el user ya está onboardado,
+  // evitamos que el siguiente nav pegue de nuevo a public.users. Mismo
+  // contrato que /api/users/me PATCH. Si necesita onboarding, NO seteamos
+  // la cookie (y dejamos que el middleware aplique el gate normal).
+  if (!needsOnboarding) {
+    response.cookies.set("lp_onb", "1", {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30,
+      path: "/",
+    });
+  }
+  return response;
 }

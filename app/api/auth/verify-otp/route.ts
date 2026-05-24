@@ -96,11 +96,18 @@ export async function POST(request: NextRequest) {
       request,
     });
 
-    return NextResponse.json({
+    // Limpiar la cookie lp_onb de cualquier sesión previa. El user puede
+    // estar logueando con OTRA cuenta (multi-cuenta es real — cada phone
+    // = una cuenta) y la cookie del user anterior NO aplica al nuevo.
+    // El middleware re-setea la cookie en el primer nav si el nuevo user
+    // tiene onboarding completo.
+    const response = NextResponse.json({
       ok: true,
       newUser: isNewUser,
       user: { id: data.user.id },
     });
+    response.cookies.delete("lp_onb");
+    return response;
   } catch (err) {
     console.error("[verify-otp] error:", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

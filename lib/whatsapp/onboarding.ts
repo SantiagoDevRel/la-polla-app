@@ -177,6 +177,7 @@ export async function handleNameConfirmed(
     await sendTextMessage(
       phone,
       "Algo falló guardando tu perfil, parce. Intenta de nuevo en un minuto.",
+      { userId: authUserId },
     );
     return;
   }
@@ -193,6 +194,7 @@ export async function handleNameConfirmed(
       phone,
       "¡Listo parce! 🎉 Tu perfil está armado.\n\n" +
         "Te uno a la polla 👇",
+      { userId: authUserId },
     );
     await handleJoinByCode(phone, authUserId, pendingCode);
     return;
@@ -205,5 +207,6 @@ export async function handleNameConfirmed(
     phone,
     "¡Listo parce! 🎉 Tu perfil está armado.\n\n" +
       "Mándame el *código de 6 caracteres* de la polla a la que te invitaron 🐥",
+    { userId: authUserId },
   );
 }

@@ -823,25 +823,67 @@ export default function PollaSlugPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Client-side polling cuando hay match live en la polla. Backend se
-  // actualiza cada 1 min vía pg_cron + ESPN, pero la UI no se entera
-  // hasta que vuelva a fetchear. Re-cargamos cada 30s para que el
-  // score / minuto se vean fresh sin pedirle al user que refresque.
-  // Sin polling cuando no hay live: cero requests innecesarias.
+  // Client-side polling cuando hay un match LIVE en la polla. Backend
+  // se actualiza cada 1 min vía pg_cron + ESPN, así que 60s es suficiente.
+  // Pausamos cuando la pestaña está hidden u offline (clear del interval,
+  // no solo skip del fetch) y re-armamos al volver visible/online.
   useEffect(() => {
-    const hasLive = matches.some(
-      (m) => m.status === "live" ||
-        (m.status === "scheduled" &&
-          Date.now() >= new Date(m.scheduled_at).getTime() - 5 * 60 * 1000),
-    );
+    const hasLive = matches.some((m) => m.status === "live");
     if (!hasLive) return;
-    const id = setInterval(() => {
-      // Solo refrescar si la pestaña está visible — ahorra requests
-      // cuando el user dejó la app abierta de fondo.
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      loadData(true);
-    }, 30_000);
-    return () => clearInterval(id);
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const start = () => {
+      if (intervalId !== null) return;
+      intervalId = setInterval(() => loadData(true), 60_000);
+    };
+    const stop = () => {
+      if (intervalId === null) return;
+      clearInterval(intervalId);
+      intervalId = null;
+    };
+
+    const isVisible = () =>
+      typeof document === "undefined" || document.visibilityState !== "hidden";
+    const isOnline = () =>
+      typeof navigator === "undefined" || navigator.onLine;
+
+    const onVisibility = () => {
+      if (isVisible() && isOnline()) {
+        loadData(true); // fresh fetch al volver para no esperar 60s
+        start();
+      } else {
+        stop();
+      }
+    };
+    const onOnline = () => {
+      if (isVisible()) {
+        loadData(true);
+        start();
+      }
+    };
+    const onOffline = () => stop();
+
+    if (isVisible() && isOnline()) start();
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibility);
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", onOnline);
+      window.addEventListener("offline", onOffline);
+    }
+
+    return () => {
+      stop();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibility);
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("online", onOnline);
+        window.removeEventListener("offline", onOffline);
+      }
+    };
   }, [matches, loadData]);
 
   // One-shot default-tab routing: admin_collects participants who have not

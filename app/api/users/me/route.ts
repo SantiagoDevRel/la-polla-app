@@ -9,6 +9,7 @@ import {
   DISPLAY_NAME_MAX,
   DISPLAY_NAME_MIN,
   isValidDisplayName,
+  needsName,
 } from "@/lib/users/needs-name";
 
 // Solo 3 métodos soportados: nequi, bancolombia, otro. Removidos
@@ -163,7 +164,33 @@ export async function PATCH(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true });
+    // Cookie de fast-path para el middleware: si después del update
+    // tenemos display_name + avatar_url, próximos navs no tienen que
+    // re-pegarle a public.users. Lee el row entero para chequear con
+    // los valores AUTORITATIVOS post-update (el cliente puede haber
+    // mandado solo uno de los dos campos).
+    const { data: fresh } = await admin
+      .from("users")
+      .select("display_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const response = NextResponse.json({ success: true });
+    if (fresh && !needsName(fresh.display_name) && fresh.avatar_url) {
+      response.cookies.set("lp_onb", "1", {
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30,
+        path: "/",
+      });
+    } else {
+      // Defense-in-depth: si por alguna razón el row quedó con perfil
+      // incompleto post-update (ej. user borró avatar via otro flow),
+      // limpiar la cookie para que el middleware vuelva a hacer la
+      // query y aplique el gate de /onboarding.
+      response.cookies.delete("lp_onb");
+    }
+    return response;
   } catch (error) {
     console.error("Error actualizando perfil:", error);
     return NextResponse.json({ error: "Error al actualizar perfil" }, { status: 500 });
