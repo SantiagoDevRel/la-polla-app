@@ -32,16 +32,23 @@ interface ButtonAction {
   reply: { id: string; title: string };
 }
 
+// Pass { userId } from a caller that already resolved the user to skip the
+// SELECT in logMessage (saves 1 DB op per send). Optional — legacy call sites
+// without a resolved user keep working via the fallback lookup.
+export interface SendOpts {
+  userId?: string;
+}
+
 // ─── Public API ───
 
-export async function sendTextMessage(to: string, text: string) {
+export async function sendTextMessage(to: string, text: string, opts?: SendOpts) {
   const response = await callMetaAPI({
     messaging_product: "whatsapp",
     to,
     type: "text",
     text: { body: text },
   });
-  await logMessage(to, "outbound", "text", text);
+  await logMessage(to, "outbound", "text", text, opts);
   return response;
 }
 
@@ -50,6 +57,7 @@ export async function sendButtonMessage(
   header: string,
   body: string,
   buttons: { id: string; title: string }[],
+  opts?: SendOpts,
 ) {
   const buttonActions: ButtonAction[] = buttons.slice(0, 3).map((b) => ({
     type: "reply",
@@ -67,7 +75,7 @@ export async function sendButtonMessage(
       action: { buttons: buttonActions },
     },
   });
-  await logMessage(to, "outbound", "interactive_button", `${header}: ${body}`);
+  await logMessage(to, "outbound", "interactive_button", `${header}: ${body}`, opts);
   return response;
 }
 
@@ -77,6 +85,7 @@ export async function sendListMessage(
   body: string,
   buttonText: string,
   items: { id: string; title: string; description?: string }[],
+  opts?: SendOpts,
 ) {
   const rows = items.slice(0, 10).map((item) => ({
     id: item.id,
@@ -98,13 +107,13 @@ export async function sendListMessage(
       },
     },
   });
-  await logMessage(to, "outbound", "interactive_list", `${header}: ${body}`);
+  await logMessage(to, "outbound", "interactive_list", `${header}: ${body}`, opts);
   return response;
 }
 
 // Alias retro-compat — ex-OTP flow lo usaba con este nombre.
-export async function sendWhatsAppMessage(to: string, text: string) {
-  return sendTextMessage(to, text);
+export async function sendWhatsAppMessage(to: string, text: string, opts?: SendOpts) {
+  return sendTextMessage(to, text, opts);
 }
 
 // ─── Internal ───
@@ -133,19 +142,26 @@ async function logMessage(
   direction: "inbound" | "outbound",
   messageType: string,
   content: string,
+  opts?: SendOpts,
 ) {
   try {
     const supabase = createAdminClient();
-    // maybeSingle: phone may have no users row yet (mid-onboarding). single()
-    // would throw on 0 rows and spam the logs for every unknown-user message.
-    const { data: user } = await supabase
-      .from("users")
-      .select("id")
-      .eq("whatsapp_number", phone)
-      .maybeSingle();
+    // Fast path: caller already knows the user_id (router resolved it via
+    // routeUser/routeOnboarding). Skip the SELECT — saves 1 DB op per send.
+    let userId: string | null = opts?.userId ?? null;
+    if (!userId) {
+      // maybeSingle: phone may have no users row yet (mid-onboarding). single()
+      // would throw on 0 rows and spam the logs for every unknown-user message.
+      const { data: user } = await supabase
+        .from("users")
+        .select("id")
+        .eq("whatsapp_number", phone)
+        .maybeSingle();
+      userId = user?.id ?? null;
+    }
 
     await supabase.from("whatsapp_messages").insert({
-      user_id: user?.id || null,
+      user_id: userId,
       direction,
       message_type: messageType,
       content: content.slice(0, 1000),

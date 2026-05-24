@@ -109,7 +109,10 @@ export async function POST() {
     // 4. Cerrar la sesion actual (cookies).
     await supabase.auth.signOut().catch(() => {});
 
-    return NextResponse.json({ success: true });
+    // 5. Limpiar la cookie lp_onb (HttpOnly, el cliente no puede borrarla).
+    const response = NextResponse.json({ success: true });
+    response.cookies.delete("lp_onb");
+    return response;
   } catch (error) {
     console.error("[delete-account] unexpected error:", error);
     return NextResponse.json(

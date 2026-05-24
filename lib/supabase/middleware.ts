@@ -23,7 +23,43 @@ function getAdmin() {
   );
 }
 
+// Public SEO surfaces que NUNCA necesitan saber el user. Saltamos
+// Supabase auth y la query a public.users por completo. El locale ya
+// fue resuelto por el outer middleware.ts (x-locale en headers) ANTES
+// de entrar acá, así que /torneos/* y /partidos/* siguen sabiendo qué
+// locale renderear. Cualquier ruta que necesite "redirect-if-logged-in"
+// (login, verify, onboarding, unirse, invites) NO va acá — esas siguen
+// pasando por el auth gate.
+const PUBLIC_NO_AUTH_PREFIXES = [
+  "/torneos",
+  "/partidos",
+  "/tournaments",
+  "/matches",
+  "/privacy",
+  "/soporte",
+];
+const PUBLIC_NO_AUTH_EXACT = new Set([
+  "/sitemap.xml",
+  "/robots.txt",
+  "/llms.txt",
+  "/opengraph-image",
+  "/twitter-image",
+]);
+
 export async function updateSession(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  // Early-return para rutas SEO públicas: sin tocar Supabase, sin DB.
+  // El outer middleware ya seteó x-locale en request.headers, así que
+  // sites.ts / i18n/request.ts siguen funcionando para estas rutas.
+  if (
+    PUBLIC_NO_AUTH_EXACT.has(path) ||
+    path.startsWith("/.well-known/") ||
+    PUBLIC_NO_AUTH_PREFIXES.some((p) => path.startsWith(p))
+  ) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -55,11 +91,11 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
-
   // Routes accessible without auth. /unirse and /invites/polla need to be
   // reachable so an unauthenticated visitor sees the polla card and gets
-  // bounced through login with a returnTo.
+  // bounced through login with a returnTo. (Los prefijos PUBLIC_NO_AUTH_*
+  // ya hicieron early-return arriba — acá quedan solo los que SÍ tocan
+  // Supabase porque necesitan saber si el user está logueado.)
   const publicRoutes = [
     "/login",
     "/verify",
@@ -68,20 +104,6 @@ export async function updateSession(request: NextRequest) {
     "/api/pollas/preview",
     "/unirse",
     "/invites/polla",
-    "/privacy",
-    "/soporte",
-    // SEO public surfaces — landings + crawler artifacts. No data-leak
-    // risk: torneos/partidos sólo exponen fixtures públicos (mismos que
-    // un usuario logueado ve) y los archivos .txt/.xml describen el sitio.
-    "/torneos",
-    "/partidos",
-    "/tournaments",
-    "/matches",
-    "/sitemap.xml",
-    "/robots.txt",
-    "/llms.txt",
-    "/opengraph-image",
-    "/twitter-image",
   ];
   const isPublicRoute = publicRoutes.some((route) => path.startsWith(route));
 
@@ -119,25 +141,49 @@ export async function updateSession(request: NextRequest) {
     !isOnboardingRoute &&
     !isAuthFlowRoute
   ) {
-    // Admin client bypasses RLS — auth.uid() returns NULL in PostgREST
-    // context (see CLAUDE.md TODO), so the anon client would read 0 rows
-    // and the gate would fail open silently. Scope is enforced manually
-    // via .eq("id", user.id) where user.id came from getUser() above.
-    const admin = getAdmin();
-    const { data: profile } = await admin
-      .from("users")
-      .select("display_name, avatar_url")
-      .eq("id", user.id)
-      .maybeSingle();
+    // Fast-path: si el user ya tiene la cookie lp_onb=1, asumimos
+    // onboarding completo y saltamos la query a public.users. La cookie
+    // se setea acá (línea más abajo) la PRIMERA vez que confirmamos
+    // onboarding completo, y también en /api/users/me PATCH cuando el
+    // user guarda nombre/avatar desde la web. Dura 30 días.
+    //
+    // NO es un override del gate: si la cookie no está (primer request,
+    // post-clear, o post-expire), caemos al slow path y la DB sigue
+    // siendo la fuente de verdad. Solo evita el round-trip cuando ya
+    // sabemos que el user está onboardado.
+    const hasOnbCookie = request.cookies.get("lp_onb")?.value === "1";
 
-    if (
-      profile &&
-      (needsName(profile.display_name) || !profile.avatar_url)
-    ) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      url.search = "";
-      return NextResponse.redirect(url);
+    if (!hasOnbCookie) {
+      // Admin client bypasses RLS — auth.uid() returns NULL in PostgREST
+      // context (see CLAUDE.md TODO), so the anon client would read 0 rows
+      // and the gate would fail open silently. Scope is enforced manually
+      // via .eq("id", user.id) where user.id came from getUser() above.
+      const admin = getAdmin();
+      const { data: profile } = await admin
+        .from("users")
+        .select("display_name, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (
+        profile &&
+        (needsName(profile.display_name) || !profile.avatar_url)
+      ) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/onboarding";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+
+      // Onboarding completo — cachear para próximos requests (30 días).
+      if (profile && !needsName(profile.display_name) && profile.avatar_url) {
+        supabaseResponse.cookies.set("lp_onb", "1", {
+          httpOnly: true,
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 30,
+          path: "/",
+        });
+      }
     }
   }
 

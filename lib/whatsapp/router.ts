@@ -108,6 +108,7 @@ export async function processIncomingMessage(
       from,
       "Recibí tu foto 📸 pero no estaba esperando ninguna en este momento. " +
         "Si quieres mandar un comprobante de pago, primero únete a una polla y te lo pido cuando toque.",
+      { userId: user.id },
     );
     return;
   }
@@ -160,6 +161,7 @@ export async function processIncomingMessage(
         await sendTextMessage(
           from,
           "Ingresá solo números parce, sin letras ni símbolos. Escribí el marcador así: *2-1* _(local primero)_",
+          { userId: user.id },
         );
         return;
       }
@@ -169,6 +171,7 @@ export async function processIncomingMessage(
         await sendTextMessage(
           from,
           "Eso parece mucho parce 😅 ¿Estás seguro? Escribí el marcador de nuevo (ej: *2-1*).",
+          { userId: user.id },
         );
         return;
       }
@@ -207,6 +210,7 @@ export async function processIncomingMessage(
         await sendTextMessage(
           from,
           "Listo, no te uniste. Si quieres probar con otro código, mándamelo de nuevo.",
+          { userId: user.id },
         );
         return;
       }
@@ -284,6 +288,7 @@ async function routePayload(
     await sendTextMessage(
       from,
       "¡Listo! 🐥\n\nMándame el *código de 6 caracteres* de la polla que quieres entrar\n\n_Te lo pasa el organizador de la polla._",
+      { userId: user.id },
     );
     return;
   }
@@ -304,6 +309,7 @@ async function routePayload(
       await sendTextMessage(
         from,
         "Parce, se me perdió el código. Mándalo de nuevo porfa.",
+        { userId: user.id },
       );
     }
     return;
@@ -313,6 +319,7 @@ async function routePayload(
     await sendTextMessage(
       from,
       "Listo, no te uniste. Si quieres probar con otro código, mándamelo de nuevo.",
+      { userId: user.id },
     );
     return;
   }
@@ -373,6 +380,7 @@ async function routePayload(
       await sendTextMessage(
         from,
         "Ups parce, se me perdió el hilo. ¿Cuál polla querías pronosticar?",
+        { userId: user.id },
       );
       await handleMisPollas(from, user.id);
     }
@@ -402,6 +410,7 @@ async function routePayload(
       await sendTextMessage(
         from,
         "Parce, perdí tu pronóstico. Dale de nuevo a Pronosticar para volver a mandarlo.",
+        { userId: user.id },
       );
       await handleMisPollas(from, user.id);
     }
@@ -416,6 +425,7 @@ async function routePayload(
       await sendTextMessage(
         from,
         "Ups, se me olvidó que ibas a cambiar. Dale a Pronosticar de nuevo.",
+        { userId: user.id },
       );
       await handleMisPollas(from, user.id);
     }

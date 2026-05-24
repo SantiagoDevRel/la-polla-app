@@ -156,7 +156,7 @@ async function verifyMemberAndPolla(
     .single();
 
   if (!polla) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.");
+    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.", { userId });
     return null;
   }
 
@@ -168,7 +168,7 @@ async function verifyMemberAndPolla(
     .maybeSingle();
 
   if (!participant || participant.status !== "approved") {
-    await sendTextMessage(phone, "No eres participante de esta polla parce.");
+    await sendTextMessage(phone, "No eres participante de esta polla parce.", { userId });
     return null;
   }
 
@@ -182,7 +182,8 @@ async function verifyMemberAndPolla(
   ) {
     await sendTextMessage(
       phone,
-      "Tu pago aún no ha sido aprobado por el organizador. Esperá a que confirme y volvé a intentar."
+      "Tu pago aún no ha sido aprobado por el organizador. Esperá a que confirme y volvé a intentar.",
+      { userId }
     );
     return null;
   }
@@ -242,6 +243,7 @@ export async function handleMisPollas(phone: string, userId: string) {
       phone,
       "Todavía no estás en ninguna polla 🐣\n\n" +
         "Mándame el *código de 6 caracteres* de la polla a la que te invitaron y te uno enseguida 🐥",
+      { userId },
     );
     return;
   }
@@ -263,6 +265,7 @@ export async function handleMisPollas(phone: string, userId: string) {
       phone,
       "😴 No tienes pollas activas en este momento parce.\n\n" +
         "Si te invitaron a una polla nueva, mándame el *código de 6 caracteres* y te uno 🐥",
+      { userId },
     );
     return;
   }
@@ -402,7 +405,8 @@ export async function handlePronosticar(
   if (polla.status === "ended") {
     await sendTextMessage(
       phone,
-      "Esta polla ya terminó. Solo puedes ver los resultados finales."
+      "Esta polla ya terminó. Solo puedes ver los resultados finales.",
+      { userId }
     );
     return;
   }
@@ -460,7 +464,8 @@ export async function handlePronosticar(
     if (!match) {
       await sendTextMessage(
         phone,
-        "Ese partido ya no está abierto parce, elegí uno de la lista."
+        "Ese partido ya no está abierto parce, elegí uno de la lista.",
+        { userId }
       );
       return handlePronosticar(phone, userId, pollaId, undefined, 0, true);
     }
@@ -667,10 +672,11 @@ export async function handleCancelPrediction(
   if (match && existing) {
     await sendTextMessage(
       phone,
-      `Listo parce, dejé tu pronóstico como estaba (*${match.home_team} ${existing.predicted_home} - ${existing.predicted_away} ${match.away_team}*)`
+      `Listo parce, dejé tu pronóstico como estaba (*${match.home_team} ${existing.predicted_home} - ${existing.predicted_away} ${match.away_team}*)`,
+      { userId }
     );
   } else {
-    await sendTextMessage(phone, "Listo parce, cancelé.");
+    await sendTextMessage(phone, "Listo parce, cancelé.", { userId });
   }
 
   await handlePollaMenu(phone, userId, pollaId);
@@ -695,7 +701,7 @@ export async function handlePredictionInput(
     .single();
 
   if (!match) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré el partido.");
+    await sendTextMessage(phone, "🤔 Parce, no encontré el partido.", { userId: user.id });
     return;
   }
 
@@ -704,7 +710,8 @@ export async function handlePredictionInput(
   if (match.status !== "scheduled" || Date.now() >= lockTime) {
     await sendTextMessage(
       phone,
-      "Este partido ya está cerrado parce, no se pueden cambiar pronósticos a menos de 5 minutos del inicio."
+      "Este partido ya está cerrado parce, no se pueden cambiar pronósticos a menos de 5 minutos del inicio.",
+      { userId: user.id }
     );
     return;
   }
@@ -761,7 +768,7 @@ export async function handleConfirmPrediction(
     .single();
 
   if (!match) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré el partido.");
+    await sendTextMessage(phone, "🤔 Parce, no encontré el partido.", { userId: user.id });
     return;
   }
 
@@ -771,7 +778,8 @@ export async function handleConfirmPrediction(
   if (match.status !== "scheduled" || Date.now() >= lockTime) {
     await sendTextMessage(
       phone,
-      "Este partido ya está cerrado parce, no se pueden cambiar pronósticos a menos de 5 minutos del inicio."
+      "Este partido ya está cerrado parce, no se pueden cambiar pronósticos a menos de 5 minutos del inicio.",
+      { userId: user.id }
     );
     return;
   }
@@ -802,7 +810,8 @@ export async function handleConfirmPrediction(
     console.error("[WA] Error saving prediction:", error);
     await sendTextMessage(
       phone,
-      "❌ Uy parce, hubo un error guardando tu pronóstico. Intentá de nuevo."
+      "❌ Uy parce, hubo un error guardando tu pronóstico. Intentá de nuevo.",
+      { userId: user.id }
     );
     return;
   }
@@ -871,7 +880,8 @@ export async function handleLeaderboard(
   if (!participants || participants.length === 0) {
     await sendTextMessage(
       phone,
-      "😅 No hay participantes en esta polla aún parce."
+      "😅 No hay participantes en esta polla aún parce.",
+      { userId }
     );
     return;
   }
@@ -887,7 +897,7 @@ export async function handleLeaderboard(
   }));
 
   const tablaText = formatTablaWA(rows, polla.name);
-  await sendTextMessage(phone, tablaText);
+  await sendTextMessage(phone, tablaText, { userId });
 }
 
 // ─── FLOW 7: Results ───
@@ -978,7 +988,7 @@ export async function handleResults(
 
   text += `💰 *Total acumulado: ${myP?.total_points || 0} pts*`;
 
-  await sendTextMessage(phone, text);
+  await sendTextMessage(phone, text, { userId });
 }
 
 // ─── FLOW 8: Join Polla via Link ───
@@ -999,7 +1009,8 @@ export async function handleJoinPolla(
   if (!polla) {
     await sendTextMessage(
       phone,
-      "🤔 Parce, no encontré una polla con ese link."
+      "🤔 Parce, no encontré una polla con ese link.",
+      { userId: user.id }
     );
     return;
   }
@@ -1007,7 +1018,8 @@ export async function handleJoinPolla(
   if (polla.status !== "active") {
     await sendTextMessage(
       phone,
-      `😅 La polla *${polla.name}* ya no está activa parce.`
+      `😅 La polla *${polla.name}* ya no está activa parce.`,
+      { userId: user.id }
     );
     return;
   }
@@ -1040,6 +1052,7 @@ export async function handleJoinPolla(
   await sendTextMessage(
     phone,
     `Esa polla es privada parce 🔒\n\nPedile al admin el código de 6 caracteres y mandámelo aquí.`,
+    { userId: user.id },
   );
 }
 
@@ -1113,7 +1126,8 @@ export async function handleHelpTopic(
         `*2 pts* — Acertaste quién ganó ✅\n` +
         `*1 pt* — Acertaste los goles de uno de los dos equipos 🎯\n` +
         `*0 pts* — No le pegaste 😅\n\n` +
-        `_Pilas parce, cada punto cuenta para la tabla_ 📊`
+        `_Pilas parce, cada punto cuenta para la tabla_ 📊`,
+      { userId: user.id }
     );
     return;
   }
@@ -1186,7 +1200,8 @@ export async function handleProfile(phone: string, userId: string) {
       `👤 *${name}*\n` +
       `📊 Pollas activas: *${activeCount}*\n` +
       `🎯 Predicciones: *${predCount}*\n` +
-      `🏆 Mejor posición: *#${bestRank && bestRank < 999 ? bestRank : "—"}*`
+      `🏆 Mejor posición: *#${bestRank && bestRank < 999 ? bestRank : "—"}*`,
+    { userId }
   );
   // Sin CTA URL a la web — el resumen alcanza para WA-only users.
 }
@@ -1244,6 +1259,7 @@ export async function handleJoinByCode(
     await sendTextMessage(
       phone,
       `¡Te uniste a *${result.polla.name}*! 🎉`,
+      { userId },
     );
 
     // Chequear si necesita subir comprobante (admin_collects, paid=false).
@@ -1292,28 +1308,32 @@ export async function handleJoinByCode(
       await sendTextMessage(
         phone,
         "Parce, ese código no tiene el formato correcto. Deben ser 6 letras o números.",
+        { userId },
       );
       return;
     case "rate_limited":
       await sendTextMessage(
         phone,
         "Muchos intentos seguidos parce. Esperá 10 minutos y volvés a probar.",
+        { userId },
       );
       return;
     case "not_found":
       await sendTextMessage(
         phone,
         "Ese código no existe. Pedile al admin de la polla que te lo mande de nuevo.",
+        { userId },
       );
       return;
     case "not_active":
       await sendTextMessage(
         phone,
         "Esa polla ya no acepta nuevos jugadores.",
+        { userId },
       );
       return;
     case "already_member":
-      await sendTextMessage(phone, "Ya sos parte de esa polla parce.");
+      await sendTextMessage(phone, "Ya sos parte de esa polla parce.", { userId });
       return;
   }
 }

@@ -71,11 +71,25 @@ export const config = {
   matcher: [
     /*
      * Se aplica a todas las rutas excepto:
-     * - _next/static (archivos estáticos)
-     * - _next/image (optimización de imágenes)
-     * - favicon.ico (favicon)
-     * - Archivos públicos (svg, png, jpg, etc.)
+     * - _next/static, _next/image (Next.js built-in)
+     * - favicon, manifest, sw.js, workbox-*.js (PWA shell)
+     * - icons/, sounds/, fonts/ (carpetas estáticas en /public)
+     * - .well-known/ (assetlinks.json, apple-app-site-association)
+     * - apple-touch-icon*, android-chrome*, mstile* (PWA icon variants)
+     * - reset.html (página utilitaria sin auth)
+     * - Archivos estáticos por extensión: imágenes, fonts, audio,
+     *   css/js/maps, ico, html
+     *
+     * IMPORTANTE: sitemap.xml, robots.txt, llms.txt NO se excluyen acá
+     * porque el outer middleware setea x-locale en headers, que esos
+     * route handlers leen en localhost/preview (en prod usan Host).
+     * Igualmente son baratos: updateSession() hace early-return para
+     * ellos antes de tocar Supabase.
+     *
+     * Verificado: ninguna ruta /api/* termina en .json — todos los
+     * route.ts viven en directorios, no en archivos con extensión.
+     * Por eso excluimos .json sin riesgo (cubre manifest.json y assets).
      */
-    "/((?!_next/static|_next/image|favicon.ico|icons/|manifest.json|reset\\.html|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|html)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|icons/|sounds/|fonts/|manifest\\.json|sw\\.js|workbox-.*\\.js|reset\\.html|\\.well-known/|apple-touch-icon.*|android-chrome.*|mstile.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|html|woff|woff2|ttf|otf|mp3|wav|ogg|css|js|map|json)$).*)",
   ],
 };

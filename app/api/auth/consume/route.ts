@@ -59,5 +59,11 @@ export async function GET(request: NextRequest) {
 
   // Las cookies de Supabase quedaron seteadas via el cookieStore del
   // createClient(). Next.js las attacha a la response de redirect.
-  return NextResponse.redirect(new URL(safePath, request.url));
+  //
+  // Limpiamos lp_onb (HttpOnly fast-path del middleware) por si en este
+  // dominio quedó una cookie de otra cuenta. El middleware re-setea en
+  // el primer nav si el perfil del nuevo user está completo.
+  const response = NextResponse.redirect(new URL(safePath, request.url));
+  response.cookies.delete("lp_onb");
+  return response;
 }
