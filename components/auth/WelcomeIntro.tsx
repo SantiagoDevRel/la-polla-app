@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 
 const SEEN_KEY = "lp_welcome_seen_v1";
@@ -51,6 +52,7 @@ const STAGE_DELAYS: Record<Exclude<Stage, "intro">, number> = {
 export function WelcomeIntro() {
   const t = useTranslations("Welcome");
   const tBrand = useTranslations("Brand");
+  const isIOSApp = useIsIOSApp();
   const INTRO = t("introLine");
   const INTRO_CHARS = useMemo(() => INTRO.split(""), [INTRO]);
   const STEPS = useMemo(
@@ -310,7 +312,7 @@ export function WelcomeIntro() {
             {/* Tournament logos — slot reserved (min-h) from the start so
                 the rest of the column doesn't move when the row reveals. */}
             <div className="mt-6 w-full flex flex-wrap items-center justify-center gap-x-5 gap-y-3 min-h-[68px]">
-              {TOURNAMENT_ORDER.map((tournament, i) => (
+              {(isIOSApp ? TOURNAMENT_ORDER.filter((tn) => tn.slug === "worldcup_2026") : TOURNAMENT_ORDER).map((tournament, i) => (
                 <motion.div
                   key={tournament.slug}
                   initial={{
@@ -331,13 +333,15 @@ export function WelcomeIntro() {
                   className="flex flex-col items-center gap-1.5"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={TOURNAMENT_ICONS[tournament.slug]}
-                    alt={t(tournament.nameKey)}
-                    width={36}
-                    height={36}
-                    className="object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
-                  />
+                  {isIOSApp ? null : (
+                    <img
+                      src={TOURNAMENT_ICONS[tournament.slug]}
+                      alt={t(tournament.nameKey)}
+                      width={36}
+                      height={36}
+                      className="object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
+                    />
+                  )}
                   <span className="text-[10px] uppercase tracking-wider text-text-secondary">
                     {t(tournament.nameKey)}
                   </span>

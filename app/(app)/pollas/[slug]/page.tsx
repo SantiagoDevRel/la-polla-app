@@ -8,6 +8,7 @@ import Image from "next/image";
 import axios from "axios";
 import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import ParticipantPayment from "@/components/polla/ParticipantPayment";
 import OrganizerPanel from "@/components/polla/OrganizerPanel";
 import PrizeDistributionEditor from "@/components/polla/PrizeDistributionEditor";
@@ -123,16 +124,21 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
   // Track si la imagen falló al cargar (404, CORS, network, etc.) para
   // mostrar fallback con iniciales en vez de quedar en blanco.
   const [errored, setErrored] = useState(false);
+  // En la app iOS no renderizamos crests de clubes (IP de terceros, p.ej.
+  // Real Madrid, Barça). Las banderas de país (Mundial) sí — no son IP.
+  // Apple 4.1(a) — ver lib/platform/ios-app.ts. Web y Android sin cambios.
+  const isIOSApp = useIsIOSApp();
 
   // Prioridad de fuentes para el "logo" del equipo:
   //   1. Bandera del país via flag-icons CDN si el team_name matchea
   //      una selección nacional conocida (Mundial, Copa América, etc.).
   //   2. flagUrl del provider (ESPN logo, football-data crest).
+  //      → SE OMITE en la app iOS para evitar mostrar crests de clubes.
   //   3. Iniciales del team_name como fallback final.
   // unoptimized: skipea el optimizador de imágenes de Vercel para
   // logos externos pequeños (24x24).
   const countryFlag = flagUrlForTeam(teamName);
-  const src = countryFlag ?? flagUrl;
+  const src = isIOSApp ? countryFlag : (countryFlag ?? flagUrl);
   if (src && !errored) {
     return (
       <Image
@@ -317,6 +323,7 @@ function MatchRow({
   const tMatch = useTranslations("Match");
   const tCommon = useTranslations("Common");
   const locale = useLocale();
+  const isIOSApp = useIsIOSApp();
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
   const pointsEarned = pred?.points_earned ?? null;
@@ -342,7 +349,7 @@ function MatchRow({
             atención. */}
         <div className="flex items-center justify-between gap-2 mb-2">
           <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] text-text-primary/70 truncate">
-            {isLeagueFormatPhase(match.phase) && TOURNAMENT_ICONS[tournamentSlug] ? (
+            {!isIOSApp && isLeagueFormatPhase(match.phase) && TOURNAMENT_ICONS[tournamentSlug] ? (
               <Image
                 src={TOURNAMENT_ICONS[tournamentSlug]!}
                 alt=""

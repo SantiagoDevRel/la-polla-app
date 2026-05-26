@@ -64,7 +64,24 @@ export async function middleware(request: NextRequest) {
   // se propaga al downstream RSC.
   request.headers.set("x-locale", locale);
 
-  return await updateSession(request);
+  const response = await updateSession(request);
+
+  // Preview de UI iOS desde browser: ?ios=1 setea cookie sticky, ?ios=0
+  // la limpia. En producción, el wrapper Capacitor iOS se detecta por
+  // User-Agent — el query param es solo para verificar localmente cómo
+  // se vería la app antes del rebuild.
+  const iosParam = request.nextUrl.searchParams.get("ios");
+  if (iosParam === "1") {
+    response.cookies.set("lp_ios_preview", "1", {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // 30 días
+      sameSite: "lax",
+    });
+  } else if (iosParam === "0") {
+    response.cookies.delete("lp_ios_preview");
+  }
+
+  return response;
 }
 
 export const config = {

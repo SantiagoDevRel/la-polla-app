@@ -11,6 +11,8 @@ import { CapacitorAppUpdate } from "@/components/layout/CapacitorAppUpdate";
 import { CapacitorDeepLinks } from "@/components/layout/CapacitorDeepLinks";
 import { OfflineBanner } from "@/components/layout/OfflineBanner";
 import { getSiteFromHeaders, SITES } from "@/lib/seo/sites";
+import { isIOSAppRequest } from "@/lib/platform/ios-app";
+import { PlatformProvider } from "@/components/platform/PlatformProvider";
 
 const bebas = Bebas_Neue({
   subsets: ["latin"],
@@ -119,6 +121,7 @@ export default async function RootLayout({
   const locale = await getLocale();
   const messages = await getMessages();
   const site = getSiteFromHeaders();
+  const isIOSApp = isIOSAppRequest();
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -149,13 +152,15 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
         />
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <CapacitorReady />
-          <CapacitorBackButton />
-          <CapacitorDeepLinks />
-          <CapacitorAppUpdate />
-          <OfflineBanner />
-          <SplashScreen />
-          {children}
+          <PlatformProvider isIOSApp={isIOSApp}>
+            <CapacitorReady />
+            <CapacitorBackButton />
+            <CapacitorDeepLinks />
+            <CapacitorAppUpdate />
+            <OfflineBanner />
+            <SplashScreen />
+            {children}
+          </PlatformProvider>
         </NextIntlClientProvider>
       </body>
     </html>

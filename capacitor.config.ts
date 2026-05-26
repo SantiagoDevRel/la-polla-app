@@ -62,6 +62,12 @@ const config: CapacitorConfig = {
     // scheme: nombre del custom URL scheme que iOS usa internamente para
     // servir la app (no afecta deep links externos). "App" es el default.
     scheme: "App",
+    // Marker en el User-Agent del WKWebView para que el server (middleware
+    // + lib/platform/ios-app.ts) detecte la request como iOS-app y
+    // renderice la UI iOS-mode (sin logos/nombres de ligas, solo Mundial
+    // + disclaimer a la web). SIN este marker, Apple ve la versión web
+    // con todo el branding -> rechazo Guideline 4.1(a)/5.2.1.
+    appendUserAgent: "LaPollaIOS/1.0",
   },
 
   plugins: {
