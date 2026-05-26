@@ -3,6 +3,7 @@
 "use client";
 
 import { getTournamentBySlug } from "@/lib/tournaments";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
 interface TournamentBadgeProps {
   tournamentSlug: string;
@@ -46,6 +47,9 @@ export default function TournamentBadge({
 }: TournamentBadgeProps) {
   const tournament = getTournamentBySlug(tournamentSlug);
   const { logo: logoSize, text: textSize } = SIZES[size];
+  // En la app iOS no renderizamos logos de ligas (IP de terceros). Apple
+  // 4.1(a) — ver lib/platform/ios-app.ts. Web y Android siguen igual.
+  const isIOSApp = useIsIOSApp();
 
   return (
     <span
@@ -56,7 +60,9 @@ export default function TournamentBadge({
         gap: size === "lg" ? 8 : 5,
       }}
     >
-      {tournament ? (
+      {isIOSApp ? (
+        <FallbackTrophy size={logoSize} />
+      ) : tournament ? (
         <img
           src={tournament.logoPath}
           alt={tournament.name}

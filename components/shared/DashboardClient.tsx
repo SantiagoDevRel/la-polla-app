@@ -3,6 +3,8 @@
 "use client";
 
 import { useState } from "react";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
+import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 import Image from "next/image";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { formatCOP } from "@/lib/formatCurrency";
@@ -212,6 +214,7 @@ function PollaSelectorWithLeaderboard({
   leaderboardData: LeaderboardEntry[];
 }) {
   const [selectedPollaId, setSelectedPollaId] = useState(pollas[0]?.id ?? null);
+  const isIOSApp = useIsIOSApp();
 
   if (pollas.length === 0) return null;
 
@@ -270,7 +273,7 @@ function PollaSelectorWithLeaderboard({
                 {/* Top: tournament + dot */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#F5F7FA", fontWeight: 500 }}>
-                    {TOURNAMENT_ICONS[polla.tournament] ? (
+                    {!isIOSApp && TOURNAMENT_ICONS[polla.tournament] ? (
                       <img src={TOURNAMENT_ICONS[polla.tournament]} alt="" style={{ width: 10, height: 10, objectFit: "contain", flexShrink: 0 }} />
                     ) : (
                       <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="#F5F7FA" strokeWidth="2" style={{ flexShrink: 0 }}>
@@ -278,7 +281,7 @@ function PollaSelectorWithLeaderboard({
                         <path d="M4 22h16" /><path d="M18 2H6v7a6 6 0 0012 0V2z" />
                       </svg>
                     )}
-                    {polla.tournamentName}
+                    {isIOSApp ? getIOSTournamentName(polla.tournament, polla.tournamentName) : polla.tournamentName}
                   </div>
                   <span
                     className={polla.isActive ? "dot-active-pulse" : ""}

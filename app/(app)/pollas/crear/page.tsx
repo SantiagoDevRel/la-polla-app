@@ -10,6 +10,8 @@ import Image from "next/image";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
+import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Handshake, Lock } from "lucide-react";
 import { TOURNAMENTS, getTournamentName } from "@/lib/tournaments";
@@ -66,6 +68,7 @@ type GroupBy = "date" | "phase";
 export default function CrearPollaPage() {
   const t = useTranslations("Crear");
   const locale = useLocale();
+  const isIOSApp = useIsIOSApp();
   const PAYMENT_MODE_OPTIONS = useMemo(
     () => [
       {
@@ -520,7 +523,7 @@ export default function CrearPollaPage() {
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">{t("labelTournaments")} <span className="text-red-alert">*</span></h2>
               <div className="space-y-2">
-                {TOURNAMENTS.map((t) => {
+                {(isIOSApp ? TOURNAMENTS.filter((tn) => tn.slug === "worldcup_2026") : TOURNAMENTS).map((t) => {
                   const isSelected = form.tournaments.includes(t.slug);
                   return (
                     <button
@@ -544,8 +547,8 @@ export default function CrearPollaPage() {
                           : "border-border-subtle hover:border-gold/20 bg-bg-elevated"
                       }`}
                     >
-                      <img src={t.logoPath} alt={getTournamentName(t.slug, locale)} width={24} height={24} style={{ objectFit: "contain", borderRadius: 4 }} />
-                      <span className="font-medium text-text-primary flex-1">{getTournamentName(t.slug, locale)}</span>
+                      {isIOSApp ? null : <img src={t.logoPath} alt={getTournamentName(t.slug, locale)} width={24} height={24} style={{ objectFit: "contain", borderRadius: 4 }} />}
+                      <span className="font-medium text-text-primary flex-1">{isIOSApp ? getIOSTournamentName(t.slug, getTournamentName(t.slug, locale)) : getTournamentName(t.slug, locale)}</span>
                       {/* Checkbox cuadrado (rounded-sm = casi recto) para
                           que se lea claro como multi-select, no radio. */}
                       <div
@@ -559,7 +562,22 @@ export default function CrearPollaPage() {
                   );
                 })}
               </div>
-              {form.tournaments.length > 1 ? (
+              {isIOSApp ? (
+                <div className="rounded-xl border border-gold/30 bg-gold/5 p-4 mt-1">
+                  <p className="text-[14px] text-text-primary leading-relaxed">
+                    Para participar en otros torneos (Champions, La Liga, Premier, Serie A, Libertadores, Sudamericana, BetPlay), visitá{" "}
+                    <a
+                      href="https://lapollacolombiana.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gold underline font-semibold"
+                    >
+                      lapollacolombiana.com
+                    </a>
+                    .
+                  </p>
+                </div>
+              ) : form.tournaments.length > 1 ? (
                 <p className="text-[11px] text-gold">
                   {t("combinedNote", { count: form.tournaments.length })}
                 </p>
@@ -589,7 +607,7 @@ export default function CrearPollaPage() {
                   {selectedMatchIds.size > 0 ? t("selectedCount", { count: selectedMatchIds.size }) : t("selectedNone")}
                 </p>
               </div>
-              {tournamentMeta && <img src={tournamentMeta.logoPath} alt="" width={28} height={28} style={{ objectFit: "contain", opacity: 0.6 }} />}
+              {tournamentMeta && !isIOSApp && <img src={tournamentMeta.logoPath} alt="" width={28} height={28} style={{ objectFit: "contain", opacity: 0.6 }} />}
             </div>
 
             {/* Group toggle: solo Mundial single-tournament. */}

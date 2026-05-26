@@ -91,3 +91,4 @@ keystore.properties
 
 # Codemagic local artifacts
 /build/ios/
+.aider*
