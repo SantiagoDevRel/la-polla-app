@@ -2,10 +2,14 @@
 // Used por:
 //   • app/api/pollas/[slug]/invite — invitaciones por WA
 //   • lib/notifications.ts          — notificaciones a users (results, etc.)
-//   • app/api/whatsapp/send         — endpoint genérico
 //
 // El flow inbound (procesar mensajes que llegan al bot) fue eliminado
 // junto con el login por WhatsApp OTP. Lo único que queda es la salida.
+//
+// Nota: existió un endpoint genérico /api/whatsapp/send que solo
+// chequeaba auth de user (sin admin gate, sin rate limit, sin destination
+// whitelist). Eliminado en migration de seguridad — convertía el número
+// Meta verificado en un canal de spam/scam para cualquier cuenta con OTP.
 import axios from "axios";
 import { createAdminClient } from "@/lib/supabase/admin";
 

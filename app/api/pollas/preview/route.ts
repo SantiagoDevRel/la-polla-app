@@ -67,14 +67,26 @@ export async function GET(request: NextRequest) {
   // invite preview page needs it for downstream calls (membership check,
   // matches fetch); it is not a sensitive field since the polla is
   // already addressable by slug and invite_token publicly.
-  // join_code: solo se devuelve cuando el caller tiene invite_token
-  // válido (ya tiene la "llave" para unirse, exponer el code corto no
-  // amplía superficie). En consultas por slug no se devuelve para no
-  // filtrar la llave a quien solo conoce el slug.
-  const { created_by: _createdBy, join_code, ...publicPolla } = polla;
+  //
+  // Token-gated fields (solo se devuelven con invite_token válido):
+  //   - join_code: la "llave" corta para unirse. Exponerla a quien solo
+  //     conoce el slug amplía superficie.
+  //   - admin_payment_instructions: típicamente "Nequi 310-… a nombre
+  //     de Pepito Pérez". Los slugs son enumerables (vienen del nombre
+  //     normalizado) → un attacker puede scrapear directorio de
+  //     "número de Nequi + titular" para phishing P2P. Solo se expone
+  //     a quien ya tiene el token de invite (path legítimo de pago).
+  const {
+    created_by: _createdBy,
+    join_code,
+    admin_payment_instructions,
+    ...publicPolla
+  } = polla;
   void _createdBy;
   return NextResponse.json({
-    polla: token ? { ...publicPolla, join_code } : publicPolla,
+    polla: token
+      ? { ...publicPolla, join_code, admin_payment_instructions }
+      : publicPolla,
     participantCount: count ?? 0,
     organizer,
   });

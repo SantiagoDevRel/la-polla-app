@@ -23,12 +23,22 @@ export async function verifyTurnstile(
   const secret = (process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY ?? "").trim();
 
   if (!secret) {
-    // Dev / preview without Turnstile configured: allow but warn loud so
-    // we never ship to prod with the env unset.
+    // Producción: fail-CLOSED. Si la env var no entra a Vercel prod por
+    // un typo o por preview→prod mismatch, no podemos dejar que el
+    // endpoint quede sin protección silenciosamente. Mejor login roto
+    // (visible al instante) que bot army gastándonos Twilio.
+    //
+    // Dev: fail-open con warning para no bloquear desarrollo local.
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[turnstile] CLOUDFLARE_TURNSTILE_SECRET_KEY missing in production — failing closed",
+      );
+      return { ok: false, reason: "secret_missing_in_prod" };
+    }
     console.warn(
-      "[turnstile] CLOUDFLARE_TURNSTILE_SECRET_KEY not set — skipping verification (dev mode)",
+      "[turnstile] CLOUDFLARE_TURNSTILE_SECRET_KEY not set — skipping verification (dev only)",
     );
-    return { ok: true, reason: "no_secret_configured" };
+    return { ok: true, reason: "no_secret_configured_dev" };
   }
 
   if (!token || token.length < 10) {

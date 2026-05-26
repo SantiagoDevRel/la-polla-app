@@ -13,6 +13,10 @@
 //
 // Sin tournament param: itera sobre todos los tournaments con polla
 // activa scope != custom (mismo gate que el cron).
+//
+// Auth: CRON_SECRET solo. Aceptado via header `x-cron-secret` o
+// `Authorization: Bearer …`. La opción ?secret=… fue removida porque
+// querystrings quedan persistidas en logs/CDN/Referer.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -27,8 +31,7 @@ function checkSecret(request: NextRequest): boolean {
   if (!secret) return false;
   const bearer = request.headers.get("authorization") ?? "";
   const header = request.headers.get("x-cron-secret") ?? "";
-  const query = request.nextUrl.searchParams.get("secret") ?? "";
-  return bearer === `Bearer ${secret}` || header === secret || query === secret;
+  return bearer === `Bearer ${secret}` || header === secret;
 }
 
 async function tournamentsToDiscover(explicit: string | null): Promise<string[]> {

@@ -3,19 +3,24 @@
 //   • Send OTP corre client-side (no hay sesión todavía, signInWithOtp directo)
 //   • Verify OTP corre server-side (/api/auth/verify-otp) para que las cookies
 //     queden persistidas via Set-Cookie HttpOnly — fix del bug iOS Safari.
-// 2 pasos (input → otp). Sin contraseña, sin Turnstile, sin WhatsApp bot.
+// 2 pasos (input → otp). Sin contraseña, sin WhatsApp bot. Turnstile filtra
+// bot traffic antes de gastar Twilio (bill-bombing protection).
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import axios from "axios";
 import { useTranslations } from "next-intl";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { createClient } from "@/lib/supabase/client";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
 import { botDeepLink } from "@/lib/whatsapp/bot-phone";
+
+const TURNSTILE_SITE_KEY =
+  process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "";
 
 function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;
@@ -57,6 +62,12 @@ function LoginInner() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PollaPreview | null>(null);
+  // Turnstile token. Server-side verifyTurnstile (lib/auth/turnstile.ts)
+  // exige este token cuando el secret está configurado en prod. El
+  // widget se renderea invisible (managed mode) y solo muestra UI si
+  // Cloudflare decide challenge interactivo.
+  const [turnstileToken, setTurnstileToken] = useState<string>("");
+  const turnstileRef = useRef<TurnstileInstance | null>(null);
   // Client-side OTP send cooldown. cooldownUntil is the epoch ms when
   // the user can send again. nowTick triggers a re-render every second
   // so the visible countdown updates.
@@ -159,6 +170,14 @@ function LoginInner() {
       setError(t("errInvalidPhone"));
       return;
     }
+    // El widget Turnstile debió haber producido un token al cargar.
+    // Si no lo tenemos significa: (a) el site key no está seteado
+    // (dev local sin env) o (b) Cloudflare está challengueando. En
+    // ambos casos el server-side rate-limit + verifyTurnstile decide.
+    if (!turnstileToken && TURNSTILE_SITE_KEY) {
+      setError(t("errCaptchaPending") || "Verificación en curso, intentá de nuevo en un segundo.");
+      return;
+    }
     setSending(true);
     try {
       // Server-side: /api/auth/start-otp decide si dispara Supabase
@@ -168,10 +187,14 @@ function LoginInner() {
       const res = await fetch("/api/auth/start-otp", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone, turnstileToken }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // Token Turnstile es one-shot: si server lo rechazó, hay que
+        // pedir uno nuevo al widget antes del próximo intento.
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
         setError(json.error || t("errSendFailed"));
         return;
       }
@@ -182,6 +205,9 @@ function LoginInner() {
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem(OTP_COOLDOWN_KEY, String(until));
       }
+      // El token Turnstile se consumió. Resetear para el próximo send.
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
       setStep("otp");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errNetwork"));
@@ -310,6 +336,32 @@ function LoginInner() {
                 {error}
               </p>
             )}
+
+            {/* Cloudflare Turnstile (managed mode). El widget se queda
+                invisible mientras Cloudflare considere al user humano;
+                solo aparece si decide challengear. Fail-closed server-
+                side: si el site key no está seteado, el widget no se
+                monta y el server rechaza el send con 403 — login roto
+                visible al instante en vez de bot army silencioso. */}
+            {TURNSTILE_SITE_KEY ? (
+              <div className="flex justify-center">
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={setTurnstileToken}
+                  onError={() => setTurnstileToken("")}
+                  onExpire={() => {
+                    setTurnstileToken("");
+                    turnstileRef.current?.reset();
+                  }}
+                  options={{
+                    appearance: "interaction-only",
+                    theme: "dark",
+                    size: "flexible",
+                  }}
+                />
+              </div>
+            ) : null}
 
             {/* Two channels side by side. SMS submits the form (gold,
                 primary). WhatsApp doesn't need the typed phone — the

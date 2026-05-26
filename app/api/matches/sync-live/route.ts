@@ -13,8 +13,9 @@
 //      sin update reciente, football-data sigue siendo el backup
 //      (corre lazy via ensureMatchesFresh en otros endpoints).
 //
-// Auth: CRON_SECRET solo (header x-cron-secret, Authorization Bearer,
-// o ?secret query). No se expone admin session.
+// Auth: CRON_SECRET solo (header x-cron-secret o Authorization Bearer).
+// No se expone admin session. La opción ?secret=… fue removida —
+// querystrings quedan persistidas en logs/CDN/Referer.
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncEspnLive } from "@/lib/espn/sync";
@@ -28,8 +29,7 @@ function checkSecret(request: NextRequest): boolean {
   if (!secret) return false;
   const bearer = request.headers.get("authorization") ?? "";
   const header = request.headers.get("x-cron-secret") ?? "";
-  const query = request.nextUrl.searchParams.get("secret") ?? "";
-  return bearer === `Bearer ${secret}` || header === secret || query === secret;
+  return bearer === `Bearer ${secret}` || header === secret;
 }
 
 async function hasActiveMatchWindow(): Promise<boolean> {

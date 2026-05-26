@@ -22,11 +22,19 @@ const nextConfig = {
   reactStrictMode: true,
   generateEtags: false,
   images: {
+    // Whitelist explícita de los hosts que servimos via next/image.
+    // hostname: "**" actuaba como proxy abierto bajo nuestra cuota Vercel
+    // Image Optimization — un attacker podía explotarlo para bill-amplification
+    // (10MB de imágenes con queries únicas revientan el free-tier en minutos)
+    // y para servir contenido phishing bajo nuestro dominio.
+    // Si hace falta agregar un host: añadirlo acá Y al CSP img-src abajo.
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
+      { protocol: "https", hostname: "crests.football-data.org" },
+      { protocol: "https", hostname: "a.espncdn.com" },
+      { protocol: "https", hostname: "api.dicebear.com" },
+      { protocol: "https", hostname: "avatars.dicebear.com" },
+      { protocol: "https", hostname: "cdn.jsdelivr.net" },
+      { protocol: "https", hostname: "**.supabase.co" },
     ],
     // Permitir SVGs optimizados para los logos de torneos bajo /public/tournaments.
     // Los archivos son estáticos y están bajo nuestro control; el CSP extra y el
@@ -81,7 +89,13 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+              // 'unsafe-eval' removido (defense-in-depth contra XSS).
+              // Next.js 14 + framer-motion + serwist + Capacitor WebView no
+              // requieren eval; si una nueva lib lo necesita, evaluar antes
+              // de reintroducirlo. 'unsafe-inline' se mantiene porque
+              // Next.js App Router todavía emite inline scripts; migrar a
+              // nonce-based CSP queda pendiente.
+              "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://api.dicebear.com https://avatars.dicebear.com https://crests.football-data.org https://a.espncdn.com https://*.supabase.co https://cdn.jsdelivr.net",
