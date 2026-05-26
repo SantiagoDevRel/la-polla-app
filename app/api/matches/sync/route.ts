@@ -6,10 +6,13 @@ import { syncCompetition, syncAllCompetitions, COMPETITIONS } from "@/lib/footba
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 export async function GET(request: NextRequest) {
-  // Dual auth: admin user session OR valid cron secret (server-only)
+  // Dual auth: admin user session OR valid cron secret (server-only).
+  // El secret SOLO se acepta via header `x-cron-secret`. ?secret=… en
+  // querystring quedaba persistido en Vercel access logs / browser
+  // history / Referer — leak garantizado cada vez que se usaba.
   const adminCheck = await isCurrentUserAdmin();
-  const secret = request.nextUrl.searchParams.get("secret") || request.headers.get("x-cron-secret");
-  const validCronSecret = process.env.CRON_SECRET && secret === process.env.CRON_SECRET;
+  const secret = request.headers.get("x-cron-secret");
+  const validCronSecret = !!process.env.CRON_SECRET && secret === process.env.CRON_SECRET;
 
   if (!adminCheck && !validCronSecret) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });

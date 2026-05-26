@@ -1,13 +1,14 @@
 // app/api/admin/sync-worldcup/route.ts — Sync del fixture del Mundial 2026
 // desde openfootball. Autenticación dual: sesión de admin o CRON_SECRET.
+// CRON_SECRET solo via header `x-cron-secret` — ?secret=… removido por
+// leak en logs/CDN/Referer.
 import { NextRequest, NextResponse } from "next/server";
 import { syncWorldCup2026 } from "@/lib/api-football/sync-worldcup";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 export async function POST(request: NextRequest) {
   const adminCheck = await isCurrentUserAdmin();
-  const cronSecret =
-    request.headers.get("x-cron-secret") || request.nextUrl.searchParams.get("secret");
+  const cronSecret = request.headers.get("x-cron-secret");
   const validCronSecret =
     !!process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET;
 

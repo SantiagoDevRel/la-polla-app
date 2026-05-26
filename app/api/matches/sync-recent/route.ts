@@ -9,12 +9,13 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 function checkSecret(request: NextRequest): boolean {
+  // Auth: CRON_SECRET solo, via header `x-cron-secret` o Bearer. La
+  // opción ?secret=… fue removida — querystrings quedan en logs.
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   const bearer = request.headers.get("authorization") ?? "";
   const header = request.headers.get("x-cron-secret") ?? "";
-  const query = request.nextUrl.searchParams.get("secret") ?? "";
-  return bearer === `Bearer ${secret}` || header === secret || query === secret;
+  return bearer === `Bearer ${secret}` || header === secret;
 }
 
 async function runSync() {
