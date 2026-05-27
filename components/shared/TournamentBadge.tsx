@@ -4,6 +4,7 @@
 
 import { getTournamentBySlug } from "@/lib/tournaments";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
+import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 
 interface TournamentBadgeProps {
   tournamentSlug: string;
@@ -87,7 +88,9 @@ export default function TournamentBadge({
             whiteSpace: "nowrap",
           }}
         >
-          {tournament?.name || tournamentSlug}
+          {isIOSApp
+            ? getIOSTournamentName(tournamentSlug, tournament?.name ?? tournamentSlug)
+            : tournament?.name || tournamentSlug}
         </span>
       )}
     </span>

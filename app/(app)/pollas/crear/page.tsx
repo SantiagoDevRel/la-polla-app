@@ -859,8 +859,11 @@ export default function CrearPollaPage() {
           </div>
         )}
 
-        {/* ═══ PASO 3 — Configuración (cuota + modo de pago) ═══ */}
-        {step === 3 && (
+        {/* ═══ PASO 3 — Configuración (cuota + modo de pago) ═══
+            iOS: skip step 3 entero. La polla en iOS se crea sin cuota,
+            sin pagos, sin distribución de premios. Los defaults del form
+            (buy_in_amount=0, payment_mode='honor') quedan en submit. */}
+        {!isIOSApp && step === 3 && (
           <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-5">
             {/* Sección 1: Cuota de entrada */}
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
@@ -1133,7 +1136,9 @@ export default function CrearPollaPage() {
             </button>
           )}
           <div className="flex-1" />
-          {step < 3 ? (
+          {/* iOS: step 2 es el final (no hay step 3). Botón salta a
+              "Crear polla" en step 2; el form usa los defaults sin plata. */}
+          {(isIOSApp ? step < 2 : step < 3) ? (
             <button
               type="button"
               onClick={() => goToStep((step + 1) as Step)}

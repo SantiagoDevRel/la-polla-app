@@ -22,6 +22,7 @@ import InlineScoringGuide from "@/components/polla/InlineScoringGuide";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/tournaments";
+import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getPollitoByPosition } from "@/lib/pollitos";
 import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock } from "lucide-react";
@@ -603,6 +604,7 @@ export default function PollaSlugPage() {
   const t = useTranslations("Detail");
   const tCommon = useTranslations("Common");
   const tMatch = useTranslations("Match");
+  const isIOSApp = useIsIOSApp();
   const locale = useLocale();
   const tDateLabels = useMemo(
     () => ({ today: tMatch("today"), tomorrow: tMatch("tomorrow") }),
@@ -896,9 +898,14 @@ export default function PollaSlugPage() {
   // One-shot default-tab routing: admin_collects participants who have not
   // been confirmed by the organizer land on Pagos first. Ref guard avoids
   // overriding a later manual tab switch even if data re-loads.
+  // iOS: skipped — el tab Pagos no existe en iOS por compliance 5.3.4.
   useEffect(() => {
     if (defaultTabAppliedRef.current) return;
     if (!polla) return;
+    if (isIOSApp) {
+      defaultTabAppliedRef.current = true;
+      return;
+    }
     if (
       polla.payment_mode === "admin_collects" &&
       currentUserPaid === false &&
@@ -907,7 +914,7 @@ export default function PollaSlugPage() {
       setActiveTab("pagos");
     }
     defaultTabAppliedRef.current = true;
-  }, [polla, currentUserPaid, currentUserRole]);
+  }, [polla, currentUserPaid, currentUserRole, isIOSApp]);
 
   // Get match IDs that have been touched and have both scores filled
   const pendingSaveIds = Array.from(touchedMatches).filter((matchId) => {
@@ -1088,7 +1095,10 @@ export default function PollaSlugPage() {
   // admin_collects pending: participant joined but the organizer has not
   // approved the comprobante. Gates the Partidos tab waiting state and
   // drives the amber banner on other tabs. Admins never see either.
+  // En iOS Capacitor wrapper se desactiva por completo: no mostramos
+  // banners de pago (App Store 5.3.4 + 5.1.1(ix)).
   const showPaymentPending =
+    !isIOSApp &&
     polla.payment_mode === "admin_collects" &&
     currentUserPaid === false &&
     !isOrganizer;
@@ -1100,7 +1110,9 @@ export default function PollaSlugPage() {
     // el InviteModal sheet directamente — no es un tab con contenido, es
     // un trigger inline (handler especial mas abajo en setActiveTab).
     { key: "invitar", label: t("tabInvitar"), icon: <Share2 className="w-4 h-4" />, show: true },
-    { key: "pagos", label: t("tabPagos"), icon: <Banknote className="w-4 h-4" />, show: polla.payment_mode !== "pay_winner" },
+    // iOS: oculta el tab "Pagos" entero — toda la UI de plata/cobros se
+    // remueve del iOS app por compliance con guideline 5.3.4.
+    { key: "pagos", label: t("tabPagos"), icon: <Banknote className="w-4 h-4" />, show: !isIOSApp && polla.payment_mode !== "pay_winner" },
     { key: "organizar", label: t("tabOrganizar"), icon: <Settings className="w-4 h-4" />, show: isOrganizer },
     { key: "info", label: t("tabInfo"), icon: <Info className="w-4 h-4" />, show: true },
   ];
@@ -1168,8 +1180,9 @@ export default function PollaSlugPage() {
       {/* Pot band — single-line summary of the pot + a compact scoring
           helper icon. The previous rank/points/payment-status band was
           redundant with the ranking tab and crowded the header; the
-          pot + (i) is the only context strip now. */}
-      {polla.buy_in_amount > 0 && (() => {
+          pot + (i) is the only context strip now.
+          iOS: oculto por compliance 5.3.4 — sin display de plata. */}
+      {!isIOSApp && polla.buy_in_amount > 0 && (() => {
         // En 'admin_collects' (pago de entrada) el pozo solo refleja la
         // plata efectivamente recaudada — solo cuentan los participantes
         // marcados como pagados. En 'pay_winner' no hay flujo de pagos
@@ -1231,7 +1244,7 @@ export default function PollaSlugPage() {
             todavía no está 'ended' o no hay pendientes, no muestra
             nada. Aparece arriba de cualquier tab para que el admin /
             ganador / perdedor lo vea siempre. */}
-        <PollaPayoutFlow slug={slug} />
+        {!isIOSApp && <PollaPayoutFlow slug={slug} />}
 
         {/* ── TAB PARTIDOS ── */}
         {activeTab === "partidos" && showPaymentPending && (
@@ -1545,7 +1558,9 @@ export default function PollaSlugPage() {
                             {p.users?.display_name || tCommon("userFallback")}
                             {isMe && <span className="ml-1 text-xs text-gold">{t("youParen")}</span>}
                           </p>
-                          {(() => {
+                          {/* Prize amounts + paid/pending — solo web/Android.
+                              En iOS oculto por compliance 5.3.4 + 5.1.1(ix). */}
+                          {!isIOSApp && (() => {
                             const prize = payoutByUser.get(p.user_id) ?? 0;
                             if (prize > 0) {
                               return (
@@ -1574,8 +1589,9 @@ export default function PollaSlugPage() {
                 can see what's at stake. Admins get the editor in-place;
                 everyone else sees the read-only view. El pot se calcula
                 igual que el header: en 'admin_collects' solo cuentan los
-                pagados, en 'pay_winner' todos los aprobados. */}
-            {(() => {
+                pagados, en 'pay_winner' todos los aprobados.
+                iOS: oculto por compliance 5.3.4 — sin display de plata. */}
+            {!isIOSApp && (() => {
               const countedCount =
                 polla.payment_mode === "admin_collects"
                   ? participants.filter((p) => p.status === "approved" && p.paid).length
@@ -1622,19 +1638,28 @@ export default function PollaSlugPage() {
             <div className="rounded-2xl p-5 space-y-3 lp-card">
               <h3 className="font-bold text-text-primary">{polla.name}</h3>
               {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
-              <div className="grid grid-cols-3 gap-2 text-sm">
+              <div className={`grid ${isIOSApp ? "grid-cols-2" : "grid-cols-3"} gap-2 text-sm`}>
                 {[
-                  { label: t("infoTournament"), value: getTournamentBySlug(polla.tournament)?.name || polla.tournament },
-                  { label: t("infoParticipants"), value: String(participants.length) },
                   {
-                    label: t("infoPayment"),
-                    value:
-                      polla.payment_mode === "admin_collects"
-                        ? t("paymentUpfront")
-                        : polla.payment_mode === "pay_winner"
-                          ? t("paymentAtEnd")
-                          : t("paymentDigital"),
+                    label: t("infoTournament"),
+                    value: isIOSApp
+                      ? getIOSTournamentName(polla.tournament, getTournamentBySlug(polla.tournament)?.name || polla.tournament)
+                      : (getTournamentBySlug(polla.tournament)?.name || polla.tournament),
                   },
+                  { label: t("infoParticipants"), value: String(participants.length) },
+                  // iOS: drop la columna de Payment (5.3.4 / 5.1.1(ix) — la
+                  // app en App Store se presenta sin manejo de dinero).
+                  ...(isIOSApp
+                    ? []
+                    : [{
+                        label: t("infoPayment"),
+                        value:
+                          polla.payment_mode === "admin_collects"
+                            ? t("paymentUpfront")
+                            : polla.payment_mode === "pay_winner"
+                              ? t("paymentAtEnd")
+                              : t("paymentDigital"),
+                      }]),
                 ].map((item) => (
                   <div key={item.label} className="rounded-xl p-2 bg-bg-elevated">
                     <p className="text-[10px] text-text-muted">{item.label}</p>
