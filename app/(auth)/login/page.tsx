@@ -141,10 +141,27 @@ function LoginInner() {
   }, [searchParams]);
 
   // PhoneInput emits an E.164 string already (e.g. "+573001234567")
-  // or "" while the user types. We just trust it and validate the
-  // overall length before sending.
+  // or "" while the user types. Si por alguna razón el state quedó
+  // vacío (caso reportado en Brave incognito 2026-05-26 con PhoneInput
+  // emitiendo "" aunque el input visualmente tenga dígitos), caemos
+  // al DOM y reconstruimos a partir del prefijo del país + número
+  // tipeado. Es defense-in-depth: nunca queremos bloquear el send por
+  // un bug de state.
   function buildPhone(): string {
-    return phoneE164.trim();
+    if (phoneE164.trim()) return phoneE164.trim();
+    if (typeof document === "undefined") return "";
+    const telInput = document.querySelector<HTMLInputElement>(
+      'input[type="tel"]',
+    );
+    const digits = telInput?.value.replace(/\D/g, "") ?? "";
+    if (!digits) return "";
+    // Detectamos el código de país del botón de selector (texto "+57").
+    const ccBtn = document.querySelector<HTMLButtonElement>(
+      'button[type="button"] span',
+    );
+    const ccMatch = ccBtn?.textContent?.match(/\+(\d+)/);
+    const cc = ccMatch ? ccMatch[1] : "57";
+    return `+${cc}${digits}`;
   }
 
   async function handleSendOtp(e: React.FormEvent) {
@@ -323,12 +340,7 @@ function LoginInner() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="submit"
-                disabled={
-                  sending ||
-                  cooldownRemaining > 0 ||
-                  !phoneE164.startsWith("+") ||
-                  phoneE164.replace(/\D/g, "").length < 8
-                }
+                disabled={sending || cooldownRemaining > 0}
                 className="bg-gold text-bg-base font-bold py-3.5 px-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base inline-flex items-center justify-center gap-2"
                 style={{ boxShadow: "0 0 20px rgba(255,215,0,0.15)" }}
               >
