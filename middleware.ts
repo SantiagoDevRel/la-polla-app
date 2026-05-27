@@ -51,7 +51,11 @@ function resolveLocale(request: NextRequest, host: string): Locale {
   const accept = request.headers.get("accept-language") ?? "";
   if (/^\s*es\b/i.test(accept)) return "es";
 
-  return "en";
+  // Fallback non-prod: default 'es' (la-polla es nuestro brand primario;
+  // chickenpicks.app es el satélite EN). Sin esto, browsers con
+  // Accept-Language=en (default Chrome en Windows) renderean Chicken Picks
+  // en localhost, lo cual confunde al preview.
+  return "es";
 }
 
 export async function middleware(request: NextRequest) {

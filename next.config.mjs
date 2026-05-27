@@ -89,13 +89,19 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // 'unsafe-eval' removido (defense-in-depth contra XSS).
+              // 'unsafe-eval' removido en prod (defense-in-depth contra XSS).
               // Next.js 14 + framer-motion + serwist + Capacitor WebView no
-              // requieren eval; si una nueva lib lo necesita, evaluar antes
-              // de reintroducirlo. 'unsafe-inline' se mantiene porque
-              // Next.js App Router todavía emite inline scripts; migrar a
-              // nonce-based CSP queda pendiente.
-              "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+              // requieren eval en build de producción; si una nueva lib lo
+              // necesita, evaluar antes de reintroducirlo. 'unsafe-inline'
+              // se mantiene porque Next.js App Router todavía emite inline
+              // scripts; migrar a nonce-based CSP queda pendiente.
+              // En DEV reactivamos 'unsafe-eval' porque Next.js dev HMR
+              // (React Refresh) lo necesita — sin eso, la JS se rompe en
+              // hidratación, los handlers de React no se atachan, y los
+              // forms hacen native-submit (page reload) al primer click.
+              process.env.NODE_ENV === "development"
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com"
+                : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://api.dicebear.com https://avatars.dicebear.com https://crests.football-data.org https://a.espncdn.com https://*.supabase.co https://cdn.jsdelivr.net",

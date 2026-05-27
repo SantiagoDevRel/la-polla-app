@@ -53,6 +53,7 @@ import { GreetingHero } from "@/components/inicio/GreetingHero";
 import GlobalPayoutBanner from "@/components/inicio/GlobalPayoutBanner";
 import DefaultPayoutPrompt from "@/components/inicio/DefaultPayoutPrompt";
 import UnpaidPollasBanner from "@/components/inicio/UnpaidPollasBanner";
+import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { RivalChip } from "@/components/inicio/RivalChip";
 import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import PredictNowCTA from "@/components/inicio/PredictNowCTA";
@@ -598,6 +599,9 @@ function heroPropsFromDb(
 
 export default async function InicioPage() {
   void ensureMatchesFresh();
+  // iOS app: oculta toda la UI de plata/cobros/payouts por compliance
+  // Apple 5.3.4. Web y Android no se afectan.
+  const isIOSApp = isIOSAppRequest();
   // Validate session. Middleware already gates /inicio, but the explicit
   // redirect keeps the page safe if middleware order ever changes.
   const supabase = createClient();
@@ -836,15 +840,18 @@ export default async function InicioPage() {
               que aún no tienen default_payout_method/account seteado en
               perfil. Saltable — para los que no quieren ahora, no
               bloquea nada. Re-aparece próxima sesión. */}
-          <DefaultPayoutPrompt />
+          {!isIOSApp && <DefaultPayoutPrompt />}
 
           {/* URGENT: pollas activas admin_collects donde el viewer
               todavía no pagó → no puede pronosticar. Más prioritario
               que el GlobalPayoutBanner (este es para EMPEZAR, ese es
-              para el final). Auto-abre modal una vez por sesión. */}
-          <section className="px-4">
-            <UnpaidPollasBanner />
-          </section>
+              para el final). Auto-abre modal una vez por sesión.
+              iOS: oculto por compliance 5.3.4. */}
+          {!isIOSApp && (
+            <section className="px-4">
+              <UnpaidPollasBanner />
+            </section>
+          )}
 
           {/* CTA principal: pronósticos pendientes (one-tap desde home
               al primer match sin pronosticar). Se monta solo cuando hay
@@ -854,10 +861,13 @@ export default async function InicioPage() {
           {/* Pagos pendientes — banner global pinned arriba con todas
               las transacciones unpaid del viewer en cualquier polla
               finalizada. Se monta solo si hay tx pendientes; auto-abre
-              el modal una vez por sesión. */}
-          <section className="px-4">
-            <GlobalPayoutBanner />
-          </section>
+              el modal una vez por sesión.
+              iOS: oculto por compliance 5.3.4. */}
+          {!isIOSApp && (
+            <section className="px-4">
+              <GlobalPayoutBanner />
+            </section>
+          )}
 
           {/* Block 7 - Empty state. Replaces blocks 3/4/5/6 entirely when
               the user has no active pollas. Offers two paths out: create

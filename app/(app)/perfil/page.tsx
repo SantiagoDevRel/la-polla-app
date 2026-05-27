@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useTranslations } from "next-intl";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -35,6 +36,7 @@ interface ActivityItem {
 
 export default function PerfilPage() {
   const t = useTranslations("Perfil");
+  const isIOSApp = useIsIOSApp();
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -268,15 +270,19 @@ export default function PerfilPage() {
 
         {/* Cuenta de pago — debajo del pollito + nombre. Edit / clear /
             cambiar de banco. Pre-llena el WinnerPayoutModal cuando ganan
-            una polla, así no tienen que re-tipear cada vez. */}
-        <PayoutDefaultEditor
-          initialMethod={profile.default_payout_method ?? undefined}
-          initialAccount={profile.default_payout_account ?? undefined}
-          initialAccountName={profile.default_payout_account_name ?? undefined}
-          initialAccountType={profile.default_payout_account_type ?? undefined}
-          onSave={handlePayoutSave}
-          onClear={handlePayoutClear}
-        />
+            una polla, así no tienen que re-tipear cada vez.
+            iOS: oculto por compliance 5.1.1(ix) — sin recolección de
+            data financiera sensible (cuenta bancaria) en el iOS app. */}
+        {!isIOSApp && (
+          <PayoutDefaultEditor
+            initialMethod={profile.default_payout_method ?? undefined}
+            initialAccount={profile.default_payout_account ?? undefined}
+            initialAccountName={profile.default_payout_account_name ?? undefined}
+            initialAccountType={profile.default_payout_account_type ?? undefined}
+            onSave={handlePayoutSave}
+            onClear={handlePayoutClear}
+          />
+        )}
 
         {/* Idioma — ES / EN. Setea cookie y, en prod, salta al dominio
             correspondiente (lapollacolombiana.com vs chickenpicks.app). */}

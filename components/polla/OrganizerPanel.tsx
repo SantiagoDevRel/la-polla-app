@@ -13,6 +13,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 import FootballLoader from "@/components/ui/FootballLoader";
 import EmptyState from "@/components/ui/EmptyState";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
 interface Participant {
   id: string;
@@ -58,6 +59,7 @@ export default function OrganizerPanel({
   const fmtCOP = (n: number): string => `$${n.toLocaleString(intlTag)}`;
   const { showToast } = useToast();
   const router = useRouter();
+  const isIOSApp = useIsIOSApp();
   const [token, setToken] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(joinCode);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -318,8 +320,10 @@ export default function OrganizerPanel({
                       {/* En 'pay_winner' nadie está "pagado" hasta que la
                           polla termine y el ganador cobre — el indicador
                           solo agrega ruido. Solo se muestra el dot+label
-                          cuando admin_collects. */}
-                      {paymentMode === "admin_collects" && (
+                          cuando admin_collects. En iOS Capacitor wrapper se
+                          oculta TODO el indicador de pago (App Store 5.3.4
+                          + 5.1.1(ix)). */}
+                      {!isIOSApp && paymentMode === "admin_collects" && (
                         <>
                           <span
                             className={`inline-block w-2 h-2 rounded-full ${p.paid ? "bg-green-live" : "bg-text-muted/50"}`}
@@ -330,7 +334,7 @@ export default function OrganizerPanel({
                           </span>
                         </>
                       )}
-                      {paymentMode === "admin_collects" && p.role !== "admin" && !isExpelled && (
+                      {!isIOSApp && paymentMode === "admin_collects" && p.role !== "admin" && !isExpelled && (
                         <button
                           onClick={() => togglePaid(p)}
                           disabled={busy === `pay:${p.id}`}
@@ -373,13 +377,19 @@ export default function OrganizerPanel({
               {t("predictionsValue", { count: predictionsCount, total: approved.length })} {matchIds.length ? t("haveParticipated") : ""}
             </p>
           </div>
-          <div className="rounded-xl p-3 bg-bg-elevated col-span-2">
-            <p className="text-[10px] text-text-muted uppercase">{t("potLabel")}</p>
-            <p className="font-medium text-text-primary">
-              <span className="text-gold font-semibold">{t("potTotal", { amount: fmtCOP(total) })}</span>{" "}
-              <span className="text-text-muted">{t("potPerPerson", { amount: fmtCOP(buyInAmount) })}</span>
-            </p>
-          </div>
+          {/* POZO row — oculta en iOS Capacitor wrapper (App Store 5.3.4
+              + 5.1.1(ix)). El admin puede ver la totalidad de la sección
+              en web y Android; en iOS la app se presenta como pronósticos
+              + tabla sin manejo de dinero. */}
+          {!isIOSApp && (
+            <div className="rounded-xl p-3 bg-bg-elevated col-span-2">
+              <p className="text-[10px] text-text-muted uppercase">{t("potLabel")}</p>
+              <p className="font-medium text-text-primary">
+                <span className="text-gold font-semibold">{t("potTotal", { amount: fmtCOP(total) })}</span>{" "}
+                <span className="text-text-muted">{t("potPerPerson", { amount: fmtCOP(buyInAmount) })}</span>
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

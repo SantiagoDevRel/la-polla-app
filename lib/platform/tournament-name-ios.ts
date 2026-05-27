@@ -11,7 +11,11 @@
 // `lib/tournaments.ts` (sin cambios).
 
 const IOS_NAMES: Record<string, string> = {
-  worldcup_2026: "Mundial 2026",
+  // "Mundial" sigue siendo defendible (palabra genérica española = "torneo
+  // mundial") pero Apple flagged the FIFA World Cup fixture schedule as
+  // FIFA content. Cambio a un descriptor neutro de "selecciones nacionales
+  // jugando en junio 2026" sin invocar la marca FIFA World Cup.
+  worldcup_2026: "Torneo de Selecciones 2026",
   champions_2025: "Copa de Europa",
   laliga_2025: "Liga de España",
   premier_2025: "Liga de Inglaterra",
