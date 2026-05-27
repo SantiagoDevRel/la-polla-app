@@ -81,7 +81,15 @@ BEGIN
 END;
 $$;
 
+-- REVOKE explícito a PUBLIC + anon + authenticated. PUBLIC solo no
+-- alcanza: Supabase otorga EXECUTE directo a anon/authenticated por
+-- default, así que el Security Advisor levanta WARN
+-- (anon_security_definer_function_executable + authenticated_…)
+-- si la función queda con grant heredado. La función solo se invoca
+-- como trigger BEFORE UPDATE — no debe ser callable via /rest/v1/rpc.
 REVOKE EXECUTE ON FUNCTION public.users_block_privileged_update() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.users_block_privileged_update() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.users_block_privileged_update() FROM authenticated;
 
 DROP TRIGGER IF EXISTS users_block_privileged_update_trg ON public.users;
 CREATE TRIGGER users_block_privileged_update_trg
