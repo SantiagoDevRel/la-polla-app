@@ -7,6 +7,7 @@ import { Users, Trophy } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useLocale, useTranslations } from "next-intl";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
 export interface PollaCardProps {
   polla: {
@@ -58,6 +59,7 @@ export function PollaCard({
 }: PollaCardProps) {
   const locale = useLocale();
   const tInvite = useTranslations("Invite");
+  const isIOSApp = useIsIOSApp();
   const showInviteIcon = !!(isOrganizer && onInviteTap && !endedState);
   const isLeader = !!userContext?.isLeader && !endedState;
   const isCarousel = variant === "carousel";
@@ -140,13 +142,14 @@ export function PollaCard({
           className="flex flex-col gap-0.5 min-w-0 font-body tabular-nums"
           style={{ fontFeatureSettings: '"tnum"' }}
         >
-          {/* Línea 1: participants · cuota */}
+          {/* Línea 1: participants · cuota. En iOS Capacitor wrapper la
+              cuota se omite completamente (App Store 5.3.4 / 5.1.1(ix)). */}
           <div className="flex items-center gap-x-2 flex-wrap text-[12px] text-text-secondary">
             <span className="inline-flex items-center gap-1">
               <Users className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
               {polla.participantCount}
             </span>
-            {polla.buyInAmount > 0 ? (
+            {!isIOSApp && polla.buyInAmount > 0 ? (
               <>
                 <span className="text-text-muted/50" aria-hidden="true">·</span>
                 <span>{formatCurrency(polla.buyInAmount, polla.currency ?? "COP", locale)} c/u</span>
@@ -154,24 +157,27 @@ export function PollaCard({
             ) : null}
           </div>
 
-          {/* Línea 2: POZO $xxx (gold) o Gratis */}
-          {polla.buyInAmount > 0 ? (
-            polla.potTotal && polla.potTotal > 0 ? (
-              <div
-                className="inline-flex items-baseline gap-1.5 text-gold"
-                title="Pozo total acumulado"
-              >
-                <span className="text-[10px] uppercase tracking-[0.1em] text-gold/70 font-semibold">
-                  Pozo
-                </span>
-                <span className="text-[14px] font-semibold">
-                  {formatCurrency(polla.potTotal, polla.currency ?? "COP", locale)}
-                </span>
-              </div>
-            ) : null
-          ) : (
-            <span className="text-[12px] text-text-muted">Gratis</span>
-          )}
+          {/* Línea 2: POZO $xxx (gold) o Gratis. Toda la línea oculta en
+              iOS — sin display de dinero por compliance App Store. */}
+          {!isIOSApp ? (
+            polla.buyInAmount > 0 ? (
+              polla.potTotal && polla.potTotal > 0 ? (
+                <div
+                  className="inline-flex items-baseline gap-1.5 text-gold"
+                  title="Pozo total acumulado"
+                >
+                  <span className="text-[10px] uppercase tracking-[0.1em] text-gold/70 font-semibold">
+                    Pozo
+                  </span>
+                  <span className="text-[14px] font-semibold">
+                    {formatCurrency(polla.potTotal, polla.currency ?? "COP", locale)}
+                  </span>
+                </div>
+              ) : null
+            ) : (
+              <span className="text-[12px] text-text-muted">Gratis</span>
+            )
+          ) : null}
         </div>
 
         {/* Logos del torneo (1 = primary, > 1 = combinada). Cada logo
