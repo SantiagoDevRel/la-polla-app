@@ -11,25 +11,22 @@ const LIMITS = {
   join_code: { maxAttempts: 5, windowMinutes: 10 },
 } as const;
 
-// IP-based generate limit — defensa contra Twilio bill-bombing.
+// IP-based generate limit — cap GENEROSO contra Twilio bill-bombing.
 // El límite por phone (5/hora) NO frena el ataque real: un bot rota
 // 1000 números colombianos random, cada uno es un phone distinto y
-// ninguno pega el límite → 1000 SMS a ~$0.05 = $50. El gate por IP sí
-// lo corta porque el atacante scriptea desde un set acotado de IPs.
+// ninguno pega el límite → 1000 SMS a ~$0.05 = $50.
 //
-// Doble ventana:
-//   - Burst (8/min): mata floods scripteados (un bot hace cientos de
-//     requests en segundos; a los 8 lo frenamos).
-//   - Sostenido (40/hora): capa el costo aunque el bot vaya lento.
-//
-// 40/hora es generoso a propósito para no bloquear usuarios reales tras
-// CGNAT de carriers móviles colombianos (Claro/Movistar/Tigo comparten
-// IPs públicas). 40 logins reales/hora desde una misma IP es improbable
-// salvo escala seria — y a un bot lo deja en ~$2/hora máx, acotado
-// además por el cap de gasto a nivel cuenta Twilio.
+// Decisión (2026-05-28): cap alto SIN ventana de burst. Las IPs NO son
+// por persona — los carriers móviles colombianos (Claro/Movistar/Tigo)
+// usan CGNAT y meten muchos usuarios reales detrás de una misma IP
+// pública. Un burst bajo (ej. 2-8/min) bloquearía grupos legítimos que
+// entran juntos antes de un partido. 60/hora es lo bastante alto para
+// que un usuario real nunca lo toque, ni en CGNAT, pero le pone techo
+// gratis a un bot de una sola IP (~60 SMS/hora = ~$3). El backstop real
+// contra cualquier ataque (rote IPs o no) es el cap de gasto a nivel
+// cuenta Twilio.
 const IP_GENERATE_WINDOWS = [
-  { maxAttempts: 8, windowMinutes: 1 },
-  { maxAttempts: 40, windowMinutes: 60 },
+  { maxAttempts: 60, windowMinutes: 60 },
 ] as const;
 
 type AttemptType = keyof typeof LIMITS;
