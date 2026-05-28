@@ -14,6 +14,7 @@ import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
 import { Plus, Mail, ChevronDown, ChevronRight, KeyRound, ArrowRight } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
 interface PollaData {
   id: string; name: string; slug: string; description?: string;
@@ -89,6 +90,7 @@ export default function MisPollasPage() {
   const [loading, setLoading] = useState(true);
   const [endedOpen, setEndedOpen] = useState(true);
   const [joinOpen, setJoinOpen] = useState(false);
+  const isIOSApp = useIsIOSApp();
   // Polla actualmente siendo invitada via share icon. null cuando el
   // InviteModal esta cerrado. Cambia cuando el organizador tappea el
   // icono en cualquier PollaCard.
@@ -220,10 +222,21 @@ export default function MisPollasPage() {
               estado="base"
               userPollitoType="goleador"
               forceDisplay="inline"
-              cta={{
-                label: t("createFirst"),
-                onClick: () => router.push("/pollas/crear"),
-              }}
+              // En iOS no ofrecemos "crear polla" — la app es solo
+              // join + predict (App Store 5.1.1(ix): sin frame de
+              // organizador, solo participación). El empty state
+              // empuja al user a unirse con código.
+              cta={
+                isIOSApp
+                  ? {
+                      label: t("joinByCodeCTA"),
+                      onClick: () => setJoinOpen(true),
+                    }
+                  : {
+                      label: t("createFirst"),
+                      onClick: () => router.push("/pollas/crear"),
+                    }
+              }
             />
           )}
         </section>
@@ -264,14 +277,18 @@ export default function MisPollasPage() {
           </section>
         )}
 
-        {/* Create button */}
-        <button
-          onClick={() => router.push("/pollas/crear")}
-          className="w-full bg-gold text-bg-base font-bold rounded-lg py-3 text-sm inline-flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"
-        >
-          <Plus size={14} strokeWidth={2.5} />
-          {t("createNew")}
-        </button>
+        {/* Create button — oculto en iOS (App Store 5.1.1(ix): la app
+            no permite a usuarios crear/organizar pollas, solo unirse
+            a las existentes por código de invitación). */}
+        {!isIOSApp && (
+          <button
+            onClick={() => router.push("/pollas/crear")}
+            className="w-full bg-gold text-bg-base font-bold rounded-lg py-3 text-sm inline-flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"
+          >
+            <Plus size={14} strokeWidth={2.5} />
+            {t("createNew")}
+          </button>
+        )}
       </main>
 
       <JoinByCodeSheet
