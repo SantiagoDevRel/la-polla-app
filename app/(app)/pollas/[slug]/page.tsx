@@ -359,7 +359,13 @@ function MatchRow({
                 className="object-contain flex-shrink-0"
               />
             ) : null}
-            <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day, t, locale)}</span>
+            {/* En iOS no mostramos phase labels (fase de grupos, cuartos,
+                semifinal, final, jornada N) — son referencias a estructuras
+                de torneos de marcas registradas. App Store 5.2.1. La hora
+                del partido queda visible a la derecha. */}
+            {!isIOSApp ? (
+              <span className="truncate">{phaseLabel(match.phase, tournamentSlug, match.match_day, t, locale)}</span>
+            ) : null}
             {editable && !pred && !touched ? (
               <span className="inline-flex items-center gap-0.5 text-[9px] uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-md bg-red-alert/15 text-red-alert border border-red-alert/30 whitespace-nowrap">
                 <span aria-hidden="true">*</span>
@@ -700,7 +706,9 @@ export default function PollaSlugPage() {
   // phase labels se resuelven desde PHASE_KEYS via t().
   const upcomingByDate = useMemo(() => {
     const bucketMap = new Map<string, Match[]>();
-    if (groupBy === "phase") {
+    // En iOS forzamos siempre agrupación por fecha (sin etiquetas de
+    // fase tipo "fase de grupos / cuartos / final" — App Store 5.2.1).
+    if (!isIOSApp && groupBy === "phase") {
       for (const m of upcomingMatches) {
         const key = m.phase || "unknown";
         const list = bucketMap.get(key);
@@ -731,7 +739,7 @@ export default function PollaSlugPage() {
       label: null as string | null,
       matches: list,
     }));
-  }, [upcomingMatches, groupBy, t]);
+  }, [upcomingMatches, groupBy, t, isIOSApp]);
 
   // Default state: el grupo de la PRÓXIMA fecha (la más cercana en el
   // tiempo, sea hoy / mañana / pasado mañana / dentro de una semana)
@@ -1370,8 +1378,12 @@ export default function PollaSlugPage() {
                       {t("upcomingSection")}
                       <span className="text-text-primary/60 font-normal">· {upcomingMatches.length}</span>
                     </h3>
-                    {/* Toggle date/phase: solo Mundial single-tournament. */}
-                    {polla.tournament === "worldcup_2026" && (polla.tournaments?.length ?? 1) === 1 && (
+                    {/* Toggle date/phase: solo Mundial single-tournament.
+                        En iOS lo ocultamos — solo agrupación por fecha,
+                        sin etiquetas de fase (fase de grupos, cuartos,
+                        final, etc) que invocan estructuras de torneos
+                        de marcas registradas. App Store 5.2.1. */}
+                    {!isIOSApp && polla.tournament === "worldcup_2026" && (polla.tournaments?.length ?? 1) === 1 && (
                       <div className="flex gap-2 px-1" role="tablist" aria-label={t("groupByLabel")}>
                         <button
                           role="tab"
