@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSbClient } from "@supabase/supabase-js";
-import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
+import { checkAndRecordAttempt, checkIpRateLimit } from "@/lib/auth/rate-limit";
 import { normalizePhone } from "@/lib/auth/phone";
 
 export const runtime = "nodejs";
@@ -40,6 +40,23 @@ export async function POST(request: NextRequest) {
 
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
+
+  // Rate limit por IP (defensa anti Twilio bill-bombing). El límite por
+  // phone de abajo NO frena al bot que rota números; este sí, porque el
+  // atacante scriptea desde un set acotado de IPs. Si no hay IP, se
+  // saltea y el límite por phone queda como único gate.
+  if (ip) {
+    const ipLimit = await checkIpRateLimit(ip);
+    if (ipLimit.blocked) {
+      return NextResponse.json(
+        {
+          error: "Demasiados intentos desde tu red. Espera un rato.",
+          retryAfter: ipLimit.retryAfter,
+        },
+        { status: 429 },
+      );
+    }
+  }
 
   // Rate limit por phone (5 generate-attempts / hora). El verify-otp
   // tiene su propio limit de 5/15min, pero limitar generates evita
