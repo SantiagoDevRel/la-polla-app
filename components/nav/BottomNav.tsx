@@ -15,6 +15,7 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/components/ui/Toast";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
 type NavKey = "inicio" | "avisos" | "pollas" | "perfil";
 
@@ -112,6 +113,7 @@ export function BottomNav({
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useToast();
+  const isIOSApp = useIsIOSApp();
   const resolvedActive = active ?? deriveActive(pathname);
   const [left, middleLeft, middleRight, right] = TABS;
 
@@ -175,13 +177,24 @@ export function BottomNav({
               // some browsers the focus trap leaves the button in a
               // limbo state where subsequent clicks no-op.
               e.currentTarget.blur();
-              setChoiceOpen(true);
+              // En iOS no ofrecemos crear (App Store 5.1.1(ix)) — el FAB
+              // abre directo el sheet de "unirme con código", sin el
+              // choice sheet intermedio que tendría una opción "crear".
+              if (isIOSApp) {
+                setJoinOpen(true);
+              } else {
+                setChoiceOpen(true);
+              }
             }}
-            aria-label={t("ariaCreateJoin")}
+            aria-label={isIOSApp ? t("joinWithCode") : t("ariaCreateJoin")}
             className={fabClass}
             style={fabStyle}
           >
-            <Plus className="w-6 h-6 text-bg-base" strokeWidth={3} aria-hidden="true" />
+            {isIOSApp ? (
+              <KeyRound className="w-6 h-6 text-bg-base" strokeWidth={2.5} aria-hidden="true" />
+            ) : (
+              <Plus className="w-6 h-6 text-bg-base" strokeWidth={3} aria-hidden="true" />
+            )}
           </button>
 
           <div className="flex-1 flex">

@@ -96,6 +96,18 @@ export default function CrearPollaPage() {
     [t],
   );
   const router = useRouter();
+
+  // App Store 5.1.1(ix): la app iOS no permite a usuarios crear pollas
+  // (solo unirse via código de invitación). Defense-in-depth: si alguien
+  // navega directo a /pollas/crear desde iOS (bookmark, deep-link viejo,
+  // etc.) lo redirigimos a /pollas. La UI de crear está oculta en iOS,
+  // pero el guard sigue acá por si la ruta llega de algún lado.
+  useEffect(() => {
+    if (isIOSApp) {
+      router.replace("/pollas");
+    }
+  }, [isIOSApp, router]);
+
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -470,6 +482,10 @@ export default function CrearPollaPage() {
     ? TOURNAMENTS.find((t) => t.slug === primaryTournament)
     : null;
   const isCombined = form.tournaments.length > 1;
+
+  // iOS: render nada mientras el effect de arriba redirige a /pollas.
+  // Evita un flash de la UI de crear antes del replace.
+  if (isIOSApp) return null;
 
   return (
     <div className="min-h-screen">

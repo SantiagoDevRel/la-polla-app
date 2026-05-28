@@ -14,6 +14,7 @@ import { useTranslations } from "next-intl";
 import { PollitoMoment } from "@/components/pollito/PollitoMoment";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
 import { useToast } from "@/components/ui/Toast";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
 export interface ActivePollasEmptyProps {
   userPollitoType: string;
@@ -25,6 +26,7 @@ export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [joinOpen, setJoinOpen] = useState(false);
+  const isIOSApp = useIsIOSApp();
 
   return (
     <>
@@ -34,24 +36,39 @@ export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
         userPollitoType={userPollitoType}
         forceDisplay="inline"
         forceShow
-        cta={{
-          label: t("createPolla"),
-          onClick: () => router.push("/pollas/crear"),
-        }}
+        // En iOS el CTA primario es "Unirme con código" porque la app
+        // no permite crear pollas (App Store 5.1.1(ix)). En web/Android
+        // sigue siendo "Crear polla".
+        cta={
+          isIOSApp
+            ? {
+                label: tNav("joinWithCode"),
+                onClick: () => setJoinOpen(true),
+              }
+            : {
+                label: t("createPolla"),
+                onClick: () => router.push("/pollas/crear"),
+              }
+        }
       />
       <p className="mt-4 font-body text-[14px] text-text-secondary text-center">
         {t("emptyMessage")}
       </p>
-      <div className="mt-3 flex justify-center">
-        <button
-          type="button"
-          onClick={() => setJoinOpen(true)}
-          className="inline-flex items-center gap-2 font-body text-[14px] font-semibold text-gold hover:text-amber transition-colors"
-        >
-          <KeyRound className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
-          {tNav("joinWithCode")}
-        </button>
-      </div>
+      {/* Link secundario "Unirme con código" — solo cuando el CTA primario
+          es "Crear polla" (web/Android). En iOS el CTA primario YA es
+          unirse, sería redundante mostrarlo dos veces. */}
+      {!isIOSApp && (
+        <div className="mt-3 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setJoinOpen(true)}
+            className="inline-flex items-center gap-2 font-body text-[14px] font-semibold text-gold hover:text-amber transition-colors"
+          >
+            <KeyRound className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
+            {tNav("joinWithCode")}
+          </button>
+        </div>
+      )}
 
       <JoinByCodeSheet
         open={joinOpen}
