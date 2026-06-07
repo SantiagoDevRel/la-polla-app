@@ -69,6 +69,15 @@ export interface VerifyResult {
   detectedAccount: string | null;
   detectedMethod: string | null;
   detectedRecipientName: string | null;
+  /** Número de "Comprobante No." / referencia tal cual lo leyó el
+   *  modelo. Para Bancolombia es de 10 dígitos (zero-padded). Usado
+   *  como señal de autenticidad en el path de aprobación por comprobante. */
+  detectedReceiptNumber: string | null;
+  /** true si el comprobante muestra estado exitoso/aprobado/completado.
+   *  Independiente de source_type — un comprobante de Bancolombia en
+   *  modo oscuro puede tener status OK aunque el modelo no lo clasifique
+   *  como bank_app por falta de branding visible. */
+  paymentStatusOk: boolean;
   /** Fecha detectada en ISO YYYY-MM-DD. null si no extrajo. Comparada
    *  contra hoy en zona Colombia (UTC-5). Si es older, marcamos
    *  warning pero NO bloqueamos. */
@@ -80,6 +89,7 @@ export interface VerifyResult {
     amount: boolean;
     account: boolean;
     name: boolean;
+    receipt: boolean; // true si hay comprobante de 10 dígitos (Bancolombia)
     date: "today_or_newer" | "older" | "missing";
   };
   /** Razón resumida de por qué se rechazó (si valid=false). */
@@ -130,7 +140,7 @@ PASO 1 — Clasificar la SOURCE solo por apariencia visual (NO por texto):
 
 Texto solo NO basta para bank_app. Si dudás → notes_app.
 
-PASO 2 — Si bank_app/wallet, extraer monto/cuenta/método/nombre/fecha. Status debe ser exitoso/aprobado/completado.
+PASO 2 — Extraé SIEMPRE (aunque dudes del source): monto, cuenta, método, nombre, número de comprobante, fecha, y si el status es exitoso/aprobado/completado.
 
 Output: SOLO JSON, sin markdown, sin texto antes/después. Mantené strings cortos (1 frase máx).
 
@@ -139,18 +149,23 @@ Output: SOLO JSON, sin markdown, sin texto antes/después. Mantené strings cort
   "source_evidence": "string corto (≤12 palabras) citando elementos visuales — ej. 'logo Bancolombia amarillo + check verde + REF: 12345'. Si no puedes citar visual concreto, NO digas bank_app.",
   "valid": boolean,
   "confidence": "high|low",
+  "payment_status_ok": boolean,
   "detected_amount": number|null,
   "detected_account": string|null,
   "detected_method": string|null,
   "detected_recipient_name": string|null,
+  "detected_receipt_number": string|null,
   "detected_date": "YYYY-MM-DD"|null,
   "rejection_reason": string|null
 }
 
 Reglas:
 - valid=true SOLO si source_type∈{bank_app,wallet} + status exitoso + datos legibles claros.
+- payment_status_ok=true si el comprobante muestra "exitoso/aprobado/completado/Transferencia exitosa", INDEPENDIENTE de source_type.
+- detected_receipt_number = el "Comprobante No." / "Comprobante" / "Referencia" / "No. de aprobación" tal cual lo veas, con todos sus dígitos (incluí ceros a la izquierda). null si no hay. En Bancolombia suele ser de 10 dígitos (ej. 0000016800).
 - confidence=high SOLO si tu source_evidence cita ≥2 señales visuales concretas.
 - rejection_reason=null si valid=true. Si valid=false: 1 frase corta (≤12 palabras).
+- OJO: la app de Bancolombia en modo oscuro tiene fondo gris/negro plano y a veces sin logo visible. Eso NO la hace notes_app — si hay "Comprobante No.", check verde y barra de navegación inferior, es bank_app.
 - Sin "notes". Sin párrafos. Sin explicaciones largas.`;
 
   switch (method) {
@@ -166,7 +181,10 @@ Para esta verificación específica (método Nequi):
 Para esta verificación específica (método Bancolombia):
 - valid=true requiere: monto exacto + cuenta coincidente + status exitoso.
 - NO valides el nombre del beneficiario. Bancolombia no lo muestra
-  cuando transferís a una cuenta inscrita.`;
+  cuando transferís a una cuenta inscrita.
+- IMPRESCINDIBLE: extraé detected_receipt_number (el "Comprobante No.",
+  típicamente 10 dígitos) y detected_date. Son la evidencia clave aunque
+  el branding no sea visible.`;
     case "otro":
       return base + `
 
@@ -178,6 +196,37 @@ Para esta verificación específica (método Otro):
 
 function normalizeDigits(s: string): string {
   return (s ?? "").replace(/\D/g, "");
+}
+
+/** Parseo robusto de la respuesta del verificador. El modelo a veces
+ *  envuelve el JSON en ```json fences o agrega texto antes/después.
+ *  Estrategia: (1) intento directo tras limpiar fences; (2) si falla,
+ *  extraigo el primer bloque {...} balanceado. Devuelve null si nada
+ *  parsea — el caller lo trata como "revisar manual". */
+function parseVerifierJson<T = Record<string, unknown>>(text: string): T | null {
+  const cleaned = text
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    // fallthrough al extractor de bloque
+  }
+
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1)) as T;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /** Hoy en zona horaria Colombia (UTC-5, sin DST) como YYYY-MM-DD. */
@@ -222,9 +271,12 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
 
   const response = await client.messages.create({
     model: SONNET_MODEL,
-    // Output reducido: el JSON cabe en ~200 tokens con strings cortos.
-    // Antes 500. Ahorra ~50% del costo de output.
-    max_tokens: 250,
+    // 600 tokens de headroom. Bajamos a 250 una vez y un comprobante
+    // real (Casvi, 2026-06-06) truncó el JSON exacto en 250 tokens →
+    // JSON.parse falló → "No pudimos parsear" → pago legítimo NO marcado.
+    // El JSON cabe en ~250 holgado; 600 deja margen sin costo relevante
+    // (output de Sonnet a $15/MTok → ~$0.009 extra por 1000 verificaciones).
+    max_tokens: 600,
     temperature: 0,
     system: buildSystemPrompt(args.expected.method),
     messages: [
@@ -260,17 +312,17 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     source_evidence?: string;
     valid?: boolean;
     confidence?: "high" | "low";
+    payment_status_ok?: boolean;
     detected_amount?: number | null;
     detected_account?: string | null;
     detected_method?: string | null;
     detected_recipient_name?: string | null;
+    detected_receipt_number?: string | null;
     detected_date?: string | null;
     rejection_reason?: string | null;
-  } = {};
-  try {
-    const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/```\s*$/i, "");
-    parsed = JSON.parse(cleaned);
-  } catch {
+  } | null = parseVerifierJson(text);
+
+  if (!parsed) {
     return {
       valid: false,
       confidence: "low",
@@ -280,8 +332,10 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
       detectedAccount: null,
       detectedMethod: null,
       detectedRecipientName: null,
+      detectedReceiptNumber: null,
+      paymentStatusOk: false,
       detectedDate: null,
-      checks: { source: false, amount: false, account: false, name: false, date: "missing" },
+      checks: { source: false, amount: false, account: false, name: false, receipt: false, date: "missing" },
       rejectionReason: "No pudimos parsear la respuesta del verificador.",
       warning: null,
       tokensIn,
@@ -319,13 +373,23 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
 
   const dateCheck = checkDate(parsed.detected_date ?? null);
 
-  // Decisión por método:
-  //   - bank_app/wallet REQUERIDO siempre.
-  //   - nequi: source + amount + account + status
-  //   - bancolombia: source + amount + account + status (sin nombre,
-  //                  cuenta inscrita no lo muestra)
-  //   - otro: SIEMPRE confidence:low → admin review manual
-  let coreMatch =
+  // Comprobante de Bancolombia: 10 dígitos zero-padded (ej. 0000016800).
+  const receiptDigits = normalizeDigits(parsed.detected_receipt_number ?? "");
+  const hasBancolombiaReceipt = receiptDigits.length === 10;
+
+  // Status exitoso, independiente del source_type. Si el modelo no
+  // emite el campo (back-compat), caemos a su veredicto `valid`.
+  const paymentStatusOk =
+    typeof parsed.payment_status_ok === "boolean"
+      ? parsed.payment_status_ok
+      : !!parsed.valid;
+
+  // Decisión por método.
+  //
+  // PATH A — visual (todos los métodos): el modelo clasifica la imagen
+  // como app bancaria/wallet con alta confianza. Defensa fuerte contra
+  // "screenshot de notas con el texto correcto".
+  const visualPath =
     !!parsed.valid &&
     parsed.confidence === "high" &&
     sourceMatches &&
@@ -333,11 +397,26 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     amountMatches &&
     nameMatches;
 
-  if (args.expected.method === "otro") {
-    // Forzamos low confidence aunque el modelo diga high — el organizador
-    // siempre debe ver y aprobar manualmente.
-    coreMatch = false;
-  }
+  // PATH B — comprobante Bancolombia (solo método bancolombia): aprueba
+  // aunque el modelo NO logre clasificar el source como bank_app (caso
+  // típico: app Bancolombia en modo oscuro = fondo gris plano, el modelo
+  // lo confundía con notes_app → falso negativo, David 2026-06-06).
+  // La evidencia anti-fraude acá es estructural: monto exacto + cuenta
+  // exacta + comprobante de 10 dígitos + fecha de HOY + status exitoso.
+  // No exige branding ni que diga literalmente "Bancolombia".
+  // NO aplica a Nequi (sus referencias no son comprobantes de 10 dígitos).
+  const bancolombiaReceiptPath =
+    args.expected.method === "bancolombia" &&
+    paymentStatusOk &&
+    amountMatches &&
+    accountMatches &&
+    hasBancolombiaReceipt &&
+    dateCheck === "today_or_newer";
+
+  let coreMatch =
+    args.expected.method === "otro"
+      ? false // 'otro' SIEMPRE va a review manual del organizador
+      : visualPath || bancolombiaReceiptPath;
 
   const finalConfidence: "high" | "low" =
     args.expected.method === "otro"
@@ -346,16 +425,26 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
         ? "high"
         : "low";
 
-  let rejectionReason = parsed.rejection_reason ?? null;
+  let rejectionReason = coreMatch ? null : (parsed.rejection_reason ?? null);
   if (!coreMatch && !rejectionReason) {
-    if (!sourceMatches) {
-      rejectionReason = `La imagen no parece ser de una app bancaria. Detectamos: ${sourceType.replace("_", " ")}.`;
-    } else if (args.expected.method === "otro") {
+    if (args.expected.method === "otro") {
       rejectionReason = "Método 'Otro': el organizador debe revisar manualmente.";
     } else if (!amountMatches) {
       rejectionReason = `Monto detectado (${parsed.detected_amount ?? "—"}) no coincide con el esperado ($${args.expected.amountCOP}).`;
     } else if (!accountMatches) {
       rejectionReason = `Cuenta detectada (${parsed.detected_account ?? "—"}) no coincide con la esperada (${args.expected.account}).`;
+    } else if (args.expected.method === "bancolombia" && !paymentStatusOk) {
+      rejectionReason = "El comprobante no muestra un pago exitoso/aprobado.";
+    } else if (args.expected.method === "bancolombia" && !hasBancolombiaReceipt) {
+      rejectionReason =
+        "No detectamos el número de comprobante de Bancolombia (10 dígitos). Subí el comprobante completo.";
+    } else if (args.expected.method === "bancolombia" && dateCheck !== "today_or_newer") {
+      rejectionReason =
+        dateCheck === "older"
+          ? "El comprobante no es de hoy. Subí el comprobante del pago de hoy."
+          : "No detectamos la fecha del comprobante. Subí el comprobante completo.";
+    } else if (!sourceMatches) {
+      rejectionReason = `La imagen no parece ser de una app bancaria. Detectamos: ${sourceType.replace("_", " ")}.`;
     } else if (parsed.confidence === "low") {
       rejectionReason = "El verificador no pudo leer el screenshot con confianza alta.";
     }
@@ -379,6 +468,8 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     detectedAccount: parsed.detected_account ?? null,
     detectedMethod: parsed.detected_method ?? null,
     detectedRecipientName: parsed.detected_recipient_name ?? null,
+    detectedReceiptNumber: parsed.detected_receipt_number ?? null,
+    paymentStatusOk,
     detectedDate:
       parsed.detected_date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.detected_date)
         ? parsed.detected_date
@@ -388,6 +479,7 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
       amount: amountMatches,
       account: accountMatches,
       name: nameMatches,
+      receipt: hasBancolombiaReceipt,
       date: dateCheck,
     },
     rejectionReason,
