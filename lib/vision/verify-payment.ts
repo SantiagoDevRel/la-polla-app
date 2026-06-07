@@ -307,7 +307,7 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     .map((c) => c.text)
     .join("");
 
-  let parsed: {
+  const parsed: {
     source_type?: SourceType;
     source_evidence?: string;
     valid?: boolean;
@@ -413,7 +413,7 @@ Hoy en Colombia es ${today}. Si el screenshot dice "Hoy" o similar, esa es la fe
     hasBancolombiaReceipt &&
     dateCheck === "today_or_newer";
 
-  let coreMatch =
+  const coreMatch =
     args.expected.method === "otro"
       ? false // 'otro' SIEMPRE va a review manual del organizador
       : visualPath || bancolombiaReceiptPath;
