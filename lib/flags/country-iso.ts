@@ -174,15 +174,20 @@ export function countryIsoForTeam(teamName: string | null | undefined): string |
 }
 
 /**
- * URL de la bandera en la CDN de jsDelivr (usa el repo lipis/flag-icons,
- * que tiene SVGs en aspect ratio 4x3 y soporta sub-codes como gb-eng).
- * Cero rate limits, jsDelivr CDN.
+ * Path local (same-origin) a la bandera SVG bajo /public/flags/.
+ * Soporta sub-codes como gb-eng/gb-sct/gb-wls/gb-nir.
  *
- * Tag 7.0.0 verificado en 2026-05-06 — la 7.5.4 que use originalmente
- * NO existe en jsdelivr (404), por eso las banderas no cargaban.
+ * Antes apuntaba al CDN de jsDelivr (lipis/flag-icons). Lo pasamos a
+ * self-hosted el 2026-06-09 porque la dependencia del CDN remoto rompía
+ * las banderas en el WebView iOS y cuando el Service Worker cacheaba una
+ * respuesta mala (el tag 7.5.4 original daba 404 → quedaba cacheado →
+ * la imagen erroraba → caía al fallback de iniciales "MEX"/"COL").
+ * Same-origin: sin CSP/CORS, funciona offline, sin rate limits, más
+ * rápido. Los SVGs son banderas nacionales (dominio público; flag-icons
+ * es CC0 para las banderas / MIT para el código) — ver public/flags/README.md.
  */
 export function flagUrlForTeam(teamName: string | null | undefined): string | null {
   const iso = countryIsoForTeam(teamName);
   if (!iso) return null;
-  return `https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/${iso}.svg`;
+  return `/flags/${iso}.svg`;
 }
