@@ -24,8 +24,15 @@ import {
   parseEspnScore,
   type ESPNEvent,
 } from "./client";
+import { isSyncableTournament } from "@/lib/tournaments";
 
-const TOURNAMENTS = Object.keys(ESPN_LEAGUE_BY_TOURNAMENT);
+// Solo torneos "syncables" (post-Mundial: solo worldcup_2026). El map
+// ESPN_LEAGUE_BY_TOURNAMENT se mantiene completo (lo usa verify-final y
+// re-activar una liga es agregar su slug a SYNCABLE_TOURNAMENT_SLUGS),
+// pero el sync en vivo automático solo recorre los syncables.
+const TOURNAMENTS = Object.keys(ESPN_LEAGUE_BY_TOURNAMENT).filter(
+  isSyncableTournament,
+);
 
 // Ventana de tolerancia para matching por kickoff (2h en cada
 // dirección). Cubre cambios de horario y zonas timezone misalignment.

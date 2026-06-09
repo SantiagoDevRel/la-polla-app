@@ -86,6 +86,27 @@ export const CREATABLE_TOURNAMENTS = TOURNAMENTS.filter((t) =>
   CREATABLE_TOURNAMENT_SLUGS.includes(t.slug),
 );
 
+export function isCreatableTournament(slug: string): boolean {
+  return (CREATABLE_TOURNAMENT_SLUGS as readonly string[]).includes(slug);
+}
+
+// Torneos que se SINCRONIZAN automáticamente (fetch de fixtures/scores
+// desde los providers: football-data, ESPN, api-football). Una liga que
+// NO esté acá no se consulta en ningún sync automático (cron + lazy
+// ensure-fresh), para no quemar cuota free-tier en ligas sin pollas
+// activas. Post-Mundial 2026 (2026-06-09) = solo el Mundial.
+//
+// Se mantiene SEPARADO de CREATABLE_TOURNAMENT_SLUGS a propósito: podrías
+// querer seguir sincronizando una liga para cerrar resultados de pollas
+// ended sin permitir crear pollas nuevas de ella. Hoy ambos = worldcup.
+// Las llamadas EXPLÍCITAS por slug (admin manual / discover ?tournament=)
+// NO pasan por este gate — son override deliberado con CRON_SECRET/admin.
+export const SYNCABLE_TOURNAMENT_SLUGS: readonly string[] = ["worldcup_2026"];
+
+export function isSyncableTournament(slug: string): boolean {
+  return SYNCABLE_TOURNAMENT_SLUGS.includes(slug);
+}
+
 // Nombres localizados. Para EN: Champions/PL/Serie A son universales
 // (no se traducen). Solo cambian Mundial→World Cup, Copa→Cup, Liga.
 const TOURNAMENT_NAMES_EN: Record<string, string> = {

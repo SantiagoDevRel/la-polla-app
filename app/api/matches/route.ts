@@ -5,12 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ESPN_LEAGUE_BY_TOURNAMENT } from "@/lib/espn/client";
 import { discoverTournament } from "@/lib/espn/discover";
+import { isSyncableTournament } from "@/lib/tournaments";
 
 const DISCOVER_TTL_MS = 30 * 60 * 1000; // re-discover max cada 30 min por torneo
 
 async function maybeAutoDiscover(tournament: string): Promise<void> {
-  // Solo si el torneo está mapeado a ESPN.
-  if (!ESPN_LEAGUE_BY_TOURNAMENT[tournament]) return;
+  // Solo si el torneo está mapeado a ESPN y es "syncable" (post-Mundial:
+  // solo worldcup_2026). Evita disparar discover de ligas sin pollas activas.
+  if (!ESPN_LEAGUE_BY_TOURNAMENT[tournament] || !isSyncableTournament(tournament)) return;
 
   const admin = createAdminClient();
 

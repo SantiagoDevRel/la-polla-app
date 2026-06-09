@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { discoverTournament } from "@/lib/espn/discover";
 import { ESPN_LEAGUE_BY_TOURNAMENT } from "@/lib/espn/client";
+import { isSyncableTournament } from "@/lib/tournaments";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -69,7 +70,13 @@ async function tournamentsToDiscover(explicit: string | null): Promise<string[]>
     tournaments.add(m.tournament);
   }
 
-  return Array.from(tournaments).filter((s) => ESPN_LEAGUE_BY_TOURNAMENT[s]);
+  // Solo torneos "syncables" (post-Mundial: solo worldcup_2026). El auto-
+  // discover por cron no toca ligas sin pollas activas. El path EXPLÍCITO
+  // (?tournament=…) sí puede seedear cualquier liga mapeada — es override
+  // deliberado con CRON_SECRET.
+  return Array.from(tournaments).filter(
+    (s) => ESPN_LEAGUE_BY_TOURNAMENT[s] && isSyncableTournament(s),
+  );
 }
 
 async function runDiscover(request: NextRequest) {

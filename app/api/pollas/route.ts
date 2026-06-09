@@ -11,6 +11,7 @@ import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { generateUniqueJoinCode } from "@/lib/pollas/join-code";
 import { POLLA_COLUMNS } from "@/lib/db/columns";
 import { resolvePollaMatchIds } from "@/lib/matches/resolve-scope";
+import { isCreatableTournament } from "@/lib/tournaments";
 import { z } from "zod";
 
 // Modos de pago válidos (payment_mode en la DB es varchar, no enum)
@@ -350,6 +351,26 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0].message },
+        { status: 400 }
+      );
+    }
+
+    // Solo se pueden crear pollas de torneos "creatables" (post-Mundial:
+    // solo worldcup_2026). Defense-in-depth: el selector del cliente ya
+    // solo ofrece el Mundial, pero un POST a mano podría intentar otra
+    // liga. Validamos el tournament primario + todos los del array combinado.
+    const requestedTournaments = [
+      parsed.data.tournament,
+      ...(parsed.data.tournaments ?? []),
+    ];
+    const invalidTournaments = Array.from(
+      new Set(requestedTournaments.filter((s) => !isCreatableTournament(s))),
+    );
+    if (invalidTournaments.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Torneo no disponible para crear pollas: ${invalidTournaments.join(", ")}`,
+        },
         { status: 400 }
       );
     }
