@@ -70,6 +70,22 @@ export const TOURNAMENTS = [
 
 export type TournamentSlug = (typeof TOURNAMENTS)[number]["slug"];
 
+// Torneos disponibles para CREAR pollas nuevas. Post-Mundial 2026 dejamos
+// SOLO el Mundial vivo (2026-06-09): las 17 pollas activas son todas
+// worldcup_2026 y las demás ligas (Champions/BetPlay/Libertadores/
+// Sudamericana) solo aparecen en pollas ya terminadas. El resto del array
+// TOURNAMENTS se mantiene como metadata histórica para que esas pollas
+// ended sigan resolviendo nombre/logo — pero no se pueden elegir al crear.
+// Para reactivar una liga (ej. cuando vuelva la temporada), agregá su slug
+// a esta lista. No hace falta tocar nada más.
+export const CREATABLE_TOURNAMENT_SLUGS: readonly TournamentSlug[] = [
+  "worldcup_2026",
+];
+
+export const CREATABLE_TOURNAMENTS = TOURNAMENTS.filter((t) =>
+  CREATABLE_TOURNAMENT_SLUGS.includes(t.slug),
+);
+
 // Nombres localizados. Para EN: Champions/PL/Serie A son universales
 // (no se traducen). Solo cambian Mundial→World Cup, Copa→Cup, Liga.
 const TOURNAMENT_NAMES_EN: Record<string, string> = {
