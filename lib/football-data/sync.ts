@@ -1,5 +1,6 @@
 // lib/football-data/sync.ts — Sync de partidos desde football-data.org a Supabase
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isSyncableTournament } from "@/lib/tournaments";
 import { fetchCompetitionMatches, rateLimitDelay, FDMatch } from "./client";
 
 // Competiciones activas — slug must match what crear polla + pollas table use
@@ -164,6 +165,9 @@ export async function syncAllCompetitions(): Promise<
   const results: Record<string, { synced: number; errors: number; total: number }> = {};
 
   for (const comp of COMPETITIONS) {
+    // Solo torneos "syncables" (post-Mundial: solo worldcup_2026). Las
+    // demás ligas no se consultan para no quemar cuota free-tier.
+    if (!isSyncableTournament(comp.tournament)) continue;
     try {
       results[comp.tournament] = await syncCompetition(comp.id, comp.tournament);
     } catch (err) {
@@ -197,6 +201,8 @@ export async function syncRecentCompetitions(
   const results: Record<string, { synced: number; errors: number; total: number }> = {};
 
   for (const comp of COMPETITIONS) {
+    // Solo torneos "syncables" (post-Mundial: solo worldcup_2026).
+    if (!isSyncableTournament(comp.tournament)) continue;
     try {
       results[comp.tournament] = await syncCompetition(
         comp.id,
