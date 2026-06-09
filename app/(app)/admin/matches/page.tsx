@@ -5,34 +5,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { staggerContainer, fadeUp } from "@/lib/animations";
+import { fadeUp } from "@/lib/animations";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import { syncMatchesAction, purgeMatchesAction } from "./actions";
+import { purgeMatchesAction } from "./actions";
 
-// Competiciones disponibles (football-data.org IDs).
-// Mundial 2026 (ID 2000) NO aparece en Principales: la fuente principal es
-// openfootball (botón "Sync Mundial 2026" más abajo). La variante
-// football-data.org se retiró porque duplicaba datos con phase=null.
-const LEAGUES = [
-  { id: 2001, label: "Champions League", tournament: "champions_2025", active: true },
-  { id: 2014, label: "La Liga", tournament: "laliga_2025", active: true },
-];
-
-interface SyncResult {
-  synced: number;
-  errors: number;
-  total: number;
-}
+// Post-Mundial 2026 la plataforma corre SOLO con el Mundial. Las ligas
+// que antes vivían en "Principales" (Champions/La Liga via football-data)
+// se retiraron del panel: ninguna polla activa las usa y el sync
+// automático también quedó limitado a worldcup_2026 (ver
+// SYNCABLE_TOURNAMENT_SLUGS en lib/tournaments.ts). Para reactivar una
+// liga, además de re-agregar su botón acá hay que sumar su slug a esa lista.
 
 export default function AdminMatchesPage() {
   const router = useRouter();
-  const [results, setResults] = useState<Record<number, SyncResult | string>>({});
-  const [loading, setLoading] = useState<number | null>(null);
   const [purging, setPurging] = useState(false);
   const [purgeResult, setPurgeResult] = useState<string | null>(null);
   const [syncingWc, setSyncingWc] = useState(false);
   const [wcResult, setWcResult] = useState<string | null>(null);
-async function handleSyncWorldCup() {
+
+  async function handleSyncWorldCup() {
     if (!confirm("¿Seguro que quieres sincronizar Copa del Mundo 2026?")) return;
     setSyncingWc(true);
     setWcResult(null);
@@ -65,30 +56,11 @@ async function handleSyncWorldCup() {
     }
   }
 
-  async function handleSync(competitionId: number, tournament: string) {
-    const league = LEAGUES.find((l) => l.id === competitionId);
-    const label = league?.label ?? "este torneo";
-    if (!confirm(`¿Seguro que quieres sincronizar ${label}?`)) return;
-    setLoading(competitionId);
-    try {
-      const result = await syncMatchesAction(competitionId, tournament);
-      setResults((prev) => ({ ...prev, [competitionId]: result }));
-    } catch (err: unknown) {
-      const e = err as Error;
-      setResults((prev) => ({
-        ...prev,
-        [competitionId]: e.message || "Error desconocido",
-      }));
-    } finally {
-      setLoading(null);
-    }
-  }
-
   return (
     <div className="min-h-screen">
       <header
         className="px-4 pt-4 pb-4"
-       
+
       >
         <div className="max-w-lg mx-auto flex items-center gap-3">
           <button onClick={() => router.push("/inicio")} className="text-text-secondary hover:text-gold transition-colors duration-200 cursor-pointer">
@@ -100,60 +72,12 @@ async function handleSyncWorldCup() {
 
       <main className="max-w-lg mx-auto p-4 space-y-4">
         <p className="text-sm text-text-secondary">
-          Sincroniza partidos desde API-Football. Cada sync hace upsert —
+          Sincroniza los partidos del Mundial 2026. Cada sync hace upsert —
           no duplica partidos existentes.
         </p>
         <div className="rounded-lg p-3 bg-blue-info/10 border border-blue-info/20 text-xs text-blue-info">
-          Principales: Champions y La Liga (football-data.org) más Mundial 2026 (openfootball).
+          Fuente única: Mundial 2026 con los 104 partidos (grupos + knockouts).
         </div>
-
-        <div>
-          <h2 className="text-base font-bold text-text-primary mb-1">Principales</h2>
-          <p className="text-xs text-text-muted mb-3">Fuentes activas para los torneos actuales</p>
-        </div>
-
-        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-4">
-        {LEAGUES.map((league) => {
-          const result = results[league.id];
-          const isLoading = loading === league.id;
-
-          return (
-            <motion.div key={league.id} variants={fadeUp} className="rounded-2xl p-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle hover:border-gold/20 hover:shadow-[0_0_20px_rgba(255,215,0,0.08)] transition-all duration-300">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="font-bold text-text-primary">{league.label}</p>
-                  <p className="text-xs text-text-muted">Competition ID: {league.id} (football-data.org)</p>
-                </div>
-                <button
-                  onClick={() => handleSync(league.id, league.tournament)}
-                  disabled={isLoading}
-                  className="flex items-center gap-1.5 bg-gold text-bg-base px-5 py-3 rounded-xl text-sm font-semibold
-                             hover:scale-[1.02] hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98] disabled:opacity-40 transition-all duration-200 cursor-pointer"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-                  {isLoading ? "Sync..." : "Sync"}
-                </button>
-              </div>
-
-              {result && (
-                <div className={`rounded-lg p-3 text-sm ${
-                  typeof result === "string"
-                    ? "bg-red-dim text-red-alert"
-                    : "bg-green-dim text-green-live"
-                }`}>
-                  {typeof result === "string" ? (
-                    <p>Error: {result}</p>
-                  ) : (
-                    <p>
-                      {result.synced} actualizados · {result.errors} errores · {result.total} total
-                    </p>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          );
-        })}
-        </motion.div>
 
         {/* Mundial 2026 primary sync: openfootball source covers groups + knockouts. */}
         <motion.div variants={fadeUp} initial="hidden" animate="visible" className="rounded-2xl p-4 bg-bg-card/80 backdrop-blur-sm border border-gold/30 hover:shadow-[0_0_20px_rgba(255,215,0,0.12)] transition-all duration-300">
