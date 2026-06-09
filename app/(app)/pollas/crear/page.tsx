@@ -14,7 +14,7 @@ import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Handshake, Lock } from "lucide-react";
-import { TOURNAMENTS, getTournamentName } from "@/lib/tournaments";
+import { TOURNAMENTS, CREATABLE_TOURNAMENTS, getTournamentName } from "@/lib/tournaments";
 import FootballLoader from "@/components/ui/FootballLoader";
 import PrizeDistributionForm, {
   type PrizeDistribution,
@@ -539,7 +539,11 @@ export default function CrearPollaPage() {
             <div className="rounded-2xl p-5 space-y-4 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
               <h2 className="text-base font-bold text-text-primary">{t("labelTournaments")} <span className="text-red-alert">*</span></h2>
               <div className="space-y-2">
-                {(isIOSApp ? TOURNAMENTS.filter((tn) => tn.slug === "worldcup_2026") : TOURNAMENTS).map((t) => {
+                {/* Solo torneos "creatables" (post-Mundial: solo worldcup_2026).
+                    En iOS además forzamos worldcup_2026 por Apple 4.1(a) — si
+                    algún día se reactiva otra liga, iOS sigue mostrando solo
+                    el Mundial. Hoy ambos resuelven a [worldcup_2026]. */}
+                {(isIOSApp ? CREATABLE_TOURNAMENTS.filter((tn) => tn.slug === "worldcup_2026") : CREATABLE_TOURNAMENTS).map((t) => {
                   const isSelected = form.tournaments.includes(t.slug);
                   return (
                     <button
