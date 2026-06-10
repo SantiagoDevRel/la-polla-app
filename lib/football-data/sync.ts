@@ -1,6 +1,7 @@
 // lib/football-data/sync.ts — Sync de partidos desde football-data.org a Supabase
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSyncableTournament } from "@/lib/tournaments";
+import { hasPlaceholderTeam } from "@/lib/matches/is-placeholder";
 import { fetchCompetitionMatches, rateLimitDelay, FDMatch } from "./client";
 
 // Competiciones activas — slug must match what crear polla + pollas table use
@@ -115,6 +116,19 @@ export async function syncCompetition(
   let errors = 0;
 
   for (const match of matches) {
+    // REGLA #2: football-data lista los knockouts sin resolver con
+    // homeTeam.name = null (verificado contra la API real 2026-06-10) o
+    // con placeholders tipo "Winner Group A". Esos NUNCA entran al RPC —
+    // los slots de bracket ya existen en DB con códigos FIFA (Regla #3)
+    // y un name NULL revienta el NOT NULL de matches.
+    if (
+      !match.homeTeam?.name ||
+      !match.awayTeam?.name ||
+      hasPlaceholderTeam(match.homeTeam.name, match.awayTeam.name)
+    ) {
+      continue;
+    }
+
     const row = mapMatchToRow(match, tournament);
 
     try {

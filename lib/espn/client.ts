@@ -109,24 +109,32 @@ export function mapEspnStatus(status: ESPNStatus): "scheduled" | "live" | "finis
   // Pre-match
   if (name === "STATUS_SCHEDULED" || name === "STATUS_DELAYED") return "scheduled";
   // In-play
+  // ⚠️ STATUS_END_OF_REGULATION es LIVE, no finished: ESPN lo emite al
+  // cierre de los 90 de un knockout empatado, ANTES del alargue. Mapearlo
+  // a finished marcaba el partido como terminado mid-game y el trigger
+  // anti-regress impedía volver a live (bug pescado auditoría 2026-06-10).
+  // Para partidos normales ESPN emite STATUS_FULL_TIME directo.
   if (
     name === "STATUS_FIRST_HALF" ||
     name === "STATUS_HALFTIME" ||
     name === "STATUS_SECOND_HALF" ||
     name === "STATUS_END_OF_PERIOD" ||
+    name === "STATUS_END_OF_REGULATION" ||
     name === "STATUS_OVERTIME" ||
     name === "STATUS_FIRST_HALF_EXTRA_TIME" ||
+    name === "STATUS_HALFTIME_ET" ||
     name === "STATUS_SECOND_HALF_EXTRA_TIME" ||
     name === "STATUS_END_OF_EXTRA_TIME" ||
     name === "STATUS_SHOOTOUT"
   ) {
     return "live";
   }
-  // Final
+  // Final. ESPN usa variantes para alargue/penales: STATUS_FINAL_AET,
+  // STATUS_FINAL_PEN (verificado contra la final de Qatar 2022 — sin el
+  // prefijo-match un partido definido por penales NUNCA pasaba a finished).
   if (
     name === "STATUS_FULL_TIME" ||
-    name === "STATUS_FINAL" ||
-    name === "STATUS_END_OF_REGULATION"
+    name.startsWith("STATUS_FINAL")
   ) {
     return "finished";
   }

@@ -245,14 +245,55 @@ export async function syncWorldCup2026(): Promise<{
     // skipeamos es placeholder sin patron Mundial (defensa contra inputs
     // raros de la fuente).
     const inferredPhase = inferWorldCupKnockoutPhase(row.home_team, row.away_team);
+    // Número FIFA (73-104): ancla de identidad del slot para el lookup
+    // #3.5 de upsert_match_safe (migración 062). Cuando openfootball
+    // renombre "W93"→equipo real, el hash external_id cambia pero
+    // match_day=num sigue apuntando al MISMO row → promoción in-place,
+    // UUID/predicciones intactos. openfootball trae `num` para 73-102;
+    // 3er puesto y final no traen num — se derivan de fase o de la fecha
+    // oficial (18/19-jul-2026).
+    const fifaNum = Number(match.num);
+    const phaseFromNum =
+      Number.isFinite(fifaNum) && fifaNum >= 73
+        ? fifaNum <= 88 ? "round_of_32"
+        : fifaNum <= 96 ? "round_of_16"
+        : fifaNum <= 100 ? "quarter_finals"
+        : fifaNum <= 102 ? "semi_finals"
+        : fifaNum === 103 ? "third_place"
+        : fifaNum === 104 ? "final"
+        : null
+        : null;
+    if (Number.isFinite(fifaNum) && fifaNum >= 73 && fifaNum <= 104) {
+      row.match_day = fifaNum;
+    }
     if (inferredPhase) {
       row.phase = inferredPhase;
+      if (row.match_day === null) {
+        if (inferredPhase === "third_place") row.match_day = 103;
+        if (inferredPhase === "final") row.match_day = 104;
+      }
     } else if (
       isPlaceholderTeamCanonical(row.home_team) ||
       isPlaceholderTeamCanonical(row.away_team)
     ) {
       console.warn(`[wc2026] Skip unrecognized placeholder ${externalId}: ${home} vs ${away}`);
       continue;
+    } else if (phaseFromNum) {
+      // Equipos REALES en un slot de knockout (bracket ya resuelto en la
+      // fuente): derivar la fase del número FIFA — el roundName plano de
+      // openfootball ("World Cup 2026") no la trae, y sin fase el lookup
+      // #3.5 y el guard anti-duplicados del RPC pierden precisión.
+      row.phase = phaseFromNum;
+    } else if (!row.phase && !match.group && match.date) {
+      // Tercer puesto / final con equipos reales y sin num: fechas
+      // oficiales del calendario FIFA 2026 (estables desde el sorteo).
+      if (match.date === "2026-07-18") row.phase = "third_place";
+      if (match.date === "2026-07-19") row.phase = "final";
+      if (row.phase === "third_place") row.match_day = row.match_day ?? 103;
+      if (row.phase === "final") row.match_day = row.match_day ?? 104;
+    }
+    if (!row.phase && match.group) {
+      row.phase = "group_stage";
     }
 
     try {

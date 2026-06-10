@@ -28,130 +28,13 @@ import {
   parseEspnScore,
   parseEspnMinute,
 } from "./client";
-import { TOURNAMENT_STRUCTURE } from "@/lib/tournaments/structure";
 import { hasPlaceholderTeam } from "@/lib/matches/is-placeholder";
 
-/**
- * Asegura placeholder rows ('TBD vs TBD') para cada fase con slots
- * conocidos del torneo. Idempotente — chequea match_day por slot, solo
- * crea los faltantes. external_id formato:
- *   "placeholder:<tournament>:<phase>:<slot>"
- *
- * Cuando ESPN publica el matchup real de un slot, la lógica de
- * promoteOrInsert (más abajo) actualiza el placeholder con los datos
- * reales sin cambiar el UUID — predicciones se mantienen.
- *
- * Esta función NO hace requests a ESPN — solo trabaja sobre nuestra
- * DB. Por eso es seguro correrla en cada visita a crear-polla sin
- * preocuparse por rate limits externos.
- */
-export async function ensurePlaceholders(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
-  tournamentSlug: string,
-): Promise<{ created: number }> {
-  const struct = TOURNAMENT_STRUCTURE[tournamentSlug];
-  if (!struct) return { created: 0 };
-
-  // Una sola query trae TODOS los matches del torneo (placeholder y
-  // reales). Necesitamos los reales para no excederlos: si hay 64
-  // fixtures reales en group_stage y slots=96, solo necesitamos 32
-  // placeholders, no 96. Antes inflábamos a 96+64=160.
-  const { data: existing } = await supabase
-    .from("matches")
-    .select("phase, match_day, external_id")
-    .eq("tournament", tournamentSlug);
-  type MatchRow = { phase: string | null; match_day: number | null; external_id: string | null };
-  const rows = (existing || []) as MatchRow[];
-  // realCountByPhase: rows que NO son placeholder. Cuentan contra el budget.
-  const realCountByPhase = new Map<string, number>();
-  // existingSlotsByPhase: match_day de placeholders existentes para cada fase.
-  const existingSlotsByPhase = new Map<string, Set<number>>();
-  for (const m of rows) {
-    const isPlaceholder = (m.external_id ?? "").startsWith("placeholder:");
-    const phaseKey = m.phase ?? "";
-    if (isPlaceholder) {
-      const set = existingSlotsByPhase.get(phaseKey) ?? new Set<number>();
-      if (m.match_day != null) set.add(m.match_day);
-      existingSlotsByPhase.set(phaseKey, set);
-    } else {
-      realCountByPhase.set(phaseKey, (realCountByPhase.get(phaseKey) ?? 0) + 1);
-    }
-  }
-
-  // Acumulamos TODOS los rows a insertar y mandamos UN solo INSERT
-  // batched al final. Antes haciamos N RPC sequential calls (250 para
-  // Libertadores) que tardaba >20s.
-  type PlaceholderRow = {
-    external_id: string;
-    tournament: string;
-    match_day: number;
-    phase: string;
-    home_team: string;
-    away_team: string;
-    home_team_flag: null;
-    away_team_flag: null;
-    home_team_abbr: null;
-    away_team_abbr: null;
-    scheduled_at: string;
-    venue: null;
-    home_score: null;
-    away_score: null;
-    status: string;
-    elapsed: null;
-  };
-  const toInsert: PlaceholderRow[] = [];
-  for (const ph of struct.phases) {
-    if (ph.slots === null) continue;
-    const realCount = realCountByPhase.get(ph.phase) ?? 0;
-    const existingSlots = existingSlotsByPhase.get(ph.phase) ?? new Set<number>();
-    // Cuántos placeholders necesitamos para llenar el budget total
-    // (ph.slots) descontando los reales que ya existen. Si hay tantos
-    // o más reales como slots, no necesitamos placeholders en absoluto.
-    const targetPlaceholders = Math.max(0, ph.slots - realCount);
-    if (existingSlots.size >= targetPlaceholders) continue; // ya tenemos suficientes
-
-    const scheduledAtStr = ph.estimatedDate
-      ? new Date(ph.estimatedDate).toISOString()
-      : "2099-12-31T00:00:00Z";
-    for (let i = 1; i <= targetPlaceholders; i++) {
-      if (existingSlots.has(i)) continue;
-      toInsert.push({
-        external_id: `placeholder:${tournamentSlug}:${ph.phase}:${i}`,
-        tournament: tournamentSlug,
-        match_day: i,
-        phase: ph.phase,
-        home_team: "TBD",
-        away_team: "TBD",
-        home_team_flag: null,
-        away_team_flag: null,
-        home_team_abbr: null,
-        away_team_abbr: null,
-        scheduled_at: scheduledAtStr,
-        venue: null,
-        home_score: null,
-        away_score: null,
-        status: "scheduled",
-        elapsed: null,
-      });
-    }
-  }
-
-  if (toInsert.length === 0) return { created: 0 };
-
-  // Bulk INSERT con conflict skip — si por race-condition alguien
-  // creó el mismo external_id mientras tanto, no falla.
-  const { error } = await supabase
-    .from("matches")
-    .insert(toInsert);
-  if (error) {
-    // Si el conflict por external_id se da fila a fila, solo loguea —
-    // no es fatal porque significa que la fila ya existe.
-    console.warn("[ensurePlaceholders] bulk insert warning:", error.message);
-    return { created: 0 };
-  }
-  return { created: toInsert.length };
-}
+// ⚠️ ensurePlaceholders fue ELIMINADA (2026-06-10). Era código muerto (cero
+// callers desde migración 050) que insertaba filas "TBD vs TBD" directo a
+// matches, violando las Reglas #1 y #2 del CLAUDE.md. Los slots de bracket
+// del Mundial se manejan con códigos reales ("W93", "1A") + promoción
+// in-place en upsert_match_safe v4 (migración 062). No reintroducir.
 
 /**
  * Inserta o actualiza un fixture descubierto vía ESPN.
