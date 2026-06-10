@@ -92,3 +92,7 @@ keystore.properties
 # Codemagic local artifacts
 /build/ios/
 .aider*
+
+# Serena MCP — per-project LSP config/cache (personal dev tooling, not committed)
+.serena/
+# Graphify / codebase-memory-mcp store data outside the repo (Downloads / ~/.cache)

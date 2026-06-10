@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import FootballLoader from "@/components/ui/FootballLoader";
 import PayoutsByPolla from "@/components/admin/PayoutsByPolla";
 import UserDetailModal from "@/components/admin/UserDetailModal";
+import KnockoutStatusCard from "@/components/admin/KnockoutStatusCard";
 
 interface AdminUser {
   id: string;
@@ -292,6 +293,10 @@ export default function AdminPage() {
                 </button>
               )}
             </section>
+
+            {/* Knockouts del Mundial sin resolver + alertas de sync
+                (migración 062). Solo renderiza si hay algo que mostrar. */}
+            <KnockoutStatusCard />
 
             {/* Stats */}
             <section className="grid grid-cols-2 gap-3">

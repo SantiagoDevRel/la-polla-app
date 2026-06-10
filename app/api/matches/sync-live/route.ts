@@ -63,25 +63,21 @@ async function runSync() {
   const started = Date.now();
 
   const inWindow = await hasActiveMatchWindow();
-  if (!inWindow) {
-    return {
-      ok: true,
-      skipped: true,
-      reason: "no_active_window",
-      ms: Date.now() - started,
-    };
-  }
 
-  const espn = await syncEspnLive();
-
-  // Después de la sync, chequear si hay matches que recién pasaron a
-  // finished y todavía no están verified contra la otra fuente.
-  // verifyPendingFinals corre solo cuando hay candidatos — barato.
+  // ⚠️ verifyPendingFinals corre SIEMPRE, gate abierto o no. El gate solo
+  // ahorra el fetch a ESPN del live sync. Razón (review 2026-06-10): la
+  // verificación dual espera a que football-data marque FINISHED (lag de
+  // minutos post-FT) — si el partido que terminó era el último del día,
+  // el gate ya está cerrado en el tick siguiente y el scoring quedaba
+  // congelado hasta la próxima ventana (la FINAL del Mundial: para
+  // siempre). El path sin candidatos cuesta 1 query con inner join — barato.
+  const espn = inWindow ? await syncEspnLive() : null;
   const verifications = await verifyPendingFinals();
 
   return {
     ok: true,
-    skipped: false,
+    skipped: !inWindow,
+    reason: inWindow ? undefined : "no_active_window",
     espn,
     verifications,
     ms: Date.now() - started,

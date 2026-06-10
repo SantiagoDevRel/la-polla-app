@@ -900,8 +900,97 @@ Si NUNCA querés que vuelva a pasar:
 
 - Antes de mergear código que toca `matches`, hacer `grep -rn '\.from("matches")\.\(upsert\|insert\|update\)' lib/ app/` y verificar que devuelva CERO matches relacionados a fixtures externos.
 - ❌ CERO lógica de "promover placeholder" en app code. Si existe, va DENTRO del RPC.
-- Excepción permitida: `ensurePlaceholders` en `lib/espn/discover.ts` hace bulk insert de filas TBD-vs-TBD (no son fixtures reales, son slots).
+- ⚠️ `ensurePlaceholders` (bulk insert de filas TBD-vs-TBD) fue **DESACTIVADO y removido** (migration 050, 2026-05-08). Ver Regla #2 abajo. NO reactivar.
 - Si necesitás un sync nuevo, **importás el RPC y se acabó.** No hay shortcut.
+
+### 🚨 REGLA #2 — NUNCA pre-crear filas "TBD vs TBD" para fases de bracket futuras 🚨
+
+*(Movida desde el global `~/.claude/CLAUDE.md` el 2026-05-29 — era la-polla-specific pero estaba cargándose en todos los proyectos.)*
+
+Aplica a CUALQUIER torneo con eliminación directa donde los matchups dependen de partidos previos (Mundial, Champions, Libertadores, Sudamericana, BetPlay, etc.).
+
+**REGLA:** No insertes filas placeholder `home_team='TBD'`/`away_team='TBD'` para "reservar slots" de cuartos/semis/final mientras los matchups reales no estén publicados por el proveedor.
+
+**Por qué:** un TBD en DB (1) aparece literal como "TBD vs TBD" en /pollas/crear → ruido visual; (2) no se puede pronosticar; (3) si el proveedor publica con otro schedule, queda huérfano y duplica al lado del partido real; (4) genera mantenimiento (limpiar TBDs viejos).
+
+**Aproximación correcta:**
+- **DB:** solo partidos REALES (teams confirmados). Las fases pendientes NO ocupan filas.
+- **UI:** las "fases pendientes" se renderean leyendo `TOURNAMENT_STRUCTURE` (mapping estático) vía `getPendingPhases(tournament, currentMatches)` en `lib/tournaments/structure.ts`. Sin filas en DB, sin SQL.
+- El **lookup #4** de `upsert_match_safe` (promoción de placeholder) se queda SOLO por compat con TBDs legacy que aún tengan predictions vivas. NO se crean nuevos.
+- **Predicción ciega sobre la final:** UN row TBD explícito por torneo, `external_id='blind:<tournament>:final'`, promovido por el RPC cuando llega el match real de la final.
+
+**No se negocia:**
+- ❌ CERO funciones tipo `ensurePlaceholders(tournament)` que hagan INSERTs masivos de TBD.
+- ❌ CERO `INSERT INTO matches (...) VALUES ('TBD','TBD',...)` desde app code/cron — excepto el row único de "predicción ciega final".
+- ✅ Cleanup opcional: cron que borra TBDs cuyo `scheduled_at` pasó hace +7 días sin predictions (defense-in-depth contra huérfanos legacy).
+- ✅ Antes de mergear código que toca creación de matches: `grep -rn "home_team:\s*['\"]TBD['\"]" lib/ app/` debe ser cero (salvo comentarios).
+
+**Historial:** 2026-05-08 — `ensurePlaceholders` pre-creaba 8+4+2 TBDs por torneo bracket → 200 TBDs acumulados (61 sudamericana + 61 libertadores + 45 worldcup + 19 champions + 14 betplay) ensuciando /pollas/crear. Migration 050: cleanup de huérfanos (se mantuvo solo el de Champions final con 2 predictions vivas) + `ensurePlaceholders` desactivado en `discoverTournament` y removido de `/api/matches`.
+
+### 🚨 REGLA #3 — Knockouts de bracket: 104 partidos, promoción IN-PLACE, jamás duplicar 🚨
+
+*(Agregada 2026-06-10 tras la auditoría pre-knockouts del Mundial.)*
+
+El Mundial tiene exactamente **104 partidos** (72 grupo + 32 knockout). Los 32
+knockouts viven en DB con equipos codificados (`"W93" vs "W94"`, `"1A" vs "2B"`)
+hasta que el bracket se resuelva. Esos rows son PARTIDOS REALES pronosticables
+(feature: predicción anticipada de bracket) — sus UUIDs están referenciados por
+`pollas.match_ids` y `predictions`, así que **NUNCA se borran ni se reemplazan**.
+
+Mecánica (migración 062):
+- `matches.match_day` = **número FIFA (73-104)** para knockouts — el ancla de
+  identidad estable. `sync-worldcup` lo manda desde openfootball (`num`).
+- `upsert_match_safe` v4 lookup **#3.5**: cuando llega el mismo partido con
+  equipos reales (hash/external_id distinto), promueve el slot codificado
+  IN-PLACE — por `(tournament, phase, match_day)` o por ventana de kickoff ±3h
+  con candidato único. UUID, predicciones y match_ids quedan intactos.
+- **Guard NO-INSERT**: mientras queden slots codificados en `(tournament,
+  phase)`, el RPC jamás inserta un row nuevo de knockout — registra alerta en
+  `admin_alerts` (visible en /admin) y devuelve NULL. `count(*)` del Mundial
+  nunca puede pasar de 104.
+- Resolución automática: el cron de discover (6h) corre `syncWorldCup2026()` +
+  football-data full cuando hay slots codificados con kickoff <7 días. Manual:
+  botón "Sync Mundial" en /admin (matches o el card de alerta del dashboard).
+- `is_bracket_slot()` (SQL) y `lib/matches/is-placeholder.ts` (TS) comparten
+  los patrones de códigos — si agregás un patrón en uno, agregalo en el otro.
+
+### 🚨 REGLA #4 — Puntos = marcador de los 90 minutos (alargue NO cuenta) 🚨
+
+*(Formalizada 2026-06-10; ya era la intención del código — football-data sync
+siempre escribió `regularTime`.)*
+
+- Las pollas se puntúan con el **score de los 90 + adición**. Goles de alargue
+  y penales NO suman para los puntos.
+- Durante el live, ESPN escribe el score corriente (incluido ET) en
+  `home_score/away_score` — la UI muestra el partido real. Al detectar entrada
+  a alargue (STATUS names de ESPN, NUNCA `elapsed > 90` — el parser convierte
+  "90'+5" en 95), `update_match_live_espn` congela el snapshot en
+  `regulation_home_score/regulation_away_score` (migración 063).
+- La verificación final para torneos cubiertos por football-data hace **fetch
+  REAL a la API de FD** (jamás confiar en el row de DB como "segunda fuente" —
+  pudo escribirlo ESPN: eso era verificación ESPN-contra-ESPN, bug de
+  auditoría). Con `duration != REGULAR`, el canónico es `score.regularTime`.
+- El cierre va SIEMPRE por `finalize_match_result()` (RPC, migración 063):
+  permite corrección a la baja (bypass del guard monotónico GREATEST) y setea
+  `final_verified_at` en un segundo UPDATE para que el trigger de scoring corra
+  con los scores ya escritos. Cero `.update({final_verified_at})` directos.
+- Partidos con señal de ET **jamás se auto-verifican** sin confirmación de
+  football-data (o snapshot 90' en torneos ESPN-only). Si no hay fuente →
+  alerta al admin → resolución manual en /admin/discrepancias.
+- Consecuencia UI: un knockout AET muestra el score de 90' como resultado final
+  (ej: 1-1 aunque terminó 2-1 en alargue); el detalle vive en
+  `live_status_detail` (STATUS_FINAL_AET/PEN) y en las notas de verificación.
+
+### 🚨 REGLA #5 — Cero hot-patches de DB sin migración 🚨
+
+*(Agregada 2026-06-10: la auditoría encontró ≥5 funciones críticas — incluido
+el trigger del lock de 5 min — que vivían SOLO en prod, editadas vía SQL editor
+/ MCP, imposibles de auditar o reconstruir desde git.)*
+
+Toda corrección aplicada a prod por SQL editor o MCP `apply_migration` genera
+su archivo `supabase/migrations/NNN_*.sql` **en el mismo commit**. La migración
+061 es el snapshot verbatim del estado real de prod al 2026-06-10 — si tocás
+una función, basate en 061+, no en la migración vieja que la creó.
 
 ### Matches: NUNCA usar `(tournament, scheduled_at)` como clave de unicidad
 

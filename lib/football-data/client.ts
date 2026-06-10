@@ -21,11 +21,16 @@ export interface FDMatch {
   awayTeam: { id: number; name: string; crest: string };
   score: {
     // fullTime: marcador al final del match. SI el partido fue a ET,
-    //   incluye los goles del alargue. Si terminó en 90, es solo 90.
+    //   incluye los goles del alargue. ⚠️ Para PENALTY_SHOOTOUT el
+    //   fullTime de la API v4 puede incluir los goles de la tanda —
+    //   nunca compararlo crudo contra ESPN (que excluye penales).
     fullTime: { home: number | null; away: number | null };
     // regularTime: marcador a los 90 + adición. Solo aparece cuando
     //   el match fue a alargue. Si no, viene undefined.
     regularTime?: { home: number | null; away: number | null };
+    // extraTime / penalties: solo en knockouts con ET/tanda.
+    extraTime?: { home: number | null; away: number | null };
+    penalties?: { home: number | null; away: number | null };
     // duration: 'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT'.
     duration?: string;
   };
