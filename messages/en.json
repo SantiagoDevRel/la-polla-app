@@ -396,6 +396,13 @@
     "deletePolla": "Delete pool",
     "deletedToast": "Pool deleted",
     "errDelete": "Couldn't delete the pool",
+    "viewProof": "View receipt",
+    "proofModalTitle": "Receipt from {name}",
+    "proofUploadedAt": "Uploaded {date}",
+    "proofAiApproved": "Auto-verified by AI",
+    "proofAiRejected": "AI could not verify it — review it yourself",
+    "proofClose": "Close",
+    "errProofLoad": "Could not load the receipt",
     "confirmDelete": "Are you sure you want to delete \"{name}\"?\n\nAll data will be lost: players, predictions, standings, and results. This action cannot be undone."
   },
   "Phone": {
