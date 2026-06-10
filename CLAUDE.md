@@ -951,6 +951,14 @@ Mecánica (migración 062):
 - Resolución automática: el cron de discover (6h) corre `syncWorldCup2026()` +
   football-data full cuando hay slots codificados con kickoff <7 días. Manual:
   botón "Sync Mundial" en /admin (matches o el card de alerta del dashboard).
+- **Confirm-before-publish (migración 064):** con
+  `app_config.bracket_promotion_mode='confirm'` (el default actual), la
+  promoción NO se publica sola: queda en `bracket_proposals` (pending) y
+  Santiago la confirma/rechaza desde el card del dashboard /admin →
+  `apply_bracket_proposal()` publica. Red de seguridad: pg_cron
+  `auto-apply-brackets` (hora :20) publica solas las propuestas con kickoff
+  <12h y deja alerta `bracket_auto_applied`. Para volver al modo automático:
+  `UPDATE app_config SET value='auto' WHERE key='bracket_promotion_mode'`.
 - `is_bracket_slot()` (SQL) y `lib/matches/is-placeholder.ts` (TS) comparten
   los patrones de códigos — si agregás un patrón en uno, agregalo en el otro.
 

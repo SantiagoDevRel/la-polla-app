@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { Copy, RefreshCw, Trash2, UserMinus } from "lucide-react";
+import { Copy, Receipt, RefreshCw, Trash2, UserMinus, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 import FootballLoader from "@/components/ui/FootballLoader";
@@ -29,6 +29,17 @@ interface Participant {
     display_name: string | null;
     whatsapp_number: string | null;
   } | null;
+}
+
+// Comprobante subido vía el flujo AI (payment_proofs + bucket con TTL de
+// 7 días). signed_url viene del endpoint organizador-gated
+// /api/pollas/[slug]/payment-proofs (1h de validez).
+interface ProofRow {
+  id: string;
+  user_id: string;
+  ai_valid: boolean | null;
+  created_at: string;
+  signed_url: string | null;
 }
 
 interface OrganizerPanelProps {
@@ -66,6 +77,11 @@ export default function OrganizerPanel({
   const [predictionsCount, setPredictionsCount] = useState(0); // unique users with at least one prediction
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  // Último comprobante (con signed URL) por user_id. Solo se llena en
+  // admin_collects; el endpoint es organizador-only así que un fallo acá
+  // simplemente esconde los botones "Ver recibo" — no es fatal.
+  const [proofsByUser, setProofsByUser] = useState<Record<string, ProofRow>>({});
+  const [viewingProof, setViewingProof] = useState<{ proof: ProofRow; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,7 +103,22 @@ export default function OrganizerPanel({
     } finally {
       setLoading(false);
     }
-  }, [pollaSlug, showToast, t]);
+    if (paymentMode === "admin_collects") {
+      try {
+        const { data } = await axios.get<{ proofs: ProofRow[] }>(
+          `/api/pollas/${pollaSlug}/payment-proofs`
+        );
+        const byUser: Record<string, ProofRow> = {};
+        for (const p of data.proofs ?? []) {
+          // El endpoint ordena created_at DESC — el primero por user es el más reciente.
+          if (p.signed_url && !byUser[p.user_id]) byUser[p.user_id] = p;
+        }
+        setProofsByUser(byUser);
+      } catch {
+        // silencioso: sin recibos el panel funciona igual
+      }
+    }
+  }, [pollaSlug, paymentMode, showToast, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -343,6 +374,25 @@ export default function OrganizerPanel({
                           {busy === `pay:${p.id}` ? "…" : p.paid ? t("unmark") : t("mark")}
                         </button>
                       )}
+                      {/* "Ver recibo" — solo el organizador (este panel ya es
+                          admin-only) y solo si el participante subió screenshot
+                          en los últimos 7 días (TTL del bucket). Oculto en iOS
+                          (App Store 5.3.4: cero UI de dinero). */}
+                      {!isIOSApp &&
+                        paymentMode === "admin_collects" &&
+                        p.role !== "admin" &&
+                        proofsByUser[p.user_id] && (
+                          <button
+                            onClick={() =>
+                              setViewingProof({ proof: proofsByUser[p.user_id], name })
+                            }
+                            title={t("viewProof")}
+                            className="text-[11px] px-2 py-1 rounded-lg border border-border-subtle hover:border-gold/40 text-text-secondary hover:text-gold inline-flex items-center gap-1"
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">{t("viewProof")}</span>
+                          </button>
+                        )}
                       {p.role !== "admin" && !isExpelled && (
                         <button
                           onClick={() => expel(p)}
@@ -392,6 +442,58 @@ export default function OrganizerPanel({
           )}
         </div>
       </section>
+
+      {/* Modal "Ver recibo" — screenshot del comprobante con signed URL
+          (1h). Solo lo abre el organizador desde la lista de pagos. */}
+      {viewingProof && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(8,12,16,0.85)", backdropFilter: "blur(4px)" }}
+          onClick={() => setViewingProof(null)}
+        >
+          <div
+            className="rounded-2xl lp-card max-w-md w-full max-h-[85vh] overflow-y-auto p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-bold text-text-primary truncate">
+                {t("proofModalTitle", { name: viewingProof.name })}
+              </h4>
+              <button
+                onClick={() => setViewingProof(null)}
+                aria-label={t("proofClose")}
+                className="p-1.5 rounded-lg border border-border-subtle text-text-secondary hover:text-text-primary hover:border-gold/40 transition-colors flex-shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[11px] text-text-muted">
+              {t("proofUploadedAt", {
+                date: new Date(viewingProof.proof.created_at).toLocaleString(intlTag, {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+              })}
+              {" · "}
+              <span className={viewingProof.proof.ai_valid ? "text-green-live" : "text-amber-400"}>
+                {viewingProof.proof.ai_valid ? t("proofAiApproved") : t("proofAiRejected")}
+              </span>
+            </p>
+            {viewingProof.proof.signed_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- signed URL temporal de Supabase Storage, next/image no aplica
+              <img
+                src={viewingProof.proof.signed_url}
+                alt={t("proofModalTitle", { name: viewingProof.name })}
+                className="w-full rounded-xl border border-border-subtle"
+              />
+            ) : (
+              <p className="text-xs text-red-alert">{t("errProofLoad")}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Section D — Danger zone. Hard-deletes the polla via DELETE
           /api/pollas/[slug]; cascade wipes participantes, pronósticos,

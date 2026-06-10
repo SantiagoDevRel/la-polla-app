@@ -396,6 +396,13 @@
     "deletePolla": "Borrar polla",
     "deletedToast": "Polla borrada",
     "errDelete": "No se pudo borrar la polla",
+    "viewProof": "Ver recibo",
+    "proofModalTitle": "Comprobante de {name}",
+    "proofUploadedAt": "Subido el {date}",
+    "proofAiApproved": "Verificado automáticamente por AI",
+    "proofAiRejected": "AI no lo pudo verificar — revisalo vos",
+    "proofClose": "Cerrar",
+    "errProofLoad": "No se pudo cargar el comprobante",
     "confirmDelete": "¿Estás seguro que deseas borrar \"{name}\"?\n\nTodos los datos se perderán: participantes, pronósticos, tabla y resultados. Esta acción no se puede deshacer."
   },
   "Phone": {
