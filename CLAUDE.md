@@ -1023,16 +1023,23 @@ siempre escribió `regularTime`.)*
   a alargue (STATUS names de ESPN, NUNCA `elapsed > 90` — el parser convierte
   "90'+5" en 95), `update_match_live_espn` congela el snapshot en
   `regulation_home_score/regulation_away_score` (migración 063).
-- La verificación final para torneos cubiertos por football-data hace **fetch
-  REAL a la API de FD** (jamás confiar en el row de DB como "segunda fuente" —
-  pudo escribirlo ESPN: eso era verificación ESPN-contra-ESPN, bug de
-  auditoría). Con `duration != REGULAR`, el canónico es `score.regularTime`.
+- La verificación final es **ESPN-primaria, FD corroborador no-bloqueante**
+  (v3, decisión de Santiago 2026-06-11: FD flapeó tras el inaugural — FINISHED
+  con `fullTime {null,null}` / regreso a TIMED — y congeló el scoring de 142
+  predicciones hasta cierre manual). Sin señal de alargue: dos lecturas de
+  ESPN en **ticks separados** que coincidan verifican (guard `espnseen=` en
+  `final_verification_notes`, >=50s — sync live y verify corren en el MISMO
+  request, así que ESPN==row al pitazo es una sola lectura). Si FD trae score
+  canónico, manda el dual-source clásico y **puede vetar** (discrepancia →
+  alerta, no se finaliza). Si FD reporta `duration != REGULAR`, el path
+  ESPN-primario se bloquea aunque la row no tenga señal de ET. Con
+  `duration != REGULAR`, el canónico es `score.regularTime`.
 - El cierre va SIEMPRE por `finalize_match_result()` (RPC, migración 063):
   permite corrección a la baja (bypass del guard monotónico GREATEST) y setea
   `final_verified_at` en un segundo UPDATE para que el trigger de scoring corra
   con los scores ya escritos. Cero `.update({final_verified_at})` directos.
-- Partidos con señal de ET **jamás se auto-verifican** sin confirmación de
-  football-data (o snapshot 90' en torneos ESPN-only). Si no hay fuente →
+- Partidos con señal de ET **jamás se auto-verifican** sin regularTime de
+  football-data o snapshot 90' propio (`regulation_*`). Si no hay fuente →
   alerta al admin → resolución manual en /admin/discrepancias.
 - Consecuencia UI: un knockout AET muestra el score de 90' como resultado final
   (ej: 1-1 aunque terminó 2-1 en alargue); el detalle vive en

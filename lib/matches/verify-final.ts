@@ -5,23 +5,36 @@
 // status='finished' o cuando un match ya finished todavía no tiene
 // final_verified_at.
 //
-// Reglas (v2, post-auditoría 2026-06-10):
-//   1. Para torneos cubiertos por football-data (Mundial): la "segunda
-//      fuente" es un FETCH REAL a la API de football-data — NUNCA el row
-//      de DB (que pudo haberlo escrito ESPN → la verificación vieja era
-//      ESPN-contra-ESPN, hallazgo crítico de la auditoría).
-//   2. REGLA DE PRODUCTO: las pollas se puntúan con el marcador de los
-//      90 minutos. football-data manda score.regularTime cuando hubo
-//      alargue; ese es el canónico. El cierre va por el RPC
-//      finalize_match_result (migración 063), que permite corrección a
-//      la baja (bypass del guard monotónico) y dispara el scoring con
-//      los scores ya escritos.
-//   3. Si las fuentes discrepan → notificar al admin UNA SOLA VEZ por
+// Reglas (v3, 2026-06-11 — decisión de Santiago tras el inaugural del
+// Mundial: FD flapeó post-pitazo (FINISHED con fullTime null / regreso a
+// TIMED) y congeló el scoring de 142 predicciones; ESPN pasa a ser la
+// fuente primaria y FD corroborador NO-bloqueante):
+//   1. ESPN-primario: sin señal de alargue, dos lecturas de ESPN en ticks
+//      SEPARADOS que coincidan verifican el match. El sync live y verify
+//      corren en el MISMO request, así que "ESPN == row" recién al pitazo
+//      es UNA sola lectura — el guard de 2 ticks (marker `espnseen=` en
+//      final_verification_notes, >=50s) exige re-ver el mismo score un
+//      tick después. Costo: ~1 min de delay. La ausencia o lag de
+//      football-data ya NO detiene el scoring.
+//   2. football-data corrobora cuando tiene score canónico: si coincide,
+//      nota dual-source; si DISCREPA, veta (alerta al admin, no se
+//      finaliza). El row de DB solo vale como proxy de la lectura ESPN al
+//      cruzar contra FD (lo escribió el sync de ESPN) — nunca como fuente
+//      independiente contra el MISMO proveedor que lo escribió (hallazgo
+//      auditoría 2026-06-10); la separación ESPN-vs-ESPN la da el guard
+//      de 2 ticks, no el row.
+//   3. REGLA DE PRODUCTO: puntos = marcador de los 90 + adición. Con
+//      alargue, el canónico es regularTime de FD si llegó este tick; si
+//      no, el snapshot regulation_* propio (migración 063). Sin ninguno →
+//      alerta y resolución manual (o espera, si ESPN aún no marcó
+//      full-time). Si FD reporta duration != REGULAR, el path ESPN-
+//      primario se bloquea aunque nuestra row no tenga señal de ET. El
+//      cierre va SIEMPRE por el RPC finalize_match_result (migración 063).
+//   4. Si las fuentes discrepan → notificar al admin UNA SOLA VEZ por
 //      match (track via final_verification_notes con "alerted").
-//   4. Si solo una fuente dice finished → no verificamos todavía, retry
-//      next tick.
 //   5. Tournaments ESPN-only (libertadores, etc.): single-source, igual
-//      que antes — pero NUNCA auto-verifican si hay señal de alargue.
+//      que antes — pero NUNCA auto-verifican si hay señal de alargue
+//      sin snapshot 90'.
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -317,120 +330,168 @@ async function verifyOneMatch(
     !ESPN_ONLY_TOURNAMENTS.has(match.tournament);
 
   if (fdCovered) {
+    // FD es CORROBORADOR, no bloqueante (v3, 2026-06-11): extraemos lo que
+    // FD tenga este tick; si trae score canónico se usa para cross-check
+    // (y puede vetar), pero su ausencia/lag/flap ya no congela el scoring.
+    let fdCanonHome: number | null = null;
+    let fdCanonAway: number | null = null;
+    let fdFtHome: number | null = null;
+    let fdFtAway: number | null = null;
+    let fdDuration = "REGULAR";
+    let fdWentToEt = false;
+    const fdEquivalents: Array<[number, number]> = [];
+    let fdState: string;
     if (fdMatches === null || fdMatches === undefined) {
-      // FD caído este tick. Sin señal de ET podemos tolerar el fallback
-      // legacy SOLO si ESPN confirma exactamente lo que ya está en DB
-      // (mejor que congelar el scoring por horas). Con señal de ET, jamás:
-      // el score de DB puede incluir goles de alargue.
+      fdState = "fetch caído";
+    } else {
+      const fd = findFdMatch(match, fdMatches);
+      if (!fd) {
+        fdState = "match no encontrado";
+      } else if (fd.status !== "FINISHED" && fd.status !== "AWARDED") {
+        fdState = `status=${fd.status}`;
+      } else {
+        fdDuration = fd.score?.duration ?? "REGULAR";
+        fdWentToEt = fdDuration !== "REGULAR";
+        // REGLA DE PRODUCTO: canónico = 90 minutos. Con alargue, regularTime.
+        fdCanonHome = fdWentToEt
+          ? fd.score?.regularTime?.home ?? null
+          : fd.score?.fullTime?.home ?? null;
+        fdCanonAway = fdWentToEt
+          ? fd.score?.regularTime?.away ?? null
+          : fd.score?.fullTime?.away ?? null;
+        fdFtHome = fd.score?.fullTime?.home ?? null;
+        fdFtAway = fd.score?.fullTime?.away ?? null;
+        if (fdCanonHome === null || fdCanonAway === null) {
+          // Visto en vivo el 2026-06-11: FINISHED con fullTime {null,null}.
+          fdState = `finished sin score canónico (duration=${fdDuration})`;
+          fdCanonHome = null;
+          fdCanonAway = null;
+        } else {
+          fdState = "scored";
+          // ⚠️ Para PENALTY_SHOOTOUT el fullTime de FD v4 puede incluir los
+          // goles de la tanda, mientras ESPN los excluye (verificado: Qatar
+          // 2022 → ESPN score 3-3, shootout aparte) — comparar contra
+          // fullTime crudo daba falsa discrepancia en CADA partido definido
+          // por penales. Construimos el set de scores equivalentes y
+          // aceptamos match contra cualquiera. extraTime puede venir
+          // acumulado o solo los goles del alargue — cubrimos ambas.
+          const etHomeRaw = fd.score?.extraTime?.home ?? null;
+          const etAwayRaw = fd.score?.extraTime?.away ?? null;
+          if (fdFtHome !== null && fdFtAway !== null) fdEquivalents.push([fdFtHome, fdFtAway]);
+          if (fdWentToEt && etHomeRaw !== null && etAwayRaw !== null) {
+            fdEquivalents.push([etHomeRaw, etAwayRaw]);
+            fdEquivalents.push([fdCanonHome + etHomeRaw, fdCanonAway + etAwayRaw]);
+          }
+          if (fdWentToEt) fdEquivalents.push([fdCanonHome, fdCanonAway]);
+        }
+      }
+    }
+
+    // ── Caso 1: FD trae score canónico → dual-source clásico. FD manda el
+    // 90'; ESPN (o DB como proxy) debe coincidir con algún equivalente.
+    if (fdState === "scored" && fdCanonHome !== null && fdCanonAway !== null) {
+      const matchesAny = (h: number | null, a: number | null): boolean =>
+        h !== null && a !== null && fdEquivalents.some(([eh, ea]) => eh === h && ea === a);
+
+      // Con ET y fullTime null (flap parcial de FD: regularTime presente,
+      // fullTime aún vacío), ESPN y DB traen scores ET-inclusive que no se
+      // pueden comparar contra el canon de 90' — tratarlos como "sin
+      // segunda señal" (→ single-source FD), no como veto espurio.
+      const etIncomparable = fdWentToEt && (fdFtHome === null || fdFtAway === null);
+      const espnAgrees =
+        !etIncomparable && espnFinished && espnHome !== null && espnAway !== null
+          ? matchesAny(espnHome, espnAway)
+          : null;
+      const dbAgrees =
+        !etIncomparable && match.home_score !== null && match.away_score !== null
+          ? matchesAny(match.home_score, match.away_score)
+          : null;
+      const agrees = espnAgrees ?? dbAgrees;
+
+      if (agrees === false) {
+        result.status = "discrepancy";
+        const other = espnAgrees !== null ? `ESPN: ${espnHome}-${espnAway}` : `DB: ${match.home_score}-${match.away_score}`;
+        result.notes = `DISCREPANCIA — football-data fullTime: ${fdFtHome}-${fdFtAway} (duration=${fdDuration}), ${other}.`;
+        await alertOnce(admin, match, result.notes, alertedSuffix);
+        return result;
+      }
+
+      result.status = "verified";
+      result.notes =
+        agrees === null
+          ? // Ni ESPN (evicted del scoreboard) ni DB tienen score para
+            // comparar — FD es la única fuente. Mejor finalizar con nota
+            // que congelar el scoring para siempre.
+            `Verificado (FD single-source, sin segunda señal): ${fdCanonHome}-${fdCanonAway} (duration=${fdDuration}).`
+          : fdWentToEt
+            ? `Verificado dual-source: 90' = ${fdCanonHome}-${fdCanonAway} (${fdDuration}, final ${fdFtHome}-${fdFtAway} — los puntos usan el 90').`
+            : `Verificado dual-source: ESPN y football-data coinciden en ${fdCanonHome}-${fdCanonAway}.`;
+      await finalize(admin, match.id, fdCanonHome, fdCanonAway, result.notes);
+      return result;
+    }
+
+    // ── Caso 2: FD sin score utilizable y SIN señal de alargue (ni nuestra
+    // ni de FD — si FD dice duration != REGULAR, este path se bloquea
+    // aunque la row no tenga señal: el score de ESPN incluiría el ET) →
+    // ESPN-primario con guard de 2 ticks.
+    if (!etSignal && !fdWentToEt) {
       if (
-        !etSignal &&
         espnFinished &&
         espnHome !== null &&
         espnAway !== null &&
         espnHome === match.home_score &&
         espnAway === match.away_score
       ) {
-        result.status = "verified";
-        result.notes = `Verificado (FD caído, ESPN==DB): ${espnHome}-${espnAway}.`;
-        await finalize(admin, match.id, espnHome, espnAway, result.notes);
+        // Guard de 2 ticks: sync live y verify corren en el MISMO request,
+        // así que ESPN==row recién al pitazo es UNA sola lectura. Exigimos
+        // haber visto el mismo score finished en un tick anterior (marker
+        // `espnseen=` en notes, >=50s) antes de finalizar — un flap de
+        // un tick de ESPN no queda grabado en un match inmutable.
+        const seen = previousNotes.match(/ espnseen=(\d+)-(\d+)@(\S+)/);
+        const sameScoreSeen =
+          seen !== null && Number(seen[1]) === espnHome && Number(seen[2]) === espnAway;
+        if (sameScoreSeen && Date.now() - new Date(seen![3]).getTime() >= 50_000) {
+          result.status = "verified";
+          result.notes = `Verificado ESPN-primario (FD ${fdState}): ${espnHome}-${espnAway}, mismo score en 2 ticks separados.`;
+          await finalize(admin, match.id, espnHome, espnAway, result.notes);
+          return result;
+        }
+        const marker = sameScoreSeen
+          ? ` espnseen=${seen![1]}-${seen![2]}@${seen![3]}` // no resetear el reloj
+          : ` espnseen=${espnHome}-${espnAway}@${new Date().toISOString()}`;
+        result.status = "pending";
+        result.notes = `ESPN finished ${espnHome}-${espnAway} — esperando tick de confirmación (FD ${fdState}).`;
+        await persistNote(admin, match.id, result.notes + marker + alertedSuffix);
         return result;
       }
       result.status = "pending";
-      result.notes = `football-data no disponible este tick${etSignal ? " (match con alargue — esperando regularTime)" : ""}.`;
+      result.notes = `Esperando confirmación — ESPN ${espnFinished ? "finished" : "no finished"} (${espnHome ?? "?"}-${espnAway ?? "?"}), DB: ${match.home_score}-${match.away_score}, FD ${fdState}.`;
       await persistNote(admin, match.id, result.notes + alertedSuffix);
       return result;
     }
 
-    const fd = findFdMatch(match, fdMatches);
-    if (!fd) {
-      result.status = "pending";
-      result.notes = `football-data no tiene el match aún (ESPN: ${espnHome}-${espnAway}).`;
-      await persistNote(admin, match.id, result.notes + alertedSuffix);
-      return result;
-    }
-
-    const fdFinished = fd.status === "FINISHED" || fd.status === "AWARDED";
-    if (!fdFinished) {
-      result.status = "pending";
-      result.notes = `football-data aún no marca finished (fd=${fd.status}).`;
-      await persistNote(admin, match.id, result.notes + alertedSuffix);
-      return result;
-    }
-
-    const duration = fd.score?.duration ?? "REGULAR";
-    const wentToEt = duration !== "REGULAR";
-    // REGLA DE PRODUCTO: canónico = 90 minutos. Con alargue, regularTime.
-    const canonHome = wentToEt
-      ? fd.score?.regularTime?.home ?? null
-      : fd.score?.fullTime?.home ?? null;
-    const canonAway = wentToEt
-      ? fd.score?.regularTime?.away ?? null
-      : fd.score?.fullTime?.away ?? null;
-    const ftHome = fd.score?.fullTime?.home ?? null;
-    const ftAway = fd.score?.fullTime?.away ?? null;
-
-    if (canonHome === null || canonAway === null) {
-      result.status = "pending";
-      result.notes = `football-data finished pero sin score canónico (duration=${duration}).`;
-      await persistNote(admin, match.id, result.notes + alertedSuffix);
-      return result;
-    }
-
-    // Cross-check de independencia: ESPN (si está) debe coincidir con
-    // ALGUNA representación del resultado de FD. ⚠️ Para PENALTY_SHOOTOUT
-    // el fullTime de FD v4 puede incluir los goles de la tanda, mientras
-    // ESPN los excluye (verificado: Qatar 2022 → ESPN score 3-3, shootout
-    // aparte) — comparar contra fullTime crudo daba falsa discrepancia en
-    // CADA partido definido por penales. Construimos el set de scores
-    // equivalentes y aceptamos match contra cualquiera.
-    const etHomeRaw = fd.score?.extraTime?.home ?? null;
-    const etAwayRaw = fd.score?.extraTime?.away ?? null;
-    const fdEquivalents: Array<[number, number]> = [];
-    if (ftHome !== null && ftAway !== null) fdEquivalents.push([ftHome, ftAway]);
-    if (wentToEt && etHomeRaw !== null && etAwayRaw !== null) {
-      // Según la versión de la API, extraTime puede venir acumulado o solo
-      // los goles del alargue — cubrimos ambas interpretaciones.
-      fdEquivalents.push([etHomeRaw, etAwayRaw]);
-      fdEquivalents.push([canonHome + etHomeRaw, canonAway + etAwayRaw]);
-    }
-    if (wentToEt) fdEquivalents.push([canonHome, canonAway]);
-
-    const matchesAny = (h: number | null, a: number | null): boolean =>
-      h !== null && a !== null && fdEquivalents.some(([eh, ea]) => eh === h && ea === a);
-
-    const espnAgrees =
-      espnFinished && espnHome !== null && espnAway !== null
-        ? matchesAny(espnHome, espnAway)
-        : null;
-    const dbAgrees =
-      match.home_score !== null && match.away_score !== null
-        ? matchesAny(match.home_score, match.away_score)
-        : null;
-    const agrees = espnAgrees ?? dbAgrees;
-
-    if (agrees === false) {
-      result.status = "discrepancy";
-      const other = espnAgrees !== null ? `ESPN: ${espnHome}-${espnAway}` : `DB: ${match.home_score}-${match.away_score}`;
-      result.notes = `DISCREPANCIA — football-data fullTime: ${ftHome}-${ftAway} (duration=${duration}), ${other}.`;
-      await alertOnce(admin, match, result.notes, alertedSuffix);
-      return result;
-    }
-    if (agrees === null) {
-      // Ni ESPN (evicted del scoreboard) ni DB tienen score para comparar.
-      // FD finished con score canónico es la única fuente disponible —
-      // mejor finalizar single-source (con nota) que dejar el scoring
-      // congelado para siempre.
+    // ── Caso 3: señal de alargue sin regularTime de FD este tick → el
+    // snapshot 90' propio (migración 063) es el canónico. Sin snapshot,
+    // alerta y resolución manual — jamás puntuar con score que incluya ET.
+    if (
+      espnFinished &&
+      match.regulation_home_score !== null &&
+      match.regulation_away_score !== null
+    ) {
       result.status = "verified";
-      result.notes = `Verificado (FD single-source, sin segunda señal): ${canonHome}-${canonAway} (duration=${duration}).`;
-      await finalize(admin, match.id, canonHome, canonAway, result.notes);
+      result.notes = `Verificado con snapshot 90' (FD ${fdState}): ${match.regulation_home_score}-${match.regulation_away_score} (ET final ESPN ${espnHome}-${espnAway} — los puntos usan el 90').`;
+      await finalize(admin, match.id, match.regulation_home_score, match.regulation_away_score, result.notes);
       return result;
     }
-
-    result.status = "verified";
-    result.notes = wentToEt
-      ? `Verificado dual-source: 90' = ${canonHome}-${canonAway} (${duration}, final ${ftHome}-${ftAway} — los puntos usan el 90').`
-      : `Verificado dual-source: ESPN y football-data coinciden en ${canonHome}-${canonAway}.`;
-    await finalize(admin, match.id, canonHome, canonAway, result.notes);
+    if (!espnFinished) {
+      result.status = "pending";
+      result.notes = `Match con alargue — esperando full-time de ESPN o regularTime de FD (FD ${fdState}).`;
+      await persistNote(admin, match.id, result.notes + alertedSuffix);
+      return result;
+    }
+    result.status = "discrepancy";
+    result.notes = `Match con alargue SIN snapshot 90' ni regularTime de FD (ESPN: ${espnHome}-${espnAway}, FD ${fdState}). Resolver manual en /admin/discrepancias.`;
+    await alertOnce(admin, match, result.notes, alertedSuffix);
     return result;
   }
 
@@ -461,8 +522,8 @@ async function verifyOneMatch(
 
   if (etSignal) {
     // ESPN-only + alargue: no hay fuente con regularTime. El snapshot
-    // regulation_* (migración 063) es lo único que tenemos — verificable
-    // pero mejor que el admin lo confirme: alerta una vez y queda pending.
+    // regulation_* (migración 063) es lo único que tenemos: si existe,
+    // verificamos con él; sin snapshot, alerta una vez y resolución manual.
     if (match.regulation_home_score !== null && match.regulation_away_score !== null) {
       result.status = "verified";
       result.notes = `Verificado con snapshot 90': ${match.regulation_home_score}-${match.regulation_away_score} (ET final ESPN ${espnHome}-${espnAway} — los puntos usan el 90').`;
