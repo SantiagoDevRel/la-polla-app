@@ -148,6 +148,10 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
         width={24}
         height={24}
         unoptimized
+        // h-6/w-6 + max-w-none + shrink-0: sin esto, el max-width:100%
+        // del preflight deja que la bandera se encoja cuando el
+        // contenedor flex se comprime (visto con text-zoom 2x).
+        className="h-6 w-6 max-w-none shrink-0"
         style={{ objectFit: "contain", borderRadius: countryFlag ? 4 : "50%" }}
         onError={() => setErrored(true)}
       />
@@ -156,9 +160,9 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
   return (
     <span style={{
       width: 24, height: 24, borderRadius: "50%",
-      background: "#1a2540", display: "flex",
+      background: "#1a2540", display: "flex", flexShrink: 0,
       alignItems: "center", justifyContent: "center",
-      fontSize: 8, fontWeight: 700, color: "#F5F7FA",
+      fontSize: 8, fontWeight: 700, color: "#F5F7FA", overflow: "hidden",
     }}>
       {teamName.slice(0, 3).toUpperCase()}
     </span>
@@ -403,43 +407,43 @@ function MatchRow({
           )}
         </div>
 
-        {/* Teams + score / inputs. Cada lado apila bandera arriba +
-            nombre abajo (patrón FotMob, igual que DashboardClient).
-            El nombre debe mostrarse SIEMPRE: el layout horizontal
-            anterior ([nombre][bandera] con truncate) colapsaba el
-            nombre a 0px cuando el user tenía text-zoom de accesibilidad
-            (iOS/Chrome "Tamaño del texto") y solo se veían banderas
-            (feedback 2026-06-11). line-clamp-2 + overflow-wrap parte
-            el nombre en 2 líneas en vez de esconderlo. */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
+        {/* Teams + score / inputs — layout a prueba de font-boost (v2).
+            Fila A: SOLO elementos de ancho fijo o acotado (banderas
+            24px shrink-0, inputs 52px, divisor div fijo — NO texto que
+            escale). Fila B: los nombres en 2 columnas de ~50% del card.
+            La v1 (nombre bajo bandera en columnas flex-1 laterales)
+            colapsaba con text-zoom de accesibilidad 2x: el centro crecía
+            con la fuente y aplastaba los lados a ~14px → bandera
+            encogida (max-width:100% del preflight) + nombre a 1 letra
+            por línea (feedback fede 2026-06-11). Con los nombres en su
+            propia fila ya no compiten con el centro: a 3x boost siguen
+            teniendo media card de ancho para partir en 2 líneas. */}
+        <div className="max-w-[340px] mx-auto">
+          <div className="flex w-full items-center justify-center gap-2">
             <TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} />
-            <p className="w-full text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere] line-clamp-2">
-              {match.home_team}
-            </p>
-          </div>
-
-          <div className="flex-shrink-0 flex items-center gap-2">
             {!editable ? (
-              <div className="flex items-center gap-1.5 px-1.5">
+              <>
                 <span
-                  className={`score-font leading-none ${
-                    isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
+                  className={`grid h-[52px] w-[52px] shrink-0 place-items-center overflow-hidden score-font text-[32px] leading-none [-webkit-text-size-adjust:none] [text-size-adjust:none] ${
+                    isLive ? "text-gold" : "text-text-primary"
                   }`}
                   style={{ fontFeatureSettings: '"tnum"' }}
                 >
                   {match.home_score ?? "—"}
                 </span>
-                <span className="text-text-primary/40 text-lg">—</span>
                 <span
-                  className={`score-font leading-none ${
-                    isLive ? "text-gold text-[36px]" : "text-text-primary text-[30px]"
+                  aria-hidden="true"
+                  className="h-0.5 w-5 shrink-0 rounded-full bg-text-primary/40"
+                />
+                <span
+                  className={`grid h-[52px] w-[52px] shrink-0 place-items-center overflow-hidden score-font text-[32px] leading-none [-webkit-text-size-adjust:none] [text-size-adjust:none] ${
+                    isLive ? "text-gold" : "text-text-primary"
                   }`}
                   style={{ fontFeatureSettings: '"tnum"' }}
                 >
                   {match.away_score ?? "—"}
                 </span>
-              </div>
+              </>
             ) : (() => {
               // Visual cue para pronósticos vacíos en matches editables:
               // borde rojo + asterisco arriba. Una vez que el user
@@ -448,7 +452,7 @@ function MatchRow({
               const homeMissing = effectiveDraft.home === "" && !touched && !pred;
               const awayMissing = effectiveDraft.away === "" && !touched && !pred;
               const inputClass = (missing: boolean) =>
-                `w-[52px] h-[52px] text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all ${
+                `h-[52px] w-[52px] shrink-0 text-center score-font text-[28px] rounded-[14px] outline-none bg-bg-elevated text-text-primary transition-all [-webkit-text-size-adjust:none] [text-size-adjust:none] ${
                   missing
                     ? "border-red-alert shadow-[0_0_0_2px_rgba(255,61,87,0.30)] focus:border-red-alert"
                     : touched
@@ -456,21 +460,27 @@ function MatchRow({
                       : "border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.3)]"
                 }`;
               return (
-                <div className="flex items-center gap-2">
+                <>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={0}
                     max={20}
                     value={effectiveDraft.home}
                     ref={homeRef ?? undefined}
                     onChange={(e) => onDraftChange("home", e.target.value)}
                     placeholder=""
+                    aria-label={match.home_team}
                     className={inputClass(homeMissing)}
                     style={{ border: "2px solid" }}
                   />
-                  <span className="text-text-primary/40 font-bold">—</span>
+                  <span
+                    aria-hidden="true"
+                    className="h-0.5 w-5 shrink-0 rounded-full bg-text-primary/40"
+                  />
                   <input
                     type="number"
+                    inputMode="numeric"
                     min={0}
                     max={20}
                     value={effectiveDraft.away}
@@ -480,17 +490,24 @@ function MatchRow({
                       if (e.target.value.length >= 1) onJumpNext();
                     }}
                     placeholder=""
+                    aria-label={match.away_team}
                     className={inputClass(awayMissing)}
                     style={{ border: "2px solid" }}
                   />
-                </div>
+                </>
               );
             })()}
+            <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
           </div>
 
-          <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
-            <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
-            <p className="w-full text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere] line-clamp-2">
+          {/* Sin line-clamp a propósito: con boost 3x un nombre largo no
+              cabe en 2 líneas y el clamp lo volvería a esconder. Wrap
+              libre — el espacio vertical es gratis. */}
+          <div className="mt-1.5 grid w-full grid-cols-2 gap-x-3">
+            <p className="min-w-0 px-1 text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere]">
+              {match.home_team}
+            </p>
+            <p className="min-w-0 px-1 text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere]">
               {match.away_team}
             </p>
           </div>

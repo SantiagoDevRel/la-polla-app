@@ -14,7 +14,7 @@
 // Razón: el diseño previo (geo-redirect + set-cookie en chickenpicks.app)
 // envenenaba el dominio EN con una cookie 'es' para visitantes desde CO,
 // haciendo que próximas visitas a chickenpicks.app vieran ES en vez de EN.
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
 type Locale = "es" | "en";
@@ -60,6 +60,19 @@ function resolveLocale(request: NextRequest, host: string): Locale {
 
 export async function middleware(request: NextRequest) {
   const host = (request.headers.get("host") ?? "").toLowerCase();
+
+  // www → apex, 308 permanente. Las cookies de Supabase son host-only
+  // (sin Domain=): un user logueado en lapollacolombiana.com que entra
+  // por www.lapollacolombiana.com cae en un cookie jar VACÍO y la app lo
+  // manda a /login aunque tenga sesión válida en el apex ("me pide login
+  // cada vez", reporte Fede/Lady 2026-06-11). Un solo host canónico
+  // elimina la dualidad. Aplica a ambos dominios (www.chickenpicks.app
+  // incluido). En localhost/preview no hay www, no-op.
+  if (host.startsWith("www.")) {
+    const url = new URL(request.nextUrl.pathname + request.nextUrl.search, `https://${host.slice(4)}`);
+    return NextResponse.redirect(url, 308);
+  }
+
   const locale = resolveLocale(request, host);
 
   // Stamp del locale en headers del request para que i18n/request.ts lo
