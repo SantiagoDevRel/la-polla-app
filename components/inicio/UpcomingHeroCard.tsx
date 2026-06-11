@@ -14,9 +14,19 @@ import { isPlaceholderTeam } from "@/lib/matches/is-placeholder";
 interface UpcomingHeroCardProps extends Omit<MatchHeroProps, "onHomeTeamClick" | "onAwayTeamClick" | "onTap"> {
   /** Slug interno del torneo (worldcup_2026) — alimenta /api/teams/info. */
   tournament: string;
+  /** Contexto de polla para que el sheet permita guardar pronósticos. */
+  pollaSlug: string;
+  pollaName: string;
+  pollaMatchIds: string[] | null;
 }
 
-export default function UpcomingHeroCard({ tournament, ...heroProps }: UpcomingHeroCardProps) {
+export default function UpcomingHeroCard({
+  tournament,
+  pollaSlug,
+  pollaName,
+  pollaMatchIds,
+  ...heroProps
+}: UpcomingHeroCardProps) {
   const [teamSheet, setTeamSheet] = useState<{ team: string; flag: string | null } | null>(null);
 
   const home = heroProps.homeTeam;
@@ -43,6 +53,9 @@ export default function UpcomingHeroCard({ tournament, ...heroProps }: UpcomingH
           fallbackFlag={teamSheet.flag}
           tournament={tournament}
           onClose={() => setTeamSheet(null)}
+          pollaSlug={pollaSlug}
+          pollaName={pollaName}
+          pollaMatchIds={pollaMatchIds}
         />
       )}
     </>

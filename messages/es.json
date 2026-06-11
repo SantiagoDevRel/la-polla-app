@@ -864,6 +864,12 @@
     "loadError": "No pudimos cargar la info del equipo",
     "retry": "Reintentar",
     "openAria": "Ver info de {team}",
-    "vs": "vs"
+    "vs": "vs",
+    "groupTitleLetter": "Grupo {letter}",
+    "predSave": "Guardar",
+    "predSaving": "Guardando…",
+    "predSavedChip": "Guardado",
+    "predSaveError": "No se pudo guardar el pronóstico",
+    "predSavedMini": "Pronóstico guardado"
   }
 }

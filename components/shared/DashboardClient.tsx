@@ -139,7 +139,11 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                         </span>
                       )}
                     </div>
-                    <span style={{ fontSize: 9, fontWeight: 600, color: "#b0b8c8", textAlign: "center", maxWidth: 46, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {/* Wrap libre, sin nowrap/ellipsis/maxWidth fijo: con
+                        text-zoom de accesibilidad la fuente escala pero los
+                        px fijos no, y el nombre quedaba en 2-3 letras.
+                        Mismo patrón que el fix de /pollas/[slug]. */}
+                    <span style={{ fontSize: 9, fontWeight: 600, color: "#b0b8c8", textAlign: "center", width: "100%", overflowWrap: "anywhere", lineHeight: 1.2 }}>
                       {match.home_team}
                     </span>
                   </div>
@@ -173,7 +177,11 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                         </span>
                       )}
                     </div>
-                    <span style={{ fontSize: 9, fontWeight: 600, color: "#b0b8c8", textAlign: "center", maxWidth: 46, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {/* Wrap libre, sin nowrap/ellipsis/maxWidth fijo: con
+                        text-zoom de accesibilidad la fuente escala pero los
+                        px fijos no, y el nombre quedaba en 2-3 letras.
+                        Mismo patrón que el fix de /pollas/[slug]. */}
+                    <span style={{ fontSize: 9, fontWeight: 600, color: "#b0b8c8", textAlign: "center", width: "100%", overflowWrap: "anywhere", lineHeight: 1.2 }}>
                       {match.away_team}
                     </span>
                   </div>

@@ -965,6 +965,9 @@ export default async function InicioPage() {
                         <UpcomingHeroCard
                           {...heroPropsFromDb(m, locale)}
                           tournament={m.tournament}
+                          pollaSlug={polla.slug}
+                          pollaName={polla.name}
+                          pollaMatchIds={polla.match_ids ?? null}
                           myPrediction={myPred ?? undefined}
                           quickPickSlot={
                             <QuickPickStrip

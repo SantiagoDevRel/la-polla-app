@@ -874,9 +874,21 @@ sheet con su ficha. Cero APIs externas (free-tier intacto).
   invictas), próximos, y la mini-tabla del grupo **inferida de los
   fixtures** (los 4 de un grupo solo juegan entre sí en group_stage —
   componente conexo; la DB no guarda letra de grupo). Cache privada 60s.
-- `lib/teams/worldcup-facts.ts` — estático: nameEs, ranking FIFA
-  (nov-2025, aproximado, editar a mano), confederación, participaciones,
+- `lib/teams/worldcup-facts.ts` — estático: nameEs, **ranking FIFA y
+  letra de grupo OFICIALES** (baked de inside.fifa.com/api/ranking-overview
+  y api.fifa.com/api/v3/calendar/matches idSeason=285023 — scripts
+  one-off en Downloads/fifa-bake.mjs + inject-fifa-facts.mjs; re-correr
+  cuando FIFA publique ranking nuevo), confederación, participaciones,
   mejor resultado histórico. Keys = nombres EXACTOS de `matches.home_team`.
+- **Pronósticos inline en "Próximos"** (2026-06-11): cada fila pronosticable
+  trae inputs + botón-icono ✓ en UNA línea con autojump. Guarda por el
+  MISMO `POST /api/pollas/[slug]/predictions` (single source of truth;
+  el GET nuevo en esa ruta prefillea). Props del sheet: `pollaSlug`,
+  `pollaName`, `pollaMatchIds`, `onPredictionSaved` (el page refetchea).
+  🚨 GOTCHA: los inputs son RELATIVOS al equipo del sheet (izq=equipo de
+  la ficha) pero `predictions` guarda home/away del MATCH — `savePrediction`
+  invierte cuando el equipo va de visitante. Sin esa inversión el marcador
+  se guarda al revés (bug real cazado en el test del 2026-06-11).
 - Entradas: `/pollas/[slug]` (MatchRow — bandera y nombre son `<button>`,
   gated con `isPlaceholderTeam` para slots "W93"/"1A") y `/inicio` strip
   Próximos (`components/inicio/UpcomingHeroCard.tsx`, wrapper cliente

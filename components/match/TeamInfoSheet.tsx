@@ -10,13 +10,15 @@
 // fijo) para sobrevivir text-zoom de accesibilidad.
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import axios from "axios";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
-import { X, CalendarDays, Shield } from "lucide-react";
+import { X, CalendarDays, Shield, Check } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import { getTeamFacts } from "@/lib/teams/worldcup-facts";
 import { DURATION, EASE } from "@/lib/animations";
@@ -66,6 +68,23 @@ interface TeamInfoSheetProps {
   fallbackFlag: string | null;
   tournament: string;
   onClose: () => void;
+  /** Contexto de polla: habilita inputs de pronóstico en "Próximos".
+   *  Guarda por el MISMO endpoint que el resto de la app
+   *  (POST /api/pollas/[slug]/predictions — único source of truth). */
+  pollaSlug?: string;
+  pollaName?: string;
+  /** pollas.match_ids — solo los partidos de la polla son pronosticables.
+   *  null/undefined = polla dinámica (todos los del torneo valen; el
+   *  server valida igual). */
+  pollaMatchIds?: string[] | null;
+  /** Avisar al caller que se guardó (el page de la polla refetchea su
+   *  estado para que /pollas muestre el mismo dato al instante). */
+  onPredictionSaved?: () => void;
+}
+
+/** Lock espejo del trigger check_prediction_lock: 5 min antes del kickoff. */
+function isLockedForPrediction(scheduledAt: string): boolean {
+  return new Date(scheduledAt).getTime() - 5 * 60 * 1000 <= Date.now();
 }
 
 // ─── Helpers ───
@@ -108,12 +127,31 @@ function fmtShortDate(iso: string, locale: string): string {
 
 // ─── Componente ───
 
-export default function TeamInfoSheet({ team, fallbackFlag, tournament, onClose }: TeamInfoSheetProps) {
+export default function TeamInfoSheet({
+  team,
+  fallbackFlag,
+  tournament,
+  onClose,
+  pollaSlug,
+  pollaName,
+  pollaMatchIds,
+  onPredictionSaved,
+}: TeamInfoSheetProps) {
   const t = useTranslations("TeamInfo");
   const locale = useLocale();
+  const router = useRouter();
+  const { showToast } = useToast();
   const [info, setInfo] = useState<TeamInfo | null>(null);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Pronósticos guardados del user en esta polla (match_id → score) +
+  // drafts de los inputs + qué fila está guardando.
+  const [savedPreds, setSavedPreds] = useState<Record<string, { home: number; away: number }>>({});
+  const [predDrafts, setPredDrafts] = useState<Record<string, { home: string; away: string }>>({});
+  const [savingMatchId, setSavingMatchId] = useState<string | null>(null);
+  // Refs de los inputs del rival para el autojump (tipear marcador del
+  // equipo → saltar al del rival).
+  const rivalScoreRefs = useRef<Record<string, HTMLInputElement | null>>({});
   // Portal a document.body: los ancestros del page traen transforms de
   // framer-motion que crean stacking contexts y dejarían el sheet DEBAJO
   // del BottomNav (z-50) aunque tenga z mayor. mounted evita el portal
@@ -140,6 +178,64 @@ export default function TeamInfoSheet({ team, fallbackFlag, tournament, onClose 
       .catch(() => { if (!cancelled) setError(true); });
     return () => { cancelled = true; };
   }, [team, tournament, reloadKey]);
+
+  // Pronósticos existentes del user en la polla — prefillean los inputs.
+  // Best-effort: si falla, los inputs arrancan vacíos y el POST igual valida.
+  useEffect(() => {
+    if (!pollaSlug) return;
+    let cancelled = false;
+    axios
+      .get<{ predictions: Array<{ match_id: string; predicted_home: number; predicted_away: number }> }>(
+        `/api/pollas/${pollaSlug}/predictions`,
+      )
+      .then((res) => {
+        if (cancelled) return;
+        const map: Record<string, { home: number; away: number }> = {};
+        for (const p of res.data.predictions) {
+          map[p.match_id] = { home: p.predicted_home, away: p.predicted_away };
+        }
+        setSavedPreds(map);
+      })
+      .catch(() => { /* inputs vacíos */ });
+    return () => { cancelled = true; };
+  }, [pollaSlug]);
+
+  // ⚠️ Los drafts del sheet son RELATIVOS al equipo de la ficha (input
+  // izquierdo = equipo del sheet, derecho = rival), pero predictions
+  // guarda home/away del MATCH. Si el equipo del sheet juega de
+  // visitante hay que invertir al guardar y al prefillear — sin esto se
+  // guardaba el marcador al revés (bug real cazado en el test del
+  // 2026-06-11: "Sudáfrica 2-1" se escribió como Chequia 2-1).
+  const savePrediction = async (m: SheetMatch) => {
+    if (!pollaSlug || savingMatchId) return;
+    const draft = predDrafts[m.id];
+    const teamScore = parseInt(draft?.home ?? "", 10);
+    const rivalScore = parseInt(draft?.away ?? "", 10);
+    if (Number.isNaN(teamScore) || Number.isNaN(rivalScore)) return;
+    const teamIsHome = m.home_team === team;
+    const home = teamIsHome ? teamScore : rivalScore;
+    const away = teamIsHome ? rivalScore : teamScore;
+    setSavingMatchId(m.id);
+    try {
+      await axios.post(`/api/pollas/${pollaSlug}/predictions`, {
+        matchId: m.id,
+        predictedHome: home,
+        predictedAway: away,
+      });
+      setSavedPreds((prev) => ({ ...prev, [m.id]: { home, away } }));
+      // Toast minimalista, no invasivo (pedido user 2026-06-11).
+      showToast(t("predSavedMini"), "success");
+      onPredictionSaved?.();
+      router.refresh();
+    } catch (err) {
+      const msg = axios.isAxiosError(err)
+        ? (err.response?.data as { error?: string } | undefined)?.error
+        : null;
+      showToast(msg && msg !== "payment_required" ? msg : t("predSaveError"), "error");
+    } finally {
+      setSavingMatchId(null);
+    }
+  };
 
   // Escape para cerrar + scroll-lock del body mientras el sheet está abierto.
   useEffect(() => {
@@ -190,9 +286,9 @@ export default function TeamInfoSheet({ team, fallbackFlag, tournament, onClose 
         exit={{ y: "100%" }}
         transition={{ duration: DURATION.medium, ease: EASE.default }}
       >
-        <div className="bg-card border border-border-subtle rounded-t-[24px] sm:rounded-[24px] shadow-[0_-8px_40px_rgba(0,0,0,0.5)] max-h-[85vh] overflow-y-auto overscroll-contain">
+        <div className="bg-bg-card border border-border-subtle rounded-t-[24px] sm:rounded-[24px] shadow-[0_-8px_40px_rgba(0,0,0,0.5)] max-h-[85vh] overflow-y-auto overscroll-contain">
           {/* Grab handle + close */}
-          <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm pt-3 pb-2 px-4 rounded-t-[24px]">
+          <div className="sticky top-0 z-10 bg-bg-card/95 backdrop-blur-sm pt-3 pb-2 px-4 rounded-t-[24px]">
             <div className="w-10 h-1 rounded-full bg-border-subtle mx-auto mb-2 sm:hidden" aria-hidden="true" />
             <div className="flex items-start gap-3">
               <FlagCircle team={team} apiFlag={fallbackFlag} size={44} />
@@ -331,7 +427,7 @@ export default function TeamInfoSheet({ team, fallbackFlag, tournament, onClose 
                 {info.group && info.group.length > 0 ? (
                   <section className="space-y-2">
                     <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-primary/70">
-                      {t("groupTitle")}
+                      {facts?.group ? t("groupTitleLetter", { letter: facts.group }) : t("groupTitle")}
                     </h3>
                     <div className="bg-bg-elevated border border-border-subtle rounded-xl overflow-hidden">
                       <div className="grid grid-cols-[1.25rem_1fr_2rem_2rem_2.25rem] gap-1 px-3 py-1.5 text-[9px] uppercase tracking-[0.06em] text-text-muted border-b border-border-subtle">
@@ -379,33 +475,106 @@ export default function TeamInfoSheet({ team, fallbackFlag, tournament, onClose 
                     </h3>
                     <ul className="space-y-1.5">
                       {[...info.live, ...info.upcoming].map((m) => {
-                        const rival = m.home_team === team ? m.away_team : m.home_team;
-                        const rivalFlag = m.home_team === team ? m.away_team_flag : m.home_team_flag;
+                        const teamIsHome = m.home_team === team;
+                        const rival = teamIsHome ? m.away_team : m.home_team;
+                        const rivalFlag = teamIsHome ? m.away_team_flag : m.home_team_flag;
                         const isLive = m.status === "live";
+                        // Pronosticable: hay polla en contexto, el match es de
+                        // la polla, está scheduled y faltan >5 min (espejo del
+                        // trigger check_prediction_lock — el server revalida).
+                        const inPolla = !pollaMatchIds || pollaMatchIds.length === 0 || pollaMatchIds.includes(m.id);
+                        const canPredict =
+                          Boolean(pollaSlug) && inPolla && m.status === "scheduled" && !isLockedForPrediction(m.scheduled_at);
+                        const saved = savedPreds[m.id];
+                        // Drafts RELATIVOS al equipo del sheet: home=izq=equipo
+                        // de la ficha, away=der=rival. savePrediction invierte
+                        // a home/away del match cuando el equipo va de visitante.
+                        const savedLeft = saved ? (teamIsHome ? saved.home : saved.away) : null;
+                        const savedRight = saved ? (teamIsHome ? saved.away : saved.home) : null;
+                        const draft = predDrafts[m.id] ?? {
+                          home: savedLeft !== null ? String(savedLeft) : "",
+                          away: savedRight !== null ? String(savedRight) : "",
+                        };
+                        const draftComplete = draft.home !== "" && draft.away !== "";
+                        const matchesSaved =
+                          saved && draft.home === String(savedLeft) && draft.away === String(savedRight);
+                        const setDraft = (side: "home" | "away", val: string) =>
+                          setPredDrafts((prev) => ({ ...prev, [m.id]: { ...draft, [side]: val } }));
+                        const predInputCls =
+                          "w-9 h-9 text-center score-font text-[16px] rounded-[10px] outline-none bg-bg-card text-text-primary border border-border-subtle focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,215,0,0.25)] transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
                         return (
-                          <li key={m.id} className="flex items-center gap-2 bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2">
-                            {/* [bandera del equipo del sheet] vs [bandera rival] Rival —
-                                ancla visual de a quién pertenece la ficha (feedback
-                                user: "vs Chequia" solo no se entendía). */}
-                            <FlagCircle team={team} apiFlag={info.flag ?? fallbackFlag} size={20} />
-                            <span className="flex-shrink-0 text-[10px] font-semibold uppercase text-text-muted">
+                          <li key={m.id} className="flex items-center gap-1.5 bg-bg-elevated border border-border-subtle rounded-xl px-2.5 py-2">
+                            {/* Una sola línea: [bandera equipo] vs [bandera rival]
+                                Rival(+fecha chiquita) [input]-[input] [icono ✓].
+                                La bandera del equipo de la ficha ancla la fila. */}
+                            <FlagCircle team={team} apiFlag={info.flag ?? fallbackFlag} size={18} />
+                            <span className="flex-shrink-0 text-[9px] font-semibold uppercase text-text-muted">
                               {t("vs")}
                             </span>
-                            <FlagCircle team={rival} apiFlag={rivalFlag} size={20} />
-                            <span className="flex-1 min-w-0 text-xs text-text-primary [overflow-wrap:anywhere] line-clamp-1">
-                              {displayName(rival)}
+                            <FlagCircle team={rival} apiFlag={rivalFlag} size={18} />
+                            <span className="flex-1 min-w-0">
+                              <span className="block text-xs text-text-primary [overflow-wrap:anywhere] line-clamp-1">
+                                {displayName(rival)}
+                              </span>
+                              <span className="block text-[9px] text-text-muted leading-tight">
+                                {fmtShortDate(m.scheduled_at, locale)}
+                              </span>
                             </span>
                             {isLive ? (
                               <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
                                 <span className="w-1.5 h-1.5 rounded-full bg-red-alert animate-pulse" />
                                 {t("liveBadge")}
                               </span>
-                            ) : (
-                              <span className="flex-shrink-0 text-[10px] text-text-secondary text-right leading-tight">
-                                {fmtShortDate(m.scheduled_at, locale)}
-                                {m.venue ? <span className="block text-text-muted">{m.venue}</span> : null}
+                            ) : canPredict ? (
+                              <span className="flex-shrink-0 inline-flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={0}
+                                  max={20}
+                                  value={draft.home}
+                                  onChange={(e) => {
+                                    setDraft("home", e.target.value);
+                                    // Autojump al input del rival apenas se tipea.
+                                    if (e.target.value.length >= 1) rivalScoreRefs.current[m.id]?.focus();
+                                  }}
+                                  aria-label={displayName(team)}
+                                  className={predInputCls}
+                                />
+                                <span className="text-text-primary/40 text-[10px] font-bold">–</span>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={0}
+                                  max={20}
+                                  value={draft.away}
+                                  onChange={(e) => setDraft("away", e.target.value)}
+                                  ref={(el) => { rivalScoreRefs.current[m.id] = el; }}
+                                  aria-label={displayName(rival)}
+                                  className={predInputCls}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => savePrediction(m)}
+                                  disabled={!draftComplete || Boolean(matchesSaved) || savingMatchId === m.id}
+                                  aria-label={matchesSaved ? t("predSavedChip") : t("predSave")}
+                                  title={matchesSaved ? t("predSavedChip") : t("predSave")}
+                                  className={`w-9 h-9 rounded-[10px] inline-flex items-center justify-center transition-all cursor-pointer disabled:cursor-default ${
+                                    matchesSaved
+                                      ? "bg-green-live/15 text-green-live border border-green-live/30"
+                                      : "bg-gold text-bg-base hover:brightness-110 disabled:opacity-40"
+                                  }`}
+                                >
+                                  <Check className={`w-4 h-4 ${savingMatchId === m.id ? "animate-pulse" : ""}`} aria-hidden="true" />
+                                </button>
                               </span>
-                            )}
+                            ) : saved ? (
+                              /* Bloqueado pero ya pronosticado: mostrar el pick
+                                 relativo al equipo de la ficha. */
+                              <span className="flex-shrink-0 score-font text-[15px] text-text-secondary" style={{ fontFeatureSettings: '"tnum"' }}>
+                                {savedLeft}–{savedRight}
+                              </span>
+                            ) : null}
                           </li>
                         );
                       })}

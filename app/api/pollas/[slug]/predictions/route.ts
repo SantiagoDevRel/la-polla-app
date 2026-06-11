@@ -1,8 +1,57 @@
-// app/api/pollas/[slug]/predictions/route.ts — Guardar o actualizar pronóstico de un partido
+// app/api/pollas/[slug]/predictions/route.ts — Guardar o actualizar pronóstico
+// de un partido (POST) y leer los pronósticos propios de la polla (GET —
+// lo usa el TeamInfoSheet para prefillear sus inputs de marcador).
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: { slug: string } }
+) {
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+
+    // Mismo workaround que el POST: lecturas via admin porque auth.uid()
+    // es NULL en el contexto PostgREST; el scope manual user_id/polla_id
+    // es el filtro de seguridad (defense-in-depth del CLAUDE.md).
+    const admin = createAdminClient();
+    const { data: polla } = await admin
+      .from("pollas")
+      .select("id")
+      .eq("slug", params.slug)
+      .single();
+    if (!polla) {
+      return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
+    }
+
+    const { data: participant } = await admin
+      .from("polla_participants")
+      .select("id, status")
+      .eq("polla_id", polla.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!participant || participant.status === "rejected") {
+      return NextResponse.json({ error: "No eres participante de esta polla" }, { status: 403 });
+    }
+
+    const { data: predictions } = await admin
+      .from("predictions")
+      .select("match_id, predicted_home, predicted_away")
+      .eq("polla_id", polla.id)
+      .eq("user_id", user.id);
+
+    return NextResponse.json({ predictions: predictions ?? [] });
+  } catch (error) {
+    console.error("Error leyendo pronósticos:", error);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}
 
 const predictionSchema = z.object({
   matchId: z.string().uuid("ID de partido inválido"),
