@@ -1009,15 +1009,55 @@ font-boosting: las FUENTES escalan ~1.3-1.5x pero los anchos fijos en px
 texto a **0px** bajo boost — el user ve solo banderas sin nombres
 (feedback real 2026-06-11, /pollas/[slug]).
 
-Reglas:
-- Nombre de equipo SIEMPRE apilado vertical (bandera arriba, nombre
-  abajo, `text-center line-clamp-2 [overflow-wrap:anywhere]`) — patrón
-  FotMob, nunca `truncate` horizontal compitiendo con un centro fijo.
+Reglas (v3, 2026-06-11 — la v1 "bandera arriba + nombre abajo en
+columnas laterales flex-1" TAMBIÉN falló con boost 2x: el centro crecía
+con la fuente y aplastaba los lados a ~14px → bandera encogida + 1 letra
+por línea, screenshot de Fede):
+- **El texto que debe verse siempre va en su PROPIA fila** donde no
+  compite con nada de ancho fijo. Patrón del MatchRow: Fila A = solo
+  elementos de ancho fijo (banderas 24px, inputs 52px, divisor `div`
+  fijo — JAMÁS un "—" de texto como separador, escala con el boost);
+  Fila B = nombres en `grid grid-cols-2`, media card cada uno,
+  `[overflow-wrap:anywhere]` SIN line-clamp (wrap libre; el clamp
+  re-esconde el nombre con boost 3x).
+- Dígitos/scores display: celda fija `h-[52px] w-[52px] overflow-hidden`
+  + `[-webkit-text-size-adjust:none]` para que el número no infle el row.
+- `next/image` dentro de flex comprimido SE ENCOGE (preflight pone
+  `max-width:100%`): siempre `className="h-6 w-6 max-w-none shrink-0"`.
 - Headers/navs: contenedor de texto `min-w-0 overflow-hidden` + íconos
   `flex-shrink-0` para que el texto clipee en vez de montarse encima.
 - Para testear: en DevTools correr boost 2-pass (capturar TODOS los
-  computed font-size primero, luego setear `el.style.fontSize = fs*1.5`)
-  y verificar que nada desaparezca ni se monte.
+  computed font-size primero, luego setear `el.style.fontSize = fs*2`)
+  y verificar que nada desaparezca ni se monte. Probar 320px y 430px.
+
+### Auth: cookies host-only + signOut global — por qué "me pide login cada vez" (2026-06-11)
+
+Tres reglas que salieron de la investigación del reporte de Fede/Lady
+(sesiones que no persistían en Chrome iPhone):
+
+1. **NUNCA `signOut()` on-mount en /login** (ni en ninguna página que un
+   user con sesión válida pueda visitar por accidente). supabase-js
+   `signOut()` default `scope:'global'` revoca TODAS las sesiones del
+   user en el server. El tile de "más visitados" de Chrome apuntando a
+   /login + signOut on-mount = sesión destruida en cada visita, en todos
+   los dispositivos. El cambio de cuenta se cubre server-side: verify-otp
+   y wa-magic hacen signOut en el request justo antes de mintear la
+   sesión nueva. Además el middleware redirige usuarios autenticados
+   fuera de /login y /verify (returnTo respetado, sanitizado).
+2. **www → apex 308 en el middleware raíz.** Las cookies de @supabase/ssr
+   son host-only (sin `Domain=`): www y apex son jars distintos. Sin el
+   redirect, un user logueado en el apex que entra por www aparece
+   deslogueado (evidencia: Lady con 7 sesiones vivas creadas en 3 días).
+3. **Todo redirect del middleware DESPUÉS de `getUser()` debe copiar las
+   cookies encoladas** (`redirectWithCookies` en lib/supabase/middleware.ts).
+   getUser() puede rotar el refresh token; un `NextResponse.redirect`
+   pelado descarta el Set-Cookie → el browser conserva el token viejo ya
+   consumido → reuse-detection revoca la familia → deslogueo fantasma.
+
+Diagnóstico rápido si vuelve a pasar: `SELECT created_at, user_agent FROM
+auth.sessions WHERE user_id='...'` — muchas sesiones jóvenes vivas = el
+browser llega sin cookies (jar/limpieza); una sola sesión sobreviviente =
+algo está revocando (signOut global).
 
 ### Matches: NUNCA usar `(tournament, scheduled_at)` como clave de unicidad
 

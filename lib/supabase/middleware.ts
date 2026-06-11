@@ -46,6 +46,30 @@ const PUBLIC_NO_AUTH_EXACT = new Set([
   "/twitter-image",
 ]);
 
+// Todo redirect emitido DESPUÉS de getUser() debe llevarse las cookies
+// que el client de Supabase haya encolado en supabaseResponse: getUser()
+// puede haber rotado el refresh token, y un redirect "pelado" descarta el
+// Set-Cookie → el browser se queda con el refresh token viejo (ya
+// consumido) → próximo request dispara reuse-detection y revoca la
+// familia entera de tokens → user deslogueado de la nada.
+function redirectWithCookies(url: URL, supabaseResponse: NextResponse) {
+  const redirect = NextResponse.redirect(url);
+  supabaseResponse.cookies.getAll().forEach((cookie) => {
+    redirect.cookies.set(cookie);
+  });
+  return redirect;
+}
+
+// returnTo sólo puede ser un path interno ("/algo"). Evita open-redirect
+// ("//evil.com" o "https://evil.com") desde el query param.
+function safeReturnTo(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes(":")) {
+    return null;
+  }
+  return raw;
+}
+
 export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
@@ -120,7 +144,22 @@ export async function updateSession(request: NextRequest) {
     const original = path + request.nextUrl.search;
     url.pathname = "/login";
     url.search = `?returnTo=${encodeURIComponent(original)}`;
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url, supabaseResponse);
+  }
+
+  // Usuario YA autenticado parado en /login o /verify → mandarlo a la app.
+  // Sin esto, la visita a /login con sesión válida es una trampa: el tile
+  // de "más visitados" de Chrome o un bookmark al login dejaban al user
+  // re-logueándose sin necesidad (y hasta 2026-06-11 un signOut() on-mount
+  // de /login le revocaba la sesión en TODOS los dispositivos). Cambiar de
+  // cuenta sigue siendo posible: Cerrar sesión en /perfil → /login.
+  if (user && (path.startsWith("/login") || path.startsWith("/verify"))) {
+    const url = request.nextUrl.clone();
+    const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));
+    const [pathname, search = ""] = (returnTo ?? "/inicio").split("?");
+    url.pathname = pathname;
+    url.search = search ? `?${search}` : "";
+    return redirectWithCookies(url, supabaseResponse);
   }
 
   // Onboarding gate — authenticated users without a real display_name or
@@ -172,7 +211,7 @@ export async function updateSession(request: NextRequest) {
         const url = request.nextUrl.clone();
         url.pathname = "/onboarding";
         url.search = "";
-        return NextResponse.redirect(url);
+        return redirectWithCookies(url, supabaseResponse);
       }
 
       // Onboarding completo — cachear para próximos requests (30 días).

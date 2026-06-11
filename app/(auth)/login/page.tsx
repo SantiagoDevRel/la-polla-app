@@ -11,13 +11,12 @@
 // que volvamos con un widget visible y testeado.
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import axios from "axios";
 import { useTranslations } from "next-intl";
-import { createClient } from "@/lib/supabase/client";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
 import { botDeepLink } from "@/lib/whatsapp/bot-phone";
@@ -50,7 +49,6 @@ function LoginInner() {
   const t = useTranslations("Login");
   const tc = useTranslations("Common");
   const searchParams = useSearchParams();
-  const supabase = useMemo(() => createClient(), []);
 
   const [step, setStep] = useState<Step>("input");
   // E.164 phone (e.g. "+573001234567") emitted by PhoneInput. The
@@ -101,15 +99,15 @@ function LoginInner() {
     ? Math.max(0, Math.ceil((cooldownUntil - nowTick) / 1000))
     : 0;
 
-  // Visiting /login means "I want to start fresh" — even if the user
-  // already has a session for another account (legitimate: same person
-  // can have a +57 account and a +351 account). Sign out on mount so
-  // the channel buttons below always create a brand-new session, and
-  // the user can't accidentally end up in the OLD account just because
-  // /inicio happened to render first.
-  useEffect(() => {
-    void supabase.auth.signOut().catch(() => {});
-  }, [supabase]);
+  // ⛔ Acá NO va ningún signOut() on-mount. Lo hubo (hasta 2026-06-11) y
+  // era un footgun: supabase-js signOut() default scope='global' revoca
+  // TODAS las sesiones del user en el server. Cualquier visita a /login
+  // con sesión válida (tile de "más visitados" de Chrome, bookmark, tab
+  // restaurado, link viejo) destruía la sesión en todos los dispositivos
+  // → "me pide login cada vez" (reportado por Fede/Lady). El caso real de
+  // cambio de cuenta queda cubierto: verify-otp y wa-magic hacen signOut
+  // server-side justo antes de mintear la sesión nueva, y además el
+  // middleware redirige usuarios autenticados fuera de /login.
 
   // Capturar returnTo + cargar preview de polla si viene de invite link.
   useEffect(() => {
