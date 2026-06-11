@@ -864,6 +864,12 @@
     "loadError": "Could not load team info",
     "retry": "Retry",
     "openAria": "View {team} info",
-    "vs": "vs"
+    "vs": "vs",
+    "groupTitleLetter": "Group {letter}",
+    "predSave": "Save",
+    "predSaving": "Saving…",
+    "predSavedChip": "Saved",
+    "predSaveError": "Could not save your prediction",
+    "predSavedMini": "Prediction saved"
   }
 }

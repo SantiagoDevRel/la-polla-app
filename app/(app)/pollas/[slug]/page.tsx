@@ -1852,6 +1852,19 @@ export default function PollaSlugPage() {
           fallbackFlag={teamSheet.flag}
           tournament={polla.tournament}
           onClose={() => setTeamSheet(null)}
+          pollaSlug={polla.slug}
+          pollaName={polla.name}
+          pollaMatchIds={polla.match_ids ?? null}
+          onPredictionSaved={async () => {
+            // Refetch para que la lista de partidos muestre el pick
+            // guardado desde el sheet — mismo patrón que el save-all.
+            try {
+              const { data } = await axios.get(`/api/pollas/${slug}`);
+              setPredictions(data.predictions);
+              setAllPredictions(data.allPredictions || []);
+              setPredictedUserIdsByMatch(data.predictedUserIdsByMatch || {});
+            } catch { /* el próximo load lo trae */ }
+          }}
         />
       )}
     </div>
