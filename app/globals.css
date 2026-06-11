@@ -216,3 +216,18 @@ a:focus-visible {
   outline: 2px solid rgba(255, 215, 0, 0.6);
   outline-offset: 2px;
 }
+
+/* Cinta de advertencia (AnnouncementTicker) — marquee infinito.
+   El track tiene 2 mitades identicas; -50% hace el loop seamless.
+   prefers-reduced-motion: el texto queda estatico (sin animacion). */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-ticker {
+  animation: ticker-scroll 16s linear infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker { animation: none; }
+}

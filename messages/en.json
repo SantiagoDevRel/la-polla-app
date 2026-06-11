@@ -25,6 +25,10 @@
     "wordmarkPart2": "PICKS",
     "wordmarkPart3": ""
   },
+  "Ticker": {
+    "predictionDeadline": "Scores can be entered up to 10 minutes before each match!",
+    "dismissAria": "Dismiss notice"
+  },
   "Nav": {
     "ariaNav": "Bottom navigation",
     "tabInicio": "Home",

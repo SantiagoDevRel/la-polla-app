@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
 import BottomNav from "@/components/nav/BottomNav";
 import { AppBackground } from "@/components/layout/AppBackground";
+import AnnouncementTicker from "@/components/layout/AnnouncementTicker";
 import BrandHeader from "@/components/layout/BrandHeader";
 import FontScaleApplier from "@/components/layout/FontScaleApplier";
 import SWAutoReload from "@/components/layout/SWAutoReload";
@@ -85,6 +86,10 @@ export default async function AppLayout({
       <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">
         <BrandHeader />
+        {/* Cinta roja de advertencia con marquee: pronósticos hasta 10 min
+            antes de cada partido (feedback 2026-06-11). Cerrable con X,
+            persiste en localStorage. */}
+        <AnnouncementTicker />
         {/* Pequeño respiro entre el header sticky y el contenido de la
             página. Antes el "Hola santi" del inicio (y otros titulares)
             quedaban pegados al header. */}
