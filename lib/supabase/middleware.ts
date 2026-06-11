@@ -12,6 +12,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createSbClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { needsName } from "@/lib/users/needs-name";
+import { safeReturnTo } from "@/lib/auth/safe-return-to";
 
 // Admin client built inline so middleware doesn't pull lib/supabase/admin
 // (which is fine, but keeps the dependency surface here explicit).
@@ -58,16 +59,6 @@ function redirectWithCookies(url: URL, supabaseResponse: NextResponse) {
     redirect.cookies.set(cookie);
   });
   return redirect;
-}
-
-// returnTo sólo puede ser un path interno ("/algo"). Evita open-redirect
-// ("//evil.com" o "https://evil.com") desde el query param.
-function safeReturnTo(raw: string | null): string | null {
-  if (!raw) return null;
-  if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes(":")) {
-    return null;
-  }
-  return raw;
 }
 
 export async function updateSession(request: NextRequest) {

@@ -16,6 +16,7 @@ import {
 } from "@/lib/pollitos";
 import FootballLoader from "@/components/ui/FootballLoader";
 import { needsName } from "@/lib/users/needs-name";
+import { safeReturnTo } from "@/lib/auth/safe-return-to";
 
 function StepDots({
   total,
@@ -114,10 +115,14 @@ export default function OnboardingPage() {
         display_name: name.trim(),
         avatar_url: selectedPollito,
       });
+      // safeReturnTo: solo paths internos — cierra open redirect vía
+      // sessionStorage envenenado (hallazgo codex 2026-06-11).
       const rt = typeof window !== "undefined"
-        ? window.sessionStorage.getItem("lp_returnTo")
+        ? safeReturnTo(window.sessionStorage.getItem("lp_returnTo"))
         : null;
-      if (rt) window.sessionStorage.removeItem("lp_returnTo");
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("lp_returnTo");
+      }
       router.push(rt || "/inicio");
     } catch {
       setError(t("errSaveProfile"));
