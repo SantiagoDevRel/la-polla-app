@@ -79,7 +79,11 @@ function TabItem({
     <Link
       href={href}
       className={cn(
-        "flex flex-col items-center justify-center flex-1 min-h-[44px] gap-0.5 relative",
+        // min-w-0 + truncate en el label: con text-zoom de accesibilidad
+        // los labels crecían, apretaban los tabs y el badge de un tab
+        // sangraba encima del ícono vecino (feedback 2026-06-11). El
+        // label se trunca antes de deformar el nav.
+        "flex flex-col items-center justify-center flex-1 min-w-0 min-h-[44px] gap-0.5 relative px-0.5",
         active ? "text-gold" : "text-text-muted",
       )}
     >
@@ -88,7 +92,7 @@ function TabItem({
         {showBadge && (
           <span
             className={cn(
-              "absolute -top-1 -right-2 min-w-[14px] h-[14px] px-[3px] rounded-full text-[9px] font-bold leading-[14px] text-center border-[2px] border-bg-base",
+              "absolute -top-1 -right-1.5 min-w-[14px] h-[14px] px-[3px] rounded-full text-[9px] font-bold leading-[14px] text-center border-[2px] border-bg-base",
               badgeBg,
             )}
             aria-label={`${badge} ${badgeLabelPrefix ?? t("ariaUnread")}`}
@@ -97,7 +101,7 @@ function TabItem({
           </span>
         )}
       </span>
-      <span className="font-body text-[10px] font-semibold">{t(labelKey)}</span>
+      <span className="font-body text-[10px] font-semibold max-w-full truncate">{t(labelKey)}</span>
     </Link>
   );
 }

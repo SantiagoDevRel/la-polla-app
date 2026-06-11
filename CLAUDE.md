@@ -1000,6 +1000,25 @@ su archivo `supabase/migrations/NNN_*.sql` **en el mismo commit**. La migración
 061 es el snapshot verbatim del estado real de prod al 2026-06-10 — si tocás
 una función, basate en 061+, no en la migración vieja que la creó.
 
+### El layout debe tolerar text-zoom de accesibilidad (±50% font scale)
+
+Usuarios iPhone con "Tamaño del texto" de iOS/Chrome agrandado reciben
+font-boosting: las FUENTES escalan ~1.3-1.5x pero los anchos fijos en px
+(inputs `w-[52px]`, banderas 24px) NO. Cualquier fila con centro
+`flex-shrink-0` + lados `flex-1 min-w-0` + texto `truncate` colapsa el
+texto a **0px** bajo boost — el user ve solo banderas sin nombres
+(feedback real 2026-06-11, /pollas/[slug]).
+
+Reglas:
+- Nombre de equipo SIEMPRE apilado vertical (bandera arriba, nombre
+  abajo, `text-center line-clamp-2 [overflow-wrap:anywhere]`) — patrón
+  FotMob, nunca `truncate` horizontal compitiendo con un centro fijo.
+- Headers/navs: contenedor de texto `min-w-0 overflow-hidden` + íconos
+  `flex-shrink-0` para que el texto clipee en vez de montarse encima.
+- Para testear: en DevTools correr boost 2-pass (capturar TODOS los
+  computed font-size primero, luego setear `el.style.fontSize = fs*1.5`)
+  y verificar que nada desaparezca ni se monte.
+
 ### Matches: NUNCA usar `(tournament, scheduled_at)` como clave de unicidad
 
 En la mayoría de torneos juegan **varios partidos en paralelo** al mismo

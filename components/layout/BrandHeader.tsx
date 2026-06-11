@@ -25,17 +25,21 @@ export default function BrandHeader() {
       }}
     >
       <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        {/* min-w-0 + overflow-hidden: con text-zoom de accesibilidad el
+            wordmark crecía y se metía DEBAJO de las burbujas (overlap
+            feo, feedback 2026-06-11). Preferimos clipear el wordmark
+            antes que taparlo con los botones. */}
+        <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/pollitos/pollito_pibe_lider.webp"
             alt=""
             width={44}
             height={44}
-            style={{ objectFit: "contain" }}
+            style={{ objectFit: "contain", flexShrink: 0 }}
           />
           <span
-            className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px]"
+            className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px] whitespace-nowrap"
             style={{
               fontSize: 20,
               textShadow: "0 2px 6px rgba(0,0,0,0.55)",
@@ -57,7 +61,7 @@ export default function BrandHeader() {
             )}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <ReportProblemBubble size={34} />
           <WhatsAppBubble size={34} />
         </div>
