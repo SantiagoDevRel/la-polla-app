@@ -133,7 +133,6 @@ export default function TeamInfoSheet({
   tournament,
   onClose,
   pollaSlug,
-  pollaName,
   pollaMatchIds,
   onPredictionSaved,
 }: TeamInfoSheetProps) {
