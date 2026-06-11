@@ -403,17 +403,20 @@ function MatchRow({
           )}
         </div>
 
-        {/* Teams + score / inputs */}
+        {/* Teams + score / inputs. Cada lado apila bandera arriba +
+            nombre abajo (patrón FotMob, igual que DashboardClient).
+            El nombre debe mostrarse SIEMPRE: el layout horizontal
+            anterior ([nombre][bandera] con truncate) colapsaba el
+            nombre a 0px cuando el user tenía text-zoom de accesibilidad
+            (iOS/Chrome "Tamaño del texto") y solo se veían banderas
+            (feedback 2026-06-11). line-clamp-2 + overflow-wrap parte
+            el nombre en 2 líneas en vez de esconderlo. */}
         <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0 text-right">
-            <div className="flex items-center justify-end gap-2">
-              <p className="font-semibold text-[13px] text-text-primary truncate min-w-0">
-                {match.home_team}
-              </p>
-              <span className="flex-shrink-0">
-                <TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} />
-              </span>
-            </div>
+          <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
+            <TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} />
+            <p className="w-full text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere] line-clamp-2">
+              {match.home_team}
+            </p>
           </div>
 
           <div className="flex-shrink-0 flex items-center gap-2">
@@ -485,15 +488,11 @@ function MatchRow({
             })()}
           </div>
 
-          <div className="flex-1 min-w-0 text-left">
-            <div className="flex items-center gap-2">
-              <span className="flex-shrink-0">
-                <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
-              </span>
-              <p className="font-semibold text-[13px] text-text-primary truncate min-w-0">
-                {match.away_team}
-              </p>
-            </div>
+          <div className="flex-1 min-w-0 flex flex-col items-center gap-1">
+            <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
+            <p className="w-full text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere] line-clamp-2">
+              {match.away_team}
+            </p>
           </div>
         </div>
 
