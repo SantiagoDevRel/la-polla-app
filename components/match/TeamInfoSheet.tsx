@@ -278,18 +278,23 @@ export default function TeamInfoSheet({ team, fallbackFlag, tournament, onClose 
                       {info.played.map((m) => {
                         const badge = resultBadge(m);
                         const rival = m.home_team === team ? m.away_team : m.home_team;
+                        const rivalFlag = m.home_team === team ? m.away_team_flag : m.home_team_flag;
                         const score = `${m.home_score ?? 0}–${m.away_score ?? 0}`;
                         const teamFirst = m.home_team === team;
                         return (
-                          <li key={m.id} className="flex items-center gap-2.5 bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2">
+                          <li key={m.id} className="flex items-center gap-2 bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2">
                             <span className={`flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-[10px] font-bold ${badge.cls}`}>
                               {badge.letter}
                             </span>
                             <span className="score-font text-[18px] text-text-primary flex-shrink-0" style={{ fontFeatureSettings: '"tnum"' }}>
                               {teamFirst ? score : `${m.away_score ?? 0}–${m.home_score ?? 0}`}
                             </span>
+                            <span className="flex-shrink-0 text-[10px] font-semibold uppercase text-text-muted">
+                              {t("vs")}
+                            </span>
+                            <FlagCircle team={rival} apiFlag={rivalFlag} size={18} />
                             <span className="flex-1 min-w-0 text-xs text-text-secondary [overflow-wrap:anywhere] line-clamp-1">
-                              {t("vsRival", { rival: displayName(rival) })}
+                              {displayName(rival)}
                             </span>
                             <span className="flex-shrink-0 text-[10px] text-text-muted">
                               {fmtShortDate(m.scheduled_at, locale).split(",")[0]}
@@ -375,12 +380,20 @@ export default function TeamInfoSheet({ team, fallbackFlag, tournament, onClose 
                     <ul className="space-y-1.5">
                       {[...info.live, ...info.upcoming].map((m) => {
                         const rival = m.home_team === team ? m.away_team : m.home_team;
+                        const rivalFlag = m.home_team === team ? m.away_team_flag : m.home_team_flag;
                         const isLive = m.status === "live";
                         return (
-                          <li key={m.id} className="flex items-center gap-2.5 bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2">
-                            <FlagCircle team={rival} apiFlag={m.home_team === team ? m.away_team_flag : m.home_team_flag} size={20} />
+                          <li key={m.id} className="flex items-center gap-2 bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2">
+                            {/* [bandera del equipo del sheet] vs [bandera rival] Rival —
+                                ancla visual de a quién pertenece la ficha (feedback
+                                user: "vs Chequia" solo no se entendía). */}
+                            <FlagCircle team={team} apiFlag={info.flag ?? fallbackFlag} size={20} />
+                            <span className="flex-shrink-0 text-[10px] font-semibold uppercase text-text-muted">
+                              {t("vs")}
+                            </span>
+                            <FlagCircle team={rival} apiFlag={rivalFlag} size={20} />
                             <span className="flex-1 min-w-0 text-xs text-text-primary [overflow-wrap:anywhere] line-clamp-1">
-                              {t("vsRival", { rival: displayName(rival) })}
+                              {displayName(rival)}
                             </span>
                             {isLive ? (
                               <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-red-alert/15 border border-red-alert/30 text-red-alert text-[10px] font-bold uppercase tracking-[0.08em]">
