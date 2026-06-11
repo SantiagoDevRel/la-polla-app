@@ -348,6 +348,9 @@ function MatchRow({
   // (los slots de bracket "W93"/"1A" no tienen ficha que mostrar).
   const homeClickable = !isPlaceholderTeam(match.home_team);
   const awayClickable = !isPlaceholderTeam(match.away_team);
+  // Marcadores de los demás colapsados por default (pedido user
+  // 2026-06-11: la lista gigante obligaba a scrollear entre partidos).
+  const [poolPredsOpen, setPoolPredsOpen] = useState(false);
 
   return (
     <div className="lp-card relative overflow-hidden flex">
@@ -620,10 +623,24 @@ function MatchRow({
             solo renderizamos lo que llegó. */}
         {locked && otherPredictions.length > 0 ? (
           <div className="mt-3 pt-3 border-t border-border-subtle">
-            <p className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60 mb-2">
-              {t("poolPredsLabel", { count: otherPredictions.length })}
-            </p>
-            <ul className="space-y-1.5">
+            {/* Dropdown: colapsado por default para que la card no crezca
+                con la lista completa de marcadores del parche. */}
+            <button
+              type="button"
+              onClick={() => setPoolPredsOpen((o) => !o)}
+              aria-expanded={poolPredsOpen}
+              className="w-full flex items-center justify-between gap-2 cursor-pointer"
+            >
+              <span className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60">
+                {t("poolPredsLabel", { count: otherPredictions.length })}
+              </span>
+              <ChevronDown
+                className={`w-4 h-4 text-text-primary/60 transition-transform ${poolPredsOpen ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
+            {poolPredsOpen && (
+            <ul className="space-y-1.5 mt-2">
               {otherPredictions.map((op) => {
                 const showPoints = isFinished;
                 const tierCls = showPoints
@@ -670,6 +687,7 @@ function MatchRow({
                 );
               })}
             </ul>
+            )}
           </div>
         ) : null}
       </div>
@@ -1579,6 +1597,32 @@ export default function PollaSlugPage() {
         {activeTab === "ranking" && (
           <div className="space-y-3">
             {showPaymentPending && <PaymentPendingBanner onGo={() => setActiveTab("pagos")} />}
+
+            {/* Prize distribution PRIMERO (pedido user 2026-06-11: ver los
+                premios sin scroll). Admins ven el editor in-place; el resto
+                la vista read-only. El pot se calcula igual que el header:
+                en 'admin_collects' solo cuentan los pagados, en 'pay_winner'
+                todos los aprobados. iOS: oculto por compliance 5.3.4. */}
+            {!isIOSApp && (() => {
+              const countedCount =
+                polla.payment_mode === "admin_collects"
+                  ? participants.filter((p) => p.status === "approved" && p.paid).length
+                  : participants.filter((p) => p.status === "approved").length;
+              const pot = polla.buy_in_amount * countedCount;
+              return isOrganizer ? (
+                <PrizeDistributionEditor
+                  pollaSlug={polla.slug}
+                  pot={pot}
+                  initial={polla.prize_distribution ?? null}
+                />
+              ) : (
+                <PrizeDistributionView
+                  pot={pot}
+                  distribution={polla.prize_distribution ?? null}
+                />
+              );
+            })()}
+
             {polla.status === "ended" && participants[0] && (
               <div
                 className="w-full rounded-2xl px-4 py-3 flex items-center gap-3"
@@ -1679,32 +1723,6 @@ export default function PollaSlugPage() {
               </>
             )}
             </div>
-
-            {/* Prize distribution lives inside Tabla so all participants
-                can see what's at stake. Admins get the editor in-place;
-                everyone else sees the read-only view. El pot se calcula
-                igual que el header: en 'admin_collects' solo cuentan los
-                pagados, en 'pay_winner' todos los aprobados.
-                iOS: oculto por compliance 5.3.4 — sin display de plata. */}
-            {!isIOSApp && (() => {
-              const countedCount =
-                polla.payment_mode === "admin_collects"
-                  ? participants.filter((p) => p.status === "approved" && p.paid).length
-                  : participants.filter((p) => p.status === "approved").length;
-              const pot = polla.buy_in_amount * countedCount;
-              return isOrganizer ? (
-                <PrizeDistributionEditor
-                  pollaSlug={polla.slug}
-                  pot={pot}
-                  initial={polla.prize_distribution ?? null}
-                />
-              ) : (
-                <PrizeDistributionView
-                  pot={pot}
-                  distribution={polla.prize_distribution ?? null}
-                />
-              );
-            })()}
           </div>
         )}
 
