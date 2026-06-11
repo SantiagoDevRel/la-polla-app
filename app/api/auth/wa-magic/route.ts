@@ -197,7 +197,9 @@ export async function GET(request: NextRequest) {
   // Defensive: signOut before verify. Same reason as in
   // /api/auth/verify-otp — a user with a live session on a different
   // account would otherwise risk the cookie swap not landing.
-  await supabase.auth.signOut().catch(() => {});
+  // scope:'local' — solo este browser; el default 'global' revocaba las
+  // sesiones del user anterior en otros dispositivos (codex 2026-06-11).
+  await supabase.auth.signOut({ scope: "local" }).catch(() => {});
 
   const { error: verifyErr } = await supabase.auth.verifyOtp({
     email: syntheticEmail,
@@ -255,6 +257,12 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 30,
       path: "/",
     });
+  } else {
+    // Paridad con verify-otp: borrar una lp_onb=1 heredada de OTRA
+    // cuenta en este browser. Sin esto, el fast-path del middleware
+    // saltea la query a public.users y un perfil sin pollito escapa
+    // el gate de onboarding (hallazgo codex 2026-06-11).
+    response.cookies.delete("lp_onb");
   }
   return response;
 }

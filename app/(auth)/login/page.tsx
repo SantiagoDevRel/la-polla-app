@@ -17,6 +17,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import axios from "axios";
 import { useTranslations } from "next-intl";
+import { safeReturnTo } from "@/lib/auth/safe-return-to";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
 import { botDeepLink } from "@/lib/whatsapp/bot-phone";
@@ -110,15 +111,18 @@ function LoginInner() {
   // middleware redirige usuarios autenticados fuera de /login.
 
   // Capturar returnTo + cargar preview de polla si viene de invite link.
+  // safeReturnTo: solo paths internos — sin sanitizar, /login?returnTo=
+  // https://evil.com era un open redirect post-login (hallazgo codex
+  // 2026-06-11).
   useEffect(() => {
-    const rt = searchParams.get("returnTo");
+    const rt = safeReturnTo(searchParams.get("returnTo"));
     if (rt && typeof window !== "undefined") {
       window.sessionStorage.setItem(RETURN_TO_KEY, rt);
     }
     const stored =
       rt ??
       (typeof window !== "undefined"
-        ? window.sessionStorage.getItem(RETURN_TO_KEY)
+        ? safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY))
         : null);
     if (!stored) return;
     const slugMatch = stored.match(/^\/(?:pollas|unirse)\/([^/?#]+)/);
@@ -237,11 +241,16 @@ function LoginInner() {
         return;
       }
       const body = (await res.json()) as { newUser?: boolean };
+      // safeReturnTo también acá: el sessionStorage pudo ser escrito por
+      // una versión vieja sin sanitizar (o manipulado) — sanitizar en el
+      // punto de NAVEGACIÓN es lo que realmente cierra el open redirect.
       const rt =
         typeof window !== "undefined"
-          ? window.sessionStorage.getItem(RETURN_TO_KEY)
+          ? safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY))
           : null;
-      if (rt) window.sessionStorage.removeItem(RETURN_TO_KEY);
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem(RETURN_TO_KEY);
+      }
       // Hard redirect para asegurar que las cookies se apliquen al
       // siguiente request (router.push a veces las pierde en middleware).
       window.location.href = body?.newUser ? "/onboarding" : rt || "/inicio";

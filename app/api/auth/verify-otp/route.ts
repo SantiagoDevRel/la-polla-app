@@ -57,7 +57,10 @@ export async function POST(request: NextRequest) {
     // cleanly when there's a live session on the request. Signing
     // out first guarantees verifyOtp writes a fresh session and B
     // takes over.
-    await supabase.auth.signOut().catch(() => {});
+    // scope:'local' — solo limpia ESTE browser. El default 'global'
+    // revocaba todas las sesiones del user anterior en sus otros
+    // dispositivos (hallazgo codex 2026-06-11).
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
 
     const { data, error } = await supabase.auth.verifyOtp({
       phone: phoneE164,
