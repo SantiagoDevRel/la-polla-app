@@ -56,6 +56,7 @@ import UnpaidPollasBanner from "@/components/inicio/UnpaidPollasBanner";
 import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { RivalChip } from "@/components/inicio/RivalChip";
 import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
+import UpcomingHeroCard from "@/components/inicio/UpcomingHeroCard";
 import PredictNowCTA from "@/components/inicio/PredictNowCTA";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
@@ -961,8 +962,9 @@ export default async function InicioPage() {
                         key={`${polla.id}|${m.id}`}
                         className="snap-center shrink-0 w-[88vw] max-w-[420px]"
                       >
-                        <MatchHero
+                        <UpcomingHeroCard
                           {...heroPropsFromDb(m, locale)}
+                          tournament={m.tournament}
                           myPrediction={myPred ?? undefined}
                           quickPickSlot={
                             <QuickPickStrip

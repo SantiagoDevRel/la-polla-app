@@ -850,6 +850,35 @@ Botón "Reportar problema" en `BrandHeader` (al lado del WhatsAppBubble) que abr
 
 ---
 
+## TeamInfoSheet — ficha de equipo al tocar bandera/nombre (2026-06-11)
+
+Feedback de user: "bacano que dieran info de cada equipo al tocar la
+banderita". Tocar la bandera o el nombre de un equipo abre un bottom
+sheet con su ficha. Cero APIs externas (free-tier intacto).
+
+- `components/match/TeamInfoSheet.tsx` — bottom sheet (portal a
+  `document.body` — los transforms de framer-motion en ancestros crean
+  stacking contexts que lo dejarían DEBAJO del BottomNav z-50). Mobile:
+  full-width bottom; ≥sm: centrado max-w-md flotante. Cierra con X,
+  backdrop o Escape. pb con `env(safe-area-inset-bottom)`.
+- `app/api/teams/info/route.ts` — GET auth-gated `?tournament=&team=`.
+  1 query a `matches`; computa forma (W/E/P), agregados (GF/GC/DG/vallas
+  invictas), próximos, y la mini-tabla del grupo **inferida de los
+  fixtures** (los 4 de un grupo solo juegan entre sí en group_stage —
+  componente conexo; la DB no guarda letra de grupo). Cache privada 60s.
+- `lib/teams/worldcup-facts.ts` — estático: nameEs, ranking FIFA
+  (nov-2025, aproximado, editar a mano), confederación, participaciones,
+  mejor resultado histórico. Keys = nombres EXACTOS de `matches.home_team`.
+- Entradas: `/pollas/[slug]` (MatchRow — bandera y nombre son `<button>`,
+  gated con `isPlaceholderTeam` para slots "W93"/"1A") y `/inicio` strip
+  Próximos (`components/inicio/UpcomingHeroCard.tsx`, wrapper cliente
+  porque /inicio es Server Component; `MatchHero` ganó props opcionales
+  `onHome/AwayTeamClick` con stopPropagation — NO se respetan si hay
+  `onTap` porque anidaría buttons). El quick-pick strip no se toca.
+- i18n: namespace `TeamInfo` en `messages/{es,en}.json`.
+
+---
+
 ## Lecciones / gotchas conocidos (importante leer en cada sesión nueva)
 
 ### 🚨 REGLA HARD: TODA inserción a `matches` DEBE pasar por `upsert_match_safe` 🚨

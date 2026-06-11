@@ -835,5 +835,31 @@
     "awaitingAccount": "Waiting for them to share account info…",
     "goToPolla": "Go to pool",
     "proofImageAlt": "Payment proof"
+  },
+  "TeamInfo": {
+    "fifaRank": "#{rank} FIFA",
+    "participations": "World Cups: {count}",
+    "formTitle": "Tournament form",
+    "formEmpty": "No matches played in this tournament yet",
+    "record": "{w}W · {d}D · {l}L",
+    "winLetter": "W",
+    "drawLetter": "D",
+    "lossLetter": "L",
+    "statGf": "Goals for",
+    "statGa": "Against",
+    "statGd": "Goal diff",
+    "statCs": "Clean sheets",
+    "groupTitle": "Group standings",
+    "thTeam": "Team",
+    "thPlayed": "P",
+    "thDiff": "GD",
+    "thPoints": "Pts",
+    "upcomingTitle": "Upcoming matches",
+    "liveBadge": "Live",
+    "vsRival": "vs {rival}",
+    "close": "Close",
+    "loadError": "Could not load team info",
+    "retry": "Retry",
+    "openAria": "View {team} info"
   }
 }

@@ -835,5 +835,31 @@
     "awaitingAccount": "Esperando que indique cómo cobrar…",
     "goToPolla": "Ir a la polla",
     "proofImageAlt": "Comprobante de pago"
+  },
+  "TeamInfo": {
+    "fifaRank": "#{rank} FIFA",
+    "participations": "Mundiales: {count}",
+    "formTitle": "Forma en el torneo",
+    "formEmpty": "Aún no juega su primer partido en este torneo",
+    "record": "{w}G · {d}E · {l}P",
+    "winLetter": "G",
+    "drawLetter": "E",
+    "lossLetter": "P",
+    "statGf": "Goles a favor",
+    "statGa": "En contra",
+    "statGd": "Diferencia",
+    "statCs": "Vallas invictas",
+    "groupTitle": "Su grupo",
+    "thTeam": "Equipo",
+    "thPlayed": "PJ",
+    "thDiff": "DG",
+    "thPoints": "Pts",
+    "upcomingTitle": "Próximos partidos",
+    "liveBadge": "En vivo",
+    "vsRival": "vs {rival}",
+    "close": "Cerrar",
+    "loadError": "No pudimos cargar la info del equipo",
+    "retry": "Reintentar",
+    "openAria": "Ver info de {team}"
   }
 }

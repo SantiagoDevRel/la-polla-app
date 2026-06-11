@@ -53,6 +53,8 @@ import { computeLiveMinute, formatLiveMinute, specialStatusLabel } from "@/lib/m
 import FootballLoader from "@/components/ui/FootballLoader";
 import { computePayout, type PaymentMode } from "@/lib/pollas/payout-allocation";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
+import { isPlaceholderTeam } from "@/lib/matches/is-placeholder";
+import TeamInfoSheet from "@/components/match/TeamInfoSheet";
 
 function fmtCOP(n: number): string {
   return `$${Math.round(n).toLocaleString("es-CO")}`;
@@ -307,6 +309,9 @@ interface MatchRowProps {
    *  Cuando el match se bloquea, esta lista se oculta y los marcadores
    *  pasan a mostrarse via otherPredictions. Pasar [] si todos predijeron. */
   missingPredictions: string[];
+  /** Abre el TeamInfoSheet con la ficha del equipo tocado. Los slots de
+   *  bracket sin resolver ("W93", "1A") no son tappables. */
+  onTeamClick: (team: string, flag: string | null) => void;
 }
 
 function MatchRow({
@@ -323,8 +328,10 @@ function MatchRow({
   otherPredictions,
   locked,
   missingPredictions,
+  onTeamClick,
 }: MatchRowProps) {
   const t = useTranslations("Detail");
+  const tTeamInfo = useTranslations("TeamInfo");
   const tMatch = useTranslations("Match");
   const tCommon = useTranslations("Common");
   const locale = useLocale();
@@ -337,6 +344,10 @@ function MatchRow({
     home: pred?.predicted_home?.toString() ?? "",
     away: pred?.predicted_away?.toString() ?? "",
   };
+  // Bandera y nombre abren el TeamInfoSheet — solo para equipos reales
+  // (los slots de bracket "W93"/"1A" no tienen ficha que mostrar).
+  const homeClickable = !isPlaceholderTeam(match.home_team);
+  const awayClickable = !isPlaceholderTeam(match.away_team);
 
   return (
     <div className="lp-card relative overflow-hidden flex">
@@ -420,7 +431,18 @@ function MatchRow({
             teniendo media card de ancho para partir en 2 líneas. */}
         <div className="max-w-[340px] mx-auto">
           <div className="flex w-full items-center justify-center gap-2">
-            <TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} />
+            {homeClickable ? (
+              <button
+                type="button"
+                onClick={() => onTeamClick(match.home_team, match.home_team_flag)}
+                aria-label={tTeamInfo("openAria", { team: match.home_team })}
+                className="shrink-0 cursor-pointer rounded-lg p-1.5 -m-1.5 hover:bg-bg-elevated/60 active:scale-95 transition-all"
+              >
+                <TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} />
+              </button>
+            ) : (
+              <TeamCrest flagUrl={match.home_team_flag} teamName={match.home_team} />
+            )}
             {!editable ? (
               <>
                 <span
@@ -497,19 +519,52 @@ function MatchRow({
                 </>
               );
             })()}
-            <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
+            {awayClickable ? (
+              <button
+                type="button"
+                onClick={() => onTeamClick(match.away_team, match.away_team_flag)}
+                aria-label={tTeamInfo("openAria", { team: match.away_team })}
+                className="shrink-0 cursor-pointer rounded-lg p-1.5 -m-1.5 hover:bg-bg-elevated/60 active:scale-95 transition-all"
+              >
+                <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
+              </button>
+            ) : (
+              <TeamCrest flagUrl={match.away_team_flag} teamName={match.away_team} />
+            )}
           </div>
 
           {/* Sin line-clamp a propósito: con boost 3x un nombre largo no
               cabe en 2 líneas y el clamp lo volvería a esconder. Wrap
-              libre — el espacio vertical es gratis. */}
+              libre — el espacio vertical es gratis. Los nombres también
+              abren el TeamInfoSheet (target táctil más generoso que la
+              bandera de 24px). */}
           <div className="mt-1.5 grid w-full grid-cols-2 gap-x-3">
-            <p className="min-w-0 px-1 text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere]">
-              {match.home_team}
-            </p>
-            <p className="min-w-0 px-1 text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere]">
-              {match.away_team}
-            </p>
+            {homeClickable ? (
+              <button
+                type="button"
+                onClick={() => onTeamClick(match.home_team, match.home_team_flag)}
+                className="min-w-0 px-1 py-0.5 text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere] cursor-pointer rounded-md hover:bg-bg-elevated/60 transition-colors"
+              >
+                {match.home_team}
+              </button>
+            ) : (
+              <p className="min-w-0 px-1 text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere]">
+                {match.home_team}
+              </p>
+            )}
+            {awayClickable ? (
+              <button
+                type="button"
+                onClick={() => onTeamClick(match.away_team, match.away_team_flag)}
+                className="min-w-0 px-1 py-0.5 text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere] cursor-pointer rounded-md hover:bg-bg-elevated/60 transition-colors"
+              >
+                {match.away_team}
+              </button>
+            ) : (
+              <p className="min-w-0 px-1 text-center font-semibold text-[11px] leading-tight text-text-primary [overflow-wrap:anywhere]">
+                {match.away_team}
+              </p>
+            )}
           </div>
         </div>
 
@@ -691,6 +746,15 @@ export default function PollaSlugPage() {
   // del Mundial — para ligas regulares "por fase" no aporta (todo es
   // regular_season). Pedido user 2026-05-12.
   const [groupBy, setGroupBy] = useState<"date" | "phase">("date");
+
+  // TeamInfoSheet: equipo tocado (bandera o nombre en una MatchRow).
+  // null = cerrado. Feedback user 2026-06-11: "bacano que dieran info
+  // de cada equipo al tocar la banderita".
+  const [teamSheet, setTeamSheet] = useState<{ team: string; flag: string | null } | null>(null);
+  const openTeamSheet = useCallback(
+    (team: string, flag: string | null) => setTeamSheet({ team, flag }),
+    [],
+  );
 
   // Status-grouped partitions driving the Partidos tab. Timeline order:
   // Finalizados (collapsed history) → En vivo (locked display) →
@@ -1344,6 +1408,7 @@ export default function PollaSlugPage() {
                             otherPredictions={otherPredsByMatch.get(match.id) ?? []}
                             locked={isLocked(match)}
                             missingPredictions={missingByMatch.get(match.id) ?? []}
+                            onTeamClick={openTeamSheet}
                           />
                         ))}
                       </div>
@@ -1376,6 +1441,7 @@ export default function PollaSlugPage() {
                           otherPredictions={otherPredsByMatch.get(match.id) ?? []}
                           locked={isLocked(match)}
                           missingPredictions={missingByMatch.get(match.id) ?? []}
+                          onTeamClick={openTeamSheet}
                         />
                       ))}
                     </div>
@@ -1476,6 +1542,7 @@ export default function PollaSlugPage() {
                                   otherPredictions={otherPredsByMatch.get(match.id) ?? []}
                                   locked={isLocked(match)}
                                   missingPredictions={missingByMatch.get(match.id) ?? []}
+                                  onTeamClick={openTeamSheet}
                                 />
                               ))}
                             </div>
@@ -1776,6 +1843,15 @@ export default function PollaSlugPage() {
           onClose={() => setShowInviteModal(false)}
           joinCode={polla.join_code}
           canRotate={currentUserRole === "admin"}
+        />
+      )}
+
+      {teamSheet && (
+        <TeamInfoSheet
+          team={teamSheet.team}
+          fallbackFlag={teamSheet.flag}
+          tournament={polla.tournament}
+          onClose={() => setTeamSheet(null)}
         />
       )}
     </div>

@@ -26,6 +26,14 @@ export interface MatchHeroProps {
    * picking a score never leaves the hero card.
    */
   quickPickSlot?: React.ReactNode;
+  /**
+   * Tap en la bandera/nombre de un equipo (abre el TeamInfoSheet en
+   * Inicio). Distinto del tap en la card (onTap) — por eso stopPropagation.
+   * ⚠️ Solo se respetan cuando NO hay onTap: con onTap el wrapper ya es
+   * un <button> y anidar buttons es HTML inválido.
+   */
+  onHomeTeamClick?: () => void;
+  onAwayTeamClick?: () => void;
 }
 
 function formatKickoff(date: Date): string {
@@ -66,6 +74,33 @@ function Crest({ team, size = 40 }: { team: Team; size?: number }) {
   );
 }
 
+function TeamSide({ team, onClick }: { team: Team; onClick?: () => void }) {
+  const inner = (
+    <>
+      <Crest team={team} size={48} />
+      <span className="font-body text-[13px] text-text-primary truncate max-w-full text-center">
+        {team.name}
+      </span>
+    </>
+  );
+  if (!onClick) {
+    return <div className="flex flex-col items-center gap-2 min-w-0">{inner}</div>;
+  }
+  return (
+    <button
+      type="button"
+      aria-label={`Ver info de ${team.name}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="flex flex-col items-center gap-2 min-w-0 max-w-full cursor-pointer rounded-lg p-1 -m-1 hover:bg-bg-elevated/60 active:scale-95 transition-all"
+    >
+      {inner}
+    </button>
+  );
+}
+
 export function MatchHero({
   competition,
   kickoffAt,
@@ -76,6 +111,8 @@ export function MatchHero({
   lockAt,
   onTap,
   quickPickSlot,
+  onHomeTeamClick,
+  onAwayTeamClick,
 }: MatchHeroProps) {
   const [now, setNow] = useState<Date>(() => new Date());
 
@@ -130,26 +167,17 @@ export function MatchHero({
         </span>
       </div>
 
-      {/* 2. Teams row */}
+      {/* 2. Teams row. Cada lado es tappable cuando el caller pasa
+          onHome/AwayTeamClick (y no hay onTap envolviendo en button). */}
       <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <div className="flex flex-col items-center gap-2">
-          <Crest team={homeTeam} size={48} />
-          <span className="font-body text-[13px] text-text-primary truncate max-w-full text-center">
-            {homeTeam.name}
-          </span>
-        </div>
+        <TeamSide team={homeTeam} onClick={!onTap ? onHomeTeamClick : undefined} />
         <span
           className="font-display text-[40px] leading-none text-gold tracking-[0.02em]"
           style={{ fontFeatureSettings: '"tnum"' }}
         >
           VS
         </span>
-        <div className="flex flex-col items-center gap-2">
-          <Crest team={awayTeam} size={48} />
-          <span className="font-body text-[13px] text-text-primary truncate max-w-full text-center">
-            {awayTeam.name}
-          </span>
-        </div>
+        <TeamSide team={awayTeam} onClick={!onTap ? onAwayTeamClick : undefined} />
       </div>
 
       {/* 3. Quick-pick slot (falls back to the legacy preds strip when
