@@ -25,6 +25,10 @@
     "wordmarkPart2": "POLLA",
     "wordmarkPart3": "COLOMBIANA"
   },
+  "Ticker": {
+    "predictionDeadline": "¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!",
+    "dismissAria": "Cerrar aviso"
+  },
   "Nav": {
     "ariaNav": "Navegación inferior",
     "tabInicio": "Inicio",
