@@ -856,10 +856,10 @@
     "thPoints": "Pts",
     "upcomingTitle": "Próximos partidos",
     "liveBadge": "En vivo",
-    "vsRival": "vs {rival}",
     "close": "Cerrar",
     "loadError": "No pudimos cargar la info del equipo",
     "retry": "Reintentar",
-    "openAria": "Ver info de {team}"
+    "openAria": "Ver info de {team}",
+    "vs": "vs"
   }
 }

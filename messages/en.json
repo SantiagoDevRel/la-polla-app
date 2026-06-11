@@ -856,10 +856,10 @@
     "thPoints": "Pts",
     "upcomingTitle": "Upcoming matches",
     "liveBadge": "Live",
-    "vsRival": "vs {rival}",
     "close": "Close",
     "loadError": "Could not load team info",
     "retry": "Retry",
-    "openAria": "View {team} info"
+    "openAria": "View {team} info",
+    "vs": "vs"
   }
 }
