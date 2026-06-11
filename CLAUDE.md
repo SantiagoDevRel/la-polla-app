@@ -496,15 +496,23 @@ Rules:
 
 ## Component Rules
 
-### Bottom Navigation (BottomNav.tsx)
-- Fixed bottom, full width, bg-base/90 backdrop-blur-md border-t border-subtle
-- 5 tabs max
-- Icons: lucide-react, w-6 h-6 fixed size
-- Active state: icon in gold + pill background bg-gold/10 rounded-full px-4 py-2
-- Inactive: icon in text-secondary
-- NO emojis. SVG icons only.
-- Active tab label visible, inactive labels hidden or muted
-- Touch targets minimum 44px
+### Bottom Navigation (BottomNav.tsx) — glass estilo Instagram (2026-06-11)
+- Pill flotante `fixed left/right/bottom-[14px] rounded-full h-[64px] max-w-[480px]`
+- Glass: `rgba(14,20,32,0.42)` + `backdrop-blur-3xl backdrop-saturate-[1.8]`
+  + `border-white/[0.12]` + inset highlight arriba. El blur fuerte es lo
+  que mantiene legibles los íconos sobre fondos ruidosos — si se baja el
+  blur hay que subir la opacidad.
+- SOLO íconos, sin labels visibles (el nombre va en `aria-label`).
+  Bonus: sin labels el nav es inmune al text-zoom de accesibilidad.
+- Active: ícono gold strokeWidth 2.4 + "lozenge" de vidrio
+  (`w-[52px] h-[40px] bg-white/[0.12]`) que se desliza entre tabs via
+  framer-motion `layoutId="nav-active-lozenge"` (spring stiffness 600,
+  damping 38 — respeta useReducedMotion).
+- Inactive: ícono text-muted strokeWidth 2. Tap: `active:scale-90`.
+- Icons: lucide-react, w-6 h-6 fijo. NO emojis. SVG only.
+- FAB gold central 48px intacto (crear/unirse). Badges sobre el ícono
+  (gold = pendientes, red = avisos).
+- Touch targets mínimo 44px (tabs son min-h-[48px])
 
 ### Buttons
 ```

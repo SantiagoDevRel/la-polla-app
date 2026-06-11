@@ -10,6 +10,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Drawer } from "vaul";
+import { motion, useReducedMotion } from "framer-motion";
 import { Home, Bell, Bookmark, User, Plus, KeyRound } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
@@ -71,6 +72,7 @@ function TabItem({
   badgeLabelPrefix?: string;
 }) {
   const t = useTranslations("Nav");
+  const reduceMotion = useReducedMotion();
   const { Icon, labelKey, href } = tab;
   const showBadge = typeof badge === "number" && badge > 0;
   const badgeLabel = showBadge ? (badge! > 9 ? "9+" : String(badge)) : null;
@@ -78,17 +80,35 @@ function TabItem({
   return (
     <Link
       href={href}
+      aria-label={t(labelKey)}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        // min-w-0 + truncate en el label: con text-zoom de accesibilidad
-        // los labels crecían, apretaban los tabs y el badge de un tab
-        // sangraba encima del ícono vecino (feedback 2026-06-11). El
-        // label se trunca antes de deformar el nav.
-        "flex flex-col items-center justify-center flex-1 min-w-0 min-h-[44px] gap-0.5 relative px-0.5",
+        // Estilo Instagram (2026-06-11): solo ícono, sin label visible
+        // (el nombre vive en aria-label). El "lozenge" de vidrio detrás
+        // del ícono activo se desliza entre tabs via framer layoutId.
+        "flex items-center justify-center flex-1 min-w-0 min-h-[48px] relative",
+        "active:scale-90 transition-transform duration-150",
         active ? "text-gold" : "text-text-muted",
       )}
     >
+      {active && (
+        <motion.span
+          layoutId="nav-active-lozenge"
+          transition={
+            reduceMotion
+              ? { duration: 0 }
+              : { type: "spring", stiffness: 600, damping: 38, mass: 0.7 }
+          }
+          className="absolute w-[52px] h-[40px] rounded-full bg-white/[0.12] border border-white/[0.08]"
+          aria-hidden="true"
+        />
+      )}
       <span className="relative">
-        <Icon className="w-[22px] h-[22px]" strokeWidth={2} aria-hidden="true" />
+        <Icon
+          className="w-6 h-6"
+          strokeWidth={active ? 2.4 : 2}
+          aria-hidden="true"
+        />
         {showBadge && (
           <span
             className={cn(
@@ -101,7 +121,6 @@ function TabItem({
           </span>
         )}
       </span>
-      <span className="font-body text-[10px] font-semibold max-w-full truncate">{t(labelKey)}</span>
     </Link>
   );
 }
@@ -150,10 +169,15 @@ export function BottomNav({
 
   return (
     <>
+      {/* Glass bar estilo Instagram (2026-06-11): bien translúcida
+          (0.42 + blur-3xl + saturate-180) — el blur fuerte es lo que
+          mantiene legibles los íconos aunque el fondo sea ruidoso.
+          Highlight interior arriba + borde claro = canto de vidrio.
+          h-64 porque ya no hay labels. */}
       <nav
         aria-label={t("ariaNav")}
-        className="fixed left-[14px] right-[14px] bottom-[14px] z-50 rounded-full backdrop-blur-md border border-border-subtle h-[76px] max-w-[480px] mx-auto"
-        style={{ background: "rgba(14, 20, 32, 0.92)" }}
+        className="fixed left-[14px] right-[14px] bottom-[14px] z-50 rounded-full backdrop-blur-3xl backdrop-saturate-[1.8] border border-white/[0.12] h-[64px] max-w-[480px] mx-auto shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.12)]"
+        style={{ background: "rgba(14, 20, 32, 0.42)" }}
       >
         <div className="relative h-full flex items-center px-4">
           <div className="flex-1 flex">
