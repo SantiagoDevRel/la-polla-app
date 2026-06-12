@@ -54,9 +54,13 @@ export async function GET(
     // only). El cliente decide si renderizar UI de participante o de
     // admin viewer. Sin esta puerta, los admins no podrían inspeccionar
     // pollas de otras personas desde el dashboard.
+    // viewerIsGlobalAdmin se devuelve al cliente para que renderice el
+    // modo "solo lectura" (banner + Pagos read-only) cuando el viewer no
+    // es miembro ni organizador de esta polla.
+    let viewerIsGlobalAdmin = false;
     if (!participant && polla.created_by !== user.id) {
-      const isAdmin = await isCurrentUserAdmin();
-      if (!isAdmin) {
+      viewerIsGlobalAdmin = await isCurrentUserAdmin();
+      if (!viewerIsGlobalAdmin) {
         return NextResponse.json({ error: "No tienes acceso a esta polla" }, { status: 403 });
       }
     }
@@ -175,6 +179,9 @@ export async function GET(
       currentUserPaymentStatus: participant?.payment_status || "approved",
       currentUserPaid: participant?.paid ?? true,
       currentUserId: user.id,
+      // true solo cuando un admin global abre una polla de la que NO es
+      // miembro ni organizador → el cliente entra en modo observador.
+      viewerIsGlobalAdmin,
     });
   } catch (error) {
     console.error("Error cargando polla:", error);

@@ -10,6 +10,7 @@ import {
   notifyParticipantPaymentApproved,
 } from "@/lib/notifications";
 import { recomputePollaStandings } from "@/lib/scoring";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { z } from "zod";
 
 // Schema para subir comprobante de pago (participante)
@@ -62,11 +63,19 @@ export async function GET(
       .eq("status", "approved")
       .maybeSingle();
 
+    // Admin global que NO es miembro → observador read-only: puede ver la
+    // lista de pagos pero NO aprobar/rechazar (el PATCH sigue gateado al
+    // organizador de la polla). isAdmin=false para que el cliente no
+    // muestre controles de mutación.
+    let viewerIsGlobalAdmin = false;
     if (!myParticipant) {
-      return NextResponse.json({ error: "No eres participante" }, { status: 403 });
+      viewerIsGlobalAdmin = await isCurrentUserAdmin();
+      if (!viewerIsGlobalAdmin) {
+        return NextResponse.json({ error: "No eres participante" }, { status: 403 });
+      }
     }
 
-    const isAdmin = myParticipant.role === "admin";
+    const isAdmin = myParticipant?.role === "admin";
 
     // Todos los participantes ven la lista completa — el pozo es público.
     const { data: payments, error: paymentsError } = await adminClient
@@ -117,6 +126,7 @@ export async function GET(
         paymentMode: polla.payment_mode,
       },
       isAdmin,
+      viewerIsGlobalAdmin,
       predictionsByUser,
     });
   } catch (error) {
