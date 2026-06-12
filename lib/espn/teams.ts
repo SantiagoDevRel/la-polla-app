@@ -10,6 +10,7 @@
 // Todo público, sin auth, sin API key. Cacheado 24h (catálogo/plantel
 // cambian poco) / 1h (noticias). Next Data Cache, compartido global.
 import { ESPN_LEAGUE_BY_TOURNAMENT } from "./client";
+import { WORLDCUP_ESPN_TEAM_IDS } from "./worldcup-team-ids";
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
 
@@ -63,6 +64,12 @@ export async function resolveEspnTeamId(
   tournamentSlug: string,
   teamName: string,
 ): Promise<string | null> {
+  // Fast path: id horneado del Mundial → evita el fetch de /teams (~460ms
+  // menos en el cold load del Plantel).
+  if (tournamentSlug === "worldcup_2026") {
+    const baked = WORLDCUP_ESPN_TEAM_IDS[teamName];
+    if (baked) return baked;
+  }
   const teams = await fetchEspnTeams(tournamentSlug);
   const exact = teams.find((t) => t.name === teamName);
   if (exact) return exact.id;
