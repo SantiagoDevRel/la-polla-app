@@ -9,14 +9,15 @@
 // viene vacía, se oculta. Loading = skeleton, nunca spinner.
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
-import { ChevronDown, X } from "lucide-react";
+import { BarChart3, List, UsersRound, X } from "lucide-react";
 import { DURATION, EASE } from "@/lib/animations";
-import type { MatchSummary, TimelineEvent, Lineup } from "@/lib/espn/summary";
+import { flagUrlForTeam } from "@/lib/flags/country-iso";
+import type { MatchStat, MatchSummary, TimelineEvent, Lineup, LineupPlayer } from "@/lib/espn/summary";
 
 // Eventos de ESPN que son RUIDO para el resumen: saques, demoras, fin de
 // tiempos. Se ocultan para que el timeline muestre solo lo que importa
@@ -93,18 +94,53 @@ interface LiveMatchPopupProps {
 // Cada cuánto refrescamos mientras el partido está en vivo.
 const LIVE_POLL_MS = 30_000;
 
+type LiveTab = "lineup" | "summary" | "stats";
+const TAB_ORDER: LiveTab[] = ["lineup", "summary", "stats"];
+
+const SHORT_TEAM_NAMES: Record<string, string> = {
+  "bosnia & herzegovina": "Bosnia-Herz.",
+  "bosnia-herzegovina": "Bosnia-Herz.",
+  "bosnia y herzegovina": "Bosnia-Herz.",
+  "czech republic": "Czechia",
+  "democratic republic of congo": "DR Congo",
+  "democratic republic of the congo": "DR Congo",
+  "republica democratica del congo": "R. D. Congo",
+  "united states": "USA",
+  "estados unidos": "EE. UU.",
+};
+
+function compactTeamName(team: string): string {
+  const key = team.trim().toLowerCase();
+  return SHORT_TEAM_NAMES[key] ?? team;
+}
+
+function teamNameSize(name: string): string {
+  if (name.length > 18) return "text-[15px]";
+  if (name.length > 13) return "text-[17px]";
+  return "text-[20px]";
+}
+
+function initials(value: string): string {
+  const clean = value.trim();
+  if (!clean) return "TBD";
+  const parts = clean.split(/[\s-]+/).filter(Boolean);
+  const fromParts = parts.map((part) => part[0]).join("");
+  return (fromParts.length >= 2 ? fromParts : clean.slice(0, 3)).toUpperCase();
+}
+
 // ─── Helpers de presentación ───
 
-/** Logo/bandera del equipo con fallback a iniciales si la imagen falla. */
+/** Bandera real por nombre de país; fallback a iniciales si no existe/carga. */
 function TeamFlag({ flag, team, size }: { flag: string | null | undefined; team: string; size: number }) {
   const [errored, setErrored] = useState(false);
-  if (flag && !errored) {
+  const src = flagUrlForTeam(team) ?? flag;
+  if (src && !errored) {
     return (
-      // ESPN sirve a.espncdn.com (ya en el CSP img-src). plain <img> por
-      // pedido — next/image se encogería dentro del flex comprimido.
+      // Plain img: las banderas locales y los assets ESPN ya están cubiertos
+      // por CSP. max-w-none evita que flex las encoja en headers apretados.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={flag}
+        src={src}
         alt=""
         width={size}
         height={size}
@@ -119,7 +155,34 @@ function TeamFlag({ flag, team, size }: { flag: string | null | undefined; team:
       className="shrink-0 rounded-full bg-bg-elevated border border-border-subtle flex items-center justify-center font-bold text-text-primary"
       style={{ width: size, height: size, fontSize: Math.max(8, size / 3) }}
     >
-      {team.slice(0, 3).toUpperCase()}
+      {initials(team).slice(0, 3)}
+    </span>
+  );
+}
+
+function PlayerHeadshot({ player }: { player: LineupPlayer }) {
+  const [errored, setErrored] = useState(false);
+  if (player.headshot && !errored) {
+    return (
+      // Plain <img>: ESPN sirve headshots desde a.espncdn.com.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={player.headshot}
+        alt=""
+        width={36}
+        height={36}
+        loading="lazy"
+        onError={() => setErrored(true)}
+        className="h-9 w-9 max-w-none shrink-0 rounded-full object-cover bg-bg-card border border-border-subtle"
+      />
+    );
+  }
+  return (
+    <span
+      className="h-9 w-9 shrink-0 rounded-full bg-bg-card border border-border-subtle flex items-center justify-center text-[11px] font-bold text-text-secondary"
+      style={{ fontFeatureSettings: '"tnum"' }}
+    >
+      {player.jersey ?? initials(player.name).slice(0, 2)}
     </span>
   );
 }
@@ -145,6 +208,24 @@ export default function LiveMatchPopup({
   // Portal sólo tras montar (evita SSR mismatch), igual que TeamInfoSheet.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  const [activeTab, setActiveTab] = useState<LiveTab>("lineup");
+  const panelsRef = useRef<HTMLDivElement | null>(null);
+
+  const goToTab = useCallback((tab: LiveTab) => {
+    setActiveTab(tab);
+    const el = panelsRef.current;
+    if (!el) return;
+    const idx = TAB_ORDER.indexOf(tab);
+    el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+  }, []);
+
+  const onPanelsScroll = useCallback(() => {
+    const el = panelsRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    const next = TAB_ORDER[Math.min(Math.max(idx, 0), TAB_ORDER.length - 1)];
+    if (next) setActiveTab((prev) => (prev === next ? prev : next));
+  }, []);
 
   // Fetch on-mount + polling cada 30s mientras el partido esté en vivo.
   // El interval se limpia en el cleanup (sin fugas si se cierra el popup).
@@ -194,6 +275,13 @@ export default function LiveMatchPopup({
   const homeLineup = lineups.find((l) => l.side === "home") ?? null;
   const awayLineup = lineups.find((l) => l.side === "away") ?? null;
   const hasAnyContent = timeline.length > 0 || stats.length > 0 || lineups.length > 0;
+  const homeDisplayName = compactTeamName(homeTeam);
+  const awayDisplayName = compactTeamName(awayTeam);
+  const tabs: { tab: LiveTab; label: string; Icon: typeof UsersRound }[] = [
+    { tab: "lineup", label: t("tabLineup"), Icon: UsersRound },
+    { tab: "summary", label: t("tabSummary"), Icon: List },
+    { tab: "stats", label: t("tabStats"), Icon: BarChart3 },
+  ];
 
   return createPortal(
     <AnimatePresence>
@@ -218,34 +306,44 @@ export default function LiveMatchPopup({
         exit={{ y: "100%" }}
         transition={{ duration: DURATION.medium, ease: EASE.default }}
       >
-        <div className="bg-bg-card border border-border-subtle rounded-t-[24px] sm:rounded-[24px] shadow-[0_-8px_40px_rgba(0,0,0,0.5)] max-h-[85vh] overflow-y-auto overscroll-contain">
-          {/* Header sticky: equipos + badge LIVE + cerrar */}
-          <div className="sticky top-0 z-10 bg-bg-card/95 backdrop-blur-sm pt-3 pb-3 px-4 rounded-t-[24px] border-b border-border-subtle/60">
-            <div className="w-10 h-1 rounded-full bg-border-subtle mx-auto mb-3 sm:hidden" aria-hidden="true" />
-            <div className="flex items-center gap-3">
-              <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
-                <TeamFlag flag={homeFlag} team={homeTeam} size={26} />
-                <span className="score-font text-[20px] leading-none text-text-primary [overflow-wrap:anywhere] line-clamp-1">
-                  {homeTeam}
-                </span>
-              </div>
-              <span className="flex-shrink-0 text-[11px] font-semibold uppercase text-text-muted">
-                {t("vs")}
-              </span>
-              <div className="flex-1 min-w-0 flex items-center gap-2 justify-end overflow-hidden">
-                <span className="score-font text-[20px] leading-none text-text-primary [overflow-wrap:anywhere] line-clamp-1 text-right">
-                  {awayTeam}
-                </span>
-                <TeamFlag flag={awayFlag} team={awayTeam} size={26} />
-              </div>
+        <div className="bg-bg-card border border-border-subtle rounded-t-[24px] sm:rounded-[24px] shadow-[0_-8px_40px_rgba(0,0,0,0.5)] max-h-[85vh] flex flex-col overscroll-contain overflow-hidden">
+          {/* Header fijo: equipos balanceados, live centrado y X arriba. */}
+          <div className="shrink-0 bg-bg-card pt-3 pb-3 px-4 rounded-t-[24px] border-b border-border-subtle/60">
+            <div className="relative min-h-9">
+              <div className="w-10 h-1 rounded-full bg-border-subtle mx-auto sm:hidden" aria-hidden="true" />
               <button
                 type="button"
                 onClick={onClose}
                 aria-label={t("close")}
-                className="flex-shrink-0 w-9 h-9 rounded-full bg-bg-elevated border border-border-subtle flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                className="absolute right-0 top-0 w-9 h-9 rounded-full bg-bg-elevated border border-border-subtle flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
               </button>
+            </div>
+            <div className="mx-auto mt-1 max-w-[350px]">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                <div className="min-w-0 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-1.5">
+                  <TeamFlag flag={homeFlag} team={homeTeam} size={28} />
+                  <span
+                    title={homeTeam}
+                    className={`score-font ${teamNameSize(homeDisplayName)} leading-[0.95] text-text-primary text-center [overflow-wrap:anywhere] [text-wrap:balance]`}
+                  >
+                    {homeDisplayName}
+                  </span>
+                </div>
+                <span className="flex-shrink-0 text-[11px] font-semibold uppercase text-text-muted">
+                  {t("vs")}
+                </span>
+                <div className="min-w-0 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
+                  <span
+                    title={awayTeam}
+                    className={`score-font ${teamNameSize(awayDisplayName)} leading-[0.95] text-text-primary text-center [overflow-wrap:anywhere] [text-wrap:balance]`}
+                  >
+                    {awayDisplayName}
+                  </span>
+                  <TeamFlag flag={awayFlag} team={awayTeam} size={28} />
+                </div>
+              </div>
             </div>
             {isLive ? (
               <div className="mt-2 flex justify-center">
@@ -257,41 +355,94 @@ export default function LiveMatchPopup({
             ) : null}
           </div>
 
-          {/* Contenido. pb generoso + safe-area para iPhones con home indicator. */}
-          <div className="px-4 py-4 space-y-6" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
-            {loading ? (
+          {loading ? (
+            <div className="flex-1 min-h-[360px] overflow-y-auto px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
               <SummarySkeleton />
-            ) : error ? (
+            </div>
+          ) : error ? (
+            <div className="flex-1 min-h-[260px] overflow-y-auto px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
               <p className="text-center text-sm text-text-secondary py-8">{t("loadError")}</p>
-            ) : !hasAnyContent ? (
+            </div>
+          ) : !hasAnyContent ? (
+            <div className="flex-1 min-h-[260px] overflow-y-auto px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
               <p className="text-center text-sm text-text-secondary py-8">{t("noData")}</p>
-            ) : (
-              <>
-                {timeline.length > 0 ? (
-                  <TimelineSection
-                    events={timeline}
-                    title={t("timelineTitle")}
-                    goalLabel={t("goal")}
-                    assistLabel={t("assist")}
-                    locale={locale}
-                  />
-                ) : null}
-                {stats.length > 0 ? (
-                  <StatsSection stats={stats} title={t("statsTitle")} />
-                ) : null}
-                {lineups.length > 0 ? (
-                  <LineupsSection
-                    home={homeLineup}
-                    away={awayLineup}
-                    homeTeam={homeTeam}
-                    awayTeam={awayTeam}
-                    title={t("lineupsTitle")}
-                    formationLabel={t("formation")}
-                  />
-                ) : null}
-              </>
-            )}
-          </div>
+            </div>
+          ) : (
+            <>
+              {/* Barra de tabs fija arriba del carrusel. */}
+              <div role="tablist" aria-label={`${homeTeam} ${t("vs")} ${awayTeam}`} className="shrink-0 sticky top-0 z-10 bg-bg-card border-b border-border-subtle px-2 flex">
+                {tabs.map(({ tab, label, Icon }) => {
+                  const isActive = activeTab === tab;
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => goToTab(tab)}
+                      className="relative flex-1 min-w-0 flex items-center justify-center gap-1.5 py-3 cursor-pointer"
+                    >
+                      <Icon
+                        className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? "text-gold" : "text-text-muted"}`}
+                        strokeWidth={isActive ? 2.4 : 2}
+                        aria-hidden="true"
+                      />
+                      <span className={`text-[12px] font-semibold truncate transition-colors ${isActive ? "text-text-primary" : "text-text-muted"}`}>
+                        {label}
+                      </span>
+                      {isActive ? (
+                        <motion.span
+                          layoutId="live-match-tab-underline"
+                          className="absolute bottom-0 inset-x-2 h-[2px] rounded-full bg-gold"
+                          transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                        />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Carrusel horizontal: tap en tab + swipe con scroll-snap. */}
+              <div
+                ref={panelsRef}
+                onScroll={onPanelsScroll}
+                className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                <div role="tabpanel" aria-label={t("tabLineup")} className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
+                  <div className="px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
+                    <LineupsSection
+                      home={homeLineup}
+                      away={awayLineup}
+                      homeTeam={homeTeam}
+                      awayTeam={awayTeam}
+                      homeFlag={homeFlag}
+                      awayFlag={awayFlag}
+                      title={t("lineupsTitle")}
+                      formationLabel={t("formation")}
+                      emptyLabel={t("noData")}
+                    />
+                  </div>
+                </div>
+                <div role="tabpanel" aria-label={t("tabSummary")} className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
+                  <div className="px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
+                    <TimelineSection
+                      events={timeline}
+                      title={t("timelineTitle")}
+                      goalLabel={t("goal")}
+                      assistLabel={t("assist")}
+                      locale={locale}
+                      emptyLabel={t("noData")}
+                    />
+                  </div>
+                </div>
+                <div role="tabpanel" aria-label={t("tabStats")} className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
+                  <div className="px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
+                    <StatsSection stats={stats} title={t("statsTitle")} emptyLabel={t("noData")} />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </motion.div>
     </AnimatePresence>,
@@ -309,35 +460,26 @@ function TimelineSection({
   goalLabel,
   assistLabel,
   locale,
+  emptyLabel,
 }: {
   events: TimelineEvent[];
   title: string;
   goalLabel: string;
   assistLabel: string;
   locale: string;
+  emptyLabel: string;
 }) {
-  // Colapsable, CERRADO por default: el resumen ocupa mucho y la data más
-  // interesante (stats, alineaciones) queda visible primero. El user lo
-  // abre si quiere ver el minuto a minuto.
-  const [open, setOpen] = useState(false);
+  if (events.length === 0) {
+    return <EmptyPanel title={title} message={emptyLabel} />;
+  }
   return (
     <section className="space-y-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-0.5 transition-colors hover:bg-bg-elevated/60"
-      >
+      <div className="flex items-center justify-between gap-2 px-1">
         <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-primary/70">{title}</h3>
-        <span className="flex items-center gap-1.5 text-[11px] tabular-nums text-text-muted">
+        <span className="text-[11px] tabular-nums text-text-muted" style={{ fontFeatureSettings: '"tnum"' }}>
           {events.length}
-          <ChevronDown
-            className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-            aria-hidden="true"
-          />
         </span>
-      </button>
-      {open ? (
+      </div>
       <ul className="space-y-1.5">
         {events.map((e, i) => {
           const alignRight = e.side === "away";
@@ -380,18 +522,20 @@ function TimelineSection({
           );
         })}
       </ul>
-      ) : null}
     </section>
   );
 }
 
 /** Stats del boxscore. Cada fila: label + barra comparativa home/away.
  *  La barra usa el valor numérico (sin "%") para el ancho relativo. */
-function StatsSection({ stats, title }: { stats: { label: string; home: string; away: string }[]; title: string }) {
+function StatsSection({ stats, title, emptyLabel }: { stats: MatchStat[]; title: string; emptyLabel: string }) {
   const num = (v: string): number => {
     const n = Number.parseFloat(v.replace(/[^0-9.]/g, ""));
     return Number.isFinite(n) ? n : 0;
   };
+  if (stats.length === 0) {
+    return <EmptyPanel title={title} message={emptyLabel} />;
+  }
   return (
     <section className="space-y-3">
       <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-primary/70">{title}</h3>
@@ -440,80 +584,122 @@ function LineupsSection({
   away,
   homeTeam,
   awayTeam,
+  homeFlag,
+  awayFlag,
   title,
   formationLabel,
+  emptyLabel,
 }: {
   home: Lineup | null;
   away: Lineup | null;
   homeTeam: string;
   awayTeam: string;
+  homeFlag: string | null | undefined;
+  awayFlag: string | null | undefined;
   title: string;
   formationLabel: string;
+  emptyLabel: string;
 }) {
+  if ((!home || home.players.length === 0) && (!away || away.players.length === 0)) {
+    return <EmptyPanel title={title} message={emptyLabel} />;
+  }
   return (
-    <section className="space-y-2">
+    <section className="space-y-3">
       <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-primary/70">{title}</h3>
-      <div className="grid grid-cols-2 gap-2">
-        <LineupColumn lineup={home} teamName={homeTeam} formationLabel={formationLabel} />
-        <LineupColumn lineup={away} teamName={awayTeam} formationLabel={formationLabel} />
+      <div className="space-y-3">
+        <LineupCard lineup={home} teamName={homeTeam} flag={homeFlag} formationLabel={formationLabel} emptyLabel={emptyLabel} />
+        <LineupCard lineup={away} teamName={awayTeam} flag={awayFlag} formationLabel={formationLabel} emptyLabel={emptyLabel} />
       </div>
     </section>
   );
 }
 
-function LineupColumn({
+function LineupCard({
   lineup,
   teamName,
+  flag,
   formationLabel,
+  emptyLabel,
 }: {
   lineup: Lineup | null;
   teamName: string;
+  flag: string | null | undefined;
   formationLabel: string;
+  emptyLabel: string;
 }) {
   if (!lineup || lineup.players.length === 0) {
     return (
-      <div className="bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2 min-w-0">
-        <p className="text-xs font-semibold text-text-primary [overflow-wrap:anywhere] line-clamp-1">
-          {lineup?.team || teamName}
-        </p>
+      <div className="bg-bg-elevated border border-border-subtle rounded-xl px-3 py-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <TeamFlag flag={flag} team={teamName} size={22} />
+          <p className="text-sm font-semibold text-text-primary [overflow-wrap:anywhere]">
+            {lineup?.team || teamName}
+          </p>
+        </div>
+        <p className="mt-2 text-xs text-text-muted">{emptyLabel}</p>
       </div>
     );
   }
   const starters = lineup.players.filter((p) => p.starter);
   const subs = lineup.players.filter((p) => !p.starter);
+  const displayTeam = lineup.team || teamName;
   return (
-    <div className="bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2.5 min-w-0">
-      <p className="text-xs font-semibold text-text-primary [overflow-wrap:anywhere] line-clamp-1">
-        {lineup.team || teamName}
-      </p>
-      {lineup.formation ? (
-        <p className="text-[10px] text-text-muted mb-1.5" style={{ fontFeatureSettings: '"tnum"' }}>
-          {formationLabel}: {lineup.formation}
-        </p>
-      ) : null}
-      <ul className="space-y-0.5">
+    <div className="bg-bg-elevated border border-border-subtle rounded-xl px-3 py-3 min-w-0">
+      <div className="flex items-start justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <TeamFlag flag={flag} team={teamName} size={22} />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-text-primary [overflow-wrap:anywhere] leading-tight">
+              {displayTeam}
+            </p>
+            {lineup.formation ? (
+              <p className="text-[11px] text-text-muted mt-0.5" style={{ fontFeatureSettings: '"tnum"' }}>
+                {formationLabel}: {lineup.formation}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </div>
+      <ul className="mt-3 space-y-1">
         {starters.map((p, i) => (
-          <li key={`s-${p.name}-${i}`} className="flex items-baseline gap-1.5 text-[11px] min-w-0">
-            <span className="text-text-muted w-5 text-right shrink-0 tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-              {p.jersey ?? ""}
-            </span>
-            <span className="text-text-secondary [overflow-wrap:anywhere] line-clamp-1">{p.name}</span>
-          </li>
+          <LineupPlayerRow key={`s-${p.name}-${p.jersey ?? i}`} player={p} />
         ))}
       </ul>
       {subs.length > 0 ? (
-        <ul className="space-y-0.5 mt-1.5 pt-1.5 border-t border-border-subtle/50">
+        <ul className="space-y-1 mt-2.5 pt-2.5 border-t border-border-subtle/60">
           {subs.map((p, i) => (
-            <li key={`b-${p.name}-${i}`} className="flex items-baseline gap-1.5 text-[11px] min-w-0 opacity-70">
-              <span className="text-text-muted w-5 text-right shrink-0 tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                {p.jersey ?? ""}
-              </span>
-              <span className="text-text-muted [overflow-wrap:anywhere] line-clamp-1">{p.name}</span>
-            </li>
+            <LineupPlayerRow key={`b-${p.name}-${p.jersey ?? i}`} player={p} muted />
           ))}
         </ul>
       ) : null}
     </div>
+  );
+}
+
+function LineupPlayerRow({ player, muted = false }: { player: LineupPlayer; muted?: boolean }) {
+  return (
+    <li className={`flex items-center gap-2.5 min-w-0 py-1 ${muted ? "opacity-65" : ""}`}>
+      <PlayerHeadshot player={player} />
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm leading-tight [overflow-wrap:anywhere] ${muted ? "text-text-muted" : "text-text-primary"}`}>
+          {player.name}
+        </p>
+        <p className="mt-0.5 text-[11px] leading-tight text-text-muted" style={{ fontFeatureSettings: '"tnum"' }}>
+          {[player.pos, player.jersey ? `#${player.jersey}` : null].filter(Boolean).join(" · ")}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+function EmptyPanel({ title, message }: { title: string; message: string }) {
+  return (
+    <section className="space-y-2">
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-primary/70">{title}</h3>
+      <div className="rounded-xl border border-border-subtle bg-bg-elevated px-3 py-8">
+        <p className="text-center text-sm text-text-secondary">{message}</p>
+      </div>
+    </section>
   );
 }
 

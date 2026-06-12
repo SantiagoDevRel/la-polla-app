@@ -60,6 +60,7 @@ import UpcomingHeroCard from "@/components/inicio/UpcomingHeroCard";
 import PredictNowCTA from "@/components/inicio/PredictNowCTA";
 import WorldCupFactsCard from "@/components/inicio/WorldCupFactsCard";
 import { HighlightsStrip } from "@/components/inicio/HighlightsStrip";
+import RoadToWorldCupCard from "@/components/inicio/RoadToWorldCupCard";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
@@ -1001,6 +1002,10 @@ export default async function InicioPage() {
               (independiente de si hay pronósticos pendientes o no). Typing
               al refrescar; dataset estático bilingüe, cero API. */}
           <WorldCupFactsCard />
+
+          {/* Road to World Cup — entrada a la bracket interactiva del Mundial
+              (zoom/pan + armá tu llave con drag-drop validado por grupo). */}
+          <RoadToWorldCupCard />
 
           {/* Próximos PRIMERO (después de los datos curiosos) solo si el user
               todavía debe pronósticos de hoy/mañana — el CTA de pronosticar
