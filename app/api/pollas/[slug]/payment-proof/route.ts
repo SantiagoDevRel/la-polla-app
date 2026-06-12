@@ -33,6 +33,7 @@ import {
   type PayoutMethod,
 } from "@/lib/vision/verify-payment";
 import { logClaudeUsage } from "@/lib/vision/log-usage";
+import { recomputePollaStandings } from "@/lib/scoring";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -293,6 +294,15 @@ export async function POST(
       console.error("[payment-proof] failed to mark paid:", updateErr);
     } else {
       autoApproved = true;
+      // Now paid=true → the participant enters the leaderboard. Recompute
+      // standings so they get the correct rank instead of the rank=1 stamp
+      // from insert (otherwise a 0-point auto-approved joiner shows as
+      // "#1 · va ganando" above point-holders). Best-effort.
+      try {
+        await recomputePollaStandings(admin, [polla.id]);
+      } catch (recErr) {
+        console.warn("[payment-proof] recompute standings failed (non-fatal):", recErr);
+      }
     }
   }
 

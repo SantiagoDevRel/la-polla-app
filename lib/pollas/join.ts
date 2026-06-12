@@ -11,6 +11,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
+import { recomputePollaStandings } from "@/lib/scoring";
 import { validateJoinCodeFormat } from "./join-code";
 
 export type JoinByCodeResult =
@@ -100,6 +101,22 @@ export async function joinByCode(
     paid: initialPaid,
   });
   if (insertErr) throw insertErr;
+
+  // Recompute standings so the new participant lands at the correct rank
+  // immediately. Without this, a fresh row is stamped rank=1 at insert
+  // (DB-side default behaviour) and a 0-point newcomer would show as
+  // "#1 · va ganando $X" above real point-holders until the next match in
+  // the polla finishes and score_match re-ranks. Only paid=true rows enter
+  // the leaderboard, so skip the recompute when the joiner is still unpaid
+  // (admin_collects pre-approval) — the payment-approval path recomputes
+  // then. Best-effort: a recompute failure must not fail the join.
+  if (initialPaid) {
+    try {
+      await recomputePollaStandings(admin, [polla.id]);
+    } catch (err) {
+      console.warn("[joinByCode] recompute standings failed (non-fatal):", err);
+    }
+  }
 
   return {
     ok: true,

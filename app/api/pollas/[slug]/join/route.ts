@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyParticipantJoined } from "@/lib/notifications";
+import { recomputePollaStandings } from "@/lib/scoring";
 
 export async function POST(
   request: NextRequest,
@@ -98,6 +99,18 @@ export async function POST(
       if (insertError) {
         console.error("[join] insert participant failed:", insertError);
         return NextResponse.json({ error: "Error al unirse" }, { status: 500 });
+      }
+      // Recompute standings so the new participant lands at the correct rank
+      // right away. A fresh row is stamped rank=1 at insert (DB-side), so a
+      // 0-point newcomer would otherwise show as "#1 · va ganando" above
+      // real point-holders until the next match finishes. paid=true rows
+      // only — admin_collects joiners (paid=false) recompute on approval.
+      if (initialPaid) {
+        try {
+          await recomputePollaStandings(admin, [polla.id]);
+        } catch (err) {
+          console.warn("[join] recompute standings failed (non-fatal):", err);
+        }
       }
       // Ping the creator. Skip for admin_collects (the Phase 2C payment-submitted
       // notification is the meaningful event for the organizer).
