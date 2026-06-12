@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { isPreviewHost } from "@/lib/preview-host";
 import BracketBoard, {
   type BracketBoardMatch,
   type BracketBoardTeam,
@@ -163,6 +165,10 @@ function buildMatches(dbRows: Map<number, DbKnockoutRow>): BracketBoardMatch[] {
 }
 
 export default async function RoadToWorldCupPage() {
+  // EN TESTING: la ruta solo existe en hosts de preview (.vercel.app). En el
+  // dominio real de producción devuelve 404 (no la ven los usuarios todavía).
+  if (!isPreviewHost()) notFound();
+
   const dbRows = await loadDbKnockouts();
   const teams = buildTeams();
   const matches = buildMatches(dbRows);
