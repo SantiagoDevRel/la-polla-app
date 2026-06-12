@@ -15,6 +15,7 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { Sparkles } from "lucide-react";
 import { WORLD_CUP_FACTS } from "@/lib/inicio/world-cup-facts";
+import { TypingText } from "@/components/inicio/TypingText";
 
 // Número de día calendario (días desde epoch) en America/Bogota. Estable
 // para una misma fecha local de Colombia, independiente de la hora UTC del
@@ -45,6 +46,18 @@ export default async function WorldCupFactsCard() {
   const i2 = (i1 + 1) % n;
   const picked = i1 === i2 ? [facts[i1]] : [facts[i1], facts[i2]];
 
+  // Typing secuencial: cada bullet arranca SOLO cuando el anterior terminó
+  // de tipear (+ una pausa). delay[i] = delay[i-1] + (chars previos × speed)
+  // + pausa. SPEED un poco lento a propósito (más estético que el tecleo
+  // veloz). El cómputo es server-side; TypingText anima en el cliente.
+  const SPEED = 30; // ms por caracter (más lento que el tecleo veloz original)
+  const PAUSE = 400; // ms entre bullets
+  const factTexts = picked.map((f) => (locale === "en" ? f.en : f.es));
+  const factDelays = factTexts.reduce<number[]>((acc, _t, i) => {
+    acc.push(i === 0 ? 0 : acc[i - 1] + factTexts[i - 1].length * SPEED + PAUSE);
+    return acc;
+  }, []);
+
   return (
     <section className="px-4">
       <h2 className="lp-section-title mb-3 flex items-center gap-2">
@@ -61,7 +74,11 @@ export default async function WorldCupFactsCard() {
               className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-text-primary/40"
             />
             <p className="text-sm leading-snug text-text-primary [overflow-wrap:anywhere]">
-              {locale === "en" ? f.en : f.es}
+              <TypingText
+                text={factTexts[idx]}
+                speed={SPEED}
+                startDelay={factDelays[idx]}
+              />
             </p>
           </div>
         ))}

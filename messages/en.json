@@ -680,6 +680,7 @@
     "upcomingSection": "Upcoming",
     "podiumSection": "Podium",
     "funFactsTitle": "World Cup fun facts",
+    "highlightsTitle": "Latest from the World Cup",
     "greeting": "Hi,",
     "rankCallout": "You're <rankBold>#{rank}</rankBold> in <nameBold>{pollaName}</nameBold>",
     "predictPrompt": "Ready to predict?",
@@ -706,7 +707,21 @@
     "today": "TODAY",
     "tomorrow": "TOMORROW",
     "live": "Live",
-    "upcoming": "UPCOMING"
+    "upcoming": "UPCOMING",
+    "openLiveDetail": "View match detail"
+  },
+  "LiveMatch": {
+    "vs": "vs",
+    "close": "Close",
+    "liveBadge": "Live",
+    "loadError": "We couldn't load the match detail.",
+    "noData": "No detail available for this match yet.",
+    "timelineTitle": "Summary",
+    "goal": "Goal",
+    "assist": "Assist",
+    "statsTitle": "Stats",
+    "lineupsTitle": "Lineups",
+    "formation": "Formation"
   },
   "MatchPrediction": {
     "savePrediction": "Save prediction"
@@ -872,6 +887,20 @@
     "predSaving": "Saving…",
     "predSavedChip": "Saved",
     "predSaveError": "Could not save your prediction",
-    "predSavedMini": "Prediction saved"
+    "predSavedMini": "Prediction saved",
+    "tabResumen": "Overview",
+    "tabPlantel": "Squad",
+    "tabNoticias": "News",
+    "lineGK": "Goalkeepers",
+    "lineDEF": "Defenders",
+    "lineMID": "Midfielders",
+    "lineFWD": "Forwards",
+    "lineOTH": "Others",
+    "rosterEmpty": "No squad available for this team",
+    "rosterError": "Could not load the squad",
+    "newsEmpty": "No news right now",
+    "newsError": "Could not load the news",
+    "newsReadMore": "Read on ESPN",
+    "ageShort": "{age} yrs"
   }
 }

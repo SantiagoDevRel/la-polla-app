@@ -96,3 +96,6 @@ keystore.properties
 # Serena MCP — per-project LSP config/cache (personal dev tooling, not committed)
 .serena/
 # Graphify / codebase-memory-mcp store data outside the repo (Downloads / ~/.cache)
+
+# Playwright MCP scratch (screenshots/console logs)
+.playwright-mcp/
