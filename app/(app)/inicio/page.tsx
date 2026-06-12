@@ -58,6 +58,7 @@ import { RivalChip } from "@/components/inicio/RivalChip";
 import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import UpcomingHeroCard from "@/components/inicio/UpcomingHeroCard";
 import PredictNowCTA from "@/components/inicio/PredictNowCTA";
+import WorldCupFactsCard from "@/components/inicio/WorldCupFactsCard";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
@@ -940,6 +941,12 @@ export default async function InicioPage() {
               </div>
             </section>
           ) : null}
+
+          {/* Block 3b - Datos curiosos del Mundial. Va entre "En vivo" y
+              "Próximos" (pedido user 2026-06-11). Siempre visible: 2 datos
+              por día, rotación determinística por fecha de Bogotá, dataset
+              estático bilingüe — cero API, free-tier intacto. */}
+          <WorldCupFactsCard />
 
           {/* Block 4 - Próximos strip: one full MatchHero + QuickPick
               card per scheduled match inside the user's pollas with

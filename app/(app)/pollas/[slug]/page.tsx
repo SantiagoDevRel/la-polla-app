@@ -25,7 +25,7 @@ import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/
 import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getPollitoByPosition } from "@/lib/pollitos";
-import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock } from "lucide-react";
+import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock, Eye } from "lucide-react";
 
 // Soccer-pitch icon for the Partidos tab — lucide's `Goal` glyph
 // reads as a flag/post at small sizes, so we render a miniature
@@ -749,6 +749,9 @@ export default function PollaSlugPage() {
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserStatus, setCurrentUserStatus] = useState("approved");
   const [currentUserPaid, setCurrentUserPaid] = useState(true);
+  // true cuando un admin global abre una polla de la que NO es miembro ni
+  // organizador → modo observador read-only (ve pagos/gente, sin mutar).
+  const [viewerIsGlobalAdmin, setViewerIsGlobalAdmin] = useState(false);
   const defaultTabAppliedRef = useRef(false);
 
   const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
@@ -914,6 +917,7 @@ export default function PollaSlugPage() {
       setCurrentUserRole(data.currentUserRole);
       setCurrentUserStatus(data.currentUserStatus || "approved");
       setCurrentUserPaid(data.currentUserPaid ?? true);
+      setViewerIsGlobalAdmin(data.viewerIsGlobalAdmin ?? false);
       // En refresh silencioso NO pisamos los drafts del usuario — si
       // tipió un score y todavía no guardó, mantener su input. Solo
       // seedeamos drafts en el primer load.
@@ -1345,6 +1349,16 @@ export default function PollaSlugPage() {
       </div>
 
       <main className="max-w-lg mx-auto p-4 space-y-3">
+        {/* Modo admin observador: un admin global (is_admin) abrió esta
+            polla desde el panel sin ser miembro ni organizador. Ve todo
+            en solo-lectura — sin botones de aprobar/cerrar/rotar. */}
+        {viewerIsGlobalAdmin && (
+          <div className="rounded-xl p-3 flex items-center gap-3 bg-amber/10 border border-amber/30">
+            <Eye className="w-5 h-5 text-amber shrink-0" aria-hidden="true" />
+            <p className="text-xs text-text-primary leading-snug">{t("adminObserverBanner")}</p>
+          </div>
+        )}
+
         {/* Liquidación de pagos al cierre. El componente decide solo
             si renderizar el banner / abrir el modal — cuando la polla
             todavía no está 'ended' o no hay pendientes, no muestra
@@ -1728,7 +1742,12 @@ export default function PollaSlugPage() {
 
         {/* ── TAB PAGOS ── */}
         {activeTab === "pagos" && polla.payment_mode !== "pay_winner" && (
-          <ParticipantPayment pollaSlug={polla.slug} currentUserId={currentUserId} currentUserRole={currentUserRole} />
+          <ParticipantPayment
+            pollaSlug={polla.slug}
+            currentUserId={currentUserId}
+            currentUserRole={currentUserRole}
+            adminObserver={viewerIsGlobalAdmin}
+          />
         )}
 
         {/* ── TAB ORGANIZAR (admin only) ── */}

@@ -24,6 +24,7 @@ import {
   type PaymentMode,
   type PrizeDistribution,
 } from "@/lib/pollas/payout-allocation";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 interface ParticipantRow {
   user_id: string;
@@ -66,7 +67,9 @@ export async function GET(
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
   }
 
-  // Acceso: participante de la polla o el creador.
+  // Acceso: participante de la polla, el creador, o un admin global en
+  // modo observador (read-only). El admin global ve la liquidación pero
+  // NO puede settlear (isAdmin=false → sin controles de cierre).
   const { data: viewerMembership } = await admin
     .from("polla_participants")
     .select("role, status")
@@ -74,7 +77,10 @@ export async function GET(
     .eq("user_id", user.id)
     .maybeSingle();
   if (!viewerMembership && polla.created_by !== user.id) {
-    return NextResponse.json({ error: "No tienes acceso" }, { status: 403 });
+    const viewerIsGlobalAdmin = await isCurrentUserAdmin();
+    if (!viewerIsGlobalAdmin) {
+      return NextResponse.json({ error: "No tienes acceso" }, { status: 403 });
+    }
   }
 
   const isAdmin =

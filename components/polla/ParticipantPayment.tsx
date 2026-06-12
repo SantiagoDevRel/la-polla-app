@@ -49,12 +49,17 @@ interface ParticipantPaymentProps {
   pollaSlug: string;
   currentUserId: string;
   currentUserRole: string;
+  /** Admin global (is_admin) viendo una polla de la que NO es miembro ni
+   *  organizador: solo-lectura. Ve la lista de pagos pero nunca el panel
+   *  de aprobación ni el formulario de subir comprobante. */
+  adminObserver?: boolean;
 }
 
 export default function ParticipantPayment({
   pollaSlug,
   currentUserId,
   currentUserRole,
+  adminObserver = false,
 }: ParticipantPaymentProps) {
   const t = useTranslations("Payments");
   // initialLoading vs subsequent refetches: no queremos desmontar el
@@ -111,6 +116,23 @@ export default function ParticipantPayment({
   }
 
   const mode = pollaPaymentInfo.paymentMode;
+
+  // Admin global observador: lista de pagos de cualquier polla en
+  // solo-lectura. Nunca el panel de aprobación ni el upload de comprobante
+  // (no es su pago ni su polla). El PATCH del backend igual lo bloquea.
+  if (adminObserver) {
+    return (
+      <PaymentsList
+        pollaSlug={pollaSlug}
+        payments={payments}
+        paymentMode={mode}
+        isAdmin={false}
+        currentUserId={currentUserId}
+        onChanged={loadPayments}
+      />
+    );
+  }
+
   const amIAdmin = isAdmin || currentUserRole === "admin";
 
   // admin_collects + admin → review panel clásico + proofs review
