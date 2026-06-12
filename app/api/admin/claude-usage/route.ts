@@ -88,7 +88,23 @@ export async function GET() {
   }
 
   // Resolver display_names en una sola query.
-  const userIds = Array.from(byUserMap.keys()).filter((k) => k !== "anon");
+  //
+  // Importante: juntamos user_ids de las TRES fuentes (MTD, last24h y
+  // recent), no solo del MTD. Si lo armamos solo del MTD, al inicio de
+  // un mes nuevo (cuando todavía no hubo calls este mes) el map queda
+  // vacío y la lista "Calls recientes" — que muestra rows de meses
+  // anteriores — rinde todas como "(sin user)" aunque tengan user real.
+  const userIdSet = new Set<string>();
+  Array.from(byUserMap.keys()).forEach((k) => {
+    if (k !== "anon") userIdSet.add(k);
+  });
+  recent.forEach((r) => {
+    if (r.user_id) userIdSet.add(r.user_id);
+  });
+  last24h.forEach((r) => {
+    if (r.user_id) userIdSet.add(r.user_id);
+  });
+  const userIds = Array.from(userIdSet);
   const userById = new Map<string, string | null>();
   if (userIds.length > 0) {
     const { data: usersData } = await admin
