@@ -9,6 +9,7 @@ import {
   notifyAdminPaymentSubmitted,
   notifyParticipantPaymentApproved,
 } from "@/lib/notifications";
+import { recomputePollaStandings } from "@/lib/scoring";
 import { z } from "zod";
 
 // Schema para subir comprobante de pago (participante)
@@ -295,6 +296,18 @@ export async function PATCH(
       .eq("polla_id", polla.id);
 
     if (updateError) throw updateError;
+
+    // On approval the participant enters the leaderboard (paid=true filter).
+    // Recompute standings so they land at the correct rank instead of the
+    // rank=1 value stamped at insert — otherwise a 0-point participant just
+    // approved would show as "#1 · va ganando" above real point-holders.
+    if (isApprove) {
+      try {
+        await recomputePollaStandings(adminClient, [polla.id]);
+      } catch (recErr) {
+        console.warn("[payments PATCH] recompute standings failed (non-fatal):", recErr);
+      }
+    }
 
     // On approval, ping the participant. Skipped on reject by design: reject
     // just clears the paid flag and lets the admin re-approve.
