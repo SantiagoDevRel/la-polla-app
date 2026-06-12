@@ -104,9 +104,14 @@ const nextConfig = {
                 : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://api.dicebear.com https://avatars.dicebear.com https://crests.football-data.org https://a.espncdn.com https://*.supabase.co https://cdn.jsdelivr.net",
+              // i.ytimg.com: thumbnails de los highlights del Mundial (FIFA
+              // YouTube) en /inicio. a.espncdn.com: fotos de jugadores/escudos
+              // para futuras fichas de equipo. Todo hotlink, sin self-host.
+              "img-src 'self' data: blob: https://api.dicebear.com https://avatars.dicebear.com https://crests.football-data.org https://a.espncdn.com https://i.ytimg.com https://*.supabase.co https://cdn.jsdelivr.net",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com",
-              "frame-src https://challenges.cloudflare.com",
+              // www.youtube.com + youtube-nocookie: embed inline de highlights
+              // del Mundial (canales de broadcasters que permiten embed).
+              "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

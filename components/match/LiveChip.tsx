@@ -2,12 +2,24 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 
+// El popup carga sólo cuando se abre (es pesado: framer-motion + portal).
+const LiveMatchPopup = dynamic(() => import("@/components/match/LiveMatchPopup"), {
+  ssr: false,
+});
+
 export interface LiveChipProps {
   kind: "live" | "upcoming";
+  /** Id del partido en nuestra DB. Si está presente (junto con
+   *  `tournament`), tocar el chip abre el popup con el detalle en vivo de
+   *  ESPN. Si falta, el chip se renderiza igual pero no es clickeable. */
+  matchId?: string;
+  /** Slug del torneo (worldcup_2026, etc.) — necesario para el popup. */
+  tournament?: string;
   homeCode: string;
   awayCode: string;
   /** URL al logo del equipo home (ESPN o football-data). Si está, se
@@ -109,6 +121,8 @@ function TeamLogoOrCode({
 export function LiveChip(props: LiveChipProps) {
   const {
     kind,
+    matchId,
+    tournament,
     homeCode,
     awayCode,
     homeLogo,
@@ -127,6 +141,11 @@ export function LiveChip(props: LiveChipProps) {
   const locale = useLocale();
   const isLive = kind === "live";
 
+  // El popup de detalle se habilita sólo si tenemos id + torneo. Sin eso
+  // el chip queda como hasta ahora (no clickeable), sin romper nada.
+  const canOpenPopup = Boolean(matchId && tournament);
+  const [popupOpen, setPopupOpen] = useState(false);
+
   function renderTeam(
     logo: string | null | undefined,
     code: string,
@@ -136,13 +155,29 @@ export function LiveChip(props: LiveChipProps) {
   }
 
   return (
+    <>
     <div
+      role={canOpenPopup ? "button" : undefined}
+      tabIndex={canOpenPopup ? 0 : undefined}
+      onClick={canOpenPopup ? () => setPopupOpen(true) : undefined}
+      onKeyDown={
+        canOpenPopup
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setPopupOpen(true);
+              }
+            }
+          : undefined
+      }
+      aria-label={canOpenPopup ? t("openLiveDetail") : undefined}
       className={cn(
         "flex-shrink-0 min-w-[150px] rounded-md px-3 py-2 flex flex-col gap-1.5 border",
         // Red accents for live rows so Inicio matches the Partidos tab's
         // language ("live == red"). Previously used turf/green which
         // fought against the Partidos pill and read inconsistent.
         isLive ? "border-red-alert/40 bg-red-alert/[0.06]" : "border-border-subtle bg-bg-card",
+        canOpenPopup && "cursor-pointer transition-transform active:scale-[0.98]",
       )}
     >
       {/* Top row: status. Minute surfaces as "VIVO · 34'" when the
@@ -214,6 +249,22 @@ export function LiveChip(props: LiveChipProps) {
         </div>
       ) : null}
     </div>
+
+    {/* Popup de detalle en vivo — sólo cuando hay matchId + tournament.
+        Lazy-loaded; se monta al abrir y se desmonta al cerrar. */}
+    {canOpenPopup && popupOpen ? (
+      <LiveMatchPopup
+        matchId={matchId!}
+        tournament={tournament!}
+        homeTeam={homeName ?? homeCode}
+        awayTeam={awayName ?? awayCode}
+        homeFlag={homeLogo}
+        awayFlag={awayLogo}
+        isLive={isLive}
+        onClose={() => setPopupOpen(false)}
+      />
+    ) : null}
+    </>
   );
 }
 

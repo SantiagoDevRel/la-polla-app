@@ -59,6 +59,7 @@ import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import UpcomingHeroCard from "@/components/inicio/UpcomingHeroCard";
 import PredictNowCTA from "@/components/inicio/PredictNowCTA";
 import WorldCupFactsCard from "@/components/inicio/WorldCupFactsCard";
+import { HighlightsStrip } from "@/components/inicio/HighlightsStrip";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
@@ -761,6 +762,13 @@ export default async function InicioPage() {
     }
   }
 
+  // ¿El user todavía debe pronósticos de los próximos partidos (hoy/mañana)?
+  // Si sí → el strip "Próximos" va PRIMERO (CTA de pronosticar manda). Si ya
+  // pronosticó todos → "Próximos" baja al final y suben Dato curioso + Videos.
+  const hasUnpredictedUpcoming = upcomingStripEntries.some(
+    (e) => !upcomingPredByPollaMatch.has(`${e.polla.id}|${e.match.id}`),
+  );
+
   // Live strip ahora lee de NUESTRA DB (que tiene ESPN fresh via cron
   // sync-live cada 1 min) en vez de llamar a football-data directo.
   // football-data tiene 5-15 min de lag para in-play, ESPN sub-minuto.
@@ -821,6 +829,51 @@ export default async function InicioPage() {
       });
     }
   }
+
+  // Strip "Próximos" extraído a una const para poder ordenarlo de forma
+  // condicional en el render (primero si faltan pronósticos, al final si
+  // ya están todos). Una card por (polla, partido) con su QuickPick.
+  const proximosSection =
+    !isActiveEmpty && upcomingStripEntries.length > 0 ? (
+      <section>
+        <h2 className="lp-section-title px-4 mb-3 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-gold" aria-hidden="true" />
+          {tInicio("upcomingSection")}
+        </h2>
+        <div className="overflow-x-auto hide-scrollbar">
+          <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
+            {upcomingStripEntries.map(({ match: m, polla }) => {
+              const myPred = upcomingPredByPollaMatch.get(`${polla.id}|${m.id}`);
+              return (
+                <div
+                  key={`${polla.id}|${m.id}`}
+                  className="snap-center shrink-0 w-[88vw] max-w-[420px]"
+                >
+                  <UpcomingHeroCard
+                    {...heroPropsFromDb(m, locale)}
+                    tournament={m.tournament}
+                    pollaSlug={polla.slug}
+                    pollaName={polla.name}
+                    pollaMatchIds={polla.match_ids ?? null}
+                    myPrediction={myPred ?? undefined}
+                    quickPickSlot={
+                      <QuickPickStrip
+                        pollaSlug={polla.slug}
+                        pollaName={polla.name}
+                        matchId={m.id}
+                        initialPrediction={myPred ?? undefined}
+                        presets={sampleQuickPickPresets(4)}
+                        locked={false}
+                      />
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    ) : null;
 
   return (
     <div className="min-h-screen">
@@ -921,6 +974,8 @@ export default async function InicioPage() {
                       <div key={m.id} className="snap-center">
                         <LiveChip
                           kind={m.status === "live" ? "live" : "upcoming"}
+                          matchId={m.id}
+                          tournament={m.tournament}
                           homeCode={homeCode}
                           awayCode={awayCode}
                           homeLogo={m.home_team_flag}
@@ -942,58 +997,24 @@ export default async function InicioPage() {
             </section>
           ) : null}
 
-          {/* Block 3b - Datos curiosos del Mundial. Va entre "En vivo" y
-              "Próximos" (pedido user 2026-06-11). Siempre visible: 2 datos
-              por día, rotación determinística por fecha de Bogotá, dataset
-              estático bilingüe — cero API, free-tier intacto. */}
+          {/* Datos curiosos del Mundial — FIJO arriba, SIEMPRE primero
+              (independiente de si hay pronósticos pendientes o no). Typing
+              al refrescar; dataset estático bilingüe, cero API. */}
           <WorldCupFactsCard />
 
-          {/* Block 4 - Próximos strip: one full MatchHero + QuickPick
-              card per scheduled match inside the user's pollas with
-              kickoff today or tomorrow. Horizontal scroll, one card
-              per "page", so users swipe left-right through every
-              prediction they still owe. Cap 15 cards — more than that
-              and they should use the polla Partidos tab. */}
-          {!isActiveEmpty && upcomingStripEntries.length > 0 ? (
-            <section>
-              <h2 className="lp-section-title px-4 mb-3 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-gold" aria-hidden="true" />
-                {tInicio("upcomingSection")}
-              </h2>
-              <div className="overflow-x-auto hide-scrollbar">
-                <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
-                  {upcomingStripEntries.map(({ match: m, polla }) => {
-                    const myPred = upcomingPredByPollaMatch.get(`${polla.id}|${m.id}`);
-                    return (
-                      <div
-                        key={`${polla.id}|${m.id}`}
-                        className="snap-center shrink-0 w-[88vw] max-w-[420px]"
-                      >
-                        <UpcomingHeroCard
-                          {...heroPropsFromDb(m, locale)}
-                          tournament={m.tournament}
-                          pollaSlug={polla.slug}
-                          pollaName={polla.name}
-                          pollaMatchIds={polla.match_ids ?? null}
-                          myPrediction={myPred ?? undefined}
-                          quickPickSlot={
-                            <QuickPickStrip
-                              pollaSlug={polla.slug}
-                              pollaName={polla.name}
-                              matchId={m.id}
-                              initialPrediction={myPred ?? undefined}
-                              presets={sampleQuickPickPresets(4)}
-                              locked={false}
-                            />
-                          }
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </section>
-          ) : null}
+          {/* Próximos PRIMERO (después de los datos curiosos) solo si el user
+              todavía debe pronósticos de hoy/mañana — el CTA de pronosticar
+              manda sobre el contenido de engagement. */}
+          {hasUnpredictedUpcoming ? proximosSection : null}
+
+          {/* "Lo último del Mundial": highlights/goles del Mundial. Client
+              Component que fetchea /api/highlights. Se auto-oculta si no hay
+              clips o falla — nunca rompe el home. */}
+          {!isActiveEmpty ? <HighlightsStrip /> : null}
+
+          {/* Próximos AL FINAL cuando el user ya pronosticó todo lo de
+              hoy/mañana. */}
+          {!hasUnpredictedUpcoming ? proximosSection : null}
 
           {/* Block 4b - Rival callout (only when we have a neighbour).
               Deep-links straight to the ranking tab so the user lands on

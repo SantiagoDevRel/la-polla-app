@@ -17,11 +17,12 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
-import { X, CalendarDays, Shield, Check } from "lucide-react";
+import { X, CalendarDays, Shield, Check, ExternalLink, Users, Newspaper, LayoutGrid } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import { getTeamFacts } from "@/lib/teams/worldcup-facts";
 import { DURATION, EASE } from "@/lib/animations";
+import type { SquadPlayer, PlayerLine, NewsItem } from "@/lib/espn/teams";
 
 // ─── Tipos (espejo del payload de /api/teams/info) ───
 
@@ -125,6 +126,72 @@ function fmtShortDate(iso: string, locale: string): string {
   }).format(new Date(iso));
 }
 
+/** Fecha relativa simple ("hace 3h", "ayer", o fecha corta si es viejo). */
+function fmtRelativeDate(iso: string | null, locale: string): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diffMs = Date.now() - then;
+  const rtf = new Intl.RelativeTimeFormat(locale === "en" ? "en-US" : "es-CO", { numeric: "auto" });
+  const mins = Math.round(diffMs / 60000);
+  if (Math.abs(mins) < 60) return rtf.format(-mins, "minute");
+  const hrs = Math.round(mins / 60);
+  if (Math.abs(hrs) < 24) return rtf.format(-hrs, "hour");
+  const days = Math.round(hrs / 24);
+  if (Math.abs(days) < 7) return rtf.format(-days, "day");
+  return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "es-CO", {
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(iso));
+}
+
+/** Iniciales para el fallback de la foto del jugador (sin headshot). */
+function playerInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/** Orden de líneas para renderizar las secciones del plantel. */
+const LINE_ORDER: PlayerLine[] = ["GK", "DEF", "MID", "FWD", "OTH"];
+const LINE_KEY: Record<PlayerLine, string> = {
+  GK: "lineGK",
+  DEF: "lineDEF",
+  MID: "lineMID",
+  FWD: "lineFWD",
+  OTH: "lineOTH",
+};
+
+// ─── Foto del jugador con fallback a iniciales/dorsal ───
+function PlayerHeadshot({ name, headshot, jersey }: { name: string; headshot: string | null; jersey: string | null }) {
+  const [errored, setErrored] = useState(false);
+  if (headshot && !errored) {
+    return (
+      // Plain <img> (ESPN headshots, a.espncdn.com ya en CSP img-src).
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={headshot}
+        alt=""
+        width={40}
+        height={40}
+        loading="lazy"
+        onError={() => setErrored(true)}
+        className="h-10 w-10 max-w-none shrink-0 rounded-full object-cover bg-bg-card border border-border-subtle"
+      />
+    );
+  }
+  return (
+    <span className="h-10 w-10 shrink-0 rounded-full bg-bg-card border border-border-subtle flex items-center justify-center text-[11px] font-bold text-text-secondary" style={{ fontFeatureSettings: '"tnum"' }}>
+      {jersey ?? playerInitials(name)}
+    </span>
+  );
+}
+
+// ─── Tabs del sheet ───
+type SheetTab = "resumen" | "plantel" | "noticias";
+const TAB_ORDER: SheetTab[] = ["resumen", "plantel", "noticias"];
+
 // ─── Componente ───
 
 export default function TeamInfoSheet({
@@ -157,6 +224,64 @@ export default function TeamInfoSheet({
   // durante SSR.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // ── Tabs (Resumen / Plantel / Noticias) ──
+  // Navegación por tap + swipe horizontal con CSS scroll-snap. El tab
+  // activo se sincroniza con el scroll para que el indicador siga el swipe.
+  const [activeTab, setActiveTab] = useState<SheetTab>("resumen");
+  const panelsRef = useRef<HTMLDivElement | null>(null);
+  // Lazy: cada tab fetchea su data solo la primera vez que se abre, para
+  // ahorrar requests a ESPN (el user puede no abrir Plantel/Noticias nunca).
+  const [roster, setRoster] = useState<SquadPlayer[] | null>(null);
+  const [rosterError, setRosterError] = useState(false);
+  const [news, setNews] = useState<NewsItem[] | null>(null);
+  const [newsError, setNewsError] = useState(false);
+  const rosterRequested = useRef(false);
+  const newsRequested = useRef(false);
+
+  // Tap en un tab → scrollea el carrusel a su panel (el snap hace el resto).
+  const goToTab = useCallback((tab: SheetTab) => {
+    setActiveTab(tab);
+    const el = panelsRef.current;
+    if (!el) return;
+    const idx = TAB_ORDER.indexOf(tab);
+    el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
+  }, []);
+
+  // Swipe → detecta qué panel quedó centrado y actualiza el tab activo.
+  const onPanelsScroll = useCallback(() => {
+    const el = panelsRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    const next = TAB_ORDER[Math.min(Math.max(idx, 0), TAB_ORDER.length - 1)];
+    if (next) setActiveTab((prev) => (prev === next ? prev : next));
+  }, []);
+
+  // Fetch Plantel la primera vez que el tab se abre.
+  useEffect(() => {
+    if (activeTab !== "plantel" || rosterRequested.current) return;
+    rosterRequested.current = true;
+    let cancelled = false;
+    setRosterError(false);
+    axios
+      .get<{ players: SquadPlayer[] }>("/api/teams/roster", { params: { tournament, team } })
+      .then((res) => { if (!cancelled) setRoster(res.data.players ?? []); })
+      .catch(() => { if (!cancelled) setRosterError(true); });
+    return () => { cancelled = true; };
+  }, [activeTab, tournament, team]);
+
+  // Fetch Noticias la primera vez que el tab se abre.
+  useEffect(() => {
+    if (activeTab !== "noticias" || newsRequested.current) return;
+    newsRequested.current = true;
+    let cancelled = false;
+    setNewsError(false);
+    axios
+      .get<{ news: NewsItem[] }>("/api/teams/news", { params: { tournament, team } })
+      .then((res) => { if (!cancelled) setNews(res.data.news ?? []); })
+      .catch(() => { if (!cancelled) setNewsError(true); });
+    return () => { cancelled = true; };
+  }, [activeTab, tournament, team]);
 
   const facts = getTeamFacts(team);
   // Display: nombre en español en lapollacolombiana, DB name (EN) en
@@ -285,9 +410,9 @@ export default function TeamInfoSheet({
         exit={{ y: "100%" }}
         transition={{ duration: DURATION.medium, ease: EASE.default }}
       >
-        <div className="bg-bg-card border border-border-subtle rounded-t-[24px] sm:rounded-[24px] shadow-[0_-8px_40px_rgba(0,0,0,0.5)] max-h-[85vh] overflow-y-auto overscroll-contain">
-          {/* Grab handle + close */}
-          <div className="sticky top-0 z-10 bg-bg-card/95 backdrop-blur-sm pt-3 pb-2 px-4 rounded-t-[24px]">
+        <div className="bg-bg-card border border-border-subtle rounded-t-[24px] sm:rounded-[24px] shadow-[0_-8px_40px_rgba(0,0,0,0.5)] max-h-[85vh] flex flex-col overscroll-contain overflow-hidden">
+          {/* Grab handle + close (header fijo arriba del carrusel). */}
+          <div className="shrink-0 bg-bg-card pt-3 pb-2 px-4 rounded-t-[24px]">
             <div className="w-10 h-1 rounded-full bg-border-subtle mx-auto mb-2 sm:hidden" aria-hidden="true" />
             <div className="flex items-start gap-3">
               <FlagCircle team={team} apiFlag={fallbackFlag} size={44} />
@@ -312,9 +437,56 @@ export default function TeamInfoSheet({
             </div>
           </div>
 
+          {/* ── Barra de tabs sticky (arriba del carrusel) ── */}
+          <div role="tablist" aria-label={displayName(team)} className="shrink-0 bg-bg-card border-b border-border-subtle px-2 flex">
+            {(
+              [
+                { tab: "resumen", label: t("tabResumen"), Icon: LayoutGrid },
+                { tab: "plantel", label: t("tabPlantel"), Icon: Users },
+                { tab: "noticias", label: t("tabNoticias"), Icon: Newspaper },
+              ] as { tab: SheetTab; label: string; Icon: typeof Users }[]
+            ).map(({ tab, label, Icon }) => {
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => goToTab(tab)}
+                  className="relative flex-1 min-w-0 flex items-center justify-center gap-1.5 py-3 cursor-pointer"
+                >
+                  <Icon
+                    className={`w-4 h-4 flex-shrink-0 transition-colors ${isActive ? "text-gold" : "text-text-muted"}`}
+                    strokeWidth={isActive ? 2.4 : 2}
+                    aria-hidden="true"
+                  />
+                  <span className={`text-[12px] font-semibold truncate transition-colors ${isActive ? "text-text-primary" : "text-text-muted"}`}>
+                    {label}
+                  </span>
+                  {isActive ? (
+                    <motion.span
+                      layoutId="team-sheet-tab-underline"
+                      className="absolute bottom-0 inset-x-2 h-[2px] rounded-full bg-gold"
+                      transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Carrusel horizontal (3 paneles, scroll-snap) ── */}
+          <div
+            ref={panelsRef}
+            onScroll={onPanelsScroll}
+            className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+          {/* ── Panel 1 · Resumen (contenido original intacto) ── */}
+          <div className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
           {/* pb generoso + safe-area: el último item nunca queda pegado
               al borde inferior ni tapado en iPhones con home indicator. */}
-          <div className="px-4 space-y-5" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
+          <div className="px-4 pt-4 space-y-5" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
             {/* Historia mundialista (estático) */}
             {facts ? (
               <div className="flex flex-wrap gap-2">
@@ -582,6 +754,158 @@ export default function TeamInfoSheet({
                 ) : null}
               </>
             )}
+          </div>
+          </div>
+          {/* ── Panel 2 · Plantel ── */}
+          <div className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
+            <div className="px-4 pt-4 space-y-5" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
+              {rosterError ? (
+                <div className="text-center py-10">
+                  <p className="text-sm text-text-secondary">{t("rosterError")}</p>
+                </div>
+              ) : roster === null ? (
+                /* Skeleton del plantel mientras carga */
+                <div className="space-y-4 animate-pulse" aria-hidden="true">
+                  {[0, 1].map((g) => (
+                    <div key={g} className="space-y-2">
+                      <div className="h-3 w-24 rounded bg-bg-elevated" />
+                      {[0, 1, 2].map((r) => (
+                        <div key={r} className="flex items-center gap-3 bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2">
+                          <div className="h-10 w-10 rounded-full bg-bg-card" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3 w-1/2 rounded bg-bg-card" />
+                            <div className="h-2.5 w-1/4 rounded bg-bg-card" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ) : roster.length === 0 ? (
+                <div className="text-center py-10">
+                  <Users className="w-8 h-8 mx-auto mb-3 text-text-muted" aria-hidden="true" />
+                  <p className="text-sm text-text-secondary">{t("rosterEmpty")}</p>
+                </div>
+              ) : (
+                LINE_ORDER.map((line) => {
+                  const group = roster.filter((p) => p.line === line);
+                  if (group.length === 0) return null;
+                  return (
+                    <section key={line} className="space-y-2">
+                      <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-primary/70">
+                        {t(LINE_KEY[line])}
+                      </h3>
+                      <ul className="space-y-1.5">
+                        {group.map((p, i) => (
+                          <li
+                            key={`${p.name}-${p.jersey ?? i}`}
+                            className="flex items-center gap-3 bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2"
+                          >
+                            <PlayerHeadshot name={p.name} headshot={p.headshot} jersey={p.jersey} />
+                            {/* Nombre en su propia columna flex-1 (sobrevive
+                                text-zoom: overflow-wrap, sin truncate horizontal
+                                contra un centro fijo). */}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-text-primary [overflow-wrap:anywhere] leading-tight">
+                                {p.name}
+                              </p>
+                              <p className="text-[11px] text-text-muted leading-tight mt-0.5">
+                                {[p.pos, p.age !== null ? t("ageShort", { age: p.age }) : null]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            </div>
+                            {p.jersey ? (
+                              <span
+                                className="flex-shrink-0 score-font text-[18px] text-text-secondary"
+                                style={{ fontFeatureSettings: '"tnum"' }}
+                              >
+                                {p.jersey}
+                              </span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  );
+                })
+              )}
+            </div>
+          </div>
+          {/* ── Panel 3 · Noticias ── */}
+          <div className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
+            <div className="px-4 pt-4 space-y-3" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
+              {newsError ? (
+                <div className="text-center py-10">
+                  <p className="text-sm text-text-secondary">{t("newsError")}</p>
+                </div>
+              ) : news === null ? (
+                /* Skeleton de noticias mientras carga */
+                <div className="space-y-3 animate-pulse" aria-hidden="true">
+                  {[0, 1, 2].map((r) => (
+                    <div key={r} className="bg-bg-elevated border border-border-subtle rounded-xl overflow-hidden">
+                      <div className="h-32 w-full bg-bg-card" />
+                      <div className="p-3 space-y-2">
+                        <div className="h-3 w-3/4 rounded bg-bg-card" />
+                        <div className="h-2.5 w-1/3 rounded bg-bg-card" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : news.length === 0 ? (
+                <div className="text-center py-10">
+                  <Newspaper className="w-8 h-8 mx-auto mb-3 text-text-muted" aria-hidden="true" />
+                  <p className="text-sm text-text-secondary">{t("newsEmpty")}</p>
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {news.map((n, i) => (
+                    <li key={`${n.headline}-${i}`}>
+                      <a
+                        href={n.url ?? "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`block bg-bg-elevated border border-border-subtle rounded-xl overflow-hidden transition-all hover:border-gold/30 ${
+                          n.url ? "cursor-pointer" : "pointer-events-none"
+                        }`}
+                      >
+                        {n.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={n.image}
+                            alt=""
+                            loading="lazy"
+                            className="w-full max-w-none h-36 object-cover bg-bg-card"
+                          />
+                        ) : null}
+                        <div className="p-3 space-y-1.5">
+                          <p className="text-sm font-semibold text-text-primary [overflow-wrap:anywhere] leading-snug">
+                            {n.headline}
+                          </p>
+                          {n.description ? (
+                            <p className="text-xs text-text-secondary [overflow-wrap:anywhere] leading-snug line-clamp-2">
+                              {n.description}
+                            </p>
+                          ) : null}
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
+                            <span className="text-[11px] text-text-muted">
+                              {fmtRelativeDate(n.publishedAt, locale)}
+                            </span>
+                            {n.url ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gold">
+                                {t("newsReadMore")}
+                                <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
           </div>
         </div>
       </motion.div>

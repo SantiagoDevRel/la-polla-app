@@ -680,6 +680,7 @@
     "upcomingSection": "Próximos",
     "podiumSection": "Podio",
     "funFactsTitle": "Datos curiosos del Mundial",
+    "highlightsTitle": "Lo último del Mundial",
     "greeting": "Hola,",
     "rankCallout": "Vas <rankBold>#{rank}</rankBold> en <nameBold>{pollaName}</nameBold>",
     "predictPrompt": "¿Listo pa' pronosticar?",
@@ -706,7 +707,21 @@
     "today": "HOY",
     "tomorrow": "MAÑANA",
     "live": "Vivo",
-    "upcoming": "PRÓXIMO"
+    "upcoming": "PRÓXIMO",
+    "openLiveDetail": "Ver detalle del partido"
+  },
+  "LiveMatch": {
+    "vs": "vs",
+    "close": "Cerrar",
+    "liveBadge": "En vivo",
+    "loadError": "No pudimos cargar el detalle del partido.",
+    "noData": "Todavía no hay detalle disponible para este partido.",
+    "timelineTitle": "Resumen",
+    "goal": "Gol",
+    "assist": "Asistencia",
+    "statsTitle": "Estadísticas",
+    "lineupsTitle": "Alineaciones",
+    "formation": "Formación"
   },
   "MatchPrediction": {
     "savePrediction": "Guardar pronóstico"
@@ -872,6 +887,20 @@
     "predSaving": "Guardando…",
     "predSavedChip": "Guardado",
     "predSaveError": "No se pudo guardar el pronóstico",
-    "predSavedMini": "Pronóstico guardado"
+    "predSavedMini": "Pronóstico guardado",
+    "tabResumen": "Resumen",
+    "tabPlantel": "Plantel",
+    "tabNoticias": "Noticias",
+    "lineGK": "Arqueros",
+    "lineDEF": "Defensas",
+    "lineMID": "Mediocampistas",
+    "lineFWD": "Delanteros",
+    "lineOTH": "Otros",
+    "rosterEmpty": "No hay plantel disponible para este equipo",
+    "rosterError": "No pudimos cargar el plantel",
+    "newsEmpty": "No hay noticias por ahora",
+    "newsError": "No pudimos cargar las noticias",
+    "newsReadMore": "Leer en ESPN",
+    "ageShort": "{age} años"
   }
 }
