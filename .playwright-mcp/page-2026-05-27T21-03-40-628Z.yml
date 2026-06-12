@@ -1,0 +1,25 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - img "LA POLLA" [ref=e6]
+      - heading "LA POLLA" [level=1] [ref=e7]
+      - paragraph [ref=e8]: La polla deportiva de tus amigos
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Tu número de celular
+        - generic [ref=e13]:
+          - button "Colombia +57" [ref=e14] [cursor=pointer]:
+            - img "Colombia" [ref=e15]
+            - generic [ref=e19]: "+57"
+            - img [ref=e20]
+          - textbox "310 123 1234" [ref=e22]
+      - generic [ref=e23]:
+        - button "SMS" [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+          - text: SMS
+        - link "Recibir código por WhatsApp" [ref=e27] [cursor=pointer]:
+          - /url: https://wa.me/573117312391?text=Hola%20parce!%20%F0%9F%90%A5%20quiero%20entrar%20a%20la%20polla
+          - img [ref=e28]
+          - text: WhatsApp
+    - paragraph [ref=e30]: Al continuar, aceptas nuestros términos y condiciones
+  - alert [ref=e31]

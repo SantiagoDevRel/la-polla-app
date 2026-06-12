@@ -1,0 +1,345 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: LA
+          - generic [ref=e8]: POLLA
+          - generic [ref=e9]: COLOMBIANA
+        - generic [ref=e10]:
+          - button "Reportar un problema" [ref=e11] [cursor=pointer]:
+            - img [ref=e12]
+          - link "Abrir el bot en WhatsApp" [ref=e14] [cursor=pointer]:
+            - /url: https://wa.me/573117312391?text=Hola%20parce!%20mu%C3%A9strame%20el%20men%C3%BA%20porfa
+            - img [ref=e15]
+    - generic [ref=e18]:
+      - banner [ref=e55]:
+        - generic [ref=e57]:
+          - button "←" [ref=e58] [cursor=pointer]
+          - heading "Polla Mundialista" [level=1] [ref=e59]
+          - generic [ref=e61]:
+            - img "Mundial 2026" [ref=e62]
+            - generic [ref=e63]: Mundial 2026
+      - generic [ref=e65]:
+        - generic [ref=e66]: "Pozo: $ 1.400.000 total ($ 100.000 por persona)"
+        - button "Cómo se puntúa" [ref=e67] [cursor=pointer]:
+          - img [ref=e68]
+      - generic [ref=e72]:
+        - button "Partidos" [ref=e73] [cursor=pointer]:
+          - img [ref=e74]
+          - text: Partidos
+        - button "Tabla" [ref=e77] [cursor=pointer]:
+          - img [ref=e78]
+          - text: Tabla
+        - button "Invitar" [ref=e84] [cursor=pointer]:
+          - img [ref=e85]
+          - text: Invitar
+        - button "Pagos" [ref=e91] [cursor=pointer]:
+          - img [ref=e92]
+          - text: Pagos
+        - button "Info" [ref=e95] [cursor=pointer]:
+          - img [ref=e96]
+          - text: Info
+      - main [ref=e98]:
+        - generic [ref=e99]:
+          - paragraph [ref=e100]: Resultado de los 90'
+          - generic [ref=e101]:
+            - heading "Próximos · 104" [level=3] [ref=e102]:
+              - img [ref=e103]
+              - text: Próximos
+              - generic [ref=e106]: · 104
+            - tablist "Agrupar partidos" [ref=e107]:
+              - tab "Por fecha" [selected] [ref=e108] [cursor=pointer]
+              - tab "Por jornada" [ref=e109] [cursor=pointer]
+            - generic [ref=e110]:
+              - button "HOY · JUEVES, 11 DE JUN· 2" [expanded] [ref=e111] [cursor=pointer]:
+                - generic [ref=e112]:
+                  - text: HOY · JUEVES, 11 DE JUN
+                  - generic [ref=e113]: · 2
+                - img [ref=e114]
+              - generic [ref=e116]:
+                - generic [ref=e119]:
+                  - generic [ref=e120]:
+                    - generic [ref=e122]: Fase de grupos
+                    - generic [ref=e123]: 11 de jun, 2:00 p. m.
+                  - generic [ref=e124]:
+                    - generic [ref=e125]:
+                      - button "Ver info de Mexico" [active] [ref=e126] [cursor=pointer]:
+                        - img "Mexico" [ref=e127]
+                      - spinbutton "Mexico" [ref=e128]: "3"
+                      - spinbutton "South Africa" [ref=e130]: "2"
+                      - button "Ver info de South Africa" [ref=e131] [cursor=pointer]:
+                        - img "South Africa" [ref=e132]
+                    - generic [ref=e133]:
+                      - button "Mexico" [ref=e134] [cursor=pointer]
+                      - button "South Africa" [ref=e135] [cursor=pointer]
+                - generic [ref=e138]:
+                  - generic [ref=e139]:
+                    - generic [ref=e141]: Fase de grupos
+                    - generic [ref=e142]: 11 de jun, 9:00 p. m.
+                  - generic [ref=e143]:
+                    - generic [ref=e144]:
+                      - button "Ver info de South Korea" [ref=e145] [cursor=pointer]:
+                        - img "South Korea" [ref=e146]
+                      - spinbutton "South Korea" [ref=e147]: "2"
+                      - spinbutton "Czechia" [ref=e149]: "1"
+                      - button "Ver info de Czechia" [ref=e150] [cursor=pointer]:
+                        - img "Czechia" [ref=e151]
+                    - generic [ref=e152]:
+                      - button "South Korea" [ref=e153] [cursor=pointer]
+                      - button "Czechia" [ref=e154] [cursor=pointer]
+            - button "MAÑANA · VIERNES, 12 DE JUN· 2" [ref=e156] [cursor=pointer]:
+              - generic [ref=e157]:
+                - text: MAÑANA · VIERNES, 12 DE JUN
+                - generic [ref=e158]: · 2
+              - img [ref=e159]
+            - button "SÁBADO, 13 DE JUN· 4" [ref=e162] [cursor=pointer]:
+              - generic [ref=e163]:
+                - text: SÁBADO, 13 DE JUN
+                - generic [ref=e164]: · 4
+              - img [ref=e165]
+            - button "DOMINGO, 14 DE JUN· 4" [ref=e168] [cursor=pointer]:
+              - generic [ref=e169]:
+                - text: DOMINGO, 14 DE JUN
+                - generic [ref=e170]: · 4
+              - img [ref=e171]
+            - button "LUNES, 15 DE JUN· 4" [ref=e174] [cursor=pointer]:
+              - generic [ref=e175]:
+                - text: LUNES, 15 DE JUN
+                - generic [ref=e176]: · 4
+              - img [ref=e177]
+            - button "MARTES, 16 DE JUN· 4" [ref=e180] [cursor=pointer]:
+              - generic [ref=e181]:
+                - text: MARTES, 16 DE JUN
+                - generic [ref=e182]: · 4
+              - img [ref=e183]
+            - button "MIÉRCOLES, 17 DE JUN· 4" [ref=e186] [cursor=pointer]:
+              - generic [ref=e187]:
+                - text: MIÉRCOLES, 17 DE JUN
+                - generic [ref=e188]: · 4
+              - img [ref=e189]
+            - button "JUEVES, 18 DE JUN· 4" [ref=e192] [cursor=pointer]:
+              - generic [ref=e193]:
+                - text: JUEVES, 18 DE JUN
+                - generic [ref=e194]: · 4
+              - img [ref=e195]
+            - button "VIERNES, 19 DE JUN· 4" [ref=e198] [cursor=pointer]:
+              - generic [ref=e199]:
+                - text: VIERNES, 19 DE JUN
+                - generic [ref=e200]: · 4
+              - img [ref=e201]
+            - button "SÁBADO, 20 DE JUN· 4" [ref=e204] [cursor=pointer]:
+              - generic [ref=e205]:
+                - text: SÁBADO, 20 DE JUN
+                - generic [ref=e206]: · 4
+              - img [ref=e207]
+            - button "DOMINGO, 21 DE JUN· 4" [ref=e210] [cursor=pointer]:
+              - generic [ref=e211]:
+                - text: DOMINGO, 21 DE JUN
+                - generic [ref=e212]: · 4
+              - img [ref=e213]
+            - button "LUNES, 22 DE JUN· 4" [ref=e216] [cursor=pointer]:
+              - generic [ref=e217]:
+                - text: LUNES, 22 DE JUN
+                - generic [ref=e218]: · 4
+              - img [ref=e219]
+            - button "MARTES, 23 DE JUN· 4" [ref=e222] [cursor=pointer]:
+              - generic [ref=e223]:
+                - text: MARTES, 23 DE JUN
+                - generic [ref=e224]: · 4
+              - img [ref=e225]
+            - button "MIÉRCOLES, 24 DE JUN· 6" [ref=e228] [cursor=pointer]:
+              - generic [ref=e229]:
+                - text: MIÉRCOLES, 24 DE JUN
+                - generic [ref=e230]: · 6
+              - img [ref=e231]
+            - button "JUEVES, 25 DE JUN· 6" [ref=e234] [cursor=pointer]:
+              - generic [ref=e235]:
+                - text: JUEVES, 25 DE JUN
+                - generic [ref=e236]: · 6
+              - img [ref=e237]
+            - button "VIERNES, 26 DE JUN· 6" [ref=e240] [cursor=pointer]:
+              - generic [ref=e241]:
+                - text: VIERNES, 26 DE JUN
+                - generic [ref=e242]: · 6
+              - img [ref=e243]
+            - button "SÁBADO, 27 DE JUN· 6" [ref=e246] [cursor=pointer]:
+              - generic [ref=e247]:
+                - text: SÁBADO, 27 DE JUN
+                - generic [ref=e248]: · 6
+              - img [ref=e249]
+            - button "DOMINGO, 28 DE JUN· 1" [ref=e252] [cursor=pointer]:
+              - generic [ref=e253]:
+                - text: DOMINGO, 28 DE JUN
+                - generic [ref=e254]: · 1
+              - img [ref=e255]
+            - button "LUNES, 29 DE JUN· 3" [ref=e258] [cursor=pointer]:
+              - generic [ref=e259]:
+                - text: LUNES, 29 DE JUN
+                - generic [ref=e260]: · 3
+              - img [ref=e261]
+            - button "MARTES, 30 DE JUN· 3" [ref=e264] [cursor=pointer]:
+              - generic [ref=e265]:
+                - text: MARTES, 30 DE JUN
+                - generic [ref=e266]: · 3
+              - img [ref=e267]
+            - button "MIÉRCOLES, 1 DE JUL· 3" [ref=e270] [cursor=pointer]:
+              - generic [ref=e271]:
+                - text: MIÉRCOLES, 1 DE JUL
+                - generic [ref=e272]: · 3
+              - img [ref=e273]
+            - button "JUEVES, 2 DE JUL· 3" [ref=e276] [cursor=pointer]:
+              - generic [ref=e277]:
+                - text: JUEVES, 2 DE JUL
+                - generic [ref=e278]: · 3
+              - img [ref=e279]
+            - button "VIERNES, 3 DE JUL· 3" [ref=e282] [cursor=pointer]:
+              - generic [ref=e283]:
+                - text: VIERNES, 3 DE JUL
+                - generic [ref=e284]: · 3
+              - img [ref=e285]
+            - button "SÁBADO, 4 DE JUL· 2" [ref=e288] [cursor=pointer]:
+              - generic [ref=e289]:
+                - text: SÁBADO, 4 DE JUL
+                - generic [ref=e290]: · 2
+              - img [ref=e291]
+            - button "DOMINGO, 5 DE JUL· 2" [ref=e294] [cursor=pointer]:
+              - generic [ref=e295]:
+                - text: DOMINGO, 5 DE JUL
+                - generic [ref=e296]: · 2
+              - img [ref=e297]
+            - button "LUNES, 6 DE JUL· 2" [ref=e300] [cursor=pointer]:
+              - generic [ref=e301]:
+                - text: LUNES, 6 DE JUL
+                - generic [ref=e302]: · 2
+              - img [ref=e303]
+            - button "MARTES, 7 DE JUL· 2" [ref=e306] [cursor=pointer]:
+              - generic [ref=e307]:
+                - text: MARTES, 7 DE JUL
+                - generic [ref=e308]: · 2
+              - img [ref=e309]
+            - button "JUEVES, 9 DE JUL· 1" [ref=e312] [cursor=pointer]:
+              - generic [ref=e313]:
+                - text: JUEVES, 9 DE JUL
+                - generic [ref=e314]: · 1
+              - img [ref=e315]
+            - button "VIERNES, 10 DE JUL· 1" [ref=e318] [cursor=pointer]:
+              - generic [ref=e319]:
+                - text: VIERNES, 10 DE JUL
+                - generic [ref=e320]: · 1
+              - img [ref=e321]
+            - button "SÁBADO, 11 DE JUL· 2" [ref=e324] [cursor=pointer]:
+              - generic [ref=e325]:
+                - text: SÁBADO, 11 DE JUL
+                - generic [ref=e326]: · 2
+              - img [ref=e327]
+            - button "MARTES, 14 DE JUL· 1" [ref=e330] [cursor=pointer]:
+              - generic [ref=e331]:
+                - text: MARTES, 14 DE JUL
+                - generic [ref=e332]: · 1
+              - img [ref=e333]
+            - button "MIÉRCOLES, 15 DE JUL· 1" [ref=e336] [cursor=pointer]:
+              - generic [ref=e337]:
+                - text: MIÉRCOLES, 15 DE JUL
+                - generic [ref=e338]: · 1
+              - img [ref=e339]
+            - button "SÁBADO, 18 DE JUL· 1" [ref=e342] [cursor=pointer]:
+              - generic [ref=e343]:
+                - text: SÁBADO, 18 DE JUL
+                - generic [ref=e344]: · 1
+              - img [ref=e345]
+            - button "DOMINGO, 19 DE JUL· 1" [ref=e348] [cursor=pointer]:
+              - generic [ref=e349]:
+                - text: DOMINGO, 19 DE JUL
+                - generic [ref=e350]: · 1
+              - img [ref=e351]
+      - dialog "México" [ref=e354]:
+        - generic [ref=e355]:
+          - generic [ref=e358]:
+            - generic [ref=e359]:
+              - heading "México" [level=2] [ref=e360]
+              - paragraph [ref=e361]: "CONCACAF · #14 FIFA"
+            - button "Cerrar" [ref=e362] [cursor=pointer]:
+              - img [ref=e363]
+          - generic [ref=e366]:
+            - generic [ref=e367]:
+              - generic [ref=e368]:
+                - img [ref=e369]
+                - text: "Mundiales: 18"
+              - generic [ref=e371]:
+                - img [ref=e372]
+                - text: Cuartos de final (1970, 1986)
+            - generic [ref=e374]:
+              - heading "Forma en el torneo" [level=3] [ref=e376]
+              - paragraph [ref=e377]: Aún no juega su primer partido en este torneo
+            - generic [ref=e378]:
+              - heading "Su grupo" [level=3] [ref=e379]
+              - generic [ref=e380]:
+                - generic [ref=e381]:
+                  - generic [ref=e383]: Equipo
+                  - generic [ref=e384]: PJ
+                  - generic [ref=e385]: DG
+                  - generic [ref=e386]: Pts
+                - generic [ref=e387]:
+                  - generic [ref=e388]: "1"
+                  - generic [ref=e390]: Chequia
+                  - generic [ref=e391]: "0"
+                  - generic [ref=e392]: "0"
+                  - generic [ref=e393]: "0"
+                - generic [ref=e394]:
+                  - generic [ref=e395]: "2"
+                  - generic [ref=e397]: México
+                  - generic [ref=e398]: "0"
+                  - generic [ref=e399]: "0"
+                  - generic [ref=e400]: "0"
+                - generic [ref=e401]:
+                  - generic [ref=e402]: "3"
+                  - generic [ref=e404]: Sudáfrica
+                  - generic [ref=e405]: "0"
+                  - generic [ref=e406]: "0"
+                  - generic [ref=e407]: "0"
+                - generic [ref=e408]:
+                  - generic [ref=e409]: "4"
+                  - generic [ref=e411]: Corea del Sur
+                  - generic [ref=e412]: "0"
+                  - generic [ref=e413]: "0"
+                  - generic [ref=e414]: "0"
+            - generic [ref=e415]:
+              - heading "Próximos partidos" [level=3] [ref=e416]
+              - list [ref=e417]:
+                - listitem [ref=e418]:
+                  - generic [ref=e419]: vs Sudáfrica
+                  - generic [ref=e420]: 11 de jun, 2:00 p. m.
+                - listitem [ref=e421]:
+                  - generic [ref=e422]: vs Corea del Sur
+                  - generic [ref=e423]: 18 de jun, 8:00 p. m.
+                - listitem [ref=e424]:
+                  - generic [ref=e425]: vs Chequia
+                  - generic [ref=e426]: 24 de jun, 8:00 p. m.
+  - navigation "Navegación inferior" [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - link "Inicio" [ref=e26] [cursor=pointer]:
+          - /url: /inicio
+          - img [ref=e28]
+          - generic [ref=e31]: Inicio
+        - link "204 por pronosticar Pollas" [ref=e32] [cursor=pointer]:
+          - /url: /pollas
+          - generic [ref=e33]:
+            - img [ref=e34]
+            - generic "204 por pronosticar" [ref=e36]: 9+
+          - generic [ref=e37]: Pollas
+      - button "Crear o unirme a una polla" [ref=e38] [cursor=pointer]:
+        - img [ref=e39]
+      - generic [ref=e40]:
+        - link "62 sin leer Avisos" [ref=e41] [cursor=pointer]:
+          - /url: /avisos
+          - generic [ref=e42]:
+            - img [ref=e43]
+            - generic "62 sin leer" [ref=e46]: 9+
+          - generic [ref=e47]: Avisos
+        - link "Perfil" [ref=e48] [cursor=pointer]:
+          - /url: /perfil
+          - img [ref=e50]
+          - generic [ref=e53]: Perfil
+  - alert [ref=e54]

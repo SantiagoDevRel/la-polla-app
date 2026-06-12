@@ -1,0 +1,44 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: LA
+          - generic [ref=e8]: POLLA
+          - generic [ref=e9]: COLOMBIANA
+        - generic [ref=e10]:
+          - button "Reportar un problema" [ref=e11] [cursor=pointer]:
+            - img [ref=e12]
+          - link "Abrir el bot en WhatsApp" [ref=e14] [cursor=pointer]:
+            - /url: https://wa.me/573117312391?text=Hola%20parce!%20mu%C3%A9strame%20el%20men%C3%BA%20porfa
+            - img [ref=e15]
+    - generic [ref=e19]:
+      - status "Cargando" [ref=e21]
+      - paragraph [ref=e22]: Cargando polla...
+  - navigation "Navegación inferior" [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - link "Inicio" [ref=e26] [cursor=pointer]:
+          - /url: /inicio
+          - img [ref=e28]
+          - generic [ref=e31]: Inicio
+        - link "204 por pronosticar Pollas" [ref=e32] [cursor=pointer]:
+          - /url: /pollas
+          - generic [ref=e33]:
+            - img [ref=e34]
+            - generic "204 por pronosticar" [ref=e36]: 9+
+          - generic [ref=e37]: Pollas
+      - button "Crear o unirme a una polla" [ref=e38] [cursor=pointer]:
+        - img [ref=e39]
+      - generic [ref=e40]:
+        - link "62 sin leer Avisos" [ref=e41] [cursor=pointer]:
+          - /url: /avisos
+          - generic [ref=e42]:
+            - img [ref=e43]
+            - generic "62 sin leer" [ref=e46]: 9+
+          - generic [ref=e47]: Avisos
+        - link "Perfil" [ref=e48] [cursor=pointer]:
+          - /url: /perfil
+          - img [ref=e50]
+          - generic [ref=e53]: Perfil
+  - alert [ref=e54]

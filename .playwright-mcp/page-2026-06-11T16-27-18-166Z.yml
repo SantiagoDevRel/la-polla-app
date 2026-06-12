@@ -1,0 +1,74 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - button "Saltar" [ref=e6] [cursor=pointer]
+    - generic [ref=e7]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: LA
+        - generic [ref=e11]: POLLA
+        - generic [ref=e12]: COLOMBIANA
+      - paragraph [ref=e14]:
+        - text: La Polla Colombiana es para que juegues con
+        - text: tus amigos los principales torneos del mundo
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - img "Mundial" [ref=e17]
+          - generic [ref=e18]: Mundial
+        - generic [ref=e19]:
+          - img "Champions" [ref=e20]
+          - generic [ref=e21]: Champions
+        - generic [ref=e22]:
+          - img "La Liga" [ref=e23]
+          - generic [ref=e24]: La Liga
+        - generic [ref=e25]:
+          - img "Serie A" [ref=e26]
+          - generic [ref=e27]: Serie A
+      - list [ref=e28]:
+        - listitem [ref=e29]:
+          - generic [ref=e30]: "1"
+          - generic [ref=e31]: Creas una polla
+        - listitem [ref=e32]:
+          - generic [ref=e33]: "2"
+          - generic [ref=e34]: Invitas a tus amigos
+        - listitem [ref=e35]:
+          - generic [ref=e36]: "3"
+          - generic [ref=e37]: Defines la distribución de premios
+        - listitem [ref=e38]:
+          - generic [ref=e39]: "4"
+          - generic [ref=e40]: Marcas quién ha pagado y quién no
+        - listitem [ref=e41]:
+          - generic [ref=e42]: "5"
+          - generic [ref=e43]: Y a pronosticar
+      - paragraph [ref=e44]:
+        - text: Todo esto es
+        - generic [ref=e45]: GRATIS
+        - text: .
+      - generic:
+        - button "Empezar"
+        - link "hecho por santiago @santiagotrujilloz":
+          - /url: https://instagram.com/santiagotrujilloz
+          - generic: hecho por santiago
+          - generic: "@santiagotrujilloz"
+  - generic [ref=e47]:
+    - generic [ref=e48]:
+      - img "LA POLLA" [ref=e50]
+      - heading "LA POLLA" [level=1] [ref=e51]
+      - paragraph [ref=e52]: La polla deportiva de tus amigos
+    - generic [ref=e53]:
+      - generic [ref=e54]:
+        - generic [ref=e55]: Tu número de celular
+        - generic [ref=e57]:
+          - button "Colombia +57" [ref=e58] [cursor=pointer]:
+            - img "Colombia" [ref=e59]
+            - generic [ref=e63]: "+57"
+            - img [ref=e64]
+          - textbox "310 123 1234" [ref=e66]
+      - generic [ref=e67]:
+        - button "SMS" [ref=e68] [cursor=pointer]:
+          - img [ref=e69]
+          - text: SMS
+        - link "Recibir código por WhatsApp" [ref=e71] [cursor=pointer]:
+          - /url: https://wa.me/573117312391?text=Hola%20parce!%20%F0%9F%90%A5%20quiero%20entrar%20a%20la%20polla
+          - img [ref=e72]
+          - text: WhatsApp
+    - paragraph [ref=e74]: Al continuar, aceptas nuestros términos y condiciones
+  - alert [ref=e75]

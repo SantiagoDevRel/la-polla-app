@@ -1,0 +1,41 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - heading "🐥 Mapa de La Polla" [level=1] [ref=e4]
+    - generic [ref=e5]: Tu app dividida en 7 zonas. Tocá una para ver qué hace y qué se afecta si la cambiás.
+    - generic [ref=e6]: Datos reales del código (grafo de codebase-memory, 2804 funciones). No es adivinanza.
+  - generic [ref=e7]:
+    - generic [ref=e8]: 🔴 Delicada — tocar con cuidado
+    - generic [ref=e10]: 🟡 Media
+    - generic [ref=e12]: 🟢 Tranquila
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16] [cursor=pointer]:
+        - generic [ref=e18]: 🔐
+        - text: Entrar
+        - generic [ref=e19]: Login con código SMS + el portero que decide quién pasa
+      - generic [ref=e20] [cursor=pointer]:
+        - generic [ref=e22]: 💬
+        - text: Bot WhatsApp
+        - generic [ref=e23]: El bot que pronostica, muestra tabla y une por chat
+      - generic [ref=e24] [cursor=pointer]:
+        - generic [ref=e26]: ⚽
+        - text: Partidos
+        - generic [ref=e27]: Trae resultados de 3 proveedores y calcula puntajes
+      - generic [ref=e28] [cursor=pointer]:
+        - generic [ref=e30]: 🎟️
+        - text: Pollas
+        - generic [ref=e31]: Crear pollas, unirse, y la tabla de posiciones
+      - generic [ref=e32] [cursor=pointer]:
+        - generic [ref=e34]: 💰
+        - text: Pagos
+        - generic [ref=e35]: Cobros, comprobantes con foto, validación con IA, premios
+      - generic [ref=e36] [cursor=pointer]:
+        - generic [ref=e38]: 🛡️
+        - text: Admin
+        - generic [ref=e39]: Tu panel de control (solo 2 teléfonos)
+      - generic [ref=e40] [cursor=pointer]:
+        - generic [ref=e42]: 🌐
+        - text: Web / SEO
+        - generic [ref=e43]: Las páginas que Google indexa (2 dominios)
+    - generic [ref=e44]: 👈 Tocá una zona para ver de qué se trata
+  - contentinfo [ref=e45]: Generado el 2026-06-07 desde el código real de La Polla · verde punteado = de esa zona toma datos · naranja = esa zona se afecta si la cambiás · La delicadeza viene de cuántas partes dependen de cada zona.

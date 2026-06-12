@@ -1,0 +1,20 @@
+[    1780ms] Error: Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at sq (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:146766)
+    at co (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:158780)
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:99417
+    at iu (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:103868)
+    at ia (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:95224)
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:91089
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:91096
+    at oZ (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:91201)
+    at MessagePort.T (https://lapollacolombiana.com/_next/static/chunks/5734-03e8474be4155a1d.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:85205)
+[    1782ms] Error: Minified React error #422; visit https://react.dev/errors/422 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:63988
+    at lZ (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:65339)
+    at iZ (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:121134)
+    at ia (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:95163)
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:91089
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:91096
+    at oZ (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:91201)
+    at MessagePort.T (https://lapollacolombiana.com/_next/static/chunks/5734-03e8474be4155a1d.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:1:85205)
+[   26061ms] [LOG] [perfil] /api/users/me profile payload: {display_name: Santiago Trujillo Z 🇨🇴, whatsapp_number: 573117312391, avatar_url: verde, is_admin: true, default_payout_method: bancolombia} @ https://lapollacolombiana.com/_next/static/chunks/app/(app)/perfil/page-d777b3c16ec66f87.js?dpl=dpl_DPotSQ8hvEBSWraiL25RFu7LRihV:0

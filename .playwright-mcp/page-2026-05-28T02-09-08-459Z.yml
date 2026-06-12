@@ -1,0 +1,12 @@
+- banner [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]: LA
+      - generic [ref=e8]: POLLA
+      - generic [ref=e9]: COLOMBIANA
+    - generic [ref=e10]:
+      - button "Reportar un problema" [ref=e11] [cursor=pointer]:
+        - img [ref=e12]
+      - link "Abrir el bot en WhatsApp" [ref=e14] [cursor=pointer]:
+        - /url: https://wa.me/573117312391?text=Hola%20parce!%20mu%C3%A9strame%20el%20men%C3%BA%20porfa
+        - img [ref=e15]

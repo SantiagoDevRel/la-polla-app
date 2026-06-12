@@ -1,0 +1,61 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: LA
+          - generic [ref=e8]: POLLA
+          - generic [ref=e9]: COLOMBIANA
+        - generic [ref=e10]:
+          - button "Reportar un problema" [ref=e11] [cursor=pointer]:
+            - img [ref=e12]
+          - link "Abrir el bot en WhatsApp" [ref=e14] [cursor=pointer]:
+            - /url: https://wa.me/573117312391?text=Hola%20parce!%20mu%C3%A9strame%20el%20men%C3%BA%20porfa
+            - img [ref=e15]
+    - generic [ref=e18]:
+      - banner [ref=e19]:
+        - generic [ref=e20]:
+          - button [ref=e21] [cursor=pointer]:
+            - img [ref=e22]
+          - heading "Mis Pollas" [level=1] [ref=e24]:
+            - img [ref=e25]
+            - text: Mis Pollas
+      - main [ref=e29]:
+        - button "¿Tienes un código? Únete" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]:
+            - img [ref=e32]
+            - text: ¿Tienes un código? Únete
+          - img [ref=e35]
+        - generic [ref=e37]:
+          - heading "Mis pollas activas · 0" [level=2] [ref=e38]:
+            - text: Mis pollas activas
+            - generic [ref=e40]: · 0
+          - generic [ref=e41]:
+            - status "Cargando" [ref=e42]
+            - paragraph [ref=e43]: Cargando pollas...
+  - navigation "Navegación inferior" [ref=e44]:
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - link "Inicio" [ref=e47] [cursor=pointer]:
+          - /url: /inicio
+          - img [ref=e49]
+          - generic [ref=e52]: Inicio
+        - link "4 por pronosticar Pollas" [ref=e53] [cursor=pointer]:
+          - /url: /pollas
+          - generic [ref=e54]:
+            - img [ref=e55]
+            - generic "4 por pronosticar" [ref=e57]: "4"
+          - generic [ref=e58]: Pollas
+      - button "Unirme con código" [ref=e59] [cursor=pointer]:
+        - img [ref=e60]
+      - generic [ref=e63]:
+        - link "4 sin leer Avisos" [ref=e64] [cursor=pointer]:
+          - /url: /avisos
+          - generic [ref=e65]:
+            - img [ref=e66]
+            - generic "4 sin leer" [ref=e69]: "4"
+          - generic [ref=e70]: Avisos
+        - link "Perfil" [ref=e71] [cursor=pointer]:
+          - /url: /perfil
+          - img [ref=e73]
+          - generic [ref=e76]: Perfil

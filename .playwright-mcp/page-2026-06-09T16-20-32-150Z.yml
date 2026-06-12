@@ -1,0 +1,10 @@
+- main [ref=e2]:
+  - heading "flag render test" [level=1] [ref=e3]
+  - generic [ref=e4]:
+    - paragraph [ref=e5]: 1) next/image unoptimized (TeamCrest approach)
+    - img "mx" [ref=e6]
+    - text: pending
+  - generic [ref=e7]:
+    - paragraph [ref=e8]: 2) plain img (LiveChip approach)
+    - img "mx" [ref=e9]
+    - text: pending

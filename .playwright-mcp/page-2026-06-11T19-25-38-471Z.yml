@@ -1,0 +1,193 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: LA
+          - generic [ref=e8]: POLLA
+          - generic [ref=e9]: COLOMBIANA
+        - generic [ref=e10]:
+          - button "Reportar un problema" [ref=e11] [cursor=pointer]:
+            - img [ref=e12]
+          - link "Abrir el bot en WhatsApp" [ref=e14] [cursor=pointer]:
+            - /url: https://wa.me/573117312391?text=Hola%20parce!%20mu%C3%A9strame%20el%20men%C3%BA%20porfa
+            - img [ref=e15]
+    - generic [ref=e18]:
+      - banner [ref=e51]:
+        - generic [ref=e53]:
+          - button "←" [ref=e54] [cursor=pointer]
+          - heading "Polla Mundialista" [level=1] [ref=e55]
+          - generic [ref=e57]:
+            - img "Mundial 2026" [ref=e58]
+            - generic [ref=e59]: Mundial 2026
+      - generic [ref=e61]:
+        - generic [ref=e62]: "Pozo: $ 1.500.000 total ($ 100.000 por persona)"
+        - button "Cómo se puntúa" [ref=e63] [cursor=pointer]:
+          - img [ref=e64]
+      - generic [ref=e68]:
+        - button "Partidos" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+          - text: Partidos
+        - button "Tabla" [ref=e73] [cursor=pointer]:
+          - img [ref=e74]
+          - text: Tabla
+        - button "Invitar" [ref=e80] [cursor=pointer]:
+          - img [ref=e81]
+          - text: Invitar
+        - button "Pagos" [ref=e87] [cursor=pointer]:
+          - img [ref=e88]
+          - text: Pagos
+        - button "Info" [ref=e91] [cursor=pointer]:
+          - img [ref=e92]
+          - text: Info
+      - main [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - generic [ref=e97]:
+              - img [ref=e98]
+              - heading "Premios" [level=3] [ref=e104]
+            - list [ref=e105]:
+              - listitem [ref=e106]:
+                - generic [ref=e107]: 1°
+                - generic [ref=e108]:
+                  - generic [ref=e109]: 70%
+                  - generic [ref=e110]: ≈ $1.050.000
+              - listitem [ref=e111]:
+                - generic [ref=e112]: 2°
+                - generic [ref=e113]:
+                  - generic [ref=e114]: 20%
+                  - generic [ref=e115]: ≈ $300.000
+              - listitem [ref=e116]:
+                - generic [ref=e117]: 3°
+                - generic [ref=e118]:
+                  - generic [ref=e119]: 10%
+                  - generic [ref=e120]: ≈ $150.000
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - generic [ref=e123]: "#1"
+              - img "Pipe" [ref=e124]
+              - generic [ref=e125]:
+                - paragraph [ref=e126]: Pipe
+                - paragraph [ref=e127]: "Va ganando: $100.000"
+              - generic [ref=e128]: "0"
+            - generic [ref=e129]:
+              - generic [ref=e130]: "#1"
+              - img "Santiago Trujillo Z 🇨🇴" [ref=e131]
+              - generic [ref=e132]:
+                - paragraph [ref=e133]: Santiago Trujillo Z 🇨🇴(tú)
+                - paragraph [ref=e134]: "Va ganando: $100.000"
+              - generic [ref=e135]: "0"
+            - generic [ref=e136]:
+              - generic [ref=e137]: "#1"
+              - img "Lucho" [ref=e138]
+              - generic [ref=e139]:
+                - paragraph [ref=e140]: Lucho
+                - paragraph [ref=e141]: "Va ganando: $100.000"
+              - generic [ref=e142]: "0"
+            - generic [ref=e143]:
+              - generic [ref=e144]: "#1"
+              - img "John Trujillo" [ref=e145]
+              - generic [ref=e146]:
+                - paragraph [ref=e147]: John Trujillo
+                - paragraph [ref=e148]: "Va ganando: $100.000"
+              - generic [ref=e149]: "0"
+            - generic [ref=e150]:
+              - generic [ref=e151]: "#1"
+              - img "Casvi" [ref=e152]
+              - generic [ref=e153]:
+                - paragraph [ref=e154]: Casvi
+                - paragraph [ref=e155]: "Va ganando: $100.000"
+              - generic [ref=e156]: "0"
+            - generic [ref=e157]:
+              - generic [ref=e158]: "#1"
+              - img "David" [ref=e159]
+              - generic [ref=e160]:
+                - paragraph [ref=e161]: David
+                - paragraph [ref=e162]: "Va ganando: $100.000"
+              - generic [ref=e163]: "0"
+            - generic [ref=e164]:
+              - generic [ref=e165]: "#1"
+              - img "Lady" [ref=e166]
+              - generic [ref=e167]:
+                - paragraph [ref=e168]: Lady
+                - paragraph [ref=e169]: "Va ganando: $100.000"
+              - generic [ref=e170]: "0"
+            - generic [ref=e171]:
+              - generic [ref=e172]: "#1"
+              - img "Daniela" [ref=e173]
+              - generic [ref=e174]:
+                - paragraph [ref=e175]: Daniela
+                - paragraph [ref=e176]: "Va ganando: $100.000"
+              - generic [ref=e177]: "0"
+            - generic [ref=e178]:
+              - generic [ref=e179]: "#1"
+              - img "JuanPa" [ref=e180]
+              - generic [ref=e181]:
+                - paragraph [ref=e182]: JuanPa
+                - paragraph [ref=e183]: "Va ganando: $100.000"
+              - generic [ref=e184]: "0"
+            - generic [ref=e185]:
+              - generic [ref=e186]: "#1"
+              - img "Tomastodonte99" [ref=e187]
+              - generic [ref=e188]:
+                - paragraph [ref=e189]: Tomastodonte99
+                - paragraph [ref=e190]: "Va ganando: $100.000"
+              - generic [ref=e191]: "0"
+            - generic [ref=e192]:
+              - generic [ref=e193]: "#1"
+              - img "Homer" [ref=e194]
+              - generic [ref=e195]:
+                - paragraph [ref=e196]: Homer
+                - paragraph [ref=e197]: "Va ganando: $100.000"
+              - generic [ref=e198]: "0"
+            - generic [ref=e199]:
+              - generic [ref=e200]: "#1"
+              - img "Juan camilo" [ref=e201]
+              - generic [ref=e202]:
+                - paragraph [ref=e203]: Juan camilo
+                - paragraph [ref=e204]: "Va ganando: $100.000"
+              - generic [ref=e205]: "0"
+            - generic [ref=e206]:
+              - generic [ref=e207]: "#1"
+              - img "Davis" [ref=e208]
+              - generic [ref=e209]:
+                - paragraph [ref=e210]: Davis
+                - paragraph [ref=e211]: "Va ganando: $100.000"
+              - generic [ref=e212]: "0"
+            - generic [ref=e213]:
+              - generic [ref=e214]: "#1"
+              - img "Julian Aristi" [ref=e215]
+              - generic [ref=e216]:
+                - paragraph [ref=e217]: Julian Aristi
+                - paragraph [ref=e218]: "Va ganando: $100.000"
+              - generic [ref=e219]: "0"
+            - generic [ref=e220]:
+              - generic [ref=e221]: "#1"
+              - img "Juan Villada" [ref=e222]
+              - generic [ref=e223]:
+                - paragraph [ref=e224]: Juan Villada
+                - paragraph [ref=e225]: "Va ganando: $100.000"
+              - generic [ref=e226]: "0"
+  - navigation "Navegación inferior" [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - link "Inicio" [ref=e26] [cursor=pointer]:
+          - /url: /inicio
+          - img [ref=e28]
+        - link "Pollas" [ref=e31] [cursor=pointer]:
+          - /url: /pollas
+          - generic [ref=e33]:
+            - img [ref=e34]
+            - generic "200 por pronosticar" [ref=e36]: 9+
+      - button "Crear o unirme a una polla" [ref=e37] [cursor=pointer]:
+        - img [ref=e38]
+      - generic [ref=e39]:
+        - link "Avisos" [ref=e40] [cursor=pointer]:
+          - /url: /avisos
+          - generic [ref=e41]:
+            - img [ref=e42]
+            - generic "66 sin leer" [ref=e45]: 9+
+        - link "Perfil" [ref=e46] [cursor=pointer]:
+          - /url: /perfil
+          - img [ref=e48]
+  - alert [ref=e227]

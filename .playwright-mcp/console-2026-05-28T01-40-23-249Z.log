@@ -1,0 +1,310 @@
+[    2366ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js:38559
+[    5062ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/za.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[    5062ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/kr.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[    5062ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/cz.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[    5063ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/mx.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[ 1496048ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1496846ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1496887ms] [LOG] [Fast Refresh] done in 41ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1498522ms] [LOG] [Fast Refresh] done in 1676ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1501355ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1501948ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1502002ms] [LOG] [Fast Refresh] done in 55ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1502858ms] [LOG] [Fast Refresh] done in 911ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1511275ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1511669ms] [LOG] [Fast Refresh] done in 395ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1520158ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1520530ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1520561ms] [LOG] [Fast Refresh] done in 31ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1521271ms] [LOG] [Fast Refresh] done in 741ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1527058ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1527503ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1527537ms] [LOG] [Fast Refresh] done in 33ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1529054ms] [LOG] [Fast Refresh] done in 1551ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1537749ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1538268ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1538309ms] [LOG] [Fast Refresh] done in 41ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1539262ms] [WARNING] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:112
+[ 1541971ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js:38559
+[ 1547683ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/mx.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[ 1547684ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/za.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[ 1547684ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/kr.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[ 1547684ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/cz.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[ 1550217ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1550671ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1550715ms] [LOG] [Fast Refresh] done in 44ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1551577ms] [LOG] [Fast Refresh] done in 907ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1574574ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1575035ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1575088ms] [LOG] [Fast Refresh] done in 52ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1575393ms] [ERROR] ./app/(app)/pollas/crear/page.tsx
+Error: 
+  x the name `router` is defined multiple times
+     ,-[C:\Users\STZTR\Desktop\claude-code-environment\la-polla\app\(app)\pollas\crear\page.tsx:69:1]
+  69 |   const t = useTranslations("Crear");
+  70 |   const locale = useLocale();
+  71 |   const isIOSApp = useIsIOSApp();
+  72 |   const router = useRouter();
+     :         ^^^|^^
+     :            `-- previous definition of `router` here
+  73 | 
+  74 |   // App Store 5.1.1(ix): la app iOS no permite a usuarios crear pollas
+  75 |   // (solo unirse via código de invitación). Defense-in-depth: si alguien
+  76 |   // navega directo a /pollas/crear desde iOS (bookmark, deep-link viejo,
+  77 |   // etc.) lo redirigimos a /pollas. La UI de crear está oculta en iOS,
+  78 |   // pero el guard sigue acá por si la ruta llega de algún lado.
+  79 |   useEffect(() => {
+  80 |     if (isIOSApp) {
+  81 |       router.replace("/pollas");
+  82 |     }
+  83 |   }, [isIOSApp, router]);
+  84 |   if (isIOSApp) return null;
+  85 |   const PAYMENT_MODE_OPTIONS = useMemo(
+  86 |     () => [
+  87 |       {
+  88 |         value: "admin_collects" as PaymentMode,
+  89 |         title: t("paymentModeUpfrontTitle"),
+  90 |         icon: "banknote",
+  91 |         description: t("paymentModeUpfrontDesc"),
+  92 |         tag: "",
+  93 |       },
+  94 |       {
+  95 |         value: "pay_winner" as PaymentMode,
+  96 |         title: t("paymentModeWinnerTitle"),
+  97 |         icon: "handshake",
+  98 |         description: t("paymentModeWinnerDesc"),
+  99 |         tag: "",
+ 100 |       },
+ 101 |     ],
+ 102 |     [t],
+ 103 |   );
+ 104 |   const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = useMemo(
+ 105 |     () => ({
+ 106 |       admin_collects: t("paymentHintUpfront"),
+ 107 |       pay_winner: t("paymentHintWinner"),
+ 108 |     }),
+ 109 |     [t],
+ 110 |   );
+ 111 |   const router = useRouter();
+     :         ^^^|^^
+     :            `-- `router` redefined here
+ 112 |   const [step, setStep] = useState<Step>(1);
+ 113 |   const [loading, setLoading] = useState(false);
+ 113 |   const [error, setError] = useState("");
+     `----
+
+Import trace for requested module:
+./app/(app)/pollas/crear/page.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/app-index.js:32
+[ 1575503ms] [ERROR] Loading plugin data from 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiBpZD0ic3ZnIj48dGV4dCB4PSIxMCIgeT0iMjAiIGlkPSJzdmctbGluay10ZXh0Ij50ZXh0PC90ZXh0Pjwvc3ZnPg==' violates the following Content Security Policy directive: "default-src 'self'". Note that 'object-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/internal/components/Overlay/maintain--tab-focus.js:236
+[ 1575504ms] [ERROR] Loading plugin data from 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiBpZD0ic3ZnIj48dGV4dCB4PSIxMCIgeT0iMjAiIGlkPSJzdmctbGluay10ZXh0Ij50ZXh0PC90ZXh0Pjwvc3ZnPg==' violates the following Content Security Policy directive: "default-src 'self'". Note that 'object-src' was not explicitly set, so 'default-src' is used as a fallback. The action has been blocked. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/internal/components/Overlay/maintain--tab-focus.js:236
+[ 1578742ms] [LOG] [Fast Refresh] done in 3706ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1580647ms] [LOG] [Fast Refresh] done in 5611ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1581485ms] [ERROR] ./app/(app)/pollas/crear/page.tsx
+Error: 
+  x the name `router` is defined multiple times
+     ,-[C:\Users\STZTR\Desktop\claude-code-environment\la-polla\app\(app)\pollas\crear\page.tsx:69:1]
+  69 |   const t = useTranslations("Crear");
+  70 |   const locale = useLocale();
+  71 |   const isIOSApp = useIsIOSApp();
+  72 |   const router = useRouter();
+     :         ^^^|^^
+     :            `-- previous definition of `router` here
+  73 | 
+  74 |   // App Store 5.1.1(ix): la app iOS no permite a usuarios crear pollas
+  75 |   // (solo unirse via código de invitación). Defense-in-depth: si alguien
+  76 |   // navega directo a /pollas/crear desde iOS (bookmark, deep-link viejo,
+  77 |   // etc.) lo redirigimos a /pollas. La UI de crear está oculta en iOS,
+  78 |   // pero el guard sigue acá por si la ruta llega de algún lado.
+  79 |   useEffect(() => {
+  80 |     if (isIOSApp) {
+  81 |       router.replace("/pollas");
+  82 |     }
+  83 |   }, [isIOSApp, router]);
+  84 |   if (isIOSApp) return null;
+  85 |   const PAYMENT_MODE_OPTIONS = useMemo(
+  86 |     () => [
+  87 |       {
+  88 |         value: "admin_collects" as PaymentMode,
+  89 |         title: t("paymentModeUpfrontTitle"),
+  90 |         icon: "banknote",
+  91 |         description: t("paymentModeUpfrontDesc"),
+  92 |         tag: "",
+  93 |       },
+  94 |       {
+  95 |         value: "pay_winner" as PaymentMode,
+  96 |         title: t("paymentModeWinnerTitle"),
+  97 |         icon: "handshake",
+  98 |         description: t("paymentModeWinnerDesc"),
+  99 |         tag: "",
+ 100 |       },
+ 101 |     ],
+ 102 |     [t],
+ 103 |   );
+ 104 |   const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = useMemo(
+ 105 |     () => ({
+ 106 |       admin_collects: t("paymentHintUpfront"),
+ 107 |       pay_winner: t("paymentHintWinner"),
+ 108 |     }),
+ 109 |     [t],
+ 110 |   );
+ 111 |   const router = useRouter();
+     :         ^^^|^^
+     :            `-- `router` redefined here
+ 112 |   const [step, setStep] = useState<Step>(1);
+ 113 |   const [loading, setLoading] = useState(false);
+ 113 |   const [error, setError] = useState("");
+     `----
+
+Import trace for requested module:
+./app/(app)/pollas/crear/page.tsx @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/app-index.js:32
+[ 1582931ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/pollas/polla-demo?tab=partidos&_rsc=qmyj4:0
+[ 1583366ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/pollas/polla-demo?tab=partidos&_rsc=qmyj4:0
+[ 1583640ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/pollas/polla-demo?tab=partidos&_rsc=qmyj4:0
+[ 1584058ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/pollas/polla-demo?tab=partidos:0
+[ 1584640ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ webpack-internal:///./node_modules/react-dom/cjs/react-dom.development.js:29889
+[ 1584724ms] ModuleBuildError: Module build failed (from ./node_modules/next/dist/build/webpack/loaders/next-swc-loader.js):
+Error: 
+  x the name `router` is defined multiple times
+     ,-[C:\Users\STZTR\Desktop\claude-code-environment\la-polla\app\(app)\pollas\crear\page.tsx:69:1]
+  69 |   const t = useTranslations("Crear");
+  70 |   const locale = useLocale();
+  71 |   const isIOSApp = useIsIOSApp();
+  72 |   const router = useRouter();
+     :         ^^^|^^
+     :            `-- previous definition of `router` here
+  73 | 
+  74 |   // App Store 5.1.1(ix): la app iOS no permite a usuarios crear pollas
+  75 |   // (solo unirse via código de invitación). Defense-in-depth: si alguien
+  76 |   // navega directo a /pollas/crear desde iOS (bookmark, deep-link viejo,
+  77 |   // etc.) lo redirigimos a /pollas. La UI de crear está oculta en iOS,
+  78 |   // pero el guard sigue acá por si la ruta llega de algún lado.
+  79 |   useEffect(() => {
+  80 |     if (isIOSApp) {
+  81 |       router.replace("/pollas");
+  82 |     }
+  83 |   }, [isIOSApp, router]);
+  84 |   if (isIOSApp) return null;
+  85 |   const PAYMENT_MODE_OPTIONS = useMemo(
+  86 |     () => [
+  87 |       {
+  88 |         value: "admin_collects" as PaymentMode,
+  89 |         title: t("paymentModeUpfrontTitle"),
+  90 |         icon: "banknote",
+  91 |         description: t("paymentModeUpfrontDesc"),
+  92 |         tag: "",
+  93 |       },
+  94 |       {
+  95 |         value: "pay_winner" as PaymentMode,
+  96 |         title: t("paymentModeWinnerTitle"),
+  97 |         icon: "handshake",
+  98 |         description: t("paymentModeWinnerDesc"),
+  99 |         tag: "",
+ 100 |       },
+ 101 |     ],
+ 102 |     [t],
+ 103 |   );
+ 104 |   const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = useMemo(
+ 105 |     () => ({
+ 106 |       admin_collects: t("paymentHintUpfront"),
+ 107 |       pay_winner: t("paymentHintWinner"),
+ 108 |     }),
+ 109 |     [t],
+ 110 |   );
+ 111 |   const router = useRouter();
+     :         ^^^|^^
+     :            `-- `router` redefined here
+ 112 |   const [step, setStep] = useState<Step>(1);
+ 113 |   const [loading, setLoading] = useState(false);
+ 113 |   const [error, setError] = useState("");
+     `----
+
+    at processResult (file://C:\Users\STZTR\Desktop\claude-code-environment\la-polla\node_modules\next\dist\compiled\webpack\bundle5.js:28:400590)
+    at <unknown> (file://C:\Users\STZTR\Desktop\claude-code-environment\la-polla\node_modules\next\dist\compiled\webpack\bundle5.js:28:402302)
+    at <unknown> (file://C:\Users\STZTR\Desktop\claude-code-environment\la-polla\node_modules\next\dist\compiled\loader-runner\LoaderRunner.js:1:8645)
+    at <unknown> (file://C:\Users\STZTR\Desktop\claude-code-environment\la-polla\node_modules\next\dist\compiled\loader-runner\LoaderRunner.js:1:5019)
+    at r.callback (file://C:\Users\STZTR\Desktop\claude-code-environment\la-polla\node_modules\next\dist\compiled\loader-runner\LoaderRunner.js:1:4039)
+[ 1584725ms] [LOG] [HMR] connected @ webpack-internal:///./node_modules/next/dist/client/components/react-dev-overlay/pages/websocket.js:38
+[ 1584734ms] [ERROR] ./app/(app)/pollas/crear/page.tsx
+Error: 
+  x the name `router` is defined multiple times
+     ,-[C:\Users\STZTR\Desktop\claude-code-environment\la-polla\app\(app)\pollas\crear\page.tsx:69:1]
+  69 |   const t = useTranslations("Crear");
+  70 |   const locale = useLocale();
+  71 |   const isIOSApp = useIsIOSApp();
+  72 |   const router = useRouter();
+     :         ^^^|^^
+     :            `-- previous definition of `router` here
+  73 | 
+  74 |   // App Store 5.1.1(ix): la app iOS no permite a usuarios crear pollas
+  75 |   // (solo unirse via código de invitación). Defense-in-depth: si alguien
+  76 |   // navega directo a /pollas/crear desde iOS (bookmark, deep-link viejo,
+  77 |   // etc.) lo redirigimos a /pollas. La UI de crear está oculta en iOS,
+  78 |   // pero el guard sigue acá por si la ruta llega de algún lado.
+  79 |   useEffect(() => {
+  80 |     if (isIOSApp) {
+  81 |       router.replace("/pollas");
+  82 |     }
+  83 |   }, [isIOSApp, router]);
+  84 |   if (isIOSApp) return null;
+  85 |   const PAYMENT_MODE_OPTIONS = useMemo(
+  86 |     () => [
+  87 |       {
+  88 |         value: "admin_collects" as PaymentMode,
+  89 |         title: t("paymentModeUpfrontTitle"),
+  90 |         icon: "banknote",
+  91 |         description: t("paymentModeUpfrontDesc"),
+  92 |         tag: "",
+  93 |       },
+  94 |       {
+  95 |         value: "pay_winner" as PaymentMode,
+  96 |         title: t("paymentModeWinnerTitle"),
+  97 |         icon: "handshake",
+  98 |         description: t("paymentModeWinnerDesc"),
+  99 |         tag: "",
+ 100 |       },
+ 101 |     ],
+ 102 |     [t],
+ 103 |   );
+ 104 |   const PAYMENT_MODE_HINTS: Record<PaymentMode, string> = useMemo(
+ 105 |     () => ({
+ 106 |       admin_collects: t("paymentHintUpfront"),
+ 107 |       pay_winner: t("paymentHintWinner"),
+ 108 |     }),
+ 109 |     [t],
+ 110 |   );
+ 111 |   const router = useRouter();
+     :         ^^^|^^
+     :            `-- `router` redefined here
+ 112 |   const [step, setStep] = useState<Step>(1);
+ 113 |   const [loading, setLoading] = useState(false);
+ 113 |   const [error, setError] = useState("");
+     `---- @ webpack-internal:///./node_modules/next/dist/client/components/react-dev-overlay/internal/helpers/hydration-error-info.js:62
+[ 1584744ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/favicon.ico:0
+[ 1598453ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///./node_modules/next/dist/client/components/react-dev-overlay/pages/hot-reloader-client.js:221
+[ 1611699ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///./node_modules/next/dist/client/components/react-dev-overlay/pages/hot-reloader-client.js:221
+[ 1613228ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/_next/static/webpack/a4c414d4fcdae213.webpack.hot-update.json:0
+[ 1613229ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ webpack-internal:///./node_modules/next/dist/client/components/react-dev-overlay/pages/hot-reloader-client.js:349
+[ 1616023ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom.development.js:38559
+[ 1618762ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/mx.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[ 1618762ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/za.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[ 1618763ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/kr.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[ 1618764ms] [WARNING] Image with src "https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/flags/4x3/cz.svg" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[ 1623103ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1623582ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1623626ms] [LOG] [Fast Refresh] done in 43ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1624513ms] [LOG] [Fast Refresh] done in 930ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1651608ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1652194ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1652243ms] [LOG] [Fast Refresh] done in 49ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1653947ms] [LOG] [Fast Refresh] done in 1754ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1666042ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1666458ms] [LOG] [Fast Refresh] rebuilding @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:186
+[ 1666501ms] [LOG] [Fast Refresh] done in 43ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43
+[ 1667253ms] [LOG] [Fast Refresh] done in 795ms @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/react-dev-overlay/app/hot-reloader-client.js:43

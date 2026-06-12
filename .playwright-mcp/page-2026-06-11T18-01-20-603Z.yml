@@ -1,0 +1,291 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: LA
+          - generic [ref=e8]: POLLA
+          - generic [ref=e9]: COLOMBIANA
+        - generic [ref=e10]:
+          - button "Reportar un problema" [ref=e11] [cursor=pointer]:
+            - img [ref=e12]
+          - link "Abrir el bot en WhatsApp" [ref=e14] [cursor=pointer]:
+            - /url: https://wa.me/573117312391?text=Hola%20parce!%20mu%C3%A9strame%20el%20men%C3%BA%20porfa
+            - img [ref=e15]
+    - status "¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!" [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: ¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!
+          - generic [ref=e23]:
+            - img [ref=e24]
+            - text: ¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!
+          - generic [ref=e26]:
+            - img [ref=e27]
+            - text: ¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!
+          - generic [ref=e29]:
+            - img [ref=e30]
+            - text: ¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - img [ref=e34]
+            - text: ¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!
+          - generic [ref=e36]:
+            - img [ref=e37]
+            - text: ¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!
+          - generic [ref=e39]:
+            - img [ref=e40]
+            - text: ¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!
+          - generic [ref=e42]:
+            - img [ref=e43]
+            - text: ¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!
+      - button "Cerrar aviso" [ref=e45] [cursor=pointer]:
+        - img [ref=e46]
+    - generic [ref=e50]:
+      - generic [ref=e54]:
+        - paragraph [ref=e55]: Hola,
+        - heading "Santiago" [level=1] [ref=e56]
+        - status [ref=e57]:
+          - img [ref=e58]
+          - generic [ref=e60]: "Vas #1 en Polla Mundialista"
+      - main [ref=e61]:
+        - generic [ref=e62]:
+          - link "Pronosticar 200 pronósticos pendientes · La Polla de Carvalho" [ref=e64] [cursor=pointer]:
+            - /url: /pollas/la-polla-de-carvalho?tab=partidos
+            - img [ref=e66]
+            - generic [ref=e69]:
+              - paragraph [ref=e70]: Pronosticar
+              - paragraph [ref=e71]: 200 pronósticos pendientes · La Polla de Carvalho
+            - img [ref=e72]
+          - generic [ref=e74]:
+            - heading "Próximos" [level=2] [ref=e75]:
+              - img [ref=e76]
+              - text: Próximos
+            - generic [ref=e80]:
+              - generic [ref=e82]:
+                - generic [ref=e83]:
+                  - generic [ref=e84]: Mundial 2026
+                  - generic [ref=e85]: 11 de jun, 2:00 p. m.
+                - generic [ref=e86]:
+                  - button "Ver info de Mexico" [ref=e87] [cursor=pointer]:
+                    - img "Mexico" [ref=e88]
+                    - generic [ref=e89]: Mexico
+                  - generic [ref=e90]: VS
+                  - button "Ver info de South Africa" [ref=e91] [cursor=pointer]:
+                    - img "South Africa" [ref=e92]
+                    - generic [ref=e93]: South Africa
+                - generic [ref=e95]:
+                  - generic [ref=e96]:
+                    - generic [ref=e97]: Tu pronóstico
+                    - generic [ref=e98]: 2-2
+                  - paragraph [ref=e99]: Cambia tu pronóstico rápido · La Polla de Carvalho
+                  - generic [ref=e100]:
+                    - button "1-1" [ref=e101] [cursor=pointer]
+                    - button "3-2" [ref=e102] [cursor=pointer]
+                    - button "3-3" [ref=e103] [cursor=pointer]
+                    - button "2-1" [ref=e104] [cursor=pointer]
+                  - button "Ya apuntaste 2-2" [disabled] [ref=e105]
+                - generic [ref=e106]:
+                  - generic [ref=e107]: Bloquea en
+                  - generic [ref=e111]: 0H 53M
+              - generic [ref=e113]:
+                - generic [ref=e114]:
+                  - generic [ref=e115]: Mundial 2026
+                  - generic [ref=e116]: 11 de jun, 2:00 p. m.
+                - generic [ref=e117]:
+                  - button "Ver info de Mexico" [ref=e118] [cursor=pointer]:
+                    - img "Mexico" [ref=e119]
+                    - generic [ref=e120]: Mexico
+                  - generic [ref=e121]: VS
+                  - button "Ver info de South Africa" [ref=e122] [cursor=pointer]:
+                    - img "South Africa" [ref=e123]
+                    - generic [ref=e124]: South Africa
+                - generic [ref=e126]:
+                  - generic [ref=e127]:
+                    - generic [ref=e128]: Tu pronóstico
+                    - generic [ref=e129]: 3-2
+                  - paragraph [ref=e130]: Cambia tu pronóstico rápido · Polla Mundialista
+                  - generic [ref=e131]:
+                    - button "2-2" [ref=e132] [cursor=pointer]
+                    - button "0-0" [ref=e133] [cursor=pointer]
+                    - button "3-2" [pressed] [ref=e134] [cursor=pointer]
+                    - button "2-1" [ref=e135] [cursor=pointer]
+                  - button "Ya apuntaste 3-2" [disabled] [ref=e136]
+                - generic [ref=e137]:
+                  - generic [ref=e138]: Bloquea en
+                  - generic [ref=e142]: 0H 53M
+              - generic [ref=e144]:
+                - generic [ref=e145]:
+                  - generic [ref=e146]: Mundial 2026
+                  - generic [ref=e147]: 11 de jun, 9:00 p. m.
+                - generic [ref=e148]:
+                  - button "Ver info de South Korea" [ref=e149] [cursor=pointer]:
+                    - img "South Korea" [ref=e150]
+                    - generic [ref=e151]: South Korea
+                  - generic [ref=e152]: VS
+                  - button "Ver info de Czechia" [ref=e153] [cursor=pointer]:
+                    - img "Czechia" [ref=e154]
+                    - generic [ref=e155]: Czechia
+                - generic [ref=e157]:
+                  - generic [ref=e158]:
+                    - generic [ref=e159]: Tu pronóstico
+                    - generic [ref=e160]: 3-0
+                  - paragraph [ref=e161]: Cambia tu pronóstico rápido · La Polla de Carvalho
+                  - generic [ref=e162]:
+                    - button "1-1" [ref=e163] [cursor=pointer]
+                    - button "1-0" [ref=e164] [cursor=pointer]
+                    - button "0-0" [ref=e165] [cursor=pointer]
+                    - button "2-1" [ref=e166] [cursor=pointer]
+                  - button "Ya apuntaste 3-0" [disabled] [ref=e167]
+                - generic [ref=e168]:
+                  - generic [ref=e169]: Bloquea en
+                  - generic [ref=e173]: 7H 53M
+              - generic [ref=e175]:
+                - generic [ref=e176]:
+                  - generic [ref=e177]: Mundial 2026
+                  - generic [ref=e178]: 11 de jun, 9:00 p. m.
+                - generic [ref=e179]:
+                  - button "Ver info de South Korea" [ref=e180] [cursor=pointer]:
+                    - img "South Korea" [ref=e181]
+                    - generic [ref=e182]: South Korea
+                  - generic [ref=e183]: VS
+                  - button "Ver info de Czechia" [ref=e184] [cursor=pointer]:
+                    - img "Czechia" [ref=e185]
+                    - generic [ref=e186]: Czechia
+                - generic [ref=e188]:
+                  - generic [ref=e189]:
+                    - generic [ref=e190]: Tu pronóstico
+                    - generic [ref=e191]: 2-1
+                  - paragraph [ref=e192]: Cambia tu pronóstico rápido · Polla Mundialista
+                  - generic [ref=e193]:
+                    - button "0-1" [ref=e194] [cursor=pointer]
+                    - button "1-0" [ref=e195] [cursor=pointer]
+                    - button "1-1" [ref=e196] [cursor=pointer]
+                    - button "3-3" [ref=e197] [cursor=pointer]
+                  - button "Ya apuntaste 2-1" [disabled] [ref=e198]
+                - generic [ref=e199]:
+                  - generic [ref=e200]: Bloquea en
+                  - generic [ref=e204]: 7H 53M
+              - generic [ref=e206]:
+                - generic [ref=e207]:
+                  - generic [ref=e208]: Mundial 2026
+                  - generic [ref=e209]: 12 de jun, 2:00 p. m.
+                - generic [ref=e210]:
+                  - button "Ver info de Canada" [ref=e211] [cursor=pointer]:
+                    - img "Canada" [ref=e212]
+                    - generic [ref=e213]: Canada
+                  - generic [ref=e214]: VS
+                  - button "Ver info de Bosnia-Herzegovina" [ref=e215] [cursor=pointer]:
+                    - img "Bosnia-Herzegovina" [ref=e216]
+                    - generic [ref=e217]: Bosnia-Herzegovina
+                - generic [ref=e219]:
+                  - paragraph [ref=e220]: Pronóstico rápido · La Polla de Carvalho
+                  - generic [ref=e221]:
+                    - button "2-2" [pressed] [ref=e222] [cursor=pointer]
+                    - button "3-2" [ref=e223] [cursor=pointer]
+                    - button "2-3" [ref=e224] [cursor=pointer]
+                    - button "1-0" [ref=e225] [cursor=pointer]
+                  - button "Apuntar 2-2" [ref=e226] [cursor=pointer]
+              - generic [ref=e228]:
+                - generic [ref=e229]:
+                  - generic [ref=e230]: Mundial 2026
+                  - generic [ref=e231]: 12 de jun, 2:00 p. m.
+                - generic [ref=e232]:
+                  - button "Ver info de Canada" [ref=e233] [cursor=pointer]:
+                    - img "Canada" [ref=e234]
+                    - generic [ref=e235]: Canada
+                  - generic [ref=e236]: VS
+                  - button "Ver info de Bosnia-Herzegovina" [ref=e237] [cursor=pointer]:
+                    - img "Bosnia-Herzegovina" [ref=e238]
+                    - generic [ref=e239]: Bosnia-Herzegovina
+                - generic [ref=e241]:
+                  - paragraph [ref=e242]: Pronóstico rápido · Polla Mundialista
+                  - generic [ref=e243]:
+                    - button "3-3" [pressed] [ref=e244] [cursor=pointer]
+                    - button "1-0" [ref=e245] [cursor=pointer]
+                    - button "0-1" [ref=e246] [cursor=pointer]
+                    - button "1-1" [ref=e247] [cursor=pointer]
+                  - button "Apuntar 3-3" [ref=e248] [cursor=pointer]
+          - generic [ref=e249]:
+            - heading "Podio" [level=2] [ref=e250]
+            - generic [ref=e251]:
+              - generic [ref=e253]:
+                - generic [ref=e254]:
+                  - heading "Polla Mundialista" [level=3] [ref=e255]
+                  - generic [ref=e256]:
+                    - generic [ref=e258]:
+                      - generic [ref=e259]:
+                        - img "Santiago Trujillo Z 🇨🇴" [ref=e261]
+                        - generic [ref=e262]:
+                          - generic [ref=e263]: Santiago Trujillo Z 🇨🇴
+                          - generic [ref=e264]: 0 PTS
+                        - generic [ref=e266]: "2"
+                      - generic [ref=e267]:
+                        - img "Pipe" [ref=e269]
+                        - generic [ref=e270]:
+                          - generic [ref=e271]: Pipe
+                          - generic [ref=e272]: 0 PTS
+                        - generic [ref=e274]: "1"
+                      - generic [ref=e275]:
+                        - img "Lucho" [ref=e277]
+                        - generic [ref=e278]:
+                          - generic [ref=e279]: Lucho
+                          - generic [ref=e280]: 0 PTS
+                        - generic [ref=e282]: "3"
+                    - link "Ver polla" [ref=e284] [cursor=pointer]:
+                      - /url: /pollas/polla-mundialista-44md
+                      - text: Ver polla
+                      - img [ref=e285]
+                - generic [ref=e287]:
+                  - heading "La Polla de Carvalho" [level=3] [ref=e288]
+                  - generic [ref=e289]:
+                    - generic [ref=e291]:
+                      - generic [ref=e292]:
+                        - img "Pedro Echeverri" [ref=e294]
+                        - generic [ref=e295]:
+                          - generic [ref=e296]: Pedro Echeverri
+                          - generic [ref=e297]: 0 PTS
+                        - generic [ref=e299]: "2"
+                      - generic [ref=e300]:
+                        - img "Carvalho" [ref=e302]
+                        - generic [ref=e303]:
+                          - generic [ref=e304]: Carvalho
+                          - generic [ref=e305]: 0 PTS
+                        - generic [ref=e307]: "1"
+                      - generic [ref=e308]:
+                        - img "Santiago Trujillo Z 🇨🇴" [ref=e310]
+                        - generic [ref=e311]:
+                          - generic [ref=e312]: Santiago Trujillo Z 🇨🇴
+                          - generic [ref=e313]: 0 PTS
+                        - generic [ref=e315]: "3"
+                    - link "Ver polla" [ref=e317] [cursor=pointer]:
+                      - /url: /pollas/la-polla-de-carvalho
+                      - text: Ver polla
+                      - img [ref=e318]
+              - tablist "Paginación del podio" [ref=e320]:
+                - tab "Ir al podio de Polla Mundialista" [selected] [ref=e321] [cursor=pointer]
+                - tab "Ir al podio de La Polla de Carvalho" [ref=e322] [cursor=pointer]
+  - navigation "Navegación inferior" [ref=e323]:
+    - generic [ref=e324]:
+      - generic [ref=e325]:
+        - link "Inicio" [ref=e326] [cursor=pointer]:
+          - /url: /inicio
+          - img [ref=e329]
+        - link "Pollas" [ref=e332] [cursor=pointer]:
+          - /url: /pollas
+          - generic [ref=e333]:
+            - img [ref=e334]
+            - generic "200 por pronosticar" [ref=e336]: 9+
+      - button "Crear o unirme a una polla" [ref=e337] [cursor=pointer]:
+        - img [ref=e338]
+      - generic [ref=e339]:
+        - link "Avisos" [ref=e340] [cursor=pointer]:
+          - /url: /avisos
+          - generic [ref=e341]:
+            - img [ref=e342]
+            - generic "66 sin leer" [ref=e345]: 9+
+        - link "Perfil" [ref=e346] [cursor=pointer]:
+          - /url: /perfil
+          - img [ref=e348]
+  - alert [ref=e351]

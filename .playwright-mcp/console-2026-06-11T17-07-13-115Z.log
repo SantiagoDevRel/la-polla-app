@@ -1,0 +1,19 @@
+[    1523ms] Error: Minified React error #425; visit https://react.dev/errors/425 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at sq (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:146766)
+    at co (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:158780)
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:99417
+    at iu (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:103868)
+    at ia (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:95224)
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:91089
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:91096
+    at oZ (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:91201)
+    at MessagePort.T (https://lapollacolombiana.com/_next/static/chunks/5734-62078437e64ffc6b.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:85205)
+[    1524ms] Error: Minified React error #422; visit https://react.dev/errors/422 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:63988
+    at lZ (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:65339)
+    at iZ (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:121134)
+    at ia (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:95163)
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:91089
+    at https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:91096
+    at oZ (https://lapollacolombiana.com/_next/static/chunks/fd9d1056-1e204ff06f548688.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:91201)
+    at MessagePort.T (https://lapollacolombiana.com/_next/static/chunks/5734-62078437e64ffc6b.js?dpl=dpl_5jxPqHfoSs2ULXeDbzeS9XarWSnX:1:85205)

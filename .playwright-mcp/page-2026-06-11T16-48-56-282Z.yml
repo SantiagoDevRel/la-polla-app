@@ -1,0 +1,67 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: LA
+          - generic [ref=e8]: POLLA
+          - generic [ref=e9]: COLOMBIANA
+        - generic [ref=e10]:
+          - button "Reportar un problema" [ref=e11] [cursor=pointer]:
+            - img [ref=e12]
+          - link "Abrir el bot en WhatsApp" [ref=e14] [cursor=pointer]:
+            - /url: https://wa.me/573117312391?text=Hola%20parce!%20mu%C3%A9strame%20el%20men%C3%BA%20porfa
+            - img [ref=e15]
+    - status "¡Los marcadores se pueden poner hasta 5 minutos antes de cada partido!" [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - img [ref=e21]
+            - text: ¡Los marcadores se pueden poner hasta 5 minutos antes de cada partido!
+          - generic [ref=e23]:
+            - img [ref=e24]
+            - text: ¡Los marcadores se pueden poner hasta 5 minutos antes de cada partido!
+          - generic [ref=e26]:
+            - img [ref=e27]
+            - text: ¡Los marcadores se pueden poner hasta 5 minutos antes de cada partido!
+          - generic [ref=e29]:
+            - img [ref=e30]
+            - text: ¡Los marcadores se pueden poner hasta 5 minutos antes de cada partido!
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - img [ref=e34]
+            - text: ¡Los marcadores se pueden poner hasta 5 minutos antes de cada partido!
+          - generic [ref=e36]:
+            - img [ref=e37]
+            - text: ¡Los marcadores se pueden poner hasta 5 minutos antes de cada partido!
+          - generic [ref=e39]:
+            - img [ref=e40]
+            - text: ¡Los marcadores se pueden poner hasta 5 minutos antes de cada partido!
+          - generic [ref=e42]:
+            - img [ref=e43]
+            - text: ¡Los marcadores se pueden poner hasta 5 minutos antes de cada partido!
+    - generic [ref=e47]:
+      - status "Cargando" [ref=e49]
+      - paragraph [ref=e50]: Cargando polla...
+  - navigation "Navegación inferior" [ref=e51]:
+    - generic [ref=e52]:
+      - generic [ref=e53]:
+        - link "Inicio" [ref=e54] [cursor=pointer]:
+          - /url: /inicio
+          - img [ref=e56]
+        - link "Pollas" [ref=e59] [cursor=pointer]:
+          - /url: /pollas
+          - generic [ref=e61]:
+            - img [ref=e62]
+            - generic "203 por pronosticar" [ref=e64]: 9+
+      - button "Crear o unirme a una polla" [ref=e65] [cursor=pointer]:
+        - img [ref=e66]
+      - generic [ref=e67]:
+        - link "Avisos" [ref=e68] [cursor=pointer]:
+          - /url: /avisos
+          - generic [ref=e69]:
+            - img [ref=e70]
+            - generic "65 sin leer" [ref=e73]: 9+
+        - link "Perfil" [ref=e74] [cursor=pointer]:
+          - /url: /perfil
+          - img [ref=e76]

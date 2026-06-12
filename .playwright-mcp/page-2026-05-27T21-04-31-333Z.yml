@@ -1,0 +1,81 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: LA
+          - generic [ref=e8]: POLLA
+          - generic [ref=e9]: COLOMBIANA
+        - generic [ref=e10]:
+          - button "Reportar un problema" [ref=e11] [cursor=pointer]:
+            - img [ref=e12]
+          - link "Abrir el bot en WhatsApp" [ref=e14] [cursor=pointer]:
+            - /url: https://wa.me/573117312391?text=Hola%20parce!%20mu%C3%A9strame%20el%20men%C3%BA%20porfa
+            - img [ref=e15]
+    - generic [ref=e18]:
+      - generic [ref=e22]:
+        - paragraph [ref=e23]: Hola,
+        - heading "Cuenta" [level=1] [ref=e24]
+        - status [ref=e25]:
+          - img [ref=e26]
+          - generic [ref=e28]: "Vas #1 en Polla Demo"
+      - main [ref=e29]:
+        - generic [ref=e30]:
+          - link "Pronosticar 4 pronósticos pendientes · Polla Demo" [ref=e32] [cursor=pointer]:
+            - /url: /pollas/polla-demo?tab=partidos
+            - img [ref=e34]
+            - generic [ref=e37]:
+              - paragraph [ref=e38]: Pronosticar
+              - paragraph [ref=e39]: 4 pronósticos pendientes · Polla Demo
+            - img [ref=e40]
+          - generic [ref=e42]:
+            - heading "Podio" [level=2] [ref=e43]
+            - generic [ref=e47]:
+              - heading "Polla Demo" [level=3] [ref=e48]
+              - generic [ref=e49]:
+                - generic [ref=e51]:
+                  - generic [ref=e52]:
+                    - generic [ref=e53]: –
+                    - generic [ref=e54]: —
+                    - generic [ref=e56]: "2"
+                  - generic [ref=e57]:
+                    - img "Cuenta Demo" [ref=e59]
+                    - generic [ref=e60]:
+                      - generic [ref=e61]: Cuenta Demo
+                      - generic [ref=e62]: 0 PTS
+                    - generic [ref=e64]: "1"
+                  - generic [ref=e65]:
+                    - generic [ref=e66]: –
+                    - generic [ref=e67]: —
+                    - generic [ref=e69]: "3"
+                - link "Ver polla" [ref=e71] [cursor=pointer]:
+                  - /url: /pollas/polla-demo
+                  - text: Ver polla
+                  - img [ref=e72]
+  - navigation "Navegación inferior" [ref=e74]:
+    - generic [ref=e75]:
+      - generic [ref=e76]:
+        - link "Inicio" [ref=e77] [cursor=pointer]:
+          - /url: /inicio
+          - img [ref=e79]
+          - generic [ref=e82]: Inicio
+        - link "4 por pronosticar Pollas" [ref=e83] [cursor=pointer]:
+          - /url: /pollas
+          - generic [ref=e84]:
+            - img [ref=e85]
+            - generic "4 por pronosticar" [ref=e87]: "4"
+          - generic [ref=e88]: Pollas
+      - button "Crear o unirme a una polla" [ref=e89] [cursor=pointer]:
+        - img [ref=e90]
+      - generic [ref=e91]:
+        - link "4 sin leer Avisos" [ref=e92] [cursor=pointer]:
+          - /url: /avisos
+          - generic [ref=e93]:
+            - img [ref=e94]
+            - generic "4 sin leer" [ref=e97]: "4"
+          - generic [ref=e98]: Avisos
+        - link "Perfil" [ref=e99] [cursor=pointer]:
+          - /url: /perfil
+          - img [ref=e101]
+          - generic [ref=e104]: Perfil
+  - alert [ref=e105]

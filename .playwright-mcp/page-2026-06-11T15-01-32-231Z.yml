@@ -1,0 +1,85 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e5]:
+    - generic [ref=e6]: LA
+    - generic [ref=e7]: POLLA
+    - generic [ref=e8]: COLOMBIANA
+  - generic [ref=e10]:
+    - button "Saltar" [ref=e14] [cursor=pointer]
+    - generic [ref=e15]:
+      - generic [ref=e17]:
+        - generic [ref=e18]: LA
+        - generic [ref=e19]: POLLA
+        - generic [ref=e20]: COLOMBIANA
+      - paragraph [ref=e22]:
+        - text: La Polla Colombiana es para que juegues con
+        - text: tus amigos los principales torneos del mundo
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - img "Mundial" [ref=e25]
+          - generic [ref=e26]: Mundial
+        - generic [ref=e27]:
+          - img "Champions" [ref=e28]
+          - generic [ref=e29]: Champions
+        - generic [ref=e30]:
+          - img "La Liga" [ref=e31]
+          - generic [ref=e32]: La Liga
+        - generic [ref=e33]:
+          - img "Serie A" [ref=e34]
+          - generic [ref=e35]: Serie A
+      - list [ref=e36]:
+        - listitem [ref=e37]:
+          - generic [ref=e38]: "1"
+          - generic [ref=e39]: Creas una polla
+        - listitem [ref=e40]:
+          - generic [ref=e41]: "2"
+          - generic [ref=e42]: Invitas a tus amigos
+        - listitem [ref=e43]:
+          - generic [ref=e44]: "3"
+          - generic [ref=e45]: Defines la distribución de premios
+        - listitem [ref=e46]:
+          - generic [ref=e47]: "4"
+          - generic [ref=e48]: Marcas quién ha pagado y quién no
+        - listitem [ref=e49]:
+          - generic [ref=e50]: "5"
+          - generic [ref=e51]: Y a pronosticar
+      - paragraph [ref=e52]:
+        - text: Todo esto es
+        - generic [ref=e53]: GRATIS
+        - text: .
+      - generic:
+        - button "Empezar"
+        - link "hecho por santiago @santiagotrujilloz":
+          - /url: https://instagram.com/santiagotrujilloz
+          - generic: hecho por santiago
+          - generic: "@santiagotrujilloz"
+  - generic [ref=e55]:
+    - generic [ref=e56]:
+      - img "LA POLLA" [ref=e58]
+      - heading "LA POLLA" [level=1] [ref=e59]
+      - paragraph [ref=e60]: La polla deportiva de tus amigos
+    - generic [ref=e61]:
+      - paragraph [ref=e62]: Te invitaron a unirte a
+      - paragraph [ref=e63]: La Polla de Carvalho
+      - generic [ref=e65]:
+        - img "Mundial 2026" [ref=e66]
+        - generic [ref=e67]: Mundial 2026
+      - paragraph [ref=e68]: 33 participantes · $100.000 por persona
+    - generic [ref=e69]:
+      - generic [ref=e70]:
+        - generic [ref=e71]: Tu número de celular
+        - generic [ref=e73]:
+          - button "Colombia +57" [ref=e74] [cursor=pointer]:
+            - img "Colombia" [ref=e75]
+            - generic [ref=e79]: "+57"
+            - img [ref=e80]
+          - textbox "310 123 1234" [ref=e82]
+      - generic [ref=e83]:
+        - button "SMS" [ref=e84] [cursor=pointer]:
+          - img [ref=e85]
+          - text: SMS
+        - link "Recibir código por WhatsApp" [ref=e87] [cursor=pointer]:
+          - /url: https://wa.me/573117312391?text=Hola%20parce!%20%F0%9F%90%A5%20quiero%20entrar%20a%20la%20polla
+          - img [ref=e88]
+          - text: WhatsApp
+    - paragraph [ref=e90]: Al continuar, aceptas nuestros términos y condiciones
+  - alert [ref=e91]
