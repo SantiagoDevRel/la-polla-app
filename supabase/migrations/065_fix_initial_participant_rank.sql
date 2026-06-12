@@ -79,7 +79,12 @@ BEGIN
 END;
 $$;
 
+-- Trigger function: nadie la llama directo (la dispara el trigger como
+-- owner). REVOKE de PUBLIC + anon + authenticated (mismo patrón que la
+-- migración 056) para no dejar WARN del Security Advisor sobre una
+-- SECURITY DEFINER ejecutable por roles públicos.
 REVOKE EXECUTE ON FUNCTION public.recompute_ranks_on_participant_change() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.recompute_ranks_on_participant_change() FROM anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.recompute_ranks_on_participant_change() TO service_role;
 
 DROP TRIGGER IF EXISTS trg_recompute_ranks_on_change ON public.polla_participants;
