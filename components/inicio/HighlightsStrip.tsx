@@ -66,6 +66,26 @@ function HighlightCard({ v, locale }: { v: HighlightVideo; locale: string }) {
                 src={v.thumbnail}
                 alt=""
                 loading="lazy"
+                onError={(e) => {
+                  // Thumbnail muerto (404) → caemos a la copa (nunca card vacía).
+                  const img = e.currentTarget;
+                  if (!img.src.endsWith("/highlight-fallback.webp")) {
+                    img.src = "/highlight-fallback.webp";
+                  }
+                }}
+                onLoad={(e) => {
+                  // YouTube sirve un placeholder GRIS de 120x90 cuando el video
+                  // no tiene thumbnail (no dispara onError) — lo detectamos por
+                  // tamaño y caemos a la copa.
+                  const img = e.currentTarget;
+                  if (
+                    img.naturalWidth > 0 &&
+                    img.naturalWidth <= 120 &&
+                    !img.src.endsWith("/highlight-fallback.webp")
+                  ) {
+                    img.src = "/highlight-fallback.webp";
+                  }
+                }}
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
               />
               <span
