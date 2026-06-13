@@ -11,6 +11,7 @@ import FootballLoader from "@/components/ui/FootballLoader";
 import PayoutsByPolla from "@/components/admin/PayoutsByPolla";
 import UserDetailModal from "@/components/admin/UserDetailModal";
 import KnockoutStatusCard from "@/components/admin/KnockoutStatusCard";
+import EngagementCard, { type EngagementData } from "@/components/admin/EngagementCard";
 
 interface AdminUser {
   id: string;
@@ -87,6 +88,7 @@ export default function AdminPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [twilio, setTwilio] = useState<TwilioUsage | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [engagement, setEngagement] = useState<EngagementData | null>(null);
   const [discrepancyCount, setDiscrepancyCount] = useState<number>(0);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [claudeUsage, setClaudeUsage] = useState<{
@@ -136,11 +138,12 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryRes, twilioRes, twilioPhoneRes, analyticsRes, discRes, claudeRes, waTplRes] = await Promise.allSettled([
+      const [summaryRes, twilioRes, twilioPhoneRes, analyticsRes, engagementRes, discRes, claudeRes, waTplRes] = await Promise.allSettled([
         axios.get<Summary>("/api/admin/summary"),
         axios.get<TwilioUsage>("/api/admin/twilio-usage"),
         axios.get("/api/admin/twilio-by-phone"),
         axios.get<Analytics>("/api/admin/analytics"),
+        axios.get<EngagementData>("/api/admin/engagement"),
         axios.get<{ matches: unknown[] }>("/api/admin/discrepancies"),
         axios.get("/api/admin/claude-usage"),
         axios.get("/api/admin/wa-template-usage"),
@@ -160,6 +163,7 @@ export default function AdminPage() {
       }
       if (twilioPhoneRes.status === "fulfilled") setTwilioByPhone(twilioPhoneRes.value.data);
       if (analyticsRes.status === "fulfilled") setAnalytics(analyticsRes.value.data);
+      if (engagementRes.status === "fulfilled") setEngagement(engagementRes.value.data);
       if (discRes.status === "fulfilled") {
         setDiscrepancyCount(discRes.value.data.matches?.length ?? 0);
       }
@@ -591,6 +595,9 @@ export default function AdminPage() {
                 </>
               )}
             </section>
+
+            {/* Engagement (juego real) — complementa Actividad (que mide logins) */}
+            <EngagementCard data={engagement} />
 
             {/* Geo + device breakdown */}
             {analytics && (analytics.top_cities.length > 0 || analytics.top_countries.length > 0 || analytics.top_devices.length > 0) && (
