@@ -254,6 +254,13 @@ export async function GET() {
         status: string | null;
         paid: boolean | null;
       }>) {
+        // Expelled members keep their row with status='rejected' (see
+        // participants PATCH route — we don't hard-delete). They must NOT
+        // count toward the member count shown on the card, otherwise an
+        // expelled player inflates it (bug: Carvalho showed 40 with 39 real
+        // members). The detail route already filters to approved, so this
+        // keeps the listado consistent with the detalle.
+        if (row.status === "rejected") continue;
         participantCountByPolla[row.polla_id] =
           (participantCountByPolla[row.polla_id] || 0) + 1;
         if (row.status === "approved") {
