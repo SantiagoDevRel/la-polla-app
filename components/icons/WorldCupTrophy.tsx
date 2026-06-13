@@ -7,12 +7,13 @@ import type { SVGProps } from "react";
 export function WorldCupTrophy(props: SVGProps<SVGSVGElement>) {
   return (
     // viewBox cuadrado, centrado en el bbox REAL del trazo (centro 427,478)
-    // y dimensionado para que el trofeo llene ~82% de la altura, igual que
-    // los íconos lucide de la navbar. Medido rasterizando el path (ver
-    // commit). El path-fantasma diminuto que traía el SVG vectorizado
-    // (un punto en ~935,3) se removió: contaminaba el bbox y descentraba.
+    // y dimensionado para que el trofeo llene ~88% de la altura — un toque
+    // más grande que los íconos lucide para que el trofeo no se sienta chico
+    // (pedido user). Medido rasterizando el path. El path-fantasma diminuto
+    // que traía el SVG vectorizado (un punto en ~935,3) se removió:
+    // contaminaba el bbox y descentraba.
     <svg
-      viewBox="115 166 624 624"
+      viewBox="137 188 580 580"
       fill="currentColor"
       stroke="none"
       aria-hidden="true"
