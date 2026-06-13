@@ -15,13 +15,13 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import axios from "axios";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useDragControls, type PanInfo } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import { X, CalendarDays, Shield, Check, ExternalLink, Users, Newspaper, LayoutGrid } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import { getTeamFacts } from "@/lib/teams/worldcup-facts";
-import { DURATION, EASE } from "@/lib/animations";
+import { DURATION } from "@/lib/animations";
 import type { SquadPlayer, PlayerLine, NewsItem } from "@/lib/espn/teams";
 
 // ─── Tipos (espejo del payload de /api/teams/info) ───
@@ -191,6 +191,8 @@ function PlayerHeadshot({ name, headshot, jersey }: { name: string; headshot: st
 // ─── Tabs del sheet ───
 type SheetTab = "resumen" | "plantel" | "noticias";
 const TAB_ORDER: SheetTab[] = ["resumen", "plantel", "noticias"];
+const SHEET_CLOSE_DRAG_OFFSET = 92;
+const SHEET_CLOSE_DRAG_VELOCITY = 720;
 
 // ─── Componente ───
 
@@ -230,6 +232,7 @@ export default function TeamInfoSheet({
   // activo se sincroniza con el scroll para que el indicador siga el swipe.
   const [activeTab, setActiveTab] = useState<SheetTab>("resumen");
   const panelsRef = useRef<HTMLDivElement | null>(null);
+  const sheetDragControls = useDragControls();
   // Lazy: cada tab fetchea su data solo la primera vez que se abre, para
   // ahorrar requests a ESPN (el user puede no abrir Plantel/Noticias nunca).
   const [roster, setRoster] = useState<SquadPlayer[] | null>(null);
@@ -238,6 +241,24 @@ export default function TeamInfoSheet({
   const [newsError, setNewsError] = useState(false);
   const rosterRequested = useRef(false);
   const newsRequested = useRef(false);
+
+  const startSheetDrag = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      const target = event.target as HTMLElement;
+      if (target.closest("button,a,input,textarea,select")) return;
+      sheetDragControls.start(event);
+    },
+    [sheetDragControls],
+  );
+
+  const closeBySheetDrag = useCallback(
+    (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+      if (info.offset.y > SHEET_CLOSE_DRAG_OFFSET || info.velocity.y > SHEET_CLOSE_DRAG_VELOCITY) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
 
   // Tap en un tab → scrollea el carrusel a su panel (el snap hace el resto).
   const goToTab = useCallback((tab: SheetTab) => {
@@ -405,14 +426,25 @@ export default function TeamInfoSheet({
         aria-modal="true"
         aria-label={displayName(team)}
         className="fixed bottom-0 inset-x-0 z-[71] mx-auto w-full sm:max-w-md sm:bottom-6 sm:px-0 px-0"
+        drag="y"
+        dragControls={sheetDragControls}
+        dragListener={false}
+        dragConstraints={{ top: 0, bottom: 150 }}
+        dragElastic={0.08}
+        dragMomentum={false}
+        dragSnapToOrigin
+        onDragEnd={closeBySheetDrag}
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
-        transition={{ duration: DURATION.medium, ease: EASE.default }}
+        transition={{ type: "spring", stiffness: 360, damping: 34 }}
       >
         <div className="bg-bg-card border border-border-subtle rounded-t-[24px] sm:rounded-[24px] shadow-[0_-8px_40px_rgba(0,0,0,0.5)] max-h-[85vh] flex flex-col overscroll-contain overflow-hidden">
           {/* Grab handle + close (header fijo arriba del carrusel). */}
-          <div className="shrink-0 bg-bg-card pt-3 pb-2 px-4 rounded-t-[24px]">
+          <div
+            className="shrink-0 cursor-grab touch-none bg-bg-card pt-3 pb-2 px-4 rounded-t-[24px] active:cursor-grabbing"
+            onPointerDown={startSheetDrag}
+          >
             <div className="w-10 h-1 rounded-full bg-border-subtle mx-auto mb-2 sm:hidden" aria-hidden="true" />
             <div className="flex items-start gap-3">
               <FlagCircle team={team} apiFlag={fallbackFlag} size={44} />

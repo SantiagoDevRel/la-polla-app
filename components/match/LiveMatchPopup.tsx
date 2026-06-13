@@ -12,10 +12,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useDragControls, type PanInfo } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import { BarChart3, List, UsersRound, X } from "lucide-react";
-import { DURATION, EASE } from "@/lib/animations";
+import { DURATION } from "@/lib/animations";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import type { MatchStat, MatchSummary, TimelineEvent, Lineup, LineupPlayer } from "@/lib/espn/summary";
 
@@ -96,6 +96,8 @@ const LIVE_POLL_MS = 30_000;
 
 type LiveTab = "lineup" | "summary" | "stats";
 const TAB_ORDER: LiveTab[] = ["lineup", "summary", "stats"];
+const SHEET_CLOSE_DRAG_OFFSET = 92;
+const SHEET_CLOSE_DRAG_VELOCITY = 720;
 
 const SHORT_TEAM_NAMES: Record<string, string> = {
   "bosnia & herzegovina": "Bosnia-Herz.",
@@ -210,6 +212,25 @@ export default function LiveMatchPopup({
   useEffect(() => setMounted(true), []);
   const [activeTab, setActiveTab] = useState<LiveTab>("lineup");
   const panelsRef = useRef<HTMLDivElement | null>(null);
+  const sheetDragControls = useDragControls();
+
+  const startSheetDrag = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      const target = event.target as HTMLElement;
+      if (target.closest("button,a,input,textarea,select")) return;
+      sheetDragControls.start(event);
+    },
+    [sheetDragControls],
+  );
+
+  const closeBySheetDrag = useCallback(
+    (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+      if (info.offset.y > SHEET_CLOSE_DRAG_OFFSET || info.velocity.y > SHEET_CLOSE_DRAG_VELOCITY) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
 
   const goToTab = useCallback((tab: LiveTab) => {
     setActiveTab(tab);
@@ -301,14 +322,25 @@ export default function LiveMatchPopup({
         aria-modal="true"
         aria-label={`${homeTeam} vs ${awayTeam}`}
         className="fixed bottom-0 inset-x-0 z-[71] mx-auto w-full sm:max-w-md sm:bottom-6 px-0"
+        drag="y"
+        dragControls={sheetDragControls}
+        dragListener={false}
+        dragConstraints={{ top: 0, bottom: 150 }}
+        dragElastic={0.08}
+        dragMomentum={false}
+        dragSnapToOrigin
+        onDragEnd={closeBySheetDrag}
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
-        transition={{ duration: DURATION.medium, ease: EASE.default }}
+        transition={{ type: "spring", stiffness: 360, damping: 34 }}
       >
         <div className="bg-bg-card border border-border-subtle rounded-t-[24px] sm:rounded-[24px] shadow-[0_-8px_40px_rgba(0,0,0,0.5)] max-h-[85vh] flex flex-col overscroll-contain overflow-hidden">
           {/* Header fijo: equipos balanceados, live centrado y X arriba. */}
-          <div className="shrink-0 bg-bg-card pt-3 pb-3 px-4 rounded-t-[24px] border-b border-border-subtle/60">
+          <div
+            className="shrink-0 cursor-grab touch-none bg-bg-card pt-3 pb-3 px-4 rounded-t-[24px] border-b border-border-subtle/60 active:cursor-grabbing"
+            onPointerDown={startSheetDrag}
+          >
             <div className="relative min-h-9">
               <div className="w-10 h-1 rounded-full bg-border-subtle mx-auto sm:hidden" aria-hidden="true" />
               <button
