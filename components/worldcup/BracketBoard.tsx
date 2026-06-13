@@ -1470,12 +1470,14 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           </Link>
+          {/* Sin título — solo el contador de partidos decididos (pedido user:
+              "no dejes nada de texto, solo el nro de partidos 0/63"). */}
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-[22px] leading-none tracking-[0.04em] text-text-primary">
-              Mi Camino
-            </p>
-            <p className="truncate text-[11px] font-semibold text-text-secondary" style={{ fontFeatureSettings: '"tnum"' }}>
-              {doneCount}/{totalDecisions} Mundial 2026
+            <p
+              className="font-display text-[22px] leading-none tracking-[0.04em] text-text-primary tabular-nums"
+              style={{ fontFeatureSettings: '"tnum"' }}
+            >
+              {doneCount}/{totalDecisions}
             </p>
           </div>
           <div className="flex items-center gap-1">
