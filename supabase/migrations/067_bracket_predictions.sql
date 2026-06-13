@@ -36,3 +36,8 @@ CREATE POLICY bracket_predictions_own ON public.bracket_predictions
 -- GRANTs explícitos (Supabase corta los auto-grants desde 30-oct-2026).
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.bracket_predictions TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.bracket_predictions TO service_role;
+
+-- Least-privilege: hasta 30-oct-2026 Supabase AÚN auto-grantea anon en tablas
+-- nuevas. RLS sin policy para anon ya lo bloquea, pero lo revocamos explícito
+-- (como la tabla 066). Aplicado a prod 2026-06-12 + advisor security limpio.
+REVOKE ALL ON public.bracket_predictions FROM anon;
