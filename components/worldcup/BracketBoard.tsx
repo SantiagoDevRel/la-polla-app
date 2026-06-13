@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, type PanInfo } from "framer-motion";
 import { ArrowLeft, Check, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { BACKGROUND_SOURCES } from "@/components/layout/background-variants";
 import { cn } from "@/lib/cn";
 import { DURATION, EASE } from "@/lib/animations";
 
@@ -123,7 +124,14 @@ const THIRD_PLACE_MATCH_DAY = 103;
 const CHAMPION_TARGET = "champion";
 const TEAM_DRAG_THRESHOLD = 8;
 const PICKER_BOTTOM = 92;
+const BOTTOM_NAV_CLEARANCE = 64;
+const BOARD_BOTTOM_MARGIN = 18;
+const BOARD_BOTTOM_PADDING = BOTTOM_NAV_CLEARANCE + BOARD_BOTTOM_MARGIN;
+const PICKER_CLOSE_DRAG_OFFSET = 74;
+const PICKER_CLOSE_DRAG_VELOCITY = 650;
 const SAVE_KEY = "lapolla-road-to-worldcup-path";
+const ONBOARDING_HINT_KEY = "lapolla-road-to-worldcup-hint-dismissed";
+const BRACKET_BACKGROUND = BACKGROUND_SOURCES["nuevo-background"];
 const GROUPS: GroupLetter[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
 const BUTTERFLY_PHASES: ButterflyPhase[] = [
   "round_of_32",
@@ -536,7 +544,7 @@ function createButterflyLayout(
   }
 
   const maxBottom = Math.max(...Object.values(slots).map((slot) => slot.y + slot.h), topPad + pitch * 8);
-  const height = Math.round(maxBottom + 118 * scale);
+  const height = Math.round(maxBottom + 12 * scale);
 
   const columns: ColumnGeometry[] = [
     { label: ROUND_LABEL_BY_PHASE.round_of_32, x: colL[0], w: sideW[0] },
@@ -631,6 +639,7 @@ function SlotChip({
   isValidTarget,
   isWinner,
   isChampionPath,
+  isOnboardingHint,
   onOpen,
   onClear,
 }: {
@@ -644,6 +653,7 @@ function SlotChip({
   isValidTarget: boolean;
   isWinner: boolean;
   isChampionPath: boolean;
+  isOnboardingHint: boolean;
   onOpen: () => void;
   onClear?: () => void;
 }) {
@@ -676,6 +686,7 @@ function SlotChip({
           isValidTarget && "border-turf/80 bg-turf/15 shadow-[0_0_18px_-10px_rgba(31,216,127,0.9)]",
           isWinner && "border-turf/50 bg-turf/10",
           isChampionPath && "border-turf-dim/70",
+          isOnboardingHint && "animate-[bk-hint-slot_1.55s_ease-in-out_infinite] border-turf/80 bg-turf/[0.14] shadow-[0_0_22px_-10px_rgba(31,216,127,0.95)]",
           isDimmed && "opacity-25",
         )}
       >
@@ -834,6 +845,7 @@ function PickerOption({
   disabled,
   selected,
   shaking,
+  compact = false,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -844,6 +856,7 @@ function PickerOption({
   disabled: boolean;
   selected: boolean;
   shaking: boolean;
+  compact?: boolean;
   onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onPointerMove: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onPointerUp: (event: React.PointerEvent<HTMLButtonElement>) => void;
@@ -865,16 +878,18 @@ function PickerOption({
       }}
       aria-disabled={disabled}
       className={cn(
-        "relative flex min-h-[58px] touch-none flex-col items-center justify-center gap-1 rounded-md border px-1 py-2 transition-all duration-200",
+        "relative flex touch-none flex-col items-center justify-center rounded-md border transition-all duration-200 active:scale-[0.97]",
+        compact ? "min-h-[38px] gap-0.5 px-0.5 py-1" : "min-h-[50px] gap-1 px-1 py-1.5",
         selected ? "border-turf/75 bg-turf/12" : "border-transparent bg-transparent",
         disabled ? "cursor-not-allowed opacity-35" : "cursor-grab active:cursor-grabbing",
         shaking && "animate-[bk-shake_320ms_ease]",
       )}
     >
-      <TeamFlag team={team} size={34} dim={disabled} />
+      <TeamFlag team={team} size={compact ? 22 : 30} dim={disabled} />
       <span
         className={cn(
-          "max-w-full truncate font-body text-[10px] font-bold tracking-[0.03em]",
+          "max-w-full truncate font-body font-bold tracking-[0.03em]",
+          compact ? "text-[8px]" : "text-[9px]",
           selected ? "text-turf" : "text-text-secondary",
         )}
       >
@@ -882,7 +897,7 @@ function PickerOption({
       </span>
       {selected ? (
         <span className="absolute right-1.5 top-1.5 text-turf">
-          <Check className="h-3 w-3" aria-hidden="true" />
+          <Check className={compact ? "h-2.5 w-2.5" : "h-3 w-3"} aria-hidden="true" />
         </span>
       ) : null}
     </button>
@@ -903,12 +918,22 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [shakeTeamId, setShakeTeamId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
+  const [showOnboardingHint, setShowOnboardingHint] = useState(false);
 
   useEffect(() => {
     const saved = loadSavedPath();
-    if (!saved) return;
-    setAssignments(saved.assignments);
-    setWinners(saved.winners);
+    if (saved) {
+      setAssignments(saved.assignments);
+      setWinners(saved.winners);
+    }
+
+    try {
+      const hasSeenHint = window.localStorage.getItem(ONBOARDING_HINT_KEY) === "1";
+      const hasStarted = Boolean(saved && (Object.keys(saved.assignments).length > 0 || Object.keys(saved.winners).length > 0));
+      if (!hasSeenHint && !hasStarted) setShowOnboardingHint(true);
+    } catch {
+      setShowOnboardingHint(false);
+    }
   }, []);
 
   const allMatchesByDay = useMemo(() => new Map(matches.map((match) => [match.matchDay, match])), [matches]);
@@ -1069,6 +1094,38 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(null), 2100);
   }, []);
+
+  const dismissOnboardingHint = useCallback(() => {
+    setShowOnboardingHint(false);
+    try {
+      window.localStorage.setItem(ONBOARDING_HINT_KEY, "1");
+    } catch {
+      // Best-effort: el hint no debe bloquear la bracket si storage falla.
+    }
+  }, []);
+
+  const closePicker = useCallback(() => {
+    setOpenTarget(null);
+    setSelectedTeamId(null);
+  }, []);
+
+  const handlePickerDragEnd = useCallback(
+    (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+      if (info.offset.y > PICKER_CLOSE_DRAG_OFFSET || info.velocity.y > PICKER_CLOSE_DRAG_VELOCITY) {
+        closePicker();
+      }
+    },
+    [closePicker],
+  );
+
+  const hintTargetKey = useMemo(() => {
+    if (!showOnboardingHint) return null;
+    return directSlots.find((slot) => !assignments[slot.key])?.key ?? directSlots[0]?.key ?? null;
+  }, [assignments, directSlots, showOnboardingHint]);
+
+  const hintGeometry = hintTargetKey ? layout.slots[hintTargetKey] : null;
+  const hintTooltipLeft = hintGeometry ? clamp(hintGeometry.x + hintGeometry.w + 8, 8, layout.width - 184) : 0;
+  const hintTooltipTop = hintGeometry ? Math.max(2, hintGeometry.y + 2) : 0;
 
   const scrollToTarget = useCallback(
     (targetKey: string) => {
@@ -1316,11 +1373,12 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
 
   const openTargetPicker = useCallback(
     (targetKey: string) => {
+      dismissOnboardingHint();
       setOpenTarget((current) => (current === targetKey ? null : targetKey));
       setSelectedTeamId(null);
       if (targetKey) window.requestAnimationFrame(() => scrollToTarget(targetKey));
     },
-    [scrollToTarget],
+    [dismissOnboardingHint, scrollToTarget],
   );
 
   const renderPicker = () => {
@@ -1334,6 +1392,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
       return team ? [team] : [];
     });
     const parsed = info ? parseSlot(info.slot) : null;
+    const isBestThirdPicker = parsed?.kind === "seed" && parsed.seed === 3;
 
     const heading = isChampion
       ? "¿Quién levanta la copa?"
@@ -1350,44 +1409,51 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
       >
         <motion.div
           data-board-interactive="true"
+          drag="y"
+          dragConstraints={{ top: 0, bottom: 120 }}
+          dragElastic={0.08}
+          dragMomentum={false}
+          onDragEnd={handlePickerDragEnd}
+          whileTap={{ scale: 0.995 }}
           initial={{ opacity: 0, y: 18, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 18, scale: 0.98 }}
-          transition={{ duration: DURATION.normal, ease: EASE.default }}
-          className="w-full max-w-[420px] rounded-lg border border-border-subtle bg-bg-elevated/95 p-3 shadow-[0_24px_60px_-18px_rgba(0,0,0,0.85)] backdrop-blur-xl"
+          transition={{ type: "spring", stiffness: 420, damping: 34 }}
+          className={cn(
+            "w-full rounded-lg border border-border-subtle bg-bg-elevated/95 shadow-[0_24px_60px_-18px_rgba(0,0,0,0.85)] backdrop-blur-xl",
+            isBestThirdPicker ? "max-w-[380px] p-2" : "max-w-[390px] p-2.5",
+          )}
         >
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="min-w-0 truncate font-body text-[11px] font-bold uppercase tracking-[0.12em] text-text-secondary">
+          <div className="mx-auto mb-1 h-1 w-9 rounded-full bg-border-strong/70" aria-hidden="true" />
+          <div className={cn("flex items-center justify-between gap-2", isBestThirdPicker ? "mb-1" : "mb-2")}>
+            <p className="min-w-0 truncate font-body text-[10px] font-bold uppercase tracking-[0.12em] text-text-secondary">
               {heading}
             </p>
             <button
               type="button"
-              onClick={() => {
-                setOpenTarget(null);
-                setSelectedTeamId(null);
-              }}
+              onClick={closePicker}
               aria-label="Cerrar picker"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border-subtle text-text-muted transition-colors hover:text-text-primary"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border-subtle text-text-muted transition-colors hover:text-text-primary active:scale-95"
             >
-              <X className="h-4 w-4" aria-hidden="true" />
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </div>
 
           {candidates.length === 0 ? (
-            <div className="rounded-md border border-border-subtle bg-bg-base/70 px-3 py-3 text-[12px] font-medium text-text-secondary">
+            <div className="rounded-md border border-border-subtle bg-bg-base/70 px-3 py-2 text-[12px] font-medium text-text-secondary">
               Primero definí el partido anterior.
             </div>
-          ) : parsed?.kind === "seed" && parsed.seed === 3 ? (
-            <div className="space-y-1.5">
+          ) : isBestThirdPicker ? (
+            <div className="space-y-0.5">
               {parsed.groups.map((group) => {
                 const rowTeams = (teamsByGroup.get(group) ?? []).filter((team) => candidateIds.includes(team.id));
                 return (
                   <div
                     key={group}
-                    className="grid items-center gap-1.5 border-t border-border-subtle pt-1.5 first:border-t-0 first:pt-0"
-                    style={{ gridTemplateColumns: "34px repeat(4, minmax(0, 1fr))" }}
+                    className="grid items-center gap-1 border-t border-border-subtle/70 pt-1 first:border-t-0 first:pt-0"
+                    style={{ gridTemplateColumns: "26px repeat(4, minmax(0, 1fr))" }}
                   >
-                    <div className="grid h-8 w-8 place-items-center rounded-md border border-border-subtle bg-bg-card font-display text-[15px] leading-none text-text-secondary">
+                    <div className="grid h-6 w-6 place-items-center rounded-md border border-border-subtle bg-bg-card font-display text-[12px] leading-none text-text-secondary">
                       {group}
                     </div>
                     {rowTeams.map((team) => {
@@ -1401,6 +1467,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
                           disabled={disabled}
                           selected={selected}
                           shaking={shakeTeamId === team.id}
+                          compact
                           onPointerDown={(event) => startOptionPress(event, team.id, disabled)}
                           onPointerMove={updateOptionPress}
                           onPointerUp={finishOptionPress}
@@ -1414,7 +1481,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
               })}
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-4 gap-1">
               {candidates.map((team) => {
                 const selected = activeTeamId === team.id;
                 const current = info ? assignments[info.key] === team.id : false;
@@ -1456,7 +1523,40 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
             transform: translateX(5px);
           }
         }
+        @keyframes bk-hint-slot {
+          0%,
+          100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.06);
+          }
+        }
       `}</style>
+
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-bg-base">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={BRACKET_BACKGROUND.poster}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-55"
+          draggable={false}
+        />
+        <video
+          muted
+          loop
+          playsInline
+          controls={false}
+          disablePictureInPicture
+          preload="metadata"
+          autoPlay
+          className="absolute inset-0 h-full w-full object-cover opacity-30 motion-reduce:hidden"
+        >
+          <source src={BRACKET_BACKGROUND.webm} type="video/webm" />
+          <source src={BRACKET_BACKGROUND.mp4} type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-black/[0.92]" />
+      </div>
 
       <header
         className="absolute inset-x-0 top-0 z-40 border-b border-border-subtle bg-bg-base/95 px-3 backdrop-blur-xl"
@@ -1518,12 +1618,13 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
 
       <main
         ref={scrollerRef}
-        className="absolute inset-x-0 overflow-auto bg-[radial-gradient(circle_at_center,rgba(31,216,127,0.06),transparent_45%)]"
+        className="absolute inset-x-0 z-10 overflow-auto overscroll-none"
         style={{
           top: "calc(env(safe-area-inset-top) + 64px)",
           bottom: 0,
           WebkitOverflowScrolling: "touch",
-          paddingBottom: `calc(env(safe-area-inset-bottom) + ${PICKER_BOTTOM + 118}px)`,
+          overscrollBehavior: "none",
+          paddingBottom: `calc(env(safe-area-inset-bottom) + ${BOARD_BOTTOM_PADDING}px)`,
         }}
       >
         <div className="relative" style={{ width: layout.width, minHeight: layout.height + 48 }}>
@@ -1582,6 +1683,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
                   isValidTarget={validSlotIds.has(info.key)}
                   isWinner={isWinner}
                   isChampionPath={isChampionPath}
+                  isOnboardingHint={hintTargetKey === info.key}
                   onOpen={() => openTargetPicker(info.key)}
                   onClear={parsed?.kind === "seed" && team ? () => removeAssignment(info.key) : undefined}
                 />
@@ -1598,6 +1700,35 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
               activeTeamId={activeTeamId}
               onOpen={() => openTargetPicker(CHAMPION_TARGET)}
             />
+
+            <AnimatePresence>
+              {showOnboardingHint && hintTargetKey && hintGeometry ? (
+                <motion.div
+                  key="bracket-onboarding-hint"
+                  data-board-interactive="true"
+                  className="absolute z-50 w-[176px] rounded-lg border border-turf/35 bg-bg-elevated/95 px-3 py-2 pr-9 text-[11px] font-semibold leading-snug text-text-primary shadow-[0_14px_34px_-18px_rgba(0,0,0,0.95)] backdrop-blur-xl"
+                  style={{ left: hintTooltipLeft, top: hintTooltipTop }}
+                  initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                  transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="absolute -left-1.5 top-4 h-3 w-3 rotate-45 border-b border-l border-turf/35 bg-bg-elevated"
+                  />
+                  TocÃ¡ un casillero para elegir
+                  <button
+                    type="button"
+                    onClick={dismissOnboardingHint}
+                    aria-label="Cerrar ayuda"
+                    className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full text-text-muted transition-colors hover:text-text-primary active:scale-95"
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </div>
         </div>
       </main>
