@@ -78,8 +78,8 @@ export function BracketIntroModal() {
               Road to World Cup
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-text-secondary [overflow-wrap:anywhere]">
-              Acá vamos a ir actualizando las llaves a medida que se confirmen los
-              cruces. Por ahora podés <span className="text-text-primary">mover las
+              Aquí vamos a ir actualizando las llaves a medida que se confirmen los
+              cruces. Por ahora puedes <span className="text-text-primary">mover las
               banderas</span> y armar tus posibles caminos hasta la final — es para
               jugar y predecir, <span className="text-gold">no suma puntos para la polla</span>.
             </p>
