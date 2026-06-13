@@ -7,7 +7,7 @@ import type { SVGProps } from "react";
 export function WorldCupTrophy(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
-      viewBox="0 0 1074 966"
+      viewBox="196 -53 840 840"
       fill="currentColor"
       stroke="none"
       aria-hidden="true"

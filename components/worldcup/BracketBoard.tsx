@@ -1717,7 +1717,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
                     aria-hidden="true"
                     className="absolute -left-1.5 top-4 h-3 w-3 rotate-45 border-b border-l border-turf/35 bg-bg-elevated"
                   />
-                  TocÃ¡ un casillero para elegir
+                  Toca una casilla para elegir un equipo ganador
                   <button
                     type="button"
                     onClick={dismissOnboardingHint}
