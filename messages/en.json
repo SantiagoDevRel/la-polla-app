@@ -681,6 +681,7 @@
     "upcomingSection": "Upcoming",
     "podiumSection": "Podium",
     "funFactsTitle": "World Cup fun facts",
+    "funFactsSwipe": "Swipe",
     "highlightsTitle": "Latest from the World Cup",
     "greeting": "Hi,",
     "rankCallout": "You're <rankBold>#{rank}</rankBold> in <nameBold>{pollaName}</nameBold>",

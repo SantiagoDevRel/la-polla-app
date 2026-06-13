@@ -21,13 +21,25 @@ interface TypingTextProps {
   /** ms antes de empezar (para escalonar varias líneas). */
   startDelay?: number;
   className?: string;
+  /** Si es false, no tipea aún (queda en blanco reservando el alto). Al
+   *  pasar a true arranca a tipear. Default true (comportamiento original).
+   *  Lo usa el carrusel de datos curiosos: cada dato "sale" cuando es el
+   *  visible. */
+  active?: boolean;
 }
 
-export function TypingText({ text, speed = 16, startDelay = 0, className }: TypingTextProps) {
+export function TypingText({ text, speed = 16, startDelay = 0, className, active = true }: TypingTextProps) {
   const [count, setCount] = useState(0);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    // Inactivo: no tipea (blanco), pero el sizer invisible mantiene el alto.
+    if (!active) {
+      setCount(0);
+      setDone(false);
+      return;
+    }
+
     const reduce =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -55,7 +67,7 @@ export function TypingText({ text, speed = 16, startDelay = 0, className }: Typi
       clearTimeout(startTimer);
       clearTimeout(tickTimer);
     };
-  }, [text, speed, startDelay]);
+  }, [text, speed, startDelay, active]);
 
   return (
     <span className={`relative inline-block ${className ?? ""}`} aria-label={text}>
