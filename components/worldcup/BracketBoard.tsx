@@ -355,6 +355,7 @@ function loadSavedPath() {
     const parsed = JSON.parse(raw) as {
       assignments?: unknown;
       winners?: unknown;
+      savedAt?: unknown;
     };
     if (
       parsed &&
@@ -366,6 +367,7 @@ function loadSavedPath() {
       return {
         assignments: parsed.assignments as Record<string, string>,
         winners: parsed.winners as Record<number, string>,
+        savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
       };
     }
   } catch {
@@ -909,6 +911,9 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
   const boardRef = useRef<HTMLDivElement | null>(null);
   const optionPressRef = useRef<TeamPressState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // true apenas el usuario edita el camino en esta sesión. Evita que la
+  // hidratación async desde DB (#12) le pise una edición en curso.
+  const userInteractedRef = useRef(false);
 
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [winners, setWinners] = useState<Record<number, string>>({});
@@ -934,6 +939,48 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
     } catch {
       setShowOnboardingHint(false);
     }
+
+    // #12 cross-device: traer el camino guardado en DB. Se aplica SOLO si el
+    // usuario no tocó nada en esta sesión Y (no había nada local, o la DB es
+    // más nueva). Best-effort: offline → se queda con localStorage. El render
+    // inmediato ya salió de localStorage arriba, así que esto es un refresh.
+    const localSavedAt = saved?.savedAt ? Date.parse(saved.savedAt) : 0;
+    const hadLocal = Boolean(saved && (Object.keys(saved.assignments).length > 0 || Object.keys(saved.winners).length > 0));
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/worldcup/bracket");
+        if (!res.ok || cancelled || userInteractedRef.current) return;
+        const json = (await res.json()) as {
+          path: { assignments?: Record<string, string>; winners?: Record<string, string> } | null;
+          updatedAt: string | null;
+        };
+        if (cancelled || userInteractedRef.current || !json.path) return;
+        const dbAssignments = json.path.assignments ?? {};
+        const dbWinners = json.path.winners ?? {};
+        const dbHasData = Object.keys(dbAssignments).length > 0 || Object.keys(dbWinners).length > 0;
+        if (!dbHasData) return;
+        const dbSavedAt = json.updatedAt ? Date.parse(json.updatedAt) : 0;
+        if (hadLocal && dbSavedAt <= localSavedAt) return; // local igual o más nuevo
+        setAssignments(dbAssignments);
+        setWinners(dbWinners as Record<number, string>);
+        setShowOnboardingHint(false);
+        // Alinear el cache local con lo que vino de DB.
+        try {
+          window.localStorage.setItem(
+            SAVE_KEY,
+            JSON.stringify({ assignments: dbAssignments, winners: dbWinners, savedAt: json.updatedAt ?? new Date().toISOString() }),
+          );
+        } catch {
+          // Best-effort.
+        }
+      } catch {
+        // Offline / falla → el usuario se queda con el camino de localStorage.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const allMatchesByDay = useMemo(() => new Map(matches.map((match) => [match.matchDay, match])), [matches]);
@@ -1259,6 +1306,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
 
   const assignTeamToTarget = useCallback(
     (teamId: string, targetKey: string) => {
+      userInteractedRef.current = true;
       if (!canTeamFillTarget(teamId, targetKey)) {
         setSelectedTeamId(null);
         showToast("Ese cruce no puede darse");
@@ -1298,6 +1346,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
 
   const removeAssignment = useCallback(
     (targetSlotKey: string) => {
+      userInteractedRef.current = true;
       const nextAssignments = { ...assignments };
       delete nextAssignments[targetSlotKey];
       const nextWinners = pruneWinners(nextAssignments, winners, playableMatchesByDay);
@@ -1309,24 +1358,35 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
   );
 
   const resetBracket = useCallback(() => {
+    userInteractedRef.current = true;
     setAssignments({});
     setWinners({});
     setOpenTarget(null);
     setSelectedTeamId(null);
     setDrag(null);
     showToast("Camino reiniciado");
+    // El reinicio es transitorio (in-memory), igual que antes: recién se
+    // persiste cuando el usuario toca "Guardar". No se hace PUT acá.
   }, [showToast]);
 
   const savePath = useCallback(() => {
+    const payload = { assignments, winners };
     try {
       window.localStorage.setItem(
         SAVE_KEY,
-        JSON.stringify({ assignments, winners, savedAt: new Date().toISOString() }),
+        JSON.stringify({ ...payload, savedAt: new Date().toISOString() }),
       );
       showToast(doneCount >= totalDecisions ? "Camino guardado" : `Camino guardado ${doneCount}/${totalDecisions}`);
     } catch {
       showToast("No se pudo guardar");
     }
+    // Persistir en DB (cross-device) — best-effort: si falla (offline), el
+    // camino ya quedó en localStorage y se sincroniza en el próximo guardado.
+    void fetch("/api/worldcup/bracket", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
   }, [assignments, doneCount, showToast, totalDecisions, winners]);
 
   const startOptionPress = useCallback(
