@@ -4,6 +4,7 @@
 // app/sw.ts en lugar de inferirse del config.
 import withSerwistInit from "@serwist/next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
@@ -108,7 +109,9 @@ const nextConfig = {
               // YouTube) en /inicio. a.espncdn.com: fotos de jugadores/escudos
               // para futuras fichas de equipo. Todo hotlink, sin self-host.
               "img-src 'self' data: blob: https://api.dicebear.com https://avatars.dicebear.com https://crests.football-data.org https://a.espncdn.com https://i.ytimg.com https://*.supabase.co https://cdn.jsdelivr.net",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com",
+              // *.ingest.us.sentry.io: ingest de errores de Sentry. Sin esto el
+              // browser bloquea el POST de eventos (CSP) y parece que "no anda".
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://*.ingest.us.sentry.io",
               // www.youtube.com + youtube-nocookie: embed inline de highlights
               // del Mundial (canales de broadcasters que permiten embed).
               "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
@@ -123,4 +126,18 @@ const nextConfig = {
   },
 };
 
-export default withNextIntl(withSerwist(nextConfig));
+export default withSentryConfig(withNextIntl(withSerwist(nextConfig)), {
+  org: "golem-bw",
+  project: "santi-apps",
+
+  // Silencioso salvo en CI (deja logs en el build de Vercel).
+  silent: !process.env.CI,
+
+  // Token para subir source maps. Vive en .env.sentry-build-plugin (local,
+  // gitignored) y en env de Vercel (prod). Si falta, el build NO falla:
+  // solo no sube source maps (los stacktraces quedan minificados).
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Mejor cobertura de source maps del bundle cliente.
+  widenClientFileUpload: true,
+});

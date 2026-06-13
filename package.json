@@ -22,6 +22,7 @@
     "@capacitor/status-bar": "^8.0.2",
     "@capawesome/capacitor-app-update": "^8.0.3",
     "@marsidev/react-turnstile": "^1.5.0",
+    "@sentry/nextjs": "^10.57.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.0",
     "@vercel/og": "^0.11.1",

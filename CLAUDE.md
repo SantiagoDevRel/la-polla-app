@@ -833,6 +833,47 @@ Where it matters most we use reply buttons:
 
 ---
 
+## Error monitoring · Sentry (added 2026-06-13)
+
+Monitoreo de errores prod (client + server + edge) con `@sentry/nextjs`.
+Plan **free** de Sentry (org `golem-bw`, proyecto `santi-apps` — proyecto
+GENÉRICO compartido por varias apps, separadas por el tag `app`). La Polla
+manda con `initialScope.tags.app = "la-polla"`.
+
+### Archivos
+- `sentry.client.config.ts` — init en browser/WebView Capacitor. (Next 14
+  usa este archivo; en Next 15.3+ migrar a `instrumentation-client.ts`.)
+- `sentry.server.config.ts` / `sentry.edge.config.ts` — runtimes node/edge.
+- `instrumentation.ts` — `register()` importa server/edge config (mergeado
+  con el `ensureDevUser` de dev) + `onRequestError`.
+- `app/global-error.tsx` — captura errores de render del root layout.
+- `lib/sentry-scrub.ts` — **scrubbing de PII** (Habeas Data): borra
+  teléfonos, emails, tokens en query, cookies y headers `Authorization`
+  antes de enviar. Corre como `beforeSend` en los 3 runtimes. Verificado
+  determinísticamente (2026-06-13).
+- `next.config.mjs` — `withSentryConfig` (outermost) + Sentry ingest
+  agregado al CSP `connect-src` (`https://*.ingest.us.sentry.io`) — sin eso
+  el browser bloquea el POST de eventos.
+
+### Reglas / config
+- **`enabled` solo en producción** (`NODE_ENV === "production"`). Local no
+  manda; para probar local: `NEXT_PUBLIC_SENTRY_FORCE=1` (client) /
+  `SENTRY_FORCE=1` (server).
+- **Session Replay APAGADO** + `tracesSampleRate: 0.1` → no quema la cuota
+  free (5k errores/mes). Los errores van al 100%.
+- **`sendDefaultPii: false`** + el scrub de `lib/sentry-scrub.ts`
+  (defense-in-depth). Si agregás captura de contexto de usuario, NUNCA
+  pongas teléfono/email — solo un id opaco.
+
+### Env vars
+- `NEXT_PUBLIC_SENTRY_DSN` — público (viaja al cliente). En `.env` local y
+  en Vercel (Production + Preview).
+- `SENTRY_AUTH_TOKEN` — **secreto**, solo build-time (sube source maps).
+  Vive en `.env.sentry-build-plugin` (gitignored) y debe estar en Vercel.
+  Si falta, el build NO falla: solo no sube source maps.
+
+---
+
 ## Feedback Bubble (added 2026-04-27)
 
 Botón "Reportar problema" en `BrandHeader` (al lado del WhatsAppBubble) que abre un modal con un único textarea. Al enviar:
