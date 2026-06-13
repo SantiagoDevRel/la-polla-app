@@ -81,6 +81,7 @@ export async function resolveEspnTeamId(
 // Plantel de un equipo.
 // ─────────────────────────────────────────────────────────────────────
 interface RawRosterAthlete {
+  id?: string;
   displayName?: string;
   jersey?: string;
   age?: number;
@@ -101,6 +102,76 @@ export interface SquadPlayer {
   line: PlayerLine;
   age: number | null;
   headshot: string | null;
+  /** Club actual del jugador (solo para selecciones — en ligas de clubes
+   *  el plantel YA es un club, así que se omite). null si ESPN no lo trae. */
+  club: string | null;
+  /** Escudo del club, URL estable del CDN de ESPN (no requiere fetch). */
+  clubCrest: string | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Enriquecimiento de club actual (selecciones).
+// ─────────────────────────────────────────────────────────────────────
+//
+// El roster de la scoreboard API NO trae el club del jugador (defaultTeam,
+// team y leagues vienen como stubs vacíos — verificado 2026-06-12). El club
+// vive SOLO en la "core" API por atleta: /athletes/{id} → defaultTeam.$ref,
+// que apunta a /teams/{clubId}. El escudo se arma del clubId sin fetch
+// (CDN estable); solo el NOMBRE del club necesita un fetch extra (deduplicado
+// por club dentro del plantel y cacheado 24h, así un parche entero comparte
+// la misma resolución y los reloads son instantáneos).
+
+/** Torneos de SELECCIONES — solo acá tiene sentido mostrar el club del
+ *  jugador (en ligas de clubes el plantel ya ES el club). */
+const NATIONAL_TEAM_TOURNAMENTS: ReadonlySet<string> = new Set(["worldcup_2026"]);
+
+const ESPN_CORE = "https://sports.core.api.espn.com/v2/sports/soccer";
+
+/** core /athletes/{id} → clubId (extraído del $ref de defaultTeam). */
+async function fetchAthleteClubId(athleteId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${ESPN_CORE}/athletes/${encodeURIComponent(athleteId)}?lang=en&region=us`, {
+      headers: { accept: "application/json" },
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { defaultTeam?: { $ref?: string } };
+    const ref = j.defaultTeam?.$ref;
+    if (!ref) return null;
+    const m = ref.match(/teams\/(\d+)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+/** core /teams/{clubId} → nombre display del club. */
+async function fetchClubName(clubId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${ESPN_CORE}/teams/${encodeURIComponent(clubId)}?lang=en&region=us`, {
+      headers: { accept: "application/json" },
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { displayName?: string; name?: string };
+    return j.displayName ?? j.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** map con límite de concurrencia (no martillar ESPN en el cold load). */
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const idx = cursor++;
+      out[idx] = await fn(items[idx]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
 }
 
 function lineFromPos(abbr: string | null, name: string | null): PlayerLine {
@@ -134,19 +205,40 @@ export async function fetchEspnTeamRoster(
   if (!res.ok) return [];
   const raw = (await res.json()) as RawTeamDetail;
   const athletes = raw.team?.athletes ?? [];
-  return athletes
+  const players: (SquadPlayer & { _id: string | null })[] = athletes
     .map((a) => {
       const pos = a.position?.abbreviation ?? null;
       return {
+        _id: a.id ?? null,
         name: a.displayName ?? "",
         jersey: a.jersey ?? null,
         pos,
         line: lineFromPos(pos, a.position?.name ?? null),
         age: typeof a.age === "number" ? a.age : null,
         headshot: a.headshot?.href ?? null,
+        club: null as string | null,
+        clubCrest: null as string | null,
       };
     })
     .filter((p) => p.name);
+
+  // Club actual: solo para selecciones (en ligas de clubes sería redundante).
+  if (NATIONAL_TEAM_TOURNAMENTS.has(tournamentSlug)) {
+    // Cache de nombre por club dentro de este plantel (un club lo comparten
+    // varios jugadores → un solo fetch por club).
+    const clubNameByIdPromise = new Map<string, Promise<string | null>>();
+    await mapWithConcurrency(players, 8, async (p) => {
+      if (!p._id) return;
+      const clubId = await fetchAthleteClubId(p._id);
+      if (!clubId) return;
+      p.clubCrest = `https://a.espncdn.com/i/teamlogos/soccer/500/${clubId}.png`;
+      if (!clubNameByIdPromise.has(clubId)) clubNameByIdPromise.set(clubId, fetchClubName(clubId));
+      p.club = await clubNameByIdPromise.get(clubId)!;
+    });
+  }
+
+  // Drop el id interno antes de devolver (no es parte del contrato público).
+  return players.map(({ _id, ...rest }) => rest);
 }
 
 // ─────────────────────────────────────────────────────────────────────

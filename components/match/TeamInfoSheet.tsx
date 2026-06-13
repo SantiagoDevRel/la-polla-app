@@ -188,6 +188,25 @@ function PlayerHeadshot({ name, headshot, jersey }: { name: string; headshot: st
   );
 }
 
+// ─── Escudo del club del jugador (selecciones) con fallback a nada ───
+function ClubCrest({ crest }: { crest: string | null }) {
+  const [errored, setErrored] = useState(false);
+  if (!crest || errored) return null;
+  return (
+    // Plain <img> (a.espncdn.com ya en CSP img-src).
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={crest}
+      alt=""
+      width={14}
+      height={14}
+      loading="lazy"
+      onError={() => setErrored(true)}
+      className="h-3.5 w-3.5 max-w-none shrink-0 object-contain"
+    />
+  );
+}
+
 // ─── Tabs del sheet ───
 type SheetTab = "resumen" | "plantel" | "noticias";
 const TAB_ORDER: SheetTab[] = ["resumen", "plantel", "noticias"];
@@ -846,6 +865,13 @@ export default function TeamInfoSheet({
                                   .filter(Boolean)
                                   .join(" · ")}
                               </p>
+                              {/* Club actual (selecciones): escudo + nombre. */}
+                              {p.club ? (
+                                <p className="flex items-center gap-1.5 text-[11px] text-text-secondary leading-tight mt-1 min-w-0">
+                                  <ClubCrest crest={p.clubCrest} />
+                                  <span className="[overflow-wrap:anywhere] line-clamp-1">{p.club}</span>
+                                </p>
+                              ) : null}
                             </div>
                             {p.jersey ? (
                               <span
