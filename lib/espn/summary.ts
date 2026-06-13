@@ -14,6 +14,12 @@
 // NO toca fetchEspnScoreboard (client.ts) — ese usa cache:"no-store" a
 // propósito porque el live sync necesita el dato fresco sí o sí.
 import { ESPN_LEAGUE_BY_TOURNAMENT } from "./client";
+import {
+  NATIONAL_TEAM_TOURNAMENTS,
+  fetchAthleteClubId,
+  fetchClubName,
+  mapWithConcurrency,
+} from "./club";
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
 
@@ -57,7 +63,7 @@ interface RawAthlete {
   jersey?: string;
   subbedIn?: boolean;
   subbedOut?: boolean;
-  athlete?: { displayName?: string; headshot?: { href?: string } };
+  athlete?: { id?: string; displayName?: string; headshot?: { href?: string } };
   position?: { abbreviation?: string };
 }
 interface RawRoster {
@@ -105,6 +111,8 @@ export interface LineupPlayer {
   pos: string | null;
   starter: boolean;
   headshot: string | null;
+  /** Club actual del jugador (solo selecciones; null si ESPN no lo trae). */
+  club: string | null;
 }
 
 export interface Lineup {
@@ -148,7 +156,12 @@ export async function fetchEspnSummary(
   }
   if (!res.ok) return null;
   const raw = (await res.json()) as RawSummary;
-  return normalizeSummary(raw);
+  const summary = normalizeSummary(raw);
+  // Club actual en las alineaciones: solo selecciones (Mundial), best-effort.
+  if (NATIONAL_TEAM_TOURNAMENTS.has(tournamentSlug)) {
+    await enrichLineupClubs(raw, summary.lineups);
+  }
+  return summary;
 }
 
 export function normalizeSummary(raw: RawSummary): MatchSummary {
@@ -214,8 +227,44 @@ export function normalizeSummary(raw: RawSummary): MatchSummary {
       pos: a.position?.abbreviation ?? null,
       starter: a.starter === true,
       headshot: a.athlete?.headshot?.href ?? null,
+      club: null,
     })),
   }));
 
   return { timeline, stats, lineups };
+}
+
+/**
+ * Enriquece las alineaciones con el CLUB ACTUAL de cada jugador (solo
+ * selecciones — en ligas de clubes sería redundante). El club no viene en el
+ * summary; se resuelve por la core API de ESPN por atleta (ver lib/espn/club).
+ * Muta `lineups` in-place. Best-effort: si un jugador no resuelve, queda null.
+ *
+ * Costo acotado: el resultado del summary va cacheado 30s (compartido global)
+ * y los fetches por atleta/club están cacheados 24h, así que esto corre ~una
+ * vez por partido, no por usuario.
+ */
+async function enrichLineupClubs(raw: RawSummary, lineups: Lineup[]): Promise<void> {
+  const rosters = raw.rosters ?? [];
+  // El map de normalizeSummary es 1:1 (sin filtros) → los índices de
+  // rosters[k].roster[i] alinean con lineups[k].players[i].
+  const tasks: { player: LineupPlayer; athleteId: string }[] = [];
+  rosters.forEach((r, k) => {
+    const lineup = lineups[k];
+    if (!lineup) return;
+    (r.roster ?? []).forEach((a, i) => {
+      const player = lineup.players[i];
+      const athleteId = a.athlete?.id;
+      if (player && athleteId) tasks.push({ player, athleteId });
+    });
+  });
+  if (tasks.length === 0) return;
+  // Un club lo comparten varios jugadores → un solo fetch de nombre por club.
+  const clubNameByIdPromise = new Map<string, Promise<string | null>>();
+  await mapWithConcurrency(tasks, 8, async ({ player, athleteId }) => {
+    const clubId = await fetchAthleteClubId(athleteId);
+    if (!clubId) return;
+    if (!clubNameByIdPromise.has(clubId)) clubNameByIdPromise.set(clubId, fetchClubName(clubId));
+    player.club = await clubNameByIdPromise.get(clubId)!;
+  });
 }

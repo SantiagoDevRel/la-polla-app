@@ -166,33 +166,6 @@ function TeamFlag({ flag, team, size }: { flag: string | null | undefined; team:
   );
 }
 
-function PlayerHeadshot({ player }: { player: LineupPlayer }) {
-  const [errored, setErrored] = useState(false);
-  if (player.headshot && !errored) {
-    return (
-      // Plain <img>: ESPN sirve headshots desde a.espncdn.com.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={player.headshot}
-        alt=""
-        width={36}
-        height={36}
-        loading="lazy"
-        onError={() => setErrored(true)}
-        className="h-9 w-9 max-w-none shrink-0 rounded-full object-cover bg-bg-card border border-border-subtle"
-      />
-    );
-  }
-  return (
-    <span
-      className="h-9 w-9 shrink-0 rounded-full bg-bg-card border border-border-subtle flex items-center justify-center text-[11px] font-bold text-text-secondary"
-      style={{ fontFeatureSettings: '"tnum"' }}
-    >
-      {player.jersey ?? initials(player.name).slice(0, 2)}
-    </span>
-  );
-}
-
 // ─── Componente ───
 
 export default function LiveMatchPopup({
@@ -614,7 +587,9 @@ function StatsSection({ stats, title, emptyLabel }: { stats: MatchStat[]; title:
   );
 }
 
-/** Alineaciones por side: formación + titulares/suplentes. */
+/** Alineaciones lado a lado: equipo local a la IZQUIERDA, visitante a la
+ *  DERECHA (pedido user 2026-06-12). Cada columna: solo número + nombre
+ *  (+ club actual si ESPN lo trae). Sin posiciones (G/RB/…) ni fotos. */
 function LineupsSection({
   home,
   away,
@@ -642,15 +617,15 @@ function LineupsSection({
   return (
     <section className="space-y-3">
       <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-primary/70">{title}</h3>
-      <div className="space-y-3">
-        <LineupCard lineup={home} teamName={homeTeam} flag={homeFlag} formationLabel={formationLabel} emptyLabel={emptyLabel} />
-        <LineupCard lineup={away} teamName={awayTeam} flag={awayFlag} formationLabel={formationLabel} emptyLabel={emptyLabel} />
+      <div className="grid grid-cols-2 gap-2 items-start">
+        <LineupColumn lineup={home} teamName={homeTeam} flag={homeFlag} formationLabel={formationLabel} emptyLabel={emptyLabel} />
+        <LineupColumn lineup={away} teamName={awayTeam} flag={awayFlag} formationLabel={formationLabel} emptyLabel={emptyLabel} />
       </div>
     </section>
   );
 }
 
-function LineupCard({
+function LineupColumn({
   lineup,
   teamName,
   flag,
@@ -663,67 +638,64 @@ function LineupCard({
   formationLabel: string;
   emptyLabel: string;
 }) {
-  if (!lineup || lineup.players.length === 0) {
-    return (
-      <div className="bg-bg-elevated border border-border-subtle rounded-xl px-3 py-3 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <TeamFlag flag={flag} team={teamName} size={22} />
-          <p className="text-sm font-semibold text-text-primary [overflow-wrap:anywhere]">
-            {lineup?.team || teamName}
-          </p>
-        </div>
-        <p className="mt-2 text-xs text-text-muted">{emptyLabel}</p>
-      </div>
-    );
-  }
-  const starters = lineup.players.filter((p) => p.starter);
-  const subs = lineup.players.filter((p) => !p.starter);
-  const displayTeam = lineup.team || teamName;
+  const displayTeam = lineup?.team || teamName;
   return (
-    <div className="bg-bg-elevated border border-border-subtle rounded-xl px-3 py-3 min-w-0">
-      <div className="flex items-start justify-between gap-2 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <TeamFlag flag={flag} team={teamName} size={22} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-text-primary [overflow-wrap:anywhere] leading-tight">
-              {displayTeam}
+    <div className="bg-bg-elevated border border-border-subtle rounded-xl px-2.5 py-2.5 min-w-0">
+      {/* Header de la columna: bandera + nombre de la selección + formación. */}
+      <div className="flex items-center gap-1.5 min-w-0 mb-2 pb-2 border-b border-border-subtle/60">
+        <TeamFlag flag={flag} team={teamName} size={18} />
+        <div className="min-w-0">
+          <p className="text-[12.5px] font-semibold text-text-primary [overflow-wrap:anywhere] leading-tight">
+            {displayTeam}
+          </p>
+          {lineup?.formation ? (
+            <p className="text-[10px] text-text-muted leading-tight mt-0.5" style={{ fontFeatureSettings: '"tnum"' }}>
+              {formationLabel}: {lineup.formation}
             </p>
-            {lineup.formation ? (
-              <p className="text-[11px] text-text-muted mt-0.5" style={{ fontFeatureSettings: '"tnum"' }}>
-                {formationLabel}: {lineup.formation}
-              </p>
-            ) : null}
-          </div>
+          ) : null}
         </div>
       </div>
-      <ul className="mt-3 space-y-1">
-        {starters.map((p, i) => (
-          <LineupPlayerRow key={`s-${p.name}-${p.jersey ?? i}`} player={p} />
-        ))}
-      </ul>
-      {subs.length > 0 ? (
-        <ul className="space-y-1 mt-2.5 pt-2.5 border-t border-border-subtle/60">
-          {subs.map((p, i) => (
-            <LineupPlayerRow key={`b-${p.name}-${p.jersey ?? i}`} player={p} muted />
-          ))}
-        </ul>
-      ) : null}
+      {!lineup || lineup.players.length === 0 ? (
+        <p className="text-[11px] text-text-muted py-2">{emptyLabel}</p>
+      ) : (
+        <>
+          <ul className="space-y-0.5">
+            {lineup.players.filter((p) => p.starter).map((p, i) => (
+              <LineupPlayerRow key={`s-${p.name}-${p.jersey ?? i}`} player={p} />
+            ))}
+          </ul>
+          {lineup.players.some((p) => !p.starter) ? (
+            <ul className="space-y-0.5 mt-2 pt-2 border-t border-border-subtle/60">
+              {lineup.players.filter((p) => !p.starter).map((p, i) => (
+                <LineupPlayerRow key={`b-${p.name}-${p.jersey ?? i}`} player={p} muted />
+              ))}
+            </ul>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
 
 function LineupPlayerRow({ player, muted = false }: { player: LineupPlayer; muted?: boolean }) {
   return (
-    <li className={`flex items-center gap-2.5 min-w-0 py-1 ${muted ? "opacity-65" : ""}`}>
-      <PlayerHeadshot player={player} />
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm leading-tight [overflow-wrap:anywhere] ${muted ? "text-text-muted" : "text-text-primary"}`}>
+    <li className={`py-0.5 min-w-0 ${muted ? "opacity-60" : ""}`}>
+      <div className="flex items-baseline gap-1.5 min-w-0">
+        <span
+          className="score-font text-[12px] tabular-nums text-text-muted w-4 text-right shrink-0"
+          style={{ fontFeatureSettings: '"tnum"' }}
+        >
+          {player.jersey ?? ""}
+        </span>
+        <span className={`text-[12.5px] leading-tight [overflow-wrap:anywhere] min-w-0 ${muted ? "text-text-muted" : "text-text-primary"}`}>
           {player.name}
-        </p>
-        <p className="mt-0.5 text-[11px] leading-tight text-text-muted" style={{ fontFeatureSettings: '"tnum"' }}>
-          {[player.pos, player.jersey ? `#${player.jersey}` : null].filter(Boolean).join(" · ")}
-        </p>
+        </span>
       </div>
+      {player.club ? (
+        <span className="block pl-[22px] text-[10px] text-text-muted leading-tight [overflow-wrap:anywhere]">
+          {player.club}
+        </span>
+      ) : null}
     </li>
   );
 }
