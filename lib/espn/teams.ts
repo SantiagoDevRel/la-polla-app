@@ -161,13 +161,17 @@ async function fetchClubName(clubId: string): Promise<string | null> {
 }
 
 /** map con límite de concurrencia (no martillar ESPN en el cold load). */
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
   const out: R[] = new Array(items.length);
   let cursor = 0;
   async function worker() {
     while (cursor < items.length) {
       const idx = cursor++;
-      out[idx] = await fn(items[idx]);
+      out[idx] = await fn(items[idx], idx);
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
@@ -238,6 +242,7 @@ export async function fetchEspnTeamRoster(
   }
 
   // Drop el id interno antes de devolver (no es parte del contrato público).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return players.map(({ _id, ...rest }) => rest);
 }
 
