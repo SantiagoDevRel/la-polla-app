@@ -1,0 +1,2 @@
+# Secretos de build — el build los toma de Vercel env, no de archivos subidos
+.env.sentry-build-plugin
