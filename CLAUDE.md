@@ -874,6 +874,23 @@ sheet con su ficha. Cero APIs externas (free-tier intacto).
   invictas), próximos, y la mini-tabla del grupo **inferida de los
   fixtures** (los 4 de un grupo solo juegan entre sí en group_stage —
   componente conexo; la DB no guarda letra de grupo). Cache privada 60s.
+- **Plantel del Mundial HORNEADO** (2026-06-13): el tab "Plantel" servía
+  desde ESPN en vivo, pero resolver el club de cada jugador cuesta ~26
+  llamadas encadenadas → el cold load tardaba ~1-2s (feedback user: "se
+  demora mucho cargando"). Como los planteles NO cambian durante la Copa,
+  se hornean una vez a `lib/espn/baked-worldcup-squads.json` (48 equipos,
+  1246 jugadores, forma `SquadPlayer[]` idéntica a la live → UI sin
+  cambios) vía `scripts/bake-worldcup-squads.ts` (reusa
+  `fetchEspnTeamRoster`). `app/api/teams/roster/route.ts` sirve el bake
+  para `worldcup_2026` (`getBakedWorldCupRoster` en `lib/espn/baked-squads.ts`,
+  server-only por construcción — solo lo importa el route, el JSON nunca
+  entra al bundle del cliente) con `Cache-Control: max-age=604800`; cae a
+  ESPN en vivo si el equipo no está horneado (slots de repechaje) u otros
+  torneos. **Re-hornear si una selección cambia plantel**: `npx tsx
+  scripts/bake-worldcup-squads.ts` + commit del JSON. ⚠️ ESPN solo tiene
+  foto de ~127/1246 (sobre todo jugadores de MLS); el resto cae al
+  fallback dorsal/iniciales de `PlayerHeadshot` — limitación de ESPN, no
+  del bake (la versión live tenía las mismas fotos).
 - `lib/teams/worldcup-facts.ts` — estático: nameEs, **ranking FIFA y
   letra de grupo OFICIALES** (baked de inside.fifa.com/api/ranking-overview
   y api.fifa.com/api/v3/calendar/matches idSeason=285023 — scripts
