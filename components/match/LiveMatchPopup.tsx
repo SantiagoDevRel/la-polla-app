@@ -17,6 +17,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { BarChart3, List, UsersRound, X } from "lucide-react";
 import { DURATION } from "@/lib/animations";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
+import { eventLabel, statLabel } from "@/lib/espn/labels-es";
 import type { MatchStat, MatchSummary, TimelineEvent, Lineup, LineupPlayer } from "@/lib/espn/summary";
 
 // Eventos de ESPN que son RUIDO para el resumen: saques, demoras, fin de
@@ -36,6 +37,10 @@ const NOISE_EVENT_TYPES = new Set([
   "Full Time",
   "First Half",
   "Second Half",
+  "Start 1st Half",
+  "Start 2nd Half",
+  "Start 1st Extra Time",
+  "Start 2nd Extra Time",
   "Game End",
   "End of Period",
   "Period Start",
@@ -46,39 +51,8 @@ function isMeaningfulEvent(e: TimelineEvent): boolean {
   return e.type !== "" && !NOISE_EVENT_TYPES.has(e.type);
 }
 
-// Etiquetas legibles (es/en) para los tipos de evento de ESPN.
-const EVENT_LABEL_ES: Record<string, string> = {
-  "Goal": "Gol",
-  "Penalty - Scored": "Gol de penal",
-  "Penalty - Missed": "Penal fallado",
-  "Own Goal": "Autogol",
-  "Yellow Card": "Tarjeta amarilla",
-  "Red Card": "Tarjeta roja",
-  "Yellow Red Card": "Doble amarilla",
-  "Second Yellow Card": "Doble amarilla",
-  "Substitution": "Cambio",
-  "VAR": "Revisión VAR",
-  "Var Decision": "Revisión VAR",
-  "Goal Disallowed": "Gol anulado",
-  "Penalty Won": "Penal a favor",
-};
-const EVENT_LABEL_EN: Record<string, string> = {
-  "Penalty - Scored": "Penalty goal",
-  "Penalty - Missed": "Penalty missed",
-  "Own Goal": "Own goal",
-  "Yellow Card": "Yellow card",
-  "Red Card": "Red card",
-  "Yellow Red Card": "Second yellow",
-  "Second Yellow Card": "Second yellow",
-  "Substitution": "Substitution",
-  "Var Decision": "VAR review",
-  "Goal Disallowed": "Goal disallowed",
-};
-
-function eventLabel(type: string, locale: string): string {
-  if (locale === "en") return EVENT_LABEL_EN[type] ?? type;
-  return EVENT_LABEL_ES[type] ?? type;
-}
+// Las etiquetas legibles de eventos y stats viven en lib/espn/labels-es.ts
+// (eventLabel / statLabel) — set finito y compartido, free-tier sin API.
 
 interface LiveMatchPopupProps {
   matchId: string;
@@ -438,7 +412,7 @@ export default function LiveMatchPopup({
               >
                 <div role="tabpanel" aria-label={t("tabStats")} className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
                   <div className="px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
-                    <StatsSection stats={stats} title={t("statsTitle")} emptyLabel={t("noData")} />
+                    <StatsSection stats={stats} title={t("statsTitle")} emptyLabel={t("noData")} locale={locale} />
                   </div>
                 </div>
                 <div role="tabpanel" aria-label={t("tabLineup")} className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
@@ -556,7 +530,7 @@ function TimelineSection({
 
 /** Stats del boxscore. Cada fila: label + barra comparativa home/away.
  *  La barra usa el valor numérico (sin "%") para el ancho relativo. */
-function StatsSection({ stats, title, emptyLabel }: { stats: MatchStat[]; title: string; emptyLabel: string }) {
+function StatsSection({ stats, title, emptyLabel, locale }: { stats: MatchStat[]; title: string; emptyLabel: string; locale: string }) {
   const num = (v: string): number => {
     const n = Number.parseFloat(v.replace(/[^0-9.]/g, ""));
     return Number.isFinite(n) ? n : 0;
@@ -569,6 +543,7 @@ function StatsSection({ stats, title, emptyLabel }: { stats: MatchStat[]; title:
       <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-text-primary/70">{title}</h3>
       <ul className="space-y-2.5">
         {stats.map((s) => {
+          const localLabel = statLabel(s.key, s.label, locale);
           const h = num(s.home);
           const a = num(s.away);
           const total = h + a;
@@ -584,7 +559,7 @@ function StatsSection({ stats, title, emptyLabel }: { stats: MatchStat[]; title:
                   {s.home}
                 </span>
                 <span className="text-[10px] uppercase tracking-[0.06em] text-text-muted text-center px-2 [overflow-wrap:anywhere]">
-                  {s.label}
+                  {localLabel}
                 </span>
                 <span className={`score-font text-[15px] tabular-nums ${a === 0 ? "text-text-muted" : "text-text-primary"}`} style={{ fontFeatureSettings: '"tnum"' }}>
                   {s.away}

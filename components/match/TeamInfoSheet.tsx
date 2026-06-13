@@ -21,6 +21,7 @@ import { X, CalendarDays, Shield, Check, ExternalLink, Users, Newspaper, LayoutG
 import { useToast } from "@/components/ui/Toast";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import { getTeamFacts } from "@/lib/teams/worldcup-facts";
+import { positionLabel } from "@/lib/espn/labels-es";
 import { DURATION } from "@/lib/animations";
 import type { SquadPlayer, PlayerLine, NewsItem } from "@/lib/espn/teams";
 
@@ -881,7 +882,7 @@ export default function TeamInfoSheet({
                                 {p.name}
                               </p>
                               <p className="text-[11px] text-text-muted leading-tight mt-0.5">
-                                {[p.pos, p.age !== null ? t("ageShort", { age: p.age }) : null]
+                                {[positionLabel(p.pos, locale), p.age !== null ? t("ageShort", { age: p.age }) : null]
                                   .filter(Boolean)
                                   .join(" · ")}
                               </p>

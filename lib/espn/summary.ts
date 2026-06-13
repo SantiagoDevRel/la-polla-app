@@ -100,6 +100,10 @@ export interface TimelineEvent {
 }
 
 export interface MatchStat {
+  /** `name` ESTABLE de ESPN (possessionPct, foulsCommitted…) — clave de
+   *  traducción robusta (el `label` llega en MAYÚSCULAS raras). Cae al
+   *  label si ESPN no trae name. Ver lib/espn/labels-es.ts. */
+  key: string;
   label: string;
   home: string;
   away: string;
@@ -198,12 +202,16 @@ export function normalizeSummary(raw: RawSummary): MatchSummary {
   const away = box.find((t) => t.homeAway === "away");
   const labels: string[] = [];
   const seen = new Set<string>();
+  // label → name ESPN estable (para traducir en el cliente sin depender del
+  // casing del label, que llega en MAYÚSCULAS para algunas stats).
+  const nameByLabel = new Map<string, string>();
   for (const t of [home, away]) {
     for (const s of t?.statistics ?? []) {
       const label = s.label ?? s.name ?? "";
       if (label && !seen.has(label)) {
         seen.add(label);
         labels.push(label);
+        if (s.name) nameByLabel.set(label, s.name);
       }
     }
   }
@@ -212,6 +220,7 @@ export function normalizeSummary(raw: RawSummary): MatchSummary {
     return s?.displayValue ?? "—";
   };
   const stats: MatchStat[] = labels.map((label) => ({
+    key: nameByLabel.get(label) ?? label,
     label,
     home: valueOf(home, label),
     away: valueOf(away, label),
