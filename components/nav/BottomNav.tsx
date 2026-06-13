@@ -11,14 +11,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Drawer } from "vaul";
 import { motion, useReducedMotion } from "framer-motion";
-import { Home, Bell, Bookmark, User, Plus, KeyRound } from "lucide-react";
+import { Home, Bookmark, User, Plus, KeyRound } from "lucide-react";
+import { WorldCupTrophy } from "@/components/icons/WorldCupTrophy";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/components/ui/Toast";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
-type NavKey = "inicio" | "avisos" | "pollas" | "perfil";
+type NavKey = "inicio" | "worldcup" | "pollas" | "perfil";
 
 export interface BottomNavProps {
   active?: NavKey;
@@ -33,10 +34,11 @@ export interface BottomNavProps {
   pollasPending?: number;
 }
 
-const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; labelKey: "tabInicio" | "tabPollas" | "tabAvisos" | "tabPerfil" }> = [
+const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; labelKey: "tabInicio" | "tabPollas" | "tabWorldcup" | "tabPerfil" }> = [
   { key: "inicio", href: "/inicio", Icon: Home, labelKey: "tabInicio" },
   { key: "pollas", href: "/pollas", Icon: Bookmark, labelKey: "tabPollas" },
-  { key: "avisos", href: "/avisos", Icon: Bell, labelKey: "tabAvisos" },
+  // "Avisos" reemplazado por las Llaves del Mundial (Road to World Cup).
+  { key: "worldcup", href: "/road-to-worldcup", Icon: WorldCupTrophy as unknown as typeof Home, labelKey: "tabWorldcup" },
   { key: "perfil", href: "/perfil", Icon: User, labelKey: "tabPerfil" },
 ];
 
@@ -47,7 +49,7 @@ function deriveActive(pathname: string | null): NavKey | undefined {
   // so the tab still highlights correctly for users hitting the old URL.
   if (pathname === "/inicio" || pathname.startsWith("/inicio")) return "inicio";
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard")) return "inicio";
-  if (pathname.startsWith("/avisos")) return "avisos";
+  if (pathname.startsWith("/road-to-worldcup")) return "worldcup";
   if (pathname.startsWith("/perfil")) return "perfil";
   // Match /pollas and /pollas/... but NOT /pollas/crear (that's the FAB target)
   if (pathname === "/pollas" || (pathname.startsWith("/pollas/") && !pathname.startsWith("/pollas/crear"))) {
@@ -129,7 +131,6 @@ export function BottomNav({
   active,
   createHref,
   onCreatePolla,
-  notifUnread = 0,
   pollasPending = 0,
 }: BottomNavProps) {
   const t = useTranslations("Nav");
@@ -226,7 +227,7 @@ export function BottomNav({
           </button>
 
           <div className="flex-1 flex">
-            <TabItem tab={middleRight} active={resolvedActive === middleRight.key} badge={notifUnread} />
+            <TabItem tab={middleRight} active={resolvedActive === middleRight.key} />
             <TabItem tab={right} active={resolvedActive === right.key} />
           </div>
         </div>

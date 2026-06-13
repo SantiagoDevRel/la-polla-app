@@ -61,7 +61,6 @@ import PredictNowCTA from "@/components/inicio/PredictNowCTA";
 import WorldCupFactsCard from "@/components/inicio/WorldCupFactsCard";
 import { HighlightsStrip } from "@/components/inicio/HighlightsStrip";
 import RoadToWorldCupCard from "@/components/inicio/RoadToWorldCupCard";
-import { isPreviewHost } from "@/lib/preview-host";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
@@ -1004,9 +1003,8 @@ export default async function InicioPage() {
               al refrescar; dataset estático bilingüe, cero API. */}
           <WorldCupFactsCard />
 
-          {/* Road to World Cup — EN TESTING: la card solo aparece en hosts
-              de preview (.vercel.app), nunca en el dominio real de prod. */}
-          {isPreviewHost() ? <RoadToWorldCupCard /> : null}
+          {/* Road to World Cup — entrada a la bracket interactiva. */}
+          <RoadToWorldCupCard />
 
           {/* Próximos PRIMERO (después de los datos curiosos) solo si el user
               todavía debe pronósticos de hoy/mañana — el CTA de pronosticar
