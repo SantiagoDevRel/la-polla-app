@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { resolveEspnTeamId, fetchEspnTeamRoster } from "@/lib/espn/teams";
+import { getBakedWorldCupRoster } from "@/lib/espn/baked-squads";
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,6 +24,20 @@ export async function GET(request: NextRequest) {
     const team = params.get("team");
     if (!tournament || !team) {
       return NextResponse.json({ error: "tournament y team requeridos" }, { status: 400 });
+    }
+
+    // Mundial 2026: plantel horneado → respuesta INSTANTÁNEA, cero ESPN en
+    // runtime. Los planteles no cambian durante la Copa; si alguno cambia se
+    // re-hornea (scripts/bake-worldcup-squads.ts). Si el equipo no está en el
+    // bake (slot de repechaje sin resolver), caemos a ESPN en vivo abajo.
+    if (tournament === "worldcup_2026") {
+      const baked = getBakedWorldCupRoster(team);
+      if (baked) {
+        return NextResponse.json(
+          { players: baked },
+          { headers: { "Cache-Control": "private, max-age=604800" } },
+        );
+      }
     }
 
     const espnId = await resolveEspnTeamId(tournament, team);
