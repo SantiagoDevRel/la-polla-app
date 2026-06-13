@@ -143,6 +143,28 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
   const countryFlag = flagUrlForTeam(teamName);
   const src = isIOSApp ? countryFlag : (countryFlag ?? flagUrl);
   if (src && !errored) {
+    // Bandera de país (flag-icons, ratio 4:3): caja 4:3 (24×18) que la
+    // bandera llena edge-to-edge. Antes era una caja CUADRADA 24×24 con
+    // object-contain → la bandera quedaba en 24×18 con barras
+    // transparentes, y las banderas OSCURAS (Qatar granate sobre el fondo
+    // #080c10) se fundían con el fondo y parecían más chicas que una
+    // brillante (Suiza). Con la caja 4:3 + ring fino, toda bandera ocupa
+    // el mismo rectángulo enmarcado. cover==contain acá (no recorta, la
+    // caja ya es 4:3). (fix 2026-06-12)
+    if (countryFlag && src === countryFlag) {
+      return (
+        <Image
+          src={src}
+          alt={teamName}
+          width={24}
+          height={18}
+          unoptimized
+          className="h-[18px] w-6 max-w-none shrink-0 rounded-[3px] object-cover ring-1 ring-white/15"
+          onError={() => setErrored(true)}
+        />
+      );
+    }
+    // Logo del provider (ESPN/football-data), normalmente cuadrado → círculo.
     return (
       <Image
         src={src}
@@ -154,7 +176,7 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
         // del preflight deja que la bandera se encoja cuando el
         // contenedor flex se comprime (visto con text-zoom 2x).
         className="h-6 w-6 max-w-none shrink-0"
-        style={{ objectFit: "contain", borderRadius: countryFlag ? 4 : "50%" }}
+        style={{ objectFit: "contain", borderRadius: "50%" }}
         onError={() => setErrored(true)}
       />
     );

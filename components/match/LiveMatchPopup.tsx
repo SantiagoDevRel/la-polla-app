@@ -139,8 +139,27 @@ function initials(value: string): string {
 /** Bandera real por nombre de país; fallback a iniciales si no existe/carga. */
 function TeamFlag({ flag, team, size }: { flag: string | null | undefined; team: string; size: number }) {
   const [errored, setErrored] = useState(false);
-  const src = flagUrlForTeam(team) ?? flag;
+  const countryFlag = flagUrlForTeam(team);
+  const src = countryFlag ?? flag;
   if (src && !errored) {
+    // Bandera de país (flag-icons 4:3): caja 4:3 que la bandera llena
+    // edge-to-edge + ring fino, para que las banderas oscuras (Qatar) no se
+    // fundan con el fondo y parezcan más chicas. Ver TeamCrest — fix 2026-06-12.
+    if (countryFlag && src === countryFlag) {
+      const h = Math.round((size * 3) / 4);
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt=""
+          width={size}
+          height={h}
+          className="max-w-none shrink-0 object-cover rounded-[3px] ring-1 ring-white/15"
+          style={{ width: size, height: h }}
+          onError={() => setErrored(true)}
+        />
+      );
+    }
     return (
       // Plain img: las banderas locales y los assets ESPN ya están cubiertos
       // por CSP. max-w-none evita que flex las encoja en headers apretados.
