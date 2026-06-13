@@ -92,8 +92,28 @@ function isLockedForPrediction(scheduledAt: string): boolean {
 
 function FlagCircle({ team, apiFlag, size }: { team: string; apiFlag: string | null; size: number }) {
   const [errored, setErrored] = useState(false);
-  const src = flagUrlForTeam(team) ?? apiFlag;
+  const countryFlag = flagUrlForTeam(team);
+  const src = countryFlag ?? apiFlag;
   if (src && !errored) {
+    // Bandera de país (flag-icons 4:3): caja 4:3 que la bandera llena
+    // edge-to-edge + ring fino, para que las banderas oscuras (Qatar) no
+    // se fundan con el fondo y parezcan más chicas. Ver nota en TeamCrest
+    // (pollas/[slug]) — fix 2026-06-12.
+    if (countryFlag && src === countryFlag) {
+      const h = Math.round((size * 3) / 4);
+      return (
+        <Image
+          src={src}
+          alt=""
+          width={size}
+          height={h}
+          unoptimized
+          className="flex-shrink-0 object-cover rounded-[3px] ring-1 ring-white/15"
+          style={{ width: size, height: h }}
+          onError={() => setErrored(true)}
+        />
+      );
+    }
     return (
       <Image
         src={src}
