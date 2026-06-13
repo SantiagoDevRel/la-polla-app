@@ -1400,7 +1400,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
         ? unresolvedSlotLabel(info?.slot ?? "")
         : parsed?.kind === "advance"
           ? `Ganador ${parsed.matchDay}`
-          : "Elegí equipo";
+          : "Elige equipo";
 
     return (
       <div
