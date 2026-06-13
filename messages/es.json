@@ -262,6 +262,8 @@
     "pointsValuePos": "+{n} pts",
     "pointsValueZero": "0 pts",
     "matchFinal": "Final",
+    "pendingPoints": "Calculando puntos…",
+    "yourPendingChip": "Tu {home}-{away} · calculando…",
     "anonymousFallback": "Anónimo",
     "phaseGroupStage": "Fase de grupos",
     "phaseRoundOf32": "16avos",

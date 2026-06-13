@@ -95,6 +95,12 @@ interface Match {
   match_day: number | null;
   elapsed: number | null;
   live_status_detail: string | null;
+  // Señal autoritativa de "ya se procesaron los puntos". Un partido
+  // puede estar status='finished' varios minutos antes de que corra el
+  // scoring (final_verified_at se setea recién al verificar el
+  // resultado). points_earned=0 es ambiguo entre "pendiente" y "fallaste";
+  // este campo desambigua: solo mostramos puntos cuando NO es null.
+  final_verified_at: string | null;
 }
 interface Prediction {
   id: string; match_id: string; predicted_home: number; predicted_away: number;
@@ -360,6 +366,11 @@ function MatchRow({
   const isIOSApp = useIsIOSApp();
   const isLive = match.status === "live";
   const isFinished = match.status === "finished";
+  // isScored: el partido terminó Y el scoring ya corrió (final_verified_at
+  // seteado). Solo entonces points_earned es confiable. En la ventana
+  // finished-pero-sin-verificar mostramos "calculando…", nunca "0 pts"
+  // (un 0 ahí parece "fallaste" cuando en realidad aún no se procesó).
+  const isScored = isFinished && match.final_verified_at != null;
   const pointsEarned = pred?.points_earned ?? null;
   const accent = matchStatusAccent(match, pointsEarned);
   const effectiveDraft = draft ?? {
@@ -602,8 +613,10 @@ function MatchRow({
           </div>
         ) : null}
 
-        {/* Finished-match tier-coloured chip */}
-        {isFinished && pred ? (
+        {/* Finished-match chip. Solo mostramos puntos cuando isScored
+            (scoring ya corrió). Finished-pero-sin-verificar → chip neutro
+            "calculando…" en vez de "0 pts" (que parecería un fallo). */}
+        {isScored && pred ? (
           <div className="mt-3 flex justify-center">
             <span
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-bold uppercase tracking-[0.08em] ${pointsTierClasses(
@@ -617,6 +630,16 @@ function MatchRow({
                   (pointsEarned ?? 0) > 0
                     ? t("pointsValuePos", { n: pointsEarned ?? 0 })
                     : t("pointsValueZero"),
+              })}
+            </span>
+          </div>
+        ) : isFinished && pred ? (
+          <div className="mt-3 flex justify-center">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-bold uppercase tracking-[0.08em] bg-bg-elevated text-text-primary/60 border-border-subtle">
+              <span className="w-1.5 h-1.5 rounded-full bg-gold/60 animate-pulse" aria-hidden="true" />
+              {t("yourPendingChip", {
+                home: pred.predicted_home,
+                away: pred.predicted_away,
               })}
             </span>
           </div>
@@ -664,7 +687,7 @@ function MatchRow({
             {poolPredsOpen && (
             <ul className="space-y-1.5 mt-2">
               {otherPredictions.map((op) => {
-                const showPoints = isFinished;
+                const showPoints = isScored;
                 const tierCls = showPoints
                   ? pointsTierClasses(op.points_earned ?? 0)
                   : "bg-bg-elevated text-text-primary border-border-subtle";
