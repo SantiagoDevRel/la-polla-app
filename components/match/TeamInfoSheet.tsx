@@ -166,14 +166,6 @@ function fmtRelativeDate(iso: string | null, locale: string): string {
   }).format(new Date(iso));
 }
 
-/** Iniciales para el fallback de la foto del jugador (sin headshot). */
-function playerInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 /** Orden de líneas para renderizar las secciones del plantel. */
 const LINE_ORDER: PlayerLine[] = ["GK", "DEF", "MID", "FWD", "OTH"];
 const LINE_KEY: Record<PlayerLine, string> = {
@@ -184,8 +176,14 @@ const LINE_KEY: Record<PlayerLine, string> = {
   OTH: "lineOTH",
 };
 
-// ─── Foto del jugador con fallback a iniciales/dorsal ───
-function PlayerHeadshot({ name, headshot, jersey }: { name: string; headshot: string | null; jersey: string | null }) {
+// ─── Foto del jugador con fallback al pollito gambeteador ───
+// ESPN solo tiene foto de ~10% de los jugadores del Mundial (sobre todo de
+// MLS). Para el resto mostramos el pollito gambeteador (marca > avatar
+// genérico). El dorsal sigue visible a la derecha de la fila, así que no se
+// pierde info. Mismo pollito para todos a propósito (decisión user
+// 2026-06-13): uniforme = se lee como placeholder, no como lista de usuarios.
+const SQUAD_FALLBACK_POLLITO = "/pollitos/pollito_gambeteador_base.webp";
+function PlayerHeadshot({ headshot }: { headshot: string | null }) {
   const [errored, setErrored] = useState(false);
   if (headshot && !errored) {
     return (
@@ -203,8 +201,16 @@ function PlayerHeadshot({ name, headshot, jersey }: { name: string; headshot: st
     );
   }
   return (
-    <span className="h-10 w-10 shrink-0 rounded-full bg-bg-card border border-border-subtle flex items-center justify-center text-[11px] font-bold text-text-secondary" style={{ fontFeatureSettings: '"tnum"' }}>
-      {jersey ?? playerInitials(name)}
+    <span className="h-10 w-10 shrink-0 rounded-full bg-bg-card border border-border-subtle flex items-center justify-center overflow-hidden">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={SQUAD_FALLBACK_POLLITO}
+        alt=""
+        width={36}
+        height={36}
+        loading="lazy"
+        className="h-9 w-9 max-w-none object-contain"
+      />
     </span>
   );
 }
@@ -873,7 +879,7 @@ export default function TeamInfoSheet({
                             key={`${p.name}-${p.jersey ?? i}`}
                             className="flex items-center gap-3 bg-bg-elevated border border-border-subtle rounded-xl px-3 py-2"
                           >
-                            <PlayerHeadshot name={p.name} headshot={p.headshot} jersey={p.jersey} />
+                            <PlayerHeadshot headshot={p.headshot} />
                             {/* Nombre en su propia columna flex-1 (sobrevive
                                 text-zoom: overflow-wrap, sin truncate horizontal
                                 contra un centro fijo). */}
