@@ -95,7 +95,11 @@ interface LiveMatchPopupProps {
 const LIVE_POLL_MS = 30_000;
 
 type LiveTab = "lineup" | "summary" | "stats";
-const TAB_ORDER: LiveTab[] = ["lineup", "summary", "stats"];
+// Orden visual del carrusel (pedido user 2026-06-12): Estadísticas primero,
+// luego Alineación, Resumen a la derecha. El array `tabs`, los paneles del
+// DOM y el activeTab inicial DEBEN seguir este mismo orden o el scroll-snap
+// se desincroniza del indicador.
+const TAB_ORDER: LiveTab[] = ["stats", "lineup", "summary"];
 const SHEET_CLOSE_DRAG_OFFSET = 92;
 const SHEET_CLOSE_DRAG_VELOCITY = 720;
 
@@ -210,7 +214,7 @@ export default function LiveMatchPopup({
   // Portal sólo tras montar (evita SSR mismatch), igual que TeamInfoSheet.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const [activeTab, setActiveTab] = useState<LiveTab>("lineup");
+  const [activeTab, setActiveTab] = useState<LiveTab>("stats");
   const panelsRef = useRef<HTMLDivElement | null>(null);
   const sheetDragControls = useDragControls();
 
@@ -299,9 +303,9 @@ export default function LiveMatchPopup({
   const homeDisplayName = compactTeamName(homeTeam);
   const awayDisplayName = compactTeamName(awayTeam);
   const tabs: { tab: LiveTab; label: string; Icon: typeof UsersRound }[] = [
+    { tab: "stats", label: t("tabStats"), Icon: BarChart3 },
     { tab: "lineup", label: t("tabLineup"), Icon: UsersRound },
     { tab: "summary", label: t("tabSummary"), Icon: List },
-    { tab: "stats", label: t("tabStats"), Icon: BarChart3 },
   ];
 
   return createPortal(
@@ -440,6 +444,11 @@ export default function LiveMatchPopup({
                 onScroll={onPanelsScroll}
                 className="flex-1 min-h-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
+                <div role="tabpanel" aria-label={t("tabStats")} className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
+                  <div className="px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
+                    <StatsSection stats={stats} title={t("statsTitle")} emptyLabel={t("noData")} />
+                  </div>
+                </div>
                 <div role="tabpanel" aria-label={t("tabLineup")} className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
                   <div className="px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
                     <LineupsSection
@@ -465,11 +474,6 @@ export default function LiveMatchPopup({
                       locale={locale}
                       emptyLabel={t("noData")}
                     />
-                  </div>
-                </div>
-                <div role="tabpanel" aria-label={t("tabStats")} className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
-                  <div className="px-4 pt-4" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
-                    <StatsSection stats={stats} title={t("statsTitle")} emptyLabel={t("noData")} />
                   </div>
                 </div>
               </div>
