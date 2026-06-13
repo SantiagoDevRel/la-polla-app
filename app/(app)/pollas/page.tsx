@@ -88,7 +88,7 @@ export default function MisPollasPage() {
   const [pollas, setPollas] = useState<PollaData[]>([]);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [endedOpen, setEndedOpen] = useState(true);
+  const [endedOpen, setEndedOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const isIOSApp = useIsIOSApp();
   // Polla actualmente siendo invitada via share icon. null cuando el
@@ -103,13 +103,27 @@ export default function MisPollasPage() {
           axios.get("/api/pollas"),
           axios.get("/api/invites/pending").catch(() => ({ data: { invites: [] } })),
         ]);
-        setPollas(pollasRes.data.pollas || []);
-        setPendingInvites(invitesRes.data.invites || []);
-      } catch { /* silently fail */ }
-      finally { setLoading(false); }
+        const loaded: PollaData[] = pollasRes.data.pollas || [];
+        const invites: PendingInvite[] = invitesRes.data.invites || [];
+        // Single-polla shortcut: si el usuario pertenece a EXACTAMENTE una
+        // polla y no tiene invitaciones pendientes que mostrar, lo mandamos
+        // directo adentro (cae en el tab "partidos" por default). replace()
+        // en vez de push() para que el back-button no rebote a /pollas y
+        // re-dispare el redirect. Dejamos loading=true a propósito para que
+        // el FootballLoader cubra el redirect sin flash de la lista.
+        if (loaded.length === 1 && invites.length === 0) {
+          router.replace(`/pollas/${loaded[0].slug}`);
+          return;
+        }
+        setPollas(loaded);
+        setPendingInvites(invites);
+        setLoading(false);
+      } catch {
+        setLoading(false);
+      }
     }
     load();
-  }, []);
+  }, [router]);
 
   // Use server-computed effective_status so a polla whose matches are all past
   // shows under Finalizadas even if the auto-close trigger hasn't run.
