@@ -1,9 +1,9 @@
 // lib/inicio/world-cup-facts.ts
 //
 // Dataset estático y bilingüe de datos curiosos REALES del Mundial de la
-// FIFA. Lo consume components/inicio/WorldCupFactsCard.tsx, que muestra 2
-// por día (rotación determinística por fecha de Bogotá). Cero APIs en
-// runtime — free-tier intacto.
+// FIFA. Lo consume components/inicio/WorldCupFactsCard.tsx, que muestra 4
+// por día (rotación determinística por fecha de Bogotá, de a uno en un
+// carrusel horizontal). Cero APIs en runtime — free-tier intacto.
 //
 // Curaduría: hechos bien establecidos y verificables (historia 1930-2022,
 // formato del Mundial 2026, récords, jugadores icónicos, y Colombia en los
@@ -186,4 +186,26 @@ export const WORLD_CUP_FACTS: WorldCupFact[] = [
   { es: "Alemania ganó Brasil 2014 con un gol de Mario Götze en el alargue ante Argentina.", en: "Germany won Brazil 2014 with a Mario Götze goal in extra time against Argentina." },
   { es: "Naranjito, una naranja sonriente, fue la mascota de España 1982.", en: "Naranjito, a smiling orange, was the mascot of the 1982 World Cup in Spain." },
   { es: "El Mundial pasó de 16 a 24 selecciones en 1982 y a 32 en 1998.", en: "The World Cup grew from 16 to 24 teams in 1982 and to 32 in 1998." },
+
+  // ── Récords y figuras ────────────────────────────────────────────────
+  { es: "Miroslav Klose es el máximo goleador histórico de los mundiales, con 16 goles.", en: "Miroslav Klose is the all-time World Cup top scorer, with 16 goals." },
+  { es: "Pelé es el único futbolista que ganó tres mundiales: 1958, 1962 y 1970.", en: "Pelé is the only footballer to win three World Cups: 1958, 1962 and 1970." },
+  { es: "El francés Just Fontaine marcó 13 goles en un solo Mundial (1958), un récord intacto.", en: "France's Just Fontaine scored 13 goals at a single World Cup (1958), a record that still stands." },
+  { es: "El gol más rápido de un Mundial lo hizo Hakan Sukur a los 11 segundos, en 2002.", en: "The fastest World Cup goal was scored by Hakan Sukur after 11 seconds, in 2002." },
+  { es: "Roger Milla, de Camerún, anotó a los 42 años en 1994: el goleador más veterano del Mundial.", en: "Cameroon's Roger Milla scored at 42 in 1994, the oldest goalscorer in World Cup history." },
+  { es: "Solo ocho selecciones han ganado un Mundial en toda la historia.", en: "Only eight nations have ever won a World Cup." },
+  { es: "Lionel Messi por fin levantó la Copa en 2022, en su quinto Mundial.", en: "Lionel Messi finally lifted the trophy in 2022, at his fifth World Cup." },
+  { es: "Alemania goleó 7-1 a Brasil en la semifinal de 2014, uno de los resultados más impactantes.", en: "Germany thrashed Brazil 7-1 in the 2014 semifinal, one of the most shocking results ever." },
+  { es: "España ganó su primer y único Mundial en 2010, en Sudáfrica.", en: "Spain won their first and only World Cup in 2010, in South Africa." },
+
+  // ── Tecnología, sedes y curiosidades ─────────────────────────────────
+  { es: "La tecnología de gol en la línea debutó en 2014 y el VAR llegó en el Mundial de 2018.", en: "Goal-line technology debuted in 2014 and VAR arrived at the 2018 World Cup." },
+  { es: "El sonido del Mundial de Sudáfrica 2010 fueron las vuvuzelas en las tribunas.", en: "The sound of the 2010 South Africa World Cup was the vuvuzelas in the stands." },
+  { es: "En 1986, Maradona marcó la 'Mano de Dios' y el 'Gol del Siglo' en el mismo partido ante Inglaterra.", en: "In 1986, Maradona scored the 'Hand of God' and the 'Goal of the Century' in the same match against England." },
+  { es: "El egipcio Essam El-Hadary jugó en 2018 a los 45 años: el futbolista más veterano de un Mundial.", en: "Egypt's Essam El-Hadary played in 2018 at age 45, the oldest player in World Cup history." },
+  { es: "La final de 1950 en el Maracaná reunió a casi 200.000 personas, una multitud récord.", en: "The 1950 final at the Maracanã drew nearly 200,000 people, a record crowd." },
+
+  // ── Colombia en los mundiales ────────────────────────────────────────
+  { es: "El mejor Mundial de Colombia fue Brasil 2014: llegó a cuartos de final por primera vez.", en: "Colombia's best World Cup was Brazil 2014, reaching the quarterfinals for the first time." },
+  { es: "James Rodriguez ganó la Bota de Oro de 2014 con 6 goles, incluida su volea ante Uruguay.", en: "James Rodriguez won the 2014 Golden Boot with 6 goals, including his volley against Uruguay." },
 ];
