@@ -1118,6 +1118,37 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
     [closePicker],
   );
 
+  // Mientras el picker está abierto, cerrarlo al (a) tocar el FONDO de las
+  // llaves —cualquier punto que no sea un elemento data-board-interactive,
+  // o sea: ni un slot ni la propia card— o (b) hacer scroll del tablero.
+  // Tocar otro slot NO pasa por acá (es interactive): su propio toggle abre
+  // el nuevo. El auto-scroll al abrir es programático (scrollTo) y NO dispara
+  // wheel/touchmove, así que el picker sobrevive a ese reencuadre. La X y el
+  // drag-hacia-abajo siguen funcionando.
+  useEffect(() => {
+    if (!openTarget) return;
+    const scroller = scrollerRef.current;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest('[data-board-interactive="true"]')) return;
+      closePicker();
+    };
+    const onUserScroll = () => closePicker();
+    // Deferir un frame: que el mismo pointerdown que ABRIÓ el picker no lo
+    // cierre de inmediato.
+    const raf = window.requestAnimationFrame(() => {
+      document.addEventListener("pointerdown", onPointerDown, true);
+    });
+    scroller?.addEventListener("wheel", onUserScroll, { passive: true });
+    scroller?.addEventListener("touchmove", onUserScroll, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(raf);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      scroller?.removeEventListener("wheel", onUserScroll);
+      scroller?.removeEventListener("touchmove", onUserScroll);
+    };
+  }, [openTarget, closePicker]);
+
   const hintTargetKey = useMemo(() => {
     if (!showOnboardingHint) return null;
     return directSlots.find((slot) => !assignments[slot.key])?.key ?? directSlots[0]?.key ?? null;
@@ -1441,7 +1472,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
 
           {candidates.length === 0 ? (
             <div className="rounded-md border border-border-subtle bg-bg-base/70 px-3 py-2 text-[12px] font-medium text-text-secondary">
-              Primero definí el partido anterior.
+              Primero define el partido anterior.
             </div>
           ) : isBestThirdPicker ? (
             <div className="space-y-0.5">
