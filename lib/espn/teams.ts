@@ -209,31 +209,35 @@ export async function fetchEspnTeamRoster(
   if (!res.ok) return [];
   const raw = (await res.json()) as RawTeamDetail;
   const athletes = raw.team?.athletes ?? [];
-  const players: (SquadPlayer & { _id: string | null })[] = athletes
-    .map((a) => {
-      const pos = a.position?.abbreviation ?? null;
-      return {
-        _id: a.id ?? null,
-        name: a.displayName ?? "",
-        jersey: a.jersey ?? null,
-        pos,
-        line: lineFromPos(pos, a.position?.name ?? null),
-        age: typeof a.age === "number" ? a.age : null,
-        headshot: a.headshot?.href ?? null,
-        club: null as string | null,
-        clubCrest: null as string | null,
-      };
-    })
-    .filter((p) => p.name);
+  // El id del atleta NO va dentro de SquadPlayer (no es parte del contrato
+  // público): se lleva en un array paralelo solo para enriquecer el club.
+  const athleteIds: (string | null)[] = [];
+  const players: SquadPlayer[] = [];
+  for (const a of athletes) {
+    if (!a.displayName) continue;
+    const pos = a.position?.abbreviation ?? null;
+    players.push({
+      name: a.displayName,
+      jersey: a.jersey ?? null,
+      pos,
+      line: lineFromPos(pos, a.position?.name ?? null),
+      age: typeof a.age === "number" ? a.age : null,
+      headshot: a.headshot?.href ?? null,
+      club: null,
+      clubCrest: null,
+    });
+    athleteIds.push(a.id ?? null);
+  }
 
   // Club actual: solo para selecciones (en ligas de clubes sería redundante).
   if (NATIONAL_TEAM_TOURNAMENTS.has(tournamentSlug)) {
     // Cache de nombre por club dentro de este plantel (un club lo comparten
     // varios jugadores → un solo fetch por club).
     const clubNameByIdPromise = new Map<string, Promise<string | null>>();
-    await mapWithConcurrency(players, 8, async (p) => {
-      if (!p._id) return;
-      const clubId = await fetchAthleteClubId(p._id);
+    await mapWithConcurrency(players, 8, async (p, idx) => {
+      const athleteId = athleteIds[idx];
+      if (!athleteId) return;
+      const clubId = await fetchAthleteClubId(athleteId);
       if (!clubId) return;
       p.clubCrest = `https://a.espncdn.com/i/teamlogos/soccer/500/${clubId}.png`;
       if (!clubNameByIdPromise.has(clubId)) clubNameByIdPromise.set(clubId, fetchClubName(clubId));
@@ -241,9 +245,7 @@ export async function fetchEspnTeamRoster(
     });
   }
 
-  // Drop el id interno antes de devolver (no es parte del contrato público).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  return players.map(({ _id, ...rest }) => rest);
+  return players;
 }
 
 // ─────────────────────────────────────────────────────────────────────
