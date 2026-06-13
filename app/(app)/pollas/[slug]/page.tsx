@@ -676,8 +676,14 @@ function MatchRow({
               aria-expanded={poolPredsOpen}
               className="w-full flex items-center justify-between gap-2 cursor-pointer"
             >
-              <span className="text-[10px] uppercase tracking-[0.1em] text-text-primary/60">
+              <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] text-text-primary/60">
                 {t("poolPredsLabel", { count: otherPredictions.length })}
+                {isFinished && !isScored ? (
+                  <span className="inline-flex items-center gap-1 text-gold/70 normal-case tracking-normal">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gold/60 animate-pulse" aria-hidden="true" />
+                    {t("pendingPoints")}
+                  </span>
+                ) : null}
               </span>
               <ChevronDown
                 className={`w-4 h-4 text-text-primary/60 transition-transform ${poolPredsOpen ? "rotate-180" : ""}`}
