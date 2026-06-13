@@ -149,19 +149,6 @@ export default function MisPollasPage() {
       </header>
 
       <main className="max-w-lg mx-auto p-4 space-y-4">
-        {/* Join by code entry */}
-        <button
-          type="button"
-          onClick={() => setJoinOpen(true)}
-          className="w-full flex items-center justify-between rounded-lg border border-gold/25 bg-gold/5 px-4 py-3 hover:bg-gold/10 transition-colors"
-        >
-          <span className="flex items-center gap-2 text-sm font-semibold text-gold">
-            <KeyRound className="w-4 h-4" aria-hidden="true" />
-            {t("joinByCodeCTA")}
-          </span>
-          <ArrowRight className="w-4 h-4 text-gold" aria-hidden="true" />
-        </button>
-
         {/* Pending invites */}
         {pendingInvites.length > 0 && (
           <div className="space-y-2">
@@ -303,6 +290,21 @@ export default function MisPollasPage() {
             {t("createNew")}
           </button>
         )}
+
+        {/* Join by code entry — al fondo, debajo de Finalizadas y de
+            "Crear nueva polla" (orden pedido por el user 2026-06-13:
+            finalizadas → crear → unirse con código). */}
+        <button
+          type="button"
+          onClick={() => setJoinOpen(true)}
+          className="w-full flex items-center justify-between rounded-lg border border-gold/25 bg-gold/5 px-4 py-3 hover:bg-gold/10 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-gold">
+            <KeyRound className="w-4 h-4" aria-hidden="true" />
+            {t("joinByCodeCTA")}
+          </span>
+          <ArrowRight className="w-4 h-4 text-gold" aria-hidden="true" />
+        </button>
       </main>
 
       <JoinByCodeSheet
