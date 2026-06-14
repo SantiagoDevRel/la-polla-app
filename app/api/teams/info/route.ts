@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { teamNameKey } from "@/lib/teams/team-name-key";
 
 // Columnas que el sheet necesita — subset de MATCH_COLUMNS, sin
 // external_id/notified_closing/etc. que el cliente no usa.
@@ -108,29 +109,36 @@ export async function GET(request: NextRequest) {
     }
 
     // Mini-tabla del grupo: rivales directos en group_stage = su grupo.
+    // Todo se compara por clave normalizada (teamNameKey) — los proveedores
+    // mezclan "Curaçao"/"Curacao" y el match por nombre exacto descartaba el
+    // partido jugado → 0 pts para todos (bug Grupo E, 2026-06-14).
     let group: StandingRow[] | null = null;
     const groupFixtures = all.filter((m) => m.phase === "group_stage");
-    const rivals = new Set<string>();
+    const teamK = teamNameKey(team);
+    const memberKeys = new Set<string>([teamK]);
     for (const m of groupFixtures) {
-      if (m.home_team === team) rivals.add(m.away_team);
-      if (m.away_team === team) rivals.add(m.home_team);
+      const hk = teamNameKey(m.home_team);
+      const ak = teamNameKey(m.away_team);
+      if (hk === teamK) memberKeys.add(ak);
+      if (ak === teamK) memberKeys.add(hk);
     }
-    if (rivals.size > 0) {
-      const members = new Set<string>([team].concat(Array.from(rivals)));
-      const table = new Map<string, StandingRow>();
-      const flagOf = (name: string): string | null => {
-        for (const m of groupFixtures) {
-          if (m.home_team === name) return m.home_team_flag;
-          if (m.away_team === name) return m.away_team_flag;
-        }
-        return null;
+    if (memberKeys.size > 1) {
+      const table = new Map<string, StandingRow>(); // keyed by teamNameKey
+      // Crea/recupera la fila de un equipo del grupo, fijando display name +
+      // flag del primer fixture que lo menciona.
+      const rowFor = (name: string, flag: string | null): StandingRow | null => {
+        const k = teamNameKey(name);
+        if (!memberKeys.has(k)) return null;
+        let row = table.get(k);
+        if (!row) { row = emptyStanding(name, flag); table.set(k, row); }
+        else if (!row.flag && flag) row.flag = flag;
+        return row;
       };
-      members.forEach((name) => table.set(name, emptyStanding(name, flagOf(name))));
       for (const m of groupFixtures) {
-        if (!members.has(m.home_team) || !members.has(m.away_team)) continue;
+        const home = rowFor(m.home_team, m.home_team_flag);
+        const away = rowFor(m.away_team, m.away_team_flag);
+        if (!home || !away) continue;
         if (m.status !== "finished" || m.home_score === null || m.away_score === null) continue;
-        const home = table.get(m.home_team)!;
-        const away = table.get(m.away_team)!;
         home.played += 1; away.played += 1;
         home.gf += m.home_score; home.ga += m.away_score;
         away.gf += m.away_score; away.ga += m.home_score;
