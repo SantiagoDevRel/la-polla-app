@@ -6,6 +6,8 @@
 // Analytics (logins, DB).
 "use client";
 
+import { useState } from "react";
+
 export interface WebAnalytics {
   configured: boolean;
   live30m: number;
@@ -108,39 +110,63 @@ function Vital({
   );
 }
 
-/** Heatmap 7×24: filas = días (Lun..Dom), columnas = horas (0..23), opacidad = volumen. */
+/** Heatmap 7×24: filas = días (Lun..Dom), columnas = horas (0..23), opacidad = volumen.
+ *  Cada celda es clickeable → muestra el detalle arriba (sirve en mobile, sin hover). */
 function Heatmap({ data }: { data: WebAnalytics["heatmap"] }) {
+  const [sel, setSel] = useState<{ dow: number; hour: number; count: number } | null>(null);
   const max = Math.max(1, ...data.map((d) => d.count));
   const grid = new Map<string, number>();
   for (const d of data) grid.set(`${d.dow}-${d.hour}`, d.count);
   const hours = Array.from({ length: 24 }, (_, h) => h);
   return (
-    <div className="overflow-x-auto -mx-1 px-1">
-      <div className="inline-block min-w-full">
-        {[1, 2, 3, 4, 5, 6, 7].map((dow) => (
-          <div key={dow} className="flex items-center gap-[3px] mb-[3px]">
-            <span className="text-[9px] text-text-muted w-6 shrink-0">{DOW[dow]}</span>
-            {hours.map((h) => {
-              const c = grid.get(`${dow}-${h}`) ?? 0;
-              const o = c === 0 ? 0.04 : 0.15 + (c / max) * 0.85;
-              return (
-                <div
-                  key={h}
-                  className="h-3 flex-1 min-w-[8px] rounded-[2px]"
-                  style={{ background: c === 0 ? "rgba(255,255,255,0.04)" : `rgba(255,215,0,${o})` }}
-                  title={`${DOW[dow]} ${String(h).padStart(2, "0")}:00 · ${c} pageviews`}
-                />
-              );
-            })}
-          </div>
-        ))}
-        <div className="flex items-center gap-[3px] mt-1">
-          <span className="w-6 shrink-0" />
-          {hours.map((h) => (
-            <span key={h} className="text-[8px] text-text-muted flex-1 min-w-[8px] text-center">
-              {h % 6 === 0 ? h : ""}
-            </span>
+    <div className="space-y-2">
+      {/* Detalle de la celda seleccionada (o hint) */}
+      <div className="rounded-lg px-3 py-1.5 text-[12px] min-h-[30px] flex items-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+        {sel ? (
+          <span className="text-text-secondary">
+            <span className="font-display text-gold" style={{ fontSize: 15 }}>{sel.count}</span>{" "}
+            pageviews · <span className="text-text-primary">{DOW[sel.dow]}</span> a las{" "}
+            <span className="text-text-primary tabular-nums">{String(sel.hour).padStart(2, "0")}:00</span>
+          </span>
+        ) : (
+          <span className="text-text-muted">Tocá un cuadrito para ver la hora y los pageviews.</span>
+        )}
+      </div>
+
+      <div className="overflow-x-auto -mx-1 px-1">
+        <div className="inline-block min-w-full">
+          {[1, 2, 3, 4, 5, 6, 7].map((dow) => (
+            <div key={dow} className="flex items-center gap-[3px] mb-[3px]">
+              <span className="text-[9px] text-text-muted w-6 shrink-0">{DOW[dow]}</span>
+              {hours.map((h) => {
+                const c = grid.get(`${dow}-${h}`) ?? 0;
+                const o = c === 0 ? 0.04 : 0.15 + (c / max) * 0.85;
+                const isSel = sel?.dow === dow && sel?.hour === h;
+                return (
+                  <button
+                    key={h}
+                    type="button"
+                    onClick={() => setSel({ dow, hour: h, count: c })}
+                    className="h-4 flex-1 min-w-[8px] rounded-[2px] cursor-pointer transition-shadow"
+                    style={{
+                      background: c === 0 ? "rgba(255,255,255,0.04)" : `rgba(255,215,0,${o})`,
+                      boxShadow: isSel ? "0 0 0 2px #FFD700" : "none",
+                    }}
+                    aria-label={`${DOW[dow]} ${String(h).padStart(2, "0")}:00, ${c} pageviews`}
+                    title={`${DOW[dow]} ${String(h).padStart(2, "0")}:00 · ${c} pageviews`}
+                  />
+                );
+              })}
+            </div>
           ))}
+          <div className="flex items-center gap-[3px] mt-1">
+            <span className="w-6 shrink-0" />
+            {hours.map((h) => (
+              <span key={h} className="text-[8px] text-text-muted flex-1 min-w-[8px] text-center">
+                {h % 6 === 0 ? h : ""}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
