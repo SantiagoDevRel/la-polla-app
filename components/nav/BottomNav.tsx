@@ -177,9 +177,26 @@ export function BottomNav({
           h-64 porque ya no hay labels. */}
       <nav
         aria-label={t("ariaNav")}
-        className="fixed left-[14px] right-[14px] bottom-[14px] z-50 rounded-full backdrop-blur-3xl backdrop-saturate-[1.8] border border-white/[0.12] h-[64px] max-w-[480px] mx-auto shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.12)]"
-        style={{ background: "rgba(14, 20, 32, 0.42)" }}
+        className="fixed left-[14px] right-[14px] bottom-[14px] z-50 h-[64px] max-w-[480px] mx-auto"
       >
+        {/* Capa de vidrio en un elemento SEPARADO del shell fixed.
+            iOS WebKit no puede mantener una capa pegada al viewport durante
+            el momentum-scroll cuando ESA MISMA capa es a la vez
+            position:fixed Y backdrop-filter: hace "blit" del bitmap fijo
+            cacheado pero no puede blittear un backdrop en vivo → la barra
+            se quedaba flotando en la mitad de la pantalla al hacer scroll en
+            iPhone (WebKit bug 89475). Separar el posicionamiento (en el
+            <nav>) del blur (acá) deja al compositor fijar el shell limpio
+            mientras el blur se re-samplea en su propia capa.
+            ⚠️ NO agregar transform / will-change / opacity<1 a ESTE div: en
+            iOS eso lo convierte en su propio backdrop-root y el blur colapsa
+            a un panel opaco. Si una device sigue drifteando, la escalación es
+            translateZ(0) en el <nav> shell (NUNCA acá). */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 rounded-full overflow-hidden backdrop-blur-3xl backdrop-saturate-[1.8] border border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.12)]"
+          style={{ background: "rgba(14, 20, 32, 0.42)" }}
+        />
         <div className="relative h-full flex items-center px-4">
           <div className="flex-1 flex">
             <TabItem tab={left} active={resolvedActive === left.key} />
