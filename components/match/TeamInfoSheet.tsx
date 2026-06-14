@@ -331,7 +331,10 @@ export default function TeamInfoSheet({
     let cancelled = false;
     setRosterError(false);
     axios
-      .get<{ players: SquadPlayer[] }>("/api/teams/roster", { params: { tournament, team } })
+      // timeout: sin esto, si el request no resuelve (ESPN fallback colgado,
+      // red lenta, cold start) roster queda en null para siempre → skeleton
+      // infinito. Con timeout el catch dispara y mostramos el error state.
+      .get<{ players: SquadPlayer[] }>("/api/teams/roster", { params: { tournament, team }, timeout: 12000 })
       .then((res) => { if (!cancelled) setRoster(res.data.players ?? []); })
       .catch(() => { if (!cancelled) setRosterError(true); });
     return () => { cancelled = true; };
@@ -344,7 +347,7 @@ export default function TeamInfoSheet({
     let cancelled = false;
     setNewsError(false);
     axios
-      .get<{ news: NewsItem[] }>("/api/teams/news", { params: { tournament, team } })
+      .get<{ news: NewsItem[] }>("/api/teams/news", { params: { tournament, team }, timeout: 12000 })
       .then((res) => { if (!cancelled) setNews(res.data.news ?? []); })
       .catch(() => { if (!cancelled) setNewsError(true); });
     return () => { cancelled = true; };

@@ -18,8 +18,16 @@
 // nuevo): `npx tsx scripts/bake-worldcup-squads.ts` y commitear el JSON.
 import bakedRaw from "./baked-worldcup-squads.json";
 import type { SquadPlayer } from "./teams";
+import { teamNameKey } from "@/lib/teams/team-name-key";
 
 const BAKED = bakedRaw as Record<string, SquadPlayer[]>;
+
+// Índice por clave normalizada (sin acentos/caja) → tolera el drift de
+// ortografía entre proveedores ("Curaçao" vs "Curacao") sin re-hornear.
+const BAKED_BY_KEY: Record<string, SquadPlayer[]> = {};
+for (const [name, squad] of Object.entries(BAKED)) {
+  BAKED_BY_KEY[teamNameKey(name)] = squad;
+}
 
 /**
  * Plantel horneado del Mundial 2026 por nombre de equipo (== matches.home_team).
@@ -27,6 +35,6 @@ const BAKED = bakedRaw as Record<string, SquadPlayer[]>;
  * resolver) → el caller cae a ESPN en vivo como fallback.
  */
 export function getBakedWorldCupRoster(teamName: string): SquadPlayer[] | null {
-  const squad = BAKED[teamName];
+  const squad = BAKED[teamName] ?? BAKED_BY_KEY[teamNameKey(teamName)];
   return squad && squad.length > 0 ? squad : null;
 }

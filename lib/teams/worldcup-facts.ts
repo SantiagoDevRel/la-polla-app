@@ -13,6 +13,7 @@
 // Para refrescar cuando FIFA publique un ranking nuevo: re-correr el
 // script y `node inject-fifa-facts.mjs`. participations cuenta
 // INCLUYENDO 2026. bestResult = mejor resultado histórico (hasta 2022).
+import { teamNameKey } from "./team-name-key";
 
 export interface TeamFacts {
   /** Nombre en español para el header del sheet. */
@@ -42,7 +43,7 @@ export const WORLDCUP_FACTS: Record<string, TeamFacts> = {
   "Cape Verde":         { nameEs: "Cabo Verde",       fifaRank: 70, group: "H", confederation: "CAF",      participations: 1,  bestResultEs: "Debut en Mundiales",                 bestResultEn: "World Cup debut" },
   "Colombia":           { nameEs: "Colombia",         fifaRank: 13, group: "K", confederation: "CONMEBOL", participations: 7,  bestResultEs: "Cuartos de final (2014)",            bestResultEn: "Quarter-finals (2014)" },
   "Croatia":            { nameEs: "Croacia",          fifaRank: 9, group: "L", confederation: "UEFA",     participations: 7,  bestResultEs: "Subcampeón (2018)",                  bestResultEn: "Runners-up (2018)" },
-  "Curacao":            { nameEs: "Curazao",          fifaRank: 84, group: "E", confederation: "CONCACAF", participations: 1,  bestResultEs: "Debut en Mundiales",                 bestResultEn: "World Cup debut" },
+  "Curaçao":            { nameEs: "Curazao",          fifaRank: 84, group: "E", confederation: "CONCACAF", participations: 1,  bestResultEs: "Debut en Mundiales",                 bestResultEn: "World Cup debut" },
   "Czechia":            { nameEs: "Chequia",          fifaRank: 39, group: "A", confederation: "UEFA",     participations: 1,  bestResultEs: "Subcampeón como Checoslovaquia (1934, 1962)", bestResultEn: "Runners-up as Czechoslovakia (1934, 1962)" },
   "DR Congo":           { nameEs: "RD del Congo",     fifaRank: 60, group: "K", confederation: "CAF",      participations: 2,  bestResultEs: "Fase de grupos como Zaire (1974)",   bestResultEn: "Group stage as Zaire (1974)" },
   "Ecuador":            { nameEs: "Ecuador",          fifaRank: 24, group: "E", confederation: "CONMEBOL", participations: 5,  bestResultEs: "Octavos de final (2006)",            bestResultEn: "Round of 16 (2006)" },
@@ -81,12 +82,13 @@ export const WORLDCUP_FACTS: Record<string, TeamFacts> = {
   "Uzbekistan":         { nameEs: "Uzbekistán",       fifaRank: 54, group: "K", confederation: "AFC",      participations: 1,  bestResultEs: "Debut en Mundiales",                 bestResultEn: "World Cup debut" },
 };
 
-/** Lookup tolerante: nombre exacto primero, luego case-insensitive. */
+/** Lookup tolerante: nombre exacto primero, luego insensible a acentos/caja
+ *  (los proveedores escriben "Curaçao" o "Curacao" indistintamente). */
 export function getTeamFacts(teamName: string): TeamFacts | null {
   if (WORLDCUP_FACTS[teamName]) return WORLDCUP_FACTS[teamName];
-  const lower = teamName.trim().toLowerCase();
-  for (const [key, facts] of Object.entries(WORLDCUP_FACTS)) {
-    if (key.toLowerCase() === lower) return facts;
+  const key = teamNameKey(teamName);
+  for (const [k, facts] of Object.entries(WORLDCUP_FACTS)) {
+    if (teamNameKey(k) === key) return facts;
   }
   return null;
 }
