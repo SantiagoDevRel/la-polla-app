@@ -14,7 +14,12 @@
 const API_HOST = process.env.SENTRY_API_HOST || "https://sentry.io";
 const ORG = process.env.SENTRY_ORG || "golem-bw";
 const PROJECT = process.env.SENTRY_PROJECT || "santi-apps";
+const PROJECT_ID = process.env.SENTRY_PROJECT_ID || "4511560489500672"; // santi-apps (numérico, para events-stats)
 const TOKEN = process.env.SENTRY_READ_TOKEN || "";
+// santi-apps es un proyecto GENÉRICO compartido por varias apps, separadas por
+// el tag `app`. Filtramos a la-polla para que la card sea de ESTA app, no de todas.
+const APP_TAG = process.env.SENTRY_APP_TAG || "la-polla";
+const TAG_FILTER = APP_TAG ? `app:${APP_TAG}` : "";
 
 export interface SentryHealth {
   configured: boolean;
@@ -67,20 +72,19 @@ export async function getSentryHealth(): Promise<SentryHealth> {
   if (!TOKEN) return { ...EMPTY, error: "missing_credentials" };
   if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
 
-  const nowSec = Math.floor(Date.now() / 1000);
-  const since7d = nowSec - 7 * 24 * 60 * 60;
-
-  // 1) Stats de eventos recibidos (resolución 1h, 7 días) → sumamos 7d y 24h.
+  // 1) Serie de errores (events-stats, 7d, 1h) filtrada por app → sumamos 7d/24h.
   const statsPath =
-    `/projects/${ORG}/${PROJECT}/stats/` +
-    `?stat=received&resolution=1h&since=${since7d}&until=${nowSec}`;
-  // 2) Top issues sin resolver de los últimos 14 días, por frecuencia.
+    `/organizations/${ORG}/events-stats/` +
+    `?project=${PROJECT_ID}&dataset=errors&yAxis=${encodeURIComponent("count()")}` +
+    `&statsPeriod=7d&interval=1h&query=${encodeURIComponent(TAG_FILTER)}`;
+  // 2) Top issues sin resolver (14d, por frecuencia), filtrados por app.
+  const issuesQuery = TAG_FILTER ? `is:unresolved ${TAG_FILTER}` : "is:unresolved";
   const issuesPath =
     `/projects/${ORG}/${PROJECT}/issues/` +
-    `?query=${encodeURIComponent("is:unresolved")}&statsPeriod=14d&sort=freq&limit=6`;
+    `?query=${encodeURIComponent(issuesQuery)}&statsPeriod=14d&sort=freq&limit=6`;
 
   const [statsR, issuesR] = await Promise.allSettled([
-    sentry<Array<[number, number]>>(statsPath),
+    sentry<{ data: Array<[number, Array<{ count: number }>]> }>(statsPath),
     sentry<
       Array<{
         id: string;
@@ -101,9 +105,10 @@ export async function getSentryHealth(): Promise<SentryHealth> {
     return { ...EMPTY, configured: true, error: statsR.reason?.message ?? "sentry_failed" };
   }
 
-  const series = statsR.value || [];
-  const errors7d = series.reduce((a, [, c]) => a + num(c), 0);
-  const errors24h = series.slice(-24).reduce((a, [, c]) => a + num(c), 0);
+  const series = statsR.value?.data || [];
+  const bucket = (v: Array<{ count: number }>): number => (v && v[0] ? num(v[0].count) : 0);
+  const errors7d = series.reduce((a, [, v]) => a + bucket(v), 0);
+  const errors24h = series.slice(-24).reduce((a, [, v]) => a + bucket(v), 0);
 
   const issues = issuesR.status === "fulfilled" ? issuesR.value : [];
   const data: SentryHealth = {
