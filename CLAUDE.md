@@ -882,7 +882,7 @@ Botón "Reportar problema" en `BrandHeader` (al lado del WhatsAppBubble) que abr
 2. Insert en tabla `feedback` (migration 025). RLS: users INSERT/SELECT own, admins SELECT all.
 3. Fan-out best-effort (las fallas no rompen la request — el row queda guardado):
    - WhatsApp al admin via `sendTextMessage()` → `FEEDBACK_NOTIFY_WHATSAPP` (E.164 sin +)
-   - Email via Resend → `FEEDBACK_NOTIFY_EMAIL`. Free tier de Resend manda desde `onboarding@resend.dev` al email dueño de la cuenta sin verificar dominio. Para enviar a otros destinatarios, verificar dominio y setear `RESEND_FROM_EMAIL`.
+   - Email via Resend → `FEEDBACK_NOTIFY_EMAIL`. Dominio propio **verificado**: `send.lapollacolombiana.com` (región sa-east-1, DKIM+SPF en Vercel DNS). `RESEND_FROM_EMAIL` está seteado en Vercel prod como `La Polla <noreply@send.lapollacolombiana.com>`, así que ya se puede enviar a cualquier destinatario (no solo al dueño de la cuenta).
 
 ### Files
 - `supabase/migrations/025_feedback.sql` — table + RLS
@@ -895,7 +895,7 @@ Botón "Reportar problema" en `BrandHeader` (al lado del WhatsAppBubble) que abr
 - `FEEDBACK_NOTIFY_WHATSAPP` — admin phone (E.164 sin +). Ej: `REDACTED-PHONE`
 - `FEEDBACK_NOTIFY_EMAIL` — admin email
 - `RESEND_API_KEY` — de https://resend.com
-- `RESEND_FROM_EMAIL` (opcional) — default `La Polla <onboarding@resend.dev>`
+- `RESEND_FROM_EMAIL` (opcional) — en prod ya seteado a `La Polla <noreply@send.lapollacolombiana.com>` (dominio verificado). Default del código si falta: `La Polla <onboarding@resend.dev>`
 
 ---
 
