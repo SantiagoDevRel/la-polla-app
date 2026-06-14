@@ -13,6 +13,7 @@ import UserDetailModal from "@/components/admin/UserDetailModal";
 import KnockoutStatusCard from "@/components/admin/KnockoutStatusCard";
 import EngagementCard, { type EngagementData } from "@/components/admin/EngagementCard";
 import WebAnalyticsCard, { type WebAnalytics } from "@/components/admin/WebAnalyticsCard";
+import SentryHealthCard, { type SentryHealth } from "@/components/admin/SentryHealthCard";
 
 interface AdminUser {
   id: string;
@@ -91,6 +92,7 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [engagement, setEngagement] = useState<EngagementData | null>(null);
   const [webAnalytics, setWebAnalytics] = useState<WebAnalytics | null>(null);
+  const [sentryHealth, setSentryHealth] = useState<SentryHealth | null>(null);
   const [discrepancyCount, setDiscrepancyCount] = useState<number>(0);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [claudeUsage, setClaudeUsage] = useState<{
@@ -140,7 +142,7 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryRes, twilioRes, twilioPhoneRes, analyticsRes, engagementRes, discRes, claudeRes, waTplRes, webAnalyticsRes] = await Promise.allSettled([
+      const [summaryRes, twilioRes, twilioPhoneRes, analyticsRes, engagementRes, discRes, claudeRes, waTplRes, webAnalyticsRes, sentryRes] = await Promise.allSettled([
         axios.get<Summary>("/api/admin/summary"),
         axios.get<TwilioUsage>("/api/admin/twilio-usage"),
         axios.get("/api/admin/twilio-by-phone"),
@@ -150,6 +152,7 @@ export default function AdminPage() {
         axios.get("/api/admin/claude-usage"),
         axios.get("/api/admin/wa-template-usage"),
         axios.get<WebAnalytics>("/api/admin/web-analytics"),
+        axios.get<SentryHealth>("/api/admin/sentry-health"),
       ]);
       if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
       else showToast("No se pudo cargar el panel", "error");
@@ -173,6 +176,7 @@ export default function AdminPage() {
       if (claudeRes.status === "fulfilled") setClaudeUsage(claudeRes.value.data);
       if (waTplRes.status === "fulfilled") setWaTemplateUsage(waTplRes.value.data);
       if (webAnalyticsRes.status === "fulfilled") setWebAnalytics(webAnalyticsRes.value.data);
+      if (sentryRes.status === "fulfilled") setSentryHealth(sentryRes.value.data);
     } finally {
       setLoading(false);
     }
@@ -604,8 +608,11 @@ export default function AdminPage() {
             <EngagementCard data={engagement} />
 
             {/* Tráfico & comportamiento (PostHog) — lo que la DB no ve:
-                visitantes anónimos, top páginas, dispositivo, web vitals */}
+                visitantes anónimos, embudo, fuentes, heatmap, top páginas, web vitals */}
             <WebAnalyticsCard data={webAnalytics} />
+
+            {/* Salud de la app (Sentry) — ¿hay algo roto en prod? */}
+            <SentryHealthCard data={sentryHealth} />
 
             {/* Geo + device breakdown */}
             {analytics && (analytics.top_cities.length > 0 || analytics.top_countries.length > 0 || analytics.top_devices.length > 0) && (
