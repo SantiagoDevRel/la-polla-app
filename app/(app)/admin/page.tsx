@@ -12,6 +12,7 @@ import PayoutsByPolla from "@/components/admin/PayoutsByPolla";
 import UserDetailModal from "@/components/admin/UserDetailModal";
 import KnockoutStatusCard from "@/components/admin/KnockoutStatusCard";
 import EngagementCard, { type EngagementData } from "@/components/admin/EngagementCard";
+import WebAnalyticsCard, { type WebAnalytics } from "@/components/admin/WebAnalyticsCard";
 
 interface AdminUser {
   id: string;
@@ -89,6 +90,7 @@ export default function AdminPage() {
   const [twilio, setTwilio] = useState<TwilioUsage | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [engagement, setEngagement] = useState<EngagementData | null>(null);
+  const [webAnalytics, setWebAnalytics] = useState<WebAnalytics | null>(null);
   const [discrepancyCount, setDiscrepancyCount] = useState<number>(0);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [claudeUsage, setClaudeUsage] = useState<{
@@ -138,7 +140,7 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [summaryRes, twilioRes, twilioPhoneRes, analyticsRes, engagementRes, discRes, claudeRes, waTplRes] = await Promise.allSettled([
+      const [summaryRes, twilioRes, twilioPhoneRes, analyticsRes, engagementRes, discRes, claudeRes, waTplRes, webAnalyticsRes] = await Promise.allSettled([
         axios.get<Summary>("/api/admin/summary"),
         axios.get<TwilioUsage>("/api/admin/twilio-usage"),
         axios.get("/api/admin/twilio-by-phone"),
@@ -147,6 +149,7 @@ export default function AdminPage() {
         axios.get<{ matches: unknown[] }>("/api/admin/discrepancies"),
         axios.get("/api/admin/claude-usage"),
         axios.get("/api/admin/wa-template-usage"),
+        axios.get<WebAnalytics>("/api/admin/web-analytics"),
       ]);
       if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.data);
       else showToast("No se pudo cargar el panel", "error");
@@ -169,6 +172,7 @@ export default function AdminPage() {
       }
       if (claudeRes.status === "fulfilled") setClaudeUsage(claudeRes.value.data);
       if (waTplRes.status === "fulfilled") setWaTemplateUsage(waTplRes.value.data);
+      if (webAnalyticsRes.status === "fulfilled") setWebAnalytics(webAnalyticsRes.value.data);
     } finally {
       setLoading(false);
     }
@@ -598,6 +602,10 @@ export default function AdminPage() {
 
             {/* Engagement (juego real) — complementa Actividad (que mide logins) */}
             <EngagementCard data={engagement} />
+
+            {/* Tráfico & comportamiento (PostHog) — lo que la DB no ve:
+                visitantes anónimos, top páginas, dispositivo, web vitals */}
+            <WebAnalyticsCard data={webAnalytics} />
 
             {/* Geo + device breakdown */}
             {analytics && (analytics.top_cities.length > 0 || analytics.top_countries.length > 0 || analytics.top_devices.length > 0) && (
