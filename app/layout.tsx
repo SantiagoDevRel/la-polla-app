@@ -13,6 +13,7 @@ import { OfflineBanner } from "@/components/layout/OfflineBanner";
 import { getSiteFromHeaders, SITES } from "@/lib/seo/sites";
 import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { PlatformProvider } from "@/components/platform/PlatformProvider";
+import { PostHogProvider } from "./providers";
 
 const bebas = Bebas_Neue({
   subsets: ["latin"],
@@ -151,17 +152,19 @@ export default async function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
         />
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <PlatformProvider isIOSApp={isIOSApp}>
-            <CapacitorReady />
-            <CapacitorBackButton />
-            <CapacitorDeepLinks />
-            <CapacitorAppUpdate />
-            <OfflineBanner />
-            <SplashScreen />
-            {children}
-          </PlatformProvider>
-        </NextIntlClientProvider>
+        <PostHogProvider>
+          <NextIntlClientProvider locale={locale} messages={messages}>
+            <PlatformProvider isIOSApp={isIOSApp}>
+              <CapacitorReady />
+              <CapacitorBackButton />
+              <CapacitorDeepLinks />
+              <CapacitorAppUpdate />
+              <OfflineBanner />
+              <SplashScreen />
+              {children}
+            </PlatformProvider>
+          </NextIntlClientProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

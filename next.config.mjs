@@ -100,9 +100,13 @@ const nextConfig = {
               // (React Refresh) lo necesita — sin eso, la JS se rompe en
               // hidratación, los handlers de React no se atachan, y los
               // forms hacen native-submit (page reload) al primer click.
+              // us-assets.i.posthog.com: PostHog sirve su config + scripts de
+              // features (web-vitals, dead-clicks) desde este CDN. Sin esto en
+              // script-src el browser los bloquea (console CSP errors). Session
+              // replay y surveys quedan apagados desde el init (analytics-only).
               process.env.NODE_ENV === "development"
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com"
-                : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://us-assets.i.posthog.com"
+                : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://us-assets.i.posthog.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               // i.ytimg.com: thumbnails de los highlights del Mundial (FIFA
@@ -111,7 +115,10 @@ const nextConfig = {
               "img-src 'self' data: blob: https://api.dicebear.com https://avatars.dicebear.com https://crests.football-data.org https://a.espncdn.com https://i.ytimg.com https://*.supabase.co https://cdn.jsdelivr.net",
               // *.ingest.us.sentry.io: ingest de errores de Sentry. Sin esto el
               // browser bloquea el POST de eventos (CSP) y parece que "no anda".
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://*.ingest.us.sentry.io",
+              // us.i.posthog.com + us-assets.i.posthog.com: ingest + assets de
+              // PostHog (product analytics). Mismo deal que Sentry: sin estos en
+              // connect-src el browser bloquea el POST de eventos.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://*.ingest.us.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com",
               // www.youtube.com + youtube-nocookie: embed inline de highlights
               // del Mundial (canales de broadcasters que permiten embed).
               "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
