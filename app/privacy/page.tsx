@@ -45,11 +45,7 @@ export default async function PrivacyPage() {
             {t("section4Title")}
           </h2>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
-            {t("section4BodyBefore")}
-            <a href="mailto:santiagotrujillozuluaga@gmail.com" style={{ color: "#FFD700", textDecoration: "underline" }}>
-              santiagotrujillozuluaga@gmail.com
-            </a>
-            {t("section4BodyAfter")}
+            {t("section4Body")}
           </p>
         </section>
 
@@ -59,6 +55,19 @@ export default async function PrivacyPage() {
           </h2>
           <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
             {t("section5BodyBefore")}
+            <a href="mailto:santiagotrujillozuluaga@gmail.com" style={{ color: "#FFD700", textDecoration: "underline" }}>
+              santiagotrujillozuluaga@gmail.com
+            </a>
+            {t("section5BodyAfter")}
+          </p>
+        </section>
+
+        <section style={{ marginBottom: 28 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 8, color: "#FFD700" }}>
+            {t("section6Title")}
+          </h2>
+          <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
+            {t("section6BodyBefore")}
             <a href="mailto:santiagotrujillozuluaga@gmail.com" style={{ color: "#FFD700", textDecoration: "underline" }}>
               santiagotrujillozuluaga@gmail.com
             </a>

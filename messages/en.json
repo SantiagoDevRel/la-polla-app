@@ -513,18 +513,20 @@
   },
   "Privacy": {
     "title": "Privacy Policy",
-    "subtitle": "Last updated: April 2026",
+    "subtitle": "Last updated: June 2026",
     "section1Title": "1. Information we collect",
     "section1Body": "We collect the following information when you use the app: your profile name, WhatsApp number, your match predictions and your prediction results (points, standings position). We don't collect location data, contacts, or financial information.",
     "section2Title": "2. How we use your information",
     "section2Body": "We use your information to: calculate your prediction points, show standings within each pool, send notifications and results via WhatsApp, and allow other participants of your pool to see your name and score.",
-    "section3Title": "3. Sharing your information",
-    "section3Body": "We don't sell or share your data with third parties. The only information visible to other users is your name and score within the pools you participate in. Your WhatsApp number is not visible to other participants.",
-    "section4Title": "4. Data deletion",
-    "section4BodyBefore": "If you want to delete your account and all your data, write to us at ",
-    "section4BodyAfter": " and we'll process your request within 30 days.",
-    "section5Title": "5. Contact",
-    "section5BodyBefore": "For any questions about this privacy policy, contact us at "
+    "section3Title": "3. How we share your information",
+    "section3Body": "We don't sell your data or hand it to third parties for commercial purposes. To operate and improve the app we use service providers that act as data processors, processing data on our behalf and under our instructions (see section 4). The only information visible to other users is your name and score within the pools you participate in; your WhatsApp number is not visible to other participants.",
+    "section4Title": "4. Third-party providers and tools",
+    "section4Body": "We use third-party tools that act as data processors and process data on servers located in the United States: (a) PostHog — product analytics: records the pages you visit and your interactions (clicks) in a pseudonymized way to understand usage and improve the experience; we don't send it your WhatsApp number and the values you type into forms are not captured. (b) Sentry — error monitoring: records technical failures so we can fix them; we scrub phone numbers, emails and sensitive data before sending. We don't use session replay or sell this information.",
+    "section5Title": "5. Data deletion",
+    "section5BodyBefore": "If you want to delete your account and all your data, write to us at ",
+    "section5BodyAfter": " and we'll process your request within 30 days.",
+    "section6Title": "6. Contact",
+    "section6BodyBefore": "For any questions about this privacy policy, contact us at "
   },
   "Share": {
     "errImage": "Couldn't generate the image. Try again.",
