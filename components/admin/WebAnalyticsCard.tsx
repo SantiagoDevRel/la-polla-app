@@ -173,6 +173,146 @@ function Heatmap({ data }: { data: WebAnalytics["heatmap"] }) {
   );
 }
 
+/** Caja de detalle (consistente con el heatmap): muestra lo que tocaste, o un hint. */
+function DetailBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg px-3 py-1.5 text-[12px] min-h-[30px] flex items-center" style={{ background: "rgba(255,255,255,0.03)" }}>
+      {children}
+    </div>
+  );
+}
+
+/** "2026-06-14" → "Sáb 14/06" */
+function fmtDay(s: string): string {
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return s;
+  const wd = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][new Date(y, m - 1, d).getDay()];
+  return `${wd} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
+}
+
+/** Sparkline 14d con tap → detalle (las barras son ciegas sin hover en mobile). */
+function Sparkline({ daily }: { daily: WebAnalytics["daily"] }) {
+  const [sel, setSel] = useState<number | null>(null);
+  const max = Math.max(1, ...daily.map((x) => x.pageviews));
+  return (
+    <div className="space-y-2">
+      <DetailBox>
+        {sel != null && daily[sel] ? (
+          <span className="text-text-secondary">
+            <span className="font-display text-gold" style={{ fontSize: 15 }}>{daily[sel].pageviews}</span>{" "}
+            pageviews · <span className="text-text-primary">{daily[sel].visitors}</span> visitantes ·{" "}
+            <span className="text-text-primary">{fmtDay(daily[sel].day)}</span>
+          </span>
+        ) : (
+          <span className="text-text-muted">Tocá una barra para ver el día.</span>
+        )}
+      </DetailBox>
+      <div className="flex items-end gap-1 h-24">
+        {daily.map((d, i) => {
+          const h = (d.pageviews / max) * 100;
+          const isSel = sel === i;
+          return (
+            <button
+              key={d.day}
+              type="button"
+              onClick={() => setSel(i)}
+              className="flex-1 flex flex-col-reverse items-center cursor-pointer h-full justify-end rounded-sm transition-shadow"
+              style={{ boxShadow: isSel ? "0 0 0 2px #FFD700" : "none" }}
+              aria-label={`${fmtDay(d.day)}: ${d.pageviews} pageviews`}
+              title={`${fmtDay(d.day)} · ${d.pageviews} pageviews · ${d.visitors} visitantes`}
+            >
+              <div className="w-full rounded-t-sm" style={{ height: `${Math.max(2, h)}%`, background: GOLD, opacity: sel == null || isSel ? 1 : 0.5 }} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Embudo con tap → detalle: % del total + caída desde el paso anterior. */
+function Funnel({ funnel }: { funnel: WebAnalytics["funnel"] }) {
+  const [sel, setSel] = useState<number | null>(null);
+  const steps = [
+    { label: "Visitantes", value: funnel.visitantes },
+    { label: "Vieron una polla", value: funnel.vioPolla },
+    { label: "Guardaron un pronóstico", value: funnel.guardo },
+  ];
+  return (
+    <div className="space-y-2.5">
+      <DetailBox>
+        {sel != null ? (
+          <span className="text-text-secondary">
+            <span className="font-display text-gold" style={{ fontSize: 15 }}>{steps[sel].value}</span>{" "}
+            personas · {pct(steps[sel].value, funnel.visitantes)}% del total
+            {sel > 0 ? <span className="text-text-muted"> · caída {Math.max(0, steps[sel - 1].value - steps[sel].value)} desde el paso anterior</span> : null}
+          </span>
+        ) : (
+          <span className="text-text-muted">Tocá un paso para ver el % y la caída.</span>
+        )}
+      </DetailBox>
+      {steps.map((step, i) => {
+        const p = pct(step.value, funnel.visitantes);
+        const isSel = sel === i;
+        return (
+          <button key={step.label} type="button" onClick={() => setSel(i)} className="block w-full text-left cursor-pointer rounded-md px-1.5 py-1 -mx-1.5 transition-shadow" style={{ boxShadow: isSel ? "0 0 0 2px #FFD700" : "none" }}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[13px] text-text-secondary">{step.label}</span>
+              <span className="flex items-baseline gap-1.5">
+                <span className="font-display text-text-primary" style={{ fontSize: 17 }}>{step.value}</span>
+                <span className="text-[11px] text-text-muted tabular-nums">{p}%</span>
+              </span>
+            </div>
+            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-bg-base">
+              <div className="h-full rounded-full" style={{ width: `${Math.max(2, p)}%`, background: GOLD }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Top páginas con tap → muestra el path completo (sin truncar) + números. */
+function TopPages({ pages }: { pages: WebAnalytics["topPages"] }) {
+  const [sel, setSel] = useState<string | null>(null);
+  const max = Math.max(1, ...pages.map((x) => x.views));
+  const selPage = pages.find((p) => p.path === sel);
+  return (
+    <div className="space-y-2.5">
+      <DetailBox>
+        {selPage ? (
+          <span className="text-text-secondary [overflow-wrap:anywhere]">
+            <span className="text-text-primary">{shortPath(selPage.path)}</span> ·{" "}
+            <span className="font-display text-gold" style={{ fontSize: 15 }}>{selPage.views}</span> vistas ·{" "}
+            {selPage.visitors} visitantes
+          </span>
+        ) : (
+          <span className="text-text-muted">Tocá una página para ver el path completo.</span>
+        )}
+      </DetailBox>
+      {pages.map((p) => {
+        const w = (p.views / max) * 100;
+        const isSel = sel === p.path;
+        return (
+          <button key={p.path} type="button" onClick={() => setSel(p.path)} className="block w-full text-left cursor-pointer rounded-md px-1.5 py-1 -mx-1.5 transition-shadow" style={{ boxShadow: isSel ? "0 0 0 2px #FFD700" : "none" }}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className={`text-[12px] text-text-secondary ${isSel ? "[overflow-wrap:anywhere]" : "truncate"}`}>{shortPath(p.path)}</span>
+              <span className="flex items-baseline gap-1.5 shrink-0">
+                <span className="font-display text-text-primary" style={{ fontSize: 15 }}>{p.views}</span>
+                <span className="text-[10px] text-text-muted tabular-nums">{p.visitors} vis</span>
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-bg-base">
+              <div className="h-full rounded-full" style={{ width: `${Math.max(2, w)}%`, background: GOLD }} />
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function WebAnalyticsCard({ data }: { data: WebAnalytics | null }) {
   return (
     <section className="rounded-2xl p-4 space-y-5" style={CARD_STYLE}>
@@ -225,44 +365,14 @@ export default function WebAnalyticsCard({ data }: { data: WebAnalytics | null }
               <SectionLabel>Embudo · visitante → jugador · 7d</SectionLabel>
               <p className="text-[11px] text-text-muted leading-snug">Desde el visitante anónimo (lo que la DB no ve) hasta guardar un pronóstico.</p>
             </div>
-            {[
-              { label: "Visitantes", value: data.funnel.visitantes },
-              { label: "Vieron una polla", value: data.funnel.vioPolla },
-              { label: "Guardaron un pronóstico", value: data.funnel.guardo },
-            ].map((step) => {
-              const p = pct(step.value, data.funnel.visitantes);
-              return (
-                <div key={step.label}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-[13px] text-text-secondary">{step.label}</span>
-                    <span className="flex items-baseline gap-1.5">
-                      <span className="font-display text-text-primary" style={{ fontSize: 17 }}>{step.value}</span>
-                      <span className="text-[11px] text-text-muted tabular-nums">{p}%</span>
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-bg-base">
-                    <div className="h-full rounded-full" style={{ width: `${Math.max(2, p)}%`, background: GOLD }} />
-                  </div>
-                </div>
-              );
-            })}
+            <Funnel funnel={data.funnel} />
           </div>
 
           {/* ── Serie diaria (14d) ── */}
           {data.daily.length > 0 ? (
             <div className="space-y-2 border-t border-white/[0.06] pt-4">
               <SectionLabel>Pageviews · últimos 14 días</SectionLabel>
-              <div className="flex items-end gap-1 h-24">
-                {data.daily.map((d) => {
-                  const max = Math.max(1, ...data.daily.map((x) => x.pageviews));
-                  const h = (d.pageviews / max) * 100;
-                  return (
-                    <div key={d.day} className="flex-1 flex flex-col-reverse items-center" title={`${d.day} · ${d.pageviews} pageviews · ${d.visitors} visitantes`}>
-                      <div className="w-full rounded-t-sm" style={{ height: `${Math.max(2, h)}%`, background: GOLD }} />
-                    </div>
-                  );
-                })}
-              </div>
+              <Sparkline daily={data.daily} />
             </div>
           ) : null}
 
@@ -305,24 +415,7 @@ export default function WebAnalyticsCard({ data }: { data: WebAnalytics | null }
           {data.topPages.length > 0 ? (
             <div className="space-y-2.5 border-t border-white/[0.06] pt-4">
               <SectionLabel>Páginas más vistas · 7d</SectionLabel>
-              {data.topPages.map((p) => {
-                const max = Math.max(1, ...data.topPages.map((x) => x.views));
-                const w = (p.views / max) * 100;
-                return (
-                  <div key={p.path}>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[12px] text-text-secondary truncate" title={p.path}>{shortPath(p.path)}</span>
-                      <span className="flex items-baseline gap-1.5 shrink-0">
-                        <span className="font-display text-text-primary" style={{ fontSize: 15 }}>{p.views}</span>
-                        <span className="text-[10px] text-text-muted tabular-nums">{p.visitors} vis</span>
-                      </span>
-                    </div>
-                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-bg-base">
-                      <div className="h-full rounded-full" style={{ width: `${Math.max(2, w)}%`, background: GOLD }} />
-                    </div>
-                  </div>
-                );
-              })}
+              <TopPages pages={data.topPages} />
             </div>
           ) : null}
 
