@@ -915,23 +915,40 @@ sheet con su ficha. Cero APIs externas (free-tier intacto).
   invictas), próximos, y la mini-tabla del grupo **inferida de los
   fixtures** (los 4 de un grupo solo juegan entre sí en group_stage —
   componente conexo; la DB no guarda letra de grupo). Cache privada 60s.
-- **Plantel del Mundial HORNEADO** (2026-06-13): el tab "Plantel" servía
-  desde ESPN en vivo, pero resolver el club de cada jugador cuesta ~26
-  llamadas encadenadas → el cold load tardaba ~1-2s (feedback user: "se
-  demora mucho cargando"). Como los planteles NO cambian durante la Copa,
-  se hornean una vez a `lib/espn/baked-worldcup-squads.json` (48 equipos,
-  1246 jugadores, forma `SquadPlayer[]` idéntica a la live → UI sin
-  cambios) vía `scripts/bake-worldcup-squads.ts` (reusa
-  `fetchEspnTeamRoster`). `app/api/teams/roster/route.ts` sirve el bake
-  para `worldcup_2026` (`getBakedWorldCupRoster` en `lib/espn/baked-squads.ts`,
-  server-only por construcción — solo lo importa el route, el JSON nunca
-  entra al bundle del cliente) con `Cache-Control: max-age=604800`; cae a
-  ESPN en vivo si el equipo no está horneado (slots de repechaje) u otros
-  torneos. **Re-hornear si una selección cambia plantel**: `npx tsx
-  scripts/bake-worldcup-squads.ts` + commit del JSON. ⚠️ ESPN solo tiene
-  foto de ~127/1246 (sobre todo jugadores de MLS); el resto cae al
-  fallback dorsal/iniciales de `PlayerHeadshot` — limitación de ESPN, no
-  del bake (la versión live tenía las mismas fotos).
+- **Plantel del Mundial HORNEADO** (re-horneado 2026-06-14, fuente FIFA):
+  el tab "Plantel" sale 100% de `lib/espn/baked-worldcup-squads.json`
+  (48 equipos, **1248 jugadores** = 26 c/u, forma `SquadPlayer[]`),
+  servido por `app/api/teams/roster/route.ts` para `worldcup_2026`
+  (`getBakedWorldCupRoster` en `lib/espn/baked-squads.ts`, server-only —
+  solo lo importa el route, el JSON nunca entra al bundle del cliente,
+  `Cache-Control: max-age=604800`). Carga INSTANTÁNEA, cero llamadas
+  externas en runtime. `getBakedWorldCupRoster` es **insensible a
+  acentos/caja** (`teamNameKey`, ver bug Curaçao abajo); cae a ESPN en
+  vivo solo si el equipo no está horneado (slots de repechaje) u otros
+  torneos.
+  - **CORE oficial FIFA:** nombre, dorsal, posición y edad (de
+    `BirthDate`) salen de la FIFA squad API
+    (`api.fifa.com/api/v3/teams/{id}/squad?idCompetition=17&idSeason=285023`).
+    FIFA define QUIÉN está convocado (los 26) → capta cambios de roster.
+    Position numérica 0=GK,1=DEF,2=MID,3=FWD.
+  - **Club / escudo / foto:** la FIFA squad API NO trae club. El club sale
+    del bake ESPN previo (join por nombre/dorsal) + research de los huecos
+    (86 jugadores nuevos vs ESPN) vía fan-out de subagentes
+    (FIFA/ESPN/Transfermarkt/federaciones), join por dorsal. Verificado con
+    review de 3 modelos (claude+agy+codex) — cazó el swap de los 2 Ederson
+    brasileños homónimos (#2 mediocampista=Atalanta, #23 arquero=Fenerbahçe)
+    y el timing de Senesi.
+  - **Pipeline de re-horneado (one-off, vive en `Downloads/`, NO en el
+    repo):** `wc-squads-build.cjs` (FIFA + merge ESPN/research) →
+    `_staged.json`+`_gaps.json` → `wc-fill-clubs.workflow.js` (rellena
+    clubes faltantes) → `wc-squads-merge.cjs` (aplica fills, escribe el
+    JSON). Re-correr si cambia una convocatoria; **es data, commitear solo
+    el JSON** (cero lógica). El viejo `scripts/bake-worldcup-squads.ts`
+    (ESPN-only) quedó obsoleto.
+  - ⚠️ **Fotos: solo ~119/1248** (la FIFA squad API devuelve `PictureUrl`
+    null; las ~119 vienen del bake ESPN, sobre todo MLS). El resto cae al
+    fallback dorsal/iniciales de `PlayerHeadshot` — limitación de fuente,
+    no del bake.
 - `lib/teams/worldcup-facts.ts` — estático: nameEs, **ranking FIFA y
   letra de grupo OFICIALES** (baked de inside.fifa.com/api/ranking-overview
   y api.fifa.com/api/v3/calendar/matches idSeason=285023 — scripts
