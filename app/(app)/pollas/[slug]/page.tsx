@@ -848,8 +848,15 @@ export default function PollaSlugPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [matches, polla?.status],
   );
+  // Orden más-reciente-primero: el último partido jugado queda arriba del
+  // dropdown y los más viejos se acumulan hacia abajo (pedido user
+  // 2026-06-14: evitar scrollear toda la historia para ver el de hoy).
+  // .filter() ya devuelve copia, así que el .sort() no muta `matches`.
   const finishedMatches = useMemo(
-    () => matches.filter((m) => TERMINAL_MATCH_STATUSES.has(m.status)),
+    () =>
+      matches
+        .filter((m) => TERMINAL_MATCH_STATUSES.has(m.status))
+        .sort((a, b) => b.scheduled_at.localeCompare(a.scheduled_at)),
     [matches],
   );
 
