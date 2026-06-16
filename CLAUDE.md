@@ -983,13 +983,21 @@ ranking de cada participante a lo largo del torneo.
 **Decisiones de producto (Santiago):**
 - **Eje = DÍA calendario** (no por partido ni por jornada/semana). Una
   columna por día con partidos verificados.
-- **Placement: NO es tab nueva.** Vive dentro de la pestaña **Ranking** como
-  toggle segmentado `Tabla | Evolución` (no se quitó Pagos ni Info — un user
-  normal solo ve 3-4 tabs; el chart es otra forma de leer el ranking).
-- **Chart = top 10** (legible, anti-espagueti). Debajo, una **lista
-  scrollable con TODOS**: tocás a cualquiera (aunque esté fuera del top 10)
-  y se traza su línea — si su rank pasa de 10 cae a un **carril overflow
-  "10+"** al fondo (el chart no crece de alto).
+- **Placement: tab propia.** La barra de tabs se reorganizó (2026-06-16) a
+  `Partidos · Tabla · Evolución · [Organizar admin] · INFO`. Evolución es su
+  propia tab (gateada a `>=2` días verificados via `verifiedDayCount` de
+  `matches`). **Invitar + Pagos se fusionaron DENTRO de INFO** (la barra no se
+  infla: 3→1 compensa la tab nueva). Pagos sigue oculto en iOS (5.3.4) dentro
+  del propio bloque; Invitar via botón/modal. `?tab=pagos` legacy redirige a
+  `info`.
+- **Chart = top 10** (legible, anti-espagueti). Ancho de columna **responsivo**
+  (`MIN_COL_W` + fill): con pocos días estira para llenar el ancho, con muchos
+  cae al mínimo y excede la pantalla → **scroll horizontal branded** (`.lp-hscroll`
+  en globals.css: scrollbar gold, sin botones, `overscroll-behavior-x: contain`,
+  arranca scrolleado al día más reciente). Debajo, una **lista (fluye en la
+  página, sin scroll anidado) con TODOS**: tocás a cualquiera (aunque esté fuera
+  del top 10) y se traza su línea — si su rank pasa de 10 cae a un **carril
+  overflow "10+"** al fondo (el chart no crece de alto).
 
 **Cómo funciona la data:**
 - RPC `get_polla_standings_history(p_polla_id, p_match_ids)` (migración 070):
@@ -1018,12 +1026,10 @@ ranking de cada participante a lo largo del torneo.
   arranca") / error.
 - `app/api/pollas/[slug]/standings-history/route.ts` — endpoint.
 - `supabase/migrations/070_polla_standings_history.sql` — RPC.
-- `app/(app)/pollas/[slug]/page.tsx` — toggle `rankingView` + render en la
-  pestaña Ranking.
+- `app/(app)/pollas/[slug]/page.tsx` — tab `evolucion` (gateada a
+  `evolucionAvailable`) + INFO fusiona Pagos/Invitar.
 
 **Pendiente / polish (no bloqueante):**
-- Empates de puesto el último día → los pollitos finales se montan (mismo y);
-  falta separarlos.
 - Late joiners se pintan planos desde el día 1 (no dashed antes de `joined_at`).
 - Ideas futuras (codex, sin decidir): "el golpe de la fecha" (qué partido
   movió más la tabla), "duelo contra tu némesis", replay post-fecha
