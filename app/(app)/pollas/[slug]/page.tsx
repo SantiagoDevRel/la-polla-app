@@ -26,7 +26,7 @@ import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/
 import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getPollitoByPosition } from "@/lib/pollitos";
-import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock, Eye } from "lucide-react";
+import { Trophy, Banknote, Info, Lock, Share2, Handshake, Settings, ChevronDown, Clock, Eye, LineChart } from "lucide-react";
 
 // Soccer-pitch icon for the Partidos tab — lucide's `Goal` glyph
 // reads as a flag/post at small sizes, so we render a miniature
@@ -108,7 +108,7 @@ interface Prediction {
   locked: boolean; visible: boolean; points_earned: number;
 }
 
-type TabType = "partidos" | "ranking" | "pagos" | "info" | "organizar" | "invitar";
+type TabType = "partidos" | "ranking" | "evolucion" | "pagos" | "info" | "organizar" | "invitar";
 
 // TeamCrest — renders flag URL via next/image proxy, falls back to 3-letter abbreviation
 function PaymentPendingBanner({ onGo }: { onGo: () => void }) {
@@ -770,8 +770,11 @@ export default function PollaSlugPage() {
   // un useEffect mas abajo.
   const rawTab = searchParams.get("tab");
   const initialTab: TabType = (() => {
-    const allowed: TabType[] = ["partidos", "ranking", "pagos", "info", "organizar"];
-    return (allowed as string[]).includes(rawTab ?? "") ? (rawTab as TabType) : "partidos";
+    const allowed: TabType[] = ["partidos", "ranking", "evolucion", "info", "organizar"];
+    const raw = rawTab ?? "";
+    // 'pagos' se fusionó en 'info' — deep-links viejos a ?tab=pagos van a info.
+    if (raw === "pagos") return "info";
+    return (allowed as string[]).includes(raw) ? (raw as TabType) : "partidos";
   })();
 
   const [loading, setLoading] = useState(true);
@@ -824,12 +827,9 @@ export default function PollaSlugPage() {
   // null = cerrado. Feedback user 2026-06-11: "bacano que dieran info
   // de cada equipo al tocar la banderita".
   const [teamSheet, setTeamSheet] = useState<{ team: string; flag: string | null } | null>(null);
-  // Sub-vista de la tab Ranking: tabla clásica vs bump chart de evolución
-  // de posiciones por día (2026-06-16, idea de Pipe).
-  const [rankingView, setRankingView] = useState<"tabla" | "evolucion">("tabla");
-  // Días con partidos verificados — gatea la sub-vista Evolución: con <2
-  // días el bump chart no tiene historia que contar (mismo bucketing por
-  // día Bogotá que el RPC). Sale gratis de `matches` ya cargado.
+  // Días con partidos verificados — gatea la tab Evolución (bump chart):
+  // con <2 días no hay historia que contar (mismo bucketing por día Bogotá
+  // que el RPC). Sale gratis de `matches` ya cargado.
   const verifiedDayCount = useMemo(() => {
     const days = new Set<string>();
     for (const m of matches) {
@@ -1100,7 +1100,8 @@ export default function PollaSlugPage() {
       currentUserPaid === false &&
       currentUserRole !== "admin"
     ) {
-      setActiveTab("pagos");
+      // Pagos vive dentro de INFO ahora.
+      setActiveTab("info");
     }
     defaultTabAppliedRef.current = true;
   }, [polla, currentUserPaid, currentUserRole, isIOSApp]);
@@ -1291,18 +1292,19 @@ export default function PollaSlugPage() {
     polla.payment_mode === "admin_collects" &&
     currentUserPaid === false &&
     !isOrganizer;
+  // IA de tabs (2026-06-16, pedido Santiago): Partidos · Tabla · Evolución ·
+  // [Organizar] · INFO. Evolución es su propia tab (gateada a >=2 días
+  // verificados). Invitar + Pagos se fusionaron DENTRO de INFO (la barra no
+  // se infla: 3→1 compensa la tab nueva). Organizar sigue admin-only.
   const TABS: { key: TabType; label: string; icon: React.ReactNode; show: boolean }[] = [
     { key: "partidos", label: t("tabPartidos"), icon: <PitchIcon className="w-4 h-4" />, show: true },
     { key: "ranking", label: t("tabRanking"), icon: <Trophy className="w-4 h-4" />, show: true },
-    // Invitar — visible para TODOS los participantes (no solo organizador).
-    // Cualquier miembro puede compartir link/codigo de la polla. Click abre
-    // el InviteModal sheet directamente — no es un tab con contenido, es
-    // un trigger inline (handler especial mas abajo en setActiveTab).
-    { key: "invitar", label: t("tabInvitar"), icon: <Share2 className="w-4 h-4" />, show: true },
-    // iOS: oculta el tab "Pagos" entero — toda la UI de plata/cobros se
-    // remueve del iOS app por compliance con guideline 5.3.4.
-    { key: "pagos", label: t("tabPagos"), icon: <Banknote className="w-4 h-4" />, show: !isIOSApp && polla.payment_mode !== "pay_winner" },
+    // Evolución (bump chart) — solo con >=2 días verificados (si no, no hay
+    // carrera que contar). PositionRaceCard maneja el fetch lazy.
+    { key: "evolucion", label: t("tabEvolucion"), icon: <LineChart className="w-4 h-4" />, show: evolucionAvailable },
     { key: "organizar", label: t("tabOrganizar"), icon: <Settings className="w-4 h-4" />, show: isOrganizer },
+    // INFO = info + pagos + invitar (Pagos hidden en iOS por 5.3.4 dentro
+    // del propio bloque; Invitar via botón/modal adentro).
     { key: "info", label: t("tabInfo"), icon: <Info className="w-4 h-4" />, show: true },
   ];
 
@@ -1405,16 +1407,7 @@ export default function PollaSlugPage() {
           {TABS.filter((t) => t.show).map((t) => (
             <button
               key={t.key}
-              onClick={() => {
-                // "invitar" no es un tab con contenido — abre el sheet
-                // directamente y deja activeTab donde estaba para que el
-                // user vuelva al contexto previo al cerrar.
-                if (t.key === "invitar") {
-                  setShowInviteModal(true);
-                  return;
-                }
-                setActiveTab(t.key);
-              }}
+              onClick={() => setActiveTab(t.key)}
               className={`flex-shrink-0 px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-colors border-b-2 flex items-center gap-1.5 ${
                 activeTab === t.key ? "text-gold border-gold" : "text-text-muted border-transparent hover:text-text-secondary"
               }`}
@@ -1456,7 +1449,7 @@ export default function PollaSlugPage() {
               </p>
             </div>
             <button
-              onClick={() => setActiveTab("pagos")}
+              onClick={() => setActiveTab("info")}
               className="w-full bg-gold text-bg-base font-semibold py-3 rounded-xl hover:brightness-110 transition-all"
             >
               {t("paymentPendingCTA")}
@@ -1689,7 +1682,7 @@ export default function PollaSlugPage() {
         {/* ── TAB RANKING ── */}
         {activeTab === "ranking" && (
           <div className="space-y-3">
-            {showPaymentPending && <PaymentPendingBanner onGo={() => setActiveTab("pagos")} />}
+            {showPaymentPending && <PaymentPendingBanner onGo={() => setActiveTab("info")} />}
 
             {/* Prize distribution PRIMERO (pedido user 2026-06-11: ver los
                 premios sin scroll). Admins ven el editor in-place; el resto
@@ -1734,32 +1727,6 @@ export default function PollaSlugPage() {
                 </p>
               </div>
             )}
-            {/* Toggle Tabla | Evolución (bump chart por día). Solo aparece
-                con >=2 días verificados (si no, no hay carrera que contar).
-                Embebido en Ranking — no es tab nueva. El activo NO usa gold:
-                en la vista Evolución el gold lo "gasta" el chart. */}
-            {evolucionAvailable && (
-              <div className="flex gap-1 p-1 rounded-full bg-bg-elevated border border-border-subtle">
-                {(["tabla", "evolucion"] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setRankingView(v)}
-                    className={`flex-1 text-xs font-semibold py-2 rounded-full transition-all ${
-                      rankingView === v
-                        ? "bg-white/10 text-text-primary"
-                        : "text-text-secondary hover:text-text-primary"
-                    }`}
-                  >
-                    {v === "tabla" ? "Tabla" : "Evolución"}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {evolucionAvailable && rankingView === "evolucion" ? (
-              <PositionRaceCard pollaSlug={polla.slug} />
-            ) : (
             <div className="rounded-2xl overflow-hidden lp-card">
             {participants.length === 0 ? (
               <EmptyState
@@ -1842,18 +1809,12 @@ export default function PollaSlugPage() {
               </>
             )}
             </div>
-            )}
           </div>
         )}
 
-        {/* ── TAB PAGOS ── */}
-        {activeTab === "pagos" && polla.payment_mode !== "pay_winner" && (
-          <ParticipantPayment
-            pollaSlug={polla.slug}
-            currentUserId={currentUserId}
-            currentUserRole={currentUserRole}
-            adminObserver={viewerIsGlobalAdmin}
-          />
+        {/* ── TAB EVOLUCIÓN (bump chart de posiciones por día) ── */}
+        {activeTab === "evolucion" && evolucionAvailable && (
+          <PositionRaceCard pollaSlug={polla.slug} />
         )}
 
         {/* ── TAB ORGANIZAR (admin only) ── */}
@@ -1872,7 +1833,6 @@ export default function PollaSlugPage() {
         {/* ── TAB INFO ── */}
         {activeTab === "info" && (
           <div className="space-y-4">
-            {showPaymentPending && <PaymentPendingBanner onGo={() => setActiveTab("pagos")} />}
             <div className="rounded-2xl p-5 space-y-3 lp-card">
               <h3 className="font-bold text-text-primary">{polla.name}</h3>
               {polla.description && <p className="text-sm text-text-secondary">{polla.description}</p>}
@@ -1906,6 +1866,19 @@ export default function PollaSlugPage() {
                 ))}
               </div>
             </div>
+
+            {/* Pagos — fusionado dentro de INFO (2026-06-16). Oculto en iOS
+                (5.3.4) y en pay_winner (no hay cobro al inicio). El propio
+                ParticipantPayment rutea admin-review / subir-comprobante /
+                lista según rol. */}
+            {!isIOSApp && polla.payment_mode !== "pay_winner" && (
+              <ParticipantPayment
+                pollaSlug={polla.slug}
+                currentUserId={currentUserId}
+                currentUserRole={currentUserRole}
+                adminObserver={viewerIsGlobalAdmin}
+              />
+            )}
 
             <div className="rounded-2xl p-5 lp-card">
               <h4 className="font-bold text-text-primary mb-3">{t("pointsSystem")}</h4>

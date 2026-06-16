@@ -79,7 +79,9 @@ const DEMO: RaceRacer[] = DEMO_INCS.map((r) => {
 
 // ─── Geometría ─────────────────────────────────────────────────────────
 const ROW_H = 30; // alto por posición
-const COL_W = 38; // ancho por día
+const MIN_COL_W = 64; // ancho mínimo por día. Con pocos días las columnas se
+                      // estiran para llenar el ancho; con muchos caen acá y
+                      // el chart excede la pantalla → scroll horizontal.
 const PAD_T = 14; // padding arriba del plot
 const PAD_B = 26; // espacio para el carril overflow (N+) + labels de día
 const GUTTER = 22; // columna izquierda con números de posición
@@ -161,13 +163,33 @@ export default function PositionRaceChart({ fechaLabels, racers, topN = 10 }: Pr
   );
   const [replay, setReplay] = useState(0);
 
-  // Al montar / cambiar la data, scrollear al día MÁS RECIENTE (derecha) —
-  // es lo que más le importa al user; scrollea izquierda para la historia.
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Ancho responsivo por día: medimos el contenedor y estiramos las columnas
+  // para llenar el ancho cuando hay pocos días (no cramped); con muchos cae
+  // a MIN_COL_W y el chart excede la pantalla → scroll horizontal.
+  const [containerW, setContainerW] = useState(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => setContainerW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const COL_W = Math.max(
+    MIN_COL_W,
+    containerW > 0
+      ? Math.floor((containerW - NODE_X0 - RIGHT) / Math.max(F - 1, 1))
+      : MIN_COL_W,
+  );
+
+  // Al montar / cambiar la data / re-medir, scrollear al día MÁS RECIENTE
+  // (derecha) — es lo que más le importa al user; scroll izquierda = historia.
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollLeft = el.scrollWidth;
-  }, [F, allRacers.length]);
+  }, [F, allRacers.length, COL_W]);
 
   const width = NODE_X0 + (F - 1) * COL_W + RIGHT;
   const height = PAD_T + N * ROW_H + PAD_B;
