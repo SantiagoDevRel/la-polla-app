@@ -825,8 +825,25 @@ export default function PollaSlugPage() {
   // de cada equipo al tocar la banderita".
   const [teamSheet, setTeamSheet] = useState<{ team: string; flag: string | null } | null>(null);
   // Sub-vista de la tab Ranking: tabla clásica vs bump chart de evolución
-  // de posiciones por día (draft 2026-06-16, idea de Pipe).
+  // de posiciones por día (2026-06-16, idea de Pipe).
   const [rankingView, setRankingView] = useState<"tabla" | "evolucion">("tabla");
+  // Días con partidos verificados — gatea la sub-vista Evolución: con <2
+  // días el bump chart no tiene historia que contar (mismo bucketing por
+  // día Bogotá que el RPC). Sale gratis de `matches` ya cargado.
+  const verifiedDayCount = useMemo(() => {
+    const days = new Set<string>();
+    for (const m of matches) {
+      if (m.final_verified_at) {
+        days.add(
+          new Date(m.final_verified_at).toLocaleDateString("en-CA", {
+            timeZone: "America/Bogota",
+          }),
+        );
+      }
+    }
+    return days.size;
+  }, [matches]);
+  const evolucionAvailable = verifiedDayCount >= 2;
   const openTeamSheet = useCallback(
     (team: string, flag: string | null) => setTeamSheet({ team, flag }),
     [],
@@ -1717,27 +1734,30 @@ export default function PollaSlugPage() {
                 </p>
               </div>
             )}
-            {/* Toggle: Tabla clásica | Evolución (bump chart por día).
-                Draft 2026-06-16 — idea de Pipe. Embebido en Ranking (no es
-                tab nueva) para no inflar la barra de tabs. */}
-            <div className="flex gap-1 p-1 rounded-full bg-bg-elevated border border-border-subtle">
-              {(["tabla", "evolucion"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setRankingView(v)}
-                  className={`flex-1 text-xs font-semibold py-2 rounded-full transition-all ${
-                    rankingView === v
-                      ? "bg-gold text-bg-base"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  {v === "tabla" ? "Tabla" : "Evolución"}
-                </button>
-              ))}
-            </div>
+            {/* Toggle Tabla | Evolución (bump chart por día). Solo aparece
+                con >=2 días verificados (si no, no hay carrera que contar).
+                Embebido en Ranking — no es tab nueva. El activo NO usa gold:
+                en la vista Evolución el gold lo "gasta" el chart. */}
+            {evolucionAvailable && (
+              <div className="flex gap-1 p-1 rounded-full bg-bg-elevated border border-border-subtle">
+                {(["tabla", "evolucion"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setRankingView(v)}
+                    className={`flex-1 text-xs font-semibold py-2 rounded-full transition-all ${
+                      rankingView === v
+                        ? "bg-white/10 text-text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    {v === "tabla" ? "Tabla" : "Evolución"}
+                  </button>
+                ))}
+              </div>
+            )}
 
-            {rankingView === "evolucion" ? (
+            {evolucionAvailable && rankingView === "evolucion" ? (
               <PositionRaceCard pollaSlug={polla.slug} />
             ) : (
             <div className="rounded-2xl overflow-hidden lp-card">
