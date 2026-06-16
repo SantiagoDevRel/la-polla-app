@@ -26,7 +26,7 @@
  * prefers-reduced-motion. Tokens del design system Tribuna Caliente.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { RotateCcw, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { getPollitoByPosition } from "@/lib/pollitos";
@@ -161,6 +161,14 @@ export default function PositionRaceChart({ fechaLabels, racers, topN = 10 }: Pr
   );
   const [replay, setReplay] = useState(0);
 
+  // Al montar / cambiar la data, scrollear al día MÁS RECIENTE (derecha) —
+  // es lo que más le importa al user; scrollea izquierda para la historia.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [F, allRacers.length]);
+
   const width = NODE_X0 + (F - 1) * COL_W + RIGHT;
   const height = PAD_T + N * ROW_H + PAD_B;
 
@@ -184,6 +192,21 @@ export default function PositionRaceChart({ fechaLabels, racers, topN = 10 }: Pr
     focusRacer && !shownIds.has(focusRacer.id) ? [...shown, focusRacer] : shown;
   const focusUsesOverflow =
     !!focusRacer && rankByFecha.some((rk) => (rk.get(focusRacer.id) ?? N) > N);
+
+  // Un pollito por puesto final: si varios empatan caen en el mismo `y` y
+  // se montarían. Mostramos uno por puesto, con prioridad enfocado > yo >
+  // primero. El roster completo igual está en la lista de abajo.
+  const avatarPicks = (() => {
+    const lastRanks = rankByFecha[F - 1];
+    const byRank = new Map<number, RaceRacer>();
+    const score = (x: RaceRacer) => (x.id === focusId ? 2 : x.isMe ? 1 : 0);
+    for (const r of avatarRacers) {
+      const rank = lastRanks.get(r.id) ?? N;
+      const cur = byRank.get(rank);
+      if (!cur || score(r) > score(cur)) byRank.set(rank, r);
+    }
+    return Array.from(byRank.values());
+  })();
   const startRank = focusRacer ? rankByFecha[0].get(focusRacer.id) ?? N : N;
   const endRank = focusRacer ? rankByFecha[F - 1].get(focusRacer.id) ?? N : N;
   const delta = startRank - endRank; // + = subió de posición
@@ -215,7 +238,7 @@ export default function PositionRaceChart({ fechaLabels, racers, topN = 10 }: Pr
       </div>
 
       {/* Chart */}
-      <div className="overflow-x-auto -mx-1 px-1">
+      <div ref={scrollRef} className="lp-hscroll overflow-x-auto -mx-1 px-1">
         <svg
           width={width}
           height={height}
@@ -365,7 +388,7 @@ export default function PositionRaceChart({ fechaLabels, racers, topN = 10 }: Pr
           {/* Pollito de cada racer en su posición FINAL (último día).
               lider/peleando/triste según el puesto de hoy. Incluye al
               enfocado aunque esté fuera del top N (en el carril overflow). */}
-          {avatarRacers.map((r) => {
+          {avatarPicks.map((r) => {
             const finalRank = rankByFecha[F - 1].get(r.id) ?? N;
             const y = yLine(finalRank);
             const x = width - RIGHT + 20;
@@ -450,7 +473,9 @@ export default function PositionRaceChart({ fechaLabels, racers, topN = 10 }: Pr
           <p className="px-1 mb-1 text-[10px] uppercase tracking-wide text-text-muted">
             Todos · toca para seguir
           </p>
-          <div className="max-h-[260px] overflow-y-auto -mx-1 px-1 space-y-0.5">
+          {/* Sin scroll anidado: la lista fluye en la página (un solo scroll,
+              sin scrollbar interno feo). Pedido de Santiago 2026-06-16. */}
+          <div className="-mx-1 px-1 space-y-0.5">
             {listRows.map(({ racer: r, rank, move, pts }) => {
               const isFocus = r.id === focusId;
               return (
