@@ -19,6 +19,7 @@ import InviteModal from "@/components/polla/InviteModal";
 import PhoneInput from "@/components/ui/PhoneInput";
 import ScoringExplanation from "@/components/polla/ScoringExplanation";
 import InlineScoringGuide from "@/components/polla/InlineScoringGuide";
+import PositionRaceCard from "@/components/polla/PositionRaceCard";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { getTournamentBySlug, getTournamentName, TOURNAMENT_ICONS } from "@/lib/tournaments";
@@ -823,6 +824,9 @@ export default function PollaSlugPage() {
   // null = cerrado. Feedback user 2026-06-11: "bacano que dieran info
   // de cada equipo al tocar la banderita".
   const [teamSheet, setTeamSheet] = useState<{ team: string; flag: string | null } | null>(null);
+  // Sub-vista de la tab Ranking: tabla clásica vs bump chart de evolución
+  // de posiciones por día (draft 2026-06-16, idea de Pipe).
+  const [rankingView, setRankingView] = useState<"tabla" | "evolucion">("tabla");
   const openTeamSheet = useCallback(
     (team: string, flag: string | null) => setTeamSheet({ team, flag }),
     [],
@@ -1713,6 +1717,29 @@ export default function PollaSlugPage() {
                 </p>
               </div>
             )}
+            {/* Toggle: Tabla clásica | Evolución (bump chart por día).
+                Draft 2026-06-16 — idea de Pipe. Embebido en Ranking (no es
+                tab nueva) para no inflar la barra de tabs. */}
+            <div className="flex gap-1 p-1 rounded-full bg-bg-elevated border border-border-subtle">
+              {(["tabla", "evolucion"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setRankingView(v)}
+                  className={`flex-1 text-xs font-semibold py-2 rounded-full transition-all ${
+                    rankingView === v
+                      ? "bg-gold text-bg-base"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  {v === "tabla" ? "Tabla" : "Evolución"}
+                </button>
+              ))}
+            </div>
+
+            {rankingView === "evolucion" ? (
+              <PositionRaceCard pollaSlug={polla.slug} />
+            ) : (
             <div className="rounded-2xl overflow-hidden lp-card">
             {participants.length === 0 ? (
               <EmptyState
@@ -1795,6 +1822,7 @@ export default function PollaSlugPage() {
               </>
             )}
             </div>
+            )}
           </div>
         )}
 

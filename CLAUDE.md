@@ -974,6 +974,63 @@ sheet con su ficha. Cero APIs externas (free-tier intacto).
 
 ---
 
+## Carrera de posiciones (bump chart) — sub-vista "Evolución" en Ranking (2026-06-16)
+
+Idea de Pipe (primo): "grafiquito animado con la fluctuación de las
+posiciones por cada fecha". Un **bump chart** que muestra cómo se mueve el
+ranking de cada participante a lo largo del torneo.
+
+**Decisiones de producto (Santiago):**
+- **Eje = DÍA calendario** (no por partido ni por jornada/semana). Una
+  columna por día con partidos verificados.
+- **Placement: NO es tab nueva.** Vive dentro de la pestaña **Ranking** como
+  toggle segmentado `Tabla | Evolución` (no se quitó Pagos ni Info — un user
+  normal solo ve 3-4 tabs; el chart es otra forma de leer el ranking).
+- **Chart = top 10** (legible, anti-espagueti). Debajo, una **lista
+  scrollable con TODOS**: tocás a cualquiera (aunque esté fuera del top 10)
+  y se traza su línea — si su rank pasa de 10 cae a un **carril overflow
+  "10+"** al fondo (el chart no crece de alto).
+
+**Cómo funciona la data:**
+- RPC `get_polla_standings_history(p_polla_id, p_match_ids)` (migración 070):
+  agrupa por `date(matches.final_verified_at AT TIME ZONE 'America/Bogota')`,
+  suma `predictions.points_earned` acumulado por (participante, día), y
+  devuelve UN json `{ days, racers:[{user_id, cum:[]}] }`. **Agregación 100%
+  en SQL** para no chocar con el cap de ~1000 filas de PostgREST (pollas
+  grandes). `STABLE SECURITY DEFINER`, `search_path` fijo, **EXECUTE solo a
+  `service_role`** (revocado de PUBLIC/anon/authenticated — Supabase auto-
+  otorga a anon/authenticated, hay que revocar explícito).
+- Endpoint lazy `GET /api/pollas/[slug]/standings-history`: auth + gate de
+  participante (mismo patrón admin-client que el leaderboard), resuelve
+  scope→match_ids con `resolvePollaMatchIds`, llama el RPC con admin client,
+  adorna cada racer con nombre + pollito (`users.avatar_url`). Solo se pide
+  cuando el user abre la sub-vista (no carga en el GET principal).
+- El cliente computa el **rank por día desde `cum`** (mismo `RANK()` de
+  competencia, empates comparten puesto) — single source para posiciones.
+
+**Archivos:**
+- `components/polla/PositionRaceChart.tsx` — el chart presentacional (SVG
+  puro + framer-motion path-draw, sin libs de charts). Sin prop `racers` cae
+  a data DEMO con badge "Demo". Pollito real (`getPollitoByPosition`) al final
+  de cada línea, líder/peleando/triste según puesto de hoy.
+- `components/polla/PositionRaceCard.tsx` — loader que trae la data real y
+  maneja loading / vacío (**<2 días verificados → teaser** "la carrera apenas
+  arranca") / error.
+- `app/api/pollas/[slug]/standings-history/route.ts` — endpoint.
+- `supabase/migrations/070_polla_standings_history.sql` — RPC.
+- `app/(app)/pollas/[slug]/page.tsx` — toggle `rankingView` + render en la
+  pestaña Ranking.
+
+**Pendiente / polish (no bloqueante):**
+- Empates de puesto el último día → los pollitos finales se montan (mismo y);
+  falta separarlos.
+- Late joiners se pintan planos desde el día 1 (no dashed antes de `joined_at`).
+- Ideas futuras (codex, sin decidir): "el golpe de la fecha" (qué partido
+  movió más la tabla), "duelo contra tu némesis", replay post-fecha
+  share-card.
+
+---
+
 ## Lecciones / gotchas conocidos (importante leer en cada sesión nueva)
 
 ### 🚨 REGLA HARD: TODA inserción a `matches` DEBE pasar por `upsert_match_safe` 🚨
