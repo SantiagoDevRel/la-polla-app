@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Ya usaste tus 2 ingresos por SMS de hoy. Entra gratis y al instante por WhatsApp 👇",
+            "Ya usaste tus 2 ingresos por SMS de hoy. Entra gratis y al instante con el botón verde de WhatsApp 👇",
           useWhatsapp: true,
         },
         { status: 429 },
