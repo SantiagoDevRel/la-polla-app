@@ -211,6 +211,7 @@
     "saveSuffix": "{count, plural, one {pronóstico guardado} other {pronósticos guardados}}",
     "tabPartidos": "Partidos",
     "tabRanking": "Tabla",
+    "tabEvolucion": "Evolución",
     "tabInvitar": "Invitar",
     "tabPagos": "Pagos",
     "tabOrganizar": "Admin",
