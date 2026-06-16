@@ -844,6 +844,8 @@ export default function PollaSlugPage() {
     return days.size;
   }, [matches]);
   const evolucionAvailable = verifiedDayCount >= 2;
+  // Pagos dentro de INFO va en un dropdown colapsado por default.
+  const [pagosOpen, setPagosOpen] = useState(false);
   const openTeamSheet = useCallback(
     (team: string, flag: string | null) => setTeamSheet({ team, flag }),
     [],
@@ -1100,8 +1102,10 @@ export default function PollaSlugPage() {
       currentUserPaid === false &&
       currentUserRole !== "admin"
     ) {
-      // Pagos vive dentro de INFO ahora.
+      // Pagos vive dentro de INFO ahora; lo abrimos para el impago (el
+      // resto lo ve colapsado por default).
       setActiveTab("info");
+      setPagosOpen(true);
     }
     defaultTabAppliedRef.current = true;
   }, [polla, currentUserPaid, currentUserRole, isIOSApp]);
@@ -1867,19 +1871,6 @@ export default function PollaSlugPage() {
               </div>
             </div>
 
-            {/* Pagos — fusionado dentro de INFO (2026-06-16). Oculto en iOS
-                (5.3.4) y en pay_winner (no hay cobro al inicio). El propio
-                ParticipantPayment rutea admin-review / subir-comprobante /
-                lista según rol. */}
-            {!isIOSApp && polla.payment_mode !== "pay_winner" && (
-              <ParticipantPayment
-                pollaSlug={polla.slug}
-                currentUserId={currentUserId}
-                currentUserRole={currentUserRole}
-                adminObserver={viewerIsGlobalAdmin}
-              />
-            )}
-
             <div className="rounded-2xl p-5 lp-card">
               <h4 className="font-bold text-text-primary mb-3">{t("pointsSystem")}</h4>
               <InlineScoringGuide
@@ -1891,6 +1882,37 @@ export default function PollaSlugPage() {
                 }}
               />
             </div>
+
+            {/* Pagos — fusionado en INFO como dropdown colapsado por default
+                (pedido Santiago 2026-06-16). Oculto en iOS (5.3.4) y en
+                pay_winner. Se auto-abre para impagos (efecto arriba). */}
+            {!isIOSApp && polla.payment_mode !== "pay_winner" && (
+              <div className="rounded-2xl lp-card overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setPagosOpen((o) => !o)}
+                  aria-expanded={pagosOpen}
+                  className="w-full flex items-center justify-between px-5 py-4 cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 font-bold text-text-primary">
+                    <Banknote className="w-4 h-4 text-gold" /> {t("tabPagos")}
+                  </span>
+                  <ChevronDown
+                    className={`w-5 h-5 text-text-muted transition-transform duration-200 ${pagosOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {pagosOpen && (
+                  <div className="px-3 pb-3 pt-3 border-t border-border-subtle">
+                    <ParticipantPayment
+                      pollaSlug={polla.slug}
+                      currentUserId={currentUserId}
+                      currentUserRole={currentUserRole}
+                      adminObserver={viewerIsGlobalAdmin}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* WhatsApp invite for the admin to share the polla */}
             {currentUserRole === "admin" && (
