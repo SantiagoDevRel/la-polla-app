@@ -11,11 +11,19 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSbClient } from "@supabase/supabase-js";
-import { checkAndRecordAttempt, checkIpRateLimit } from "@/lib/auth/rate-limit";
+import {
+  checkAndRecordAttempt,
+  checkIpRateLimit,
+  checkDailySmsCap,
+} from "@/lib/auth/rate-limit";
 import { normalizePhone } from "@/lib/auth/phone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Admins (migración 024) — exentos del tope diario de SMS para que las
+// pruebas de login del equipo no se choquen con el cap. E.164 sin "+".
+const ADMIN_PHONES = new Set(["573117312391", "351934255581"]);
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -52,6 +60,24 @@ export async function POST(request: NextRequest) {
         {
           error: "Demasiados intentos desde tu red. Espera un rato.",
           retryAfter: ipLimit.retryAfter,
+        },
+        { status: 429 },
+      );
+    }
+  }
+
+  // Tope DIARIO de SMS por teléfono (2/día). Más allá, empujamos al
+  // usuario a WhatsApp (gratis e instantáneo) — el botón de WhatsApp del
+  // /login ya da el camino, así que NO lo dejamos afuera, solo movemos el
+  // costo del canal pago al gratis. Admins exentos. Va ANTES del envío.
+  if (!ADMIN_PHONES.has(phoneNormalized)) {
+    const daily = await checkDailySmsCap(phoneNormalized);
+    if (daily.blocked) {
+      return NextResponse.json(
+        {
+          error:
+            "Ya usaste tus 2 ingresos por SMS de hoy. Entra gratis y al instante con el botón verde de WhatsApp 👇",
+          useWhatsapp: true,
         },
         { status: 429 },
       );

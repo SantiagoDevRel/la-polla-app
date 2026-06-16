@@ -135,7 +135,10 @@ async function replyWithMagicLink(fromRaw: string, request: NextRequest) {
 
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
-  const limit = await checkAndRecordAttempt(phoneNormalized, "generate", ip);
+  // 'wa_magic' (NO 'generate'): el magic-link de WhatsApp no cuesta Twilio,
+  // así que no debe contar en el tope diario de SMS ni inflar las métricas
+  // de costo. Sigue throttleado (5/hora) contra abuso del canal WhatsApp.
+  const limit = await checkAndRecordAttempt(phoneNormalized, "wa_magic", ip);
   if (limit.blocked) {
     await sendTextMessage(
       fromRaw,

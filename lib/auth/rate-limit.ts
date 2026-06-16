@@ -9,7 +9,19 @@ const LIMITS = {
   // Join-by-code: 5 attempts per phone per 10 minutes. Tighter than verify
   // so brute-forcing the 32^6 code space is not feasible.
   join_code: { maxAttempts: 5, windowMinutes: 10 },
+  // WhatsApp magic-link sends (lib/whatsapp webhook). Misma cadencia que
+  // 'generate' para frenar abuso, pero con tipo PROPIO: el magic-link de
+  // WhatsApp NO cuesta Twilio, así que NO debe contar en el tope diario de
+  // SMS ni inflar las métricas de costo (que cuentan solo 'generate').
+  wa_magic: { maxAttempts: 5, windowMinutes: 60 },
 } as const;
+
+// Tope DIARIO de SMS por teléfono. Más allá, el login empuja al usuario a
+// WhatsApp (gratis) — no lo bloquea, porque el fallback de WhatsApp del
+// /login ya existe y funciona. Acota el costo Twilio del re-login crónico
+// (usuarios reales pidiendo varios SMS/día por el bug de persistencia de
+// sesión) sin castigar a nadie. Bumpealo si hay quejas de gente sin WhatsApp.
+export const DAILY_SMS_CAP = 2;
 
 // IP-based generate limit — cap GENEROSO contra Twilio bill-bombing.
 // El límite por phone (5/hora) NO frena el ataque real: un bot rota
@@ -89,6 +101,32 @@ export async function checkAndRecordAttempt(
   });
 
   return { blocked: false, remaining: maxAttempts - currentCount - 1 };
+}
+
+/**
+ * Count-only: ¿el teléfono ya gastó su cupo de SMS de hoy (últimas 24h)?
+ * Cuenta SOLO attempt_type='generate' (SMS reales por Twilio); el magic-link
+ * de WhatsApp usa 'wa_magic' y NO cuenta. Llamar ANTES de checkAndRecordAttempt
+ * en el flow de SMS. No inserta — la fila la graba checkAndRecordAttempt.
+ */
+export async function checkDailySmsCap(phone: string): Promise<RateLimitResult> {
+  const admin = createAdminClient();
+  const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const { count } = await admin
+    .from("otp_rate_limits")
+    .select("*", { count: "exact", head: true })
+    .eq("phone_number", phone)
+    .eq("attempt_type", "generate")
+    .gte("attempted_at", windowStart.toISOString());
+  const used = count ?? 0;
+  if (used >= DAILY_SMS_CAP) {
+    return {
+      blocked: true,
+      remaining: 0,
+      retryAfter: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    };
+  }
+  return { blocked: false, remaining: DAILY_SMS_CAP - used };
 }
 
 /**
