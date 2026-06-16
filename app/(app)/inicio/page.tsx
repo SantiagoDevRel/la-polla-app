@@ -836,7 +836,7 @@ export default async function InicioPage() {
   // ya están todos). Una card por (polla, partido) con su QuickPick.
   const proximosSection =
     !isActiveEmpty && upcomingStripEntries.length > 0 ? (
-      <section>
+      <section key="inicio-proximos">
         <h2 className="lp-section-title px-4 mb-3 flex items-center gap-2">
           <Clock className="w-4 h-4 text-gold" aria-hidden="true" />
           {tInicio("upcomingSection")}
@@ -1006,19 +1006,22 @@ export default async function InicioPage() {
           {/* Road to World Cup — entrada a la bracket interactiva. */}
           <RoadToWorldCupCard />
 
-          {/* Próximos PRIMERO (después de los datos curiosos) solo si el user
-              todavía debe pronósticos de hoy/mañana — el CTA de pronosticar
-              manda sobre el contenido de engagement. */}
-          {hasUnpredictedUpcoming ? proximosSection : null}
-
-          {/* "Lo último del Mundial": highlights/goles del Mundial. Client
-              Component que fetchea /api/highlights. Se auto-oculta si no hay
-              clips o falla — nunca rompe el home. */}
-          {!isActiveEmpty ? <HighlightsStrip /> : null}
-
-          {/* Próximos AL FINAL cuando el user ya pronosticó todo lo de
-              hoy/mañana. */}
-          {!hasUnpredictedUpcoming ? proximosSection : null}
+          {/* Próximos + "Lo último del Mundial" (highlights), en orden según
+              si el user todavía debe pronósticos de hoy/mañana:
+                • faltan pronósticos → Próximos PRIMERO (el CTA de pronosticar
+                  manda sobre el contenido de engagement).
+                • ya pronosticó todo → Próximos AL FINAL y suben los videos.
+              proximosSection aparece UNA sola vez y ambos llevan `key` estable:
+              cuando el flag flipea (router.refresh tras guardar el último
+              pronóstico) React MUEVE los nodos por key en vez de re-montarlos
+              por índice. Renderizar el MISMO elemento en dos slots hermanos
+              sin key reconciliaba por posición y era frágil (riesgo de
+              "Rendered more hooks…" en reorders). HighlightsStrip se auto-
+              oculta si no hay clips o falla — nunca rompe el home. */}
+          {(hasUnpredictedUpcoming
+            ? [proximosSection, !isActiveEmpty ? <HighlightsStrip key="inicio-highlights" /> : null]
+            : [!isActiveEmpty ? <HighlightsStrip key="inicio-highlights" /> : null, proximosSection]
+          ).filter(Boolean)}
 
           {/* Block 4b - Rival callout (only when we have a neighbour).
               Deep-links straight to the ranking tab so the user lands on
