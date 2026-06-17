@@ -115,6 +115,12 @@ export function mapEspnStatus(status: ESPNStatus): "scheduled" | "live" | "finis
   // anti-regress impedía volver a live (bug pescado auditoría 2026-06-10).
   // Para partidos normales ESPN emite STATUS_FULL_TIME directo.
   if (
+    // STATUS_IN_PROGRESS es el status genérico in-play de ESPN: a veces
+    // lo emite en lugar de STATUS_FIRST_HALF / STATUS_SECOND_HALF (visto
+    // en vivo en fifa.world, Argentina-Algeria 2026-06-17). Sin esto el
+    // mapper devolvía null y la sync skipeaba el row entero → el partido
+    // quedaba congelado mid-game (minuto y score clavados).
+    name === "STATUS_IN_PROGRESS" ||
     name === "STATUS_FIRST_HALF" ||
     name === "STATUS_HALFTIME" ||
     name === "STATUS_SECOND_HALF" ||
