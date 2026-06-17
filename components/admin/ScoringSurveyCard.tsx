@@ -1,10 +1,11 @@
 // components/admin/ScoringSurveyCard.tsx — Resultados de la encuesta de
-// sistema de puntos (goles_v2) en /admin, una fila por polla.
+// sistema de puntos (goles_v2) en /admin, polla por polla via dropdown.
 //
-// Para cada polla con encuesta abierta (o ya migrada) muestra el tally
-// Sí/No/Faltan + un botón "Implementar cambio" que migra ESA polla a
-// goles_v2 desde ese momento en adelante (NO retroactivo), o "Mantener".
-// Se auto-oculta si no hay ninguna encuesta ni polla en goles_v2.
+// Un <select> lista TODAS las pollas con encuesta abierta (o ya migrada);
+// al elegir una se muestra su tally Sí/No/Faltan + un botón "Implementar
+// cambio" que migra ESA polla a goles_v2 desde ese momento en adelante
+// (NO retroactivo), o "Mantener". Se auto-oculta si no hay ninguna encuesta
+// ni polla en goles_v2.
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -26,13 +27,22 @@ export default function ScoringSurveyCard() {
   const [surveys, setSurveys] = useState<Survey[] | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const { data } = await axios.get<{ surveys: Survey[] }>(
         "/api/admin/scoring-survey",
       );
-      setSurveys(data.surveys ?? []);
+      const next = data.surveys ?? [];
+      setSurveys(next);
+      // Mantener la selección si sigue existiendo; si no, caer a la primera
+      // (las abiertas vienen primero por el sort del endpoint).
+      setSelectedId((prev) =>
+        prev && next.some((s) => s.pollaId === prev)
+          ? prev
+          : (next[0]?.pollaId ?? null),
+      );
     } catch {
       setSurveys([]);
     } finally {
@@ -77,6 +87,8 @@ export default function ScoringSurveyCard() {
 
   const openCount = surveys.filter((s) => s.surveyOpen).length;
   const appliedCount = surveys.filter((s) => s.scoringMode === "goles_v2").length;
+  const selected =
+    surveys.find((s) => s.pollaId === selectedId) ?? surveys[0] ?? null;
 
   return (
     <section
@@ -102,103 +114,142 @@ export default function ScoringSurveyCard() {
         desde el próximo partido. Cada polla se decide aparte según sus votos.
       </p>
 
-      <div className="space-y-2.5">
-        {surveys.map((s) => {
-          const { counts } = s;
-          const decided = counts.si + counts.no;
-          const majorityYes = counts.si > counts.total / 2;
-          const majorityNo = counts.no >= counts.total / 2 && counts.total > 0;
-          const applied = s.scoringMode === "goles_v2";
-          const busy = acting === s.pollaId;
-          return (
-            <div
-              key={s.pollaId}
-              className="rounded-xl border border-border-subtle bg-bg-card/60 p-3"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-text-primary">
-                    {s.pollaName || s.pollaSlug}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-text-muted">
-                    {counts.total} {counts.total === 1 ? "jugador" : "jugadores"} ·{" "}
-                    {decided} {decided === 1 ? "votó" : "votaron"}
-                  </p>
-                </div>
-                {applied ? (
-                  <span className="shrink-0 rounded-full bg-turf/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-turf">
-                    Implementada
-                  </span>
-                ) : (
-                  <span className="shrink-0 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">
-                    Abierta
-                  </span>
-                )}
-              </div>
+      {/* Dropdown: elegir polla por polla */}
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+          Polla
+        </span>
+        <div className="relative">
+          <select
+            value={selected?.pollaId ?? ""}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="w-full appearance-none rounded-xl border border-border-subtle bg-bg-elevated px-4 py-3 pr-10 text-[14px] text-text-primary outline-none transition-colors focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
+          >
+            {surveys.map((s) => {
+              const label = s.pollaName || s.pollaSlug;
+              const tag =
+                s.scoringMode === "goles_v2"
+                  ? "implementada"
+                  : `${s.counts.si + s.counts.no}/${s.counts.total} votos`;
+              return (
+                <option key={s.pollaId} value={s.pollaId}>
+                  {label} · {tag}
+                </option>
+              );
+            })}
+          </select>
+          {/* Chevron */}
+          <svg
+            aria-hidden
+            viewBox="0 0 24 24"
+            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </div>
+      </label>
 
-              {/* Tally */}
-              <div className="mt-2 flex items-center gap-3 text-[12px]">
-                <span className="text-turf">
-                  Sí <span className="font-display text-[15px]">{counts.si}</span>
-                </span>
-                <span className="text-red-alert">
-                  No <span className="font-display text-[15px]">{counts.no}</span>
-                </span>
-                <span className="text-text-muted">
-                  Faltan{" "}
-                  <span className="font-display text-[15px]">{counts.pending}</span>
-                </span>
-                {!applied ? (
-                  majorityYes ? (
-                    <span className="ml-auto text-[11px] text-turf">Mayoría: Sí</span>
-                  ) : majorityNo ? (
-                    <span className="ml-auto text-[11px] text-text-secondary">
-                      Mayoría: No
+      {/* Detalle de la polla seleccionada */}
+      {selected
+        ? (() => {
+            const s = selected;
+            const { counts } = s;
+            const decided = counts.si + counts.no;
+            const majorityYes = counts.si > counts.total / 2;
+            const majorityNo = counts.no >= counts.total / 2 && counts.total > 0;
+            const applied = s.scoringMode === "goles_v2";
+            const busy = acting === s.pollaId;
+            return (
+              <div className="rounded-xl border border-border-subtle bg-bg-card/60 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-semibold text-text-primary">
+                      {s.pollaName || s.pollaSlug}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-text-muted">
+                      {counts.total} {counts.total === 1 ? "jugador" : "jugadores"} ·{" "}
+                      {decided} {decided === 1 ? "votó" : "votaron"}
+                    </p>
+                  </div>
+                  {applied ? (
+                    <span className="shrink-0 rounded-full bg-turf/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-turf">
+                      Implementada
                     </span>
                   ) : (
-                    <span className="ml-auto text-[11px] text-text-muted">
-                      Sin mayoría
+                    <span className="shrink-0 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">
+                      Abierta
                     </span>
-                  )
-                ) : null}
-              </div>
-
-              {/* Acciones */}
-              {!applied ? (
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => decide(s, "apply")}
-                    className="flex-1 rounded-full bg-gold py-2 font-display text-[12.5px] tracking-[0.04em] text-bg-base transition-transform active:scale-[0.98] disabled:opacity-60"
-                  >
-                    {busy ? "…" : "Implementar cambio"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => decide(s, "keep")}
-                    className="rounded-full border border-border-subtle px-3 py-2 font-display text-[12.5px] tracking-[0.04em] text-text-secondary transition-colors hover:text-text-primary disabled:opacity-60"
-                  >
-                    Mantener
-                  </button>
+                  )}
                 </div>
-              ) : (
-                <p className="mt-2 text-[11px] text-turf">
-                  Cuenta con goles_v2 desde{" "}
-                  {s.changedAt
-                    ? new Date(s.changedAt).toLocaleDateString("es-CO", {
-                        day: "numeric",
-                        month: "short",
-                      })
-                    : "—"}
-                  .
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
+
+                {/* Tally */}
+                <div className="mt-2 flex items-center gap-3 text-[12px]">
+                  <span className="text-turf">
+                    Sí <span className="font-display text-[15px]">{counts.si}</span>
+                  </span>
+                  <span className="text-red-alert">
+                    No <span className="font-display text-[15px]">{counts.no}</span>
+                  </span>
+                  <span className="text-text-muted">
+                    Faltan{" "}
+                    <span className="font-display text-[15px]">{counts.pending}</span>
+                  </span>
+                  {!applied ? (
+                    majorityYes ? (
+                      <span className="ml-auto text-[11px] text-turf">Mayoría: Sí</span>
+                    ) : majorityNo ? (
+                      <span className="ml-auto text-[11px] text-text-secondary">
+                        Mayoría: No
+                      </span>
+                    ) : (
+                      <span className="ml-auto text-[11px] text-text-muted">
+                        Sin mayoría
+                      </span>
+                    )
+                  ) : null}
+                </div>
+
+                {/* Acciones */}
+                {!applied ? (
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => decide(s, "apply")}
+                      className="flex-1 rounded-full bg-gold py-2 font-display text-[12.5px] tracking-[0.04em] text-bg-base transition-transform active:scale-[0.98] disabled:opacity-60"
+                    >
+                      {busy ? "…" : "Implementar cambio"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => decide(s, "keep")}
+                      className="rounded-full border border-border-subtle px-3 py-2 font-display text-[12.5px] tracking-[0.04em] text-text-secondary transition-colors hover:text-text-primary disabled:opacity-60"
+                    >
+                      Mantener
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-[11px] text-turf">
+                    Cuenta con goles_v2 desde{" "}
+                    {s.changedAt
+                      ? new Date(s.changedAt).toLocaleDateString("es-CO", {
+                          day: "numeric",
+                          month: "short",
+                        })
+                      : "—"}
+                    .
+                  </p>
+                )}
+              </div>
+            );
+          })()
+        : null}
     </section>
   );
 }
