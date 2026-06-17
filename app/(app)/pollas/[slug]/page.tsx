@@ -73,7 +73,8 @@ interface Polla {
   status: string; buy_in_amount: number; currency: string;
   payment_mode: string; points_exact: number; points_winner: number;
   points_goal_diff: number; points_correct_result: number;
-  points_one_team: number; created_by: string; scope: string; type: string;
+  points_one_team: number; scoring_mode?: string | null;
+  created_by: string; scope: string; type: string;
   admin_payment_instructions: string | null;
   join_code: string | null;
   match_ids?: string[] | null;
@@ -1874,6 +1875,7 @@ export default function PollaSlugPage() {
             <div className="rounded-2xl p-5 lp-card">
               <h4 className="font-bold text-text-primary mb-3">{t("pointsSystem")}</h4>
               <InlineScoringGuide
+                mode={polla.scoring_mode === "goles_v2" ? "goles_v2" : "classic"}
                 points={{
                   exact: polla.points_exact,
                   goalDiff: polla.points_goal_diff ?? 3,
