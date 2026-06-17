@@ -195,8 +195,15 @@ export function ScoringSurveyModal() {
                 ))}
               </div>
 
-              <p className="mt-3 text-[11px] leading-snug text-text-muted">
-                Solo cambia si la mayoría vota que sí. Aplica únicamente a esta
+              <div className="mt-3 rounded-xl border border-border-subtle bg-bg-elevated px-3 py-2.5">
+                <p className="text-[11.5px] leading-snug text-text-secondary">
+                  <span className="text-text-primary">No es retroactivo:</span> los
+                  puntos que ya llevas no se tocan. Si gana el Sí, el nuevo sistema
+                  cuenta desde el próximo partido en adelante.
+                </p>
+              </div>
+              <p className="mt-2 text-[11px] leading-snug text-text-muted">
+                Solo cambia si la mayoría vota que sí, y aplica únicamente a esta
                 polla — las demás siguen igual.
               </p>
             </div>
