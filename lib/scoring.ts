@@ -15,6 +15,7 @@ interface MatchRow {
   status: string;
   home_score: number | null;
   away_score: number | null;
+  scheduled_at: string | null;
 }
 
 interface PredictionRow {
@@ -32,6 +33,7 @@ interface PollaScoringRow {
   points_correct_result: number | null;
   points_one_team: number | null;
   scoring_mode: string | null;
+  scoring_mode_changed_at: string | null;
 }
 
 export interface ScoreMatchResult {
@@ -47,7 +49,7 @@ export async function scoreMatch(
 ): Promise<ScoreMatchResult> {
   const { data: match, error: matchErr } = await admin
     .from("matches")
-    .select("id, status, home_score, away_score")
+    .select("id, status, home_score, away_score, scheduled_at")
     .eq("id", matchId)
     .maybeSingle<MatchRow>();
   if (matchErr) throw matchErr;
@@ -76,7 +78,7 @@ export async function scoreMatch(
   const pollaIds = Array.from(new Set(predictions.map((p) => p.polla_id)));
   const { data: pollas, error: pollaErr } = await admin
     .from("pollas")
-    .select("id, points_exact, points_goal_diff, points_correct_result, points_one_team, scoring_mode")
+    .select("id, points_exact, points_goal_diff, points_correct_result, points_one_team, scoring_mode, scoring_mode_changed_at")
     .in("id", pollaIds)
     .returns<PollaScoringRow[]>();
   if (pollaErr) throw pollaErr;
@@ -86,6 +88,13 @@ export async function scoreMatch(
   // 1) Escribir points_earned + visible=true para cada predicción.
   for (const pred of predictions) {
     const scoring = pollaScoring.get(pred.polla_id);
+    // No-retroactivo: goles_v2 solo si el kickoff del match es >= el momento
+    // en que la polla cambió de modo. El pasado conserva su puntaje classic.
+    const useV2 =
+      scoring?.scoring_mode === "goles_v2" &&
+      !!scoring.scoring_mode_changed_at &&
+      !!match.scheduled_at &&
+      new Date(match.scheduled_at) >= new Date(scoring.scoring_mode_changed_at);
     const pts = calculatePoints(
       { homeScore: pred.predicted_home, awayScore: pred.predicted_away },
       result,
@@ -95,7 +104,7 @@ export async function scoreMatch(
         pointsCorrectResult: scoring?.points_correct_result ?? undefined,
         pointsOneTeam: scoring?.points_one_team ?? undefined,
       },
-      (scoring?.scoring_mode as ScoringMode) ?? "classic"
+      (useV2 ? "goles_v2" : "classic") as ScoringMode
     );
     const { error: updErr } = await admin
       .from("predictions")
