@@ -17,6 +17,7 @@ import AnnouncementTicker from "@/components/layout/AnnouncementTicker";
 import BrandHeader from "@/components/layout/BrandHeader";
 import FontScaleApplier from "@/components/layout/FontScaleApplier";
 import SWAutoReload from "@/components/layout/SWAutoReload";
+import ScoringSurveyModal from "@/components/polla/ScoringSurveyModal";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
@@ -82,6 +83,7 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <SWAutoReload />
+      <ScoringSurveyModal />
       <FontScaleApplier />
       <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">

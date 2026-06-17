@@ -7,7 +7,7 @@
 //   2. Correr manualmente tras un admin sync (belt-and-suspenders).
 //   3. Scripts offline que no van por el trigger.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { calculatePoints } from "@/lib/utils/points";
+import { calculatePoints, type ScoringMode } from "@/lib/utils/points";
 import { notifyMatchFinished, notifyRankImprovements } from "@/lib/notifications";
 
 interface MatchRow {
@@ -31,6 +31,7 @@ interface PollaScoringRow {
   points_goal_diff: number | null;
   points_correct_result: number | null;
   points_one_team: number | null;
+  scoring_mode: string | null;
 }
 
 export interface ScoreMatchResult {
@@ -75,7 +76,7 @@ export async function scoreMatch(
   const pollaIds = Array.from(new Set(predictions.map((p) => p.polla_id)));
   const { data: pollas, error: pollaErr } = await admin
     .from("pollas")
-    .select("id, points_exact, points_goal_diff, points_correct_result, points_one_team")
+    .select("id, points_exact, points_goal_diff, points_correct_result, points_one_team, scoring_mode")
     .in("id", pollaIds)
     .returns<PollaScoringRow[]>();
   if (pollaErr) throw pollaErr;
@@ -93,7 +94,8 @@ export async function scoreMatch(
         pointsGoalDiff: scoring?.points_goal_diff ?? undefined,
         pointsCorrectResult: scoring?.points_correct_result ?? undefined,
         pointsOneTeam: scoring?.points_one_team ?? undefined,
-      }
+      },
+      (scoring?.scoring_mode as ScoringMode) ?? "classic"
     );
     const { error: updErr } = await admin
       .from("predictions")

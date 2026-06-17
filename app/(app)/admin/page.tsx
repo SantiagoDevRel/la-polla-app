@@ -11,6 +11,7 @@ import FootballLoader from "@/components/ui/FootballLoader";
 import PayoutsByPolla from "@/components/admin/PayoutsByPolla";
 import UserDetailModal from "@/components/admin/UserDetailModal";
 import KnockoutStatusCard from "@/components/admin/KnockoutStatusCard";
+import ScoringSurveyCard from "@/components/admin/ScoringSurveyCard";
 import EngagementCard, { type EngagementData } from "@/components/admin/EngagementCard";
 import WebAnalyticsCard, { type WebAnalytics } from "@/components/admin/WebAnalyticsCard";
 import SentryHealthCard, { type SentryHealth } from "@/components/admin/SentryHealthCard";
@@ -309,6 +310,11 @@ export default function AdminPage() {
             {/* Knockouts del Mundial sin resolver + alertas de sync
                 (migración 062). Solo renderiza si hay algo que mostrar. */}
             <KnockoutStatusCard />
+
+            {/* Encuesta de sistema de puntos (migración 072) — tally +
+                comparativa de tabla + aplicar/mantener. Se auto-oculta si no
+                hay encuesta abierta ni polla en goles_v2. */}
+            <ScoringSurveyCard />
 
             {/* Stats */}
             <section className="grid grid-cols-2 gap-3">
