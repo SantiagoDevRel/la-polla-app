@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
 
@@ -21,8 +21,6 @@ interface Survey {
   pollaId: string;
   pollaName: string;
 }
-
-const SNOOZE_KEY = "lp_scoring_survey_snoozed_v1";
 
 // Filas de comparación HOY vs PROPUESTA. `up` marca los tiers que suben.
 const ROWS: { label: string; hoy: number; nuevo: number; up?: boolean }[] = [
@@ -52,11 +50,6 @@ export function ScoringSurveyModal() {
     let cancelled = false;
     (async () => {
       try {
-        if (sessionStorage.getItem(SNOOZE_KEY)) return;
-      } catch {
-        /* noop */
-      }
-      try {
         const { data } = await axios.get<{ survey: Survey | null }>(
           "/api/scoring-survey",
         );
@@ -72,15 +65,6 @@ export function ScoringSurveyModal() {
       cancelled = true;
     };
   }, []);
-
-  const snooze = () => {
-    setOpen(false);
-    try {
-      sessionStorage.setItem(SNOOZE_KEY, "1");
-    } catch {
-      /* noop */
-    }
-  };
 
   const vote = async (choice: "si" | "no") => {
     if (!survey || submitting) return;
@@ -114,7 +98,6 @@ export function ScoringSurveyModal() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={snooze}
           role="dialog"
           aria-modal="true"
           aria-label="Encuesta de sistema de puntos"
@@ -127,24 +110,14 @@ export function ScoringSurveyModal() {
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3 px-5 pt-5">
-              <div>
-                <span className="inline-block rounded-full border border-gold/20 bg-gold/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gold">
-                  Encuesta
-                </span>
-                <h2 className="mt-2 font-display text-[23px] leading-none tracking-[0.03em] text-text-primary">
-                  ¿Cambiamos el puntaje?
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={snooze}
-                aria-label="Cerrar"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border-subtle bg-bg-elevated text-text-secondary transition-colors hover:text-text-primary"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
+            {/* Header (sin X: hay que votar Sí o No para cerrar) */}
+            <div className="px-5 pt-5">
+              <span className="inline-block rounded-full border border-gold/20 bg-gold/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gold">
+                Encuesta
+              </span>
+              <h2 className="mt-2 font-display text-[23px] leading-none tracking-[0.03em] text-text-primary">
+                ¿Cambiamos el puntaje?
+              </h2>
             </div>
 
             <div className="overflow-y-auto px-5 pb-2 pt-3">
@@ -245,14 +218,6 @@ export function ScoringSurveyModal() {
                 className="h-11 w-full rounded-full border border-border-subtle font-display text-[14px] tracking-[0.05em] text-text-secondary transition-colors hover:text-text-primary disabled:opacity-60"
               >
                 No, déjenlo así
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={snooze}
-                className="mt-0.5 h-8 w-full text-[12px] text-text-muted transition-colors hover:text-text-secondary disabled:opacity-60"
-              >
-                Lo veo después
               </button>
             </div>
           </motion.div>
