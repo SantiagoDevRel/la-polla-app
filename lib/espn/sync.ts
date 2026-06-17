@@ -7,7 +7,8 @@
 //     logueamos warning y skipeamos.
 //   * Solo actualiza status / scores / elapsed via la función
 //     update_match_live_espn() — que también marca live_updated_at +
-//     live_source y bloquea regresiones de score.
+//     live_source. (Desde migración 071 el live sigue a ESPN incluso en
+//     bajadas de score: goles anulados por VAR se reflejan en vivo.)
 //   * Match strategy: primero por espn_id (fast path después del
 //     primer encuentro). Si no hay, por (tournament + scheduled_at
 //     ±2h + fuzzy team match). Cuando matchea, se persiste el
@@ -215,7 +216,18 @@ export async function syncEspnLive(): Promise<EspnSyncResult[]> {
 
       // 4. Mapear status + scores + minute.
       const newStatus = mapEspnStatus(event.status);
-      if (newStatus === null) continue; // estado desconocido — no tocar
+      if (newStatus === null) {
+        // Estado desconocido — no tocar el row. Si ESPN dice que está
+        // in-play (state="in") pero el NAME no lo mapeamos, lo logueamos:
+        // ese skip silencioso fue lo que congeló Argentina-Algeria cuando
+        // ESPN empezó a emitir STATUS_IN_PROGRESS sin que estuviera mapeado.
+        if (event.status.type.state === "in") {
+          console.warn(
+            `[espn-sync] in-play status sin mapear (row congelado): ${event.status.type.name} — ${event.name}`,
+          );
+        }
+        continue;
+      }
       const competition = event.competitions[0];
       const home = competition.competitors.find((c) => c.homeAway === "home");
       const away = competition.competitors.find((c) => c.homeAway === "away");
@@ -223,8 +235,8 @@ export async function syncEspnLive(): Promise<EspnSyncResult[]> {
       const newAway = parseEspnScore(away?.score);
       const newElapsed = parseEspnMinute(event.status.displayClock, event.status.period);
 
-      // 5. Aplicar update via la función segura (que bloquea regresión
-      //    de scores y marca live_updated_at + live_source).
+      // 5. Aplicar update via la función segura (marca live_updated_at +
+      //    live_source; desde 071 el score sigue a ESPN, también en bajadas).
       const { error: rpcErr } = await supabase.rpc("update_match_live_espn", {
         p_match_id: row.id,
         p_espn_id: event.id,
