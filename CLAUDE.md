@@ -1182,6 +1182,22 @@ siempre escribió `regularTime`.)*
 - Consecuencia UI: un knockout AET muestra el score de 90' como resultado final
   (ej: 1-1 aunque terminó 2-1 en alargue); el detalle vive en
   `live_status_detail` (STATUS_FINAL_AET/PEN) y en las notas de verificación.
+- **El score EN VIVO ahora sigue a ESPN también en BAJADAS (migración 071,
+  2026-06-17).** `update_match_live_espn` tenía un guard monotónico que clampaba
+  cualquier bajada de score → un gol anulado por VAR (ej. Argentina-Algeria: a
+  Argelia le anularon el 1-1, real 1-0) se quedaba mostrando el score viejo en
+  vivo hasta el pitazo. La 071 quitó ese clamp: el live refleja goles anulados
+  al toque. Lo que NO cambió: inmutabilidad post-verificación (`final_verified_at
+  IS NOT NULL → RETURN false`), snapshot reglamentario de ET, y el `COALESCE`
+  que conserva el valor previo si ESPN manda NULL/"" (sin dato). Tradeoff: un
+  glitch raro de ESPN podría flapear un score un tick. El cierre canónico de
+  90' sigue siendo `finalize_match_result`.
+- **ESPN emite `STATUS_IN_PROGRESS` (in-play genérico), no solo
+  `STATUS_FIRST_HALF`/`STATUS_SECOND_HALF`.** `mapEspnStatus` mapea por NAME
+  exacto; si falta uno, `sync.ts` hace `continue` silencioso y **congela el row
+  mid-game** (minuto y score clavados). Pasó con `STATUS_IN_PROGRESS` (mapeado
+  2026-06-17). Ahora `sync.ts` loguea un `warn` cuando llega un status `state="in"`
+  sin mapear, para que el próximo no pase desapercibido.
 
 ### 🚨 REGLA #5 — Cero hot-patches de DB sin migración 🚨
 
