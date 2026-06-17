@@ -1,55 +1,40 @@
 // components/admin/ScoringSurveyCard.tsx — Resultados de la encuesta de
-// sistema de puntos en /admin. Muestra el tally (Sí/No/Faltan), una
-// comparativa "cómo está vs cómo quedaría" con goles_v2, y botones para
-// aplicar o mantener. Se auto-oculta si no hay encuesta ni polla en goles_v2.
+// sistema de puntos (goles_v2) en /admin, una fila por polla.
+//
+// Para cada polla con encuesta abierta (o ya migrada) muestra el tally
+// Sí/No/Faltan + un botón "Implementar cambio" que migra ESA polla a
+// goles_v2 desde ese momento en adelante (NO retroactivo), o "Mantener".
+// Se auto-oculta si no hay ninguna encuesta ni polla en goles_v2.
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
 
-interface Row {
-  userId: string;
-  name: string;
-  avatar: string | null;
-  currentPoints: number;
-  currentRank: number;
-  projectedPoints: number;
-  projectedRank: number;
-  vote: "si" | "no" | null;
-}
-
-interface SurveyData {
+interface Survey {
   pollaId: string;
   pollaName: string;
   pollaSlug: string;
   scoringMode: string;
   surveyOpen: boolean;
+  changedAt: string | null;
   counts: { total: number; si: number; no: number; pending: number };
-  rows: Row[];
-}
-
-function rankDelta(curr: number, proj: number) {
-  // rank más bajo = mejor. Sube si proj < curr.
-  if (proj < curr) return { txt: `▲${curr - proj}`, color: "#1FD87F" };
-  if (proj > curr) return { txt: `▼${proj - curr}`, color: "#FF3D57" };
-  return { txt: "=", color: "#6B7689" };
 }
 
 export default function ScoringSurveyCard() {
   const { showToast } = useToast();
-  const [data, setData] = useState<SurveyData | null>(null);
+  const [surveys, setSurveys] = useState<Survey[] | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [acting, setActing] = useState(false);
+  const [acting, setActing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const { data: body } = await axios.get<{ survey: SurveyData | null }>(
+      const { data } = await axios.get<{ surveys: Survey[] }>(
         "/api/admin/scoring-survey",
       );
-      setData(body.survey);
+      setSurveys(data.surveys ?? []);
     } catch {
-      setData(null);
+      setSurveys([]);
     } finally {
       setLoaded(true);
     }
@@ -60,42 +45,38 @@ export default function ScoringSurveyCard() {
   }, [load]);
 
   const decide = useCallback(
-    async (action: "apply" | "keep") => {
-      if (!data) return;
+    async (s: Survey, action: "apply" | "keep") => {
       const msg =
         action === "apply"
-          ? `¿Aplicar el NUEVO sistema (goles_v2) a "${data.pollaName}"? Se recalculan todos los puntos de esta polla. Las demás pollas no se tocan.`
-          : `¿Cerrar la encuesta y MANTENER el sistema actual en "${data.pollaName}"?`;
+          ? `¿Implementar el NUEVO sistema (goles_v2) en "${s.pollaName}"?\n\nNO es retroactivo: los puntos actuales no se tocan. Cuenta desde el próximo partido en adelante. Las demás pollas no se afectan.`
+          : `¿Cerrar la encuesta y MANTENER el sistema actual en "${s.pollaName}"?`;
       if (!window.confirm(msg)) return;
-      setActing(true);
+      setActing(s.pollaId);
       try {
         await axios.post("/api/admin/scoring-survey", {
-          pollaId: data.pollaId,
+          pollaId: s.pollaId,
           action,
         });
         showToast(
           action === "apply"
-            ? "Nuevo sistema aplicado y puntos recalculados"
-            : "Encuesta cerrada, sistema actual mantenido",
+            ? `"${s.pollaName}" ahora cuenta con el nuevo sistema (desde hoy)`
+            : `Encuesta cerrada en "${s.pollaName}"`,
           "success",
         );
         await load();
       } catch {
         showToast("No se pudo procesar la acción", "error");
       } finally {
-        setActing(false);
+        setActing(null);
       }
     },
-    [data, load, showToast],
+    [load, showToast],
   );
 
-  if (!loaded || !data) return null;
+  if (!loaded || !surveys || surveys.length === 0) return null;
 
-  const { counts } = data;
-  const decided = counts.si + counts.no;
-  const majorityYes = counts.si > counts.total / 2;
-  const majorityNo = counts.no >= counts.total / 2;
-  const applied = data.scoringMode === "goles_v2";
+  const openCount = surveys.filter((s) => s.surveyOpen).length;
+  const appliedCount = surveys.filter((s) => s.scoringMode === "goles_v2").length;
 
   return (
     <section
@@ -105,129 +86,119 @@ export default function ScoringSurveyCard() {
         border: "1px solid rgba(255,215,0,0.25)",
       }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-display text-[18px] tracking-[0.03em] text-text-primary">
-            Encuesta · nuevo puntaje
-          </h3>
-          <p className="mt-0.5 text-[12px] text-text-secondary">
-            {data.pollaName}
-            {applied ? (
-              <span className="ml-2 rounded-full bg-turf/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-turf">
-                Aplicado
-              </span>
-            ) : data.surveyOpen ? (
-              <span className="ml-2 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">
-                Abierta
-              </span>
-            ) : (
-              <span className="ml-2 rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-                Cerrada
-              </span>
-            )}
-          </p>
-        </div>
+      <div>
+        <h3 className="font-display text-[18px] tracking-[0.03em] text-text-primary">
+          Encuesta · nuevo puntaje (goles_v2)
+        </h3>
+        <p className="mt-0.5 text-[12px] text-text-secondary">
+          {openCount} {openCount === 1 ? "encuesta abierta" : "encuestas abiertas"}
+          {appliedCount > 0 ? ` · ${appliedCount} ya implementada(s)` : ""}
+        </p>
       </div>
 
-      {/* Tally */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-xl bg-bg-elevated px-3 py-2 text-center">
-          <div className="font-display text-[22px] text-turf">{counts.si}</div>
-          <div className="text-[10px] uppercase tracking-wide text-text-muted">Sí</div>
-        </div>
-        <div className="rounded-xl bg-bg-elevated px-3 py-2 text-center">
-          <div className="font-display text-[22px] text-red-alert">{counts.no}</div>
-          <div className="text-[10px] uppercase tracking-wide text-text-muted">No</div>
-        </div>
-        <div className="rounded-xl bg-bg-elevated px-3 py-2 text-center">
-          <div className="font-display text-[22px] text-text-secondary">{counts.pending}</div>
-          <div className="text-[10px] uppercase tracking-wide text-text-muted">Faltan</div>
-        </div>
-      </div>
-      <p className="text-[11.5px] text-text-secondary">
-        {decided} de {counts.total} votaron.{" "}
-        {majorityYes ? (
-          <span className="text-turf">Mayoría a favor del nuevo sistema.</span>
-        ) : majorityNo ? (
-          <span className="text-text-secondary">Mayoría por mantener el actual.</span>
-        ) : (
-          <span className="text-text-muted">Sin mayoría todavía.</span>
-        )}
+      <p className="rounded-xl bg-bg-elevated px-3 py-2 text-[11px] leading-snug text-text-secondary">
+        <span className="text-text-primary">No retroactivo:</span> &quot;Implementar&quot;
+        no cambia los puntos actuales — esa polla empieza a contar con goles_v2
+        desde el próximo partido. Cada polla se decide aparte según sus votos.
       </p>
 
-      {/* Comparativa de tabla */}
-      <div className="overflow-hidden rounded-xl border border-border-subtle">
-        <div className="grid grid-cols-[1.4fr_1fr_1fr_auto] items-center gap-x-2 border-b border-border-subtle bg-bg-elevated px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-muted">
-          <span>Jugador</span>
-          <span className="text-center">Hoy</span>
-          <span className="text-center text-gold">Nuevo</span>
-          <span className="w-10 text-center">Voto</span>
-        </div>
-        {data.rows.map((r, i) => {
-          const d = rankDelta(r.currentRank, r.projectedRank);
+      <div className="space-y-2.5">
+        {surveys.map((s) => {
+          const { counts } = s;
+          const decided = counts.si + counts.no;
+          const majorityYes = counts.si > counts.total / 2;
+          const majorityNo = counts.no >= counts.total / 2 && counts.total > 0;
+          const applied = s.scoringMode === "goles_v2";
+          const busy = acting === s.pollaId;
           return (
             <div
-              key={r.userId}
-              className="grid grid-cols-[1.4fr_1fr_1fr_auto] items-center gap-x-2 px-3 py-1.5"
-              style={{ borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.04)" }}
+              key={s.pollaId}
+              className="rounded-xl border border-border-subtle bg-bg-card/60 p-3"
             >
-              <span className="truncate text-[12px] text-text-primary">{r.name}</span>
-              <span className="text-center text-[12px] text-text-secondary">
-                <span className="text-text-muted">#{r.currentRank}</span>{" "}
-                <span className="font-display text-[14px]">{r.currentPoints}</span>
-              </span>
-              <span className="text-center text-[12px]">
-                <span style={{ color: d.color }}>#{r.projectedRank}</span>{" "}
-                <span className="font-display text-[14px] text-text-primary">
-                  {r.projectedPoints}
-                </span>
-                <span className="ml-1 text-[10px]" style={{ color: d.color }}>
-                  {d.txt}
-                </span>
-              </span>
-              <span className="w-10 text-center text-[11px]">
-                {r.vote === "si" ? (
-                  <span className="text-turf">Sí</span>
-                ) : r.vote === "no" ? (
-                  <span className="text-red-alert">No</span>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold text-text-primary">
+                    {s.pollaName || s.pollaSlug}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-text-muted">
+                    {counts.total} {counts.total === 1 ? "jugador" : "jugadores"} ·{" "}
+                    {decided} {decided === 1 ? "votó" : "votaron"}
+                  </p>
+                </div>
+                {applied ? (
+                  <span className="shrink-0 rounded-full bg-turf/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-turf">
+                    Implementada
+                  </span>
                 ) : (
-                  <span className="text-text-muted">—</span>
+                  <span className="shrink-0 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold">
+                    Abierta
+                  </span>
                 )}
-              </span>
+              </div>
+
+              {/* Tally */}
+              <div className="mt-2 flex items-center gap-3 text-[12px]">
+                <span className="text-turf">
+                  Sí <span className="font-display text-[15px]">{counts.si}</span>
+                </span>
+                <span className="text-red-alert">
+                  No <span className="font-display text-[15px]">{counts.no}</span>
+                </span>
+                <span className="text-text-muted">
+                  Faltan{" "}
+                  <span className="font-display text-[15px]">{counts.pending}</span>
+                </span>
+                {!applied ? (
+                  majorityYes ? (
+                    <span className="ml-auto text-[11px] text-turf">Mayoría: Sí</span>
+                  ) : majorityNo ? (
+                    <span className="ml-auto text-[11px] text-text-secondary">
+                      Mayoría: No
+                    </span>
+                  ) : (
+                    <span className="ml-auto text-[11px] text-text-muted">
+                      Sin mayoría
+                    </span>
+                  )
+                ) : null}
+              </div>
+
+              {/* Acciones */}
+              {!applied ? (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => decide(s, "apply")}
+                    className="flex-1 rounded-full bg-gold py-2 font-display text-[12.5px] tracking-[0.04em] text-bg-base transition-transform active:scale-[0.98] disabled:opacity-60"
+                  >
+                    {busy ? "…" : "Implementar cambio"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => decide(s, "keep")}
+                    className="rounded-full border border-border-subtle px-3 py-2 font-display text-[12.5px] tracking-[0.04em] text-text-secondary transition-colors hover:text-text-primary disabled:opacity-60"
+                  >
+                    Mantener
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-2 text-[11px] text-turf">
+                  Cuenta con goles_v2 desde{" "}
+                  {s.changedAt
+                    ? new Date(s.changedAt).toLocaleDateString("es-CO", {
+                        day: "numeric",
+                        month: "short",
+                      })
+                    : "—"}
+                  .
+                </p>
+              )}
             </div>
           );
         })}
       </div>
-      <p className="text-[10.5px] leading-snug text-text-muted">
-        &quot;Hoy&quot; = puntaje actual (classic). &quot;Nuevo&quot; = proyección con goles_v2
-        sobre los partidos ya verificados. ▲ = sube puestos, ▼ = baja.
-      </p>
-
-      {/* Acciones */}
-      {!applied ? (
-        <div className="flex gap-2 pt-1">
-          <button
-            type="button"
-            disabled={acting}
-            onClick={() => decide("apply")}
-            className="flex-1 rounded-full bg-gold py-2.5 font-display text-[13px] tracking-[0.05em] text-bg-base transition-transform active:scale-[0.98] disabled:opacity-60"
-          >
-            Aplicar nuevo sistema
-          </button>
-          <button
-            type="button"
-            disabled={acting}
-            onClick={() => decide("keep")}
-            className="flex-1 rounded-full border border-border-subtle py-2.5 font-display text-[13px] tracking-[0.05em] text-text-secondary transition-colors hover:text-text-primary disabled:opacity-60"
-          >
-            Mantener actual
-          </button>
-        </div>
-      ) : (
-        <p className="pt-1 text-[12px] text-turf">
-          Sistema goles_v2 aplicado a esta polla. Los puntos ya se recalcularon.
-        </p>
-      )}
     </section>
   );
 }
