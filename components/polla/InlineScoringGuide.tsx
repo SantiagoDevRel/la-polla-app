@@ -86,14 +86,71 @@ function buildRows(
   ];
 }
 
+// Escalera goles_v2 (migración 072) — 6 niveles, copy es-CO fijo (no i18n:
+// es una polla puntual). Debe quedar 1:1 con calculatePointsGolesV2.
+function golesV2Rows(): Row[] {
+  return [
+    {
+      label: "Marcador exacto",
+      pts: 5,
+      ptsLabel: "5",
+      color: "#FFD700",
+      explanation: "Le pegaste al marcador clavado.",
+      example: { pred: "2-1", result: "2-1" },
+    },
+    {
+      label: "Ganador + diferencia de gol",
+      pts: 4,
+      ptsLabel: "4",
+      color: "#f0f4ff",
+      explanation: "Acertaste quién ganó y por cuántos goles, aunque no el marcador exacto.",
+      example: { pred: "3-2", result: "2-1" },
+    },
+    {
+      label: "Ganador + un gol de algún equipo",
+      pts: 3,
+      ptsLabel: "3",
+      color: "#f0f4ff",
+      explanation: "Acertaste quién ganó y los goles de uno de los equipos.",
+      example: { pred: "2-0", result: "2-1" },
+    },
+    {
+      label: "Ganador solo",
+      pts: 2,
+      ptsLabel: "2",
+      color: "#f0f4ff",
+      explanation: "Acertaste quién ganó, pero ni la diferencia ni los goles de un equipo.",
+      example: { pred: "3-0", result: "2-1" },
+    },
+    {
+      label: "Un gol de algún equipo (sin el ganador)",
+      pts: 1,
+      ptsLabel: "1",
+      color: "#f0f4ff",
+      explanation: "Le acertaste los goles de un equipo aunque erraste quién ganó.",
+      example: { pred: "2-3", result: "2-1" },
+    },
+    {
+      label: "Nada",
+      pts: 0,
+      ptsLabel: "0",
+      color: "#4a5568",
+      explanation: "No coincidió ni el ganador ni los goles de un equipo.",
+      example: { pred: "0-0", result: "2-1" },
+    },
+  ];
+}
+
 export interface InlineScoringGuideProps {
   /** Polla-specific point values. Omit to fall back to 5/3/2/1/0. */
   points?: ScoringPoints;
+  /** Modo de puntaje. 'goles_v2' usa la escalera de 6 niveles. */
+  mode?: "classic" | "goles_v2";
 }
 
-export function InlineScoringGuide({ points }: InlineScoringGuideProps) {
+export function InlineScoringGuide({ points, mode = "classic" }: InlineScoringGuideProps) {
   const t = useTranslations("Scoring");
-  const rows = buildRows(points ?? {}, t);
+  const rows = mode === "goles_v2" ? golesV2Rows() : buildRows(points ?? {}, t);
   const [expanded, setExpanded] = useState<number | null>(null);
 
   return (
