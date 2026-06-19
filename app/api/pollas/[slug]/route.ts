@@ -130,12 +130,28 @@ export async function GET(
       points_earned: number | null;
     }> = [];
     if (lockedMatchIds.length > 0) {
-      const { data: locked } = await adminSupabase
-        .from("predictions")
-        .select("match_id, user_id, predicted_home, predicted_away, points_earned")
-        .eq("polla_id", polla.id)
-        .in("match_id", lockedMatchIds);
-      allPredictions = locked || [];
+      // Paginar en bloques de 1000: PostgREST/supabase-js topa la
+      // respuesta en ~1000 filas y descarta el resto EN SILENCIO. Una
+      // polla grande (104 partidos × N participantes) supera ese cap
+      // fácil, y al cortarse se "perdían" los pronósticos de los últimos
+      // partidos cargados → el row mostraba menos pronósticos de los
+      // reales (bug: Canada vs Qatar mostraba 19 de 39). Ver memoria
+      // postgrest-row-cap-admin-aggregates.
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data: page, error: pageErr } = await adminSupabase
+          .from("predictions")
+          .select("match_id, user_id, predicted_home, predicted_away, points_earned")
+          .eq("polla_id", polla.id)
+          .in("match_id", lockedMatchIds)
+          .order("match_id", { ascending: true })
+          .order("user_id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (pageErr) break;
+        const rows = page || [];
+        allPredictions.push(...rows);
+        if (rows.length < PAGE) break;
+      }
     }
 
     // Para matches NO bloqueados, devolvemos solo (match_id, user_id)
@@ -148,12 +164,27 @@ export async function GET(
       .map((m) => m.id);
     let predictedUserIdsByMatch: Record<string, string[]> = {};
     if (upcomingScheduledIds.length > 0) {
-      const { data: upcomingPreds } = await adminSupabase
-        .from("predictions")
-        .select("match_id, user_id")
-        .eq("polla_id", polla.id)
-        .in("match_id", upcomingScheduledIds);
-      predictedUserIdsByMatch = (upcomingPreds || []).reduce(
+      // Mismo cap de ~1000 filas que allPredictions: paginar para no
+      // perder pronósticos de los últimos partidos próximos (si se
+      // cortan, missingByMatch marca como "no pronosticó" a gente que sí
+      // lo hizo).
+      const PAGE = 1000;
+      const upcomingPreds: Array<{ match_id: string; user_id: string }> = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data: page, error: pageErr } = await adminSupabase
+          .from("predictions")
+          .select("match_id, user_id")
+          .eq("polla_id", polla.id)
+          .in("match_id", upcomingScheduledIds)
+          .order("match_id", { ascending: true })
+          .order("user_id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (pageErr) break;
+        const rows = page || [];
+        upcomingPreds.push(...rows);
+        if (rows.length < PAGE) break;
+      }
+      predictedUserIdsByMatch = upcomingPreds.reduce(
         (acc, p) => {
           (acc[p.match_id] = acc[p.match_id] || []).push(p.user_id);
           return acc;
