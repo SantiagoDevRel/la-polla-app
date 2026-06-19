@@ -122,20 +122,58 @@ export async function GET(
       })
       .map((m) => m.id);
 
-    let allPredictions: Array<{
+    // Solo PRECARGAMOS los marcadores de partidos con kickoff en las
+    // últimas 24h (recientes). Los partidos viejos no se traen aquí: en
+    // una polla del Mundial (104 partidos × N jugadores) eso son miles de
+    // filas que casi nadie mira. El cliente los pide on-demand via
+    // /api/pollas/[slug]/match-predictions cuando alguien expande "ver
+    // marcadores" de ese partido. recentLockedMatchIds le dice al cliente
+    // cuáles ya vienen completos (vs cuáles debe lazy-cargar).
+    const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+    const recentCutoff = Date.now() - RECENT_WINDOW_MS;
+    const recentLockedMatchIds = (matches || [])
+      .filter((m) => {
+        if (!lockedMatchIds.includes(m.id)) return false;
+        if (m.status === "live") return true; // live siempre es reciente
+        const kickoffMs = new Date(m.scheduled_at).getTime();
+        return Number.isFinite(kickoffMs) && kickoffMs >= recentCutoff;
+      })
+      .map((m) => m.id);
+
+    const allPredictions: Array<{
       match_id: string;
       user_id: string;
       predicted_home: number;
       predicted_away: number;
       points_earned: number | null;
     }> = [];
-    if (lockedMatchIds.length > 0) {
-      const { data: locked } = await adminSupabase
-        .from("predictions")
-        .select("match_id, user_id, predicted_home, predicted_away, points_earned")
-        .eq("polla_id", polla.id)
-        .in("match_id", lockedMatchIds);
-      allPredictions = locked || [];
+    if (recentLockedMatchIds.length > 0) {
+      // Paginar en bloques de 1000: PostgREST/supabase-js topa la
+      // respuesta en ~1000 filas y descarta el resto EN SILENCIO. Aunque
+      // ahora solo traemos partidos recientes, paginamos por defensa (un
+      // día pico del Mundial puede tener varios partidos × cientos de
+      // jugadores). Ver memoria postgrest-row-cap-admin-aggregates.
+      const PAGE = 1000;
+      for (let from = 0; ; from += PAGE) {
+        const { data: page, error: pageErr } = await adminSupabase
+          .from("predictions")
+          .select("match_id, user_id, predicted_home, predicted_away, points_earned")
+          .eq("polla_id", polla.id)
+          .in("match_id", recentLockedMatchIds)
+          .order("match_id", { ascending: true })
+          .order("user_id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (pageErr) {
+          // No silenciar: si una página falla devolvemos lo cargado pero
+          // dejamos rastro en logs (un payload parcial reproduce el mismo
+          // síntoma del bug original con otro root cause).
+          console.error("[polla GET] allPredictions page error", pageErr);
+          break;
+        }
+        const rows = page || [];
+        allPredictions.push(...rows);
+        if (rows.length < PAGE) break;
+      }
     }
 
     // Para matches NO bloqueados, devolvemos solo (match_id, user_id)
@@ -148,12 +186,30 @@ export async function GET(
       .map((m) => m.id);
     let predictedUserIdsByMatch: Record<string, string[]> = {};
     if (upcomingScheduledIds.length > 0) {
-      const { data: upcomingPreds } = await adminSupabase
-        .from("predictions")
-        .select("match_id, user_id")
-        .eq("polla_id", polla.id)
-        .in("match_id", upcomingScheduledIds);
-      predictedUserIdsByMatch = (upcomingPreds || []).reduce(
+      // Mismo cap de ~1000 filas que allPredictions: paginar para no
+      // perder pronósticos de los últimos partidos próximos (si se
+      // cortan, missingByMatch marca como "no pronosticó" a gente que sí
+      // lo hizo).
+      const PAGE = 1000;
+      const upcomingPreds: Array<{ match_id: string; user_id: string }> = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data: page, error: pageErr } = await adminSupabase
+          .from("predictions")
+          .select("match_id, user_id")
+          .eq("polla_id", polla.id)
+          .in("match_id", upcomingScheduledIds)
+          .order("match_id", { ascending: true })
+          .order("user_id", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (pageErr) {
+          console.error("[polla GET] predictedUserIds page error", pageErr);
+          break;
+        }
+        const rows = page || [];
+        upcomingPreds.push(...rows);
+        if (rows.length < PAGE) break;
+      }
+      predictedUserIdsByMatch = upcomingPreds.reduce(
         (acc, p) => {
           (acc[p.match_id] = acc[p.match_id] || []).push(p.user_id);
           return acc;
@@ -173,6 +229,10 @@ export async function GET(
       matches: matches || [],
       predictions: predictions || [],
       allPredictions,
+      // Partidos cuyos marcadores ya vienen completos en allPredictions
+      // (últimas 24h). Para el resto de partidos bloqueados, el cliente
+      // hace lazy-load via /match-predictions al expandir.
+      recentLockedMatchIds,
       predictedUserIdsByMatch,
       currentUserRole: currentRole,
       currentUserStatus: participant?.status || "approved",
