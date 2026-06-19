@@ -332,6 +332,17 @@ interface MatchRowProps {
    *  min del kickoff) — el server filtra eso. Pasar [] cuando todavía
    *  no hay nada que revelar. */
   otherPredictions: OtherPrediction[];
+  /** true si los marcadores de este partido ya vienen precargados
+   *  (kickoff en las últimas 24h). Si es false, el partido es viejo y sus
+   *  marcadores se lazy-cargan al expandir "ver marcadores". */
+  predsPreloaded: boolean;
+  /** true si ya tenemos los marcadores (precargados o lazy-cargados). Sirve
+   *  para distinguir "todavía no cargado" de "nadie pronosticó". */
+  predsLoaded: boolean;
+  /** true mientras se está haciendo el fetch lazy de este partido. */
+  predsLoading: boolean;
+  /** Dispara el lazy-load de los marcadores de este partido. */
+  onRequestPreds: () => void;
   locked: boolean;
   /** Display names de participantes approved+paid que aún NO han
    *  pronosticado este partido. Solo se renderizan cuando !locked —
@@ -356,6 +367,10 @@ function MatchRow({
   awayRef,
   tournamentSlug,
   otherPredictions,
+  predsPreloaded,
+  predsLoaded,
+  predsLoading,
+  onRequestPreds,
   locked,
   missingPredictions,
   onTeamClick,
@@ -668,18 +683,24 @@ function MatchRow({
             entonces los pronósticos siguen siendo privados. El server
             ya filtra qué predictions devuelve por match, así que aquí
             solo renderizamos lo que llegó. */}
-        {locked && otherPredictions.length > 0 ? (
+        {locked && (predsPreloaded ? otherPredictions.length > 0 : true) ? (
           <div className="mt-3 pt-3 border-t border-border-subtle">
-            {/* Dropdown: colapsado por default para que la card no crezca
-                con la lista completa de marcadores del parche. */}
+            {/* Dropdown: colapsado por default. Partidos recientes (24h)
+                vienen precargados; los viejos lazy-cargan al expandir, así
+                no transferimos miles de marcadores que casi nadie mira. */}
             <button
               type="button"
-              onClick={() => setPoolPredsOpen((o) => !o)}
+              onClick={() => {
+                if (!predsLoaded && !predsLoading) onRequestPreds();
+                setPoolPredsOpen((o) => !o);
+              }}
               aria-expanded={poolPredsOpen}
               className="w-full flex items-center justify-between gap-2 cursor-pointer"
             >
               <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] text-text-primary/60">
-                {t("poolPredsLabel", { count: otherPredictions.length })}
+                {predsLoaded
+                  ? t("poolPredsLabel", { count: otherPredictions.length })
+                  : t("poolPredsLoad")}
                 {isFinished && !isScored ? (
                   <span className="inline-flex items-center gap-1 text-gold/70 normal-case tracking-normal">
                     <span className="w-1.5 h-1.5 rounded-full bg-gold/60 animate-pulse" aria-hidden="true" />
@@ -692,7 +713,13 @@ function MatchRow({
                 aria-hidden="true"
               />
             </button>
-            {poolPredsOpen && (
+            {poolPredsOpen && (predsLoading && !predsLoaded) ? (
+              <p className="text-[11px] text-text-primary/50 mt-2">{t("poolPredsLoading")}</p>
+            ) : null}
+            {poolPredsOpen && predsLoaded && otherPredictions.length === 0 ? (
+              <p className="text-[11px] text-text-primary/50 mt-2">{t("poolPredsEmpty")}</p>
+            ) : null}
+            {poolPredsOpen && otherPredictions.length > 0 && (
             <ul className="space-y-1.5 mt-2">
               {otherPredictions.map((op) => {
                 const showPoints = isScored;
@@ -801,6 +828,15 @@ export default function PollaSlugPage() {
   const [predictedUserIdsByMatch, setPredictedUserIdsByMatch] = useState<
     Record<string, string[]>
   >({});
+  // Partidos cuyos marcadores vienen precargados en allPredictions (últimas
+  // 24h). El resto se lazy-cargan on-demand. Ver route.ts.
+  const [recentLockedIds, setRecentLockedIds] = useState<Set<string>>(new Set());
+  // Cache de marcadores lazy-cargados por match_id (partidos viejos que el
+  // user expandió). Y el set de los que están cargando ahora.
+  const [lazyPredsByMatch, setLazyPredsByMatch] = useState<
+    Map<string, Array<{ match_id: string; user_id: string; predicted_home: number; predicted_away: number; points_earned: number | null }>>
+  >(new Map());
+  const [lazyLoadingIds, setLazyLoadingIds] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState("");
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserStatus, setCurrentUserStatus] = useState("approved");
@@ -994,6 +1030,7 @@ export default function PollaSlugPage() {
       setMatches(data.matches);
       setPredictions(data.predictions);
       setAllPredictions(data.allPredictions || []);
+      setRecentLockedIds(new Set<string>(data.recentLockedMatchIds || []));
       setPredictedUserIdsByMatch(data.predictedUserIdsByMatch || {});
       setCurrentUserId(data.currentUserId);
       setCurrentUserRole(data.currentUserRole);
@@ -1134,6 +1171,7 @@ export default function PollaSlugPage() {
       const { data } = await axios.get(`/api/pollas/${slug}`);
       setPredictions(data.predictions);
       setAllPredictions(data.allPredictions || []);
+      setRecentLockedIds(new Set<string>(data.recentLockedMatchIds || []));
       setPredictedUserIdsByMatch(data.predictedUserIdsByMatch || {});
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -1231,7 +1269,12 @@ export default function PollaSlugPage() {
   // Descarta los que ya no están en la lista de participantes approved+paid.
   const otherPredsByMatch = useMemo(() => {
     const out = new Map<string, OtherPrediction[]>();
-    for (const ap of allPredictions) {
+    // allPredictions trae los marcadores precargados (últimas 24h); los
+    // lazy-cargados (partidos viejos que el user expandió) se suman acá,
+    // así el render no distingue entre unos y otros.
+    const all = [...allPredictions];
+    lazyPredsByMatch.forEach((rows) => all.push(...rows));
+    for (const ap of all) {
       const info = participantInfoById.get(ap.user_id);
       if (!info) continue;
       const arr = out.get(ap.match_id) ?? [];
@@ -1257,7 +1300,51 @@ export default function PollaSlugPage() {
       });
     });
     return out;
-  }, [allPredictions, currentUserId, participantInfoById]);
+  }, [allPredictions, lazyPredsByMatch, currentUserId, participantInfoById]);
+
+  // Lazy-load de marcadores de un partido viejo (fuera de la ventana de
+  // 24h que precarga el server). Se dispara al expandir "ver marcadores".
+  // Cachea por match_id y evita pedidos duplicados. Guarda las filas raw;
+  // el memo otherPredsByMatch las enriquece con nombre/pollito.
+  const loadMatchPreds = useCallback(
+    async (matchId: string) => {
+      if (lazyPredsByMatch.has(matchId) || lazyLoadingIds.has(matchId)) return;
+      setLazyLoadingIds((s) => new Set(s).add(matchId));
+      try {
+        const { data } = await axios.get(
+          `/api/pollas/${slug}/match-predictions`,
+          { params: { match_id: matchId } },
+        );
+        const rows = (data?.predictions ?? []) as Array<{
+          match_id: string; user_id: string; predicted_home: number;
+          predicted_away: number; points_earned: number | null;
+        }>;
+        setLazyPredsByMatch((m) => new Map(m).set(matchId, rows));
+      } catch {
+        // Silencioso: si falla, el botón sigue disponible para reintentar.
+      } finally {
+        setLazyLoadingIds((s) => {
+          const next = new Set(s);
+          next.delete(matchId);
+          return next;
+        });
+      }
+    },
+    [slug, lazyPredsByMatch, lazyLoadingIds],
+  );
+
+  // Props de marcadores para un MatchRow: de dónde salen sus pronósticos
+  // (precargados vs lazy) y los flags de estado de carga.
+  function predProps(matchId: string) {
+    const preloaded = recentLockedIds.has(matchId);
+    return {
+      otherPredictions: otherPredsByMatch.get(matchId) ?? [],
+      predsPreloaded: preloaded,
+      predsLoaded: preloaded || lazyPredsByMatch.has(matchId),
+      predsLoading: lazyLoadingIds.has(matchId),
+      onRequestPreds: () => loadMatchPreds(matchId),
+    };
+  }
 
   // Loading skeleton
   if (loading) {
@@ -1514,7 +1601,7 @@ export default function PollaSlugPage() {
                             homeRef={null}
                             awayRef={null}
                             tournamentSlug={polla.tournament}
-                            otherPredictions={otherPredsByMatch.get(match.id) ?? []}
+                            {...predProps(match.id)}
                             locked={isLocked(match)}
                             missingPredictions={missingByMatch.get(match.id) ?? []}
                             onTeamClick={openTeamSheet}
@@ -1547,7 +1634,7 @@ export default function PollaSlugPage() {
                           homeRef={null}
                           awayRef={null}
                           tournamentSlug={polla.tournament}
-                          otherPredictions={otherPredsByMatch.get(match.id) ?? []}
+                          {...predProps(match.id)}
                           locked={isLocked(match)}
                           missingPredictions={missingByMatch.get(match.id) ?? []}
                           onTeamClick={openTeamSheet}
@@ -1648,7 +1735,7 @@ export default function PollaSlugPage() {
                                   homeRef={(el) => { homeInputRefs.current[match.id] = el; }}
                                   awayRef={(el) => { awayInputRefs.current[match.id] = el; }}
                                   tournamentSlug={polla.tournament}
-                                  otherPredictions={otherPredsByMatch.get(match.id) ?? []}
+                                  {...predProps(match.id)}
                                   locked={isLocked(match)}
                                   missingPredictions={missingByMatch.get(match.id) ?? []}
                                   onTeamClick={openTeamSheet}
@@ -2002,6 +2089,8 @@ export default function PollaSlugPage() {
               const { data } = await axios.get(`/api/pollas/${slug}`);
               setPredictions(data.predictions);
               setAllPredictions(data.allPredictions || []);
+              setRecentLockedIds(new Set<string>(data.recentLockedMatchIds || []));
+      setRecentLockedIds(new Set<string>(data.recentLockedMatchIds || []));
               setPredictedUserIdsByMatch(data.predictedUserIdsByMatch || {});
             } catch { /* el próximo load lo trae */ }
           }}

@@ -246,6 +246,38 @@ Files: `app/(auth)/{login,onboarding}/page.tsx`,
 
 ---
 
+## 🚨🚨 REGLA HARD — NUNCA tocar ni borrar pronósticos sin orden EXPLÍCITA 🚨🚨
+
+*(Agregada 2026-06-18 por pedido del owner.)*
+
+Los `predictions` son **datos sagrados de los usuarios**. El LLM (vos)
+tiene **PROHIBIDO** modificar, borrar, recalcular, "limpiar", deduplicar,
+migrar o reescribir filas de la tabla `predictions` en Supabase **a menos
+que el owner te lo pida EXPLÍCITAMENTE en este mismo hilo** (ej: "borrá el
+pronóstico X", "cambiá el marcador de Y a 2-1"). Sin esa orden literal:
+
+- ❌ CERO `DELETE`, `UPDATE`, `INSERT`, `UPSERT` sobre `predictions` —
+  ni por SQL editor, ni por MCP `execute_sql`/`apply_migration`, ni por la
+  Management API, ni por supabase-js, ni dentro de una migración, ni como
+  "efecto secundario" de otro fix.
+- ❌ CERO tocar `points_earned` a mano (lo calcula el trigger de scoring
+  desde `matches.final_verified_at` — ver REGLA #4). Si los puntos se ven
+  mal, el problema está en el MATCH o en el trigger, NO en el pronóstico.
+- ❌ CERO "arreglar duplicados" de pronósticos por tu cuenta. Si ves algo
+  raro (ej: 2 filas del mismo user/match), **reportalo y pará** — no borres.
+  Recordá: `UNIQUE(polla_id, user_id, match_id)`, así que el mismo user en
+  2 pollas distintas tiene 2 filas legítimas (NO es duplicado).
+- ✅ LEER pronósticos (SELECT) para diagnosticar: siempre permitido.
+- ✅ Cambiar CÓDIGO que lee/muestra pronósticos (endpoints, UI): permitido
+  bajo las reglas normales del repo — eso NO toca las filas.
+
+**Por qué:** un pronóstico borrado o cambiado por error es prácticamente
+irrecuperable (el user ya no recuerda qué puso) y rompe la integridad de
+la polla + el ranking + los premios. El costo de un falso "lo arreglo yo"
+es altísimo. Ante la duda: **preguntá, no toques.**
+
+---
+
 ## Hard rules (post-cleanup, 2026-04)
 
 - **No `digital_pool` payment mode**. Removed end-to-end (Wompi gone).
