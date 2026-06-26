@@ -834,10 +834,12 @@ Where it matters most we use reply buttons:
 
 ### Admin Access Control
 - `users.is_admin` column (boolean) — set via migration 005, locked
-  down to exactly two phones via migration 024. The two admins are
-  `573117312391` (+57 311 731 2391) and `351934255581` (+351 934 255
-  581); migration 024 also demotes anyone else who somehow had the
-  flag, and is idempotent so re-running is safe.
+  down to exactly two specific phones via migration 024 (the literal
+  numbers are kept out of the public repo). **Admin authorization is the
+  `users.is_admin` DB column, not any phone check.** The `ADMIN_PHONES_E164`
+  env var is unrelated to authorization — it only exempts those phones from
+  the SMS daily cap in `start-otp`. Migration 024 also demotes anyone else
+  who somehow had the flag, and is idempotent so re-running is safe.
 - `lib/auth/admin.ts` — `isCurrentUserAdmin()` server-side check, used in API routes and admin layout
 - `app/(app)/admin/layout.tsx` — server-side layout guard, redirects non-admins to /dashboard
 - Admin API routes (`/api/admin/*`, `/api/matches/sync`) use dual auth: admin session OR CRON_SECRET header
@@ -924,7 +926,7 @@ Botón "Reportar problema" en `BrandHeader` (al lado del WhatsAppBubble) que abr
 - `components/layout/BrandHeader.tsx` — wires both bubbles
 
 ### Env vars (add to .env.local)
-- `FEEDBACK_NOTIFY_WHATSAPP` — admin phone (E.164 sin +). Ej: `351934255581`
+- `FEEDBACK_NOTIFY_WHATSAPP` — admin phone (E.164 sin +). Ej: `57XXXXXXXXXX`
 - `FEEDBACK_NOTIFY_EMAIL` — admin email
 - `RESEND_API_KEY` — de https://resend.com
 - `RESEND_FROM_EMAIL` (opcional) — en prod ya seteado a `La Polla <noreply@send.lapollacolombiana.com>` (dominio verificado). Default del código si falta: `La Polla <onboarding@resend.dev>`

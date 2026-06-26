@@ -42,14 +42,16 @@ const MAX_UPLOADS_PER_USER_24H = 10;
 const MAX_PROOFS_PER_POLLA = 2;
 const ENDPOINT_NAME = "pollas/payment-proof";
 
-// Bypass para testers — saltan el cap de comprobantes por polla. NO
-// saltan el throttle de 10/24h ni la verificación AI. Hardcoded a
-// propósito: son IDs estables del owner del proyecto y mantenerlos
-// acá hace el bypass auditable en git.
-const TESTER_USER_IDS = new Set<string>([
-  "2c765059-4f94-462a-90f5-8c207fd913f8", // Santi 🇨🇴 (+57 311 7312391)
-  "fcb50add-ba50-4141-ab81-8faea347e689", // Santi PT (+351 934 255 581)
-]);
+// Bypass para testers — saltan el cap de comprobantes por polla. NO saltan
+// el throttle de 10/24h ni la verificación AI. Se leen de env
+// (TESTER_USER_IDS, UUIDs separados por coma) para no exponer identificadores
+// personales en el repo público. Vacío = nadie bypassa (no rompe nada).
+const TESTER_USER_IDS = new Set<string>(
+  (process.env.TESTER_USER_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean),
+);
 
 export async function POST(
   request: NextRequest,

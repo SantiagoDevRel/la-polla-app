@@ -21,9 +21,17 @@ import { normalizePhone } from "@/lib/auth/phone";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Admins (migración 024) — exentos del tope diario de SMS para que las
-// pruebas de login del equipo no se choquen con el cap. E.164 sin "+".
-const ADMIN_PHONES = new Set(["573117312391", "351934255581"]);
+// Admins — exentos del tope diario de SMS para que las pruebas de login
+// del equipo no se choquen con el cap. Se leen de env (ADMIN_PHONES_E164,
+// E.164 sin "+", separados por coma) para no hardcodear números personales
+// en el repo público. Si la var no está seteada, el set queda vacío y los
+// admins caen al cap normal — no rompe nada, solo se pierde la exención.
+const ADMIN_PHONES = new Set(
+  (process.env.ADMIN_PHONES_E164 ?? "")
+    .split(",")
+    .map((p) => p.replace(/\D/g, ""))
+    .filter(Boolean),
+);
 
 export async function POST(request: NextRequest) {
   let body: unknown;
