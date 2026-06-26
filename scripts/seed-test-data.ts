@@ -188,10 +188,17 @@ async function main() {
   // ────────────────────────────────────
   console.log("1. Finding Santiago (existing user)...");
 
-  // Look up via auth.users to get the correct auth UID (which is what RLS uses)
+  // Look up via auth.users to get the correct auth UID (which is what RLS uses).
+  // Owner phone comes from env (SEED_OWNER_PHONE, E.164 sin "+") so we don't
+  // hardcode a personal number in the public repo.
+  const ownerPhone = (process.env.SEED_OWNER_PHONE ?? "").replace(/\D/g, "");
+  if (!ownerPhone) {
+    console.error("   ✗ Falta SEED_OWNER_PHONE en .env (E.164 sin +) para ubicar la cuenta del owner.");
+    process.exit(1);
+  }
   const { data: authUsers } = await supabase.auth.admin.listUsers();
   const santiagoAuth = authUsers?.users?.find(
-    (u) => u.email === "REDACTED-PHONE@wa.lapolla.app" || u.phone === "REDACTED-PHONE"
+    (u) => u.email === `${ownerPhone}@wa.lapolla.app` || u.phone === ownerPhone
   );
 
   if (!santiagoAuth) {
