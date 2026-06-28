@@ -28,73 +28,75 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  // Prioridad: si el usuario tiene pendiente la encuesta goles_v2, esa va
-  // primero. No mostramos la del doble hasta que resuelva la otra (un popup
-  // a la vez). Mismo criterio de "participante pagado + survey abierta + no
-  // votó" que /api/scoring-survey.
+  // Prioridad: si el usuario tiene pendiente la encuesta goles_v2 en CUALQUIERA
+  // de sus pollas, esa va primero (un popup a la vez). Diferimos la del doble
+  // hasta que no le quede ninguna goles_v2 sin votar.
   const { data: gv2Parts } = await admin
     .from("polla_participants")
-    .select("polla_id, pollas!inner(id, scoring_survey_open)")
+    .select("polla_id, pollas!inner(scoring_survey_open)")
     .eq("user_id", user.id)
     .eq("paid", true)
-    .eq("pollas.scoring_survey_open", true)
-    .limit(1);
-  const gv2Row = gv2Parts?.[0] as unknown as { polla_id: string } | undefined;
-  if (gv2Row) {
-    const { data: gv2Voted } = await admin
+    .eq("pollas.scoring_survey_open", true);
+  const gv2Ids = (gv2Parts ?? []).map((p) => p.polla_id);
+  if (gv2Ids.length > 0) {
+    const { data: gv2Votes } = await admin
       .from("scoring_survey_votes")
-      .select("choice")
-      .eq("polla_id", gv2Row.polla_id)
+      .select("polla_id")
       .eq("user_id", user.id)
-      .maybeSingle();
-    // Tiene una goles_v2 abierta sin votar → diferimos la del doble.
-    if (!gv2Voted) {
+      .in("polla_id", gv2Ids);
+    const gv2Voted = new Set((gv2Votes ?? []).map((v) => v.polla_id));
+    if (gv2Ids.some((id) => !gv2Voted.has(id))) {
       return NextResponse.json({ survey: null });
     }
   }
 
-  // Pollas con la encuesta del doble abierta donde este usuario es
-  // participante pagado. Traemos también la escala de puntos para mostrar
-  // la tabla "hoy vs doble" con los valores reales de ESA polla.
+  // TODAS las pollas donde el usuario es participante pagado y la encuesta del
+  // doble está abierta (no .limit(1): el usuario puede estar en varias y todas
+  // deben mostrarse, una por una). Traemos también la escala de puntos para la
+  // tabla "hoy vs doble" con los valores reales de ESA polla.
   const { data: parts, error: partsErr } = await admin
     .from("polla_participants")
     .select(
-      "polla_id, pollas!inner(id, name, slug, double_survey_open, scoring_mode, points_exact, points_goal_diff, points_correct_result, points_one_team)",
+      "polla_id, joined_at, pollas!inner(id, name, slug, double_survey_open, scoring_mode, points_exact, points_goal_diff, points_correct_result, points_one_team)",
     )
     .eq("user_id", user.id)
     .eq("paid", true)
     .eq("pollas.double_survey_open", true)
-    .limit(1);
+    .order("joined_at", { ascending: true });
 
   if (partsErr) {
     console.error("[double-survey] participants query error:", partsErr);
     return NextResponse.json({ survey: null });
   }
 
-  const row = parts?.[0] as unknown as
-    | { polla_id: string; pollas: PollaScoring }
-    | undefined;
-  if (!row) {
+  const rows = (parts ?? []) as unknown as {
+    polla_id: string;
+    pollas: PollaScoring;
+  }[];
+  if (rows.length === 0) {
     return NextResponse.json({ survey: null });
   }
 
-  // ¿Ya votó?
-  const { data: existing } = await admin
+  // Excluir las pollas donde ya votó → primera polla SIN votar. Cuando vote en
+  // esa, el próximo fetch devuelve la siguiente, hasta agotar todas.
+  const pollaIds = rows.map((r) => r.polla_id);
+  const { data: votes } = await admin
     .from("double_survey_votes")
-    .select("choice")
-    .eq("polla_id", row.polla_id)
+    .select("polla_id")
     .eq("user_id", user.id)
-    .maybeSingle();
+    .in("polla_id", pollaIds);
+  const voted = new Set((votes ?? []).map((v) => v.polla_id));
 
-  if (existing) {
+  const next = rows.find((r) => !voted.has(r.polla_id));
+  if (!next) {
     return NextResponse.json({ survey: null, alreadyVoted: true });
   }
 
   return NextResponse.json({
     survey: {
-      pollaId: row.polla_id,
-      pollaName: (row.pollas?.name ?? "").trim(),
-      tiers: buildTiers(row.pollas),
+      pollaId: next.polla_id,
+      pollaName: (next.pollas?.name ?? "").trim(),
+      tiers: buildTiers(next.pollas),
     },
   });
 }
