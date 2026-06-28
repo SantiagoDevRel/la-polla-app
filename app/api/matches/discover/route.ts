@@ -26,6 +26,7 @@ import { isSyncableTournament } from "@/lib/tournaments";
 import { hasPlaceholderTeam } from "@/lib/matches/is-placeholder";
 import { syncWorldCup2026 } from "@/lib/api-football/sync-worldcup";
 import { syncCompetition } from "@/lib/football-data/sync";
+import { resolveWorldCupBracketsFromEspn } from "@/lib/espn/resolve-brackets";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -93,6 +94,7 @@ async function resolveWorldCupBrackets(): Promise<{
   ran: boolean;
   openfootball?: { synced: number; errors: number };
   footballData?: { synced: number; errors: number };
+  espn?: { promoted: number; errors: number };
 }> {
   const admin = createAdminClient();
   const horizon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -127,6 +129,17 @@ async function resolveWorldCupBrackets(): Promise<{
   } catch (err) {
     console.error("[discover] football-data WC sync failed:", err);
     out.footballData = { synced: 0, errors: 1 };
+  }
+  try {
+    // ESPN suele resolver los brackets antes que football-data. Promueve los
+    // slots codificados desde los cruces YA resueltos de ESPN — pens-safe
+    // (solo cruces con ambos equipos reales = partidos previos 100% jugados),
+    // in-place via el mismo RPC (confirm/auto según bracket_promotion_mode).
+    const espn = await resolveWorldCupBracketsFromEspn();
+    out.espn = { promoted: espn.promoted, errors: espn.errors };
+  } catch (err) {
+    console.error("[discover] ESPN bracket resolve failed:", err);
+    out.espn = { promoted: 0, errors: 1 };
   }
   return out;
 }

@@ -30,6 +30,13 @@ const PLACEHOLDER_PATTERNS: RegExp[] = [
   /^Winner Group [A-Z]/i,
   /^Loser Group [A-Z]/i,
   /^Runner-up Group [A-Z]/i,
+  // Catch-all robusto: cualquier slot de avance termina en "... Winner" /
+  // "... Loser" (ej. "Quarterfinal 1 Winner", "Semifinal 2 Loser", "Round of
+  // 32 1 Winner") o contiene "... Place" (ej. "Group J 2nd Place", "Third
+  // Place ..."). Ningun equipo real matchea estos — evita promover un slot a
+  // un placeholder (bug cazado 2026-06-28 con el resolver ESPN).
+  / (Winner|Loser)$/i,
+  /\bPlace\b/i,
 ];
 
 /**

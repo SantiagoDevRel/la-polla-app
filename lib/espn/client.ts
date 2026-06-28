@@ -222,3 +222,25 @@ export async function fetchEspnScoreboard(tournamentSlug: string): Promise<ESPNE
   const data = (await res.json()) as ESPNScoreboard;
   return data.events ?? [];
 }
+
+/**
+ * Como fetchEspnScoreboard pero con rango de fechas explícito
+ * (`YYYYMMDD-YYYYMMDD`). ESPN sin ?dates= devuelve solo el día actual; con
+ * rango cubre fixtures futuros (discovery / resolución de brackets). Recibe
+ * el league code directo (no el tournament slug).
+ */
+export async function fetchEspnScoreboardWithDates(
+  leagueCode: string,
+  datesParam: string,
+): Promise<ESPNEvent[]> {
+  const url = `${ESPN_BASE}/${leagueCode}/scoreboard?dates=${datesParam}`;
+  const res = await fetch(url, {
+    headers: { accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`[espn] ${leagueCode} dates=${datesParam} → HTTP ${res.status}`);
+  }
+  const data = (await res.json()) as ESPNScoreboard;
+  return data.events ?? [];
+}
