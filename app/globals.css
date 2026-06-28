@@ -252,6 +252,38 @@ body {
   background: rgba(255, 215, 0, 0.55);
 }
 
+/* Shine sweep para la card "Road to World Cup" del inicio: barrido de luz
+   diagonal que cruza la card en loop (con pausa) para invitar al tap. El
+   borde/glow gold viven en el componente; esto es solo el barrido animado. */
+.rtw-shine {
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(255, 215, 0, 0.14) 47%,
+    rgba(255, 255, 255, 0.13) 50%,
+    rgba(255, 215, 0, 0.14) 53%,
+    transparent 62%
+  );
+  background-size: 250% 100%;
+  background-position: 160% 0;
+  animation: rtw-shine-sweep 4s ease-in-out infinite;
+}
+@keyframes rtw-shine-sweep {
+  0% {
+    background-position: 160% 0;
+  }
+  45%,
+  100% {
+    background-position: -60% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rtw-shine {
+    animation: none;
+    background: none;
+  }
+}
+
 /* Global focus ring — gold on dark backgrounds. Browser default
    ring is hard to see against the stadium video; this gives every
    interactive element a consistent keyboard-accessible affordance
