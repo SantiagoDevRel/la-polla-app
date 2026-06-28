@@ -8,6 +8,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
 
@@ -26,6 +27,7 @@ export default function ScoringSurveyCard() {
   const [surveys, setSurveys] = useState<Survey[] | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [acting, setActing] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -86,23 +88,36 @@ export default function ScoringSurveyCard() {
         border: "1px solid rgba(255,215,0,0.25)",
       }}
     >
-      <div>
-        <h3 className="font-display text-[18px] tracking-[0.03em] text-text-primary">
-          Encuesta · nuevo puntaje (goles_v2)
-        </h3>
-        <p className="mt-0.5 text-[12px] text-text-secondary">
-          {openCount} {openCount === 1 ? "encuesta abierta" : "encuestas abiertas"}
-          {appliedCount > 0 ? ` · ${appliedCount} ya implementada(s)` : ""}
-        </p>
-      </div>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <div>
+          <h3 className="font-display text-[18px] tracking-[0.03em] text-text-primary">
+            Encuesta · nuevo puntaje (goles_v2)
+          </h3>
+          <p className="mt-0.5 text-[12px] text-text-secondary">
+            {openCount} {openCount === 1 ? "encuesta abierta" : "encuestas abiertas"}
+            {appliedCount > 0 ? ` · ${appliedCount} ya implementada(s)` : ""}
+          </p>
+        </div>
+        <ChevronDown
+          className={`h-5 w-5 shrink-0 text-text-muted transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
 
-      <p className="rounded-xl bg-bg-elevated px-3 py-2 text-[11px] leading-snug text-text-secondary">
-        <span className="text-text-primary">No retroactivo:</span> &quot;Implementar&quot;
-        no cambia los puntos actuales — esa polla empieza a contar con goles_v2
-        desde el próximo partido. Cada polla se decide aparte según sus votos.
-      </p>
+      {expanded ? (
+        <>
+          <p className="rounded-xl bg-bg-elevated px-3 py-2 text-[11px] leading-snug text-text-secondary">
+            <span className="text-text-primary">No retroactivo:</span> &quot;Implementar&quot;
+            no cambia los puntos actuales — esa polla empieza a contar con goles_v2
+            desde el próximo partido. Cada polla se decide aparte según sus votos.
+          </p>
 
-      <div className="space-y-2.5">
+          <div className="space-y-2.5">
         {surveys.map((s) => {
           const { counts } = s;
           const decided = counts.si + counts.no;
@@ -198,7 +213,9 @@ export default function ScoringSurveyCard() {
             </div>
           );
         })}
-      </div>
+          </div>
+        </>
+      ) : null}
     </section>
   );
 }
