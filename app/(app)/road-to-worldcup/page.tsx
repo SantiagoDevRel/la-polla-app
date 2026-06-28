@@ -96,6 +96,43 @@ const WORLDCUP_KNOCKOUT_SEEDS: KnockoutSeed[] = [
   { matchDay: 104, phase: "final", homeSlot: "W101", awaySlot: "W102" },
 ];
 
+// Equipos REALES ya clasificados a 16vos (resultado del Mundial, grupos
+// cerrados 2026-06-27). Keys de equipo = EXACTAS de WORLDCUP_FACTS (ojo el
+// drift de ortografía: "DR Congo" no "Congo DR", "Cape Verde" no "Cape Verde
+// Islands"). Estos quedan FIJOS en el bracket; el usuario predice de octavos
+// en adelante. Verificado contra ESPN (fifa.world) + la DB.
+// Actualizar acá cuando se resuelva una fase nueva (o migrar a leer de la DB).
+const WORLDCUP_R32_QUALIFIED: Record<number, { home: string; away: string }> = {
+  73: { home: "South Africa", away: "Canada" },
+  74: { home: "Germany", away: "Paraguay" },
+  75: { home: "Netherlands", away: "Morocco" },
+  76: { home: "Brazil", away: "Japan" },
+  77: { home: "France", away: "Sweden" },
+  78: { home: "Ivory Coast", away: "Norway" },
+  79: { home: "Mexico", away: "Ecuador" },
+  80: { home: "England", away: "DR Congo" },
+  81: { home: "United States", away: "Bosnia-Herzegovina" },
+  82: { home: "Belgium", away: "Senegal" },
+  83: { home: "Portugal", away: "Croatia" },
+  84: { home: "Spain", away: "Austria" },
+  85: { home: "Switzerland", away: "Algeria" },
+  86: { home: "Argentina", away: "Cape Verde" },
+  87: { home: "Colombia", away: "Ghana" },
+  88: { home: "Australia", away: "Egypt" },
+};
+
+// Construye los slots fijos (slotKey → teamId) solo para equipos que existen
+// en el set de equipos del bracket (defensa contra drift de nombres: si un
+// nombre no matchea, se omite en vez de romper el render).
+function buildLockedAssignments(teamIds: Set<string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [matchDay, pair] of Object.entries(WORLDCUP_R32_QUALIFIED)) {
+    if (teamIds.has(pair.home)) out[`${matchDay}:home`] = pair.home;
+    if (teamIds.has(pair.away)) out[`${matchDay}:away`] = pair.away;
+  }
+  return out;
+}
+
 function getPhaseLabel(phase: KnockoutPhase) {
   const worldCup = TOURNAMENT_STRUCTURE.worldcup_2026;
   return worldCup.phases.find((item) => item.phase === phase)?.label ?? phase;
@@ -167,10 +204,11 @@ export default async function RoadToWorldCupPage() {
   const dbRows = await loadDbKnockouts();
   const teams = buildTeams();
   const matches = buildMatches(dbRows);
+  const locked = buildLockedAssignments(new Set(teams.map((t) => t.id)));
 
   return (
     <>
-      <BracketBoard teams={teams} matches={matches} />
+      <BracketBoard teams={teams} matches={matches} locked={locked} />
       <BracketIntroModal />
     </>
   );
