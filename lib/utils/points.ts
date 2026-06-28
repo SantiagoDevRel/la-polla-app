@@ -125,6 +125,34 @@ export function calculatePoints(
 }
 
 /**
+ * Fases donde los puntos valen el DOBLE cuando una polla aprobó la encuesta
+ * `double_from_octavos` (migración 074). El doble cuenta DESDE OCTAVOS en
+ * adelante — round_of_32 (16vos) y group_stage NO se doblan. Debe quedar
+ * 1:1 con el multiplicador de public.score_match / public.rescore_polla en
+ * la DB. El Mundial 48 es el único torneo con round_of_32 antes de octavos,
+ * por eso hay que distinguir explícitamente.
+ */
+export const OCTAVOS_PLUS_PHASES: ReadonlySet<string> = new Set([
+  "round_of_16",
+  "quarter_finals",
+  "semi_finals",
+  "third_place",
+  "final",
+]);
+
+/**
+ * Multiplicador de puntaje por fase: 2 si la polla tiene el doble activo y
+ * el partido es de octavos en adelante; 1 en cualquier otro caso. Envuelve
+ * el scorer base (classic o goles_v2).
+ */
+export function phaseScoreMultiplier(
+  phase: string | null | undefined,
+  doubleFromOctavos: boolean | null | undefined
+): number {
+  return doubleFromOctavos && !!phase && OCTAVOS_PLUS_PHASES.has(phase) ? 2 : 1;
+}
+
+/**
  * Calcula el total de puntos para una lista de pronósticos vs resultados.
  */
 export function calculateTotalPoints(

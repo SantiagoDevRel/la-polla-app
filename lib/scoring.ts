@@ -7,7 +7,7 @@
 //   2. Correr manualmente tras un admin sync (belt-and-suspenders).
 //   3. Scripts offline que no van por el trigger.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { calculatePoints, type ScoringMode } from "@/lib/utils/points";
+import { calculatePoints, phaseScoreMultiplier, type ScoringMode } from "@/lib/utils/points";
 import { notifyMatchFinished, notifyRankImprovements } from "@/lib/notifications";
 
 interface MatchRow {
@@ -16,6 +16,7 @@ interface MatchRow {
   home_score: number | null;
   away_score: number | null;
   scheduled_at: string | null;
+  phase: string | null;
 }
 
 interface PredictionRow {
@@ -34,6 +35,7 @@ interface PollaScoringRow {
   points_one_team: number | null;
   scoring_mode: string | null;
   scoring_mode_changed_at: string | null;
+  double_from_octavos: boolean | null;
 }
 
 export interface ScoreMatchResult {
@@ -49,7 +51,7 @@ export async function scoreMatch(
 ): Promise<ScoreMatchResult> {
   const { data: match, error: matchErr } = await admin
     .from("matches")
-    .select("id, status, home_score, away_score, scheduled_at")
+    .select("id, status, home_score, away_score, scheduled_at, phase")
     .eq("id", matchId)
     .maybeSingle<MatchRow>();
   if (matchErr) throw matchErr;
@@ -78,7 +80,7 @@ export async function scoreMatch(
   const pollaIds = Array.from(new Set(predictions.map((p) => p.polla_id)));
   const { data: pollas, error: pollaErr } = await admin
     .from("pollas")
-    .select("id, points_exact, points_goal_diff, points_correct_result, points_one_team, scoring_mode, scoring_mode_changed_at")
+    .select("id, points_exact, points_goal_diff, points_correct_result, points_one_team, scoring_mode, scoring_mode_changed_at, double_from_octavos")
     .in("id", pollaIds)
     .returns<PollaScoringRow[]>();
   if (pollaErr) throw pollaErr;
@@ -95,7 +97,7 @@ export async function scoreMatch(
       !!scoring.scoring_mode_changed_at &&
       !!match.scheduled_at &&
       new Date(match.scheduled_at) >= new Date(scoring.scoring_mode_changed_at);
-    const pts = calculatePoints(
+    const basePts = calculatePoints(
       { homeScore: pred.predicted_home, awayScore: pred.predicted_away },
       result,
       {
@@ -106,6 +108,9 @@ export async function scoreMatch(
       },
       (useV2 ? "goles_v2" : "classic") as ScoringMode
     );
+    // Doble desde octavos: envuelve el scorer base (octavos+ = base x2 si la
+    // polla aprobó la encuesta 074). Debe coincidir con public.score_match.
+    const pts = basePts * phaseScoreMultiplier(match.phase, scoring?.double_from_octavos);
     const { error: updErr } = await admin
       .from("predictions")
       .update({ points_earned: pts, visible: true })
