@@ -5,6 +5,7 @@ import BracketBoard, {
 } from "@/components/worldcup/BracketBoard";
 import { BracketIntroModal } from "@/components/worldcup/BracketIntroModal";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
+import { isPlaceholderTeam } from "@/lib/matches/is-placeholder";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { WORLDCUP_FACTS } from "@/lib/teams/worldcup-facts";
 import { TOURNAMENT_STRUCTURE, type PhaseSlug } from "@/lib/tournaments/structure";
@@ -133,6 +134,77 @@ function buildLockedAssignments(teamIds: Set<string>): Record<string, string> {
   return out;
 }
 
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Resuelve un nombre de equipo de la tabla `matches` (ortografía propia, ej.
+// "Congo DR", "Cape Verde Islands") al teamId del bracket (key de
+// WORLDCUP_FACTS, ej. "DR Congo", "Cape Verde"). Match por tokens compartidos
+// — tolerante al orden de palabras y a sufijos. Null si no hay match claro.
+function resolveTeamId(dbName: string, teamIds: string[]): string | null {
+  const target = normalizeName(dbName);
+  if (!target) return null;
+  const exact = teamIds.find((id) => normalizeName(id) === target);
+  if (exact) return exact;
+  const targetTokens = new Set(target.split(" ").filter((t) => t.length > 2));
+  if (targetTokens.size === 0) return null;
+  let best: { id: string; score: number } | null = null;
+  for (const id of teamIds) {
+    const tokens = new Set(normalizeName(id).split(" ").filter((t) => t.length > 2));
+    if (tokens.size === 0) continue;
+    let shared = 0;
+    targetTokens.forEach((t) => {
+      if (tokens.has(t)) shared++;
+    });
+    const score = shared / Math.min(targetTokens.size, tokens.size);
+    if (score >= 0.5 && (!best || score > best.score)) best = { id, score };
+  }
+  return best?.id ?? null;
+}
+
+function feederMatchDay(slot: string): number | null {
+  const m = slot.match(/^W(\d+)$/);
+  return m ? Number(m[1]) : null;
+}
+
+// Bloqueos derivados de la DB: equipos REALES en cada cruce de knockout.
+//   - 16vos (slots de seed por grupo "2A"/"1E"/"3X"): bloquea el assignment.
+//   - octavos+ (slots "Wx"): el equipo real ES el ganador del partido x, así
+//     que bloquea ese ganador (winners[x]). A medida que la DB resuelve los
+//     cruces reales, road-to-worldcup va fijando quién pasó — pens-correcto
+//     (usa el equipo que la fuente publicó, no un cálculo de los 90').
+function buildLockedFromDb(
+  dbRows: Map<number, DbKnockoutRow>,
+  teamIds: string[],
+): { assignments: Record<string, string>; winners: Record<number, string> } {
+  const assignments: Record<string, string> = {};
+  const winners: Record<number, string> = {};
+  for (const seed of WORLDCUP_KNOCKOUT_SEEDS) {
+    const row = dbRows.get(seed.matchDay);
+    if (!row) continue;
+    const sides: Array<{ side: "home" | "away"; team: string; slot: string }> = [
+      { side: "home", team: row.home_team, slot: seed.homeSlot },
+      { side: "away", team: row.away_team, slot: seed.awaySlot },
+    ];
+    for (const { side, team, slot } of sides) {
+      if (!team || isPlaceholderTeam(team)) continue;
+      const id = resolveTeamId(team, teamIds);
+      if (!id) continue;
+      const feeder = feederMatchDay(slot);
+      if (feeder != null) winners[feeder] = id;
+      else assignments[`${seed.matchDay}:${side}`] = id;
+    }
+  }
+  return { assignments, winners };
+}
+
 function getPhaseLabel(phase: KnockoutPhase) {
   const worldCup = TOURNAMENT_STRUCTURE.worldcup_2026;
   return worldCup.phases.find((item) => item.phase === phase)?.label ?? phase;
@@ -204,11 +276,20 @@ export default async function RoadToWorldCupPage() {
   const dbRows = await loadDbKnockouts();
   const teams = buildTeams();
   const matches = buildMatches(dbRows);
-  const locked = buildLockedAssignments(new Set(teams.map((t) => t.id)));
+  const teamIds = teams.map((t) => t.id);
+  const fromDb = buildLockedFromDb(dbRows, teamIds);
+  // 16vos: hardcode verificado como base + lo que la DB ya tenga (la DB manda).
+  // Avances (octavos+): solo de la DB, fijándose solos a medida que se resuelven.
+  const locked = { ...buildLockedAssignments(new Set(teamIds)), ...fromDb.assignments };
 
   return (
     <>
-      <BracketBoard teams={teams} matches={matches} locked={locked} />
+      <BracketBoard
+        teams={teams}
+        matches={matches}
+        locked={locked}
+        lockedWinners={fromDb.winners}
+      />
       <BracketIntroModal />
     </>
   );
