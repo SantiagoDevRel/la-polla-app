@@ -54,11 +54,18 @@ interface BracketBoardProps {
   teams: BracketBoardTeam[];
   matches: BracketBoardMatch[];
   /**
-   * Slots con equipo YA clasificado de verdad (resultado real). Keyed por
-   * slotKey (`${matchDay}:home|away`) → teamId. Quedan FIJOS: no se arrastran,
-   * no se quitan, no se re-eligen. El resto del bracket sigue editable.
+   * Slots de fase de SEED (16vos) con equipo YA clasificado de verdad
+   * (resultado real). Keyed por slotKey (`${matchDay}:home|away`) → teamId.
+   * Quedan FIJOS: no se arrastran, no se quitan, no se re-eligen.
    */
   locked?: Record<string, string>;
+  /**
+   * Ganadores YA decididos de verdad (un partido que avanzó). Keyed por
+   * matchDay → teamId del que ganó. Pre-llena `winners` y FIJA esos avances:
+   * el usuario no puede cambiar quién pasó. Octavos en adelante se van
+   * bloqueando solos a medida que la DB resuelve los cruces reales.
+   */
+  lockedWinners?: Record<number, string>;
 }
 
 type Seed = 1 | 2 | 3;
@@ -923,7 +930,7 @@ function PickerOption({
   );
 }
 
-export default function BracketBoard({ teams, matches, locked }: BracketBoardProps) {
+export default function BracketBoard({ teams, matches, locked, lockedWinners }: BracketBoardProps) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const optionPressRef = useRef<TeamPressState | null>(null);
@@ -935,11 +942,19 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
   // Equipos ya clasificados (resultado real) — fijos, no editables.
   const lockedAssignments = useMemo(() => locked ?? {}, [locked]);
   const lockedKeys = useMemo(() => new Set(Object.keys(lockedAssignments)), [lockedAssignments]);
+  // Ganadores ya decididos de verdad — fijos. matchDay → teamId.
+  const lockedWinnersMap = useMemo(() => lockedWinners ?? {}, [lockedWinners]);
+  const lockedWinnerDays = useMemo(
+    () => new Set(Object.keys(lockedWinnersMap).map(Number)),
+    [lockedWinnersMap],
+  );
 
   const [assignments, setAssignments] = useState<Record<string, string>>(() => ({
     ...lockedAssignments,
   }));
-  const [winners, setWinners] = useState<Record<number, string>>({});
+  const [winners, setWinners] = useState<Record<number, string>>(() => ({
+    ...lockedWinnersMap,
+  }));
   const [openTarget, setOpenTarget] = useState<OpenTarget | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -953,7 +968,7 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
     if (saved) {
       // Los slots fijos (clasificados reales) siempre mandan sobre lo guardado.
       setAssignments({ ...saved.assignments, ...lockedAssignments });
-      setWinners(saved.winners);
+      setWinners({ ...saved.winners, ...lockedWinnersMap });
     }
 
     try {
@@ -987,7 +1002,7 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
         const dbSavedAt = json.updatedAt ? Date.parse(json.updatedAt) : 0;
         if (hadLocal && dbSavedAt <= localSavedAt) return; // local igual o más nuevo
         setAssignments({ ...dbAssignments, ...lockedAssignments });
-        setWinners(dbWinners as Record<number, string>);
+        setWinners({ ...(dbWinners as Record<number, string>), ...lockedWinnersMap });
         setShowOnboardingHint(false);
         // Alinear el cache local con lo que vino de DB.
         try {
@@ -1005,7 +1020,7 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
     return () => {
       cancelled = true;
     };
-  }, [lockedAssignments]);
+  }, [lockedAssignments, lockedWinnersMap]);
 
   const allMatchesByDay = useMemo(() => new Map(matches.map((match) => [match.matchDay, match])), [matches]);
   const finalMatch = allMatchesByDay.get(FINAL_MATCH_DAY) ?? matches.find((match) => match.phase === "final") ?? null;
@@ -1327,11 +1342,12 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
 
   const pickWinner = useCallback(
     (matchDay: number, teamId: string) => {
+      if (lockedWinnerDays.has(matchDay)) return; // ya se jugó: avance fijo
       const nextWinners = pruneWinners(assignments, { ...winners, [matchDay]: teamId }, playableMatchesByDay);
       setWinners(nextWinners);
       advanceToNext(assignments, nextWinners);
     },
-    [advanceToNext, assignments, playableMatchesByDay, winners],
+    [advanceToNext, assignments, lockedWinnerDays, playableMatchesByDay, winners],
   );
 
   const assignTeamToTarget = useCallback(
@@ -1345,6 +1361,18 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
       if (!canTeamFillTarget(teamId, targetKey)) {
         setSelectedTeamId(null);
         showToast("Ese cruce no puede darse");
+        return;
+      }
+
+      // Avance ya decidido (octavos+ que ya se jugaron) — no se cambia.
+      const lockInfo = slotInfoByKey.get(targetKey);
+      const lockParsed = lockInfo ? parseSlot(lockInfo.slot) : null;
+      if (
+        (targetKey === CHAMPION_TARGET && lockedWinnerDays.has(FINAL_MATCH_DAY)) ||
+        (lockParsed?.kind === "advance" && lockedWinnerDays.has(lockParsed.matchDay))
+      ) {
+        setSelectedTeamId(null);
+        showToast("Ese cruce ya se jugó · queda fijo");
         return;
       }
 
@@ -1371,6 +1399,7 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
       assignments,
       canTeamFillTarget,
       lockedKeys,
+      lockedWinnerDays,
       pickWinner,
       placeTeam,
       playableMatchesByDay,
@@ -1396,17 +1425,17 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
 
   const resetBracket = useCallback(() => {
     userInteractedRef.current = true;
-    // Reset conserva los equipos clasificados (fijos) — solo borra las
-    // predicciones del usuario (avances/ganadores y placements editables).
+    // Reset conserva los equipos clasificados Y los avances ya decididos
+    // (fijos) — solo borra las predicciones editables del usuario.
     setAssignments({ ...lockedAssignments });
-    setWinners({});
+    setWinners({ ...lockedWinnersMap });
     setOpenTarget(null);
     setSelectedTeamId(null);
     setDrag(null);
     showToast("Camino reiniciado");
     // El reinicio es transitorio (in-memory), igual que antes: recién se
     // persiste cuando el usuario toca "Guardar". No se hace PUT acá.
-  }, [lockedAssignments, showToast]);
+  }, [lockedAssignments, lockedWinnersMap, showToast]);
 
   const savePath = useCallback(() => {
     const payload = { assignments, winners };
@@ -1503,8 +1532,13 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
 
   const openTargetPicker = useCallback(
     (targetKey: string) => {
-      if (lockedKeys.has(targetKey)) {
-        showToast("Ya clasificó · queda fijo");
+      const info = slotInfoByKey.get(targetKey);
+      const parsed = info ? parseSlot(info.slot) : null;
+      const winnerLocked =
+        (parsed?.kind === "advance" && lockedWinnerDays.has(parsed.matchDay)) ||
+        (targetKey === CHAMPION_TARGET && lockedWinnerDays.has(FINAL_MATCH_DAY));
+      if (lockedKeys.has(targetKey) || winnerLocked) {
+        showToast(winnerLocked ? "Ya se jugó · queda fijo" : "Ya clasificó · queda fijo");
         return;
       }
       dismissOnboardingHint();
@@ -1512,7 +1546,7 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
       setSelectedTeamId(null);
       if (targetKey) window.requestAnimationFrame(() => scrollToTarget(targetKey));
     },
-    [dismissOnboardingHint, lockedKeys, scrollToTarget, showToast],
+    [dismissOnboardingHint, lockedKeys, lockedWinnerDays, scrollToTarget, showToast, slotInfoByKey],
   );
 
   const renderPicker = () => {
@@ -1818,7 +1852,10 @@ export default function BracketBoard({ teams, matches, locked }: BracketBoardPro
                   isWinner={isWinner}
                   isChampionPath={isChampionPath}
                   isOnboardingHint={hintTargetKey === info.key}
-                  isLocked={lockedKeys.has(info.key)}
+                  isLocked={
+                    lockedKeys.has(info.key) ||
+                    (parsed?.kind === "advance" && lockedWinnerDays.has(parsed.matchDay))
+                  }
                   onOpen={() => openTargetPicker(info.key)}
                   onClear={
                     parsed?.kind === "seed" && team && !lockedKeys.has(info.key)
