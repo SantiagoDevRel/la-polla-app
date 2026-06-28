@@ -27,43 +27,49 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  // Pollas con encuesta abierta donde este usuario es participante pagado.
+  // TODAS las pollas con encuesta abierta donde este usuario es participante
+  // pagado (no .limit(1): puede estar en varias y todas deben mostrarse, una
+  // por una).
   const { data: parts, error: partsErr } = await admin
     .from("polla_participants")
-    .select("polla_id, pollas!inner(id, name, slug, scoring_survey_open)")
+    .select("polla_id, joined_at, pollas!inner(id, name, slug, scoring_survey_open)")
     .eq("user_id", user.id)
     .eq("paid", true)
     .eq("pollas.scoring_survey_open", true)
-    .limit(1);
+    .order("joined_at", { ascending: true });
 
   if (partsErr) {
     console.error("[scoring-survey] participants query error:", partsErr);
     return NextResponse.json({ survey: null });
   }
 
-  const row = parts?.[0] as unknown as
-    | { polla_id: string; pollas: { id: string; name: string; slug: string } }
-    | undefined;
-  if (!row) {
+  const rows = (parts ?? []) as unknown as {
+    polla_id: string;
+    pollas: { id: string; name: string; slug: string };
+  }[];
+  if (rows.length === 0) {
     return NextResponse.json({ survey: null });
   }
 
-  // ¿Ya votó?
-  const { data: existing } = await admin
+  // Excluir las pollas donde ya votó → primera SIN votar. Al votar esa, el
+  // próximo fetch devuelve la siguiente, hasta agotar todas.
+  const pollaIds = rows.map((r) => r.polla_id);
+  const { data: votes } = await admin
     .from("scoring_survey_votes")
-    .select("choice")
-    .eq("polla_id", row.polla_id)
+    .select("polla_id")
     .eq("user_id", user.id)
-    .maybeSingle();
+    .in("polla_id", pollaIds);
+  const voted = new Set((votes ?? []).map((v) => v.polla_id));
 
-  if (existing) {
+  const next = rows.find((r) => !voted.has(r.polla_id));
+  if (!next) {
     return NextResponse.json({ survey: null, alreadyVoted: true });
   }
 
   return NextResponse.json({
     survey: {
-      pollaId: row.polla_id,
-      pollaName: (row.pollas?.name ?? "").trim(),
+      pollaId: next.polla_id,
+      pollaName: (next.pollas?.name ?? "").trim(),
     },
   });
 }
