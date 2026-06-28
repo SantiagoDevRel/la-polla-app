@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { calculatePoints, calculatePointsGolesV2 } from "./points";
+import {
+  calculatePoints,
+  calculatePointsGolesV2,
+  phaseScoreMultiplier,
+} from "./points";
 
 // 5-tier scoring contract:
 //   1) exact score → 5
@@ -117,5 +121,52 @@ describe("calculatePointsGolesV2", () => {
     const res = { homeScore: 2, awayScore: 1 };
     expect(calculatePoints(pred, res)).toBe(3);
     expect(calculatePoints(pred, res, undefined, "goles_v2")).toBe(4);
+  });
+});
+
+// "Puntos dobles desde octavos" (migración 074). El multiplicador envuelve
+// el scorer base: octavos+ = base x2 si la polla aprobó el doble. Debe
+// quedar 1:1 con public.score_match / public.rescore_polla.
+describe("phaseScoreMultiplier", () => {
+  it("sin doble activo → siempre x1 (cualquier fase)", () => {
+    expect(phaseScoreMultiplier("round_of_16", false)).toBe(1);
+    expect(phaseScoreMultiplier("final", false)).toBe(1);
+    expect(phaseScoreMultiplier("round_of_16", null)).toBe(1);
+    expect(phaseScoreMultiplier("final", undefined)).toBe(1);
+  });
+
+  it("con doble activo → x2 SOLO de octavos en adelante", () => {
+    expect(phaseScoreMultiplier("round_of_16", true)).toBe(2); // octavos
+    expect(phaseScoreMultiplier("quarter_finals", true)).toBe(2);
+    expect(phaseScoreMultiplier("semi_finals", true)).toBe(2);
+    expect(phaseScoreMultiplier("third_place", true)).toBe(2);
+    expect(phaseScoreMultiplier("final", true)).toBe(2);
+  });
+
+  it("con doble activo → 16vos y grupos NO se doblan (x1)", () => {
+    expect(phaseScoreMultiplier("round_of_32", true)).toBe(1); // dieciseisavos
+    expect(phaseScoreMultiplier("group_stage", true)).toBe(1);
+  });
+
+  it("fase null/desconocida → x1 aunque el doble esté activo", () => {
+    expect(phaseScoreMultiplier(null, true)).toBe(1);
+    expect(phaseScoreMultiplier("", true)).toBe(1);
+    expect(phaseScoreMultiplier("league_stage", true)).toBe(1);
+  });
+
+  it("composición base x multiplicador: marcador exacto en octavos 5 → 10", () => {
+    const pred = { homeScore: 2, awayScore: 1 };
+    const res = { homeScore: 2, awayScore: 1 };
+    const base = calculatePoints(pred, res); // 5
+    expect(base * phaseScoreMultiplier("round_of_16", true)).toBe(10);
+    // mismo marcador en 16vos: sigue 5 (no se dobla)
+    expect(base * phaseScoreMultiplier("round_of_32", true)).toBe(5);
+  });
+
+  it("composición con goles_v2: ganador+dif en cuartos 4 → 8", () => {
+    const pred = { homeScore: 3, awayScore: 2 };
+    const res = { homeScore: 2, awayScore: 1 };
+    const base = calculatePoints(pred, res, undefined, "goles_v2"); // 4
+    expect(base * phaseScoreMultiplier("quarter_finals", true)).toBe(8);
   });
 });

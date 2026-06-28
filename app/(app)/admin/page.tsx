@@ -12,6 +12,7 @@ import PayoutsByPolla from "@/components/admin/PayoutsByPolla";
 import UserDetailModal from "@/components/admin/UserDetailModal";
 import KnockoutStatusCard from "@/components/admin/KnockoutStatusCard";
 import ScoringSurveyCard from "@/components/admin/ScoringSurveyCard";
+import DoublePointsSurveyCard from "@/components/admin/DoublePointsSurveyCard";
 import EngagementCard, { type EngagementData } from "@/components/admin/EngagementCard";
 import WebAnalyticsCard, { type WebAnalytics } from "@/components/admin/WebAnalyticsCard";
 import SentryHealthCard, { type SentryHealth } from "@/components/admin/SentryHealthCard";
@@ -315,6 +316,11 @@ export default function AdminPage() {
                 comparativa de tabla + aplicar/mantener. Se auto-oculta si no
                 hay encuesta abierta ni polla en goles_v2. */}
             <ScoringSurveyCard />
+
+            {/* Encuesta "puntos dobles desde octavos" (migración 074) — tally
+                + comparativa por fase + implementar/mantener. Se auto-oculta
+                si no hay encuesta abierta ni polla con el doble activo. */}
+            <DoublePointsSurveyCard />
 
             {/* Stats */}
             <section className="grid grid-cols-2 gap-3">

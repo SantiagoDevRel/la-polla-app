@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, type PanInfo } from "framer-motion";
-import { ArrowLeft, Check, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, Check, Lock, RotateCcw, X, ZoomIn, ZoomOut } from "lucide-react";
 import { BACKGROUND_SOURCES } from "@/components/layout/background-variants";
 import { cn } from "@/lib/cn";
 import { DURATION, EASE } from "@/lib/animations";
@@ -53,6 +53,12 @@ export interface BracketBoardMatch {
 interface BracketBoardProps {
   teams: BracketBoardTeam[];
   matches: BracketBoardMatch[];
+  /**
+   * Slots con equipo YA clasificado de verdad (resultado real). Keyed por
+   * slotKey (`${matchDay}:home|away`) → teamId. Quedan FIJOS: no se arrastran,
+   * no se quitan, no se re-eligen. El resto del bracket sigue editable.
+   */
+  locked?: Record<string, string>;
 }
 
 type Seed = 1 | 2 | 3;
@@ -642,6 +648,7 @@ function SlotChip({
   isWinner,
   isChampionPath,
   isOnboardingHint,
+  isLocked,
   onOpen,
   onClear,
 }: {
@@ -656,10 +663,11 @@ function SlotChip({
   isWinner: boolean;
   isChampionPath: boolean;
   isOnboardingHint: boolean;
+  isLocked: boolean;
   onOpen: () => void;
   onClear?: () => void;
 }) {
-  const isDimmed = Boolean(activeTeamId) && !isValidTarget && !isChampionPath;
+  const isDimmed = Boolean(activeTeamId) && !isValidTarget && !isChampionPath && !isLocked;
   const canClear = Boolean(team && onClear);
   const previewTeams = candidateIds.flatMap((id) => {
     const candidate = teamsById.get(id);
@@ -684,6 +692,7 @@ function SlotChip({
         className={cn(
           "flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-md border px-1 transition-all duration-200",
           team ? "bg-bg-card border-border-subtle" : "border-dashed border-border-subtle bg-bg-base/75",
+          isLocked && "border-gold/45 bg-gold/[0.07] cursor-default",
           isOpen && "border-turf/80 bg-turf/12 ring-1 ring-turf/35",
           isValidTarget && "border-turf/80 bg-turf/15 shadow-[0_0_18px_-10px_rgba(31,216,127,0.9)]",
           isWinner && "border-turf/50 bg-turf/10",
@@ -735,6 +744,14 @@ function SlotChip({
         >
           <X className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
+      ) : null}
+      {isLocked && team ? (
+        <span
+          aria-hidden="true"
+          className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-gold/40 bg-bg-elevated text-gold shadow-[0_4px_10px_-6px_rgba(0,0,0,0.9)]"
+        >
+          <Lock className="h-2.5 w-2.5" />
+        </span>
       ) : null}
     </div>
   );
@@ -906,7 +923,7 @@ function PickerOption({
   );
 }
 
-export default function BracketBoard({ teams, matches }: BracketBoardProps) {
+export default function BracketBoard({ teams, matches, locked }: BracketBoardProps) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const optionPressRef = useRef<TeamPressState | null>(null);
@@ -915,7 +932,13 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
   // hidratación async desde DB (#12) le pise una edición en curso.
   const userInteractedRef = useRef(false);
 
-  const [assignments, setAssignments] = useState<Record<string, string>>({});
+  // Equipos ya clasificados (resultado real) — fijos, no editables.
+  const lockedAssignments = useMemo(() => locked ?? {}, [locked]);
+  const lockedKeys = useMemo(() => new Set(Object.keys(lockedAssignments)), [lockedAssignments]);
+
+  const [assignments, setAssignments] = useState<Record<string, string>>(() => ({
+    ...lockedAssignments,
+  }));
   const [winners, setWinners] = useState<Record<number, string>>({});
   const [openTarget, setOpenTarget] = useState<OpenTarget | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
@@ -928,7 +951,8 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
   useEffect(() => {
     const saved = loadSavedPath();
     if (saved) {
-      setAssignments(saved.assignments);
+      // Los slots fijos (clasificados reales) siempre mandan sobre lo guardado.
+      setAssignments({ ...saved.assignments, ...lockedAssignments });
       setWinners(saved.winners);
     }
 
@@ -962,7 +986,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
         if (!dbHasData) return;
         const dbSavedAt = json.updatedAt ? Date.parse(json.updatedAt) : 0;
         if (hadLocal && dbSavedAt <= localSavedAt) return; // local igual o más nuevo
-        setAssignments(dbAssignments);
+        setAssignments({ ...dbAssignments, ...lockedAssignments });
         setWinners(dbWinners as Record<number, string>);
         setShowOnboardingHint(false);
         // Alinear el cache local con lo que vino de DB.
@@ -981,7 +1005,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [lockedAssignments]);
 
   const allMatchesByDay = useMemo(() => new Map(matches.map((match) => [match.matchDay, match])), [matches]);
   const finalMatch = allMatchesByDay.get(FINAL_MATCH_DAY) ?? matches.find((match) => match.phase === "final") ?? null;
@@ -1198,8 +1222,14 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
 
   const hintTargetKey = useMemo(() => {
     if (!showOnboardingHint) return null;
-    return directSlots.find((slot) => !assignments[slot.key])?.key ?? directSlots[0]?.key ?? null;
-  }, [assignments, directSlots, showOnboardingHint]);
+    const emptySeed = directSlots.find(
+      (slot) => !assignments[slot.key] && !lockedKeys.has(slot.key),
+    );
+    if (emptySeed) return emptySeed.key;
+    // Todo el 16vos ya está fijo → apuntar al primer cruce de octavos a decidir.
+    const firstR16 = positionedMatches.find((match) => match.phase === "round_of_16");
+    return firstR16 ? slotKey(firstR16.matchDay, "home") : null;
+  }, [assignments, directSlots, lockedKeys, positionedMatches, showOnboardingHint]);
 
   const hintGeometry = hintTargetKey ? layout.slots[hintTargetKey] : null;
   const hintTooltipLeft = hintGeometry ? clamp(hintGeometry.x + hintGeometry.w + 8, 8, layout.width - 184) : 0;
@@ -1307,6 +1337,11 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
   const assignTeamToTarget = useCallback(
     (teamId: string, targetKey: string) => {
       userInteractedRef.current = true;
+      if (lockedKeys.has(targetKey)) {
+        setSelectedTeamId(null);
+        showToast("Ese equipo ya clasificó · queda fijo");
+        return;
+      }
       if (!canTeamFillTarget(teamId, targetKey)) {
         setSelectedTeamId(null);
         showToast("Ese cruce no puede darse");
@@ -1335,6 +1370,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
       advanceToNext,
       assignments,
       canTeamFillTarget,
+      lockedKeys,
       pickWinner,
       placeTeam,
       playableMatchesByDay,
@@ -1346,6 +1382,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
 
   const removeAssignment = useCallback(
     (targetSlotKey: string) => {
+      if (lockedKeys.has(targetSlotKey)) return; // clasificado real: fijo
       userInteractedRef.current = true;
       const nextAssignments = { ...assignments };
       delete nextAssignments[targetSlotKey];
@@ -1354,12 +1391,14 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
       setWinners(nextWinners);
       setOpenTarget(targetSlotKey);
     },
-    [assignments, playableMatchesByDay, winners],
+    [assignments, lockedKeys, playableMatchesByDay, winners],
   );
 
   const resetBracket = useCallback(() => {
     userInteractedRef.current = true;
-    setAssignments({});
+    // Reset conserva los equipos clasificados (fijos) — solo borra las
+    // predicciones del usuario (avances/ganadores y placements editables).
+    setAssignments({ ...lockedAssignments });
     setWinners({});
     setOpenTarget(null);
     setSelectedTeamId(null);
@@ -1367,7 +1406,7 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
     showToast("Camino reiniciado");
     // El reinicio es transitorio (in-memory), igual que antes: recién se
     // persiste cuando el usuario toca "Guardar". No se hace PUT acá.
-  }, [showToast]);
+  }, [lockedAssignments, showToast]);
 
   const savePath = useCallback(() => {
     const payload = { assignments, winners };
@@ -1464,12 +1503,16 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
 
   const openTargetPicker = useCallback(
     (targetKey: string) => {
+      if (lockedKeys.has(targetKey)) {
+        showToast("Ya clasificó · queda fijo");
+        return;
+      }
       dismissOnboardingHint();
       setOpenTarget((current) => (current === targetKey ? null : targetKey));
       setSelectedTeamId(null);
       if (targetKey) window.requestAnimationFrame(() => scrollToTarget(targetKey));
     },
-    [dismissOnboardingHint, scrollToTarget],
+    [dismissOnboardingHint, lockedKeys, scrollToTarget, showToast],
   );
 
   const renderPicker = () => {
@@ -1775,9 +1818,36 @@ export default function BracketBoard({ teams, matches }: BracketBoardProps) {
                   isWinner={isWinner}
                   isChampionPath={isChampionPath}
                   isOnboardingHint={hintTargetKey === info.key}
+                  isLocked={lockedKeys.has(info.key)}
                   onOpen={() => openTargetPicker(info.key)}
-                  onClear={parsed?.kind === "seed" && team ? () => removeAssignment(info.key) : undefined}
+                  onClear={
+                    parsed?.kind === "seed" && team && !lockedKeys.has(info.key)
+                      ? () => removeAssignment(info.key)
+                      : undefined
+                  }
                 />
+              );
+            })}
+
+            {/* "vs" entre las dos cards de cada cruce — las cards quedan muy
+                pegadas y sin esto se confunde qué equipo juega contra cuál.
+                El final ya trae su propio "VS" en el ChampionCenter. */}
+            {positionedMatches.map((match) => {
+              if (match.matchDay === FINAL_MATCH_DAY) return null;
+              const home = layout.slots[slotKey(match.matchDay, "home")];
+              const away = layout.slots[slotKey(match.matchDay, "away")];
+              if (!home || !away) return null;
+              const cx = home.x + home.w / 2;
+              const cy = (home.y + home.h + away.y) / 2;
+              return (
+                <span
+                  key={`vs-${match.matchDay}`}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border-subtle bg-bg-base px-1 font-display text-[9px] leading-[13px] tracking-[0.08em] text-text-muted"
+                  style={{ left: cx, top: cy }}
+                >
+                  vs
+                </span>
               );
             })}
 
