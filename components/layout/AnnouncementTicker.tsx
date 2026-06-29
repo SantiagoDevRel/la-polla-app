@@ -16,40 +16,57 @@
 // tiene 2 mitades idénticas y anima translateX(-50%), loop seamless.
 // Cada mitad repite el mensaje 4 veces para cubrir anchos grandes.
 // prefers-reduced-motion → texto estático (animation: none).
+//
+// Parametrizado (2026-06-29): acepta `messageKey` (key dentro del
+// namespace i18n "Ticker") y `dismissKey` (key de localStorage) para
+// poder montar VARIAS cintas independientes — cada una se cierra y
+// persiste por separado. Default = aviso de deadline de pronósticos
+// (comportamiento histórico). 2ª instancia en el layout: regla de los
+// 90 minutos (REGLA #4 del repo — el alargue no cuenta para los puntos).
 "use client";
 
 import { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-// "10min" en el mensaje a propósito (el lock real es 5 min): margen para
-// que nadie llegue a los 6 minutos y se queje de que "decía 5".
-const DISMISS_KEY = "lp_ticker_dismissed:pred-deadline-10min";
+type TickerProps = {
+  // Key de mensaje en el namespace "Ticker" de messages/{es,en}.json.
+  messageKey?: "predictionDeadline" | "ninetyMinutes";
+  // Key de localStorage para el dismiss persistente. DEBE ser única por
+  // cinta. Para relanzar un aviso ya cerrado, cambiá este valor (ej.
+  // sumar fecha/slug) y todos lo vuelven a ver.
+  dismissKey?: string;
+};
 
-export default function AnnouncementTicker() {
+export default function AnnouncementTicker({
+  // "10min" en el mensaje a propósito (el lock real es 5 min): margen para
+  // que nadie llegue a los 6 minutos y se queje de que "decía 5".
+  messageKey = "predictionDeadline",
+  dismissKey = "lp_ticker_dismissed:pred-deadline-10min",
+}: TickerProps = {}) {
   const t = useTranslations("Ticker");
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(DISMISS_KEY) !== "1") {
+      if (window.localStorage.getItem(dismissKey) !== "1") {
         setVisible(true);
       }
     } catch {
       // localStorage bloqueado (modo privado estricto) → mostrar igual.
       setVisible(true);
     }
-  }, []);
+  }, [dismissKey]);
 
   if (!visible) return null;
 
-  const msg = t("predictionDeadline");
+  const msg = t(messageKey);
   const copies = [0, 1, 2, 3];
 
   function dismiss() {
     setVisible(false);
     try {
-      window.localStorage.setItem(DISMISS_KEY, "1");
+      window.localStorage.setItem(dismissKey, "1");
     } catch {
       // Sin storage no persiste, pero al menos se cierra esta sesión.
     }

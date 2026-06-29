@@ -27,6 +27,7 @@
   },
   "Ticker": {
     "predictionDeadline": "¡Los marcadores se pueden poner hasta 10 minutos antes de cada partido!",
+    "ninetyMinutes": "Los resultados de las pollas se basan en los 90 minutos del partido — el alargue no cuenta",
     "dismissAria": "Cerrar aviso"
   },
   "Nav": {

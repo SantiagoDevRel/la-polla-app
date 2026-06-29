@@ -27,6 +27,7 @@
   },
   "Ticker": {
     "predictionDeadline": "Scores can be entered up to 10 minutes before each match!",
+    "ninetyMinutes": "Pool results are based on the 90-minute score — extra time doesn't count",
     "dismissAria": "Dismiss notice"
   },
   "Nav": {
