@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 }
 
 // GET: últimos jobs del usuario (para mostrar el historial / estado).
-export async function GET(req: NextRequest) {
+export async function GET() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
