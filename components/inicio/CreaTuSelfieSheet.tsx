@@ -2,19 +2,29 @@
 
 // CreaTuSelfieSheet — bottom-sheet del flujo "Crea tu Selfie" (admin-only).
 // 3 selfies (frente/perfil1/perfil2) + elegir 1 jugador del Mundial + radio de pintura
-// de cara → POST /api/ai-image → polling → resultado (descargar / compartir).
-// Toda la generación corre en el NVIDIA DGX (vía la cola ai_image_jobs).
+// de cara → POST /api/ai-image → la cola corre en el DGX → el resultado queda en una
+// GALERÍA PRIVADA persistente (GET /api/ai-image): mandás, podés cerrar/salir de la app,
+// y al volver tus fotos están acá. Tocás cualquiera para verla grande / descargar / compartir.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Camera, X, Search, Download, Share2, Loader2, Check, Sparkles, RotateCcw } from "lucide-react";
+import { Camera, X, Search, Download, Share2, Loader2, Check, Sparkles, Plus, ChevronLeft, ImageOff } from "lucide-react";
 import PLAYERS from "@/lib/ai-selfie/players.json";
 
 type Player = { name: string; country: string };
 type FacePaint = "none" | "cheek" | "full";
-type Phase = "form" | "pending" | "done" | "error";
+type Phase = "gallery" | "form" | "viewer";
 type SlotKey = "front" | "left" | "right";
+type Job = {
+  id: string;
+  status: "pending" | "done" | "error";
+  player_name: string | null;
+  face_paint: string;
+  error: string | null;
+  result_url: string | null;
+  created_at: string;
+};
 
 const SLOTS: { key: SlotKey; label: string }[] = [
   { key: "front", label: "Frente" },
@@ -28,10 +38,14 @@ const PAINT_OPTS: { value: FacePaint; label: string; hint: string }[] = [
   { value: "full", label: "Cara completa pintada", hint: "Hincha full" },
 ];
 
+function jobLabel(j: Job) {
+  return j.player_name || (j.face_paint !== "none" ? "Pintura" : "Selfie");
+}
+
 export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const reduce = useReducedMotion();
   const [mounted, setMounted] = useState(false);
-  const [phase, setPhase] = useState<Phase>("form");
+  const [phase, setPhase] = useState<Phase>("gallery");
   const [files, setFiles] = useState<Record<SlotKey, File | null>>({ front: null, left: null, right: null });
   const [previews, setPreviews] = useState<Record<SlotKey, string | null>>({ front: null, left: null, right: null });
   const [query, setQuery] = useState("");
@@ -39,6 +53,8 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
   const [paint, setPaint] = useState<FacePaint>("none");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => setMounted(true), []);
@@ -54,23 +70,47 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
   // limpiar polling al desmontar
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
 
-  // al abrir: recuperá el último job del server (persiste aunque hayas salido de la app).
-  // Así podés mandar el selfie, cerrar/salir de la polla, y al volver la foto queda cargada acá.
-  // No piso un formulario que ya estés armando (files/player) ni un estado en curso.
+  async function loadJobs(): Promise<Job[]> {
+    try {
+      const res = await fetch("/api/ai-image");
+      const j = await res.json();
+      const list: Job[] = Array.isArray(j.jobs) ? j.jobs : [];
+      setJobs(list);
+      return list;
+    } catch {
+      return [];
+    }
+  }
+
+  function poll(id: string) {
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/ai-image/${id}`);
+        const j = await res.json();
+        if (j.status === "done" || j.status === "error") { await loadJobs(); return; }
+      } catch { /* reintenta */ }
+      pollRef.current = setTimeout(tick, 4000);
+    };
+    if (pollRef.current) clearTimeout(pollRef.current);
+    pollRef.current = setTimeout(tick, 4000);
+  }
+
+  // al abrir: cargar la galería del server (persiste aunque hayas cerrado/salido de la app).
   useEffect(() => {
     if (!open) return;
-    if (phase !== "form" || files.front || files.left || files.right || player) return;
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch("/api/ai-image");
-        const j = await res.json();
-        const last = (j.jobs ?? [])[0];
-        if (cancelled || !last) return;
-        if (last.status === "done" && last.result_url) { setResultUrl(last.result_url); setPhase("done"); }
-        else if (last.status === "pending") { setPhase("pending"); poll(last.id); }
-        else if (last.status === "error") { setErrorMsg(last.error || "Falló la generación"); setPhase("error"); }
-      } catch { /* sin red: queda el form */ }
+      setLoadingJobs(true);
+      const list = await loadJobs();
+      if (cancelled) return;
+      setLoadingJobs(false);
+      const pend = list.find((x) => x.status === "pending");
+      if (pend) poll(pend.id);
+      // no piso un formulario que el user ya esté armando
+      setPhase((prev) => {
+        if (prev === "form" && (files.front || files.left || files.right || player)) return prev;
+        return list.length > 0 ? "gallery" : "form";
+      });
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,6 +133,15 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
     });
   }
 
+  function clearForm() {
+    setPreviews((p) => {
+      Object.values(p).forEach((u) => u && URL.revokeObjectURL(u));
+      return { front: null, left: null, right: null };
+    });
+    setFiles({ front: null, left: null, right: null });
+    setPlayer(null); setQuery(""); setPaint("none"); setErrorMsg(null);
+  }
+
   const hasSelfie = !!files.front || !!files.left || !!files.right;
   const canSubmit = hasSelfie && (!!player || paint !== "none");
 
@@ -104,33 +153,18 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
     if (files.right) fd.append("selfie3", files.right);
     if (player) { fd.append("player_name", player.name); fd.append("player_team", player.country); }
     fd.append("face_paint", paint);
-    setPhase("pending");
     try {
       const res = await fetch("/api/ai-image", { method: "POST", body: fd });
       const j = await res.json();
-      if (!res.ok) { setErrorMsg(j.error || "No se pudo crear"); setPhase("error"); return; }
+      if (!res.ok) { setErrorMsg(j.error || "No se pudo crear"); return; }
+      // a la galería: el job nuevo aparece como tile "generándose"; podés cerrar y volver
+      clearForm();
+      setPhase("gallery");
+      await loadJobs();
       poll(j.job_id);
     } catch {
-      setErrorMsg("Error de red"); setPhase("error");
+      setErrorMsg("Error de red. Reintentá.");
     }
-  }
-
-  function poll(id: string) {
-    const tick = async () => {
-      try {
-        const res = await fetch(`/api/ai-image/${id}`);
-        const j = await res.json();
-        if (j.status === "done" && j.result_url) { setResultUrl(j.result_url); setPhase("done"); return; }
-        if (j.status === "error") { setErrorMsg(j.error || "Falló la generación"); setPhase("error"); return; }
-      } catch { /* reintenta */ }
-      pollRef.current = setTimeout(tick, 4000);
-    };
-    pollRef.current = setTimeout(tick, 4000);
-  }
-
-  function reset() {
-    if (pollRef.current) clearTimeout(pollRef.current);
-    setPhase("form"); setErrorMsg(null); setResultUrl(null);
   }
 
   async function share() {
@@ -149,6 +183,8 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
   if (!mounted || !open) return null;
 
   const spring = reduce ? { duration: 0 } : { type: "spring" as const, stiffness: 360, damping: 34 };
+  const pendingCount = jobs.filter((j) => j.status === "pending").length;
+  const showBack = (phase === "form" || phase === "viewer") && jobs.length > 0;
 
   return createPortal(
     <AnimatePresence>
@@ -172,8 +208,16 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
           {/* header */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-subtle shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-              <Sparkles className="w-5 h-5 text-gold shrink-0" />
-              <h2 className="font-display text-2xl leading-none text-text-primary truncate">CREA TU SELFIE</h2>
+              {showBack ? (
+                <button onClick={() => setPhase("gallery")} aria-label="Volver a la galería" className="p-1 -ml-1 rounded-full text-text-secondary hover:text-text-primary hover:bg-card-hover transition-colors shrink-0">
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              ) : (
+                <Sparkles className="w-5 h-5 text-gold shrink-0" />
+              )}
+              <h2 className="font-display text-2xl leading-none text-text-primary truncate">
+                {phase === "form" ? "NUEVA SELFIE" : phase === "viewer" ? "TU SELFIE" : "CREA TU SELFIE"}
+              </h2>
             </div>
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-card-hover transition-colors">
               <X className="w-5 h-5" />
@@ -181,8 +225,70 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
           </div>
 
           <div className="overflow-y-auto px-5 py-4 grow">
+            {/* ===== GALERÍA ===== */}
+            {phase === "gallery" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="font-display text-lg text-text-primary">Tu galería</p>
+                  {pendingCount > 0 && (
+                    <span className="text-xs text-gold flex items-center gap-1.5">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> {pendingCount} generándose
+                    </span>
+                  )}
+                </div>
+
+                {loadingJobs && jobs.length === 0 ? (
+                  <div className="py-12 text-center text-sm text-muted">Cargando tu galería…</div>
+                ) : jobs.length === 0 ? (
+                  <div className="py-12 flex flex-col items-center text-center gap-2">
+                    <Sparkles className="w-8 h-8 text-muted" />
+                    <p className="text-sm text-muted">Todavía no tenés selfies.<br />Creá la primera 👇</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {jobs.map((j) => {
+                      const label = jobLabel(j);
+                      if (j.status === "done" && j.result_url) {
+                        return (
+                          <button
+                            key={j.id} onClick={() => { setResultUrl(j.result_url!); setPhase("viewer"); }}
+                            className="relative aspect-square rounded-xl overflow-hidden border border-subtle hover:border-gold/40 transition-colors"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={j.result_url} alt={label} className="absolute inset-0 w-full h-full object-cover" />
+                            <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/75 to-transparent px-2 py-1 text-[11px] text-white truncate text-left">{label}</span>
+                          </button>
+                        );
+                      }
+                      if (j.status === "pending") {
+                        return (
+                          <div key={j.id} className="aspect-square rounded-xl border border-gold/30 bg-gold/5 flex flex-col items-center justify-center gap-2 text-center px-2">
+                            <Loader2 className="w-6 h-6 text-gold animate-spin" />
+                            <span className="text-[11px] text-muted leading-tight">Generando…<br />{label}</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={j.id} className="aspect-square rounded-xl border border-subtle bg-elevated flex flex-col items-center justify-center gap-1 text-center px-2">
+                          <ImageOff className="w-5 h-5 text-red-alert" />
+                          <span className="text-[11px] text-red-alert">Falló</span>
+                          <span className="text-[10px] text-muted line-clamp-2">{j.error || "Reintentá"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <p className="text-[11px] text-muted text-center pt-1">Galería privada — solo vos la ves. Las fotos quedan acá aunque cierres la app.</p>
+              </div>
+            )}
+
+            {/* ===== FORM ===== */}
             {phase === "form" && (
               <div className="space-y-6">
+                {errorMsg && (
+                  <div className="rounded-xl border border-red-alert/30 bg-red-alert/10 px-4 py-2.5 text-sm text-red-alert">{errorMsg}</div>
+                )}
                 {/* selfies */}
                 <section>
                   <p className="font-display text-lg text-text-primary mb-1">1 · Tus selfies</p>
@@ -267,20 +373,8 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
               </div>
             )}
 
-            {phase === "pending" && (
-              <div className="py-12 flex flex-col items-center text-center gap-4">
-                <Loader2 className="w-10 h-10 text-gold animate-spin" />
-                <div>
-                  <p className="font-display text-xl text-text-primary">Generando tu imagen…</p>
-                  <p className="text-sm text-muted mt-1">Corriendo en nuestro hardware (1-5 min). <span className="text-text-secondary">Podés cerrar esto y seguir usando la app</span> — la foto queda generándose y aparece acá cuando vuelvas.</p>
-                </div>
-                <button onClick={reset} className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary mt-1">
-                  <RotateCcw className="w-4 h-4" /> Empezar otra
-                </button>
-              </div>
-            )}
-
-            {phase === "done" && resultUrl && (
+            {/* ===== VIEWER (una foto grande) ===== */}
+            {phase === "viewer" && resultUrl && (
               <div className="py-2 flex flex-col items-center gap-4">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={resultUrl} alt="Tu selfie de La Polla" className="w-full rounded-xl border border-subtle" />
@@ -292,17 +386,9 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
                     <Share2 className="w-4 h-4" /> Compartir
                   </button>
                 </div>
-                <button onClick={reset} className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary mt-1">
-                  <RotateCcw className="w-4 h-4" /> Crear otra
+                <button onClick={() => setPhase("gallery")} className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary mt-1">
+                  <ChevronLeft className="w-4 h-4" /> Volver a la galería
                 </button>
-              </div>
-            )}
-
-            {phase === "error" && (
-              <div className="py-12 flex flex-col items-center text-center gap-3">
-                <p className="font-display text-xl text-red-alert">Algo salió mal</p>
-                <p className="text-sm text-muted">{errorMsg || "Reintentá en un momento."}</p>
-                <button onClick={reset} className="rounded-full border border-subtle text-text-primary px-5 py-2.5 text-sm hover:border-gold/30 transition-colors mt-1">Volver</button>
               </div>
             )}
           </div>
@@ -315,6 +401,16 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
                 className={`w-full rounded-full px-5 py-3.5 font-semibold transition-all ${canSubmit ? "bg-gold text-bg-base hover:brightness-110 active:scale-[0.98]" : "bg-elevated text-muted cursor-not-allowed"}`}
               >
                 Generar mi imagen
+              </button>
+            </div>
+          )}
+          {phase === "gallery" && (
+            <div className="px-5 py-4 border-t border-subtle shrink-0">
+              <button
+                onClick={() => { setErrorMsg(null); setPhase("form"); }}
+                className="w-full flex items-center justify-center gap-2 rounded-full px-5 py-3.5 font-semibold bg-gold text-bg-base hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                <Plus className="w-5 h-5" /> Crear nueva selfie
               </button>
             </div>
           )}

@@ -47,6 +47,9 @@ interface DbKnockoutRow {
   phase: string | null;
   home_team: string;
   away_team: string;
+  home_score: number | null;
+  away_score: number | null;
+  final_verified_at: string | null;
   scheduled_at: string | null;
   venue: string | null;
 }
@@ -205,6 +208,35 @@ function buildLockedFromDb(
   return { assignments, winners };
 }
 
+// Ganadores derivados DIRECTO del resultado verificado de cada cruce de
+// knockout: apenas un partido se cierra (final_verified_at) con marcador
+// DECISIVO a los 90', fija al ganador en el bracket — sin esperar a que la
+// promoción de la ronda siguiente corra en la DB (la cinta de promoción está
+// en modo 'confirm', así que puede tardar). Es la fuente inmediata del avance.
+//   - Empate a los 90' → lo decidieron alargue/penales (REGLA #4: la DB guarda
+//     el score reglamentario). NO se infiere acá; cae al fallback de
+//     buildLockedFromDb, que lee el equipo ya promovido en la ronda siguiente
+//     (única fuente confiable de quién pasó por penales).
+//   - Cruce aún sin resolver (team placeholder tipo "W74") → se salta; el
+//     guard isPlaceholderTeam asegura que octavos+ solo deriva tras promoverse.
+function deriveWinnersFromResults(
+  dbRows: Map<number, DbKnockoutRow>,
+  teamIds: string[],
+): Record<number, string> {
+  const winners: Record<number, string> = {};
+  for (const seed of WORLDCUP_KNOCKOUT_SEEDS) {
+    const row = dbRows.get(seed.matchDay);
+    if (!row || !row.final_verified_at) continue;
+    if (row.home_score == null || row.away_score == null) continue;
+    if (row.home_score === row.away_score) continue; // empate 90' → penales
+    if (isPlaceholderTeam(row.home_team) || isPlaceholderTeam(row.away_team)) continue;
+    const winnerName = row.home_score > row.away_score ? row.home_team : row.away_team;
+    const id = resolveTeamId(winnerName, teamIds);
+    if (id) winners[seed.matchDay] = id;
+  }
+  return winners;
+}
+
 function getPhaseLabel(phase: KnockoutPhase) {
   const worldCup = TOURNAMENT_STRUCTURE.worldcup_2026;
   return worldCup.phases.find((item) => item.phase === phase)?.label ?? phase;
@@ -241,7 +273,9 @@ async function loadDbKnockouts() {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("matches")
-      .select("match_day, phase, home_team, away_team, scheduled_at, venue")
+      .select(
+        "match_day, phase, home_team, away_team, home_score, away_score, final_verified_at, scheduled_at, venue",
+      )
       .eq("tournament", "worldcup_2026")
       .in("phase", KNOCKOUT_PHASES)
       .gte("match_day", 73)
@@ -278,9 +312,14 @@ export default async function RoadToWorldCupPage() {
   const matches = buildMatches(dbRows);
   const teamIds = teams.map((t) => t.id);
   const fromDb = buildLockedFromDb(dbRows, teamIds);
+  const derivedWinners = deriveWinnersFromResults(dbRows, teamIds);
   // 16vos: hardcode verificado como base + lo que la DB ya tenga (la DB manda).
-  // Avances (octavos+): solo de la DB, fijándose solos a medida que se resuelven.
   const locked = { ...buildLockedAssignments(new Set(teamIds)), ...fromDb.assignments };
+  // Avances: el resultado verificado del propio cruce (inmediato, marcador
+  // decisivo) MANDA sobre la inferencia desde la ronda siguiente; esa última
+  // solo cubre los empates resueltos por penales. Cada cruce se fija solo
+  // apenas se cierra, sin depender de la promoción de bracket.
+  const lockedWinners = { ...fromDb.winners, ...derivedWinners };
 
   return (
     <>
@@ -288,7 +327,7 @@ export default async function RoadToWorldCupPage() {
         teams={teams}
         matches={matches}
         locked={locked}
-        lockedWinners={fromDb.winners}
+        lockedWinners={lockedWinners}
       />
       <BracketIntroModal />
     </>
