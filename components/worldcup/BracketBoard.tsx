@@ -967,8 +967,19 @@ export default function BracketBoard({ teams, matches, locked, lockedWinners }: 
     const saved = loadSavedPath();
     if (saved) {
       // Los slots fijos (clasificados reales) siempre mandan sobre lo guardado.
-      setAssignments({ ...saved.assignments, ...lockedAssignments });
-      setWinners({ ...saved.winners, ...lockedWinnersMap });
+      const mergedAssignments = { ...saved.assignments, ...lockedAssignments };
+      setAssignments(mergedAssignments);
+      // Un avance real (lockedWinners) puede invalidar un pick guardado río
+      // abajo —ej: predijiste al equipo que terminó eliminado—. pruneWinners
+      // borra esos ganadores fantasma; sin él, un equipo eliminado queda
+      // colgado en una ronda posterior hasta que el user toque algo.
+      setWinners(
+        pruneWinners(
+          mergedAssignments,
+          { ...saved.winners, ...lockedWinnersMap },
+          playableMatchesByDayRef.current,
+        ),
+      );
     }
 
     try {
@@ -1001,8 +1012,15 @@ export default function BracketBoard({ teams, matches, locked, lockedWinners }: 
         if (!dbHasData) return;
         const dbSavedAt = json.updatedAt ? Date.parse(json.updatedAt) : 0;
         if (hadLocal && dbSavedAt <= localSavedAt) return; // local igual o más nuevo
-        setAssignments({ ...dbAssignments, ...lockedAssignments });
-        setWinners({ ...(dbWinners as Record<number, string>), ...lockedWinnersMap });
+        const mergedDbAssignments = { ...dbAssignments, ...lockedAssignments };
+        setAssignments(mergedDbAssignments);
+        setWinners(
+          pruneWinners(
+            mergedDbAssignments,
+            { ...(dbWinners as Record<number, string>), ...lockedWinnersMap },
+            playableMatchesByDayRef.current,
+          ),
+        );
         setShowOnboardingHint(false);
         // Alinear el cache local con lo que vino de DB.
         try {
@@ -1040,6 +1058,11 @@ export default function BracketBoard({ teams, matches, locked, lockedWinners }: 
     () => new Map(positionedMatches.map((match) => [match.matchDay, match])),
     [positionedMatches],
   );
+  // Ref al mapa de partidos para que el efecto de hidratación (declarado más
+  // arriba que este memo) pueda podar ganadores fantasma sin meterlo en sus
+  // deps — es estable, y referenciarlo en el array daría TDZ.
+  const playableMatchesByDayRef = useRef(playableMatchesByDay);
+  playableMatchesByDayRef.current = playableMatchesByDay;
 
   const layout = useMemo(
     () => createButterflyLayout(leftBuckets, rightBuckets, finalMatch, scale),
