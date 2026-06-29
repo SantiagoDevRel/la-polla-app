@@ -54,6 +54,28 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
   // limpiar polling al desmontar
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current); }, []);
 
+  // al abrir: recuperá el último job del server (persiste aunque hayas salido de la app).
+  // Así podés mandar el selfie, cerrar/salir de la polla, y al volver la foto queda cargada acá.
+  // No piso un formulario que ya estés armando (files/player) ni un estado en curso.
+  useEffect(() => {
+    if (!open) return;
+    if (phase !== "form" || files.front || files.left || files.right || player) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/ai-image");
+        const j = await res.json();
+        const last = (j.jobs ?? [])[0];
+        if (cancelled || !last) return;
+        if (last.status === "done" && last.result_url) { setResultUrl(last.result_url); setPhase("done"); }
+        else if (last.status === "pending") { setPhase("pending"); poll(last.id); }
+        else if (last.status === "error") { setErrorMsg(last.error || "Falló la generación"); setPhase("error"); }
+      } catch { /* sin red: queda el form */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   const players = PLAYERS as Player[];
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -250,7 +272,7 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
                 <Loader2 className="w-10 h-10 text-gold animate-spin" />
                 <div>
                   <p className="font-display text-xl text-text-primary">Generando tu imagen…</p>
-                  <p className="text-sm text-muted mt-1">Corriendo en el DGX. Puede tardar 1-3 min — podés esperar acá.</p>
+                  <p className="text-sm text-muted mt-1">Corriendo en nuestro hardware (1-5 min). <span className="text-text-secondary">Podés cerrar esto y seguir usando la app</span> — la foto queda generándose y aparece acá cuando vuelvas.</p>
                 </div>
               </div>
             )}
