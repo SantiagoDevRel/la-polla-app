@@ -274,6 +274,9 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
                   <p className="font-display text-xl text-text-primary">Generando tu imagen…</p>
                   <p className="text-sm text-muted mt-1">Corriendo en nuestro hardware (1-5 min). <span className="text-text-secondary">Podés cerrar esto y seguir usando la app</span> — la foto queda generándose y aparece acá cuando vuelvas.</p>
                 </div>
+                <button onClick={reset} className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary mt-1">
+                  <RotateCcw className="w-4 h-4" /> Empezar otra
+                </button>
               </div>
             )}
 
