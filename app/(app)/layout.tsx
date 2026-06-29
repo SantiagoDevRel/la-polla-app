@@ -90,10 +90,13 @@ export default async function AppLayout({
       <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">
         <BrandHeader />
-        {/* Cinta roja de advertencia con marquee: pronósticos hasta 10 min
-            antes de cada partido (feedback 2026-06-11). Cerrable con X,
-            persiste en localStorage. */}
-        <AnnouncementTicker />
+        {/* Cinta roja de advertencia con marquee: los resultados se basan en
+            los 90 minutos del partido (REGLA #4 — el alargue no cuenta para
+            los puntos). Cerrable con X, persiste en localStorage. */}
+        <AnnouncementTicker
+          messageKey="ninetyMinutes"
+          dismissKey="lp_ticker_dismissed:results-90min"
+        />
         {/* Pequeño respiro entre el header sticky y el contenido de la
             página. Antes el "Hola santi" del inicio (y otros titulares)
             quedaban pegados al header. */}
