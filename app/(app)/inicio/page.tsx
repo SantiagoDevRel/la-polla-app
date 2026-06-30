@@ -61,7 +61,6 @@ import PredictNowCTA from "@/components/inicio/PredictNowCTA";
 import WorldCupFactsCard from "@/components/inicio/WorldCupFactsCard";
 import { HighlightsStrip } from "@/components/inicio/HighlightsStrip";
 import RoadToWorldCupCard from "@/components/inicio/RoadToWorldCupCard";
-import CreaTuSelfieCard from "@/components/inicio/CreaTuSelfieCard";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
 
@@ -629,12 +628,9 @@ export default async function InicioPage() {
   // character key.
   const { data: publicUser } = await admin
     .from("users")
-    .select("display_name, avatar_url, is_admin")
+    .select("display_name, avatar_url")
     .eq("id", user.id)
     .single();
-
-  // Feature "Crea tu Selfie" — SOLO admins la ven (card en /inicio).
-  const isAdmin = publicUser?.is_admin === true;
 
   const displayName = publicUser?.display_name || user.phone || fallbacks.user;
   const firstName = displayName.split(" ")[0];
@@ -1006,10 +1002,6 @@ export default async function InicioPage() {
               (independiente de si hay pronósticos pendientes o no). Typing
               al refrescar; dataset estático bilingüe, cero API. */}
           <WorldCupFactsCard />
-
-          {/* Crea tu Selfie — ADMIN-ONLY (genera imágenes con el DGX). Va arriba
-              de Road to World Cup. Solo se monta si el viewer es admin. */}
-          {isAdmin && <CreaTuSelfieCard />}
 
           {/* Road to World Cup — entrada a la bracket interactiva. */}
           <RoadToWorldCupCard />
