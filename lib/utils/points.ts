@@ -152,6 +152,109 @@ export function phaseScoreMultiplier(
   return doubleFromOctavos && !!phase && OCTAVOS_PLUS_PHASES.has(phase) ? 2 : 1;
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Modo "120' + avance" por polla (migración 077). Espejo 1:1 de
+// public.score_match / public.rescore_polla. Componible con goles_v2 +
+// double_from_octavos.
+//
+//   eff_score = score_120 activo ? COALESCE(fulltime_120, 90') : 90'
+//   base      = scorer(pred, eff_score)              // classic o goles_v2
+//   total     = base * multiplicador_octavos + (1 si acertó quién avanza)
+//
+// El +1 de avance es PLANO (por fuera del x2). Solo knockouts (16vos+) y
+// solo después del cutoff kc_mode_changed_at (no retroactivo).
+// ─────────────────────────────────────────────────────────────────────
+
+/** Fases de knockout (16vos en adelante) donde aplica el +1 de "quién avanza". */
+export const KNOCKOUT_PHASES: ReadonlySet<string> = new Set([
+  "round_of_32",
+  "round_of_16",
+  "quarter_finals",
+  "semi_finals",
+  "third_place",
+  "final",
+]);
+
+/** Datos de resultado del match relevantes para el modo 120'/avance. */
+export interface MatchOutcome {
+  homeScore: number; // matches.home_score (canónico 90')
+  awayScore: number;
+  fulltimeHome?: number | null; // matches.fulltime_home_score (120', incl. alargue)
+  fulltimeAway?: number | null;
+  advancer?: "home" | "away" | null; // matches.advancer (quién avanzó, incl. penales)
+  scheduledAt?: string | null;
+  phase?: string | null;
+}
+
+/** Flags del modo en la polla (migración 077). Cutoffs SEPARADOS: score_120
+ *  arranca en kcModeChangedAt; el +1 de avance en advanceBonusFrom (puede ser
+ *  posterior). */
+export interface KnockoutScoring {
+  score120?: boolean | null;
+  advanceBonus?: boolean | null;
+  kcModeChangedAt?: string | null;
+  advanceBonusFrom?: string | null;
+}
+
+/** El modo aplica si el flag está activo Y el kickoff es >= el cutoff (no retro). */
+function kcModeActive(
+  changedAt: string | null | undefined,
+  scheduledAt: string | null | undefined
+): boolean {
+  return !!changedAt && !!scheduledAt && new Date(scheduledAt) >= new Date(changedAt);
+}
+
+/**
+ * Marcador efectivo para puntuar: el de 120' si score_120 está activo (y pasó
+ * el cutoff), si no el de 90'. COALESCE al 90' si no se capturó el 120'.
+ * Espejo del subselect `src.eff_home/eff_away` en score_match.
+ */
+export function effectiveResult(match: MatchOutcome, kc?: KnockoutScoring): MatchResult {
+  const isKnockout = !!match.phase && KNOCKOUT_PHASES.has(match.phase);
+  const use120 =
+    !!kc?.score120 && isKnockout && kcModeActive(kc?.kcModeChangedAt, match.scheduledAt);
+  if (use120) {
+    return {
+      homeScore: match.fulltimeHome ?? match.homeScore,
+      awayScore: match.fulltimeAway ?? match.awayScore,
+    };
+  }
+  return { homeScore: match.homeScore, awayScore: match.awayScore };
+}
+
+/**
+ * Quién avanzó: la captura (matches.advancer) o, si falta, el derivado del
+ * marcador decisivo (120' si lo hay, si no 90'). Un empate sin captura → null
+ * (se fue a penales y no sabemos quién ganó → sin bonus). Espejo de
+ * `src.eff_advancer`.
+ */
+export function effectiveAdvancer(match: MatchOutcome): "home" | "away" | null {
+  if (match.advancer === "home" || match.advancer === "away") return match.advancer;
+  const h = match.fulltimeHome ?? match.homeScore;
+  const a = match.fulltimeAway ?? match.awayScore;
+  if (h === a) return null;
+  return h > a ? "home" : "away";
+}
+
+/**
+ * +1 PLANO por acertar quién avanza (migración 077). Solo si la polla tiene
+ * advance_bonus, el match es knockout (16vos+), pasó el cutoff, el user eligió
+ * y conocemos el avance. Espejo del término `+ CASE ... THEN 1 ELSE 0` de
+ * score_match (va POR FUERA del x2 de octavos).
+ */
+export function advanceBonus(
+  advancePick: "home" | "away" | null | undefined,
+  match: MatchOutcome,
+  kc?: KnockoutScoring
+): number {
+  if (!kc?.advanceBonus) return 0;
+  if (!kcModeActive(kc?.advanceBonusFrom, match.scheduledAt)) return 0;
+  if (!match.phase || !KNOCKOUT_PHASES.has(match.phase)) return 0;
+  if (advancePick !== "home" && advancePick !== "away") return 0;
+  const adv = effectiveAdvancer(match);
+  return adv !== null && advancePick === adv ? 1 : 0;
+}
+
 /**
  * Calcula el total de puntos para una lista de pronósticos vs resultados.
  */

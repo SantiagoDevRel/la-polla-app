@@ -56,6 +56,7 @@ import { computePayout, type PaymentMode } from "@/lib/pollas/payout-allocation"
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import { isPlaceholderTeam } from "@/lib/matches/is-placeholder";
 import TeamInfoSheet from "@/components/match/TeamInfoSheet";
+import { KNOCKOUT_PHASES, effectiveAdvancer } from "@/lib/utils/points";
 
 function fmtCOP(n: number): string {
   return `$${Math.round(n).toLocaleString("es-CO")}`;
@@ -74,6 +75,12 @@ interface Polla {
   payment_mode: string; points_exact: number; points_winner: number;
   points_goal_diff: number; points_correct_result: number;
   points_one_team: number; scoring_mode?: string | null;
+  /** Modo "120' + avance" por polla (migración 077). advance_bonus prende el
+   *  +1 de "quién avanza"; score_120 puntúa knockouts por el marcador de 120'. */
+  advance_bonus?: boolean | null; score_120?: boolean | null;
+  /** Cutoff del 120' (arranca hoy) y del +1 de avance (mañana). Migración 077. */
+  kc_mode_changed_at?: string | null;
+  advance_bonus_from?: string | null;
   created_by: string; scope: string; type: string;
   admin_payment_instructions: string | null;
   join_code: string | null;
@@ -103,10 +110,19 @@ interface Match {
   // resultado). points_earned=0 es ambiguo entre "pendiente" y "fallaste";
   // este campo desambigua: solo mostramos puntos cuando NO es null.
   final_verified_at: string | null;
+  /** Quién avanzó/ganó el cruce (incluidos penales). NULL fuera de knockouts
+   *  o sin capturar. Migración 077. */
+  advancer: "home" | "away" | null;
+  /** Marcador de 120' (incluye alargue). NULL fuera de knockouts/sin captura.
+   *  En pollas con score_120 es el que se muestra como final. Migración 077. */
+  fulltime_home_score: number | null;
+  fulltime_away_score: number | null;
 }
 interface Prediction {
   id: string; match_id: string; predicted_home: number; predicted_away: number;
   locked: boolean; visible: boolean; points_earned: number;
+  /** Pick de "quién avanza" del usuario (+1 si acierta). Migración 077. */
+  advance_pick: "home" | "away" | null;
 }
 
 type TabType = "partidos" | "ranking" | "evolucion" | "pagos" | "info" | "organizar" | "invitar";
@@ -316,7 +332,7 @@ interface OtherPrediction {
 interface MatchRowProps {
   match: Match;
   pred: Prediction | undefined;
-  draft: { home: string; away: string } | undefined;
+  draft: { home: string; away: string; advance?: "home" | "away" | null } | undefined;
   editable: boolean;
   touched: boolean;
   onDraftChange: (side: "home" | "away", val: string) => void;
@@ -353,6 +369,15 @@ interface MatchRowProps {
   /** Abre el TeamInfoSheet con la ficha del equipo tocado. Los slots de
    *  bracket sin resolver ("W93", "1A") no son tappables. */
   onTeamClick: (team: string, flag: string | null) => void;
+  /** true si la polla tiene el +1 de "quién avanza" activo (advance_bonus).
+   *  El picker solo se muestra en knockouts editables; el resultado del
+   *  avance se muestra en knockouts ya verificados. Migración 077. */
+  advanceEnabled: boolean;
+  /** Setea el pick de "quién avanza" en el draft (y marca el match touched). */
+  onAdvanceChange: (val: "home" | "away") => void;
+  /** true si la polla puntúa knockouts por 120' (score_120) — para mostrar el
+   *  marcador de 120' en finished en vez del de 90'. Migración 077. */
+  score120Enabled: boolean;
 }
 
 function MatchRow({
@@ -374,6 +399,9 @@ function MatchRow({
   locked,
   missingPredictions,
   onTeamClick,
+  advanceEnabled,
+  onAdvanceChange,
+  score120Enabled,
 }: MatchRowProps) {
   const t = useTranslations("Detail");
   const tTeamInfo = useTranslations("TeamInfo");
@@ -398,6 +426,41 @@ function MatchRow({
   // (los slots de bracket "W93"/"1A" no tienen ficha que mostrar).
   const homeClickable = !isPlaceholderTeam(match.home_team);
   const awayClickable = !isPlaceholderTeam(match.away_team);
+  // Modo "quién avanza" (+1, migración 077). El picker solo en knockouts
+  // editables de pollas con advance_bonus; el draft pisa al guardado.
+  const isKnockout = match.phase != null && KNOCKOUT_PHASES.has(match.phase);
+  const advanceSel: "home" | "away" | null = draft?.advance ?? pred?.advance_pick ?? null;
+  const showAdvancePicker = editable && advanceEnabled && isKnockout && homeClickable && awayClickable;
+  // Avance efectivo: la captura (matches.advancer) o derivado del marcador
+  // decisivo (120'/90') — IGUAL que el scorer (effectiveAdvancer). Así la UI no
+  // esconde un +1 que el scoring sí otorgó (ej: knockout definido en 90' sin
+  // captura, donde el avance se deriva). Migración 077.
+  const effAdvancer =
+    isScored && match.home_score != null && match.away_score != null
+      ? effectiveAdvancer({
+          homeScore: match.home_score,
+          awayScore: match.away_score,
+          fulltimeHome: match.fulltime_home_score,
+          fulltimeAway: match.fulltime_away_score,
+          advancer: match.advancer,
+        })
+      : null;
+  const advanceWinnerTeam =
+    effAdvancer === "home" ? match.home_team : effAdvancer === "away" ? match.away_team : null;
+  const advanceHit =
+    pred?.advance_pick != null && effAdvancer != null && pred.advance_pick === effAdvancer;
+  const showAdvanceResult = isScored && advanceEnabled && isKnockout && advanceWinnerTeam != null;
+  // score_120: en knockouts finalizados mostramos el marcador de 120' (el que
+  // puntúa), no el de 90'. En vivo fulltime_* es null → cae a home_score (que
+  // sigue a ESPN, alargue incluido). Migración 077.
+  const displayHome =
+    score120Enabled && isKnockout && match.fulltime_home_score != null
+      ? match.fulltime_home_score
+      : match.home_score;
+  const displayAway =
+    score120Enabled && isKnockout && match.fulltime_away_score != null
+      ? match.fulltime_away_score
+      : match.away_score;
   // Marcadores de los demás colapsados por default (pedido user
   // 2026-06-11: la lista gigante obligaba a scrollear entre partidos).
   const [poolPredsOpen, setPoolPredsOpen] = useState(false);
@@ -504,7 +567,7 @@ function MatchRow({
                   }`}
                   style={{ fontFeatureSettings: '"tnum"' }}
                 >
-                  {match.home_score ?? "—"}
+                  {displayHome ?? "—"}
                 </span>
                 <span
                   aria-hidden="true"
@@ -516,7 +579,7 @@ function MatchRow({
                   }`}
                   style={{ fontFeatureSettings: '"tnum"' }}
                 >
-                  {match.away_score ?? "—"}
+                  {displayAway ?? "—"}
                 </span>
               </>
             ) : (() => {
@@ -621,6 +684,37 @@ function MatchRow({
           </div>
         </div>
 
+        {/* Picker "¿quién avanza?" (+1) — solo knockouts editables en pollas
+            con advance_bonus. El +1 es plano (no lo dobla el x2). Migración 077. */}
+        {showAdvancePicker ? (
+          <div className="mt-3">
+            <p className="text-center text-[10px] uppercase tracking-[0.1em] text-gold/80 mb-1.5">
+              {t("whoAdvances")}
+            </p>
+            <div className="grid grid-cols-2 gap-2 max-w-[340px] mx-auto">
+              {(["home", "away"] as const).map((side) => {
+                const team = side === "home" ? match.home_team : match.away_team;
+                const sel = advanceSel === side;
+                return (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => onAdvanceChange(side)}
+                    aria-pressed={sel}
+                    className={`px-2 py-2 rounded-xl border text-[11px] font-semibold leading-tight [overflow-wrap:anywhere] transition-all cursor-pointer ${
+                      sel
+                        ? "bg-gold/10 border-gold/40 text-gold shadow-[0_0_12px_rgba(255,215,0,0.12)]"
+                        : "bg-card border-border-subtle text-text-secondary hover:border-gold/20 hover:bg-bg-elevated/60"
+                    }`}
+                  >
+                    {team}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
         {/* Locked-but-predicted (live-section rows) */}
         {isLive && pred ? (
           <div className="mt-2 text-center">
@@ -658,6 +752,24 @@ function MatchRow({
                 home: pred.predicted_home,
                 away: pred.predicted_away,
               })}
+            </span>
+          </div>
+        ) : null}
+
+        {/* Resultado del avance (+1): quién avanzó y si lo acertaste.
+            Verde si acertaste (con +1), neutro si no. Migración 077. */}
+        {showAdvanceResult ? (
+          <div className="mt-2 flex justify-center">
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-semibold ${
+                advanceHit
+                  ? "bg-turf/15 text-turf border-turf/30"
+                  : "bg-bg-elevated text-text-primary/60 border-border-subtle"
+              }`}
+            >
+              {advanceHit
+                ? t("advancedHit", { team: advanceWinnerTeam })
+                : t("advancedMiss", { team: advanceWinnerTeam })}
             </span>
           </div>
         ) : null}
@@ -846,7 +958,7 @@ export default function PollaSlugPage() {
   const [viewerIsGlobalAdmin, setViewerIsGlobalAdmin] = useState(false);
   const defaultTabAppliedRef = useRef(false);
 
-  const [drafts, setDrafts] = useState<Record<string, { home: string; away: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { home: string; away: string; advance?: "home" | "away" | null }>>({});
   const [savingAll, setSavingAll] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
   const [finishedOpen, setFinishedOpen] = useState(false);
@@ -1041,9 +1153,13 @@ export default function PollaSlugPage() {
       // tipió un score y todavía no guardó, mantener su input. Solo
       // seedeamos drafts en el primer load.
       if (!silent) {
-        const d: Record<string, { home: string; away: string }> = {};
+        const d: Record<string, { home: string; away: string; advance?: "home" | "away" | null }> = {};
         data.predictions.forEach((p: Prediction) => {
-          d[p.match_id] = { home: p.predicted_home.toString(), away: p.predicted_away.toString() };
+          d[p.match_id] = {
+            home: p.predicted_home.toString(),
+            away: p.predicted_away.toString(),
+            advance: p.advance_pick ?? null,
+          };
         });
         setDrafts(d);
       }
@@ -1163,6 +1279,9 @@ export default function PollaSlugPage() {
           const d = drafts[matchId];
           return axios.post(`/api/pollas/${slug}/predictions`, {
             matchId, predictedHome: parseInt(d.home), predictedAway: parseInt(d.away),
+            // El pick de avance se guarda junto al marcador (omitido si no
+            // eligió, para no pisar uno previo). Migración 077.
+            ...(d.advance ? { advancePick: d.advance } : {}),
           });
         })
       );
@@ -1187,6 +1306,28 @@ export default function PollaSlugPage() {
     if (polla?.status === "ended") return true;
     if (m.status === "live" || m.status === "finished") return true;
     return Date.now() >= new Date(m.scheduled_at).getTime() - 5 * 60 * 1000;
+  }
+
+  // El +1 de "quién avanza" aplica a un match si la polla tiene advance_bonus
+  // Y el kickoff es >= advance_bonus_from (cutoff propio, arranca mañana —
+  // distinto del de 120'). Gatea el picker y el chip de resultado. Migración 077.
+  function advanceActiveFor(m: Match): boolean {
+    return (
+      !!polla?.advance_bonus &&
+      !!polla?.advance_bonus_from &&
+      new Date(m.scheduled_at) >= new Date(polla.advance_bonus_from)
+    );
+  }
+
+  // El 120' aplica a un match si la polla tiene score_120 Y el kickoff es >=
+  // kc_mode_changed_at. Gatea el display del marcador de 120' (consistente con
+  // el scorer, que también chequea el cutoff). Migración 077.
+  function score120ActiveFor(m: Match): boolean {
+    return (
+      !!polla?.score_120 &&
+      !!polla?.kc_mode_changed_at &&
+      new Date(m.scheduled_at) >= new Date(polla.kc_mode_changed_at)
+    );
   }
 
   // Map de user_id -> {display_name, avatar_url} solo de participantes
@@ -1605,6 +1746,9 @@ export default function PollaSlugPage() {
                             locked={isLocked(match)}
                             missingPredictions={missingByMatch.get(match.id) ?? []}
                             onTeamClick={openTeamSheet}
+                            advanceEnabled={advanceActiveFor(match)}
+                            score120Enabled={score120ActiveFor(match)}
+                            onAdvanceChange={() => { /* not editable */ }}
                           />
                         ))}
                       </div>
@@ -1638,6 +1782,9 @@ export default function PollaSlugPage() {
                           locked={isLocked(match)}
                           missingPredictions={missingByMatch.get(match.id) ?? []}
                           onTeamClick={openTeamSheet}
+                          advanceEnabled={advanceActiveFor(match)}
+                          score120Enabled={score120ActiveFor(match)}
+                          onAdvanceChange={() => { /* not editable */ }}
                         />
                       ))}
                     </div>
@@ -1739,6 +1886,13 @@ export default function PollaSlugPage() {
                                   locked={isLocked(match)}
                                   missingPredictions={missingByMatch.get(match.id) ?? []}
                                   onTeamClick={openTeamSheet}
+                                  advanceEnabled={advanceActiveFor(match)}
+                                  score120Enabled={score120ActiveFor(match)}
+                                  onAdvanceChange={(val) => {
+                                    const cur = drafts[match.id] ?? { home: "", away: "" };
+                                    setDrafts((prev) => ({ ...prev, [match.id]: { ...cur, advance: val } }));
+                                    setTouchedMatches((prev) => new Set(prev).add(match.id));
+                                  }}
                                 />
                               ))}
                             </div>

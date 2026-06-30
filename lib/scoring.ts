@@ -7,7 +7,15 @@
 //   2. Correr manualmente tras un admin sync (belt-and-suspenders).
 //   3. Scripts offline que no van por el trigger.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { calculatePoints, phaseScoreMultiplier, type ScoringMode } from "@/lib/utils/points";
+import {
+  calculatePoints,
+  phaseScoreMultiplier,
+  effectiveResult,
+  advanceBonus,
+  type ScoringMode,
+  type MatchOutcome,
+  type KnockoutScoring,
+} from "@/lib/utils/points";
 import { notifyMatchFinished, notifyRankImprovements } from "@/lib/notifications";
 
 interface MatchRow {
@@ -17,6 +25,9 @@ interface MatchRow {
   away_score: number | null;
   scheduled_at: string | null;
   phase: string | null;
+  fulltime_home_score: number | null;
+  fulltime_away_score: number | null;
+  advancer: "home" | "away" | null;
 }
 
 interface PredictionRow {
@@ -25,6 +36,7 @@ interface PredictionRow {
   user_id: string;
   predicted_home: number;
   predicted_away: number;
+  advance_pick: "home" | "away" | null;
 }
 
 interface PollaScoringRow {
@@ -36,6 +48,10 @@ interface PollaScoringRow {
   scoring_mode: string | null;
   scoring_mode_changed_at: string | null;
   double_from_octavos: boolean | null;
+  score_120: boolean | null;
+  advance_bonus: boolean | null;
+  kc_mode_changed_at: string | null;
+  advance_bonus_from: string | null;
 }
 
 export interface ScoreMatchResult {
@@ -51,7 +67,7 @@ export async function scoreMatch(
 ): Promise<ScoreMatchResult> {
   const { data: match, error: matchErr } = await admin
     .from("matches")
-    .select("id, status, home_score, away_score, scheduled_at, phase")
+    .select("id, status, home_score, away_score, scheduled_at, phase, fulltime_home_score, fulltime_away_score, advancer")
     .eq("id", matchId)
     .maybeSingle<MatchRow>();
   if (matchErr) throw matchErr;
@@ -64,11 +80,22 @@ export async function scoreMatch(
     return { matchId, predictionsScored: 0, pollasRecomputed: 0, skipped: "null_score" };
   }
 
-  const result = { homeScore: match.home_score, awayScore: match.away_score };
+  // matchOutcome lleva 90' + 120' + avance; el marcador efectivo a usar
+  // depende del modo de CADA polla (score_120 es por-polla), así que se
+  // resuelve dentro del loop por predicción. Ver lib/utils/points.ts.
+  const matchOutcome: MatchOutcome = {
+    homeScore: match.home_score,
+    awayScore: match.away_score,
+    fulltimeHome: match.fulltime_home_score,
+    fulltimeAway: match.fulltime_away_score,
+    advancer: match.advancer,
+    scheduledAt: match.scheduled_at,
+    phase: match.phase,
+  };
 
   const { data: predictions, error: predErr } = await admin
     .from("predictions")
-    .select("id, polla_id, user_id, predicted_home, predicted_away")
+    .select("id, polla_id, user_id, predicted_home, predicted_away, advance_pick")
     .eq("match_id", matchId)
     .returns<PredictionRow[]>();
   if (predErr) throw predErr;
@@ -80,7 +107,7 @@ export async function scoreMatch(
   const pollaIds = Array.from(new Set(predictions.map((p) => p.polla_id)));
   const { data: pollas, error: pollaErr } = await admin
     .from("pollas")
-    .select("id, points_exact, points_goal_diff, points_correct_result, points_one_team, scoring_mode, scoring_mode_changed_at, double_from_octavos")
+    .select("id, points_exact, points_goal_diff, points_correct_result, points_one_team, scoring_mode, scoring_mode_changed_at, double_from_octavos, score_120, advance_bonus, kc_mode_changed_at, advance_bonus_from")
     .in("id", pollaIds)
     .returns<PollaScoringRow[]>();
   if (pollaErr) throw pollaErr;
@@ -97,9 +124,17 @@ export async function scoreMatch(
       !!scoring.scoring_mode_changed_at &&
       !!match.scheduled_at &&
       new Date(match.scheduled_at) >= new Date(scoring.scoring_mode_changed_at);
+    // Modo 120' + avance (migración 077): score_120 cambia la fuente del
+    // marcador (120' vs 90'); advance_bonus suma +1 plano. Por-polla.
+    const kc: KnockoutScoring = {
+      score120: scoring?.score_120,
+      advanceBonus: scoring?.advance_bonus,
+      kcModeChangedAt: scoring?.kc_mode_changed_at,
+      advanceBonusFrom: scoring?.advance_bonus_from,
+    };
     const basePts = calculatePoints(
       { homeScore: pred.predicted_home, awayScore: pred.predicted_away },
-      result,
+      effectiveResult(matchOutcome, kc),
       {
         pointsExact: scoring?.points_exact ?? undefined,
         pointsGoalDiff: scoring?.points_goal_diff ?? undefined,
@@ -109,8 +144,11 @@ export async function scoreMatch(
       (useV2 ? "goles_v2" : "classic") as ScoringMode
     );
     // Doble desde octavos: envuelve el scorer base (octavos+ = base x2 si la
-    // polla aprobó la encuesta 074). Debe coincidir con public.score_match.
-    const pts = basePts * phaseScoreMultiplier(match.phase, scoring?.double_from_octavos);
+    // polla aprobó la encuesta 074). El +1 de avance va POR FUERA del x2
+    // (plano). Debe coincidir con public.score_match (migración 077).
+    const pts =
+      basePts * phaseScoreMultiplier(match.phase, scoring?.double_from_octavos) +
+      advanceBonus(pred.advance_pick, matchOutcome, kc);
     const { error: updErr } = await admin
       .from("predictions")
       .update({ points_earned: pts, visible: true })
