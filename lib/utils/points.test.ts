@@ -3,6 +3,11 @@ import {
   calculatePoints,
   calculatePointsGolesV2,
   phaseScoreMultiplier,
+  effectiveResult,
+  effectiveAdvancer,
+  advanceBonus,
+  type MatchOutcome,
+  type KnockoutScoring,
 } from "./points";
 
 // 5-tier scoring contract:
@@ -168,5 +173,188 @@ describe("phaseScoreMultiplier", () => {
     const res = { homeScore: 2, awayScore: 1 };
     const base = calculatePoints(pred, res, undefined, "goles_v2"); // 4
     expect(base * phaseScoreMultiplier("quarter_finals", true)).toBe(8);
+  });
+});
+
+// Modo "120' + avance" por polla (migración 077). Debe quedar 1:1 con
+// public.score_match / public.rescore_polla.
+const CUTOFF = "2026-06-30T00:00:00Z";
+const AFTER = "2026-07-04T18:00:00Z"; // knockout posterior al cutoff
+const BEFORE = "2026-06-20T18:00:00Z"; // partido previo al cutoff
+
+describe("effectiveResult (score_120)", () => {
+  const ko: MatchOutcome = {
+    homeScore: 1, // 90'
+    awayScore: 1,
+    fulltimeHome: 2, // 120' (alargue)
+    fulltimeAway: 1,
+    scheduledAt: AFTER,
+    phase: "quarter_finals",
+  };
+
+  it("score_120 OFF → usa el 90'", () => {
+    expect(effectiveResult(ko, { score120: false, kcModeChangedAt: CUTOFF })).toEqual({
+      homeScore: 1,
+      awayScore: 1,
+    });
+  });
+
+  it("score_120 ON + después del cutoff → usa el 120'", () => {
+    expect(effectiveResult(ko, { score120: true, kcModeChangedAt: CUTOFF })).toEqual({
+      homeScore: 2,
+      awayScore: 1,
+    });
+  });
+
+  it("score_120 ON pero ANTES del cutoff → usa el 90' (no retroactivo)", () => {
+    const pre = { ...ko, scheduledAt: BEFORE };
+    expect(effectiveResult(pre, { score120: true, kcModeChangedAt: CUTOFF })).toEqual({
+      homeScore: 1,
+      awayScore: 1,
+    });
+  });
+
+  it("score_120 ON sin captura del 120' → COALESCE al 90'", () => {
+    const noFt = { ...ko, fulltimeHome: null, fulltimeAway: null };
+    expect(effectiveResult(noFt, { score120: true, kcModeChangedAt: CUTOFF })).toEqual({
+      homeScore: 1,
+      awayScore: 1,
+    });
+  });
+
+  it("fase de grupos → siempre 90' aunque score_120 esté ON", () => {
+    const group = { ...ko, phase: "group_stage" };
+    expect(effectiveResult(group, { score120: true, kcModeChangedAt: CUTOFF })).toEqual({
+      homeScore: 1,
+      awayScore: 1,
+    });
+  });
+});
+
+describe("effectiveAdvancer", () => {
+  it("usa la captura (matches.advancer) cuando existe", () => {
+    expect(
+      effectiveAdvancer({ homeScore: 1, awayScore: 1, advancer: "away" }),
+    ).toBe("away");
+  });
+
+  it("deriva del 120' decisivo si no hay captura", () => {
+    expect(
+      effectiveAdvancer({ homeScore: 1, awayScore: 1, fulltimeHome: 2, fulltimeAway: 1 }),
+    ).toBe("home");
+  });
+
+  it("deriva del 90' decisivo si no hay 120' ni captura", () => {
+    expect(effectiveAdvancer({ homeScore: 0, awayScore: 2 })).toBe("away");
+  });
+
+  it("empate a 120' sin captura → null (penales, ganador desconocido)", () => {
+    expect(
+      effectiveAdvancer({ homeScore: 1, awayScore: 1, fulltimeHome: 1, fulltimeAway: 1 }),
+    ).toBeNull();
+  });
+});
+
+describe("advanceBonus (+1 plano)", () => {
+  const kc: KnockoutScoring = { advanceBonus: true, advanceBonusFrom: CUTOFF };
+  const ko: MatchOutcome = {
+    homeScore: 1,
+    awayScore: 1,
+    fulltimeHome: 1,
+    fulltimeAway: 1,
+    advancer: "home", // ganó por penales
+    scheduledAt: AFTER,
+    phase: "round_of_16",
+  };
+
+  it("acertó quién avanza → +1", () => {
+    expect(advanceBonus("home", ko, kc)).toBe(1);
+  });
+
+  it("erró quién avanza → 0", () => {
+    expect(advanceBonus("away", ko, kc)).toBe(0);
+  });
+
+  it("sin pick → 0", () => {
+    expect(advanceBonus(null, ko, kc)).toBe(0);
+  });
+
+  it("polla sin advance_bonus → 0", () => {
+    expect(advanceBonus("home", ko, { advanceBonus: false, advanceBonusFrom: CUTOFF })).toBe(0);
+  });
+
+  it("antes del cutoff → 0 (no retroactivo)", () => {
+    expect(advanceBonus("home", { ...ko, scheduledAt: BEFORE }, kc)).toBe(0);
+  });
+
+  it("fase de grupos → 0 (solo knockouts 16vos+)", () => {
+    expect(advanceBonus("home", { ...ko, phase: "group_stage" }, kc)).toBe(0);
+  });
+
+  it("16vos (round_of_32) SÍ aplica → +1", () => {
+    expect(advanceBonus("home", { ...ko, phase: "round_of_32" }, kc)).toBe(1);
+  });
+
+  it("final SÍ aplica (campeón) → +1", () => {
+    expect(advanceBonus("home", { ...ko, phase: "final" }, kc)).toBe(1);
+  });
+
+  it("respeta su PROPIO cutoff (advance_bonus_from), distinto del de 120'", () => {
+    // Cutoffs separados: 120' desde 30-jun, avance desde 02-jul.
+    const kcSplit: KnockoutScoring = {
+      advanceBonus: true,
+      kcModeChangedAt: "2026-06-30T00:00:00Z",
+      advanceBonusFrom: "2026-07-02T00:00:00Z",
+    };
+    // Partido el 01-jul (entre ambos cutoffs): el bonus AÚN no aplica.
+    expect(advanceBonus("home", { ...ko, scheduledAt: "2026-07-01T18:00:00Z" }, kcSplit)).toBe(0);
+    // Partido el 03-jul (después del cutoff del avance): sí aplica.
+    expect(advanceBonus("home", { ...ko, scheduledAt: "2026-07-03T18:00:00Z" }, kcSplit)).toBe(1);
+  });
+});
+
+// Composición completa estilo "La Polla de Carvalho": goles_v2 + x2 octavos
+// + score_120 + advance_bonus. El +1 va POR FUERA del x2 (plano).
+describe("composición Carvalho (goles_v2 + x2 + 120' + avance)", () => {
+  const kc: KnockoutScoring = {
+    score120: true,
+    advanceBonus: true,
+    kcModeChangedAt: CUTOFF,
+    advanceBonusFrom: CUTOFF,
+  };
+  // Cuartos que se fue a alargue: 90' = 1-1, 120' = 2-1, avanzó el local.
+  const ko: MatchOutcome = {
+    homeScore: 1,
+    awayScore: 1,
+    fulltimeHome: 2,
+    fulltimeAway: 1,
+    advancer: "home",
+    scheduledAt: AFTER,
+    phase: "quarter_finals",
+  };
+
+  function total(pred: { homeScore: number; awayScore: number }, advancePick: "home" | "away" | null) {
+    const base = calculatePoints(pred, effectiveResult(ko, kc), undefined, "goles_v2");
+    return base * phaseScoreMultiplier(ko.phase, true) + advanceBonus(advancePick, ko, kc);
+  }
+
+  it("exacto al 120' (2-1) + acertó avance en cuartos → 5*2 + 1 = 11", () => {
+    expect(total({ homeScore: 2, awayScore: 1 }, "home")).toBe(11);
+  });
+
+  it("el +1 NO se dobla: exacto 120' sin acertar avance → 5*2 = 10", () => {
+    expect(total({ homeScore: 2, awayScore: 1 }, "away")).toBe(10);
+  });
+
+  it("si se puntuara por 90' (1-1), el pronóstico 2-1 valdría mucho menos", () => {
+    // Contraste: con score_120 OFF, 2-1 vs 1-1 en goles_v2 = 1 (un marcador,
+    // ganador errado) * 2 = 2, + avance 1 = 3. El 120' premia el acierto real.
+    const base90 = calculatePoints(
+      { homeScore: 2, awayScore: 1 },
+      effectiveResult(ko, { ...kc, score120: false }),
+      undefined,
+      "goles_v2",
+    );
+    expect(base90 * phaseScoreMultiplier(ko.phase, true) + advanceBonus("home", ko, kc)).toBe(3);
   });
 });

@@ -42,7 +42,7 @@ export async function GET(
 
     const { data: predictions } = await admin
       .from("predictions")
-      .select("match_id, predicted_home, predicted_away")
+      .select("match_id, predicted_home, predicted_away, advance_pick")
       .eq("polla_id", polla.id)
       .eq("user_id", user.id);
 
@@ -57,6 +57,9 @@ const predictionSchema = z.object({
   matchId: z.string().uuid("ID de partido inválido"),
   predictedHome: z.number().int().min(0).max(20),
   predictedAway: z.number().int().min(0).max(20),
+  // Pick de "quién avanza" (+1 plano en pollas con advance_bonus, migración
+  // 077). Opcional: solo se manda en knockouts. null para limpiarlo.
+  advancePick: z.enum(["home", "away"]).nullable().optional(),
 });
 
 export async function POST(
@@ -135,20 +138,30 @@ export async function POST(
     // el upsert via admin no debilita la lógica anti-tarde. Usamos
     // admin porque predictions_insert/update gatean por auth.uid() =
     // user_id que es NULL en PostgREST.
+    const row: {
+      polla_id: string;
+      user_id: string;
+      match_id: string;
+      predicted_home: number;
+      predicted_away: number;
+      advance_pick?: "home" | "away" | null;
+    } = {
+      polla_id: polla.id,
+      user_id: user.id,
+      match_id: parsed.data.matchId,
+      predicted_home: parsed.data.predictedHome,
+      predicted_away: parsed.data.predictedAway,
+    };
+    // Solo incluimos advance_pick si vino en el body: así guardar el marcador
+    // NO borra un advance_pick previo (y al revés). El trigger de lock de 5
+    // min aplica igual (mismo upsert). Migración 077.
+    if (parsed.data.advancePick !== undefined) {
+      row.advance_pick = parsed.data.advancePick;
+    }
+
     const { data: prediction, error: predError } = await admin
       .from("predictions")
-      .upsert(
-        {
-          polla_id: polla.id,
-          user_id: user.id,
-          match_id: parsed.data.matchId,
-          predicted_home: parsed.data.predictedHome,
-          predicted_away: parsed.data.predictedAway,
-        },
-        {
-          onConflict: "polla_id,user_id,match_id",
-        }
-      )
+      .upsert(row, { onConflict: "polla_id,user_id,match_id" })
       .select()
       .single();
 

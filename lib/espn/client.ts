@@ -65,6 +65,14 @@ export interface ESPNStatus {
 export interface ESPNCompetitor {
   homeAway: "home" | "away";
   score: string; // "0", "1", … (string in ESPN payload)
+  /** true para el equipo que ganó/avanzó el cruce (incluidos penales).
+   *  ESPN lo setea también en partidos normales de 90'. Verificado contra la
+   *  Euro 2024 (España/Francia/Inglaterra/PB): correcto en AET, penales y FT. */
+  winner?: boolean;
+  /** Penales convertidos en la tanda. Presente SOLO si el match fue a penales
+   *  (ESPN lo devuelve como number en el scoreboard; el `score` de arriba es
+   *  el de los 120', sin penales). */
+  shootoutScore?: number;
   team: {
     id: string;
     displayName: string;

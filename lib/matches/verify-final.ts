@@ -61,6 +61,7 @@ interface MatchRow {
   external_id: string | null;
   espn_id: string | null;
   tournament: string;
+  phase: string | null;
   home_team: string;
   away_team: string;
   home_score: number | null;
@@ -72,6 +73,28 @@ interface MatchRow {
   live_status_detail: string | null;
   regulation_home_score: number | null;
   regulation_away_score: number | null;
+}
+
+// Fases de knockout (16vos en adelante). Solo para estos partidos
+// capturamos el marcador de 120', los penales y quién avanzó (migración
+// 077): un cruce eliminatorio tiene un ganador inequívoco y puede ir a
+// alargue/penales; la fase de grupos no.
+const KNOCKOUT_PHASES = new Set([
+  "round_of_32",
+  "round_of_16",
+  "quarter_finals",
+  "semi_finals",
+  "third_place",
+  "final",
+]);
+
+/** Datos de cierre extendidos de un knockout, capturados de ESPN (migración 077). */
+interface KnockoutExtras {
+  fulltime_home_score: number | null; // marcador a los 120' (incluye alargue)
+  fulltime_away_score: number | null;
+  penalty_home: number | null; // tanda de penales
+  penalty_away: number | null;
+  advancer: "home" | "away" | null; // quién avanzó (incluidos penales)
 }
 
 const FD_COMPETITION_BY_TOURNAMENT: Record<string, number> = Object.fromEntries(
@@ -179,7 +202,7 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
   const { data, error } = await admin
     .from("matches")
     .select(
-      "id, external_id, espn_id, tournament, home_team, away_team, home_score, away_score, status, scheduled_at, final_verified_at, final_verification_notes, live_status_detail, regulation_home_score, regulation_away_score, predictions!inner(id)",
+      "id, external_id, espn_id, tournament, phase, home_team, away_team, home_score, away_score, status, scheduled_at, final_verified_at, final_verification_notes, live_status_detail, regulation_home_score, regulation_away_score, predictions!inner(id)",
     )
     .eq("status", "finished")
     .is("final_verified_at", null)
@@ -282,6 +305,12 @@ async function verifyOneMatch(
   let espnFinished = false;
   let espnHome: number | null = null;
   let espnAway: number | null = null;
+  // Extras de knockout (migración 077): el `score` de ESPN es el marcador de
+  // los 120' (incluye alargue, EXCLUYE penales); shootoutScore es la tanda;
+  // winner marca quién avanzó. Se capturan acá y se persisten al finalizar.
+  let espnAdvancer: "home" | "away" | null = null;
+  let espnPenHome: number | null = null;
+  let espnPenAway: number | null = null;
   {
     const events = espnEvents ?? [];
     let event = match.espn_id ? events.find((e) => e.id === match.espn_id) : null;
@@ -312,8 +341,31 @@ async function verifyOneMatch(
       const away = competition?.competitors.find((c) => c.homeAway === "away");
       espnHome = parseEspnScore(home?.score);
       espnAway = parseEspnScore(away?.score);
+      // Quién avanzó / tanda de penales (solo se usan en knockouts más abajo).
+      if (home?.winner) espnAdvancer = "home";
+      else if (away?.winner) espnAdvancer = "away";
+      espnPenHome = typeof home?.shootoutScore === "number" ? home.shootoutScore : null;
+      espnPenAway = typeof away?.shootoutScore === "number" ? away.shootoutScore : null;
     }
   }
+
+  // Extras a persistir SOLO en knockouts. fulltime = score de 120' de ESPN
+  // (para partidos sin alargue es el de 90', idéntico al canónico). Si ESPN
+  // no apareció, quedan null y score_match degrada seguro (cae al 90' y
+  // deriva el avance del marcador decisivo). Ver migración 077.
+  // Solo capturamos si ESPN marcó el partido como FINISHED: si no, espnHome/away
+  // sería un score en vivo/parcial (no el de 120') y el winner aún no es
+  // definitivo. Sin espnFinished → null → score_match cae al 90' / snapshot.
+  const knockoutExtras: KnockoutExtras | null =
+    espnFinished && match.phase !== null && KNOCKOUT_PHASES.has(match.phase)
+      ? {
+          fulltime_home_score: espnHome,
+          fulltime_away_score: espnAway,
+          penalty_home: espnPenHome,
+          penalty_away: espnPenAway,
+          advancer: espnAdvancer,
+        }
+      : null;
 
   // Marker anti-spam: "alerted=<iso>" debe sobrevivir cualquier re-write
   // de notes — si se pierde, el próximo tick re-notifica al admin.
@@ -322,6 +374,41 @@ async function verifyOneMatch(
   const alertedSuffix = previousAlertedMatch ? previousAlertedMatch[0] : "";
 
   const etSignal = hasEtSignal(match);
+
+  // Persistir los extras de knockout (120'/penales/avance) ANTES de cualquier
+  // finalize: score_match corre al setear final_verified_at dentro de
+  // finalize_match_result, así que las columnas ya tienen que estar escritas.
+  // Si la escritura FALLA, NO finalizamos este tick → el match queda sin
+  // verificar y reintenta el próximo (codex: no scorear sin los extras).
+  // fulltime/penales como par atómico (los dos o ninguno). Migración 077.
+  if (knockoutExtras) {
+    const patch: Record<string, number | string> = {};
+    if (
+      knockoutExtras.fulltime_home_score !== null &&
+      knockoutExtras.fulltime_away_score !== null
+    ) {
+      patch.fulltime_home_score = knockoutExtras.fulltime_home_score;
+      patch.fulltime_away_score = knockoutExtras.fulltime_away_score;
+    }
+    if (knockoutExtras.penalty_home !== null && knockoutExtras.penalty_away !== null) {
+      patch.penalty_home = knockoutExtras.penalty_home;
+      patch.penalty_away = knockoutExtras.penalty_away;
+    }
+    if (knockoutExtras.advancer !== null) patch.advancer = knockoutExtras.advancer;
+    if (Object.keys(patch).length > 0) {
+      const { error: exErr } = await admin
+        .from("matches")
+        .update(patch)
+        .eq("id", match.id);
+      if (exErr) {
+        console.error(`[verify-final] knockout extras update failed for ${match.id}:`, exErr.message);
+        result.status = "pending";
+        result.notes = `Captura de 120'/avance falló — reintenta el próximo tick.`;
+        await persistNote(admin, match.id, result.notes + alertedSuffix);
+        return result;
+      }
+    }
+  }
 
   // ── Path A: torneo cubierto por football-data (Mundial) ─────────────
   // La segunda fuente es el fetch REAL a FD, nunca el row de DB.
@@ -426,7 +513,7 @@ async function verifyOneMatch(
           : fdWentToEt
             ? `Verificado dual-source: 90' = ${fdCanonHome}-${fdCanonAway} (${fdDuration}, final ${fdFtHome}-${fdFtAway} — los puntos usan el 90').`
             : `Verificado dual-source: ESPN y football-data coinciden en ${fdCanonHome}-${fdCanonAway}.`;
-      await finalize(admin, match.id, fdCanonHome, fdCanonAway, result.notes);
+      await finalize(admin, match.id, fdCanonHome, fdCanonAway, result.notes, knockoutExtras);
       return result;
     }
 
@@ -453,7 +540,7 @@ async function verifyOneMatch(
         if (sameScoreSeen && Date.now() - new Date(seen![3]).getTime() >= 50_000) {
           result.status = "verified";
           result.notes = `Verificado ESPN-primario (FD ${fdState}): ${espnHome}-${espnAway}, mismo score en 2 ticks separados.`;
-          await finalize(admin, match.id, espnHome, espnAway, result.notes);
+          await finalize(admin, match.id, espnHome, espnAway, result.notes, knockoutExtras);
           return result;
         }
         const marker = sameScoreSeen
@@ -480,7 +567,7 @@ async function verifyOneMatch(
     ) {
       result.status = "verified";
       result.notes = `Verificado con snapshot 90' (FD ${fdState}): ${match.regulation_home_score}-${match.regulation_away_score} (ET final ESPN ${espnHome}-${espnAway} — los puntos usan el 90').`;
-      await finalize(admin, match.id, match.regulation_home_score, match.regulation_away_score, result.notes);
+      await finalize(admin, match.id, match.regulation_home_score, match.regulation_away_score, result.notes, knockoutExtras);
       return result;
     }
     if (!espnFinished) {
@@ -510,7 +597,7 @@ async function verifyOneMatch(
     ) {
       result.status = "verified";
       result.notes = `Verificado (single-source ESPN): ${fdHomeDb}-${fdAwayDb}.`;
-      await finalize(admin, match.id, fdHomeDb, fdAwayDb, result.notes);
+      await finalize(admin, match.id, fdHomeDb, fdAwayDb, result.notes, knockoutExtras);
       return result;
     }
 
@@ -527,7 +614,7 @@ async function verifyOneMatch(
     if (match.regulation_home_score !== null && match.regulation_away_score !== null) {
       result.status = "verified";
       result.notes = `Verificado con snapshot 90': ${match.regulation_home_score}-${match.regulation_away_score} (ET final ESPN ${espnHome}-${espnAway} — los puntos usan el 90').`;
-      await finalize(admin, match.id, match.regulation_home_score, match.regulation_away_score, result.notes);
+      await finalize(admin, match.id, match.regulation_home_score, match.regulation_away_score, result.notes, knockoutExtras);
       return result;
     }
     result.status = "discrepancy";
@@ -539,7 +626,7 @@ async function verifyOneMatch(
   if (espnHome === fdHomeDb && espnAway === fdAwayDb && fdFinishedDb) {
     result.status = "verified";
     result.notes = `Verificado: ESPN y DB coinciden en ${fdHomeDb}-${fdAwayDb}.`;
-    await finalize(admin, match.id, fdHomeDb!, fdAwayDb!, result.notes);
+    await finalize(admin, match.id, fdHomeDb!, fdAwayDb!, result.notes, knockoutExtras);
     return result;
   }
 
@@ -549,14 +636,20 @@ async function verifyOneMatch(
   return result;
 }
 
-/** Cierra el match vía el RPC autoritativo (migración 063). */
+/** Cierra el match vía el RPC autoritativo (migración 063). `extras` (knockouts)
+ *  se persisten ANTES del RPC para que score_match los vea (migración 077). */
 async function finalize(
   admin: ReturnType<typeof createAdminClient>,
   matchId: string,
   homeScore: number,
   awayScore: number,
   notes: string,
+  extras: KnockoutExtras | null = null,
 ): Promise<void> {
+  // Los extras de knockout (120'/penales/avance) ya se escribieron en
+  // verifyOneMatch ANTES de llamar a finalize (y si fallaron, no se llega
+  // hasta acá: se reintenta). Acá solo cerramos vía el RPC autoritativo.
+  void extras;
   const { error } = await admin.rpc("finalize_match_result", {
     p_match_id: matchId,
     p_home_score: homeScore,

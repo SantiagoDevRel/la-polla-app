@@ -13,6 +13,7 @@ import UserDetailModal from "@/components/admin/UserDetailModal";
 import KnockoutStatusCard from "@/components/admin/KnockoutStatusCard";
 import ScoringSurveyCard from "@/components/admin/ScoringSurveyCard";
 import DoublePointsSurveyCard from "@/components/admin/DoublePointsSurveyCard";
+import KnockoutModeCard from "@/components/admin/KnockoutModeCard";
 import EngagementCard, { type EngagementData } from "@/components/admin/EngagementCard";
 import WebAnalyticsCard, { type WebAnalytics } from "@/components/admin/WebAnalyticsCard";
 import SentryHealthCard, { type SentryHealth } from "@/components/admin/SentryHealthCard";
@@ -321,6 +322,11 @@ export default function AdminPage() {
                 + comparativa por fase + implementar/mantener. Se auto-oculta
                 si no hay encuesta abierta ni polla con el doble activo. */}
             <DoublePointsSurveyCard />
+
+            {/* Modo "120' + avance" por polla (migración 077) — flip top-down
+                (sin encuesta): los knockouts puntúan por el marcador de 120' +
+                bonus +1 por acertar quién avanza. Para La Polla de Carvalho. */}
+            <KnockoutModeCard />
 
             {/* Stats */}
             <section className="grid grid-cols-2 gap-3">
