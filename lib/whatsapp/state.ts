@@ -34,6 +34,7 @@ export type ConversationAction =
   | "picking_match"
   | "waiting_prediction"
   | "confirm_prediction"
+  | "confirm_advance"
   | "waiting_join_confirm"
   | "waiting_join_code"
   | "onboarding_ask_name"
