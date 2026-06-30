@@ -42,6 +42,36 @@ function jobLabel(j: Job) {
   return j.player_name || (j.face_paint !== "none" ? "Pintura" : "Selfie");
 }
 
+// Las fotos de celular pesan 2-6MB; el POST multipart de 3 superaría el límite de body
+// de Vercel (~4.5MB) y fallaría sin crear el job. Las redimensionamos/comprimimos en el
+// cliente (lado largo 1280px, JPEG 0.82) → ~200-400KB c/u → sube rápido y entra holgado.
+function loadImg(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+async function compressImage(file: File, max = 1280, quality = 0.82): Promise<Blob> {
+  const img = await loadImg(file);
+  const scale = Math.min(1, max / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no ctx");
+  ctx.drawImage(img, 0, 0, w, h);
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob null"))), "image/jpeg", quality);
+  });
+}
+async function prepareFile(file: File): Promise<Blob> {
+  try { return await compressImage(file); } catch { return file; }
+}
+
 export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const reduce = useReducedMotion();
   const [mounted, setMounted] = useState(false);
@@ -55,6 +85,7 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => setMounted(true), []);
@@ -146,17 +177,23 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
   const canSubmit = hasSelfie && (!!player || paint !== "none");
 
   async function submit() {
+    if (submitting) return;
     setErrorMsg(null);
-    const fd = new FormData();
-    if (files.front) fd.append("selfie1", files.front);
-    if (files.left) fd.append("selfie2", files.left);
-    if (files.right) fd.append("selfie3", files.right);
-    if (player) { fd.append("player_name", player.name); fd.append("player_team", player.country); }
-    fd.append("face_paint", paint);
+    setSubmitting(true);
     try {
+      const fd = new FormData();
+      if (files.front) fd.append("selfie1", await prepareFile(files.front), "selfie1.jpg");
+      if (files.left) fd.append("selfie2", await prepareFile(files.left), "selfie2.jpg");
+      if (files.right) fd.append("selfie3", await prepareFile(files.right), "selfie3.jpg");
+      if (player) { fd.append("player_name", player.name); fd.append("player_team", player.country); }
+      fd.append("face_paint", paint);
       const res = await fetch("/api/ai-image", { method: "POST", body: fd });
-      const j = await res.json();
-      if (!res.ok) { setErrorMsg(j.error || "No se pudo crear"); return; }
+      let j: { error?: string; job_id?: string } = {};
+      try { j = await res.json(); } catch { /* respuesta no-JSON (ej. 413) */ }
+      if (!res.ok || !j.job_id) {
+        setErrorMsg(j.error || (res.status === 413 ? "Las fotos pesan demasiado" : `No se pudo crear (${res.status})`));
+        return;
+      }
       // a la galería: el job nuevo aparece como tile "generándose"; podés cerrar y volver
       clearForm();
       setPhase("gallery");
@@ -164,6 +201,8 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
       poll(j.job_id);
     } catch {
       setErrorMsg("Error de red. Reintentá.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -397,10 +436,10 @@ export default function CreaTuSelfieSheet({ open, onClose }: { open: boolean; on
           {phase === "form" && (
             <div className="px-5 py-4 border-t border-subtle shrink-0">
               <button
-                disabled={!canSubmit} onClick={submit}
-                className={`w-full rounded-full px-5 py-3.5 font-semibold transition-all ${canSubmit ? "bg-gold text-bg-base hover:brightness-110 active:scale-[0.98]" : "bg-elevated text-muted cursor-not-allowed"}`}
+                disabled={!canSubmit || submitting} onClick={submit}
+                className={`w-full flex items-center justify-center gap-2 rounded-full px-5 py-3.5 font-semibold transition-all ${canSubmit && !submitting ? "bg-gold text-bg-base hover:brightness-110 active:scale-[0.98]" : "bg-elevated text-muted cursor-not-allowed"}`}
               >
-                Generar mi imagen
+                {submitting ? (<><Loader2 className="w-5 h-5 animate-spin" /> Enviando…</>) : "Generar mi imagen"}
               </button>
             </div>
           )}
