@@ -7,12 +7,13 @@ import {
   sendListMessage,
   sendCTAButton,
 } from "./interactive";
-import { clearState, setState } from "./state";
+import { clearState, getState, setState } from "./state";
 import { formatTablaWA } from "./tabla";
 import { shortMatchTitle } from "./format";
 import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
+import { KNOCKOUT_PHASES } from "@/lib/utils/points";
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "https://lapollacolombiana.com";
 const FOOTER = "La Polla Colombiana 🐥";
@@ -696,7 +697,7 @@ export async function handlePredictionInput(
 
   const { data: match } = await supabase
     .from("matches")
-    .select("id, home_team, away_team, scheduled_at, status")
+    .select("id, home_team, away_team, scheduled_at, status, phase")
     .eq("id", matchId)
     .single();
 
@@ -763,7 +764,7 @@ export async function handleConfirmPrediction(
 
   const { data: match } = await supabase
     .from("matches")
-    .select("id, home_team, away_team, scheduled_at, status")
+    .select("id, home_team, away_team, scheduled_at, status, phase")
     .eq("id", matchId)
     .single();
 
@@ -816,6 +817,46 @@ export async function handleConfirmPrediction(
     return;
   }
 
+  // ¿La polla tiene el +1 de "quién avanza" y este es un knockout post-cutoff?
+  // → en vez de cerrar, pedimos quién avanza. Gateado a advance_bonus (solo
+  // Carvalho) + advance_bonus_from (no retroactivo). Migración 077.
+  const { data: pollaAdv } = await supabase
+    .from("pollas")
+    .select("advance_bonus, advance_bonus_from")
+    .eq("id", pollaId)
+    .maybeSingle();
+  const isKnockout = match.phase != null && KNOCKOUT_PHASES.has(match.phase);
+  const advanceEligible =
+    isKnockout &&
+    !!pollaAdv?.advance_bonus &&
+    !!pollaAdv?.advance_bonus_from &&
+    new Date(match.scheduled_at) >= new Date(pollaAdv.advance_bonus_from);
+
+  if (advanceEligible) {
+    await setState(phone, {
+      action: "confirm_advance",
+      pollaId,
+      matchId,
+      predictedHome,
+      predictedAway,
+    });
+    const hF = getTeamFlag(match.home_team);
+    const aF = getTeamFlag(match.away_team);
+    const cap = (s: string) => (s.length > 20 ? s.slice(0, 19) + "…" : s);
+    await sendReplyButtons(
+      phone,
+      `✅ Guardé ${hF} *${match.home_team}* *${predictedHome}-${predictedAway}* *${match.away_team}* ${aF}\n\n` +
+        `🎯 *¿Y quién avanza a la siguiente ronda?*\n_Suma +1 si aciertas (incluye penales)._`,
+      [
+        { id: "adv_home", title: cap(match.home_team) },
+        { id: "adv_away", title: cap(match.away_team) },
+      ],
+      "¿Quién avanza? +1",
+      FOOTER
+    );
+    return;
+  }
+
   // Batch 4a: explicit clear on flow completion.
   // Placed after the successful upsert so the persisted prediction is the
   // source of truth, and before the user-facing send so a network error on
@@ -853,6 +894,79 @@ export async function handleConfirmPrediction(
       }
     }
   }
+}
+
+// ─── FLOW 5d: Pick de "quién avanza" (+1) — solo pollas con advance_bonus ───
+
+export async function handleAdvancePick(
+  phone: string,
+  user: { id: string; display_name: string },
+  pick: "home" | "away"
+) {
+  const state = await getState(phone);
+  if (!state || state.action !== "confirm_advance" || !state.pollaId || !state.matchId) {
+    await sendTextMessage(
+      phone,
+      "Parce, perdí el hilo. Dale a Pronosticar de nuevo.",
+      { userId: user.id }
+    );
+    await handleMisPollas(phone, user.id);
+    return;
+  }
+
+  const supabase = createAdminClient();
+  const { data: match } = await supabase
+    .from("matches")
+    .select("home_team, away_team, scheduled_at, status")
+    .eq("id", state.matchId)
+    .single();
+  if (!match) {
+    await sendTextMessage(phone, "🤔 Parce, no encontré el partido.", { userId: user.id });
+    await clearState(phone);
+    return;
+  }
+
+  // Mismo lock de 5 min que el marcador (editamos la misma fila de prediction).
+  const lockTime = new Date(match.scheduled_at).getTime() - 5 * 60 * 1000;
+  if (match.status !== "scheduled" || Date.now() >= lockTime) {
+    await sendTextMessage(
+      phone,
+      "Este partido ya está cerrado parce, no se puede cambiar a menos de 5 minutos del inicio.",
+      { userId: user.id }
+    );
+    await clearState(phone);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("predictions")
+    .update({ advance_pick: pick })
+    .eq("polla_id", state.pollaId)
+    .eq("user_id", user.id)
+    .eq("match_id", state.matchId);
+  if (error) {
+    console.error("[WA] Error saving advance_pick:", error);
+    await sendTextMessage(
+      phone,
+      "❌ Uy parce, no pude guardar quién avanza. Intentá de nuevo.",
+      { userId: user.id }
+    );
+    return;
+  }
+
+  await clearState(phone);
+  const pickedTeam = pick === "home" ? match.home_team : match.away_team;
+  const pickedFlag = getTeamFlag(pickedTeam);
+  await sendReplyButtons(
+    phone,
+    `✅ ¡Listo parce! Marcaste que avanza ${pickedFlag} *${pickedTeam}* 🎯\n\n_Suma +1 si aciertas_`,
+    [
+      { id: `pred_next_${state.pollaId}`, title: "Siguiente ➡️" },
+      { id: "menu", title: "🏠 Menú" },
+    ],
+    "Avance guardado ✅",
+    FOOTER
+  );
 }
 
 // ─── FLOW 6: Leaderboard ───

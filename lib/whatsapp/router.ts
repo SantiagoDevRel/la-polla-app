@@ -36,6 +36,7 @@ import { looksLikeMenuIntent } from "./menu-intent";
 import {
   handleCancelPrediction,
   handleConfirmPrediction,
+  handleAdvancePick,
   handleHelp,
   handleHelpTopic,
   handleJoinByCode,
@@ -271,6 +272,8 @@ async function routePayload(
     payload.startsWith("more_") ||
     payload === "confirm_yes" ||
     payload === "confirm_no" ||
+    payload === "adv_home" ||
+    payload === "adv_away" ||
     payload === "join_code_yes" ||
     payload === "join_code_no" ||
     payload.startsWith("paymeth_");
@@ -414,6 +417,11 @@ async function routePayload(
       );
       await handleMisPollas(from, user.id);
     }
+    return;
+  }
+
+  if (payload === "adv_home" || payload === "adv_away") {
+    await handleAdvancePick(from, user, payload === "adv_home" ? "home" : "away");
     return;
   }
 
