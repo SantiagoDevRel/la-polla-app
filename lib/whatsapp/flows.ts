@@ -832,7 +832,24 @@ export async function handleConfirmPrediction(
     !!pollaAdv?.advance_bonus_from &&
     new Date(match.scheduled_at) >= new Date(pollaAdv.advance_bonus_from);
 
-  if (advanceEligible) {
+  // ¿Va a dispararse el ask de método de pago? (1ª predicción de la vida + polla
+  // con buy-in + sin método guardado). Si sí, tiene PRIORIDAD sobre el pick de
+  // avance (setea otro state) — ese ask dispara una sola vez y no debe perderse.
+  // El avance se puede setear después re-pronosticando. (codex)
+  let paymentAskPending = false;
+  if (isFirstPredictionEver) {
+    const { data: pollaInfo0 } = await supabase
+      .from("pollas")
+      .select("buy_in_amount")
+      .eq("id", pollaId)
+      .maybeSingle();
+    if (pollaInfo0 && Number(pollaInfo0.buy_in_amount) > 0) {
+      const { userNeedsPaymentInfo } = await import("./payment");
+      paymentAskPending = await userNeedsPaymentInfo(user.id);
+    }
+  }
+
+  if (advanceEligible && !paymentAskPending) {
     await setState(phone, {
       action: "confirm_advance",
       pollaId,
@@ -877,22 +894,12 @@ export async function handleConfirmPrediction(
     FOOTER
   );
 
-  // Después de la PRIMERA predicción de su vida, si la polla tiene
-  // buy_in > 0 y no tiene método de pago guardado, le pedimos. Solo en
-  // ese momento — no antes (saturaba al unirse) ni después (perdía el
-  // momento de mayor engagement).
-  if (isFirstPredictionEver) {
-    const { data: pollaInfo } = await supabase
-      .from("pollas")
-      .select("buy_in_amount")
-      .eq("id", pollaId)
-      .maybeSingle();
-    if (pollaInfo && Number(pollaInfo.buy_in_amount) > 0) {
-      const { userNeedsPaymentInfo, askPaymentMethod } = await import("./payment");
-      if (await userNeedsPaymentInfo(user.id)) {
-        await askPaymentMethod(phone);
-      }
-    }
+  // Ask de método de pago (ya calculado arriba en paymentAskPending): 1ª
+  // predicción de su vida + buy_in > 0 + sin método guardado. Solo en ese
+  // momento — no antes (saturaba al unirse) ni después (perdía el engagement).
+  if (paymentAskPending) {
+    const { askPaymentMethod } = await import("./payment");
+    await askPaymentMethod(phone);
   }
 }
 

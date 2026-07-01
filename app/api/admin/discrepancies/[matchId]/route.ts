@@ -18,6 +18,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin, getAuthenticatedUser } from "@/lib/auth/admin";
+import { fetchKnockoutExtras } from "@/lib/espn/knockout-extras";
+import { KNOCKOUT_PHASES } from "@/lib/utils/points";
 
 const BodySchema = z.discriminatedUnion("source", [
   z.object({
@@ -63,7 +65,7 @@ export async function POST(
   // Obtener el match para diagnóstico + status check.
   const { data: match, error: matchErr } = await admin
     .from("matches")
-    .select("id, status, home_score, away_score, final_verified_at, final_verification_notes")
+    .select("id, status, home_score, away_score, final_verified_at, final_verification_notes, tournament, phase, home_team, away_team, scheduled_at, espn_id")
     .eq("id", params.matchId)
     .maybeSingle();
   if (matchErr || !match) {
@@ -91,6 +93,11 @@ export async function POST(
     final_verification_notes: string;
     home_score?: number;
     away_score?: number;
+    fulltime_home_score?: number | null;
+    fulltime_away_score?: number | null;
+    penalty_home?: number | null;
+    penalty_away?: number | null;
+    advancer?: "home" | "away" | null;
   } = {
     final_verified_at: verifiedAt,
     final_verification_notes: `${adminNote} via /admin/discrepancias source=${parsed.data.source} at=${verifiedAt}`,
@@ -101,6 +108,46 @@ export async function POST(
     updates.away_score = parsed.data.away;
   }
   // source === 'fd' → no tocamos scores, ya están escritos.
+
+  // Knockout: el 120'/penales/avance (para score_match, disparado por
+  // final_verified_at) se resuelve según la fuente que eligió el admin.
+  // Migración 077.
+  if (match.phase && KNOCKOUT_PHASES.has(match.phase)) {
+    if (parsed.data.source === "espn") {
+      // El admin CONFIRMÓ ESPN → capturamos sus extras (par atómico; si falla
+      // el scorer degrada al 90'/avance derivado).
+      const extras = await fetchKnockoutExtras(match.tournament, {
+        espn_id: match.espn_id,
+        scheduled_at: match.scheduled_at,
+        home_team: match.home_team,
+        away_team: match.away_team,
+      });
+      if (extras) {
+        if (
+          extras.fulltime_home_score !== null &&
+          extras.fulltime_away_score !== null
+        ) {
+          updates.fulltime_home_score = extras.fulltime_home_score;
+          updates.fulltime_away_score = extras.fulltime_away_score;
+        }
+        if (extras.penalty_home !== null && extras.penalty_away !== null) {
+          updates.penalty_home = extras.penalty_home;
+          updates.penalty_away = extras.penalty_away;
+        }
+        if (extras.advancer !== null) updates.advancer = extras.advancer;
+      }
+    } else {
+      // 'manual'/'fd': el admin RECHAZÓ ESPN. Limpiamos cualquier extra de ESPN
+      // que verify-final haya escrito ANTES de la discrepancia — si no, el
+      // scorer usaría un 120'/avance stale de ESPN en vez de la fuente elegida.
+      // Cae al 90'/avance derivado del marcador. (codex)
+      updates.fulltime_home_score = null;
+      updates.fulltime_away_score = null;
+      updates.penalty_home = null;
+      updates.penalty_away = null;
+      updates.advancer = null;
+    }
+  }
 
   const { error: updErr } = await admin
     .from("matches")
