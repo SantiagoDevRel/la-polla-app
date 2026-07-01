@@ -138,6 +138,29 @@ export async function POST(
     // el upsert via admin no debilita la lógica anti-tarde. Usamos
     // admin porque predictions_insert/update gatean por auth.uid() =
     // user_id que es NULL en PostgREST.
+    // El advance_pick NO está cubierto por el trigger de lock de la DB (que solo
+    // bloquea cambios de marcador predicted_home/away). Enforce el lock de 5 min
+    // a nivel app cuando viene un advancePick — sin esto un user podría fijar o
+    // cambiar quién avanza DESPUÉS de ver el resultado del partido. (codex)
+    if (parsed.data.advancePick !== undefined) {
+      const { data: lockMatch } = await admin
+        .from("matches")
+        .select("scheduled_at, status")
+        .eq("id", parsed.data.matchId)
+        .maybeSingle();
+      if (lockMatch) {
+        const locked =
+          lockMatch.status !== "scheduled" ||
+          Date.now() >= new Date(lockMatch.scheduled_at).getTime() - 5 * 60 * 1000;
+        if (locked) {
+          return NextResponse.json(
+            { error: "No se puede modificar el pronóstico a menos de 5 minutos del partido" },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     const row: {
       polla_id: string;
       user_id: string;
