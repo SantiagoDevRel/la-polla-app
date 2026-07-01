@@ -1071,6 +1071,66 @@ ranking de cada participante a lo largo del torneo.
 
 ---
 
+## Modo "120' + avance" por polla — La Polla de Carvalho (2026-06-30)
+
+Modo de puntaje POR POLLA (migración 077), hermano de `goles_v2` (072) y del
+doble-octavos (074). Prendido SOLO en La Polla de Carvalho
+(`56ca95a7-cded-482b-ab31-8f8d7089618f`). Dos flags en `pollas`:
+
+- `score_120` — knockouts puntúan con el marcador de **120'** (alargue) en vez
+  de los 90'. Cutoff `kc_mode_changed_at`.
+- `advance_bonus` — **+1 PLANO** por acertar quién avanza
+  (`predictions.advance_pick` == `matches.advancer`), POR FUERA del x2 de
+  octavos. Cutoff SEPARADO `advance_bonus_from` (puede ser posterior al de 120').
+
+Ambos gateados a fase knockout (round_of_32+) + su cutoff (NO retroactivo). Con
+los 2 flags en false, `score_match`/`rescore_polla` dan **idéntico al 074**
+(toda otra polla intacta — verificado codex + tests). Fórmula:
+`total = ladder(eff_score) * mult_octavos + bonus_avance` — el +1 va POR FUERA
+del x2. `eff_score` = 120' si score_120+cutoff+knockout, si no 90' (COALESCE).
+`advancer` efectivo = la captura o, si falta, derivado del marcador decisivo.
+
+### Captura (ESPN, automática)
+- ESPN trae `competitor.score` (=120'), `shootoutScore` (=penales) y `winner`
+  (=quién avanza). El cliente (`lib/espn/client.ts`) ahora los modela.
+- `verify-final.ts` escribe `matches.fulltime_home/away_score`,
+  `penalty_home/away`, `advancer` ANTES del RPC finalize (par atómico; solo si
+  ESPN=FINISHED). `/admin/discrepancias` hace lo mismo via
+  `lib/espn/knockout-extras.ts` (source=espn escribe, manual/fd LIMPIA extras
+  stale de ESPN).
+
+### Columnas / archivos
+- `pollas`: `score_120`, `advance_bonus`, `kc_mode_changed_at`,
+  `advance_bonus_from`. `matches`: `fulltime_home/away_score`,
+  `penalty_home/away`, `advancer`. `predictions`: `advance_pick`.
+- Scoring: `score_match`/`rescore_polla` (mig 077, snapshot autoritativo desde
+  acá) + espejo TS 1:1 `lib/utils/points.ts`
+  (`effectiveResult`/`effectiveAdvancer`/`advanceBonus`/`KNOCKOUT_PHASES`) +
+  `lib/scoring.ts`. **Mantener 1:1.**
+- UI: picker "¿Quién avanza? +1" en MatchRow (`pollas/[slug]/page.tsx`) + bot
+  WhatsApp (`flows.ts` `handleConfirmPrediction`/`handleAdvancePick`, state
+  `confirm_advance`, botones `adv_home`/`adv_away`). Admin: `KnockoutModeCard`
+  + `/api/admin/knockout-mode` (flip por polla).
+
+### Gotchas
+- El trigger DB de lock (`check_prediction_lock`) SOLO mira cambios de marcador
+  → un update de solo-`advance_pick` lo bypassaba. Se enforcea a nivel APP (5
+  min) en el endpoint web (`predictions/route.ts`) y en el bot.
+- Prender el modo = setear los flags en la polla (admin card o SQL) + `now()` en
+  los cutoffs; aplicar = `SELECT rescore_polla(id)`. Ver el bloque de comentario
+  al final de la migración 077.
+- Las fuentes se ven distintas en dev (localhost) vs prod: es Next dev sin el
+  preload de `next/font`, NO un cambio de fuente.
+
+### Seguridad (mismo día, mig 078/079)
+- 078: RLS + deny-all en `matches_backup_r32_20260628` (backup sin RLS, email de
+  Supabase).
+- 079: revocar EXECUTE de anon/authenticated en `finalize_match_result` /
+  `score_match` / `update_match_live_espn` (eran ejecutables por cualquier
+  autenticado → finalizar partidos arbitrarios; ahora solo service_role).
+
+---
+
 ## Lecciones / gotchas conocidos (importante leer en cada sesión nueva)
 
 ### 🚨 REGLA HARD: TODA inserción a `matches` DEBE pasar por `upsert_match_safe` 🚨
