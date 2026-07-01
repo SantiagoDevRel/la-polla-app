@@ -273,6 +273,18 @@ export default function TeamInfoSheet({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // Vive por TODA la vida del componente. Las requests lazy (plantel/noticias)
+  // gatean su setState con esto, NO con un `cancelled` por-efecto: el activeTab
+  // flipea plantel→resumen→plantel durante el scroll suave del carrusel (los
+  // onScroll intermedios caen en idx 0), y un cleanup por-efecto cancelaba la
+  // request EN VUELO mientras el guard rosterRequested ya estaba en true → el
+  // skeleton se quedaba infinito hasta reabrir el sheet (bug 2026-07-01).
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => { aliveRef.current = false; };
+  }, []);
+
   // ── Tabs (Resumen / Plantel / Noticias) ──
   // Navegación por tap + swipe horizontal con CSS scroll-snap. El tab
   // activo se sincroniza con el scroll para que el indicador siga el swipe.
@@ -287,6 +299,11 @@ export default function TeamInfoSheet({
   const [newsError, setNewsError] = useState(false);
   const rosterRequested = useRef(false);
   const newsRequested = useRef(false);
+  // Índice destino de un scroll PROGRAMÁTICO (tap en un tab). Mientras el
+  // smooth-scroll está en curso, onPanelsScroll ignora los onScroll intermedios
+  // (que caen en índices previos) para no flipear el tab activo de ida y vuelta.
+  // Se limpia cuando el scroll asienta en el destino. null = scroll libre (swipe).
+  const programmaticTargetRef = useRef<number | null>(null);
 
   const startSheetDrag = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
@@ -312,6 +329,11 @@ export default function TeamInfoSheet({
     const el = panelsRef.current;
     if (!el) return;
     const idx = TAB_ORDER.indexOf(tab);
+    const currentIdx = el.clientWidth === 0 ? idx : Math.round(el.scrollLeft / el.clientWidth);
+    // Marcar el destino solo si el scroll REALMENTE se va a mover: si ya estamos
+    // en el panel destino no hay onScroll que limpie el ref y bloquearía el sync
+    // de swipes futuros. onPanelsScroll no re-sincroniza hasta que asiente ahí.
+    programmaticTargetRef.current = currentIdx === idx ? null : idx;
     el.scrollTo({ left: idx * el.clientWidth, behavior: "smooth" });
   }, []);
 
@@ -320,37 +342,51 @@ export default function TeamInfoSheet({
     const el = panelsRef.current;
     if (!el || el.clientWidth === 0) return;
     const idx = Math.round(el.scrollLeft / el.clientWidth);
+    // Durante un scroll programático (tap), ignorar los onScroll intermedios
+    // hasta llegar al destino — así el tab activo no flipea atrás y adelante.
+    const target = programmaticTargetRef.current;
+    if (target !== null) {
+      if (idx === target) programmaticTargetRef.current = null; // asentó → liberar
+      return;
+    }
     const next = TAB_ORDER[Math.min(Math.max(idx, 0), TAB_ORDER.length - 1)];
     if (next) setActiveTab((prev) => (prev === next ? prev : next));
   }, []);
 
-  // Fetch Plantel la primera vez que el tab se abre.
+  // Fetch Plantel la primera vez que el tab se abre. NO usa cleanup con
+  // `cancelled`: un flip intermedio de activeTab durante el scroll suave lo
+  // dispararía y mataría la request en vuelo dejando el skeleton clavado (ver
+  // aliveRef arriba). El setState se gatea por aliveRef (vida del componente).
   useEffect(() => {
     if (activeTab !== "plantel" || rosterRequested.current) return;
     rosterRequested.current = true;
-    let cancelled = false;
     setRosterError(false);
     axios
       // timeout: sin esto, si el request no resuelve (ESPN fallback colgado,
       // red lenta, cold start) roster queda en null para siempre → skeleton
       // infinito. Con timeout el catch dispara y mostramos el error state.
       .get<{ players: SquadPlayer[] }>("/api/teams/roster", { params: { tournament, team }, timeout: 12000 })
-      .then((res) => { if (!cancelled) setRoster(res.data.players ?? []); })
-      .catch(() => { if (!cancelled) setRosterError(true); });
-    return () => { cancelled = true; };
+      .then((res) => { if (aliveRef.current) setRoster(res.data.players ?? []); })
+      .catch(() => {
+        if (!aliveRef.current) return;
+        rosterRequested.current = false; // permitir reintento al reabrir el tab
+        setRosterError(true);
+      });
   }, [activeTab, tournament, team]);
 
-  // Fetch Noticias la primera vez que el tab se abre.
+  // Fetch Noticias la primera vez que el tab se abre. Mismo patrón que Plantel.
   useEffect(() => {
     if (activeTab !== "noticias" || newsRequested.current) return;
     newsRequested.current = true;
-    let cancelled = false;
     setNewsError(false);
     axios
       .get<{ news: NewsItem[] }>("/api/teams/news", { params: { tournament, team }, timeout: 12000 })
-      .then((res) => { if (!cancelled) setNews(res.data.news ?? []); })
-      .catch(() => { if (!cancelled) setNewsError(true); });
-    return () => { cancelled = true; };
+      .then((res) => { if (aliveRef.current) setNews(res.data.news ?? []); })
+      .catch(() => {
+        if (!aliveRef.current) return;
+        newsRequested.current = false; // permitir reintento al reabrir el tab
+        setNewsError(true);
+      });
   }, [activeTab, tournament, team]);
 
   const facts = getTeamFacts(team);
