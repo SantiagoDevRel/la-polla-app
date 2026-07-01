@@ -146,6 +146,7 @@ export async function GET(
       predicted_home: number;
       predicted_away: number;
       points_earned: number | null;
+      advance_pick: "home" | "away" | null;
     }> = [];
     if (recentLockedMatchIds.length > 0) {
       // Paginar en bloques de 1000: PostgREST/supabase-js topa la
@@ -157,7 +158,7 @@ export async function GET(
       for (let from = 0; ; from += PAGE) {
         const { data: page, error: pageErr } = await adminSupabase
           .from("predictions")
-          .select("match_id, user_id, predicted_home, predicted_away, points_earned")
+          .select("match_id, user_id, predicted_home, predicted_away, points_earned, advance_pick")
           .eq("polla_id", polla.id)
           .in("match_id", recentLockedMatchIds)
           .order("match_id", { ascending: true })

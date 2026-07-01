@@ -272,6 +272,7 @@
     "whoAdvances": "Who advances? +1",
     "advancedHit": "{team} advanced · +1",
     "advancedMiss": "{team} advanced",
+    "advancePickTip": "Advances: {team}",
     "anonymousFallback": "Anonymous",
     "phaseGroupStage": "Group stage",
     "phaseRoundOf32": "Round of 32",
