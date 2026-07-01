@@ -319,6 +319,33 @@ function matchStatusAccent(m: Match, pointsEarned: number | null): string {
   return "#FFD700";
 }
 
+// Banderita mini del equipo que un jugador eligió que clasifica (solo pollas
+// con advance_bonus, migración 077). Reusa flagUrlForTeam (bandera de país,
+// iOS-safe para selecciones del Mundial); cae a la abreviatura si falla/no hay.
+function AdvanceFlag({ team, flagUrl }: { team: string; flagUrl: string | null }) {
+  const [errored, setErrored] = useState(false);
+  const countryFlag = flagUrlForTeam(team);
+  const src = countryFlag ?? flagUrl;
+  if (src && !errored) {
+    return (
+      <Image
+        src={src}
+        alt={team}
+        width={18}
+        height={13}
+        unoptimized
+        className="h-[13px] w-[18px] max-w-none shrink-0 rounded-[2px] object-cover ring-1 ring-white/15"
+        onError={() => setErrored(true)}
+      />
+    );
+  }
+  return (
+    <span className="shrink-0 text-[9px] font-bold uppercase text-text-primary/55">
+      {team.slice(0, 3)}
+    </span>
+  );
+}
+
 interface OtherPrediction {
   user_id: string;
   predicted_home: number;
@@ -327,6 +354,8 @@ interface OtherPrediction {
   display_name: string | null;
   avatar_url: string | null;
   is_me?: boolean;
+  /** Quién eligió que clasifica (solo pollas con advance_bonus). Migración 077. */
+  advance_pick?: "home" | "away" | null;
 }
 
 interface MatchRowProps {
@@ -838,6 +867,15 @@ function MatchRow({
                 const tierCls = showPoints
                   ? pointsTierClasses(op.points_earned ?? 0)
                   : "bg-bg-elevated text-text-primary border-border-subtle";
+                // Banderita de "quién clasifica" que eligió este jugador (solo
+                // knockouts de pollas con advance_bonus). Migración 077.
+                const opAdvance =
+                  advanceEnabled && isKnockout && op.advance_pick
+                    ? {
+                        team: op.advance_pick === "home" ? match.home_team : match.away_team,
+                        flag: op.advance_pick === "home" ? match.home_team_flag : match.away_team_flag,
+                      }
+                    : null;
                 return (
                   <li
                     key={op.user_id}
@@ -861,20 +899,31 @@ function MatchRow({
                         {op.is_me ? <span className="text-[10px] text-gold/80 ml-1">{t("youParen")}</span> : null}
                       </span>
                     </div>
-                    <span
-                      className={`shrink-0 inline-flex items-center gap-1 px-2 py-[2px] rounded-full border text-[11px] font-semibold tabular-nums ${tierCls}`}
-                      style={{ fontFeatureSettings: '"tnum"' }}
-                    >
-                      {op.predicted_home}-{op.predicted_away}
-                      {showPoints ? (
-                        <span className="text-[10px] opacity-80">
-                          ·{" "}
-                          {(op.points_earned ?? 0) > 0
-                            ? `+${op.points_earned}`
-                            : "0"}
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {opAdvance ? (
+                        <span
+                          className="inline-flex items-center"
+                          title={t("advancePickTip", { team: opAdvance.team })}
+                          aria-label={t("advancePickTip", { team: opAdvance.team })}
+                        >
+                          <AdvanceFlag team={opAdvance.team} flagUrl={opAdvance.flag} />
                         </span>
                       ) : null}
-                    </span>
+                      <span
+                        className={`shrink-0 inline-flex items-center gap-1 px-2 py-[2px] rounded-full border text-[11px] font-semibold tabular-nums ${tierCls}`}
+                        style={{ fontFeatureSettings: '"tnum"' }}
+                      >
+                        {op.predicted_home}-{op.predicted_away}
+                        {showPoints ? (
+                          <span className="text-[10px] opacity-80">
+                            ·{" "}
+                            {(op.points_earned ?? 0) > 0
+                              ? `+${op.points_earned}`
+                              : "0"}
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
                   </li>
                 );
               })}
@@ -933,6 +982,7 @@ export default function PollaSlugPage() {
       predicted_home: number;
       predicted_away: number;
       points_earned: number | null;
+      advance_pick: "home" | "away" | null;
     }>
   >([]);
   // Para matches scheduled (no bloqueados): user_ids que ya pronosticaron,
@@ -946,7 +996,7 @@ export default function PollaSlugPage() {
   // Cache de marcadores lazy-cargados por match_id (partidos viejos que el
   // user expandió). Y el set de los que están cargando ahora.
   const [lazyPredsByMatch, setLazyPredsByMatch] = useState<
-    Map<string, Array<{ match_id: string; user_id: string; predicted_home: number; predicted_away: number; points_earned: number | null }>>
+    Map<string, Array<{ match_id: string; user_id: string; predicted_home: number; predicted_away: number; points_earned: number | null; advance_pick: "home" | "away" | null }>>
   >(new Map());
   const [lazyLoadingIds, setLazyLoadingIds] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState("");
@@ -1427,6 +1477,7 @@ export default function PollaSlugPage() {
         display_name: info.display_name,
         avatar_url: info.avatar_url,
         is_me: ap.user_id === currentUserId,
+        advance_pick: ap.advance_pick ?? null,
       });
       out.set(ap.match_id, arr);
     }
@@ -1459,6 +1510,7 @@ export default function PollaSlugPage() {
         const rows = (data?.predictions ?? []) as Array<{
           match_id: string; user_id: string; predicted_home: number;
           predicted_away: number; points_earned: number | null;
+          advance_pick: "home" | "away" | null;
         }>;
         setLazyPredsByMatch((m) => new Map(m).set(matchId, rows));
       } catch {

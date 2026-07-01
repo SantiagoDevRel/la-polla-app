@@ -82,11 +82,12 @@ export async function GET(
       predicted_home: number;
       predicted_away: number;
       points_earned: number | null;
+      advance_pick: "home" | "away" | null;
     }> = [];
     for (let from = 0; ; from += PAGE) {
       const { data: page, error: pageErr } = await adminSupabase
         .from("predictions")
-        .select("match_id, user_id, predicted_home, predicted_away, points_earned")
+        .select("match_id, user_id, predicted_home, predicted_away, points_earned, advance_pick")
         .eq("polla_id", polla.id)
         .eq("match_id", matchId)
         .order("user_id", { ascending: true })
