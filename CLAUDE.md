@@ -1242,6 +1242,19 @@ Mecánica (migración 062):
   `UPDATE app_config SET value='auto' WHERE key='bracket_promotion_mode'`.
 - `is_bracket_slot()` (SQL) y `lib/matches/is-placeholder.ts` (TS) comparten
   los patrones de códigos — si agregás un patrón en uno, agregalo en el otro.
+- **Flags nunca se pierden al promover (migración 080).** Bug real 2026-07-18:
+  la final Spain vs Argentina quedó SIN banderas — nuestro resolver de ESPN
+  (`lib/espn/resolve-brackets.ts`) no pasa los logos que ESPN expone, la
+  promoción escribía `p_flag` sin COALESCE, y el sync full de football-data
+  (que las rellenaba) solo corre mientras queden slots codificados (la final
+  era el último). Fix: `lookup_team_flag(tournament, team)` hereda la última
+  bandera conocida del equipo (insensible a acentos vía `normalize_team_name`);
+  `upsert_match_safe` (promoción + INSERT + fallback en UPDATEs) y
+  `apply_bracket_proposal` la usan con COALESCE — se prefiere heredar el crest
+  de football-data antes que mezclar logos ESPN. La 080 también revocó EXECUTE
+  de anon/authenticated en `apply_bracket_proposal` Y en su wrapper
+  `auto_apply_due_bracket_proposals()` (misma clase de hueco que cerró la 079;
+  el wrapper lo cazó la auditoría codex).
 
 ### 🚨 REGLA #4 — Puntos = marcador de los 90 minutos (alargue NO cuenta) 🚨
 
