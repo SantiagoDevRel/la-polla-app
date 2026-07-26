@@ -78,8 +78,16 @@ export type TournamentSlug = (typeof TOURNAMENTS)[number]["slug"];
 // ended sigan resolviendo nombre/logo — pero no se pueden elegir al crear.
 // Para reactivar una liga (ej. cuando vuelva la temporada), agregá su slug
 // a esta lista. No hace falta tocar nada más.
+//
+// 2026-07-26 — TEMPORADA CERRADA: el Mundial terminó el 19-jul y no queda
+// ningún torneo con partidos futuros en la DB (0 filas con scheduled_at >
+// now(), 62/62 pollas en status='ended'). La lista queda VACÍA a
+// propósito: es el interruptor único del modo cierre (ver lib/closure.ts).
+// Con la lista vacía → banner de cierre en toda la app, /pollas/crear
+// muestra el estado de cierre y POST /api/pollas rechaza con 403.
+// Para REABRIR: descomentá/agregá el slug del torneo que vuelva y listo.
 export const CREATABLE_TOURNAMENT_SLUGS: readonly TournamentSlug[] = [
-  "worldcup_2026",
+  // "worldcup_2026",  ← Mundial 2026, cerrado el 2026-07-19
 ];
 
 export const CREATABLE_TOURNAMENTS = TOURNAMENTS.filter((t) =>
@@ -101,7 +109,18 @@ export function isCreatableTournament(slug: string): boolean {
 // ended sin permitir crear pollas nuevas de ella. Hoy ambos = worldcup.
 // Las llamadas EXPLÍCITAS por slug (admin manual / discover ?tournament=)
 // NO pasan por este gate — son override deliberado con CRON_SECRET/admin.
-export const SYNCABLE_TOURNAMENT_SLUGS: readonly string[] = ["worldcup_2026"];
+//
+// 2026-07-26 — TEMPORADA CERRADA: lista vacía. Con el Mundial terminado no
+// queda un solo partido futuro que sincronizar, así que los crons dejan de
+// pegarle a football-data / ESPN / api-football (cuota free-tier intacta).
+// Todos los usos son gates (`filter` / `continue` / early-return), así que
+// vaciarla convierte cada sync automático en no-op sin romper nada.
+// El path EXPLÍCITO por slug (admin manual, discover ?tournament= con
+// CRON_SECRET) NO pasa por este gate: si necesitás resincronizar algo
+// puntual, sigue funcionando sin tocar esta lista.
+export const SYNCABLE_TOURNAMENT_SLUGS: readonly string[] = [
+  // "worldcup_2026",  ← Mundial 2026, cerrado el 2026-07-19
+];
 
 export function isSyncableTournament(slug: string): boolean {
   return SYNCABLE_TOURNAMENT_SLUGS.includes(slug);

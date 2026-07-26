@@ -12,6 +12,7 @@ import { generateUniqueJoinCode } from "@/lib/pollas/join-code";
 import { POLLA_COLUMNS } from "@/lib/db/columns";
 import { resolvePollaMatchIds } from "@/lib/matches/resolve-scope";
 import { isCreatableTournament } from "@/lib/tournaments";
+import { SEASON_CLOSED } from "@/lib/closure";
 import { z } from "zod";
 
 // Modos de pago válidos (payment_mode en la DB es varchar, no enum)
@@ -359,6 +360,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: parsed.error.issues[0].message },
         { status: 400 }
+      );
+    }
+
+    // Temporada cerrada (2026-07-26): sin torneos creables no se arma
+    // ninguna polla nueva. Va antes de la validación por torneo para que
+    // el error diga "está cerrado" en vez de "ese torneo no sirve".
+    // Se reabre solo al volver a poblar CREATABLE_TOURNAMENT_SLUGS.
+    if (SEASON_CLOSED) {
+      return NextResponse.json(
+        {
+          error:
+            "La temporada está cerrada: por ahora no hay torneos para armar pollas nuevas.",
+        },
+        { status: 403 }
       );
     }
 

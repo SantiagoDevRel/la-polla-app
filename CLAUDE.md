@@ -12,6 +12,77 @@ Visual changes ONLY. Never touch API routes, Supabase calls, middleware, auth fl
 
 ---
 
+## 🔒 ESTADO ACTUAL — TEMPORADA CERRADA (2026-07-26)
+
+La app está **cerrada**. El Mundial 2026 terminó el 19-jul (último partido
+verificado) y no queda ningún torneo con partidos futuros en la DB: 0 filas
+con `scheduled_at > now()`, 62/62 pollas en `status='ended'`. Sin torneos,
+`/pollas/crear` mostraba un formulario vacío sin salida — lo convertimos en
+un cierre explícito.
+
+**El interruptor es UNO SOLO:** `CREATABLE_TOURNAMENT_SLUGS` en
+`lib/tournaments.ts`. Lista vacía = cerrado. `lib/closure.ts` deriva
+`SEASON_CLOSED` de ahí — no hay un segundo flag que se pueda desincronizar.
+
+Con la lista vacía:
+- Banner fijo `SeasonClosedBanner` arriba en toda `(app)/` (reemplaza al
+  `AnnouncementTicker`; no es cerrable, decisión del owner: es el estado de
+  la app, no un nag).
+- `/pollas/crear` renderiza `SeasonClosedCreate` en vez del wizard.
+- `POST /api/pollas` responde 403 antes de tocar la DB.
+- `SYNCABLE_TOURNAMENT_SLUGS` también vacía → los crons dejan de pegarle a
+  football-data / ESPN / api-football (cuota free-tier intacta). Todos sus
+  usos son gates `filter`/`continue`, así que vaciarla es no-op seguro. El
+  path explícito por slug (admin manual, `discover ?tournament=` con
+  `CRON_SECRET`) NO pasa por ese gate y sigue funcionando.
+
+**Lo que NO cambió:** login, /inicio, ver pollas, tablas, evolución, perfil,
+avisos y el bot de WhatsApp. La app sigue de consulta — los datos de la
+gente se ven igual que siempre. Unirse a una polla ya estaba bloqueado por
+`status='ended'` en `/api/pollas/[slug]/join`.
+
+**Para REABRIR:** agregá el slug del torneo que vuelva a
+`CREATABLE_TOURNAMENT_SLUGS` (y a `SYNCABLE_TOURNAMENT_SLUGS` para que
+sincronice). Se cae el banner, vuelve el wizard, vuelve la cinta de aviso.
+Nada más que tocar.
+
+Archivos: `lib/closure.ts`, `lib/tournaments.ts`,
+`components/layout/SeasonClosedBanner.tsx`,
+`components/pollas/SeasonClosedCreate.tsx`, namespace `Closure` en
+`messages/{es,en}.json`, `app/(app)/layout.tsx`, `app/(app)/pollas/crear/page.tsx`,
+`app/api/pollas/route.ts`.
+
+---
+
+## 💾 Backup de la DB (leelo antes de tocar Supabase)
+
+El plan free **no tiene backups automáticos** y Supabase pausa proyectos
+inactivos. Con la app dormida, la única garantía de que los pronósticos de
+294 personas sigan existiendo es la copia local:
+
+```bash
+npx tsx scripts/export-backup.ts     # dump completo (solo lectura)
+npx tsx scripts/verify-backup.ts     # sha256 + filas, 100% offline
+npx tsx scripts/restore-backup.ts    # dry run por default
+```
+
+Snapshot del cierre (2026-07-26): **38.061 filas · 36 tablas · 294 cuentas ·
+117 comprobantes · 33 MB**, en `backups/2026-07-26-21-17/` + copia
+verificada byte a byte en el DGX (`~/apps/la-polla-backup/`).
+
+- Las tablas se auto-descubren del OpenAPI de PostgREST → una tabla nueva
+  entra al backup sola.
+- PostgREST topa en **1000 filas** por request incluso con service_role: el
+  script pagina y después verifica contra el count exacto. Si no cuadra,
+  **aborta** — un backup truncado en silencio es peor que ninguno.
+- `backups/` está en `.gitignore`. Lleva teléfonos y comprobantes de pago y
+  **este repo es público**: nunca se commitea.
+
+Guía completa (incluye cómo reabrir en un proyecto nuevo):
+`docs/backup-restore.md`.
+
+---
+
 ## NUNCA dejes ideas a medio camino
 
 Cada vez que el usuario menciona una idea, feature, o decisión —

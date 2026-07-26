@@ -14,11 +14,13 @@ import { ToastProvider } from "@/components/ui/Toast";
 import BottomNav from "@/components/nav/BottomNav";
 import { AppBackground } from "@/components/layout/AppBackground";
 import AnnouncementTicker from "@/components/layout/AnnouncementTicker";
+import SeasonClosedBanner from "@/components/layout/SeasonClosedBanner";
 import BrandHeader from "@/components/layout/BrandHeader";
 import FontScaleApplier from "@/components/layout/FontScaleApplier";
 import SWAutoReload from "@/components/layout/SWAutoReload";
 import ScoringSurveyModal from "@/components/polla/ScoringSurveyModal";
 import DoublePointsSurveyModal from "@/components/polla/DoublePointsSurveyModal";
+import { SEASON_CLOSED } from "@/lib/closure";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
@@ -90,13 +92,20 @@ export default async function AppLayout({
       <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">
         <BrandHeader />
-        {/* Cinta roja de advertencia con marquee: los resultados se basan en
-            los 90 minutos del partido (REGLA #4 — el alargue no cuenta para
-            los puntos). Cerrable con X, persiste en localStorage. */}
-        <AnnouncementTicker
-          messageKey="ninetyMinutes"
-          dismissKey="lp_ticker_dismissed:results-90min"
-        />
+        {/* Temporada cerrada (2026-07-26) → banner fijo de cierre en vez de
+            la cinta. Las advertencias de la cinta ("los marcadores se ponen
+            hasta 10 min antes", "los puntos van por los 90 minutos") no
+            aplican sin partidos. Cuando se reabra la temporada
+            (CREATABLE_TOURNAMENT_SLUGS deja de estar vacío) vuelve sola la
+            cinta roja del alargue — REGLA #4 sigue vigente. */}
+        {SEASON_CLOSED ? (
+          <SeasonClosedBanner />
+        ) : (
+          <AnnouncementTicker
+            messageKey="ninetyMinutes"
+            dismissKey="lp_ticker_dismissed:results-90min"
+          />
+        )}
         {/* Pequeño respiro entre el header sticky y el contenido de la
             página. Antes el "Hola santi" del inicio (y otros titulares)
             quedaban pegados al header. */}

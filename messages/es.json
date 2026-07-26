@@ -30,6 +30,16 @@
     "ninetyMinutes": "Los resultados de las pollas se basan en los 90 minutos del partido — el alargue no cuenta",
     "dismissAria": "Cerrar aviso"
   },
+  "Closure": {
+    "bannerTitle": "TEMPORADA CERRADA",
+    "bannerBody": "El Mundial 2026 terminó y no hay más torneos por ahora, así que no se pueden armar pollas nuevas. Tus pollas, tus puntos y tus pronósticos quedan guardados acá.",
+    "createTitle": "LA POLLA CERRÓ POR AHORA",
+    "createBody": "El Mundial 2026 terminó el 19 de julio y no quedó ningún torneo con partidos para armar polla.",
+    "createKept": "No se borra nada: tus pollas, tu tabla, tus puntos y cada pronóstico quedan tal como los dejaste.",
+    "createComeback": "Cuando vuelva un torneo que valga la pena, abrimos de nuevo y sigues justo donde quedaste.",
+    "createCta": "Ver mis pollas",
+    "createSecondary": "Ir al inicio"
+  },
   "Nav": {
     "ariaNav": "Navegación inferior",
     "tabInicio": "Inicio",

@@ -30,6 +30,16 @@
     "ninetyMinutes": "Pool results are based on the 90-minute score — extra time doesn't count",
     "dismissAria": "Dismiss notice"
   },
+  "Closure": {
+    "bannerTitle": "SEASON CLOSED",
+    "bannerBody": "The 2026 World Cup is over and there are no tournaments running right now, so new pools can't be created. Your pools, points and picks are all still here.",
+    "createTitle": "CHICKENPICKS IS CLOSED FOR NOW",
+    "createBody": "The 2026 World Cup ended on July 19 and there's no tournament left with matches to build a pool from.",
+    "createKept": "Nothing gets deleted: your pools, your table, your points and every pick stay exactly as you left them.",
+    "createComeback": "When a tournament worth playing comes back, we reopen and you pick up right where you left off.",
+    "createCta": "See my pools",
+    "createSecondary": "Go home"
+  },
   "Nav": {
     "ariaNav": "Bottom navigation",
     "tabInicio": "Home",
