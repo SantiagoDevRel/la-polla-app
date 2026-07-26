@@ -38,7 +38,9 @@
     "createKept": "No se borra nada: tus pollas, tu tabla, tus puntos y cada pronóstico quedan tal como los dejaste.",
     "createComeback": "Cuando vuelva un torneo que valga la pena, abrimos de nuevo y sigues justo donde quedaste.",
     "createCta": "Ver mis pollas",
-    "createSecondary": "Ir al inicio"
+    "createSecondary": "Ir al inicio",
+    "emptyMessage": "La temporada cerró: no hay torneos para armar pollas nuevas. Las tuyas quedaron guardadas con su tabla final.",
+    "emptyActive": "No tienes pollas en curso: la temporada cerró. Las que jugaste quedan abajo, en Finalizadas."
   },
   "Nav": {
     "ariaNav": "Navegación inferior",

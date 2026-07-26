@@ -11,6 +11,7 @@ import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
 import InviteModal from "@/components/polla/InviteModal";
 import { useToast } from "@/components/ui/Toast";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
+import { SEASON_CLOSED } from "@/lib/closure";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
 import { Plus, Mail, ChevronDown, ChevronRight, KeyRound, ArrowRight } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
@@ -83,6 +84,7 @@ export default function MisPollasPage() {
   const t = useTranslations("Pollas");
   const locale = useLocale();
   const tNav = useTranslations("Nav");
+  const tClosure = useTranslations("Closure");
   const router = useRouter();
   const { showToast } = useToast();
   const [pollas, setPollas] = useState<PollaData[]>([]);
@@ -217,6 +219,15 @@ export default function MisPollasPage() {
                 </AnimatedItem>
               ))}
             </AnimatedList>
+          ) : SEASON_CLOSED ? (
+            // Temporada cerrada: el momento M1 del pollito trae copy de
+            // onboarding horneada ("¿Primera polla? Dale, yo te acompaño")
+            // que invita a un flujo muerto. Acá alcanza una línea: las
+            // finalizadas están listadas justo abajo y el banner de arriba
+            // ya explica el cierre.
+            <p className="px-1 font-body text-[14px] leading-relaxed text-text-secondary">
+              {tClosure("emptyActive")}
+            </p>
           ) : (
             <PollitoMoment
               moment="M1"
@@ -280,8 +291,11 @@ export default function MisPollasPage() {
 
         {/* Create button — oculto en iOS (App Store 5.1.1(ix): la app
             no permite a usuarios crear/organizar pollas, solo unirse
-            a las existentes por código de invitación). */}
-        {!isIOSApp && (
+            a las existentes por código de invitación) y oculto con la
+            temporada cerrada (no hay torneo con el cual armar polla).
+            El acceso por código sigue abajo: si alguien tiene un código
+            viejo, el join le responde "esta polla ya finalizó". */}
+        {!isIOSApp && !SEASON_CLOSED && (
           <button
             onClick={() => router.push("/pollas/crear")}
             className="w-full bg-gold text-bg-base font-bold rounded-lg py-3 text-sm inline-flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"

@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { useToast } from "@/components/ui/Toast";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
+import { SEASON_CLOSED } from "@/lib/closure";
 
 type NavKey = "inicio" | "worldcup" | "pollas" | "perfil";
 
@@ -223,20 +224,27 @@ export function BottomNav({
               // some browsers the focus trap leaves the button in a
               // limbo state where subsequent clicks no-op.
               e.currentTarget.blur();
-              // En iOS no ofrecemos crear (App Store 5.1.1(ix)) — el FAB
-              // abre directo el sheet de "unirme con código", sin el
-              // choice sheet intermedio que tendría una opción "crear".
-              if (isIOSApp) {
+              // Temporada cerrada: ni crear ni unirse llevan a ningún lado
+              // (no hay torneos y todas las pollas están 'ended'), así que
+              // el FAB va DIRECTO a la pantalla de cierre en vez de abrir
+              // un sheet con dos opciones muertas. Mismo criterio que el
+              // bypass de iOS de abajo.
+              if (SEASON_CLOSED) {
+                router.push(effectiveCreateHref);
+              } else if (isIOSApp) {
+                // En iOS no ofrecemos crear (App Store 5.1.1(ix)) — el FAB
+                // abre directo el sheet de "unirme con código", sin el
+                // choice sheet intermedio que tendría una opción "crear".
                 setJoinOpen(true);
               } else {
                 setChoiceOpen(true);
               }
             }}
-            aria-label={isIOSApp ? t("joinWithCode") : t("ariaCreateJoin")}
+            aria-label={isIOSApp && !SEASON_CLOSED ? t("joinWithCode") : t("ariaCreateJoin")}
             className={fabClass}
             style={fabStyle}
           >
-            {isIOSApp ? (
+            {isIOSApp && !SEASON_CLOSED ? (
               <KeyRound className="w-6 h-6 text-bg-base" strokeWidth={2.5} aria-hidden="true" />
             ) : (
               <Plus className="w-6 h-6 text-bg-base" strokeWidth={3} aria-hidden="true" />

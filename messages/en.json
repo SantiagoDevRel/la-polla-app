@@ -38,7 +38,9 @@
     "createKept": "Nothing gets deleted: your pools, your table, your points and every pick stay exactly as you left them.",
     "createComeback": "When a tournament worth playing comes back, we reopen and you pick up right where you left off.",
     "createCta": "See my pools",
-    "createSecondary": "Go home"
+    "createSecondary": "Go home",
+    "emptyMessage": "The season is closed: there are no tournaments to build new pools from. Yours are saved with their final table.",
+    "emptyActive": "No pools in progress: the season is closed. The ones you played are below, under Finished."
   },
   "Nav": {
     "ariaNav": "Bottom navigation",
