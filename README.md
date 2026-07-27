@@ -4,6 +4,14 @@ App de pollas (predicciones de fútbol) para el Mundial Colombia 2026 y otras co
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
+> **Estado: temporada cerrada (julio 2026).** El Mundial 2026 terminó y no
+> hay torneos con partidos por delante, así que no se pueden armar pollas
+> nuevas: la app muestra un banner de cierre y queda de consulta (todas las
+> pollas, tablas y pronósticos siguen visibles). Se reabre agregando un
+> torneo a `CREATABLE_TOURNAMENT_SLUGS` en `lib/tournaments.ts` — ver
+> `lib/closure.ts`. Los datos están respaldados fuera de Supabase; ver
+> [docs/backup-restore.md](docs/backup-restore.md).
+
 ## Filosofía: free-tier punta a punta
 
 La Polla es **gratis para todos** y se mantiene sobre planes gratuitos
@@ -214,6 +222,26 @@ Después de un deploy nuevo:
 - `pre-wompi-removal` — antes de eliminar el flujo Wompi/digital_pool
 
 Para revertir cualquier deploy: `git revert <sha> && git push origin main`.
+
+---
+
+## Backup y restore
+
+El plan free de Supabase no incluye backups automáticos y pausa los
+proyectos inactivos, así que la copia de los datos vive afuera:
+
+```bash
+npx tsx scripts/export-backup.ts    # dump completo (solo lectura)
+npx tsx scripts/verify-backup.ts    # sha256 + filas, 100% offline
+npx tsx scripts/restore-backup.ts   # dry run por default
+```
+
+Deja `backups/<fecha>/` con todas las tablas de `public`, `auth` (+ SQL de
+restore con los mismos uuid), los archivos de Storage, las migraciones y un
+`RESUMEN.md` con la tabla final de cada polla en texto plano. `backups/`
+está en `.gitignore`: **lleva teléfonos y este repo es público.**
+
+Guía completa: [docs/backup-restore.md](docs/backup-restore.md).
 
 ---
 

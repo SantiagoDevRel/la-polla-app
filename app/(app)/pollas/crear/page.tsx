@@ -15,6 +15,8 @@ import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 import { staggerContainer } from "@/lib/animations";
 import { ArrowLeft, Check, ChevronRight, Info, Trophy, Banknote, Handshake, Lock } from "lucide-react";
 import { TOURNAMENTS, CREATABLE_TOURNAMENTS, getTournamentName } from "@/lib/tournaments";
+import { SEASON_CLOSED } from "@/lib/closure";
+import SeasonClosedCreate from "@/components/pollas/SeasonClosedCreate";
 import FootballLoader from "@/components/ui/FootballLoader";
 import PrizeDistributionForm, {
   type PrizeDistribution,
@@ -486,6 +488,14 @@ export default function CrearPollaPage() {
   // iOS: render nada mientras el effect de arriba redirige a /pollas.
   // Evita un flash de la UI de crear antes del replace.
   if (isIOSApp) return null;
+
+  // Temporada cerrada (2026-07-26): sin torneos creables el paso 1 mostraba
+  // la sección "Torneos" vacía y el wizard quedaba sin salida hacia
+  // adelante. Contamos el cierre en vez de dejar el form roto. Va DESPUÉS
+  // del gate de iOS para no pisarle su redirect, y después de todos los
+  // hooks. Se reabre solo cuando CREATABLE_TOURNAMENT_SLUGS deja de estar
+  // vacío (ver lib/closure.ts). El POST /api/pollas también lo rechaza.
+  if (SEASON_CLOSED) return <SeasonClosedCreate />;
 
   return (
     <div className="min-h-screen">

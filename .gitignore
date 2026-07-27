@@ -30,6 +30,11 @@ yarn-error.log*
 .env*.local
 .env.sentry-build-plugin
 
+# Backups de la DB (scripts/export-backup.ts). Llevan TELÉFONOS de usuarios
+# reales, comprobantes de pago y el dump de auth. Este repo es PÚBLICO (MIT):
+# esto JAMÁS se commitea. Vive local + copia en el DGX (~/apps/la-polla-backup).
+/backups/
+
 # sentry
 .sentryclirc
 

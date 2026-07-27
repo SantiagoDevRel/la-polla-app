@@ -15,6 +15,7 @@ import { PollitoMoment } from "@/components/pollito/PollitoMoment";
 import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
 import { useToast } from "@/components/ui/Toast";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
+import { SEASON_CLOSED } from "@/lib/closure";
 
 export interface ActivePollasEmptyProps {
   userPollitoType: string;
@@ -23,10 +24,43 @@ export interface ActivePollasEmptyProps {
 export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
   const t = useTranslations("Inicio");
   const tNav = useTranslations("Nav");
+  const tClosure = useTranslations("Closure");
   const router = useRouter();
   const { showToast } = useToast();
   const [joinOpen, setJoinOpen] = useState(false);
   const isIOSApp = useIsIOSApp();
+
+  // Temporada cerrada: el momento M1 del pollito NO sirve acá. Su copy está
+  // horneada ("ONBOARDING · ¿Primera polla? Dale. Yo te acompaño.") y con la
+  // app cerrada invita a un flujo muerto — era justo lo que se veía raro en
+  // /inicio. Renderizamos un bloque propio: sin arenga, sin CTA de crear, y
+  // un camino a las pollas que ya jugó. El banner de arriba ya explica el
+  // porqué, así que acá no lo repetimos.
+  if (SEASON_CLOSED) {
+    return (
+      <div className="rounded-lg border border-border-subtle bg-bg-card/80 backdrop-blur-sm px-5 py-6 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/pollitos/Pollito_esperando.webp"
+          alt=""
+          width={80}
+          height={80}
+          className="h-20 w-20 max-w-none mx-auto"
+          style={{ objectFit: "contain" }}
+        />
+        <p className="mt-3 font-body text-[14px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]">
+          {tClosure("emptyMessage")}
+        </p>
+        <button
+          type="button"
+          onClick={() => router.push("/pollas")}
+          className="mt-4 inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-2.5 font-body text-[14px] font-semibold text-text-primary cursor-pointer transition-all duration-200 hover:border-gold/30 hover:bg-bg-elevated"
+        >
+          {tClosure("createCta")}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -41,14 +75,8 @@ export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
         // sigue siendo "Crear polla".
         cta={
           isIOSApp
-            ? {
-                label: tNav("joinWithCode"),
-                onClick: () => setJoinOpen(true),
-              }
-            : {
-                label: t("createPolla"),
-                onClick: () => router.push("/pollas/crear"),
-              }
+            ? { label: tNav("joinWithCode"), onClick: () => setJoinOpen(true) }
+            : { label: t("createPolla"), onClick: () => router.push("/pollas/crear") }
         }
       />
       <p className="mt-4 font-body text-[14px] text-text-secondary text-center">
