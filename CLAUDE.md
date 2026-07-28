@@ -46,6 +46,17 @@ gente se ven igual que siempre. Unirse a una polla ya estaba bloqueado por
 sincronice). Se cae el banner, vuelve el wizard, vuelve la cinta de aviso.
 Nada más que tocar.
 
+**⚰️ DESCONTINUACIÓN (2026-07-28):** el proyecto de Supabase se apaga en
+los próximos días, así que la promesa de "app de consulta" deja de ser
+cierta — sin Supabase no hay ni login. El copy del namespace `Closure`
+(banner + /pollas/crear + empty states) ya NO dice "todo queda guardado":
+ahora anuncia que La Polla se despide en los próximos días y que volvemos
+para el próximo Mundial (2030). La llave `createKept` se renombró a
+`createThanks`. **Fase 2 pendiente (task #1):** cuando Supabase muera de
+verdad, dejar ~1 año una despedida 100% estática (sin NINGUNA llamada a
+Supabase, ni en middleware) diciendo que La Polla se descontinuó. Los datos
+reales sobreviven en el backup local + DGX (ver sección Backup abajo).
+
 Archivos: `lib/closure.ts`, `lib/tournaments.ts`,
 `components/layout/SeasonClosedBanner.tsx`,
 `components/pollas/SeasonClosedCreate.tsx`, namespace `Closure` en

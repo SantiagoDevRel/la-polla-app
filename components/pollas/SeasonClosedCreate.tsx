@@ -63,7 +63,7 @@ export default function SeasonClosedCreate() {
           </p>
 
           <p className="mt-3 text-[14px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]">
-            {t("createKept")}
+            {t("createThanks")}
           </p>
 
           <p className="mt-3 text-[13px] leading-relaxed text-text-muted [overflow-wrap:anywhere]">
