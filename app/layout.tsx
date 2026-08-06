@@ -14,6 +14,7 @@ import { getSiteFromHeaders, SITES } from "@/lib/seo/sites";
 import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { PlatformProvider } from "@/components/platform/PlatformProvider";
 import { PostHogProvider } from "./providers";
+import { AgentationDev } from "@/components/dev/AgentationDev";
 
 const bebas = Bebas_Neue({
   subsets: ["latin"],
@@ -165,6 +166,7 @@ export default async function RootLayout({
             </PlatformProvider>
           </NextIntlClientProvider>
         </PostHogProvider>
+        <AgentationDev />
       </body>
     </html>
   );

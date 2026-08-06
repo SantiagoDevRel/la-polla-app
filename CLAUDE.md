@@ -747,6 +747,26 @@ grep -r "alert(" app/               # Must return nothing (except comments)
 
 ---
 
+## E2E visual + a11y — Playwright (agregado 2026-08-06)
+
+- `npx playwright test` — 12 tests: screenshots (`toHaveScreenshot`, baselines win32 en
+  `e2e/a11y-visual.spec.ts-snapshots/`, SÍ se versionan; no compartir con CI Linux) + axe
+  WCAG A/AA (bloquea solo critical/serious, el resto se loguea) sobre `/login` `/privacy`
+  `/soporte`, desktop + mobile, dark mode, con el Chrome instalado (channel, no descarga browser).
+- Cambio visual intencional → `npx playwright test --update-snapshots` re-siembra baselines.
+- Usa el dev server de :3001 si ya corre (`reuseExistingServer`); si no, lo bootea (timeout 300s
+  — el boot frío es lento por los fetch de Google Fonts que timetean).
+- ⚠️ Si una corrida se mata a la mitad, su webServer puede quedar huérfano agarrando :3001 sin
+  responder → corridas siguientes "se cuelgan". Chequear `Get-NetTCPConnection -LocalPort 3001`
+  y matar el `next start-server.js` zombie.
+- El overlay dev de Agentation (`components/dev/AgentationDev.tsx`) se auto-apaga en tests vía
+  `window.__DISABLE_AGENTATION__` (sus botones sin label disparaban axe y ensuciaban screenshots).
+- `npm run typecheck:fast` = tsgo (TS7 nativo Go): ~6s vs ~60s de `tsc`. `tsc` sigue siendo el
+  source of truth (`css.d.ts` existe porque tsgo exige declarar los imports side-effect de CSS).
+- `npx knip` — dead code/deps report-only (config en `knip.json`): reporta, NUNCA borra solo.
+- Pre-commit hook (local, `.git/hooks/pre-commit`): TruffleHog escanea secrets antes de cada
+  commit (repo público). Binario compartido en `claude-code-environment/tools/trufflehog-bin/`.
+
 ## File Modification Priority
 
 1. `components/ui/BottomNav.tsx` — replace emojis with lucide-react SVG icons, add active pill
