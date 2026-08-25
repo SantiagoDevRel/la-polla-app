@@ -84,6 +84,39 @@ export default async function PagarPage({
           </div>
         </StreetCard>
 
+        {/* A DÓNDE se transfiere. Sin esto el flujo era imposible de
+            completar: la pantalla pedía el pantallazo de una transferencia
+            que la persona no sabía a quién hacer. */}
+        {polla.payout_account ? (
+          <StreetCard hero className="p-4">
+            <Label>Transfiere a</Label>
+            <div className="lp-display-sm mt-1 text-gold">
+              {(polla.payout_method ?? "").toUpperCase()}
+            </div>
+            <div className="lp-money mt-2 select-all text-[26px] leading-none text-text-primary">
+              {polla.payout_account}
+            </div>
+            {polla.payout_account_name && (
+              <p className="mt-2 text-[13px] text-text-secondary">
+                A nombre de{" "}
+                <span className="text-text-primary">{polla.payout_account_name}</span>
+              </p>
+            )}
+            <p className="mt-3 border-t border-border-subtle pt-3 text-[12px] text-text-muted">
+              Manda exactamente {formatCop(entrada)}. Después subes el pantallazo
+              acá abajo y Tama lo confirma.
+            </p>
+          </StreetCard>
+        ) : (
+          <div className="border border-red-alert/40 bg-red-alert/10 p-3">
+            <p className="lp-label text-red-alert">Falta la cuenta de cobro</p>
+            <p className="mt-1 text-[13px] text-text-secondary">
+              Esta polla todavía no tiene a dónde transferir. Avísale a Tama
+              antes de mandar plata a ningún lado.
+            </p>
+          </div>
+        )}
+
         <PagarForm
           slug={polla.slug}
           esRifa={polla.kind === "rifa"}

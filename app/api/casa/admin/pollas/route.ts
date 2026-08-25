@@ -23,6 +23,12 @@ const baseSchema = z.object({
   houseCutPct: z.number().int().min(0).max(100).default(30),
   closesAt: z.string().datetime(),
   prizeObject: z.string().trim().max(160).optional(),
+  // A dónde transfiere la gente. Opcional en el schema porque un borrador
+  // puede quedar a medias, pero obligatorio para PUBLICAR una polla paga
+  // (se valida abajo): sin esto nadie puede completar el pago.
+  payoutMethod: z.string().trim().max(40).optional(),
+  payoutAccount: z.string().trim().max(60).optional(),
+  payoutAccountName: z.string().trim().max(80).optional(),
   publish: z.boolean().default(false),
 });
 
@@ -60,7 +66,11 @@ const rifaSchema = baseSchema.extend({
   // En una rifa el premio NO es opcional: es la razon por la que alguien
   // compra la boleta. En las demas pollas el premio es el pozo en plata y
   // `prizeObject` es un extra; aca es el producto.
-  prizeObject: z.string().trim().min(3).max(160),
+  prizeObject: z
+    .string({ message: "Escribe qué se rifa." })
+    .trim()
+    .min(3, "Escribe qué se rifa.")
+    .max(160),
 });
 
 const schema = z.discriminatedUnion("kind", [
@@ -98,6 +108,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Publicar una polla paga sin cuenta de cobro deja a la gente mirando un
+  // botón de "transferir" sin saber a dónde. Como borrador sí se permite.
+  if (body.publish && body.entryPriceCop > 0) {
+    if (!body.payoutMethod || !body.payoutAccount) {
+      return NextResponse.json(
+        {
+          error:
+            "Falta la cuenta de cobro. Sin eso la gente no sabe a dónde transferir.",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   const db = createAdminClient();
 
   // Slug unico: si ya existe, le pega un sufijo corto en vez de fallar.
@@ -130,6 +154,9 @@ export async function POST(req: NextRequest) {
       closes_at: body.closesAt,
       ticket_count: body.kind === "rifa" ? body.ticketCount : null,
       draw_method: body.kind === "rifa" ? body.drawMethod : null,
+      payout_method: body.payoutMethod ?? null,
+      payout_account: body.payoutAccount ?? null,
+      payout_account_name: body.payoutAccountName ?? null,
       created_by: user.id,
     })
     .select("id, slug")

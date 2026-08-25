@@ -43,6 +43,11 @@ export interface CasaPolla {
 
   settled_at: string | null;
   settle_notes: string | null;
+
+  /** A dónde transfiere la gente. Sin esto la polla no se puede pagar. */
+  payout_method: string | null;
+  payout_account: string | null;
+  payout_account_name: string | null;
   created_by: string;
   created_at: string;
 }
@@ -124,7 +129,7 @@ export interface CasaDistribution {
    Regla dura del repo: nunca `select("*")` en tablas con datos de usuario.
    Enumerar evita que una columna sensible futura se filtre sola. */
 export const CASA_POLLA_COLUMNS =
-  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_object, points_exact, points_one_team, points_result, status, opens_at, closes_at, ticket_count, draw_method, drawn_number, settled_at, settle_notes, created_by, created_at" as const;
+  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_object, points_exact, points_one_team, points_result, status, opens_at, closes_at, ticket_count, draw_method, drawn_number, settled_at, settle_notes, payout_method, payout_account, payout_account_name, created_by, created_at" as const;
 
 export const CASA_ENTRY_COLUMNS =
   "id, polla_id, user_id, status, amount_cop, proof_path, proof_uploaded_at, reviewed_at, reject_reason, ticket_number, created_at" as const;

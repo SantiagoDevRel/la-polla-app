@@ -57,6 +57,13 @@ export function CrearPollaForm() {
   const [closesAt, setClosesAt] = useState(proximoCierre);
   const [premioObjeto, setPremioObjeto] = useState("");
 
+  // Cuenta de cobro. Se pre-llena con la de la última polla creada: la casa
+  // casi siempre cobra a la misma, y volver a escribirla cada vez es la clase
+  // de fricción que hace que alguien publique sin cuenta.
+  const [payoutMethod, setPayoutMethod] = useState("Nequi");
+  const [payoutAccount, setPayoutAccount] = useState("");
+  const [payoutAccountName, setPayoutAccountName] = useState("");
+
   // partidos
   const [tournament, setTournament] = useState(
     // Champions encabeza el array pero suele estar fuera de temporada; abrir
@@ -83,6 +90,22 @@ export function CrearPollaForm() {
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Trae la cuenta de cobro de la última polla para no re-escribirla.
+  useEffect(() => {
+    fetch("/api/casa/admin/pollas")
+      .then((r) => r.json())
+      .then((j) => {
+        const ultima = (j.pollas ?? []).find(
+          (p: { payout_account?: string | null }) => p.payout_account,
+        );
+        if (!ultima) return;
+        setPayoutMethod(ultima.payout_method ?? "Nequi");
+        setPayoutAccount(ultima.payout_account ?? "");
+        setPayoutAccountName(ultima.payout_account_name ?? "");
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (kind !== "partidos" || !tournament) return;
@@ -114,6 +137,8 @@ export function CrearPollaForm() {
       return setError("Escribe al menos una pregunta.");
     if (kind === "rifa" && premioObjeto.trim().length < 3)
       return setError("Escribe qué se rifa.");
+    if (publicar && precio > 0 && payoutAccount.trim().length < 5)
+      return setError("Falta la cuenta de cobro: sin eso nadie puede pagar.");
 
     setGuardando(true);
     try {
@@ -124,6 +149,9 @@ export function CrearPollaForm() {
         houseCutPct: houseCut,
         closesAt: new Date(closesAt).toISOString(),
         prizeObject: premioObjeto.trim() || undefined,
+        payoutMethod: payoutMethod.trim() || undefined,
+        payoutAccount: payoutAccount.trim() || undefined,
+        payoutAccountName: payoutAccountName.trim() || undefined,
         publish: publicar,
       };
 
@@ -246,6 +274,42 @@ export function CrearPollaForm() {
           Por cada persona que entre: <b className="text-text-primary">{formatCop(alPozo)}</b> al
           pozo y <b className="text-text-primary">{formatCop(precio - alPozo)}</b> a la casa.
         </p>
+
+        {/* Cuenta de cobro — sin esto la polla no se puede pagar. */}
+        <div className="border-t border-border-subtle pt-4">
+          <Label>Cuenta de cobro</Label>
+          <div className="mt-2 grid grid-cols-3 gap-px">
+            {["Nequi", "Daviplata", "Banco"].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setPayoutMethod(m)}
+                className={`lp-btn text-[12px] ${
+                  payoutMethod === m ? "lp-btn-primary" : "lp-btn-ghost bg-bg-elevated"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <input
+            value={payoutAccount}
+            onChange={(e) => setPayoutAccount(e.target.value)}
+            placeholder="300 123 4567"
+            inputMode="numeric"
+            className="lp-input lp-money mt-2 text-[18px]"
+          />
+          <input
+            value={payoutAccountName}
+            onChange={(e) => setPayoutAccountName(e.target.value)}
+            placeholder="A nombre de..."
+            className="lp-input mt-2"
+          />
+          <p className="mt-2 text-[11px] text-text-muted">
+            Es lo que la gente ve para transferir. Sin esto no puedes publicar
+            una polla con precio.
+          </p>
+        </div>
 
         <div>
           <Label>Cierra</Label>
