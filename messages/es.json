@@ -61,7 +61,7 @@
   },
   "Login": {
     "brand": "LA POLLA",
-    "tagline": "La polla deportiva de tus amigos",
+    "tagline": "La polla del fin de semana",
     "invitedTo": "Te invitaron a unirte a",
     "participants": "{count, plural, =0 {0 participantes} one {1 participante} other {# participantes}}",
     "perPerson": "{amount} por persona",

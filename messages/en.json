@@ -61,7 +61,7 @@
   },
   "Login": {
     "brand": "CHICKEN PICKS",
-    "tagline": "Your friends' football pool",
+    "tagline": "The weekend football pool",
     "invitedTo": "You were invited to join",
     "participants": "{count, plural, =0 {0 players} one {1 player} other {# players}}",
     "perPerson": "{amount} per person",
