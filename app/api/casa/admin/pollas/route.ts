@@ -11,6 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin, getAuthenticatedUser } from "@/lib/auth/admin";
 import { slugify } from "@/lib/casa/format";
 import { listAllPollas } from "@/lib/casa/queries";
+import { isCreatableTournament } from "@/lib/tournaments";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,7 +28,12 @@ const baseSchema = z.object({
 
 const partidosSchema = baseSchema.extend({
   kind: z.literal("partidos"),
-  tournament: z.string().min(2),
+  // Solo los torneos que la casa tiene habilitados. Antes era un string
+  // libre: se podia crear una polla con un torneo inexistente y despues
+  // la UI no resolvia ni el nombre ni el escudo.
+  tournament: z.string().refine(isCreatableTournament, {
+    message: "Ese torneo no está habilitado.",
+  }),
   scoringMode: z.enum(["1x2", "marcador"]),
   matchIds: z.array(z.string().uuid()).min(1).max(30),
 });
@@ -51,6 +57,10 @@ const rifaSchema = baseSchema.extend({
   kind: z.literal("rifa"),
   ticketCount: z.number().int().min(2).max(1000),
   drawMethod: z.string().trim().min(5).max(240),
+  // En una rifa el premio NO es opcional: es la razon por la que alguien
+  // compra la boleta. En las demas pollas el premio es el pozo en plata y
+  // `prizeObject` es un extra; aca es el producto.
+  prizeObject: z.string().trim().min(3).max(160),
 });
 
 const schema = z.discriminatedUnion("kind", [

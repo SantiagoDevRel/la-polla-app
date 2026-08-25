@@ -112,6 +112,8 @@ export function CrearPollaForm() {
       return setError("Elige al menos un partido.");
     if (kind === "manual" && preguntas.every((q) => !q.prompt.trim()))
       return setError("Escribe al menos una pregunta.");
+    if (kind === "rifa" && premioObjeto.trim().length < 3)
+      return setError("Escribe qué se rifa.");
 
     setGuardando(true);
     try {
@@ -255,6 +257,7 @@ export function CrearPollaForm() {
           />
         </div>
 
+        {kind !== "rifa" && (
         <div>
           <Label>Premio en objeto (opcional)</Label>
           <input
@@ -264,6 +267,7 @@ export function CrearPollaForm() {
             className="lp-input mt-2"
           />
         </div>
+        )}
       </StreetCard>
 
       {/* ── Partidos ────────────────────────────────────────────────────── */}
@@ -502,6 +506,22 @@ export function CrearPollaForm() {
       {/* ── Rifa ────────────────────────────────────────────────────────── */}
       {kind === "rifa" && (
         <StreetCard className="space-y-4 p-4">
+          {/* En una rifa el premio es obligatorio: es LA razón por la que
+              alguien compra la boleta. En las otras pollas el premio es el
+              pozo en plata y esto es un extra opcional (el campo de arriba). */}
+          <div>
+            <Label>Qué se rifa</Label>
+            <input
+              value={premioObjeto}
+              onChange={(e) => setPremioObjeto(e.target.value)}
+              placeholder="Camiseta firmada por el plantel"
+              className="lp-input mt-2"
+            />
+            <p className="mt-2 text-[11px] text-text-muted">
+              Obligatorio. Es lo primero que va a leer la gente.
+            </p>
+          </div>
+
           <div>
             <Label>Cuántas boletas</Label>
             <input

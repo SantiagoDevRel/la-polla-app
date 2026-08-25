@@ -19,6 +19,7 @@ import {
   type PayoutMethod,
 } from "@/lib/vision/verify-payment";
 import { logClaudeUsage } from "@/lib/vision/log-usage";
+import { P2P_CREATION_RETIRED } from "@/lib/closure";
 
 const FOOTER = "La Polla Colombiana 🐥";
 
@@ -256,6 +257,30 @@ export async function handlePaymentProofImage(
   userId: string,
   mediaId: string,
 ): Promise<void> {
+  // ── RETIRADO con el pivote a la casa (2026-08-25) ─────────────────────
+  // Gemelo por WhatsApp del endpoint /api/pollas/[slug]/payment-proof: si
+  // el modelo de vision da el comprobante por bueno, escribe `paid = true`
+  // sin que nadie lo revise. La spec del producto nuevo dice explicitamente
+  // que el admin revisa manual, y en la casa el pago queda `pendiente`
+  // hasta que Tama toca Aprobar en Telegram.
+  //
+  // Igual que el endpoint web, solo escribe en `polla_participants` (modelo
+  // P2P viejo) — nunca pudo tocar la plata de la casa. Se cierra por la
+  // misma llave, y ademas deja de gastar creditos de Anthropic por foto.
+  if (P2P_CREATION_RETIRED) {
+    await sendTextMessage(
+      phone,
+      [
+        "Ya no recibo comprobantes por acá, parce 🐥",
+        "",
+        "Ahora las pollas las armamos nosotros y el pago se sube desde la app. Entra, escoge tu polla y ahí mismo mandas el pantallazo.",
+      ].join("\n"),
+      { userId },
+    );
+    await clearState(phone);
+    return;
+  }
+
   const state = await getState(phone);
   const pollaId = state?.pollaId;
   if (!pollaId) {

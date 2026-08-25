@@ -34,6 +34,7 @@ import {
 } from "@/lib/vision/verify-payment";
 import { logClaudeUsage } from "@/lib/vision/log-usage";
 import { recomputePollaStandings } from "@/lib/scoring";
+import { P2P_CREATION_RETIRED } from "@/lib/closure";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +58,26 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  // ── RETIRADO con el pivote a la casa (2026-08-25) ───────────────────────
+  // Este endpoint AUTO-APRUEBA pagos: si el modelo de visión dice que el
+  // comprobante es válido, escribe `paid = true` sin que nadie lo mire.
+  // La spec del producto nuevo dice lo contrario — el admin revisa a mano —
+  // y el flujo de la casa (POST /api/casa/pollas/[slug]/join) deja todo en
+  // `pendiente` hasta que Tama toca Aprobar en Telegram.
+  //
+  // Solo escribe en `polla_participants`, o sea el modelo P2P viejo: nunca
+  // pudo tocar la plata de la casa. Pero seguía vivo, y cada llamada gasta
+  // creditos de Anthropic. Se cierra por la misma llave que el resto del P2P.
+  if (P2P_CREATION_RETIRED) {
+    return NextResponse.json(
+      {
+        error:
+          "Este flujo ya no está disponible. Ahora los pagos los revisa el admin a mano desde la polla.",
+      },
+      { status: 410 },
+    );
+  }
+
   const supabase = createClient();
   const {
     data: { user },
