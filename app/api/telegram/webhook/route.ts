@@ -38,7 +38,9 @@ const AYUDA = [
   "/pendientes — pagos esperando que los revises",
   "/pollas — las pollas y como va el pozo de cada una",
   "/cerrar &lt;slug&gt; — cierra las inscripciones de una polla",
-  "/resolver &lt;slug&gt; — calcula puntos y reparte el pozo",
+  "/resolver &lt;slug&gt; — resuelve las preguntas y reparte el pozo",
+  "/numero &lt;slug&gt; &lt;n&gt; — cierra una rifa con el número que salió",
+  "/respuesta &lt;slug&gt; &lt;id&gt; &lt;texto&gt; — responde una pregunta libre",
   "/salir — desvincula este chat del panel",
 ].join("\n");
 
@@ -162,6 +164,24 @@ async function handleMessage(msg: TelegramMessage) {
     return;
   }
 
+  if (/^\/numero\b/i.test(text)) {
+    const [slug, n] = text
+      .replace(/^\/numero\s*/i, "")
+      .trim()
+      .split(/\s+/);
+    await setDrawnNumber(chatId, slug ?? "", Number(n));
+    return;
+  }
+
+  // /respuesta <slug> <pregunta12> <la respuesta que sea>
+  // Para las preguntas de texto libre, donde no hay botones que ofrecer.
+  if (/^\/respuesta\b/i.test(text)) {
+    const resto = text.replace(/^\/respuesta\s*/i, "").trim();
+    const [, qPrefix, ...palabras] = resto.split(/\s+/);
+    await resolveFreeText(chatId, qPrefix ?? "", palabras.join(" "));
+    return;
+  }
+
   await sendMessage(chatId, `No entendí eso.\n\n${AYUDA}`);
 }
 
@@ -176,7 +196,19 @@ async function handleCallback(cb: TelegramCallbackQuery) {
     return;
   }
 
-  const [action, entryId] = (cb.data ?? "").split(":");
+  const parts = (cb.data ?? "").split(":");
+  const action = parts[0];
+
+  // Resolver una pregunta manual: q:<pregunta12>:<opcion12>
+  // Se mandan solo los primeros 12 hex de cada uuid porque callback_data topa
+  // en 64 bytes y dos uuid completos no caben. 48 bits alcanzan de sobra para
+  // no chocar a esta escala.
+  if (action === "q") {
+    await resolveQuestion(chatId, cb.id, parts[1] ?? "", parts[2] ?? "");
+    return;
+  }
+
+  const entryId = parts[1];
   if (!entryId || (action !== "ok" && action !== "no")) {
     await answerCallback(cb.id);
     return;
@@ -353,13 +385,76 @@ async function settlePolla(chatId: number, slug: string) {
   const db = createAdminClient();
   const { data: polla } = await db
     .from("casa_pollas")
-    .select("id, name")
+    .select("id, name, kind, drawn_number")
     .eq("slug", slug)
     .maybeSingle();
 
   if (!polla) {
     await sendMessage(chatId, `No encontré <code>${esc(slug)}</code>.`);
     return;
+  }
+
+  // Rifa sin número todavía: no hay nada que repartir.
+  if (polla.kind === "rifa" && polla.drawn_number == null) {
+    await sendMessage(
+      chatId,
+      `Esa rifa todavía no tiene número ganador.
+Mandame <code>/numero ${esc(slug)} 47</code> con el que salió.`,
+    );
+    return;
+  }
+
+  // Polla manual: primero hay que decir cuál fue la respuesta de cada pregunta.
+  if (polla.kind === "manual") {
+    const { data: pendientes } = await db
+      .from("casa_questions")
+      .select("id, prompt, input_kind, order_index")
+      .eq("polla_id", polla.id)
+      .is("resolved_at", null)
+      .order("order_index", { ascending: true });
+
+    if (pendientes && pendientes.length > 0) {
+      await sendMessage(
+        chatId,
+        `<b>${esc(polla.name)}</b>
+Faltan ${pendientes.length} pregunta(s) por resolver. Decime cuál fue la respuesta:`,
+      );
+
+      for (const q of pendientes as QuestionRow[]) {
+        if (q.input_kind === "texto") {
+          await sendMessage(
+            chatId,
+            `<b>${esc(q.prompt)}</b>
+Esta es de respuesta libre. Mandame:
+<code>/respuesta ${esc(slug)} ${q.id.slice(0, 12)} tu respuesta</code>`,
+          );
+          continue;
+        }
+
+        const { data: ops } = await db
+          .from("casa_options")
+          .select("id, label")
+          .eq("question_id", q.id)
+          .order("order_index", { ascending: true });
+
+        const botones: InlineButton[][] = (ops ?? []).map(
+          (o: { id: string; label: string }) => [
+            {
+              text: o.label.slice(0, 60),
+              callback_data: `q:${q.id.slice(0, 12)}:${o.id.slice(0, 12)}`,
+            },
+          ],
+        );
+
+        await sendMessage(chatId, `<b>${esc(q.prompt)}</b>`, botones);
+      }
+
+      await sendMessage(
+        chatId,
+        `Cuando estén todas, mandá <code>/resolver ${esc(slug)}</code> otra vez y reparto el pozo.`,
+      );
+      return;
+    }
   }
 
   const { data, error } = await db.rpc("casa_settle_polla", {
@@ -393,6 +488,153 @@ async function settlePolla(chatId: number, slug: string) {
       .filter(Boolean)
       .join("\n"),
   );
+}
+
+/**
+ * Busca una pregunta SIN RESOLVER por el prefijo de su uuid.
+ *
+ * Por qué no un `.like("id", "abc%")`: `casa_questions.id` es uuid y PostgREST
+ * no compara uuid contra un patrón de texto — la query no falla, devuelve
+ * vacío, que es la peor forma de fallar. Como las preguntas pendientes son
+ * siempre un puñado, se traen todas y se matchea el prefijo acá.
+ */
+async function findQuestionByPrefix(prefix: string) {
+  if (prefix.length < 8) return null;
+  const db = createAdminClient();
+  const { data } = await db
+    .from("casa_questions")
+    .select("id, polla_id, prompt, resolved_at")
+    .is("resolved_at", null)
+    .limit(500);
+  return (
+    (data ?? []).find((q: { id: string }) => q.id.startsWith(prefix)) ?? null
+  );
+}
+
+/** Tap en "esta opción fue la que ganó". */
+async function resolveQuestion(
+  chatId: number,
+  callbackId: string,
+  qPrefix: string,
+  oPrefix: string,
+) {
+  if (qPrefix.length < 8 || oPrefix.length < 8) {
+    await answerCallback(callbackId, "Dato incompleto.");
+    return;
+  }
+
+  const db = createAdminClient();
+  const q = await findQuestionByPrefix(qPrefix);
+
+  if (!q) {
+    await answerCallback(callbackId, "No encontré esa pregunta (o ya se resolvió).");
+    return;
+  }
+
+  const { data: ops } = await db
+    .from("casa_options")
+    .select("id, label")
+    .eq("question_id", q.id);
+
+  const op = (ops ?? []).find((o: { id: string }) => o.id.startsWith(oPrefix));
+
+  if (!op) {
+    await answerCallback(callbackId, "No encontré esa opción.");
+    return;
+  }
+
+  await db
+    .from("casa_questions")
+    .update({ resolved_option_id: op.id, resolved_at: new Date().toISOString() })
+    .eq("id", q.id)
+    .is("resolved_at", null); // guard anti doble-tap
+
+  // Repuntuar al toque: la tabla queda al día sin esperar el reparto.
+  await db.rpc("casa_score_polla", { p_polla_id: q.polla_id });
+
+  await answerCallback(callbackId, `Listo: ${op.label}`);
+  await sendMessage(
+    chatId,
+    `✅ <b>${esc(q.prompt)}</b>
+Respuesta: <b>${esc(op.label)}</b>`,
+  );
+}
+
+/**
+ * /respuesta <slug> <pregunta12> <texto> — resuelve una pregunta de respuesta
+ * libre. El match contra lo que puso la gente lo hace SQL, insensible a
+ * mayúsculas y espacios, así que "morelos" y "Morelos " valen igual.
+ */
+async function resolveFreeText(chatId: number, qPrefix: string, respuesta: string) {
+  if (qPrefix.length < 8 || !respuesta.trim()) {
+    await sendMessage(
+      chatId,
+      "Se usa así: <code>/respuesta mi-polla a1b2c3d4e5f6 Morelos</code>",
+    );
+    return;
+  }
+
+  const db = createAdminClient();
+  const q = await findQuestionByPrefix(qPrefix);
+
+  if (!q) {
+    await sendMessage(chatId, "No encontré esa pregunta (o ya se resolvió).");
+    return;
+  }
+
+  await db
+    .from("casa_questions")
+    .update({
+      resolved_text: respuesta.trim(),
+      resolved_at: new Date().toISOString(),
+    })
+    .eq("id", q.id)
+    .is("resolved_at", null);
+
+  await db.rpc("casa_score_polla", { p_polla_id: q.polla_id });
+
+  await sendMessage(
+    chatId,
+    `✅ <b>${esc(q.prompt)}</b>\nRespuesta: <b>${esc(respuesta.trim())}</b>`,
+  );
+}
+
+/** /numero <slug> <n> — cierra una rifa con el número que salió. */
+async function setDrawnNumber(chatId: number, slug: string, n: number) {
+  if (!slug || !Number.isFinite(n)) {
+    await sendMessage(chatId, "Se usa así: <code>/numero mi-rifa 47</code>");
+    return;
+  }
+
+  const db = createAdminClient();
+  const { data: polla } = await db
+    .from("casa_pollas")
+    .select("id, name, kind, ticket_count")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (!polla || polla.kind !== "rifa") {
+    await sendMessage(chatId, `<code>${esc(slug)}</code> no es una rifa.`);
+    return;
+  }
+  if (polla.ticket_count != null && (n < 1 || n > polla.ticket_count)) {
+    await sendMessage(chatId, `Esa rifa va del 1 al ${polla.ticket_count}.`);
+    return;
+  }
+
+  await db.from("casa_pollas").update({ drawn_number: n }).eq("id", polla.id);
+  await sendMessage(
+    chatId,
+    `🎟 Número ganador de <b>${esc(polla.name)}</b>: <b>${n}</b>.
+Mandá <code>/resolver ${esc(slug)}</code> para repartir.`,
+  );
+}
+
+interface QuestionRow {
+  id: string;
+  prompt: string;
+  input_kind: string;
+  order_index: number;
 }
 
 /* ═════════════════════════ tipos del update ══════════════════════════ */

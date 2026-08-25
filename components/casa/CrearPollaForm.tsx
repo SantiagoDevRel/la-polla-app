@@ -58,7 +58,13 @@ export function CrearPollaForm() {
   const [premioObjeto, setPremioObjeto] = useState("");
 
   // partidos
-  const [tournament, setTournament] = useState(CREATABLE_TOURNAMENTS[0]?.slug ?? "");
+  const [tournament, setTournament] = useState(
+    // Champions encabeza el array pero suele estar fuera de temporada; abrir
+    // el form ahi mostraba "no hay partidos" y se leia como error.
+    CREATABLE_TOURNAMENTS.find((t) => t.slug === "premier_2025")?.slug ??
+      CREATABLE_TOURNAMENTS[0]?.slug ??
+      "",
+  );
   const [scoringMode, setScoringMode] = useState<"1x2" | "marcador">("1x2");
   const [matches, setMatches] = useState<MatchOption[]>([]);
   const [seleccion, setSeleccion] = useState<string[]>([]);

@@ -263,7 +263,7 @@ export function PicksBoard({
 
       {/* Barra de guardado: pegada abajo, encima del nav. */}
       {canEdit && (
-        <div className="sticky bottom-[88px] z-20 mt-4 px-4">
+        <div className="sticky bottom-[88px] z-20 mt-4 border-t border-border-default bg-bg-base px-4 pb-3 pt-3">
           {msg && (
             <p
               className={`mb-2 border p-2 text-center text-[12px] ${

@@ -17,6 +17,7 @@ import {
   getMyPicks,
   getPollaBySlug,
   getPollaMatches,
+  getPollaQuestions,
   getPot,
 } from "@/lib/casa/queries";
 import { isPollaOpen, pollaStatusLabel, type Pick1x2 } from "@/lib/casa/types";
@@ -24,6 +25,7 @@ import { formatCop, timeLeft } from "@/lib/casa/format";
 import { getTournamentLogo, getTournamentName } from "@/lib/tournaments";
 import { HeroFrame, Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { PicksBoard } from "@/components/casa/PicksBoard";
+import { QuestionsBoard } from "@/components/casa/QuestionsBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -41,14 +43,16 @@ export default async function PollaPage({
   const polla = await getPollaBySlug(params.slug);
   if (!polla || polla.status === "borrador") notFound();
 
-  const [pot, entry, matches, picks, distribution, tabla] = await Promise.all([
-    getPot(polla.id),
-    getMyEntry(polla.id, user.id),
-    polla.kind === "partidos" ? getPollaMatches(polla.id) : Promise.resolve([]),
-    getMyPicks(polla.id, user.id),
-    getDistribution(polla.id),
-    getLeaderboard(polla.id),
-  ]);
+  const [pot, entry, matches, questions, picks, distribution, tabla] =
+    await Promise.all([
+      getPot(polla.id),
+      getMyEntry(polla.id, user.id),
+      polla.kind === "partidos" ? getPollaMatches(polla.id) : Promise.resolve([]),
+      polla.kind === "manual" ? getPollaQuestions(polla.id) : Promise.resolve([]),
+      getMyPicks(polla.id, user.id),
+      getDistribution(polla.id),
+      getLeaderboard(polla.id),
+    ]);
 
   const abierta = isPollaOpen(polla);
   const estado = pollaStatusLabel(polla);
@@ -59,12 +63,21 @@ export default async function PollaPage({
     string,
     { pick1x2: Pick1x2 | null; homeScore: number | null; awayScore: number | null }
   > = {};
+  const picksPorPregunta: Record<
+    string,
+    { optionId: string | null; freeText: string | null }
+  > = {};
   for (const p of picks) {
     if (p.match_id) {
       picksPorPartido[p.match_id] = {
         pick1x2: p.pick_1x2,
         homeScore: p.home_score,
         awayScore: p.away_score,
+      };
+    } else if (p.question_id) {
+      picksPorPregunta[p.question_id] = {
+        optionId: p.option_id,
+        freeText: p.free_text,
       };
     }
   }
@@ -197,6 +210,31 @@ export default async function PollaPage({
                 lockedReason={
                   !inscrito
                     ? "Entrá a la polla para poder marcar."
+                    : "Esta polla ya cerró."
+                }
+              />
+            </div>
+          </>
+        )}
+
+        {/* ── Las preguntas manuales ───────────────────────────────────── */}
+        {polla.kind === "manual" && questions.length > 0 && (
+          <>
+            <SectionHead
+              title="Las preguntas"
+              meta={`${questions.length}`}
+              className="mt-8"
+            />
+            <div className="-mx-4">
+              <QuestionsBoard
+                slug={polla.slug}
+                questions={questions}
+                initialPicks={picksPorPregunta}
+                distribution={distribution}
+                canEdit={inscrito && abierta}
+                lockedReason={
+                  !inscrito
+                    ? "Entrá a la polla para poder responder."
                     : "Esta polla ya cerró."
                 }
               />
