@@ -1,318 +1,156 @@
-// components/nav/BottomNav.tsx — Tribuna Caliente §3.8
+// components/nav/BottomNav.tsx — la navegación de la casa.
 //
-// Floating pill + center FAB. Tapping the FAB now opens a small choice
-// sheet: "Crear polla" (navigates to createHref) or "Unirme con código"
-// (opens the JoinByCodeSheet). Keeping both affordances inside the nav
-// keeps the FAB the single entry point for "add a polla to my home".
+// ─── POR QUÉ SE REESCRIBIÓ (2026-08-25) ───
+// La versión anterior tenía 4 tabs (Inicio · Pollas · Llaves del Mundial ·
+// Perfil) más un botón central para CREAR polla o unirse con código. Todo
+// eso era el producto viejo: cualquiera armaba su polla e invitaba amigos.
+//
+// En la casa centralizada eso está retirado — solo el admin arma pollas —
+// así que el botón central no solo sobraba: invitaba a algo que ya no
+// existe. Y las Llaves del Mundial son de un torneo que terminó en julio.
+//
+// Queda lo que el producto realmente tiene: ver las pollas, y tu perfil.
+// Dos destinos. Si sos admin aparece un tercero para armarlas.
+//
+// También cambió la forma: era una píldora de vidrio flotante con blur, que
+// es exactamente el lenguaje "burbuja premium" que el skin nuevo dejó atrás.
+// Ahora es una barra sólida pegada abajo, con hairline arriba y el tab
+// activo marcado por una barra de acento. Bonus: sin blur ni backdrop-filter
+// desaparece el bug de WebKit que hacía flotar la barra en medio de la
+// pantalla durante el momentum-scroll en iPhone.
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Drawer } from "vaul";
-import { motion, useReducedMotion } from "framer-motion";
-import { Home, Bookmark, User, Plus, KeyRound } from "lucide-react";
-import { WorldCupTrophy } from "@/components/icons/WorldCupTrophy";
+import { usePathname } from "next/navigation";
+import { Ticket, User, SlidersHorizontal } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
-import { useToast } from "@/components/ui/Toast";
-import { JoinByCodeSheet } from "@/components/pollas/JoinByCodeSheet";
-import { useIsIOSApp } from "@/components/platform/PlatformProvider";
-import { SEASON_CLOSED } from "@/lib/closure";
 
-type NavKey = "inicio" | "worldcup" | "pollas" | "perfil";
+type NavKey = "pollas" | "perfil" | "admin";
 
 export interface BottomNavProps {
   active?: NavKey;
-  createHref?: string;
-  onCreatePolla?: () => void;
-  /** Count of unread avisos; shows a red badge on the Avisos tab when > 0. */
-  notifUnread?: number;
-  /** Count of partidos por pronosticar across all the viewer's active
-   *  pollas; gold badge on the Pollas tab when > 0. Distinto color que
-   *  Avisos para que el viewer mayor distinga "tienes algo que hacer
-   *  acá" (gold) vs "te avisaron de algo" (red). */
+  /** Muestra el tab de administración. Lo decide el layout con users.is_admin. */
+  isAdmin?: boolean;
+  /**
+   * Pollas donde te falta marcar algo. Badge en el tab de pollas: es la
+   * única notificación que importa en este producto — la plata ya está
+   * puesta y el partido arranca igual.
+   */
   pollasPending?: number;
 }
 
-const TABS: Array<{ key: NavKey; href: string; Icon: typeof Home; labelKey: "tabInicio" | "tabPollas" | "tabWorldcup" | "tabPerfil" }> = [
-  { key: "inicio", href: "/inicio", Icon: Home, labelKey: "tabInicio" },
-  { key: "pollas", href: "/pollas", Icon: Bookmark, labelKey: "tabPollas" },
-  // "Avisos" reemplazado por las Llaves del Mundial (Road to World Cup).
-  { key: "worldcup", href: "/road-to-worldcup", Icon: WorldCupTrophy as unknown as typeof Home, labelKey: "tabWorldcup" },
-  { key: "perfil", href: "/perfil", Icon: User, labelKey: "tabPerfil" },
-];
+interface Tab {
+  key: NavKey;
+  href: string;
+  Icon: typeof Ticket;
+  labelKey: "tabPollas" | "tabPerfil" | "tabAdmin";
+}
+
+const TAB_POLLAS: Tab = { key: "pollas", href: "/casa", Icon: Ticket, labelKey: "tabPollas" };
+const TAB_PERFIL: Tab = { key: "perfil", href: "/perfil", Icon: User, labelKey: "tabPerfil" };
+const TAB_ADMIN: Tab = {
+  key: "admin",
+  href: "/casa/admin",
+  Icon: SlidersHorizontal,
+  labelKey: "tabAdmin",
+};
 
 function deriveActive(pathname: string | null): NavKey | undefined {
   if (!pathname) return undefined;
-  // Match /inicio as the canonical home. /dashboard also resolves here
-  // during the cutover window because it redirects to /inicio server-side,
-  // so the tab still highlights correctly for users hitting the old URL.
-  if (pathname === "/inicio" || pathname.startsWith("/inicio")) return "inicio";
-  if (pathname === "/dashboard" || pathname.startsWith("/dashboard")) return "inicio";
-  if (pathname.startsWith("/road-to-worldcup")) return "worldcup";
+  // El orden importa: /casa/admin es más específico que /casa.
+  if (pathname.startsWith("/casa/admin")) return "admin";
+  if (pathname.startsWith("/casa")) return "pollas";
   if (pathname.startsWith("/perfil")) return "perfil";
-  // Match /pollas and /pollas/... but NOT /pollas/crear (that's the FAB target)
-  if (pathname === "/pollas" || (pathname.startsWith("/pollas/") && !pathname.startsWith("/pollas/crear"))) {
-    return "pollas";
-  }
+  // Las rutas del modelo viejo (/inicio, /pollas, /road-to-worldcup) ya no
+  // tienen tab. Si alguien llega por una URL guardada, no se marca ninguna
+  // en vez de mentir sobre dónde está.
   return undefined;
+}
+
+export function BottomNav({ active, isAdmin = false, pollasPending = 0 }: BottomNavProps) {
+  const t = useTranslations("Nav");
+  const pathname = usePathname();
+  const resolvedActive = active ?? deriveActive(pathname);
+
+  const tabs: Tab[] = isAdmin
+    ? [TAB_POLLAS, TAB_ADMIN, TAB_PERFIL]
+    : [TAB_POLLAS, TAB_PERFIL];
+
+  return (
+    <nav
+      aria-label={t("ariaNav")}
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border-default bg-bg-base"
+    >
+      <div className="mx-auto flex max-w-[480px] safe-bottom">
+        {tabs.map((tab) => (
+          <TabItem
+            key={tab.key}
+            tab={tab}
+            active={resolvedActive === tab.key}
+            badge={tab.key === "pollas" ? pollasPending : 0}
+            badgeLabelPrefix={t("ariaToPredict")}
+          />
+        ))}
+      </div>
+    </nav>
+  );
 }
 
 function TabItem({
   tab,
   active,
-  badge,
-  badgeTone = "red",
+  badge = 0,
   badgeLabelPrefix,
 }: {
-  tab: (typeof TABS)[number];
+  tab: Tab;
   active: boolean;
   badge?: number;
-  /** "red" para avisos sin leer; "gold" para acciones pendientes (pronósticos). */
-  badgeTone?: "red" | "gold";
-  /** Prefijo del aria-label del badge. Default es "sin leer" / "unread". */
   badgeLabelPrefix?: string;
 }) {
   const t = useTranslations("Nav");
-  const reduceMotion = useReducedMotion();
   const { Icon, labelKey, href } = tab;
-  const showBadge = typeof badge === "number" && badge > 0;
-  const badgeLabel = showBadge ? (badge! > 9 ? "9+" : String(badge)) : null;
-  const badgeBg = badgeTone === "gold" ? "bg-gold text-bg-base" : "bg-red-alert text-white";
+  const showBadge = badge > 0;
+
   return (
     <Link
       href={href}
       aria-label={t(labelKey)}
       aria-current={active ? "page" : undefined}
       className={cn(
-        // Estilo Instagram (2026-06-11): solo ícono, sin label visible
-        // (el nombre vive en aria-label). El "lozenge" de vidrio detrás
-        // del ícono activo se desliza entre tabs via framer layoutId.
-        "flex items-center justify-center flex-1 min-w-0 min-h-[48px] relative",
-        "active:scale-90 transition-transform duration-150",
-        active ? "text-gold" : "text-text-muted",
+        "relative flex min-h-[58px] flex-1 flex-col items-center justify-center gap-1",
+        "transition-colors duration-150",
+        active ? "text-gold" : "text-text-muted hover:text-text-secondary",
       )}
     >
+      {/* Marca del tab activo: una barra de acento arriba. Reemplaza al
+          "lozenge" redondeado que se deslizaba — cuadrado y quieto. */}
       {active && (
-        <motion.span
-          layoutId="nav-active-lozenge"
-          transition={
-            reduceMotion
-              ? { duration: 0 }
-              : { type: "spring", stiffness: 600, damping: 38, mass: 0.7 }
-          }
-          className="absolute w-[52px] h-[40px] rounded-full bg-white/[0.12] border border-white/[0.08]"
+        <span
           aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-[2px] bg-gold"
         />
       )}
+
       <span className="relative">
-        <Icon
-          className="w-6 h-6"
-          strokeWidth={active ? 2.4 : 2}
-          aria-hidden="true"
-        />
+        <Icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
         {showBadge && (
           <span
-            className={cn(
-              "absolute -top-1 -right-1.5 min-w-[14px] h-[14px] px-[3px] rounded-full text-[9px] font-bold leading-[14px] text-center border-[2px] border-bg-base",
-              badgeBg,
-            )}
-            aria-label={`${badge} ${badgeLabelPrefix ?? t("ariaUnread")}`}
+            className="absolute -right-2 -top-1 min-w-[15px] border-2 border-bg-base bg-gold px-[3px] text-center text-[9px] font-bold leading-[13px] text-bg-base"
+            aria-label={`${badge} ${badgeLabelPrefix ?? ""}`}
           >
-            {badgeLabel}
+            {badge > 9 ? "9+" : badge}
           </span>
         )}
       </span>
+
+      {/* Con solo dos o tres destinos, la etiqueta cabe y ahorra que la gente
+          adivine qué significa el ícono. El nav anterior las escondía porque
+          tenía cinco elementos y no había espacio. */}
+      <span className="lp-label text-[9px] leading-none" style={{ color: "inherit" }}>
+        {t(labelKey)}
+      </span>
     </Link>
-  );
-}
-
-export function BottomNav({
-  active,
-  createHref,
-  onCreatePolla,
-  pollasPending = 0,
-}: BottomNavProps) {
-  const t = useTranslations("Nav");
-  const pathname = usePathname();
-  const router = useRouter();
-  const { showToast } = useToast();
-  const isIOSApp = useIsIOSApp();
-  const resolvedActive = active ?? deriveActive(pathname);
-  const [left, middleLeft, middleRight, right] = TABS;
-
-  // Hide the entire navbar inside flows that need full-screen focus
-  // (currently only the create-polla wizard). The wizard renders its
-  // own sticky Cancelar/Atrás/Continuar bar at the bottom, so the
-  // BottomNav would just collide with it.
-  const hideNav = pathname?.startsWith("/pollas/crear") ?? false;
-
-  // Tapping the FAB opens the small choice sheet. That sheet hands off
-  // either to createHref (or the onCreatePolla callback, if no href) or
-  // to the join-by-code sheet.
-  const [choiceOpen, setChoiceOpen] = useState(false);
-  const [joinOpen, setJoinOpen] = useState(false);
-
-  const effectiveCreateHref = createHref ?? "/pollas/crear";
-
-  // FAB sits FULLY INSIDE the navbar, centered vertically. We reserve a
-  // 64px slot in the middle of the row (`w-16`) so the FAB doesn't crash
-  // visually with the Pollas/Avisos tabs to either side. With a 48px
-  // FAB and 8px breathing room on each side it sits cleanly between
-  // the two flex groups.
-  const fabClass =
-    "absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[48px] h-[48px] rounded-full bg-gold flex items-center justify-center active:scale-95 transition-transform duration-150";
-  const fabStyle: React.CSSProperties = {
-    boxShadow: "0 4px 16px -4px rgba(255,215,0,0.45)",
-  };
-
-  if (hideNav) return null;
-
-  return (
-    <>
-      {/* Glass bar estilo Instagram (2026-06-11): bien translúcida
-          (0.42 + blur-3xl + saturate-180) — el blur fuerte es lo que
-          mantiene legibles los íconos aunque el fondo sea ruidoso.
-          Highlight interior arriba + borde claro = canto de vidrio.
-          h-64 porque ya no hay labels. */}
-      <nav
-        aria-label={t("ariaNav")}
-        className="fixed left-[14px] right-[14px] bottom-[14px] z-50 h-[64px] max-w-[480px] mx-auto"
-      >
-        {/* Capa de vidrio en un elemento SEPARADO del shell fixed.
-            iOS WebKit no puede mantener una capa pegada al viewport durante
-            el momentum-scroll cuando ESA MISMA capa es a la vez
-            position:fixed Y backdrop-filter: hace "blit" del bitmap fijo
-            cacheado pero no puede blittear un backdrop en vivo → la barra
-            se quedaba flotando en la mitad de la pantalla al hacer scroll en
-            iPhone (WebKit bug 89475). Separar el posicionamiento (en el
-            <nav>) del blur (acá) deja al compositor fijar el shell limpio
-            mientras el blur se re-samplea en su propia capa.
-            ⚠️ NO agregar transform / will-change / opacity<1 a ESTE div: en
-            iOS eso lo convierte en su propio backdrop-root y el blur colapsa
-            a un panel opaco. Si una device sigue drifteando, la escalación es
-            translateZ(0) en el <nav> shell (NUNCA acá). */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 rounded-full overflow-hidden backdrop-blur-3xl backdrop-saturate-[1.8] border border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.12)]"
-          style={{ background: "rgba(14, 20, 32, 0.42)" }}
-        />
-        <div className="relative h-full flex items-center px-4">
-          <div className="flex-1 flex">
-            <TabItem tab={left} active={resolvedActive === left.key} />
-            <TabItem
-              tab={middleLeft}
-              active={resolvedActive === middleLeft.key}
-              badge={pollasPending}
-              badgeTone="gold"
-              badgeLabelPrefix={t("ariaToPredict")}
-            />
-          </div>
-
-          {/* Reserved center slot — 64px wide. Stops the FAB from sitting
-              on top of the Pollas/Avisos tabs. */}
-          <div className="w-16 flex-shrink-0" aria-hidden="true" />
-
-          <button
-            type="button"
-            onClick={(e) => {
-              // Blur first: Vaul drawers slap aria-hidden on background
-              // elements (including this nav) when they open. If the FAB
-              // keeps focus, React warns ("Blocked aria-hidden on an
-              // element because its descendant retained focus") and on
-              // some browsers the focus trap leaves the button in a
-              // limbo state where subsequent clicks no-op.
-              e.currentTarget.blur();
-              // Temporada cerrada: ni crear ni unirse llevan a ningún lado
-              // (no hay torneos y todas las pollas están 'ended'), así que
-              // el FAB va DIRECTO a la pantalla de cierre en vez de abrir
-              // un sheet con dos opciones muertas. Mismo criterio que el
-              // bypass de iOS de abajo.
-              if (SEASON_CLOSED) {
-                router.push(effectiveCreateHref);
-              } else if (isIOSApp) {
-                // En iOS no ofrecemos crear (App Store 5.1.1(ix)) — el FAB
-                // abre directo el sheet de "unirme con código", sin el
-                // choice sheet intermedio que tendría una opción "crear".
-                setJoinOpen(true);
-              } else {
-                setChoiceOpen(true);
-              }
-            }}
-            aria-label={isIOSApp && !SEASON_CLOSED ? t("joinWithCode") : t("ariaCreateJoin")}
-            className={fabClass}
-            style={fabStyle}
-          >
-            {isIOSApp && !SEASON_CLOSED ? (
-              <KeyRound className="w-6 h-6 text-bg-base" strokeWidth={2.5} aria-hidden="true" />
-            ) : (
-              <Plus className="w-6 h-6 text-bg-base" strokeWidth={3} aria-hidden="true" />
-            )}
-          </button>
-
-          <div className="flex-1 flex">
-            <TabItem tab={middleRight} active={resolvedActive === middleRight.key} />
-            <TabItem tab={right} active={resolvedActive === right.key} />
-          </div>
-        </div>
-      </nav>
-
-      {/* FAB choice sheet */}
-      <Drawer.Root open={choiceOpen} onOpenChange={setChoiceOpen}>
-        <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 bg-black/60 z-[55]" />
-          <Drawer.Content
-            className="fixed bottom-0 left-0 right-0 z-[60] rounded-t-xl border border-border-default bg-bg-card"
-          >
-            <Drawer.Title className="sr-only">{t("newPolla")}</Drawer.Title>
-            <Drawer.Description className="sr-only">
-              {t("newPollaDescription")}
-            </Drawer.Description>
-            <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-border-default" />
-            <div className="p-5 pb-8 flex flex-col gap-3">
-              <h3 className="font-display text-[22px] tracking-[0.04em] uppercase text-text-primary leading-none mb-1">
-                {t("newPolla")}
-              </h3>
-              <Link
-                href={effectiveCreateHref}
-                onClick={() => {
-                  setChoiceOpen(false);
-                  onCreatePolla?.();
-                }}
-                className="flex items-center gap-3 rounded-full bg-gold text-bg-base font-display tracking-[0.06em] uppercase text-[16px] h-[52px] px-5 shadow-[0_8px_24px_-6px_rgba(255,215,0,0.4)]"
-              >
-                <Plus className="w-5 h-5" strokeWidth={3} aria-hidden="true" />
-                {t("createNew")}
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  setChoiceOpen(false);
-                  // Small delay so the first drawer can fully close before the
-                  // second opens; avoids Vaul overlay flicker.
-                  window.setTimeout(() => setJoinOpen(true), 200);
-                }}
-                className="flex items-center gap-3 rounded-full bg-bg-elevated border border-border-default text-text-primary font-display tracking-[0.06em] uppercase text-[16px] h-[52px] px-5"
-              >
-                <KeyRound className="w-5 h-5 text-gold" strokeWidth={2} aria-hidden="true" />
-                {t("joinWithCode")}
-              </button>
-            </div>
-          </Drawer.Content>
-        </Drawer.Portal>
-      </Drawer.Root>
-
-      <JoinByCodeSheet
-        open={joinOpen}
-        onOpenChange={setJoinOpen}
-        onSuccess={(polla) => {
-          setJoinOpen(false);
-          showToast(t("joinedToast", { name: polla.name }), "success");
-          router.push(`/pollas/${polla.slug}`);
-        }}
-      />
-    </>
   );
 }
 

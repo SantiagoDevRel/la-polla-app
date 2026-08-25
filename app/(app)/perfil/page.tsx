@@ -2,6 +2,8 @@
 // Avatar, nombre editable, stats, actividad reciente, puntuación, logout
 "use client";
 
+import Link from "next/link";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -347,6 +349,18 @@ export default function PerfilPage() {
             {t("adminPanel")}
           </button>
         )}
+
+        {/* Historial del modelo viejo.
+            /pollas salió de la navegación con el pivote a la casa, pero ahí
+            siguen vivas las 62 pollas y los 15.426 pronósticos de la etapa
+            P2P. Sin esta puerta el histórico existiría pero sería
+            inalcanzable, que en la práctica es lo mismo que perderlo. */}
+        <Link
+          href="/pollas"
+          className="w-full flex items-center justify-center py-3 font-medium text-text-secondary border border-border-default hover:border-gold hover:text-gold transition-colors"
+        >
+          {t("oldPollas")}
+        </Link>
 
         {/* Logout */}
         <button onClick={handleLogout}

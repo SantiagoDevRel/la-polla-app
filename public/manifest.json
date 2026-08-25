@@ -2,7 +2,7 @@
   "name": "La Polla App",
   "short_name": "La Polla",
   "description": "La mejor polla deportiva de Colombia",
-  "start_url": "/dashboard",
+  "start_url": "/casa",
   "display": "standalone",
   "background_color": "#003087",
   "theme_color": "#FCD116",

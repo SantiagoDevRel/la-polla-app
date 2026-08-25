@@ -73,6 +73,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // ── Rutas retiradas con el pivote a la casa (2026-08-25) ───────────────
+  // El producto pasó de pollas P2P a una casa centralizada. Estas pantallas
+  // eran del modelo viejo y ya no forman parte de la app:
+  //
+  //   /inicio, /dashboard   el tablero P2P (mis pollas, podio, evolución)
+  //   /road-to-worldcup     las llaves de un Mundial que terminó en julio
+  //
+  // Se resuelve acá y no borrando las páginas a propósito: los archivos
+  // quedan intactos y revivir cualquiera es sacarla de esta lista. Ojo con
+  // lo que NO está acá: /pollas y /pollas/[slug] siguen alcanzables por URL
+  // directa —  salieron del nav, pero son la única forma de consultar las
+  // 62 pollas y los 15.426 pronósticos del histórico. /pollas/crear no
+  // necesita entrada acá: ya lo bloquea P2P_CREATION_RETIRED.
+  const RETIRADAS = ["/inicio", "/dashboard", "/road-to-worldcup"];
+  const path = request.nextUrl.pathname;
+  if (RETIRADAS.some((r) => path === r || path.startsWith(`${r}/`))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/casa";
+    url.search = "";
+    return NextResponse.redirect(url, 307); // temporal: es una decisión de producto, no una URL muerta
+  }
+
   const locale = resolveLocale(request, host);
 
   // Stamp del locale en headers del request para que i18n/request.ts lo

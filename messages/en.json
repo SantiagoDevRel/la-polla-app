@@ -31,16 +31,16 @@
     "dismissAria": "Dismiss notice"
   },
   "Closure": {
-    "bannerTitle": "CHICKENPICKS IS SIGNING OFF",
-    "bannerBody": "The 2026 World Cup is over and ChickenPicks will shut down in the next few days. Thanks for playing this season — we'll be back for the next World Cup.",
-    "createTitle": "THANKS FOR PLAYING",
-    "createBody": "The 2026 World Cup ended on July 19 and ChickenPicks will shut down in the next few days.",
-    "createThanks": "Thanks for every pick, every fought-over table and every pool you built with your crew this season.",
-    "createComeback": "We'll be back for the next World Cup. See you in 2030.",
-    "createCta": "See my pools",
-    "createSecondary": "Go home",
-    "emptyMessage": "The season is over and ChickenPicks is signing off in the next few days. Thanks for playing — we'll be back for the next World Cup.",
-    "emptyActive": "No pools in progress: the season is closed. The ones you played are below, under Finished."
+    "bannerTitle": "THE HOUSE RUNS THE POOLS NOW",
+    "bannerBody": "You no longer build your own pool. Every weekend we post the pools and you join the ones you want.",
+    "createTitle": "WE BUILD THE POOLS NOW",
+    "createBody": "We changed things: instead of everyone building their own, we post the weekend's pools and you pick which ones to join.",
+    "createThanks": "It's simpler. Join, pay, make your picks, wait for kickoff.",
+    "createComeback": "Have a look at what's open right now.",
+    "createCta": "See the pools",
+    "createSecondary": "See my old pools",
+    "emptyMessage": "No pools are open yet. As soon as we post the weekend's, they show up here.",
+    "emptyActive": "You're not in any active pool. The ones you already played are below, under Finished."
   },
   "Nav": {
     "ariaNav": "Bottom navigation",
@@ -56,7 +56,8 @@
     "newPollaDescription": "Create a new pool or join an existing one with a code.",
     "createNew": "Create new pool",
     "joinWithCode": "Join with code",
-    "joinedToast": "You joined {name}"
+    "joinedToast": "You joined {name}",
+    "tabAdmin": "House"
   },
   "Login": {
     "brand": "CHICKEN PICKS",
@@ -677,7 +678,8 @@
     "deleteConfirmCancel": "Cancel",
     "deleting": "Deleting…",
     "deleteSuccess": "Your account was deleted",
-    "deleteError": "Couldn't delete the account. Please try again."
+    "deleteError": "Couldn't delete the account. Please try again.",
+    "oldPollas": "See my old pools"
   },
   "Avisos": {
     "metadataTitle": "Alerts · Chicken Picks",
@@ -932,5 +934,35 @@
     "newsError": "Could not load the news",
     "newsReadMore": "Read on ESPN",
     "ageShort": "{age} yrs"
+  },
+  "Profile": {
+    "header": "My Profile",
+    "errMinChars": "Min 2 characters",
+    "toastNameUpdated": "Name updated",
+    "errUpdateName": "Error updating name",
+    "toastChickenUpdated": "Chicken updated",
+    "errUpdateChicken": "Error updating chicken",
+    "toastPayoutSaved": "Payment account saved",
+    "errSavePayout": "Error saving account",
+    "toastPayoutCleared": "Payment account cleared",
+    "errClearPayout": "Error clearing account",
+    "loading": "Loading profile...",
+    "errLoading": "Error loading profile",
+    "pickChicken": "Pick your chicken",
+    "edit": "Edit",
+    "recentActivity": "Recent activity",
+    "pointsLabel": "pts",
+    "scoringTitle": "How does scoring work?",
+    "adminPanel": "Admin panel",
+    "logout": "Log out",
+    "deleteAccount": "Delete my account",
+    "deleteConfirmTitle": "Delete your account?",
+    "deleteConfirmBody": "This permanently deletes your profile, your predictions and your participation in pools. Pools you created will stay available for the other participants. This action cannot be undone.",
+    "deleteConfirmYes": "Yes, delete my account",
+    "deleteConfirmCancel": "Cancel",
+    "deleting": "Deleting…",
+    "deleteSuccess": "Your account was deleted",
+    "deleteError": "Couldn't delete the account. Please try again.",
+    "oldPollas": "See my old pools"
   }
 }

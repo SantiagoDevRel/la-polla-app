@@ -1256,9 +1256,9 @@ export async function handleHelpTopic(
   if (topic === "help_crear") {
     await sendCTAButton(
       phone,
-      "Crea tu polla desde la web, es bacano y rapidito 🐥\n\n_Eliges el torneo, pones el nombre y compartes el link con tus amigos_",
-      "Crear mi polla 🏆",
-      `${APP_URL}/pollas/crear`,
+      "Ahora las pollas las armamos nosotros 🐥\n\n_Cada fin de semana subimos las del finde. Entras, mandas el pantallazo del pago y marcas tus partidos._",
+      "Ver las pollas 🏆",
+      `${APP_URL}/casa`,
       FOOTER
     );
     return;

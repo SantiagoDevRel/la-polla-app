@@ -243,7 +243,7 @@ export async function GET(request: NextRequest) {
     /^\+?\d{8,15}$/.test(String(profile.display_name).trim()) ||
     !profile.avatar_url;
 
-  const target = needsOnboarding ? "/onboarding" : "/inicio";
+  const target = needsOnboarding ? "/onboarding" : "/casa";
   const response = NextResponse.redirect(new URL(target, request.url));
 
   // Fast-path cookie para el middleware: si el user ya está onboardado,

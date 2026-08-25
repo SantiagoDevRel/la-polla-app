@@ -71,7 +71,7 @@ export default function SeasonClosedCreate() {
           </p>
 
           <Link
-            href="/pollas"
+            href="/casa"
             className="mt-6 inline-flex items-center justify-center rounded-full bg-gold text-bg-base font-semibold px-6 py-3 cursor-pointer transition-all duration-200 hover:brightness-110 hover:shadow-[0_0_24px_rgba(255,215,0,0.25)] active:scale-[0.98]"
           >
             {t("createCta")}
@@ -79,7 +79,7 @@ export default function SeasonClosedCreate() {
 
           <div className="mt-3">
             <Link
-              href="/inicio"
+              href="/pollas"
               className="inline-flex items-center justify-center rounded-full px-4 py-2 text-[13px] font-medium text-text-secondary hover:text-text-primary hover:bg-bg-elevated cursor-pointer transition-all duration-200"
             >
               {t("createSecondary")}

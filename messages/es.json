@@ -31,16 +31,16 @@
     "dismissAria": "Cerrar aviso"
   },
   "Closure": {
-    "bannerTitle": "LA POLLA SE DESPIDE",
-    "bannerBody": "El Mundial 2026 terminó y La Polla dejará de funcionar en los próximos días. Gracias por jugar esta temporada: volveremos para el próximo Mundial.",
-    "createTitle": "GRACIAS POR JUGAR",
-    "createBody": "El Mundial 2026 terminó el 19 de julio y La Polla dejará de funcionar en los próximos días.",
-    "createThanks": "Gracias por cada pronóstico, cada tabla peleada y cada polla armada con tu parche esta temporada.",
-    "createComeback": "Volveremos para el próximo Mundial. Nos vemos en el 2030.",
-    "createCta": "Ver mis pollas",
-    "createSecondary": "Ir al inicio",
-    "emptyMessage": "La temporada cerró y La Polla se despide en los próximos días. Gracias por jugar: volveremos para el próximo Mundial.",
-    "emptyActive": "No tienes pollas en curso: la temporada cerró. Las que jugaste quedan abajo, en Finalizadas."
+    "bannerTitle": "AHORA LAS POLLAS LAS ARMA LA CASA",
+    "bannerBody": "Ya no armas tu propia polla. Cada fin de semana subimos las pollas y tú entras a la que quieras.",
+    "createTitle": "LAS POLLAS AHORA LAS ARMAMOS NOSOTROS",
+    "createBody": "Cambiamos: en vez de que cada quien arme la suya, cada fin de semana subimos las pollas y tú escoges en cuál entras.",
+    "createThanks": "Es más simple. Entras, pagas, marcas y a esperar el pitazo.",
+    "createComeback": "Mira las que están abiertas ahora mismo.",
+    "createCta": "Ver las pollas",
+    "createSecondary": "Ver mis pollas viejas",
+    "emptyMessage": "Todavía no hay pollas abiertas. En cuanto subamos las del fin de semana te aparecen acá.",
+    "emptyActive": "No estás en ninguna polla en curso. Las que ya jugaste quedan abajo, en Finalizadas."
   },
   "Nav": {
     "ariaNav": "Navegación inferior",
@@ -56,7 +56,8 @@
     "newPollaDescription": "Crea una polla nueva o únete a una existente con un código.",
     "createNew": "Crear polla nueva",
     "joinWithCode": "Unirme con código",
-    "joinedToast": "Te uniste a {name}"
+    "joinedToast": "Te uniste a {name}",
+    "tabAdmin": "Casa"
   },
   "Login": {
     "brand": "LA POLLA",
@@ -677,7 +678,8 @@
     "deleteConfirmCancel": "Cancelar",
     "deleting": "Eliminando…",
     "deleteSuccess": "Tu cuenta fue eliminada",
-    "deleteError": "No se pudo eliminar la cuenta. Intenta de nuevo."
+    "deleteError": "No se pudo eliminar la cuenta. Intenta de nuevo.",
+    "oldPollas": "Ver mis pollas viejas"
   },
   "Avisos": {
     "metadataTitle": "Avisos · La Polla",
@@ -932,5 +934,35 @@
     "newsError": "No pudimos cargar las noticias",
     "newsReadMore": "Leer en ESPN",
     "ageShort": "{age} años"
+  },
+  "Profile": {
+    "header": "Mi Perfil",
+    "errMinChars": "Mínimo 2 caracteres",
+    "toastNameUpdated": "Nombre actualizado",
+    "errUpdateName": "Error actualizando nombre",
+    "toastChickenUpdated": "Pollito actualizado",
+    "errUpdateChicken": "Error actualizando pollito",
+    "toastPayoutSaved": "Cuenta de pago guardada",
+    "errSavePayout": "Error guardando la cuenta",
+    "toastPayoutCleared": "Cuenta de pago borrada",
+    "errClearPayout": "Error borrando la cuenta",
+    "loading": "Cargando perfil...",
+    "errLoading": "Error cargando perfil",
+    "pickChicken": "Elige tu pollito",
+    "edit": "Editar",
+    "recentActivity": "Actividad reciente",
+    "pointsLabel": "pts",
+    "scoringTitle": "¿Cómo se puntúa?",
+    "adminPanel": "Panel de administración",
+    "logout": "Cerrar sesión",
+    "deleteAccount": "Eliminar mi cuenta",
+    "deleteConfirmTitle": "¿Eliminar tu cuenta?",
+    "deleteConfirmBody": "Esto borra tu perfil, tus pronósticos y tu participación en las pollas, de forma permanente. Las pollas que creaste seguirán existiendo para los demás participantes. Esta acción no se puede deshacer.",
+    "deleteConfirmYes": "Sí, eliminar mi cuenta",
+    "deleteConfirmCancel": "Cancelar",
+    "deleting": "Eliminando…",
+    "deleteSuccess": "Tu cuenta fue eliminada",
+    "deleteError": "No se pudo eliminar la cuenta. Intenta de nuevo.",
+    "oldPollas": "Ver mis pollas viejas"
   }
 }

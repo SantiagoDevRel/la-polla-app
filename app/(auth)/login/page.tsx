@@ -253,7 +253,7 @@ function LoginInner() {
       }
       // Hard redirect para asegurar que las cookies se apliquen al
       // siguiente request (router.push a veces las pierde en middleware).
-      window.location.href = body?.newUser ? "/onboarding" : rt || "/inicio";
+      window.location.href = body?.newUser ? "/onboarding" : rt || "/casa";
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errNetwork"));
     } finally {
