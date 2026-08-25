@@ -90,6 +90,7 @@ export function CrearPollaForm() {
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [msgOk, setMsgOk] = useState<string | null>(null);
 
   // Trae la cuenta de cobro de la última polla para no re-escribirla.
   useEffect(() => {
@@ -181,7 +182,14 @@ export function CrearPollaForm() {
       const json = await res.json();
       if (!res.ok) return setError(json.error ?? "No pude crear la polla.");
 
-      router.push(`/casa/${json.slug}`);
+      // Un borrador NO es visible en /casa/<slug> (esa ruta hace notFound()
+      // para los borradores), asi que mandar ahi era mandar a un 404.
+      if (json.publicada) {
+        router.push(`/casa/${json.slug}`);
+      } else {
+        setError(null);
+        setMsgOk("Guardado como borrador. No es visible hasta que lo publiques.");
+      }
       router.refresh();
     } catch {
       setError("Se cayó la conexión.");
@@ -619,6 +627,12 @@ export function CrearPollaForm() {
       {error && (
         <p className="border border-red-alert/40 bg-red-alert/10 p-3 text-center text-[12px] text-red-alert">
           {error}
+        </p>
+      )}
+
+      {msgOk && (
+        <p className="border border-turf/40 bg-turf/10 p-3 text-center text-[12px] text-turf">
+          {msgOk}
         </p>
       )}
 

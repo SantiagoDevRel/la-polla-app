@@ -9,7 +9,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { listPublicPollas, getPots } from "@/lib/casa/queries";
-import { pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
+import { isPollaOpen, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import { getTournamentLogo, getTournamentName } from "@/lib/tournaments";
 import {
@@ -32,8 +32,11 @@ export default async function CasaPage() {
   const pollas = await listPublicPollas();
   const pots = await getPots(pollas.map((p) => p.id));
 
-  const abiertas = pollas.filter((p) => p.status === "abierta");
-  const cerradas = pollas.filter((p) => p.status !== "abierta");
+  // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
+  // paso sigue con status abierta hasta que alguien la cierre, y quedaba
+  // listada como "del fin de semana" diciendo "cierra en cerrada".
+  const abiertas = pollas.filter((p) => isPollaOpen(p));
+  const cerradas = pollas.filter((p) => !isPollaOpen(p));
 
   // El número grande de arriba: todo lo que hay repartible ahora mismo.
   const enJuego = abiertas.reduce((sum, p) => sum + (pots[p.id]?.prize_cop ?? 0), 0);
@@ -102,7 +105,7 @@ function PollaRow({
   pot?: { prize_cop: number; paid_entries: number };
 }) {
   const estado = pollaStatusLabel(polla);
-  const abierta = polla.status === "abierta";
+  const abierta = isPollaOpen(polla);
 
   return (
     <li>

@@ -242,7 +242,7 @@ async function handleCallback(cb: TelegramCallbackQuery) {
 
   const aprobado = action === "ok";
 
-  await db
+  const { data: actualizada, error: updErr } = await db
     .from("casa_entries")
     .update({
       status: aprobado ? "pagada" : "rechazada",
@@ -250,7 +250,20 @@ async function handleCallback(cb: TelegramCallbackQuery) {
       reject_reason: aprobado ? null : "Rechazado desde el panel de Telegram",
     })
     .eq("id", entryId)
-    .eq("status", "pendiente"); // guard anti doble-tap
+    .eq("status", "pendiente") // guard anti doble-tap
+    .select("id")
+    .maybeSingle();
+
+  // Antes se respondia "Aprobado ✅" pasara lo que pasara. Si el UPDATE no
+  // tocaba ninguna fila (otro admin ya decidio, o fallo la DB), Tama se iba
+  // convencido de haber resuelto y el jugador seguia en pendiente.
+  if (updErr || !actualizada) {
+    await answerCallback(
+      cb.id,
+      updErr ? "No pude guardarlo. Probá otra vez." : "Ya la habían resuelto.",
+    );
+    return;
+  }
 
   const [{ data: polla }, pot] = await Promise.all([
     db
@@ -466,6 +479,45 @@ Esta es de respuesta libre. Mándame:
       await sendMessage(
         chatId,
         `Cuando estén todas, manda <code>/resolver ${esc(slug)}</code> otra vez y reparto el pozo.`,
+      );
+      return;
+    }
+  }
+
+  // Guardas antes de repartir. Sin esto se podia liquidar una polla abierta,
+  // o con partidos sin resultado final: esos cuentan 0, alguien cobra de
+  // menos, y el reparto queda congelado como "resuelta" — es plata mal dada
+  // y no hay como deshacerla desde el bot.
+  if (polla.kind === "partidos") {
+    const { data: pendientes } = await db
+      .from("casa_polla_matches")
+      .select("match_id, matches(final_verified_at, home_team, away_team)")
+      .eq("polla_id", polla.id);
+
+    const sinVerificar = (pendientes ?? []).filter((r: { matches: unknown }) => {
+      const m = Array.isArray(r.matches) ? r.matches[0] : r.matches;
+      return !(m as { final_verified_at?: string | null } | null)?.final_verified_at;
+    });
+
+    if (sinVerificar.length > 0) {
+      const nombres = sinVerificar
+        .slice(0, 5)
+        .map((r: { matches: unknown }) => {
+          const m = (Array.isArray(r.matches) ? r.matches[0] : r.matches) as
+            | { home_team?: string; away_team?: string }
+            | null;
+          return `• ${esc(m?.home_team ?? "?")} vs ${esc(m?.away_team ?? "?")}`;
+        })
+        .join("\n");
+      await sendMessage(
+        chatId,
+        [
+          `Todavía faltan ${sinVerificar.length} partido(s) por verificar:`,
+          "",
+          nombres,
+          "",
+          "Si reparto ahora esos cuentan 0 y alguien cobra de menos. Espera el cierre, o resuélvelos en /admin/discrepancias.",
+        ].join("\n"),
       );
       return;
     }

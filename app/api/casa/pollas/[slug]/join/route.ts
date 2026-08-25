@@ -22,7 +22,11 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MAX_BYTES = 8 * 1024 * 1024; // el bucket topa en 10MB; dejamos aire
-const TIPOS_OK = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+// Exactamente los que acepta el bucket `payment-proofs`. Tenerlos
+// desalineados era peor que ser estricto: HEIC pasaba esta validacion, el
+// storage lo rechazaba, y la persona veia "no pude guardar el pantallazo"
+// sin ninguna pista de que su iPhone estaba mandando un formato distinto.
+const TIPOS_OK = ["image/jpeg", "image/png", "image/webp"];
 
 const bodySchema = z.object({
   /** Solo en rifas: que boleta quiere. */
@@ -75,8 +79,16 @@ export async function POST(
     );
   }
   if (!TIPOS_OK.includes(file.type)) {
+    // Mensaje distinto para HEIC: es lo que manda un iPhone cuando la foto
+    // viene de la camara, y decir solo "formato no soportado" no le dice a
+    // nadie que hacer al respecto.
+    const esHeic = /heic|heif/i.test(file.type) || /\.hei[cf]$/i.test(file.name ?? "");
     return NextResponse.json(
-      { error: "Solo acepto imágenes (JPG, PNG, WEBP o HEIC)." },
+      {
+        error: esHeic
+          ? "Ese formato de iPhone no me sirve. Toma un pantallazo de la transferencia (botón de bloqueo + volumen) y sube esa imagen."
+          : "Solo acepto imágenes JPG, PNG o WEBP.",
+      },
       { status: 415 },
     );
   }
@@ -113,7 +125,11 @@ export async function POST(
   if (polla.kind !== "rifa") {
     const existing = await getMyEntry(polla.id, user.id);
     if (existing) {
-      if (existing.status === "rechazada") {
+      // `rechazada` (Tama dijo que no) y `anulada` (fallo la subida) son las
+      // dos formas de "intentaste y no quedo". Las dos tienen que dejar
+      // reintentar: si no, la fila vieja bloquea el indice unico y la persona
+      // se queda sin forma de entrar a la polla, para siempre.
+      if (existing.status === "rechazada" || existing.status === "anulada") {
         entryExistente = existing.id;
       } else {
         return NextResponse.json(

@@ -53,7 +53,13 @@ const manualSchema = baseSchema.extend({
         points: z.number().int().min(1).max(50).default(3),
         inputKind: z.enum(["opciones", "texto"]).default("opciones"),
         options: z.array(z.string().trim().min(1).max(60)).max(30).default([]),
-      }),
+      }).refine(
+        // Una pregunta de opciones SIN opciones se publica igual y despues la
+        // gente ve el enunciado sin un solo boton para responder — y el bot
+        // tampoco puede resolverla porque no hay que elegir.
+        (q) => q.inputKind !== "opciones" || q.options.filter(Boolean).length >= 2,
+        { message: "Cada pregunta de opciones necesita al menos 2 opciones." },
+      ),
     )
     .min(1)
     .max(20),
@@ -150,7 +156,11 @@ export async function POST(req: NextRequest) {
       points_result: 3,
       points_exact: 3,
       points_one_team: 1,
-      status: body.publish ? "abierta" : "borrador",
+      // Siempre nace como BORRADOR. Se pasa a `abierta` recien al final,
+      // cuando partidos o preguntas ya quedaron guardados: publicar primero
+      // dejaba una polla visible y cobrable aunque el insert de los partidos
+      // fallara justo despues.
+      status: "borrador",
       closes_at: body.closesAt,
       ticket_count: body.kind === "rifa" ? body.ticketCount : null,
       draw_method: body.kind === "rifa" ? body.drawMethod : null,
@@ -177,8 +187,14 @@ export async function POST(req: NextRequest) {
     const { error: mErr } = await db.from("casa_polla_matches").insert(filas);
     if (mErr) {
       console.error("[casa/admin] partidos:", mErr.message);
+      // Queda en borrador (nunca se publico), asi que no es visible ni
+      // cobrable. Se avisa para que Tama sepa que revisar.
       return NextResponse.json(
-        { error: "Creé la polla pero no pude asociar los partidos.", slug: polla.slug },
+        {
+          error:
+            "Creé la polla pero no pude asociar los partidos. Quedó en borrador.",
+          slug: polla.slug,
+        },
         { status: 500 },
       );
     }
@@ -218,5 +234,29 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, slug: polla.slug, id: polla.id });
+  // Ahora si: todo lo de adentro quedo guardado, se puede publicar.
+  if (body.publish) {
+    const { error: pubErr } = await db
+      .from("casa_pollas")
+      .update({ status: "abierta" })
+      .eq("id", polla.id);
+    if (pubErr) {
+      console.error("[casa/admin] no pude publicar:", pubErr.message);
+      return NextResponse.json(
+        {
+          error:
+            "Creé la polla pero quedó en borrador: no pude publicarla. Revisala e intenta de nuevo.",
+          slug: polla.slug,
+        },
+        { status: 500 },
+      );
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    slug: polla.slug,
+    id: polla.id,
+    publicada: body.publish,
+  });
 }
