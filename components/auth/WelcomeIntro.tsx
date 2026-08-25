@@ -263,19 +263,19 @@ export function WelcomeIntro() {
                 className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px]"
                 style={{
                   fontSize: 26,
-                  textShadow: "0 2px 6px rgba(0,0,0,0.55)",
+                  
                 }}
               >
                 {tBrand("wordmarkPart3") ? (
                   <>
-                    <span style={{ color: "#FFD700" }}>{tBrand("wordmarkPart1")}</span>
+                    <span style={{ color: "var(--gold)" }}>{tBrand("wordmarkPart1")}</span>
                     <span style={{ color: "#2F6DF4" }}>{tBrand("wordmarkPart2")}</span>
                     <span style={{ color: "#E4463A" }}>{tBrand("wordmarkPart3")}</span>
                   </>
                 ) : (
                   <>
-                    <span style={{ color: "#FFD700" }}>{tBrand("wordmarkPart1")}</span>
-                    <span style={{ color: "#FFD700" }}>{tBrand("wordmarkPart2")}</span>
+                    <span style={{ color: "var(--gold)" }}>{tBrand("wordmarkPart1")}</span>
+                    <span style={{ color: "var(--gold)" }}>{tBrand("wordmarkPart2")}</span>
                   </>
                 )}
               </span>
@@ -418,7 +418,7 @@ export function WelcomeIntro() {
                   ease: [0.34, 1.4, 0.64, 1],
                 }}
                 className="inline-block font-display text-gold text-[26px] tracking-wide align-[-0.05em]"
-                style={{ textShadow: "0 2px 8px rgba(255,215,0,0.35)" }}
+                style={{ textShadow: "0 2px 8px rgba(216, 255, 71, 0.35)" }}
               >
                 {t("taglineAccent")}
               </motion.span>

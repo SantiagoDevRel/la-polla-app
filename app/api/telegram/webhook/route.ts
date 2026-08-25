@@ -27,6 +27,7 @@ import {
   unlink,
 } from "@/lib/telegram/admin";
 import { formatCop, timeLeft } from "@/lib/casa/format";
+import { sendTextMessage } from "@/lib/whatsapp/bot";
 import { getPot, listAllPollas, listPendingProofs } from "@/lib/casa/queries";
 
 export const dynamic = "force-dynamic";
@@ -267,6 +268,19 @@ async function handleCallback(cb: TelegramCallbackQuery) {
     .maybeSingle();
 
   await answerCallback(cb.id, aprobado ? "Aprobado ✅" : "Rechazado ❌");
+
+  // Avisarle a la PERSONA. Sin esto, Tama aprobaba y del otro lado no pasaba
+  // nada: la pantalla seguía diciendo "Pago en revisión" y el jugador se
+  // quedaba esperando algo que ya había ocurrido. Va por WhatsApp porque es
+  // el canal que esta gente sí mira, y es best-effort: si Meta falla, la
+  // inscripción ya quedó aprobada igual.
+  void notificarAlJugador({
+    userId: entry.user_id,
+    aprobado,
+    pollaName: polla?.name ?? "la polla",
+    pollaSlug: polla?.slug ?? "",
+    pozoCop: pot.prize_cop,
+  });
 
   if (cb.message?.message_id) {
     await editCaption(
@@ -635,6 +649,51 @@ interface QuestionRow {
   prompt: string;
   input_kind: string;
   order_index: number;
+}
+
+/**
+ * Le avisa al jugador que su pago se aprobó (o no). Best-effort a propósito:
+ * la decisión de Tama ya quedó escrita en la DB antes de llegar acá, así que
+ * si WhatsApp está caído se pierde el aviso, no la aprobación.
+ */
+async function notificarAlJugador(n: {
+  userId: string;
+  aprobado: boolean;
+  pollaName: string;
+  pollaSlug: string;
+  pozoCop: number;
+}) {
+  try {
+    const db = createAdminClient();
+    const { data: u } = await db
+      .from("users")
+      .select("whatsapp_number")
+      .eq("id", n.userId)
+      .maybeSingle();
+    if (!u?.whatsapp_number) return;
+
+    const url = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://lapollacolombiana.com"}/casa/${n.pollaSlug}`;
+
+    const texto = n.aprobado
+      ? [
+          `✅ *Quedaste dentro de ${n.pollaName}*`,
+          "",
+          `Tu pago quedó confirmado. El pozo va en ${formatCop(n.pozoCop)}.`,
+          "",
+          `Marca tus partidos antes de que cierre 👉 ${url}`,
+        ].join("\n")
+      : [
+          `❌ *No pude confirmar tu pago de ${n.pollaName}*`,
+          "",
+          "Revisa el pantallazo y vuelve a subirlo, o escríbeme para resolverlo.",
+          "",
+          url,
+        ].join("\n");
+
+    await sendTextMessage(u.whatsapp_number, texto, { userId: n.userId });
+  } catch (err) {
+    console.warn("[telegram] no pude avisarle al jugador:", (err as Error).message);
+  }
 }
 
 /* ═════════════════════════ tipos del update ══════════════════════════ */

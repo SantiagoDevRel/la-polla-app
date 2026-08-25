@@ -172,6 +172,19 @@ export default async function PollaPage({
           </Link>
         )}
 
+        {/* Estás dentro. Antes, cuando Tama aprobaba, simplemente DESAPARECÍA
+            el aviso ámbar y no aparecía nada — la única señal de que el pago
+            se confirmó era una ausencia, que nadie nota. */}
+        {entry?.status === "pagada" && (
+          <div className="mt-4 border border-turf/40 bg-turf/10 p-3">
+            <p className="lp-label text-turf">Estás dentro</p>
+            <p className="mt-1 text-[13px] text-text-secondary">
+              Tama confirmó tu pago y ya cuentas para el pozo.
+              {abierta ? " Marca tus partidos antes de que cierre." : ""}
+            </p>
+          </div>
+        )}
+
         {pagoPendiente && (
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">Pago en revisión</p>

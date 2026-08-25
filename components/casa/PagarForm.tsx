@@ -110,8 +110,11 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
       <input
         ref={inputRef}
         type="file"
+        // Sin `capture`: el comprobante es un PANTALLAZO que ya está en la
+        // galería, no una foto que se toma ahora. Con capture="environment"
+        // varios Android abren la cámara directo y no ofrecen galería, o sea
+        // que el pago quedaba imposible de completar.
         accept="image/*"
-        capture="environment"
         onChange={(e) => elegir(e.target.files?.[0] ?? null)}
         className="sr-only"
       />

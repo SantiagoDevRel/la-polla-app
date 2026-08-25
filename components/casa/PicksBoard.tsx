@@ -42,11 +42,30 @@ interface Props {
   lockedReason?: string;
 }
 
-const OPCIONES: { key: Pick1x2; label: string }[] = [
-  { key: "L", label: "LOCAL" },
-  { key: "E", label: "EMPATE" },
-  { key: "V", label: "VISITA" },
-];
+/** Nombre corto: "Manchester City FC" no entra en un boton de 110px. */
+function corto(nombre: string): string {
+  return nombre
+    // Solo sufijos/prefijos societarios. "United" y "Club" NO se tocan:
+    // sacarle el United a "Manchester United" lo deja como "Manchester",
+    // que es exactamente el mismo nombre que el City abreviado.
+    .replace(/\s+(FC|CF|AFC|SC|AC|SAD)$/i, "")
+    .replace(/^(FC|CF|AFC|SC|AC)\s+/i, "")
+    .trim();
+}
+
+/**
+ * Las tres opciones de un partido. El label sale del EQUIPO, no de
+ * "local/visitante": con los escudos chicos y dos nombres que uno no
+ * distingue, decir "LOCAL" obliga a la persona a acordarse de cual era
+ * cual — y ahi es donde marca el palo equivocado.
+ */
+function opcionesDe(m: { home_team: string; away_team: string }) {
+  return [
+    { key: "L" as Pick1x2, label: corto(m.home_team) },
+    { key: "E" as Pick1x2, label: "Empate" },
+    { key: "V" as Pick1x2, label: corto(m.away_team) },
+  ];
+}
 
 /** 5 minutos antes del pitazo se traba, igual que el resto del repo. */
 const LOCK_MS = 5 * 60_000;
@@ -125,10 +144,16 @@ export function PicksBoard({
         return;
       }
       setDirty(false);
+      // No decir "quedaste con todo marcado" si faltan partidos: la persona
+      // se iba tranquila y el domingo descubria que tenia 5 en blanco.
+      const faltan = matches.length - marcados;
       setMsg({
         text: json.avisos?.length
           ? `Guardado. ${json.avisos[0]}`
-          : "Guardado, quedaste con todo marcado.",
+          : faltan > 0
+            ? `Guardado ${marcados} de ${matches.length}. Te faltan ${faltan}.`
+            : "Guardado, quedaste con todo marcado.",
+        bad: faltan > 0,
       });
     } catch {
       setMsg({ text: "Se cayó la conexión. Prueba otra vez.", bad: true });
@@ -178,7 +203,7 @@ export function PicksBoard({
 
               {scoringMode === "1x2" ? (
                 <div className="grid grid-cols-3 gap-px">
-                  {OPCIONES.map((op) => {
+                  {opcionesDe(m).map((op) => {
                     const elegido = mine?.pick1x2 === op.key;
                     const n = dist?.conteo?.[op.key] ?? 0;
                     const pct = total > 0 ? (n / total) * 100 : 0;

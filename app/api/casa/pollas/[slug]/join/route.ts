@@ -103,43 +103,79 @@ export async function POST(
         { status: 400 },
       );
     }
-  } else {
-    // En polla normal, una sola inscripcion por persona.
+  }
+
+  // En polla normal, una sola inscripcion por persona. Si la anterior fue
+  // RECHAZADA se reusa esa fila en vez de insertar otra: el indice unico
+  // (casa_entries_one_per_user) bloqueaba el INSERT y la persona quedaba sin
+  // forma de volver a intentar despues de que le rebotaran el comprobante.
+  let entryExistente: string | null = null;
+  if (polla.kind !== "rifa") {
     const existing = await getMyEntry(polla.id, user.id);
-    if (existing && existing.status !== "rechazada") {
-      return NextResponse.json(
-        { error: "Ya estás inscrito en esta polla.", entryId: existing.id },
-        { status: 409 },
-      );
+    if (existing) {
+      if (existing.status === "rechazada") {
+        entryExistente = existing.id;
+      } else {
+        return NextResponse.json(
+          { error: "Ya estás inscrito en esta polla.", entryId: existing.id },
+          { status: 409 },
+        );
+      }
     }
   }
 
   const db = createAdminClient();
 
-  // ── crear la inscripcion ───────────────────────────────────────────────
-  const { data: entry, error: insErr } = await db
-    .from("casa_entries")
-    .insert({
-      polla_id: polla.id,
-      user_id: user.id,
-      status: "pendiente",
-      amount_cop: polla.entry_price_cop,
-      ticket_number: polla.kind === "rifa" ? ticketNumber : null,
-    })
-    .select("id")
-    .single();
+  // ── crear (o revivir) la inscripcion ───────────────────────────────────
+  let entry: { id: string } | null = null;
+  let insErr: { code?: string } | null = null;
+
+  if (entryExistente) {
+    const { data, error } = await db
+      .from("casa_entries")
+      .update({
+        status: "pendiente",
+        reject_reason: null,
+        reviewed_at: null,
+        reviewed_by: null,
+        amount_cop: polla.entry_price_cop,
+      })
+      .eq("id", entryExistente)
+      .eq("user_id", user.id) // ← filtro explicito, siempre
+      .select("id")
+      .single();
+    entry = data;
+    insErr = error;
+  } else {
+    const { data, error } = await db
+      .from("casa_entries")
+      .insert({
+        polla_id: polla.id,
+        user_id: user.id,
+        status: "pendiente",
+        amount_cop: polla.entry_price_cop,
+        ticket_number: polla.kind === "rifa" ? ticketNumber : null,
+      })
+      .select("id")
+      .single();
+    entry = data;
+    insErr = error;
+  }
 
   if (insErr || !entry) {
-    // El indice unico de boleta es lo que ordena la carrera entre dos personas
-    // que piden el mismo numero al tiempo. Gana quien inserta primero.
-    const yaTomada = insErr?.code === "23505";
+    // 23505 = choque contra un indice unico. En rifa significa que otra
+    // persona pidio esa boleta primero; en polla normal seria otra cosa, y
+    // decirle "esa boleta ya la cogieron" a alguien que no eligio ninguna
+    // boleta es peor que no decir nada.
+    const choque = insErr?.code === "23505";
     return NextResponse.json(
       {
-        error: yaTomada
-          ? "Esa boleta ya la cogió alguien. Elige otra."
-          : "No pude registrar tu inscripción.",
+        error:
+          choque && polla.kind === "rifa"
+            ? "Esa boleta ya la cogió alguien. Elige otra."
+            : "No pude registrar tu inscripción. Prueba otra vez.",
       },
-      { status: yaTomada ? 409 : 500 },
+      { status: choque ? 409 : 500 },
     );
   }
 
@@ -153,6 +189,17 @@ export async function POST(
 
   if (upErr) {
     console.error("[casa/join] fallo la subida:", redactId(entry.id), upErr.message);
+    // Sin comprobante, esta inscripcion es invisible para Tama (la cola del
+    // bot filtra por proof_path). Si se deja en `pendiente`, la persona queda
+    // esperando una aprobacion que nadie va a ver nunca, y ademas no puede
+    // reintentar porque el indice unico la bloquea. Se anula para que el
+    // proximo intento entre limpio.
+    await db
+      .from("casa_entries")
+      .update({ status: "anulada", reject_reason: "No se pudo subir el comprobante" })
+      .eq("id", entry.id)
+      .eq("user_id", user.id);
+
     return NextResponse.json(
       { error: "No pude guardar el pantallazo. Prueba otra vez." },
       { status: 500 },

@@ -12,6 +12,7 @@ import { pollaStatusLabel } from "@/lib/casa/types";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import { HeroFrame, Label, SectionHead, Tape } from "@/components/street";
 import { CrearPollaForm } from "@/components/casa/CrearPollaForm";
+import { ColaDePagos } from "@/components/casa/ColaDePagos";
 
 export const dynamic = "force-dynamic";
 
@@ -50,17 +51,21 @@ export default async function CasaAdminPage() {
       </HeroFrame>
 
       <div className="px-4 pt-5">
-        {pendientes.length > 0 && (
-          <div className="mb-6 border border-amber/40 bg-amber/10 p-3">
-            <p className="lp-label text-amber">
-              {pendientes.length} pago{pendientes.length === 1 ? "" : "s"} esperando
-            </p>
-            <p className="mt-1 text-[13px] text-text-secondary">
-              Aprobalos desde el bot de Telegram con <b>/pendientes</b>. Llegan
-              solos apenas alguien sube el pantallazo.
-            </p>
-          </div>
-        )}
+        {/* La cola de pagos, aca mismo. Antes esto solo decia "aprobalos desde
+            Telegram" — util si el bot anda, inutil si se cayo o si el chat
+            nunca se vinculo, y en ese caso la gente quedaba esperando sin que
+            nadie pudiera hacer nada desde la web. */}
+        <SectionHead
+          title="Pagos por revisar"
+          meta={pendientes.length > 0 ? `${pendientes.length}` : undefined}
+        />
+        <div className="mb-9">
+          <ColaDePagos />
+          <p className="mt-2 text-[11px] text-text-muted">
+            También te llegan al bot de Telegram apenas alguien sube el
+            pantallazo. Da igual por dónde lo resuelvas: es la misma decisión.
+          </p>
+        </div>
 
         {/* ── Las pollas que ya existen ────────────────────────────────── */}
         {pollas.length > 0 && (

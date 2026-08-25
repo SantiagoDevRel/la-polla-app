@@ -148,9 +148,9 @@ export default function OnboardingPage() {
         <div
           className="w-full max-w-md rounded-2xl p-6 space-y-6"
           style={{
-            background: "#0e1420",
+            background: "var(--bg-card)",
             border: "1px solid rgba(255,255,255,0.06)",
-            boxShadow: "0 0 60px rgba(255,215,0,0.05)",
+            boxShadow: "0 0 60px rgba(216, 255, 71, 0.05)",
           }}
         >
           <StepDots total={2} current={1} ariaLabel={t("stepLabel", { current: 1, total: 2 })} />
@@ -207,8 +207,8 @@ export default function OnboardingPage() {
               disabled={name.trim().length < 2}
               style={{
                 width: "100%",
-                background: "#FFD700",
-                color: "#080c10",
+                background: "var(--gold)",
+                color: "var(--bg-base)",
                 fontWeight: 700,
                 padding: "14px 16px",
                 borderRadius: 12,
@@ -217,7 +217,7 @@ export default function OnboardingPage() {
                 cursor: "pointer",
                 fontFamily: "'Outfit', sans-serif",
                 opacity: name.trim().length < 2 ? 0.4 : 1,
-                boxShadow: "0 0 20px rgba(255,215,0,0.15)",
+                boxShadow: "0 0 20px rgba(216, 255, 71, 0.15)",
               }}
             >
               {tc("continue")}
@@ -230,9 +230,9 @@ export default function OnboardingPage() {
         <div
           className="w-full max-w-md rounded-2xl p-5 space-y-4"
           style={{
-            background: "#0e1420",
+            background: "var(--bg-card)",
             border: "1px solid rgba(255,255,255,0.06)",
-            boxShadow: "0 0 60px rgba(255,215,0,0.05)",
+            boxShadow: "0 0 60px rgba(216, 255, 71, 0.05)",
             maxHeight: "90vh",
             overflowY: "auto",
           }}
@@ -271,7 +271,7 @@ export default function OnboardingPage() {
                 inset: 0,
                 borderRadius: "50%",
                 background:
-                  "radial-gradient(circle, rgba(255,215,0,0.28) 0%, transparent 70%)",
+                  "radial-gradient(circle, rgba(216, 255, 71, 0.28) 0%, transparent 70%)",
                 filter: "blur(6px)",
               }}
             />
@@ -310,8 +310,8 @@ export default function OnboardingPage() {
                   type="button"
                   onClick={() => setSelectedPollito(p.id)}
                   style={{
-                    background: isSelected ? "rgba(255,215,0,0.08)" : "#131d2e",
-                    border: isSelected ? "2px solid #FFD700" : "2px solid rgba(255,255,255,0.06)",
+                    background: isSelected ? "rgba(216, 255, 71, 0.08)" : "#131d2e",
+                    border: isSelected ? "2px solid var(--gold)" : "2px solid rgba(255,255,255,0.06)",
                     borderRadius: 12,
                     padding: "8px 4px 6px",
                     cursor: "pointer",
@@ -329,7 +329,7 @@ export default function OnboardingPage() {
                   />
                   <span style={{
                     fontSize: 9,
-                    color: isSelected ? "#FFD700" : "#F5F7FA",
+                    color: isSelected ? "var(--gold)" : "#F5F7FA",
                     fontWeight: isSelected ? 600 : 400,
                     fontFamily: "'Outfit', sans-serif",
                     textAlign: "center",
@@ -373,8 +373,8 @@ export default function OnboardingPage() {
               disabled={loading}
               style={{
                 flex: 2,
-                background: "#FFD700",
-                color: "#080c10",
+                background: "var(--gold)",
+                color: "var(--bg-base)",
                 fontWeight: 700,
                 padding: "12px",
                 borderRadius: 11,
@@ -383,7 +383,7 @@ export default function OnboardingPage() {
                 fontFamily: "'Outfit', sans-serif",
                 fontSize: 14,
                 opacity: loading ? 0.4 : 1,
-                boxShadow: "0 0 20px rgba(255,215,0,0.15)",
+                boxShadow: "0 0 20px rgba(216, 255, 71, 0.15)",
               }}
             >
               {loading ? tc("saving") : t("finish")}
