@@ -5,72 +5,76 @@
 @tailwind utilities;
 
 :root {
-  /* ─── Tribuna Caliente v0.1 · canonical tokens (see docs/design-system.md §1.1) ─── */
+  /* ─── "Parche" v1.0 · lenguaje visual de calle ─────────────────────────
+     Reemplaza a Tribuna Caliente v0.1. Los NOMBRES de los tokens se
+     conservan a proposito para que los ~600 usos ya escritos en la app
+     se reskinneen solos; lo que cambia es a que apuntan.
+     Referencia mental: afiche pegado en un poste, no tarjeta de credito. */
 
-  /* surfaces */
-  --bg-base:         #080c10;
-  --bg-card:         #0e1420;
-  --bg-elevated:     #131b2b;
-  --bg-subtle:       #0b1119;
+  /* superficies — concreto, no vidrio */
+  --bg-base:         #0A0A0B;
+  --bg-card:         #121214;
+  --bg-elevated:     #1A1A1D;
+  --bg-subtle:       #0E0E10;
 
-  /* brand accents */
-  --gold:            #FFD700;
-  --amber:           #FF9F1C;
-  --amber-dim:       #aa6a0c;
-  --turf:            #1FD87F;
-  --turf-dim:        #0d8a4e;
+  /* acento — CAL (verde limon de spray). Ocupa el slot que antes era gold. */
+  --gold:            #D8FF47;
+  --amber:           #FF8A3D;
+  --amber-dim:       #8a4b00;
+  --turf:            #21D07A;
+  --turf-dim:        #067a3f;
 
-  /* semantic */
-  --red-alert:       #FF3D57;
+  --red-alert:       #FF4D2E;
 
-  /* text — three-tier hierarchy restored. Primary stays at full
-     readability over the stadium video; secondary/muted are still
-     bright enough to pass against the darkest video frames but
-     drop just enough to give labels and meta-text a distinct voice
-     instead of every line shouting the same volume. */
-  --text-primary:    #F5F7FA;
-  --text-secondary:  #D1D7E0;
-  --text-muted:      #A8AFBC;
+  /* texto — papel sucio sobre asfalto */
+  --text-primary:    #F2F2EF;
+  --text-secondary:  #A9A9A3;
+  --text-muted:      #6E6E72;
 
-  /* RGB triplets — used by Tailwind utilities so alpha modifiers
-     (`bg-gold/10`, `border-amber/25`, etc.) produce the expected tint.
-     Keep these in sync with the hex tokens above. */
-  --bg-base-rgb:      8 12 16;
-  --bg-card-rgb:      14 20 32;
-  --bg-elevated-rgb:  19 27 43;
-  --bg-subtle-rgb:    11 17 25;
-  --gold-rgb:         255 215 0;
-  --amber-rgb:        255 159 28;
-  --turf-rgb:         31 216 127;
-  --red-alert-rgb:    255 61 87;
-  --text-primary-rgb: 245 247 250;
-  --text-secondary-rgb: 209 215 224;
-  --text-muted-rgb:   168 175 188;
+  /* triplets RGB para los modificadores de alfa de Tailwind
+     (`bg-gold/10`, `border-turf/25`). Mantener en sync con los hex. */
+  --bg-base-rgb:      10 10 11;
+  --bg-card-rgb:      18 18 20;
+  --bg-elevated-rgb:  26 26 29;
+  --bg-subtle-rgb:    14 14 16;
+  --gold-rgb:         216 255 71;
+  --amber-rgb:        255 138 61;
+  --turf-rgb:         33 208 122;
+  --red-alert-rgb:    255 77 46;
+  --text-primary-rgb: 242 242 239;
+  --text-secondary-rgb: 169 169 163;
+  --text-muted-rgb:   110 110 114;
 
-  /* borders */
-  --border-subtle:   rgba(255, 255, 255, 0.06);
-  --border-default:  rgba(255, 255, 255, 0.10);
-  --border-strong:   rgba(255, 255, 255, 0.18);
+  /* bordes SOLIDOS. La calle es linea dura, no velo translucido. */
+  --border-subtle:   #1F1F22;
+  --border-default:  #2A2A2E;
+  --border-strong:   #3A3A40;
 
-  /* radius */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
+  /* radios: cero. Ver la nota en tailwind.config.ts. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 
-  /* --font-display and --font-body are defined by next/font/google on <html>
-     (see app/layout.tsx). Do NOT redefine them here — doing so overrides the
-     generated font-face alias with a literal string and breaks loading. */
+  /* cinta de peligro */
+  --hazard-a: #D8FF47;
+  --hazard-b: #0A0A0B;
 
-  /* ─── legacy aliases · maintained during Phase 1 transition, drop in Phase 2 ─── */
+  /* ruido de concreto — SVG inline, sin pedir un archivo extra */
+  --concrete-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+
+  /* --font-display y --font-body los define next/font/google en <html>
+     (ver app/layout.tsx). NO redefinirlos aca. */
+
+  /* ─── aliases heredados ─── */
   --bg-card-hover:    var(--bg-elevated);
   --bg-card-elevated: var(--bg-elevated);
   --border-medium:    var(--border-default);
-  --border-gold:      rgba(255, 215, 0, 0.35);
-  --gold-dim:         rgba(255, 215, 0, 0.15);
+  --border-gold:      rgba(216, 255, 71, 0.40);
+  --gold-dim:         rgba(216, 255, 71, 0.15);
   --green-live:       var(--turf);
-  --green-dim:        rgba(31, 216, 127, 0.12);
-  --red-dim:          rgba(255, 61, 87, 0.12);
+  --green-dim:        rgba(0, 210, 106, 0.14);
+  --red-dim:          rgba(255, 59, 31, 0.14);
   --blue-info:        #4fc3f7;
 }
 
@@ -86,7 +90,7 @@ body {
      layer is mounted). AppBackground (fixed, -z-10) layers on top. */
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-body), 'Outfit', sans-serif;
+  font-family: var(--font-body), 'Barlow', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -99,9 +103,10 @@ body {
 /* Números deportivos — Bebas Neue */
 .score-font,
 .font-display {
-  font-family: var(--font-display), 'Bebas Neue', sans-serif;
+  font-family: var(--font-display), 'Anton', Impact, sans-serif;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 /* Animaciones */
@@ -164,24 +169,20 @@ body {
                      (MatchHero on Inicio, PollaCard when isLeader)
      ghost         → no class at all; just render plain content over
                      the ambient background (e.g. PodiumCarousel). */
+  /* Plano y opaco. Se fue el vidrio: nada de backdrop-filter, nada de
+     translucido, nada de sombra difusa. Una card es un bloque de concreto
+     con un borde duro. */
   .lp-card {
-    /* Opacity matched to the Partidos MatchRow so every card surface
-       in the app breathes the same amount of stadium video through.
-       0.5 is the compromise between Partidos' 0.4 "airy" feel and the
-       readability budget of text-heavy surfaces (Tabla, Pagos, Info). */
-    background-color: rgba(14, 20, 32, 0.5);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    background-color: var(--bg-card);
     border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
+    border-radius: 0;
   }
+  /* El unico momento destacado de cada pantalla: borde cal de 2px, sin glow. */
   .lp-card-hero {
-    background-color: rgba(14, 20, 32, 0.5);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 215, 0, 0.28);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 20px 60px -28px rgba(255, 215, 0, 0.32);
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-default);
+    box-shadow: inset 0 2px 0 0 var(--gold);
+    border-radius: 0;
   }
 
   /* Section title. Canonical style for "MIS POLLAS", "PODIO", "AVISOS",
@@ -190,9 +191,9 @@ body {
      size locally with text-[Npx] after this class if they really need
      to (e.g. Avisos top header). */
   .lp-section-title {
-    font-family: var(--font-display), 'Bebas Neue', sans-serif;
+    font-family: var(--font-display), 'Anton', Impact, sans-serif;
     font-size: 18px;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-primary);
     line-height: 1;
@@ -208,19 +209,19 @@ body {
 .lp-hscroll {
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 215, 0, 0.30) transparent;
+  scrollbar-color: rgba(216, 255, 71, 0.30) transparent;
 }
 .lp-hscroll::-webkit-scrollbar { height: 6px; }
 /* Sin botones de flecha (Windows/desktop los mete y se ven clunky). */
 .lp-hscroll::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 .lp-hscroll::-webkit-scrollbar-track { background: transparent; }
 .lp-hscroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 215, 0, 0.30);
-  border-radius: 9999px;
+  background: rgba(216, 255, 71, 0.30);
+  border-radius: 0;
 }
 .lp-hscroll::-webkit-scrollbar-thumb:hover,
 .lp-hscroll::-webkit-scrollbar-thumb:active {
-  background: rgba(255, 215, 0, 0.5);
+  background: rgba(216, 255, 71, 0.5);
 }
 
 /* Scrollbar branded GLOBAL: gold sutil en toda la app (página, modales con
@@ -229,7 +230,7 @@ body {
    especificidad donde se usan. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 215, 0, 0.32) transparent;
+  scrollbar-color: rgba(216, 255, 71, 0.32) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
@@ -244,12 +245,12 @@ body {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 215, 0, 0.30);
-  border-radius: 9999px;
+  background: rgba(216, 255, 71, 0.30);
+  border-radius: 0;
 }
 *::-webkit-scrollbar-thumb:hover,
 *::-webkit-scrollbar-thumb:active {
-  background: rgba(255, 215, 0, 0.55);
+  background: rgba(216, 255, 71, 0.55);
 }
 
 /* Shine sweep para la card "Road to World Cup" del inicio: barrido de luz
@@ -289,13 +290,13 @@ body {
    interactive element a consistent keyboard-accessible affordance
    without affecting mouse/touch users (focus-visible only). */
 :focus-visible {
-  outline: 2px solid rgba(255, 215, 0, 0.6);
+  outline: 2px solid rgba(216, 255, 71, 0.75);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 0;
 }
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid rgba(255, 215, 0, 0.6);
+  outline: 2px solid rgba(216, 255, 71, 0.75);
   outline-offset: 2px;
 }
 
@@ -312,4 +313,213 @@ a:focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-ticker { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PARCHE v1.0 · utilidades de calle
+   Lo que le da identidad al skin nuevo. Todo plano, todo cuadrado.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Ruido de concreto. Va como overlay del <body> para que el fondo no se
+   lea como un plano digital perfecto. 4% — se siente, no se ve. */
+.lp-concrete::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--concrete-noise);
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+}
+
+/* Cinta de peligro. Para avisos que tienen que frenar al que va pasando. */
+.lp-hazard {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--hazard-a) 0 10px,
+    var(--hazard-b) 10px 20px
+  );
+}
+.lp-hazard-thin { height: 4px; }
+
+/* Etiqueta tipo cinta pegada: bloque solido, leve rotacion, sin esquinas.
+   Se usa para estados ("ABIERTA", "CERRADA", "PAGO PENDIENTE"). */
+.lp-tape {
+  display: inline-block;
+  padding: 2px 8px;
+  font-family: var(--font-display), 'Anton', Impact, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.35;
+  border-radius: 0;
+}
+.lp-tape-cal   { background: var(--gold);      color: #0B0B0C; }
+.lp-tape-red   { background: var(--red-alert); color: #F2F2EF; }
+.lp-tape-live  { background: var(--turf);      color: #0B0B0C; }
+.lp-tape-mute  { background: var(--border-strong); color: var(--text-primary); }
+
+/* Titulo stencil: el registro de voz de la app. Grande, condensado, gritado. */
+.lp-stencil {
+  font-family: var(--font-display), 'Anton', Impact, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 0.92;
+}
+
+/* Numero de plata / puntos. Tabular siempre, para que no bailen las cifras. */
+.lp-cifra {
+  font-family: var(--font-display), 'Anton', Impact, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: 0.01em;
+}
+
+/* Boton de calle: rectangulo macizo, sin escala ni glow al presionar.
+   Se hunde 1px, como una tecla de verdad. */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 20px;
+  border-radius: 0;
+  border: 2px solid transparent;
+  font-family: var(--font-display), 'Anton', Impact, sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.12s linear, color 0.12s linear,
+              border-color 0.12s linear, transform 0.06s linear;
+}
+.lp-btn:active { transform: translateY(1px); }
+.lp-btn-primary {
+  background: var(--gold);
+  color: #0B0B0C;
+  border-color: var(--gold);
+}
+.lp-btn-primary:hover { background: #F1FF6B; border-color: #F1FF6B; }
+.lp-btn-ghost {
+  background: transparent;
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+.lp-btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+.lp-btn-danger {
+  background: var(--red-alert);
+  color: #F2F2EF;
+  border-color: var(--red-alert);
+}
+.lp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.lp-btn:disabled:active { transform: none; }
+
+/* Barra de porcentaje ("cuantos pusieron esto"). Cuadrada, sin transicion
+   de ancho llamativa: es un dato, no una animacion. */
+.lp-pct {
+  height: 4px;
+  background: var(--border-subtle);
+  border-radius: 0;
+  overflow: hidden;
+}
+.lp-pct > span {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+  border-radius: 0;
+}
+
+/* Input de calle: caja dura, foco cal, cero redondeo. */
+.lp-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 0;
+  color: var(--text-primary);
+  font-family: var(--font-body), 'Barlow', sans-serif;
+}
+.lp-input::placeholder { color: var(--text-muted); }
+.lp-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+
+/* Divisor de seccion: linea dura de borde a borde. */
+.lp-rule { height: 1px; background: var(--border-subtle); }
+.lp-rule-strong { height: 2px; background: var(--border-strong); }
+
+
+/* ── Escala tipografica editorial ────────────────────────────────────────
+   El problema del primer intento era que TODO pesaba lo mismo. Acá la
+   jerarquia es explicita: el display grita con leading apretado y tracking
+   negativo (registro de portada), la etiqueta susurra en 11px con tracking
+   ancho. Esa distancia es lo que se lee como oficio. */
+.lp-display {
+  font-family: var(--font-display), 'Anton', Impact, sans-serif;
+  text-transform: uppercase;
+  font-size: clamp(38px, 12vw, 60px);
+  line-height: 0.86;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+.lp-display-sm {
+  font-family: var(--font-display), 'Anton', Impact, sans-serif;
+  text-transform: uppercase;
+  font-size: 26px;
+  line-height: 0.94;
+  letter-spacing: -0.01em;
+}
+/* Etiqueta de metadato. Siempre en text-muted, nunca en el acento. */
+.lp-label {
+  font-family: var(--font-body), 'Barlow', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+/* Cifra de plata. Tabular y con el tamano suficiente para ser el ancla
+   visual de la tarjeta. */
+.lp-money {
+  font-family: var(--font-display), 'Anton', Impact, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+/* ── Capas sobre fotografia ──────────────────────────────────────────────
+   La foto es el heroe; el scrim es lo que la vuelve legible sin apagarla.
+   Doble parada (no un gradiente plano) para que el texto tenga contraste
+   abajo y la imagen respire arriba. */
+.lp-scrim {
+  background: linear-gradient(
+    180deg,
+    rgba(10, 10, 11, 0.15) 0%,
+    rgba(10, 10, 11, 0.55) 45%,
+    rgba(10, 10, 11, 0.94) 100%
+  );
+}
+/* Grano de pelicula sobre la foto: le quita el plastico de imagen generada. */
+.lp-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--concrete-noise);
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+}
+/* Regla de acento: reemplaza a la cinta de peligro como marca de seccion.
+   Un solo trazo, 2px, 28px de ancho. Suficiente. */
+.lp-accent-rule {
+  display: block;
+  width: 28px;
+  height: 2px;
+  background: var(--gold);
 }

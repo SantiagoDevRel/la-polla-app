@@ -1,9 +1,10 @@
-// components/layout/BrandHeader.tsx — Header global de marca para todas
-// las páginas dentro de (app)/. Sticky arriba, con el wordmark tricolor,
-// el pollito-pibe líder y el botón flotante de WhatsApp para chatear con
-// el bot. Originalmente vivía solo en /inicio; lo extraemos al layout
-// para que la marca no desaparezca cuando el user navega a /pollas, /avisos,
-// /perfil, etc.
+// components/layout/BrandHeader.tsx — la marca, arriba, en todas las pantallas.
+//
+// PARCHE v1.0 (2026-08-25): el wordmark era tricolor (dorado/azul/rojo) con
+// sombra y blur detrás. Tres colores compitiendo en 20px se leen como banner
+// de página vieja, no como marca. Ahora es monocromo con UNA palabra en el
+// acento, sobre una barra sólida con hairline abajo. El pollito se queda —
+// es la marca — pero baja a 26px: pasa de mascota protagonista a firma.
 "use client";
 
 import { useTranslations } from "next-intl";
@@ -15,55 +16,33 @@ export default function BrandHeader() {
   const part1 = t("wordmarkPart1");
   const part2 = t("wordmarkPart2");
   const part3 = t("wordmarkPart3");
+
   return (
-    <header
-      className="sticky top-0 z-40 px-4 pt-4 pb-3 backdrop-blur-md"
-      style={{
-        // Slightly translucent background so what scrolls underneath
-        // gets a subtle blur, but the header itself stays readable.
-        background: "rgba(8, 12, 16, 0.85)",
-      }}
-    >
-      <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
-        {/* min-w-0 + overflow-hidden: con text-zoom de accesibilidad el
-            wordmark crecía y se metía DEBAJO de las burbujas (overlap
-            feo, feedback 2026-06-11). Preferimos clipear el wordmark
-            antes que taparlo con los botones. */}
-        <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
+    <header className="sticky top-0 z-40 border-b border-border-subtle bg-bg-base px-4 py-3">
+      <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+        {/* min-w-0 + overflow-hidden: con el text-zoom de accesibilidad el
+            wordmark crecía y se metía DEBAJO de las burbujas. Preferimos
+            clipearlo antes que dejar que se monte encima. */}
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/pollitos/pollito_pibe_lider.webp"
             alt=""
-            width={44}
-            height={44}
-            style={{ objectFit: "contain", flexShrink: 0 }}
+            width={26}
+            height={26}
+            className="h-[26px] w-[26px] max-w-none shrink-0 object-contain"
           />
-          <span
-            className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px] whitespace-nowrap"
-            style={{
-              fontSize: 20,
-              textShadow: "0 2px 6px rgba(0,0,0,0.55)",
-            }}
-          >
-            {part3 ? (
-              <>
-                {/* Tricolor wordmark — Colombian flag colors. */}
-                <span style={{ color: "#FFD700" }}>{part1}</span>
-                <span style={{ color: "#2F6DF4" }}>{part2}</span>
-                <span style={{ color: "#E4463A" }}>{part3}</span>
-              </>
-            ) : (
-              <>
-                {/* Single-color wordmark (locales sin la metáfora bandera). */}
-                <span style={{ color: "#FFD700" }}>{part1}</span>
-                <span style={{ color: "#FFD700" }}>{part2}</span>
-              </>
-            )}
+          <span className="lp-stencil flex items-baseline gap-[6px] whitespace-nowrap text-[17px] text-text-primary">
+            <span>{part1}</span>
+            {/* Una sola palabra en el acento. El resto, papel. */}
+            <span className="text-gold">{part2}</span>
+            {part3 ? <span>{part3}</span> : null}
           </span>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <ReportProblemBubble size={34} />
-          <WhatsAppBubble size={34} />
+
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <ReportProblemBubble size={32} />
+          <WhatsAppBubble size={32} />
         </div>
       </div>
     </header>

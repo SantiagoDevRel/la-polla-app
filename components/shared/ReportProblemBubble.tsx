@@ -91,17 +91,12 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t("ariaButton")}
-        className={`inline-flex items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 ${className}`}
-        style={{
-          width: size,
-          height: size,
-          backgroundColor: "var(--red-alert, #E4463A)",
-          boxShadow: "0 0 12px rgba(228,70,58,0.35)",
-        }}
+        className={`inline-flex items-center justify-center border border-border-default bg-bg-elevated text-text-secondary transition-colors hover:border-red-alert hover:text-red-alert ${className}`}
+        style={{ width: size, height: size, borderRadius: 0 }}
       >
         <MessageSquareWarning
           size={Math.round(size * 0.55)}
-          color="white"
+          color="currentColor"
           strokeWidth={2.25}
         />
       </button>

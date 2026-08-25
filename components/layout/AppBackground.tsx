@@ -1,47 +1,52 @@
-// components/layout/AppBackground.tsx — Ambient background, server picker.
+// components/layout/AppBackground.tsx — el fondo de la app.
 //
-// Server component que en CADA request elige uno de los 5 videos del pool
-// (ver background-variants.ts) y renderea el client renderer con esa
-// variant. Asi:
-//   - El SSR HTML ya trae el poster correcto horneado: primer frame se
-//     ve al instante, sin flash a negro mientras carga el JS.
-//   - Cada refresh = nuevo render server = nuevo video random.
-//   - Cero "play button" nativo: el client intenta autoplay, si falla
-//     queda con la imagen estatica.
+// PARCHE v1.0 (2026-08-25): antes esto era un video de estadio en loop con
+// el pollito gigante de fondo. Se sacó por dos razones concretas:
+//   1. Peleaba con el skin nuevo. Todo el lenguaje es plano, duro y de alto
+//      contraste; un video con blur encima convierte cada tarjeta en un
+//      sticker flotando y devuelve el look "burbuja" que justamente se quiso
+//      matar.
+//   2. Pesaba. 5 variantes de video en una app que se usa en la calle, con
+//      datos móviles, en teléfonos de gama media.
 //
-// Forzamos render dinamico via `headers()` para que Next no estatice el
-// layout y termine sirviendo siempre el mismo video.
+// Queda un fondo de concreto: negro profundo, una caída de luz muy sutil
+// arriba (como el resplandor de un reflector lejano) y el grano que ya define
+// globals.css. Sin video, sin blur, sin autoplay.
+//
+// Los archivos de video siguen en /public/videos por si se quieren usar en
+// otro lado; simplemente ya nadie los pide.
 
-import { headers } from "next/headers";
-import { AppBackgroundClient } from "./AppBackgroundClient";
-import { pickRandomVariant, type BackgroundVariant } from "./background-variants";
-
-export interface AppBackgroundProps {
+interface AppBackgroundProps {
   className?: string;
-  /** Opacity del overlay negro sobre el video (0-1). Default 0.78
-   *  mantiene la motion visible y garantiza contraste de texto. */
+  /** Se acepta por compatibilidad con los llamados existentes; ya no aplica. */
   overlayOpacity?: number;
-  /** Forzar una variant especifica (testing / pages tematicas).
-   *  Si se omite, el server elige random por request. */
-  variant?: BackgroundVariant;
+  variant?: string;
 }
 
-export async function AppBackground({
-  className,
-  overlayOpacity,
-  variant,
-}: AppBackgroundProps) {
-  // Llamar `headers()` opta el render por request (no estatico). Sin esto
-  // Next puede cachear el HTML del layout y servir el mismo video a todos.
-  await headers();
-  const picked = variant ?? pickRandomVariant();
-
+export function AppBackground({ className }: AppBackgroundProps) {
   return (
-    <AppBackgroundClient
-      variant={picked}
-      className={className}
-      overlayOpacity={overlayOpacity}
-    />
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none fixed inset-0 -z-10 bg-bg-base ${className ?? ""}`}
+    >
+      {/* Caída de luz superior. Muy tenue: da profundidad sin ensuciar el
+          contraste del texto que va encima. */}
+      <div
+        className="absolute inset-x-0 top-0 h-[46vh]"
+        style={{
+          background:
+            "radial-gradient(120% 100% at 50% 0%, rgba(216,255,71,0.055) 0%, rgba(216,255,71,0.018) 34%, transparent 68%)",
+        }}
+      />
+      {/* Piso: refuerza el negro abajo para que el nav flotante despegue. */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-[30vh]"
+        style={{
+          background:
+            "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.55) 100%)",
+        }}
+      />
+    </div>
   );
 }
 

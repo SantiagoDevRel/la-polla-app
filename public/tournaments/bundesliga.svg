@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Bundesliga">
+  <rect width="64" height="64" fill="#0A0A0B"/>
+  <rect x="3" y="3" width="58" height="58" fill="none" stroke="#D20515" stroke-width="3"/>
+  <text x="32" y="41" text-anchor="middle" font-family="Anton, Impact, sans-serif"
+        font-size="30" fill="#F2F2EF" letter-spacing="-1">BL</text>
+</svg>
