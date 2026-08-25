@@ -12,56 +12,107 @@ Visual changes ONLY. Never touch API routes, Supabase calls, middleware, auth fl
 
 ---
 
-## 🔒 ESTADO ACTUAL — TEMPORADA CERRADA (2026-07-26)
+## 🎟 ESTADO ACTUAL — LA CASA (2026-08-25)
 
-La app está **cerrada**. El Mundial 2026 terminó el 19-jul (último partido
-verificado) y no queda ningún torneo con partidos futuros en la DB: 0 filas
-con `scheduled_at > now()`, 62/62 pollas en `status='ended'`. Sin torneos,
-`/pollas/crear` mostraba un formulario vacío sin salida — lo convertimos en
-un cierre explícito.
+El producto **pivotó**: de pollas P2P entre amigos a **una casa centralizada**.
+Solo el admin (Tama) crea las pollas del fin de semana; la gente entra
+pagando por fuera (Nequi/transferencia) y subiendo el pantallazo; el admin
+aprueba desde un bot de Telegram. **El 30% se lo queda la casa, el 70% va
+al pozo de los ganadores.**
 
-**El interruptor es UNO SOLO:** `CREATABLE_TOURNAMENT_SLUGS` en
-`lib/tournaments.ts`. Lista vacía = cerrado. `lib/closure.ts` deriva
-`SEASON_CLOSED` de ahí — no hay un segundo flag que se pueda desincronizar.
+**Lo viejo NO se borró.** El modelo P2P (`pollas`, `polla_participants`,
+`predictions`) sigue en pie con sus 62 pollas y 15.426 pronósticos
+históricos. El producto nuevo vive en tablas con prefijo `casa_` y en
+rutas `/casa/*`. Conviven a propósito: cambiar cuál es la puerta de
+entrada (`/inicio` vs `/casa`) es una decisión de producto pendiente, no
+un refactor.
 
-Con la lista vacía:
-- Banner fijo `SeasonClosedBanner` arriba en toda `(app)/` (reemplaza al
-  `AnnouncementTicker`; no es cerrable, decisión del owner: es el estado de
-  la app, no un nag).
-- `/pollas/crear` renderiza `SeasonClosedCreate` en vez del wizard.
-- `POST /api/pollas` responde 403 antes de tocar la DB.
-- `SYNCABLE_TOURNAMENT_SLUGS` también vacía → los crons dejan de pegarle a
-  football-data / ESPN / api-football (cuota free-tier intacta). Todos sus
-  usos son gates `filter`/`continue`, así que vaciarla es no-op seguro. El
-  path explícito por slug (admin manual, `discover ?tournament=` con
-  `CRON_SECRET`) NO pasa por ese gate y sigue funcionando.
+⚠️ **La temporada YA NO está cerrada.** `CREATABLE_TOURNAMENT_SLUGS` volvió
+a tener los 8 torneos, así que `lib/closure.ts` da `SEASON_CLOSED = false`
+y el banner de cierre no aparece. El namespace `Closure` de los mensajes
+sigue existiendo pero está inactivo.
 
-**Lo que NO cambió:** login, /inicio, ver pollas, tablas, evolución, perfil,
-avisos y el bot de WhatsApp. La app sigue de consulta — los datos de la
-gente se ven igual que siempre. Unirse a una polla ya estaba bloqueado por
-`status='ended'` en `/api/pollas/[slug]/join`.
+### El modelo nuevo (migraciones 081 y 082)
+- `casa_pollas` — kind: `partidos` | `manual` | `rifa`. Trae el precio de
+  entrada, `house_cut_pct` (30 por defecto), los puntos configurables y
+  el cierre.
+- `casa_polla_matches` · `casa_questions` + `casa_options` · `casa_entries`
+  (la inscripción y su comprobante) · `casa_picks` · `casa_payouts`.
+- `telegram_admins` / `telegram_outbox` / `telegram_auth_attempts`.
 
-**Para REABRIR:** agregá el slug del torneo que vuelva a
-`CREATABLE_TOURNAMENT_SLUGS` (y a `SYNCABLE_TOURNAMENT_SLUGS` para que
-sincronice). Se cae el banner, vuelve el wizard, vuelve la cinta de aviso.
-Nada más que tocar.
+### 🚨 La plata se calcula en SQL, nunca en TypeScript
+Toda cifra de dinero sale de estas funciones. Si necesitás un total, llamá
+al RPC — **no lo recalcules en JS**, porque ahí empiezan las dos verdades:
+- `casa_polla_pot(polla)` → recaudado, pozo (70%) y parte de la casa (30%).
+- `casa_score_polla(polla)` → 1X2 (3 pts) · marcador (3 exacto / 1 un
+  equipo) · manual (los puntos de la pregunta). Idempotente.
+- `casa_leaderboard(polla)` → `RANK()`, los empates comparten puesto.
+- `casa_pick_distribution(polla)` → los porcentajes ("cuántos pusieron 2-1").
+- `casa_settle_polla(polla)` → reparte. Si empatan, divide entre todos.
 
-**⚰️ DESCONTINUACIÓN (2026-07-28):** el proyecto de Supabase se apaga en
-los próximos días, así que la promesa de "app de consulta" deja de ser
-cierta — sin Supabase no hay ni login. El copy del namespace `Closure`
-(banner + /pollas/crear + empty states) ya NO dice "todo queda guardado":
-ahora anuncia que La Polla se despide en los próximos días y que volvemos
-para el próximo Mundial (2030). La llave `createKept` se renombró a
-`createThanks`. **Fase 2 pendiente (task #1):** cuando Supabase muera de
-verdad, dejar ~1 año una despedida 100% estática (sin NINGUNA llamada a
-Supabase, ni en middleware) diciendo que La Polla se descontinuó. Los datos
-reales sobreviven en el backup local + DGX (ver sección Backup abajo).
+Sigue valiendo la **Regla #4**: se puntúa con el marcador de los 90
+minutos (`final_verified_at IS NOT NULL`). El alargue no suma.
 
-Archivos: `lib/closure.ts`, `lib/tournaments.ts`,
-`components/layout/SeasonClosedBanner.tsx`,
-`components/pollas/SeasonClosedCreate.tsx`, namespace `Closure` en
-`messages/{es,en}.json`, `app/(app)/layout.tsx`, `app/(app)/pollas/crear/page.tsx`,
-`app/api/pollas/route.ts`.
+### El bot de Telegram
+`@LaPollaColombianaAdminBot` · webhook en `app/api/telegram/webhook/route.ts`.
+- Autenticación en dos capas: el header `X-Telegram-Bot-Api-Secret-Token`
+  se verifica **antes de leer el body**; después, ningún comando responde
+  hasta que el chat esté vinculado con `TELEGRAM_ADMIN_CODE` (5 intentos /
+  15 min, comparación en tiempo constante).
+- La ruta está exenta en `lib/supabase/middleware.ts` porque quien llama es
+  Telegram, no un browser. Si alguna vez responde un 307 a `/login`, es que
+  esa exención se cayó.
+- Comandos: `/pendientes` `/pollas` `/cerrar` `/resolver` `/numero`
+  `/respuesta` `/salir`.
+- ⚠️ `callback_data` topa en **64 bytes**: dos uuid completos no entran, por
+  eso se mandan prefijos de 12 caracteres. Y ojo — **`.like()` no filtra
+  sobre columnas `uuid` en PostgREST**: no falla, devuelve vacío. El
+  prefijo se matchea en JS (`findQuestionByPrefix`).
+
+### Para dejar de recibir gente en una polla
+`/cerrar <slug>` desde el bot, o `status='cerrada'`. Para repartir,
+`/resolver <slug>`: si es manual pide primero las respuestas; si es rifa
+pide el número con `/numero`.
+
+Archivos: `lib/casa/*`, `lib/telegram/*`, `app/api/casa/**`,
+`app/api/telegram/webhook/route.ts`, `app/(app)/casa/**`,
+`components/casa/*`, `components/street/*`.
+
+---
+
+## 🎨 DISEÑO — "Parche v1.0" (reemplaza a Tribuna Caliente v0.1)
+
+El lenguaje visual cambió a **calle premium**: la referencia es una marca de
+cultura futbolera bien dirigida, no un volante fotocopiado. Lo que hace que
+se vea caro no es el color — es la distancia entre la jerarquía grande y la
+chica, y los hairlines finos.
+
+**La jugada estructural:** los tokens conservan el NOMBRE y cambian de
+valor, así que los ~600 usos ya escritos en la app se reskinean solos. Si
+vas a cambiar la paleta, cambiá `app/globals.css`, no los componentes.
+
+- **`borderRadius` está en 0 ENTERO, `full` incluido** (`tailwind.config.ts`).
+  Eso es lo que mata el look burbuja de un golpe. Hay una escotilla,
+  `rounded-pill`, para el caso puntual que de verdad la pida.
+- **`gold` ya no es dorado: es cal (`#D8FF47`)**. Conserva el nombre para no
+  romper los usos viejos. Regla dura: **máximo 2 apariciones del acento por
+  pantalla**; todo lo demás es neutro.
+- **Anton (display) + Barlow (texto)**, siguen siendo dos familias.
+- Bordes SÓLIDOS y sutiles (`#1F1F22`), no velos translúcidos.
+- **Se fue el video de estadio de fondo.** `AppBackground` es concreto plano
+  con una caída de luz. Peleaba con el skin y pesaba en datos móviles.
+- El héroe es `components/street/TribunaArt.tsx` — hinchada, humo y
+  reflectores en SVG (~3KB). Es el **fallback**: `<HeroFrame image="...">`
+  ya acepta fotografía cuando la haya.
+- Utilidades nuevas en `globals.css`: `.lp-display` `.lp-label` `.lp-money`
+  `.lp-btn` `.lp-tape` `.lp-pct` `.lp-input` `.lp-scrim` `.lp-grain`.
+- El pollito sigue siendo la marca, pero a 26px en el header: pasó de
+  mascota protagonista a firma.
+
+⚠️ **`npx tsgo` no alcanza.** El target del repo es ES5 y tsgo deja pasar
+cosas que `tsc` (el source of truth) rechaza: `.entries()` sobre un array y
+`[...new Set(x)]` rompen el build de producción aunque tsgo esté verde.
+Corré `npx next build` antes de dar algo por listo.
 
 ---
 
