@@ -52,6 +52,12 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   /^\/inicio(\/|$)/,
   /^\/avisos(\/|$)/,
   /^\/perfil(\/|$)/,
+  // La casa (2026-08-25). Acá el riesgo de cachear no es solo cargar un
+  // chunk JS viejo: estas pantallas muestran PLATA y un contador de cierre.
+  // Un pozo cacheado de hace media hora le miente a alguien que está por
+  // pagar, y un contador congelado lo deja creyendo que todavía alcanza a
+  // entrar. Siempre a la red.
+  /^\/casa(\/|$)/,
 ];
 
 const serwist = new Serwist({

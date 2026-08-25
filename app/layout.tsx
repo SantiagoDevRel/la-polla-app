@@ -1,6 +1,6 @@
 // app/layout.tsx — Layout raíz de la aplicación La Polla App con configuración PWA
 import type { Metadata, Viewport } from "next";
-import { Bebas_Neue, Outfit } from "next/font/google";
+import { Anton, Barlow } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import "./globals.css";
@@ -14,15 +14,20 @@ import { getSiteFromHeaders, SITES } from "@/lib/seo/sites";
 import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { PlatformProvider } from "@/components/platform/PlatformProvider";
 import { PostHogProvider } from "./providers";
+import { AgentationDev } from "@/components/dev/AgentationDev";
 
-const bebas = Bebas_Neue({
+// Parche v1.0 — tipografia de calle. Anton para todo lo que grita (titulos,
+// cifras, botones): condensada, pesada, de afiche. Barlow para leer: es
+// utilitaria y aguanta bien los tamanos chicos en telefonos de gama media.
+// Siguen siendo DOS familias, como manda el design system.
+const anton = Anton({
   subsets: ["latin"],
   weight: "400",
   variable: "--font-display",
   display: "swap",
 });
 
-const outfit = Outfit({
+const barlow = Barlow({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-body",
@@ -47,22 +52,22 @@ export async function generateMetadata(): Promise<Metadata> {
       site.locale === "es"
         ? [
             "polla deportiva",
-            "polla mundial 2026",
+            "polla del fin de semana",
+            "polla premier league",
             "polla champions league",
             "polla copa libertadores",
             "polla liga betplay",
             "quiniela futbol",
             "pronosticos futbol colombia",
-            "crear polla con amigos",
           ]
         : [
             "football pool",
-            "world cup 2026 pool",
+            "weekend football pool",
+            "premier league pool",
             "champions league pool",
             "copa libertadores pool",
             "liga betplay pool",
             "soccer predictions",
-            "create pool with friends",
           ],
     alternates: {
       canonical: "/",
@@ -142,8 +147,8 @@ export default async function RootLayout({
   };
 
   return (
-    <html lang={locale} className={`${bebas.variable} ${outfit.variable}`}>
-      <body className="antialiased">
+    <html lang={locale} className={`${anton.variable} ${barlow.variable}`}>
+      <body className="antialiased lp-concrete">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
@@ -165,6 +170,7 @@ export default async function RootLayout({
             </PlatformProvider>
           </NextIntlClientProvider>
         </PostHogProvider>
+        <AgentationDev />
       </body>
     </html>
   );

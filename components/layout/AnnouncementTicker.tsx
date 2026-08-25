@@ -74,7 +74,7 @@ export default function AnnouncementTicker({
 
   return (
     <div
-      className="relative overflow-hidden bg-red-alert text-white h-[34px] flex items-center"
+      className="relative flex h-[30px] items-center overflow-hidden border-b border-border-subtle bg-bg-elevated text-text-secondary"
       role="status"
       aria-label={msg}
     >
@@ -84,9 +84,9 @@ export default function AnnouncementTicker({
             {copies.map((i) => (
               <span
                 key={i}
-                className="flex items-center gap-1.5 px-5 text-[12px] font-semibold uppercase tracking-[0.06em]"
+                className="flex items-center gap-1.5 px-5 text-[11px] font-semibold uppercase tracking-[0.14em]"
               >
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+                <AlertTriangle className="w-3 h-3 shrink-0 text-amber" strokeWidth={2.5} aria-hidden="true" />
                 {msg}
               </span>
             ))}
@@ -99,7 +99,7 @@ export default function AnnouncementTicker({
         type="button"
         onClick={dismiss}
         aria-label={t("dismissAria")}
-        className="absolute right-0 top-0 h-full w-11 flex items-center justify-end pr-2.5 bg-gradient-to-l from-red-alert via-red-alert/90 to-transparent cursor-pointer active:scale-90 transition-transform duration-150"
+        className="absolute right-0 top-0 flex h-full w-11 cursor-pointer items-center justify-end bg-gradient-to-l from-bg-elevated via-bg-elevated/90 to-transparent pr-2.5 text-text-muted transition-colors hover:text-text-primary"
       >
         <X className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
       </button>

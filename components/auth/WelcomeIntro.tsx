@@ -27,15 +27,29 @@ const CHAR_FADE_MS = 160; // each char's fade-in; multiple chars overlap mid-fad
 // "physics". Acts close to easeOutExpo — soft landing, no overshoot.
 const SMOOTH: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-// Order curated for visual recognition: World Cup first (most universal),
-// then the three biggest club competitions. Premier removed — its white
-// background renders inconsistently inside Capacitor WebView (Android),
-// breaking the row alignment vs the dark-on-dark logos of the others.
-const TOURNAMENT_ORDER: Array<{ slug: keyof typeof TOURNAMENT_ICONS; nameKey: "tournamentMundial" | "tournamentChampions" | "tournamentLaLiga" | "tournamentSerieA" }> = [
-  { slug: "worldcup_2026", nameKey: "tournamentMundial" },
+// Cuatro de los ocho torneos de la casa. Se muestran cuatro y no ocho porque
+// la animación los hace caer en cascada en una sola fila: con ocho no entran
+// en 390px sin encogerlos hasta volverlos irreconocibles.
+//
+// La selección no es aleatoria: dos de peso europeo (Champions, La Liga) y
+// dos que el público de esta app siente propias (Libertadores, BetPlay). El
+// Mundial salió — terminó en julio y ya no se puede jugar.
+//
+// Premier sigue afuera: su logo blanco renderiza inconsistente dentro del
+// WebView de Capacitor en Android y rompe la alineación contra los otros
+// tres, que son oscuros.
+const TOURNAMENT_ORDER: Array<{
+  slug: keyof typeof TOURNAMENT_ICONS;
+  nameKey:
+    | "tournamentChampions"
+    | "tournamentLaLiga"
+    | "tournamentLibertadores"
+    | "tournamentBetplay";
+}> = [
   { slug: "champions_2025", nameKey: "tournamentChampions" },
   { slug: "laliga_2025", nameKey: "tournamentLaLiga" },
-  { slug: "seriea_2025", nameKey: "tournamentSerieA" },
+  { slug: "libertadores_2026", nameKey: "tournamentLibertadores" },
+  { slug: "betplay_2026", nameKey: "tournamentBetplay" },
 ];
 
 // Stage gates — ms between the previous beat finishing and the next

@@ -51,34 +51,53 @@ export async function GET() {
       .eq("id", user.id)
       .single();
 
-    const { data: participations } = await admin
-      .from("polla_participants")
-      .select("polla_id, rank")
-      .eq("user_id", user.id);
+    // ── Stats ────────────────────────────────────────────────────────────
+    // Se leen del modelo NUEVO (casa_entries / casa_picks). Antes salian de
+    // polla_participants + predictions, o sea del P2P retirado: el perfil
+    // mostraba numeros de un producto que el usuario ya no puede usar, y
+    // peor, que no coincidian con nada de lo que veia en /casa.
+    //
+    // El historico P2P no se perdio — vive igual en sus tablas y se puede
+    // consultar entrando a /pollas por URL directa. Simplemente dejo de ser
+    // lo que el perfil resume.
+    const { data: entries } = await admin
+      .from("casa_entries")
+      .select("id, polla_id, status")
+      .eq("user_id", user.id) // ← filtro explicito (ver TODO auth.uid())
+      .eq("status", "pagada");
 
-    const { count: predCount } = await admin
-      .from("predictions")
+    const { count: picksCount } = await admin
+      .from("casa_picks")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id);
 
-    const ranks = (participations || []).map((p) => p.rank).filter((r): r is number => r !== null);
-
-    // Recent activity: last 3 scored predictions
-    const { data: recentPreds } = await admin
-      .from("predictions")
-      .select("points_earned, match_id, polla_id, matches(home_team, away_team), pollas(name)")
+    // Puntos totales acumulados en las pollas de la casa.
+    const { data: puntos } = await admin
+      .from("casa_picks")
+      .select("points_earned")
       .eq("user_id", user.id)
-      .gt("points_earned", -1)
-      .not("points_earned", "is", null)
-      .order("submitted_at", { ascending: false })
+      .gt("points_earned", 0);
+
+    const totalPoints = (puntos || []).reduce(
+      (sum: number, r: { points_earned: number | null }) => sum + (r.points_earned || 0),
+      0,
+    );
+
+    // Lo ultimo que sumo puntos, para "actividad reciente".
+    const { data: recentPicks } = await admin
+      .from("casa_picks")
+      .select("points_earned, matches(home_team, away_team), casa_pollas(name)")
+      .eq("user_id", user.id)
+      .gt("points_earned", 0)
+      .order("updated_at", { ascending: false })
       .limit(3);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const recentActivity = ((recentPreds || []) as any[]).map((r) => {
+    const recentActivity = ((recentPicks || []) as any[]).map((r) => {
       const match = Array.isArray(r.matches) ? r.matches[0] : r.matches;
-      const polla = Array.isArray(r.pollas) ? r.pollas[0] : r.pollas;
+      const polla = Array.isArray(r.casa_pollas) ? r.casa_pollas[0] : r.casa_pollas;
       return {
-        matchName: match ? `${match.home_team} vs ${match.away_team}` : "Partido",
+        matchName: match ? `${match.home_team} vs ${match.away_team}` : "Pregunta",
         pollaName: polla?.name || "Polla",
         pointsEarned: r.points_earned || 0,
       };
@@ -87,9 +106,13 @@ export async function GET() {
     return NextResponse.json({
       profile: userData,
       stats: {
-        pollasCount: participations?.length || 0,
-        predictionsCount: predCount || 0,
-        bestRank: ranks.length > 0 ? Math.min(...ranks) : null,
+        pollasCount: entries?.length || 0,
+        predictionsCount: picksCount || 0,
+        // `bestRank` no aplica en la casa: cada polla es independiente y no
+        // hay un ranking global. Se manda el puntaje acumulado, que es el
+        // numero que la gente si reconoce.
+        bestRank: null,
+        totalPoints,
       },
       recentActivity,
     });

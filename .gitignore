@@ -108,3 +108,7 @@ keystore.properties
 
 # Playwright MCP scratch (screenshots/console logs)
 .playwright-mcp/
+
+# Playwright Test — artefactos de corrida (las baselines *-snapshots/ SÍ se versionan)
+/test-results/
+/playwright-report/

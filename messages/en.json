@@ -1,7 +1,7 @@
 {
   "App": {
     "title": "Chicken Picks — Football Pools",
-    "description": "The football pool app. Create your pool, invite your friends and win by predicting match results."
+    "description": "The weekend football pool. Every week we post pools for the Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Champions League, Libertadores and Liga BetPlay. Join, pick, and 70% of the pot goes to the winners."
   },
   "Common": {
     "loading": "Loading...",
@@ -31,16 +31,16 @@
     "dismissAria": "Dismiss notice"
   },
   "Closure": {
-    "bannerTitle": "SEASON CLOSED",
-    "bannerBody": "The 2026 World Cup is over and there are no tournaments running right now, so new pools can't be created. Your pools, points and picks are all still here.",
-    "createTitle": "CHICKENPICKS IS CLOSED FOR NOW",
-    "createBody": "The 2026 World Cup ended on July 19 and there's no tournament left with matches to build a pool from.",
-    "createKept": "Nothing gets deleted: your pools, your table, your points and every pick stay exactly as you left them.",
-    "createComeback": "When a tournament worth playing comes back, we reopen and you pick up right where you left off.",
-    "createCta": "See my pools",
-    "createSecondary": "Go home",
-    "emptyMessage": "The season is closed: there are no tournaments to build new pools from. Yours are saved with their final table.",
-    "emptyActive": "No pools in progress: the season is closed. The ones you played are below, under Finished."
+    "bannerTitle": "THE HOUSE RUNS THE POOLS NOW",
+    "bannerBody": "You no longer build your own pool. Every weekend we post the pools and you join the ones you want.",
+    "createTitle": "WE BUILD THE POOLS NOW",
+    "createBody": "We changed things: instead of everyone building their own, we post the weekend's pools and you pick which ones to join.",
+    "createThanks": "It's simpler. Join, pay, make your picks, wait for kickoff.",
+    "createComeback": "Have a look at what's open right now.",
+    "createCta": "See the pools",
+    "createSecondary": "See my old pools",
+    "emptyMessage": "No pools are open yet. As soon as we post the weekend's, they show up here.",
+    "emptyActive": "You're not in any active pool. The ones you already played are below, under Finished."
   },
   "Nav": {
     "ariaNav": "Bottom navigation",
@@ -56,7 +56,8 @@
     "newPollaDescription": "Create a new pool or join an existing one with a code.",
     "createNew": "Create new pool",
     "joinWithCode": "Join with code",
-    "joinedToast": "You joined {name}"
+    "joinedToast": "You joined {name}",
+    "tabAdmin": "House"
   },
   "Login": {
     "brand": "CHICKEN PICKS",
@@ -88,21 +89,21 @@
     "otpTryWhatsapp": "Try WhatsApp"
   },
   "Welcome": {
-    "introLine": "Chicken Picks is for playing the world's\nbiggest tournaments with your friends",
-    "tournamentMundial": "World Cup",
+    "introLine": "Every weekend we post the pools.\nYou join, you pick, you play for the pot.",
     "tournamentChampions": "Champions",
     "tournamentLaLiga": "La Liga",
-    "tournamentSerieA": "Serie A",
-    "step1": "You create a pool",
-    "step2": "You invite your friends",
-    "step3": "You set the prize distribution",
-    "step4": "You mark who's paid and who hasn't",
-    "step5": "Then start predicting",
-    "taglineBefore": "It's all",
-    "taglineAccent": "FREE",
+    "step1": "Pick the weekend's pool",
+    "step2": "Pay and send the screenshot",
+    "step3": "Call home, draw or away",
+    "step4": "Wait for kickoff",
+    "step5": "Most correct picks takes it",
+    "taglineBefore": "Of the pot,",
+    "taglineAccent": "70% IS YOURS",
     "skip": "Skip",
     "start": "Get started",
-    "madeBy": "made by santiago"
+    "madeBy": "made by santiago",
+    "tournamentLibertadores": "Libertadores",
+    "tournamentBetplay": "BetPlay"
   },
   "Scoring": {
     "tier1Label": "Exact score",
@@ -477,15 +478,15 @@
     "reportBody": "Inside the app, in the top right, there's a \"Report problem\" button with an alert icon. Tap it to send us a detailed message and we get notified instantly.",
     "faqSection": "Frequently asked questions",
     "q1": "How do I join a pool?",
-    "a1": "Ask the organizer for the pool code or invite link. Tap the link, log in with your WhatsApp number and accept the invite.",
-    "q2": "How do I create a new pool?",
-    "a2": "From the home screen, tap the gold button with the \"+\" symbol. Pick the tournament (Champions, World Cup, La Liga, Premier or Serie A), name the pool, choose the payment mode and you're done. We give you a code and an invite link.",
+    "a1": "Open the app, look at the weekend's open pools and tap the one you want. It shows the entry price and where to transfer. You transfer outside the app, upload the screenshot, and wait for the admin to confirm it. Once approved, your picks count and your money joins the pot.",
+    "q2": "Can I create my own pool?",
+    "a2": "No. The admin posts the pools every weekend and you pick which ones to join. Anyone could create their own before, but that mode was retired: now there's a single pot per pool and the split is the same for everyone.",
     "q3": "How are points calculated?",
-    "a3": "Predicting the exact score is worth more points than just predicting the winner. The full scoring guide is in your profile, in the \"How scoring works\" section.",
+    "a3": "It depends on the pool's mode, and it's always written inside before you join. In home/draw/away pools, a correct call is worth 3 points and there are no other options. In exact-score pools, nailing the scoreline is worth 3 and getting just one team's goals right is worth 1. In manual pools, each question states its own value. Points use the 90-minute score: extra time and penalties don't count.",
     "q4": "I'm not receiving the SMS verification",
     "a4": "Make sure the number is written with the country code (e.g. +57 for Colombia). If after a minute nothing arrives, use the \"Receive via WhatsApp\" option on the login screen.",
     "q5": "Does the app handle money?",
-    "a5": "No. It's just a prediction tool between friends. If your pool has a buy-in, that money moves directly between players (outside the app). We don't process payments.",
+    "a5": "The app doesn't charge or transfer money — there's no payment gateway. You transfer outside the app and it only stores the screenshot so the admin can verify the payment by hand. What the app does track is the accounting: how much came in, how much goes to the pot, and who gets paid. Of every entry, 70% goes to the winners' pot and 30% stays with the house; that's stated on every pool before you pay.",
     "q6": "How do I delete my account?",
     "a6Before": "Write to us at ",
     "a6After": " with your registered WhatsApp number. We'll delete your account and all associated data within 30 days.",
@@ -536,7 +537,7 @@
     "title": "Privacy Policy",
     "subtitle": "Last updated: June 2026",
     "section1Title": "1. Information we collect",
-    "section1Body": "We collect the following information when you use the app: your profile name, WhatsApp number, your match predictions and your prediction results (points, standings position). We don't collect location data, contacts, or financial information.",
+    "section1Body": "We collect the following information when you use the app: your profile name, WhatsApp number, your match predictions and their results (points, leaderboard position). When you join a paid pool we also store the payment proof you upload (the screenshot of your transfer) and the entry amount, solely so the administrator can verify the payment. Only the administrator sees that proof; it is kept in private storage and is not shared with anyone else. We do not collect location data, contacts, card numbers or banking credentials: the app does not process payments and never asks for those details.",
     "section2Title": "2. How we use your information",
     "section2Body": "We use your information to: calculate your prediction points, show standings within each pool, send notifications and results via WhatsApp, and allow other participants of your pool to see your name and score.",
     "section3Title": "3. How we share your information",
@@ -677,7 +678,8 @@
     "deleteConfirmCancel": "Cancel",
     "deleting": "Deleting…",
     "deleteSuccess": "Your account was deleted",
-    "deleteError": "Couldn't delete the account. Please try again."
+    "deleteError": "Couldn't delete the account. Please try again.",
+    "oldPollas": "See my old pools"
   },
   "Avisos": {
     "metadataTitle": "Alerts · Chicken Picks",
@@ -932,5 +934,35 @@
     "newsError": "Could not load the news",
     "newsReadMore": "Read on ESPN",
     "ageShort": "{age} yrs"
+  },
+  "Profile": {
+    "header": "My Profile",
+    "errMinChars": "Min 2 characters",
+    "toastNameUpdated": "Name updated",
+    "errUpdateName": "Error updating name",
+    "toastChickenUpdated": "Chicken updated",
+    "errUpdateChicken": "Error updating chicken",
+    "toastPayoutSaved": "Payment account saved",
+    "errSavePayout": "Error saving account",
+    "toastPayoutCleared": "Payment account cleared",
+    "errClearPayout": "Error clearing account",
+    "loading": "Loading profile...",
+    "errLoading": "Error loading profile",
+    "pickChicken": "Pick your chicken",
+    "edit": "Edit",
+    "recentActivity": "Recent activity",
+    "pointsLabel": "pts",
+    "scoringTitle": "How does scoring work?",
+    "adminPanel": "Admin panel",
+    "logout": "Log out",
+    "deleteAccount": "Delete my account",
+    "deleteConfirmTitle": "Delete your account?",
+    "deleteConfirmBody": "This permanently deletes your profile, your predictions and your participation in pools. Pools you created will stay available for the other participants. This action cannot be undone.",
+    "deleteConfirmYes": "Yes, delete my account",
+    "deleteConfirmCancel": "Cancel",
+    "deleting": "Deleting…",
+    "deleteSuccess": "Your account was deleted",
+    "deleteError": "Couldn't delete the account. Please try again.",
+    "oldPollas": "See my old pools"
   }
 }

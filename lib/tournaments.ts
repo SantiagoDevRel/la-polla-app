@@ -66,6 +66,23 @@ export const TOURNAMENTS = [
     logoPath: `/tournaments/liga_betplay.svg?v=${LOGO_V}`,
     color: "#fcd116",
   },
+  // Agregadas 2026-08-25 para la polla centralizada: el owner pidio las 5
+  // grandes ligas europeas y estas dos faltaban. Ambas estan en el plan free
+  // de football-data (BL1 / FL1) y en ESPN (ger.1 / fra.1).
+  {
+    slug: "bundesliga_2025",
+    name: "Bundesliga",
+    apiCode: "BL1",
+    logoPath: `/tournaments/bundesliga.svg?v=${LOGO_V}`,
+    color: "#d20515",
+  },
+  {
+    slug: "ligue1_2025",
+    name: "Ligue 1",
+    apiCode: "FL1",
+    logoPath: `/tournaments/ligue_1.svg?v=${LOGO_V}`,
+    color: "#dae025",
+  },
 ] as const;
 
 export type TournamentSlug = (typeof TOURNAMENTS)[number]["slug"];
@@ -87,7 +104,14 @@ export type TournamentSlug = (typeof TOURNAMENTS)[number]["slug"];
 // muestra el estado de cierre y POST /api/pollas rechaza con 403.
 // Para REABRIR: descomentá/agregá el slug del torneo que vuelva y listo.
 export const CREATABLE_TOURNAMENT_SLUGS: readonly TournamentSlug[] = [
-  // "worldcup_2026",  ← Mundial 2026, cerrado el 2026-07-19
+  "premier_2025",
+  "laliga_2025",
+  "seriea_2025",
+  "bundesliga_2025",
+  "ligue1_2025",
+  "champions_2025",
+  "libertadores_2026",
+  "betplay_2026",
 ];
 
 export const CREATABLE_TOURNAMENTS = TOURNAMENTS.filter((t) =>
@@ -119,7 +143,7 @@ export function isCreatableTournament(slug: string): boolean {
 // CRON_SECRET) NO pasa por este gate: si necesitás resincronizar algo
 // puntual, sigue funcionando sin tocar esta lista.
 export const SYNCABLE_TOURNAMENT_SLUGS: readonly string[] = [
-  // "worldcup_2026",  ← Mundial 2026, cerrado el 2026-07-19
+  ...CREATABLE_TOURNAMENT_SLUGS,
 ];
 
 export function isSyncableTournament(slug: string): boolean {
@@ -137,6 +161,8 @@ const TOURNAMENT_NAMES_EN: Record<string, string> = {
   libertadores_2026: "Copa Libertadores",
   sudamericana_2026: "Copa Sudamericana",
   betplay_2026: "BetPlay League",
+  bundesliga_2025: "Bundesliga",
+  ligue1_2025: "Ligue 1",
 };
 
 export function getTournamentBySlug(slug: string) {
@@ -166,4 +192,6 @@ export const TOURNAMENT_ICONS: Record<string, string> = {
   libertadores_2026: `/tournaments/copa_libertadores.svg?v=${LOGO_V}`,
   sudamericana_2026: `/tournaments/copa_sudamericana.svg?v=${LOGO_V}`,
   betplay_2026: `/tournaments/liga_betplay.svg?v=${LOGO_V}`,
+  bundesliga_2025: `/tournaments/bundesliga.svg?v=${LOGO_V}`,
+  ligue1_2025: `/tournaments/ligue_1.svg?v=${LOGO_V}`,
 };

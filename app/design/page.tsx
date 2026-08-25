@@ -469,7 +469,7 @@ export default function DesignPage() {
           The actual component lives at `components/nav/BottomNav.tsx`.
         </p>
         <div className="mt-4">
-          <BottomNav active="inicio" />
+          <BottomNav active="pollas" />
         </div>
       </Section>
 

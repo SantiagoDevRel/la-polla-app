@@ -126,6 +126,11 @@ export async function updateSession(request: NextRequest) {
   const isApiWebhook =
     path.startsWith("/api/whatsapp/webhook") ||
     path.startsWith("/api/whatsapp/test-send") ||
+    // Panel de admin en Telegram. NO puede pedir sesión de Supabase: quien
+    // llama es Telegram, no un browser. Su autenticación propia es el header
+    // X-Telegram-Bot-Api-Secret-Token, que el handler verifica antes de leer
+    // una sola línea del body (ver app/api/telegram/webhook/route.ts).
+    path.startsWith("/api/telegram/webhook") ||
     path.startsWith("/api/matches/sync") ||
     path.startsWith("/api/matches/discover") ||
     path.startsWith("/api/admin/");

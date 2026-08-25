@@ -25,6 +25,8 @@ export const ESPN_LEAGUE_BY_TOURNAMENT: Record<string, string> = {
   libertadores_2026: "conmebol.libertadores",
   sudamericana_2026: "conmebol.sudamericana",
   betplay_2026: "col.1",
+  bundesliga_2025: "ger.1",
+  ligue1_2025: "fra.1",
 };
 
 /**

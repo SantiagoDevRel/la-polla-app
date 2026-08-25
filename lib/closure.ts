@@ -1,27 +1,54 @@
-// lib/closure.ts — Estado de "temporada cerrada" de La Polla.
+// lib/closure.ts — qué está retirado del producto viejo.
 //
-// Contexto (2026-07-26): el Mundial 2026 terminó el 19 de julio (último
-// partido verificado) y no queda NINGÚN torneo con partidos futuros en la
-// DB. Las 62 pollas están en status='ended'. Sin torneos creables, el
-// wizard de /pollas/crear renderizaba una lista de chips vacía — un form
-// roto. Preferimos un cierre explícito y bien contado.
+// ─── HISTORIA CORTA ───
+// (2026-07-26) El Mundial terminó y no quedaba ningún torneo con partidos
+// futuros. Como sin torneos el wizard de /pollas/crear renderizaba un form
+// vacío y roto, se derivó un "modo temporada cerrada" de la lista
+// CREATABLE_TOURNAMENT_SLUGS: lista vacía = cerrado. Un solo interruptor,
+// sin flag propio que se pudiera desincronizar.
 //
-// ─── UN SOLO INTERRUPTOR ───
-// El cierre NO tiene flag propio: se DERIVA de CREATABLE_TOURNAMENT_SLUGS.
-// Lista vacía = temporada cerrada. Agregarle un slug (ej. "betplay_2026"
-// cuando arranque la liga) reabre TODO de una: desaparece el banner, el
-// wizard vuelve a funcionar y el POST /api/pollas deja de rechazar.
-// Esto respeta la convención que ya estaba documentada en tournaments.ts
-// ("Para reactivar una liga, agregá su slug a esta lista. No hace falta
-// tocar nada más") en vez de sumar un segundo flag que se desincronice.
+// (2026-08-25) Eso dejó de servir, y de una forma peligrosa. La app pivotó
+// a la casa centralizada, y para eso hubo que volver a llenar
+// CREATABLE_TOURNAMENT_SLUGS con las 8 ligas — porque la casa SÍ necesita
+// esos torneos para armar sus pollas. Efecto colateral: `SEASON_CLOSED`
+// pasó a false y **el wizard P2P viejo revivió**, dejando que cualquiera
+// creara pollas propias. Justo lo contrario de la premisa del producto
+// nuevo, donde solo la casa arma pollas.
 //
-// Lo que el cierre NO toca (a propósito): login, /inicio, ver pollas,
-// tablas, evolución, perfil, avisos y el bot de WhatsApp. La app sigue
-// siendo de consulta — los datos de la gente se ven igual que siempre.
+// La lección: derivar un estado de producto de un dato de configuración
+// funciona hasta que ese dato cambia por otra razón. Ahora son dos cosas
+// distintas porque SON dos cosas distintas:
+//
+//   CREATABLE_TOURNAMENT_SLUGS → qué ligas puede usar la casa (dato)
+//   P2P_CREATION_RETIRED       → si la gente puede crear pollas (producto)
+
 import { CREATABLE_TOURNAMENT_SLUGS } from "@/lib/tournaments";
 
-/** true = no hay torneos para armar pollas nuevas → temporada cerrada. */
-export const SEASON_CLOSED = CREATABLE_TOURNAMENT_SLUGS.length === 0;
+/**
+ * El modelo viejo "cualquiera crea su polla e invita a sus amigos" está
+ * RETIRADO. Lo reemplazó la casa centralizada: solo el admin arma pollas y
+ * la gente entra pagando (ver /casa y las tablas casa_*).
+ *
+ * Con esto en true:
+ *   · /pollas/crear no arma nada — manda a la casa.
+ *   · POST /api/pollas responde 403 antes de tocar la DB.
+ *   · El nav no ofrece crear ni unirse por código.
+ *
+ * Las pollas P2P que ya existen NO se tocan: se siguen pudiendo ver, con
+ * sus tablas y su historia. Lo retirado es CREAR nuevas.
+ *
+ * Para revivir el modelo viejo (no deberías): poné esto en false.
+ */
+export const P2P_CREATION_RETIRED = true;
+
+/**
+ * @deprecated Quedó como alias para no romper los ~8 usos que ya existen.
+ * Antes significaba "no hay torneos, no se puede crear nada"; hoy lo que
+ * importa es que la creación P2P está retirada, sin importar los torneos.
+ * En código nuevo usá `P2P_CREATION_RETIRED`.
+ */
+export const SEASON_CLOSED =
+  P2P_CREATION_RETIRED || CREATABLE_TOURNAMENT_SLUGS.length === 0;
 
 /**
  * Fecha del último partido verificado del Mundial 2026 (final), en ISO.
