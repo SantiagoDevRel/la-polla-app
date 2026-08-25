@@ -1239,15 +1239,20 @@ export async function handleHelpTopic(
   topic: string
 ) {
   if (topic === "help_puntaje") {
+    // Antes esto enseñaba la escalera del Mundial (5 exacto / 3 diferencia de
+    // gol / 2 ganador / 1 un equipo). En la casa el puntaje lo fija Tama al
+    // armar cada polla y son dos modos simples — ninguno tiene diferencia de
+    // gol, y el máximo es 3.
     await sendTextMessage(
       phone,
-      `🎯 *¿Cómo se puntúa en La Polla?*\n\n` +
-        `*5 pts* — Resultado exacto (ej: dijiste 2-1 y fue 2-1) 🔥\n` +
-        `*3 pts* — Le pegaste al ganador y a la diferencia de goles ⚡\n` +
-        `*2 pts* — Acertaste quién ganó ✅\n` +
-        `*1 pt* — Acertaste los goles de uno de los dos equipos 🎯\n` +
-        `*0 pts* — No le pegaste 😅\n\n` +
-        `_Pilas parce, cada punto cuenta para la tabla_ 📊`,
+      `🎯 *¿Cómo se puntúa?*\n\n` +
+        `Depende del modo de la polla, y siempre está escrito adentro antes de que entres.\n\n` +
+        `*Local / Empate / Visitante*\n` +
+        `*3 pts* si le achuntas. Esas son las únicas 3 opciones 🐥\n\n` +
+        `*Al marcador*\n` +
+        `*3 pts* si clavas el marcador exacto 🔥\n` +
+        `*1 pt* si le achuntas a los goles de uno solo de los dos equipos\n\n` +
+        `_Ojo: los puntos van por los 90 minutos. El alargue y los penales no suman._ ⏱️`,
       { userId: user.id }
     );
     return;

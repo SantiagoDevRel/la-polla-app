@@ -18,8 +18,6 @@ import AnnouncementTicker from "@/components/layout/AnnouncementTicker";
 import BrandHeader from "@/components/layout/BrandHeader";
 import FontScaleApplier from "@/components/layout/FontScaleApplier";
 import SWAutoReload from "@/components/layout/SWAutoReload";
-import ScoringSurveyModal from "@/components/polla/ScoringSurveyModal";
-import DoublePointsSurveyModal from "@/components/polla/DoublePointsSurveyModal";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { needsName } from "@/lib/users/needs-name";
@@ -140,8 +138,15 @@ export default async function AppLayout({
   return (
     <ToastProvider>
       <SWAutoReload />
-      <ScoringSurveyModal />
-      <DoublePointsSurveyModal />
+      {/* Los dos popups de encuesta (ScoringSurveyModal y
+          DoublePointsSurveyModal) SE DESMONTARON de acá (2026-08-25).
+          Estaban globales en el shell, o sea que aparecían encima de /casa
+          preguntando por cosas que en este producto no existen: cambiar la
+          escala 5/3/2/1 por goles_v2, y duplicar puntos desde octavos de
+          final. Son experimentos de puntaje POR POLLA de la etapa Mundial, y
+          en la casa el puntaje lo fija Tama al armar cada polla. Los
+          componentes y sus endpoints siguen en el repo por si alguna vez se
+          quiere volver a encuestar algo. */}
       <FontScaleApplier />
       <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">

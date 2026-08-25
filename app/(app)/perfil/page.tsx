@@ -14,7 +14,6 @@ import { useToast } from "@/components/ui/Toast";
 import UserAvatar from "@/components/ui/UserAvatar";
 import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
-import { InlineScoringGuide } from "@/components/polla/InlineScoringGuide";
 import FontScalePicker from "@/components/perfil/FontScalePicker";
 import LanguageToggle from "@/components/perfil/LanguageToggle";
 import PayoutDefaultEditor, { type PayoutMethod, type PayoutAccountType } from "@/components/perfil/PayoutDefaultEditor";
@@ -175,8 +174,12 @@ export default function PerfilPage() {
   }
 
   function pointsColorClass(pts: number): string {
-    if (pts >= 5) return "text-turf";
-    if (pts >= 2) return "text-gold";
+    // Los cortes eran 5 y 2, heredados del puntaje del Mundial donde el
+    // marcador exacto valia 5. En la casa el maximo por partido es 3, asi
+    // que el umbral verde no se alcanzaba NUNCA y todo se veia apagado.
+    // Ahora: 3 = le acertaste de lleno, 1 = le pegaste a algo.
+    if (pts >= 3) return "text-turf";
+    if (pts >= 1) return "text-gold";
     return "text-text-muted";
   }
 
@@ -324,16 +327,19 @@ export default function PerfilPage() {
           </div>
         )}
 
-        {/* ¿Cómo se puntúa? — shared with the polla-detail Info tab */}
-        <div className="lp-card p-3.5">
-          <div className="text-[13px] font-bold text-text-primary mb-2.5 flex items-center gap-1.5">
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold">
-              <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
-            </svg>
-            {t("scoringTitle")}
-          </div>
-          <InlineScoringGuide />
-        </div>
+        {/* La guia global de puntaje SE FUE de acá (2026-08-25).
+            Mostraba la escalera del Mundial — marcador exacto / diferencia de
+            gol / ganador / un equipo — con 5 puntos por defecto. Nada de eso
+            existe en la casa: acá el puntaje es de la POLLA, no de la app, y
+            son dos reglas simples (1X2 = 3 pts, o marcador exacto = 3 y goles
+            de un equipo = 1). Una guia global no puede ser cierta para todas
+            las pollas a la vez, y esta le estaba enseñando a la gente un
+            sistema que no se usa.
+
+            Donde vive ahora: dentro de cada polla, junto al reparto, que es
+            donde la persona decide si entra. InlineScoringGuide sigue
+            existiendo y se sigue usando en /pollas/[slug] — ahí SÍ es cierta,
+            porque describe las pollas P2P viejas. */}
 
         {/* Panel de administración — only for admin users */}
         {profile.is_admin && (

@@ -176,7 +176,7 @@ export default async function PollaPage({
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">Pago en revisión</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              Ya le llegó tu pantallazo a Tama. Podés ir marcando mientras tanto,
+              Ya le llegó tu pantallazo a Tama. Puedes ir marcando mientras tanto,
               pero no contás para el pozo hasta que lo confirme.
             </p>
           </div>
@@ -186,7 +186,7 @@ export default async function PollaPage({
           <div className="mt-4 border border-red-alert/40 bg-red-alert/10 p-3">
             <p className="lp-label text-red-alert">Pago rechazado</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              {entry.reject_reason ?? "Hablá con Tama para resolverlo."}
+              {entry.reject_reason ?? "Habla con Tama para resolverlo."}
             </p>
           </div>
         )}
@@ -209,7 +209,7 @@ export default async function PollaPage({
                 canEdit={inscrito && abierta}
                 lockedReason={
                   !inscrito
-                    ? "Entrá a la polla para poder marcar."
+                    ? "Entra a la polla para poder marcar."
                     : "Esta polla ya cerró."
                 }
               />
@@ -234,7 +234,7 @@ export default async function PollaPage({
                 canEdit={inscrito && abierta}
                 lockedReason={
                   !inscrito
-                    ? "Entrá a la polla para poder responder."
+                    ? "Entra a la polla para poder responder."
                     : "Esta polla ya cerró."
                 }
               />

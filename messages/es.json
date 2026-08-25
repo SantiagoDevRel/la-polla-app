@@ -1,7 +1,7 @@
 {
   "App": {
     "title": "La Polla Colombiana 🐥",
-    "description": "La mejor polla deportiva de Colombia. Crea tu polla, invita a tus parceros y gana prediciendo resultados de fútbol."
+    "description": "La polla del fin de semana. Cada semana subimos las pollas de Premier, La Liga, Serie A, Bundesliga, Ligue 1, Champions, Libertadores y BetPlay. Entras, marcas y el 70% del pozo va para los ganadores."
   },
   "Common": {
     "loading": "Cargando...",
@@ -89,21 +89,21 @@
     "otpTryWhatsapp": "Prueba con WhatsApp"
   },
   "Welcome": {
-    "introLine": "La Polla Colombiana es para que juegues con\ntus amigos los principales torneos del mundo",
-    "tournamentMundial": "Mundial",
+    "introLine": "Cada fin de semana subimos las pollas.\nEntras, marcas y peleas el pozo.",
     "tournamentChampions": "Champions",
     "tournamentLaLiga": "La Liga",
-    "tournamentSerieA": "Serie A",
-    "step1": "Creas una polla",
-    "step2": "Invitas a tus amigos",
-    "step3": "Defines la distribución de premios",
-    "step4": "Marcas quién ha pagado y quién no",
-    "step5": "Y a pronosticar",
-    "taglineBefore": "Todo esto es",
-    "taglineAccent": "GRATIS",
+    "step1": "Escoges la polla del finde",
+    "step2": "Pagas y mandas el pantallazo",
+    "step3": "Marcas local, empate o visitante",
+    "step4": "Esperas el pitazo",
+    "step5": "El que más acierta, cobra",
+    "taglineBefore": "Del pozo, el",
+    "taglineAccent": "70% ES DE USTEDES",
     "skip": "Saltar",
     "start": "Empezar",
-    "madeBy": "hecho por santiago"
+    "madeBy": "hecho por santiago",
+    "tournamentLibertadores": "Libertadores",
+    "tournamentBetplay": "BetPlay"
   },
   "Scoring": {
     "tier1Label": "Resultado exacto",
@@ -477,16 +477,16 @@
     "reportSection": "Reportar un problema desde la app",
     "reportBody": "Dentro de la app, en la parte superior derecha, hay un botón \"Reportar problema\" con un ícono de alerta. Al tocarlo puedes enviarnos un mensaje detallado y recibimos la notificación al instante.",
     "faqSection": "Preguntas frecuentes",
-    "q1": "¿Cómo me uno a una polla?",
-    "a1": "Pídele al organizador el código de la polla o el link de invitación. Toca el link, inicia sesión con tu número de WhatsApp y aceptas unirte.",
-    "q2": "¿Cómo creo una polla nueva?",
-    "a2": "Desde la pantalla de inicio, toca el botón dorado con el símbolo \"+\". Eliges el torneo (Champions, Mundial, La Liga, Premier o Serie A), defines el nombre de la polla, el modo de pago y listo. Te damos un código y un link para invitar.",
+    "q1": "¿Cómo entro a una polla?",
+    "a1": "Abre la app, mira las pollas abiertas del fin de semana y toca la que quieras. Ahí te dice cuánto vale la entrada y a qué cuenta transferir. Haces la transferencia por fuera, subes el pantallazo y esperas a que el admin lo confirme. Apenas lo aprueba, tus pronósticos cuentan y tu plata entra al pozo.",
+    "q2": "¿Puedo crear mi propia polla?",
+    "a2": "No. Las pollas las arma el admin cada fin de semana; tú escoges en cuál entrar. Antes cualquiera podía crear la suya, pero ese modo se retiró: ahora hay un solo pozo por polla y el reparto es parejo para todos.",
     "q3": "¿Cómo se calculan los puntos?",
-    "a3": "Acertar el resultado exacto suma más puntos que solo acertar el ganador. Encontrarás la guía completa de puntaje en tu perfil dentro de la app, en la sección \"Cómo se gana\".",
+    "a3": "Depende del modo de la polla, y siempre está escrito adentro antes de que entres. En las pollas de local/empate/visitante, acertar vale 3 puntos y no hay más opciones. En las de marcador, clavar el marcador exacto vale 3 y acertarle a los goles de uno solo de los dos equipos vale 1. En las manuales, cada pregunta dice cuánto vale. Los puntos se calculan con el marcador de los 90 minutos: el alargue y los penales no suman.",
     "q4": "No me llega el SMS de verificación",
     "a4": "Verifica que el número esté escrito con el indicativo del país (ej. +57 para Colombia). Si después de un minuto no llega, usa la opción \"Recibir por WhatsApp\" en la pantalla de login.",
     "q5": "¿La app maneja dinero?",
-    "a5": "No. Es solo una herramienta de pronósticos entre amigos. Si tu polla tiene un monto de inscripción, ese dinero se mueve directamente entre los participantes (por fuera de la app). No procesamos pagos.",
+    "a5": "La app no cobra ni transfiere plata: no hay pasarela de pagos. Tú transfieres por fuera (Nequi, Daviplata, banco) y la app solo guarda el pantallazo para que el admin verifique el pago a mano. Lo que sí lleva la app es la cuenta: cuánto entró, cuánto va al pozo y a quién le toca. De cada entrada, el 70% va al pozo de los ganadores y el 30% se lo queda la casa; eso está escrito en cada polla antes de que pagues.",
     "q6": "¿Cómo elimino mi cuenta?",
     "a6Before": "Escríbenos a ",
     "a6After": " con tu número de WhatsApp registrado. Eliminamos tu cuenta y todos tus datos asociados en máximo 30 días.",
@@ -537,7 +537,7 @@
     "title": "Política de Privacidad",
     "subtitle": "Última actualización: junio 2026",
     "section1Title": "1. Información que recopilamos",
-    "section1Body": "Recopilamos la siguiente información cuando usas la app: tu nombre de perfil, número de WhatsApp, tus pronósticos de partidos y los resultados de tus predicciones (puntos, posición en la tabla). No recopilamos datos de ubicación, contactos ni información financiera.",
+    "section1Body": "Recopilamos la siguiente información cuando usas la app: tu nombre de perfil, número de WhatsApp, tus pronósticos de partidos y los resultados de tus predicciones (puntos, posición en la tabla). Cuando entras a una polla paga, también guardamos el comprobante de pago que subes (el pantallazo de tu transferencia) y el monto de la inscripción, únicamente para que el administrador pueda verificar el pago. Ese comprobante lo ve solo el administrador, se guarda en almacenamiento privado y no se comparte con nadie más. No recopilamos datos de ubicación, contactos, ni números de tarjeta o credenciales bancarias: la app no procesa pagos y nunca te pide esos datos.",
     "section2Title": "2. Cómo usamos tu información",
     "section2Body": "Usamos tu información para: calcular los puntos de tus pronósticos, mostrar las tablas de posiciones dentro de cada polla, enviar notificaciones y resultados por WhatsApp, y permitir que otros participantes de tu polla vean tu nombre y puntuación.",
     "section3Title": "3. Cómo compartimos tu información",

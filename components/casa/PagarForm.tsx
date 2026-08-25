@@ -40,11 +40,11 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
 
   async function enviar() {
     if (!file) {
-      setError("Subí el pantallazo de la transferencia.");
+      setError("Sube el pantallazo de la transferencia.");
       return;
     }
     if (esRifa && !ticket) {
-      setError("Elegí el número de boleta.");
+      setError("Elige el número de boleta.");
       return;
     }
 
@@ -69,7 +69,7 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
       // Un respiro para que se lea la confirmación antes de volver.
       setTimeout(() => router.push(`/casa/${slug}`), 1600);
     } catch {
-      setError("Se cayó la conexión. Probá otra vez.");
+      setError("Se cayó la conexión. Prueba otra vez.");
     } finally {
       setEnviando(false);
     }
@@ -80,7 +80,7 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
       <StreetCard hero className="p-6 text-center">
         <p className="lp-display-sm text-gold">Listo, ya quedó</p>
         <p className="mt-2 text-[13px] text-text-secondary">
-          A Tama le llegó tu pantallazo. Apenas lo confirme, entrás al pozo y
+          A Tama le llegó tu pantallazo. Apenas lo confirme, entras al pozo y
           tus pronósticos cuentan.
         </p>
       </StreetCard>
@@ -130,14 +130,14 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
           />
         ) : (
           <span className="text-[13px] text-text-muted">
-            Tocá acá para subir la foto
+            Toca acá para subir la foto
           </span>
         )}
       </button>
 
       {file && (
         <p className="mt-2 text-center text-[11px] text-text-muted">
-          {file.name} · tocá la imagen para cambiarla
+          {file.name} · toca la imagen para cambiarla
         </p>
       )}
 

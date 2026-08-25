@@ -39,7 +39,7 @@ export async function POST(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: "Necesitás iniciar sesión." }, { status: 401 });
+    return NextResponse.json({ error: "Necesitas iniciar sesión." }, { status: 401 });
   }
 
   const polla = await getPollaBySlug(params.slug);
@@ -70,7 +70,7 @@ export async function POST(
   }
   if (file.size > MAX_BYTES) {
     return NextResponse.json(
-      { error: "La imagen pesa mucho. Mandá una de menos de 8 MB." },
+      { error: "La imagen pesa mucho. Manda una de menos de 8 MB." },
       { status: 413 },
     );
   }
@@ -93,7 +93,7 @@ export async function POST(
   if (polla.kind === "rifa") {
     if (ticketNumber == null) {
       return NextResponse.json(
-        { error: "Elegí el número de boleta." },
+        { error: "Elige el número de boleta." },
         { status: 400 },
       );
     }
@@ -136,7 +136,7 @@ export async function POST(
     return NextResponse.json(
       {
         error: yaTomada
-          ? "Esa boleta ya la cogió alguien. Elegí otra."
+          ? "Esa boleta ya la cogió alguien. Elige otra."
           : "No pude registrar tu inscripción.",
       },
       { status: yaTomada ? 409 : 500 },
@@ -154,7 +154,7 @@ export async function POST(
   if (upErr) {
     console.error("[casa/join] fallo la subida:", redactId(entry.id), upErr.message);
     return NextResponse.json(
-      { error: "No pude guardar el pantallazo. Probá otra vez." },
+      { error: "No pude guardar el pantallazo. Prueba otra vez." },
       { status: 500 },
     );
   }
@@ -189,6 +189,6 @@ export async function POST(
     entryId: entry.id,
     status: "pendiente",
     mensaje:
-      "Listo, ya le llegó el pantallazo al admin. Apenas lo confirme, entrás al pozo.",
+      "Listo, ya le llegó el pantallazo al admin. Apenas lo confirme, entras al pozo.",
   });
 }

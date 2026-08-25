@@ -52,22 +52,22 @@ export async function generateMetadata(): Promise<Metadata> {
       site.locale === "es"
         ? [
             "polla deportiva",
-            "polla mundial 2026",
+            "polla del fin de semana",
+            "polla premier league",
             "polla champions league",
             "polla copa libertadores",
             "polla liga betplay",
             "quiniela futbol",
             "pronosticos futbol colombia",
-            "crear polla con amigos",
           ]
         : [
             "football pool",
-            "world cup 2026 pool",
+            "weekend football pool",
+            "premier league pool",
             "champions league pool",
             "copa libertadores pool",
             "liga betplay pool",
             "soccer predictions",
-            "create pool with friends",
           ],
     alternates: {
       canonical: "/",

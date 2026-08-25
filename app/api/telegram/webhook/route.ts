@@ -91,7 +91,7 @@ async function handleMessage(msg: TelegramMessage) {
           "<b>Panel de La Polla Colombiana</b>",
           "",
           "Este bot es solo para el admin.",
-          "Mandame el código de acceso para entrar.",
+          "Mándame el código de acceso para entrar.",
         ].join("\n"),
       );
       return;
@@ -105,7 +105,7 @@ async function handleMessage(msg: TelegramMessage) {
     if (result === "bloqueado") {
       await sendMessage(
         chatId,
-        "Demasiados intentos. Esperá 15 minutos y volvé a probar.",
+        "Demasiados intentos. Espera 15 minutos y vuelve a probar.",
       );
       return;
     }
@@ -139,7 +139,7 @@ async function handleMessage(msg: TelegramMessage) {
     await unlink(chatId);
     await sendMessage(
       chatId,
-      "Listo, este chat quedó desvinculado. Mandá el código otra vez si querés volver.",
+      "Listo, este chat quedó desvinculado. Manda el código otra vez si quieres volver.",
     );
     return;
   }
@@ -358,7 +358,7 @@ async function sendPollas(chatId: number) {
 
 async function closePolla(chatId: number, slug: string) {
   if (!slug) {
-    await sendMessage(chatId, "Decime cuál: <code>/cerrar nombre-de-la-polla</code>");
+    await sendMessage(chatId, "Dime cuál: <code>/cerrar nombre-de-la-polla</code>");
     return;
   }
   const db = createAdminClient();
@@ -379,7 +379,7 @@ async function closePolla(chatId: number, slug: string) {
 
 async function settlePolla(chatId: number, slug: string) {
   if (!slug) {
-    await sendMessage(chatId, "Decime cuál: <code>/resolver nombre-de-la-polla</code>");
+    await sendMessage(chatId, "Dime cuál: <code>/resolver nombre-de-la-polla</code>");
     return;
   }
   const db = createAdminClient();
@@ -417,7 +417,7 @@ Mandame <code>/numero ${esc(slug)} 47</code> con el que salió.`,
       await sendMessage(
         chatId,
         `<b>${esc(polla.name)}</b>
-Faltan ${pendientes.length} pregunta(s) por resolver. Decime cuál fue la respuesta:`,
+Faltan ${pendientes.length} pregunta(s) por resolver. Dime cuál fue la respuesta:`,
       );
 
       for (const q of pendientes as QuestionRow[]) {
@@ -425,7 +425,7 @@ Faltan ${pendientes.length} pregunta(s) por resolver. Decime cuál fue la respue
           await sendMessage(
             chatId,
             `<b>${esc(q.prompt)}</b>
-Esta es de respuesta libre. Mandame:
+Esta es de respuesta libre. Mándame:
 <code>/respuesta ${esc(slug)} ${q.id.slice(0, 12)} tu respuesta</code>`,
           );
           continue;
@@ -451,7 +451,7 @@ Esta es de respuesta libre. Mandame:
 
       await sendMessage(
         chatId,
-        `Cuando estén todas, mandá <code>/resolver ${esc(slug)}</code> otra vez y reparto el pozo.`,
+        `Cuando estén todas, manda <code>/resolver ${esc(slug)}</code> otra vez y reparto el pozo.`,
       );
       return;
     }
@@ -483,7 +483,7 @@ Esta es de respuesta libre. Mandame:
       `A cada uno: <b>${formatCop(r.each_cop)}</b>`,
       r.top_points != null ? `Puntaje ganador: ${r.top_points}` : "",
       "",
-      "Los pagos los hacés vos por fuera; acá queda el registro de a quién y cuánto.",
+      "Los pagos los haces tú por fuera; acá queda el registro de a quién y cuánto.",
     ]
       .filter(Boolean)
       .join("\n"),
@@ -626,7 +626,7 @@ async function setDrawnNumber(chatId: number, slug: string, n: number) {
   await sendMessage(
     chatId,
     `🎟 Número ganador de <b>${esc(polla.name)}</b>: <b>${n}</b>.
-Mandá <code>/resolver ${esc(slug)}</code> para repartir.`,
+Manda <code>/resolver ${esc(slug)}</code> para repartir.`,
   );
 }
 

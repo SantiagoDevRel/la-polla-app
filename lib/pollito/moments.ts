@@ -35,7 +35,7 @@ export const MOMENTS: Record<MomentKey, Moment> = {
     key: "M3",
     estado: "lider",
     title: "Marcador exacto",
-    dialog: (v) => `¡Pegaste el ${v.home}-${v.away} exacto! +5 puntos.`,
+    dialog: (v) => `¡Clavaste el ${v.home}-${v.away}! Puntaje completo.`,
     display: "inline",
   },
   M4: {
@@ -56,7 +56,7 @@ export const MOMENTS: Record<MomentKey, Moment> = {
     key: "M6",
     estado: "triste",
     title: "Racha mala",
-    dialog: () => "Uff. Tres seguidas. Pero un exacto vale 5. Todavía.",
+    dialog: () => "Uff. Tres seguidas. Pero todavía puedes clavar una.",
     display: "inline",
   },
   M7: {

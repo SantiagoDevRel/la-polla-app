@@ -131,7 +131,7 @@ export function PicksBoard({
           : "Guardado, quedaste con todo marcado.",
       });
     } catch {
-      setMsg({ text: "Se cayó la conexión. Probá otra vez.", bad: true });
+      setMsg({ text: "Se cayó la conexión. Prueba otra vez.", bad: true });
     } finally {
       setSaving(false);
     }

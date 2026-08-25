@@ -3,7 +3,7 @@
 // Guardar y leer los pronosticos de UNA persona en UNA polla.
 //
 // Reglas duras:
-//  * Solo se pronostica si tenés inscripcion (aunque el pago esté pendiente:
+//  * Solo se pronostica si tienes inscripcion (aunque el pago esté pendiente:
 //    asi la gente puede ir marcando mientras el admin confirma).
 //  * Se bloquea cuando la polla cierra (`closes_at`) y, ademas, partido por
 //    partido: un partido que ya arrancó no se puede pronosticar aunque la
@@ -85,7 +85,7 @@ export async function PUT(
   const entry = await getMyEntry(polla.id, user.id);
   if (!entry || entry.status === "rechazada" || entry.status === "anulada") {
     return NextResponse.json(
-      { error: "Primero tenés que inscribirte a la polla." },
+      { error: "Primero tienes que inscribirte a la polla." },
       { status: 403 },
     );
   }

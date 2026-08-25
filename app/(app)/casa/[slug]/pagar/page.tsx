@@ -54,7 +54,7 @@ export default async function PagarPage({
         <StreetCard className="p-4">
           <div className="flex items-end justify-between">
             <div>
-              <Label>Tenés que transferir</Label>
+              <Label>Tienes que transferir</Label>
               <div className="lp-money mt-1 text-[34px] leading-none text-gold">
                 {formatCop(entrada)}
               </div>
@@ -76,7 +76,7 @@ export default async function PagarPage({
               </span>
             </div>
             <div className="flex justify-between border-t border-border-subtle pt-1.5">
-              <span className="text-text-secondary">Pozo si entrás</span>
+              <span className="text-text-secondary">Pozo si entras</span>
               <span className="lp-money text-text-primary">
                 {formatCop(pot.prize_cop + alPozo)}
               </span>

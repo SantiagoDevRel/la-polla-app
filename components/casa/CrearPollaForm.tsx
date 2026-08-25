@@ -107,11 +107,11 @@ export function CrearPollaForm() {
 
   async function crear(publicar: boolean) {
     setError(null);
-    if (name.trim().length < 3) return setError("Ponele un nombre a la polla.");
+    if (name.trim().length < 3) return setError("Ponle un nombre a la polla.");
     if (kind === "partidos" && seleccion.length === 0)
-      return setError("Elegí al menos un partido.");
+      return setError("Elige al menos un partido.");
     if (kind === "manual" && preguntas.every((q) => !q.prompt.trim()))
-      return setError("Escribí al menos una pregunta.");
+      return setError("Escribe al menos una pregunta.");
 
     setGuardando(true);
     try {
@@ -526,7 +526,7 @@ export function CrearPollaForm() {
               className="lp-input mt-2 min-h-[84px] resize-none py-3"
             />
             <p className="mt-2 text-[11px] text-text-muted">
-              Escribilo clarito: es lo que la gente va a leer antes de pagar.
+              Escríbelo clarito: es lo que la gente va a leer antes de pagar.
             </p>
           </div>
         </StreetCard>

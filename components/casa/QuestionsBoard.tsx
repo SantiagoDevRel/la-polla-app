@@ -173,7 +173,7 @@ export function QuestionsBoard({
                     disabled={!editable}
                     value={mine?.freeText ?? ""}
                     onChange={(e) => escribir(q.id, e.target.value)}
-                    placeholder="Escribí tu respuesta"
+                    placeholder="Escribe tu respuesta"
                     className="lp-input"
                   />
                   {total > 0 && mine?.freeText?.trim() && (
