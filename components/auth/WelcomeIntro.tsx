@@ -1,11 +1,16 @@
-// components/auth/WelcomeIntro.tsx — First-ever-visit welcome
+// components/auth/WelcomeIntro.tsx — la bienvenida, una sola vez en la vida.
 //
-// Shown one time, ever, before the login form. Plays the stadium video
-// loop full-screen with a phased pitch reveal:
-//   1. Typewriter intro line.
-//   2. Tournament logo row fades in.
-//   3. Numbered steps cascade.
-//   4. "Todo esto es gratis." closes with the gold word emphasised.
+// Se muestra una unica vez, antes del formulario de login, y su unico trabajo
+// es que alguien que nunca vio esto entienda el producto en 15 segundos:
+//   1. Linea de intro que se escribe sola.
+//   2. Fila de escudos de los torneos.
+//   3. Los 5 pasos, en cascada: escoges, pagas, marcas, esperas, cobras.
+//   4. Remate: del pozo, el 70% es de ustedes.
+//
+// (2026-08-25) Antes cerraba con "Todo esto es GRATIS" sobre un video de
+// estadio a pantalla completa. Las dos cosas se fueron: la app ahora cobra
+// entrada, y el video se descargaba en datos moviles antes de que la persona
+// supiera siquiera de que se trata.
 //   5. CTA + credit line settle.
 //
 // Persisted via localStorage so returning users land straight on the
@@ -176,54 +181,43 @@ export function WelcomeIntro() {
           transition={{ duration: 0.7, ease: SMOOTH }}
           className="fixed inset-0 z-[10000] overflow-hidden bg-bg-base"
         >
-          {/* Stadium video — same source as AppBackground for visual
-              continuity into the rest of the app. Hidden under
-              prefers-reduced-motion; the poster carries the still. */}
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            poster="/videos/nuevo-background-poster.webp"
-            className="absolute inset-0 w-full h-full object-cover motion-reduce:hidden"
-            style={{ transform: "scale(1.18) translateY(-7%)" }}
-          >
-            <source src="/videos/nuevo-background.webm" type="video/webm" />
-            <source src="/videos/nuevo-background-lite.mp4" type="video/mp4" />
-          </video>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/videos/nuevo-background-poster.webp"
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover hidden motion-reduce:block"
-            style={{ transform: "scale(1.18) translateY(-7%)" }}
+          {/* El video de estadio SE FUE (2026-08-25). Dos razones:
+              1. Se descargaba en la PRIMERA visita, con datos moviles, antes
+                 de que la persona hubiera visto nada de la app. Un webm de
+                 fondo es lo ultimo que uno quiere pagarle a alguien que
+                 todavia no sabe si le interesa el producto.
+              2. El resto de la app dejo de usar video cuando el skin paso a
+                 concreto plano; esta pantalla quedaba siendo la unica con
+                 movimiento, y ademas mostraba el pollito gigante — el
+                 lenguaje que justamente se abandono.
+              Queda la caida de luz del fondo, igual que en el resto. */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(120% 90% at 50% 0%, rgba(216,255,71,0.07) 0%, rgba(216,255,71,0.02) 38%, transparent 70%)",
+            }}
           />
 
-          {/* Darken overlay so the copy stays readable over the moving
-              footage. Heavier than AppBackground (0.78) since we're
-              holding text longer here. */}
-          <div className="absolute inset-0 bg-bg-base/75" />
+          <div className="absolute inset-0 bg-bg-base/40" />
 
           {/* Soft radial vignette pulling focus to the center column. */}
           <div
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(70% 70% at 50% 45%, transparent 45%, rgba(8,12,16,0.7) 100%)",
+                "radial-gradient(70% 70% at 50% 45%, transparent 45%, rgba(10,10,11,0.75) 100%)",
             }}
           />
 
-          {/* Bottom fade — masks the small gap iOS Safari leaves under
-              the video (its translateY(-7%) shifts the bottom edge up).
-              Without this the gap reads as a visible black bar between
-              the footage and the CTA. The gradient lands at solid bg-
-              base at 100% so any gap blends in cleanly. */}
+          {/* Desvanecido inferior: entrega la pantalla al fondo solido para
+              que el CTA no quede flotando sobre un borde duro. */}
           <div
             className="absolute bottom-0 left-0 right-0 h-[200px] pointer-events-none"
             style={{
               background:
-                "linear-gradient(180deg, transparent 0%, rgba(8,12,16,0.7) 50%, rgba(8,12,16,1) 100%)",
+                "linear-gradient(180deg, transparent 0%, rgba(10,10,11,0.75) 50%, rgba(8,12,16,1) 100%)",
             }}
           />
 
