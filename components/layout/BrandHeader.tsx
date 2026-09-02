@@ -16,7 +16,6 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import WhatsAppBubble from "@/components/shared/WhatsAppBubble";
 import ReportProblemBubble from "@/components/shared/ReportProblemBubble";
 
 export default function BrandHeader() {
@@ -70,9 +69,17 @@ export default function BrandHeader() {
           </span>
         </div>
 
-        <div className="flex flex-shrink-0 items-center gap-2">
+        {/* (2026-09-02) Se fue el boton de WhatsApp. Decision del dueno: "por
+            ahora nada de bots, solo la UI del website" — el bot del backend
+            sigue existiendo, lo que se quita es la puerta de entrada desde el
+            header. WhatsAppBubble no se borro, quedo sin usar por si vuelve.
+            OJO: esto NO es el boton de WhatsApp del /login, que es el segundo
+            metodo de acceso a la cuenta cuando el SMS falla.
+            Se cae el gap-2 porque ya no hay dos burbujas que separar; el
+            flex-shrink-0 se queda porque con el text-zoom de accesibilidad es
+            lo que evita que el wordmark aplaste la burbuja. */}
+        <div className="flex flex-shrink-0 items-center">
           <ReportProblemBubble size={34} />
-          <WhatsAppBubble size={34} />
         </div>
       </div>
     </header>

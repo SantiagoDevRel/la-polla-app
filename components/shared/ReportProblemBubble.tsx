@@ -1,6 +1,6 @@
 // components/shared/ReportProblemBubble.tsx — Botón circular en el header
 // que abre un modal con un textarea para "reportar problema". Drop-anywhere:
-// se monta junto al WhatsAppBubble en BrandHeader y POSTea a /api/feedback.
+// se monta en BrandHeader (desde el 2026-09-02 es el unico boton del header) y POSTea a /api/feedback.
 // El user_id sale del cookie de Supabase server-side, así que el form solo
 // pide el mensaje — nada más para no agregar fricción.
 "use client";
@@ -12,7 +12,7 @@ import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 
 interface Props {
-  /** Visual size in px. Default 34 to match WhatsAppBubble. */
+  /** Visual size in px. Default 34. */
   size?: number;
   className?: string;
 }

@@ -11,11 +11,20 @@
 // Era una trampa: el boton mas conservador del formulario — el que uno toca
 // cuando no esta seguro — era el unico que perdia el trabajo.
 //
-// ALCANCE A PROPOSITO: publicar y anular. No edita campos.
-//   · publicar → borrador pasa a 'abierta'. Solo desde 'borrador'.
-//   · anular   → 'anulada'. listPublicPollas ya la filtra.
-// Cerrar y repartir NO viven aca: son del bot (/cerrar y /resolver), que ya
-// tiene los guards de partidos verificados y numero sorteado.
+// ALCANCE: publicar, cerrar, repartir y anular — el ciclo completo.
+//
+// (2026-09-02) Cerrar y repartir SE MUDARON ACA. Hasta hoy `/cerrar` y
+// `/resolver` existian UNICAMENTE como comandos del bot de Telegram, o sea
+// que la plata tenia una sola puerta: si el bot se caia, o el chat no estaba
+// vinculado, el pozo no se podia repartir salvo corriendo SQL a mano.
+// El dueño ademas pidio sacar los bots de la UI ("por ahora nada de bots"),
+// asi que la web pasa a ser el camino principal y no el respaldo.
+//
+// Los guards del bot NO se relajaron al mudarlos — se copiaron:
+//   · repartir exige que TODOS los partidos esten verificados (si no, esos
+//     cuentan 0 puntos y alguien cobra de menos),
+//   · una rifa exige el numero sorteado,
+//   · una polla manual exige sus preguntas resueltas.
 //
 // ⛔ NO se expone DELETE. Una polla puede tener inscripciones pagadas: borrarla
 // destruiria el rastro de plata de gente real. 'anulada' es reversible y
@@ -29,7 +38,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
-  action: z.enum(["publicar", "anular"]),
+  action: z.enum(["publicar", "cerrar", "repartir", "anular"]),
 });
 
 export async function PATCH(
@@ -77,6 +86,136 @@ export async function PATCH(
       );
     }
     return NextResponse.json({ ok: true, slug: data.slug, status: data.status });
+  }
+
+  // ── cerrar ───────────────────────────────────────────────────────────
+  // Deja de recibir inscripciones. NO reparte: son dos gestos separados a
+  // proposito, porque entre uno y otro hay que esperar a que terminen los
+  // partidos.
+  if (parsed.data.action === "cerrar") {
+    const { data, error } = await db
+      .from("casa_pollas")
+      .update({ status: "cerrada" })
+      .eq("id", params.id)
+      .eq("status", "abierta")
+      .select("id, slug, status")
+      .maybeSingle();
+
+    if (error) {
+      console.error("[casa/admin/pollas] cerrar:", error.message);
+      return NextResponse.json({ error: "No pude cerrarla." }, { status: 500 });
+    }
+    if (!data) {
+      return NextResponse.json(
+        { error: "Esa polla ya no está abierta." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ ok: true, slug: data.slug, status: data.status });
+  }
+
+  // ── repartir ─────────────────────────────────────────────────────────
+  if (parsed.data.action === "repartir") {
+    const { data: polla } = await db
+      .from("casa_pollas")
+      .select("id, slug, kind, status, drawn_number")
+      .eq("id", params.id)
+      .maybeSingle();
+
+    if (!polla) {
+      return NextResponse.json({ error: "No existe esa polla." }, { status: 404 });
+    }
+    if (polla.status === "resuelta") {
+      return NextResponse.json({ error: "Ya se repartió." }, { status: 409 });
+    }
+    if (polla.status !== "cerrada") {
+      return NextResponse.json(
+        { error: "Primero ciérrala. Repartir con la polla abierta dejaría entrar gente después del reparto." },
+        { status: 409 },
+      );
+    }
+
+    // Guard de la rifa: sin numero sorteado no hay a quien pagarle.
+    if (polla.kind === "rifa" && polla.drawn_number == null) {
+      return NextResponse.json(
+        { error: "Falta el número que salió. Regístralo antes de repartir." },
+        { status: 409 },
+      );
+    }
+
+    // Guard de las preguntas: una pregunta sin resolver puntúa 0 para todos.
+    if (polla.kind === "manual") {
+      const { data: qs } = await db
+        .from("casa_questions")
+        .select("id, prompt, resolved_at")
+        .eq("polla_id", polla.id);
+      const sinResolver = (qs ?? []).filter(
+        (q: { resolved_at: string | null }) => !q.resolved_at,
+      );
+      if (sinResolver.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Faltan ${sinResolver.length} pregunta(s) por resolver. Si reparto ahora, esas cuentan 0 para todos.`,
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    // Guard de los partidos: EL MAS IMPORTANTE. Un partido sin verificar
+    // puntúa 0, así que repartir antes de tiempo le paga de menos a quien
+    // acertó — y el reparto no se puede deshacer.
+    if (polla.kind === "partidos") {
+      const { data: links } = await db
+        .from("casa_polla_matches")
+        .select("match_id")
+        .eq("polla_id", polla.id);
+      const ids = (links ?? []).map((l: { match_id: string }) => l.match_id);
+
+      if (ids.length > 0) {
+        const { data: ms } = await db
+          .from("matches")
+          .select("id, home_team, away_team, final_verified_at")
+          .in("id", ids);
+        const sinVerificar = (ms ?? []).filter(
+          (m: { final_verified_at: string | null }) => !m.final_verified_at,
+        );
+        if (sinVerificar.length > 0) {
+          const nombres = sinVerificar
+            .slice(0, 4)
+            .map(
+              (m: { home_team: string; away_team: string }) =>
+                `${m.home_team} vs ${m.away_team}`,
+            )
+            .join(", ");
+          return NextResponse.json(
+            {
+              error: `Faltan ${sinVerificar.length} partido(s) por verificar (${nombres}). Si reparto ahora esos cuentan 0 y alguien cobra de menos.`,
+            },
+            { status: 409 },
+          );
+        }
+      }
+    }
+
+    const { data: repartido, error } = await db.rpc("casa_settle_polla", {
+      p_polla_id: polla.id,
+    });
+    if (error) {
+      console.error("[casa/admin/pollas] repartir:", error.message);
+      return NextResponse.json(
+        { error: `No pude repartir: ${error.message}` },
+        { status: 500 },
+      );
+    }
+
+    const r = repartido as {
+      prize_cop: number;
+      winners: number;
+      each_cop: number;
+      top_points: number;
+    } | null;
+    return NextResponse.json({ ok: true, slug: polla.slug, reparto: r });
   }
 
   // anular — se permite desde borrador o abierta. Una polla ya 'liquidada' no

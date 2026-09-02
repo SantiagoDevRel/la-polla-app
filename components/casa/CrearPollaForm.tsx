@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { formatCop, formatMatchTime } from "@/lib/casa/format";
+import { LOCK_MINUTES } from "@/lib/casa/types";
 import { CREATABLE_TOURNAMENTS, getTournamentLogo } from "@/lib/tournaments";
 
 type Kind = "partidos" | "manual" | "rifa";
@@ -55,7 +56,21 @@ export function CrearPollaForm() {
   const [precio, setPrecio] = useState(10000);
   const [houseCut, setHouseCut] = useState(30);
   const [closesAt, setClosesAt] = useState(proximoCierre);
+
+  // ── Premio ─────────────────────────────────────────────────────────
+  // Antes solo existia un input de texto libre "Premio en objeto". Para
+  // decir "el premio es el pozo" habia que escribirlo a mano, con lo que
+  // cada polla lo contaba distinto y la cifra nunca se actualizaba sola.
+  const [prizeKind, setPrizeKind] = useState<"pozo" | "objeto">("pozo");
   const [premioObjeto, setPremioObjeto] = useState("");
+  const [prizeImagePath, setPrizeImagePath] = useState<string | null>(null);
+  const [prizeImageUrl, setPrizeImageUrl] = useState<string | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+
+  // ── Cierre ─────────────────────────────────────────────────────────
+  // "auto" lo calcula el SERVER a partir del primer partido; el input de
+  // fecha solo se usa en "manual".
+  const [closeMode, setCloseMode] = useState<"auto" | "manual">("auto");
 
   // Cuenta de cobro. Se pre-llena con la de la última polla creada: la casa
   // casi siempre cobra a la misma, y volver a escribirla cada vez es la clase
@@ -76,6 +91,8 @@ export function CrearPollaForm() {
   const [matches, setMatches] = useState<MatchOption[]>([]);
   const [seleccion, setSeleccion] = useState<string[]>([]);
   const [cargando, setCargando] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   // ── Cierre vs primer pitazo ──────────────────────────────────────────
   // (2026-09-02) El default era "el proximo sabado a las 12:00", fijo. Para
@@ -101,8 +118,17 @@ export function CrearPollaForm() {
 
   useEffect(() => {
     if (cierreTocado.current || primerKickoff === null) return;
-    setClosesAt(toLocalInput(new Date(primerKickoff - 15 * 60_000)));
+    // Prellena el input de manual con el mismo valor que usaria el modo
+    // automatico, para que cambiar de modo no sea un salto brusco.
+    setClosesAt(toLocalInput(new Date(primerKickoff - LOCK_MINUTES * 60_000)));
   }, [primerKickoff]);
+
+  // El cierre automatico necesita partidos de donde sacar la hora. En una
+  // polla manual o una rifa no hay primer pitazo, asi que el modo se cae
+  // solo a manual en vez de dejar una opcion que el server va a rechazar.
+  useEffect(() => {
+    if (kind !== "partidos" && closeMode === "auto") setCloseMode("manual");
+  }, [kind, closeMode]);
 
   const cierreTarde =
     primerKickoff !== null && new Date(closesAt).getTime() > primerKickoff;
@@ -149,6 +175,66 @@ export function CrearPollaForm() {
       .finally(() => setCargando(false));
   }, [kind, tournament]);
 
+  /**
+   * Trae el calendario de ESPN para el torneo elegido y vuelve a pedir los
+   * partidos. Es admin-only del lado del server; el boton solo existe cuando
+   * la lista vino vacia.
+   */
+  async function traerDeEspn() {
+    setSincronizando(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch("/api/admin/sync-ligas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tournament }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSyncMsg(json.error ?? "No se pudo traer el calendario.");
+        return;
+      }
+      const r = await fetch(`/api/casa/admin/matches?tournament=${tournament}`);
+      const j = await r.json().catch(() => ({}));
+      const traidos = j.matches ?? [];
+      setMatches(traidos);
+      setSyncMsg(
+        traidos.length > 0
+          ? `Listo: ${traidos.length} partidos.`
+          : "ESPN tampoco tiene partidos próximos de este torneo. Puede estar fuera de temporada.",
+      );
+    } catch {
+      setSyncMsg("Se cayó la conexión.");
+    } finally {
+      setSincronizando(false);
+    }
+  }
+
+  async function subirFoto(file: File | null) {
+    if (!file) return;
+    setSubiendoFoto(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/casa/admin/prize-image", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error ?? "No se pudo subir la imagen.");
+        return;
+      }
+      setPrizeImagePath(json.path);
+      setPrizeImageUrl(json.url);
+    } catch {
+      setError("Se cayó la conexión al subir la imagen.");
+    } finally {
+      setSubiendoFoto(false);
+    }
+  }
+
   function toggleMatch(id: string) {
     setSeleccion((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
@@ -168,6 +254,8 @@ export function CrearPollaForm() {
       return setError("Escribe al menos una pregunta.");
     if (kind === "rifa" && premioObjeto.trim().length < 3)
       return setError("Escribe qué se rifa.");
+    if (prizeKind === "objeto" && premioObjeto.trim().length < 3)
+      return setError("Escribe cuál es el premio.");
     if (publicar && precio > 0 && payoutAccount.trim().length < 5)
       return setError("Falta la cuenta de cobro: sin eso nadie puede pagar.");
 
@@ -178,8 +266,13 @@ export function CrearPollaForm() {
         description: description.trim() || undefined,
         entryPriceCop: precio,
         houseCutPct: houseCut,
+        // En modo auto el server ignora este valor y lo recalcula desde el
+        // primer partido; se manda igual porque el schema lo exige.
         closesAt: new Date(closesAt).toISOString(),
+        closeMode,
+        prizeKind,
         prizeObject: premioObjeto.trim() || undefined,
+        prizeImagePath: prizeImagePath ?? undefined,
         payoutMethod: payoutMethod.trim() || undefined,
         payoutAccount: payoutAccount.trim() || undefined,
         payoutAccountName: payoutAccountName.trim() || undefined,
@@ -349,45 +442,169 @@ export function CrearPollaForm() {
           </p>
         </div>
 
+        {/* ── Cuándo cierra ──────────────────────────────────────────
+              El modo automático es el default porque es el que casi siempre
+              se quiere y el que no se puede equivocar: la hora la calcula el
+              server leyendo los partidos, no el navegador. */}
         <div>
-          <Label>Cierra</Label>
-          <input
-            type="datetime-local"
-            value={closesAt}
-            onChange={(e) => {
-              // Tocarlo a mano apaga el ajuste automatico: a partir de aca
-              // manda el criterio del admin, no el calculo.
-              cierreTocado.current = true;
-              setClosesAt(e.target.value);
-            }}
-            className="lp-input mt-2"
-          />
-          {cierreTarde ? (
-            <p className="mt-2 text-[12px] font-semibold text-red-alert">
-              El cierre queda DESPUES de que arranque el primer partido
-              seleccionado. Quien entre despues del pitazo ya sabria el
-              resultado.
+          <Label>Cuándo cierra</Label>
+          <div className="mt-2 grid grid-cols-2 gap-px">
+            {(
+              [
+                { v: "auto", t: "Automático" },
+                { v: "manual", t: "Fecha manual" },
+              ] as const
+            ).map((o) => {
+              const on = closeMode === o.v;
+              const off = o.v === "auto" && kind !== "partidos";
+              return (
+                <button
+                  key={o.v}
+                  type="button"
+                  disabled={off}
+                  onClick={() => setCloseMode(o.v)}
+                  className={`px-4 py-3 text-[14px] font-semibold transition-colors ${
+                    on
+                      ? "bg-gold text-bg-base"
+                      : off
+                        ? "bg-bg-elevated text-text-muted opacity-40"
+                        : "bg-bg-elevated text-text-secondary"
+                  }`}
+                >
+                  {o.t}
+                </button>
+              );
+            })}
+          </div>
+
+          {closeMode === "auto" ? (
+            <p className="mt-2 text-[12px] leading-relaxed text-text-secondary">
+              Cierra 5 minutos antes de que arranque el primer partido que
+              elijas
+              {primerKickoff !== null ? (
+                <>
+                  {" "}
+                  &mdash;{" "}
+                  <span className="text-text-primary">
+                    {formatMatchTime(
+                      new Date(primerKickoff - LOCK_MINUTES * 60_000).toISOString(),
+                    )}
+                  </span>
+                </>
+              ) : (
+                ". Elige los partidos abajo y aquí te muestro la hora exacta."
+              )}
             </p>
           ) : (
-            <p className="mt-2 text-[11px] text-text-muted">
-              {primerKickoff
-                ? "Se ajusto solo a 15 minutos antes del primer partido. Puedes cambiarlo."
-                : "Hora de tu telefono."}
-            </p>
+            <>
+              <input
+                type="datetime-local"
+                value={closesAt}
+                onChange={(e) => {
+                  cierreTocado.current = true;
+                  setClosesAt(e.target.value);
+                }}
+                className="lp-input mt-2"
+              />
+              {cierreTarde ? (
+                // No es un error que impida publicar: es una decisión válida
+                // (dejar entrar gente el domingo aunque el sábado ya se jugó).
+                // Pero tiene que estar dicho, porque cambia lo que recibe el
+                // que entra tarde.
+                <p className="mt-2 text-[12px] leading-relaxed text-amber">
+                  Cierra después de que arranque el primer partido. Quien entre
+                  tarde igual va a poder inscribirse, pero NO va a poder
+                  pronosticar los partidos ya empezados: entra con esos puntos
+                  perdidos.
+                </p>
+              ) : (
+                <p className="mt-2 text-[11px] text-text-muted">
+                  Hora de tu teléfono.
+                </p>
+              )}
+            </>
           )}
         </div>
 
-        {kind !== "rifa" && (
+        {/* ── El premio ──────────────────────────────────────────────── */}
         <div>
-          <Label>Premio en objeto (opcional)</Label>
-          <input
-            value={premioObjeto}
-            onChange={(e) => setPremioObjeto(e.target.value)}
-            placeholder="Camiseta del Nacional"
-            className="lp-input mt-2"
-          />
+          <Label>Premio</Label>
+          <div className="mt-2 grid grid-cols-2 gap-px">
+            {(
+              [
+                { v: "pozo", t: "El pozo" },
+                { v: "objeto", t: "Un objeto" },
+              ] as const
+            ).map((o) => {
+              const on = prizeKind === o.v;
+              return (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => setPrizeKind(o.v)}
+                  className={`px-4 py-3 text-[14px] font-semibold transition-colors ${
+                    on ? "bg-gold text-bg-base" : "bg-bg-elevated text-text-secondary"
+                  }`}
+                >
+                  {o.t}
+                </button>
+              );
+            })}
+          </div>
+
+          {prizeKind === "pozo" ? (
+            // La cifra es VIVA: crece con cada inscripción. Por eso se muestra
+            // calculada y no como un texto que el admin escriba.
+            <div className="mt-3 border border-border-subtle bg-bg-elevated p-3">
+              <span className="lp-label block">Se lleva el ganador</span>
+              <div className="lp-money mt-1 text-[26px] leading-none text-gold">
+                {formatCop(alPozo)}
+                <span className="lp-label ml-2 inline text-text-muted">
+                  por cada inscrito
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
+                El {100 - houseCut}% de todo lo que entre. Con {precio > 0 ? "10" : "N"}{" "}
+                inscritos serían {formatCop(alPozo * 10)}.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <input
+                value={premioObjeto}
+                onChange={(e) => setPremioObjeto(e.target.value)}
+                placeholder="iPhone 15, camiseta del Nacional..."
+                className="lp-input"
+              />
+              <label className="block">
+                <span className="lp-label">Foto (opcional)</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => subirFoto(e.target.files?.[0] ?? null)}
+                  className="lp-input mt-2 file:mr-3 file:border-0 file:bg-bg-card file:px-3 file:py-1 file:text-[13px] file:text-text-secondary"
+                />
+              </label>
+              {subiendoFoto && (
+                <p className="text-[12px] text-text-muted">Subiendo la foto...</p>
+              )}
+              {prizeImageUrl && (
+                <div className="flex items-center gap-3 border border-border-subtle bg-bg-elevated p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={prizeImageUrl}
+                    alt="Foto del premio"
+                    className="h-14 w-14 max-w-none shrink-0 object-cover"
+                  />
+                  <span className="text-[12px] text-text-secondary">
+                    Lista. Se muestra en la polla.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-        )}
+
       </StreetCard>
 
       {/* ── Partidos ────────────────────────────────────────────────────── */}
@@ -463,8 +680,26 @@ export function CrearPollaForm() {
                 Cargando partidos...
               </StreetCard>
             ) : matches.length === 0 ? (
-              <StreetCard className="p-6 text-center text-[13px] text-text-muted">
-                No hay partidos programados en los próximos 10 días para ese torneo.
+              // (2026-09-02) Antes esto solo decía "no hay partidos" y se leía
+              // como un error de la app: el admin elegía Champions o BetPlay,
+              // veía la caja vacía y no tenía nada que hacer al respecto.
+              // La causa real es que esas ligas nunca se sincronizaron, y ESPN
+              // sí las tiene — así que acá va el botón que las trae.
+              <StreetCard className="p-5 text-center">
+                <p className="text-[13px] text-text-secondary">
+                  No hay partidos cargados de este torneo.
+                </p>
+                <button
+                  type="button"
+                  onClick={traerDeEspn}
+                  disabled={sincronizando}
+                  className="lp-btn lp-btn-ghost mt-3 h-10 min-h-0 w-full text-[14px]"
+                >
+                  {sincronizando ? "Trayendo el calendario..." : "Traer el calendario"}
+                </button>
+                {syncMsg && (
+                  <p className="mt-2 text-[12px] text-text-muted">{syncMsg}</p>
+                )}
               </StreetCard>
             ) : (
               <ul className="max-h-[420px] space-y-px overflow-y-auto">

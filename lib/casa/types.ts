@@ -12,6 +12,11 @@ export type CasaPollaStatus =
   | "resuelta"
   | "anulada";
 export type CasaEntryStatus = "pendiente" | "pagada" | "rechazada" | "anulada";
+export type CasaPrizeKind = "pozo" | "objeto";
+export type CasaCloseMode = "auto" | "manual";
+
+/** Margen antes del pitazo. UN solo numero para todo el repo. */
+export const LOCK_MINUTES = 5;
 
 /** L = local gana · E = empate · V = visitante gana. Las UNICAS 3 opciones. */
 export type Pick1x2 = "L" | "E" | "V";
@@ -27,7 +32,17 @@ export interface CasaPolla {
 
   entry_price_cop: number;
   house_cut_pct: number;
+
+  /**
+   * Que ES el premio (migracion 089).
+   *   "pozo"   -> plata: el 70% recaudado. La UI muestra la cifra VIVA que
+   *               devuelve casa_polla_pot, no un texto escrito a mano.
+   *   "objeto" -> una cosa. Ahi manda prize_object y la foto opcional.
+   */
+  prize_kind: CasaPrizeKind;
   prize_object: string | null;
+  /** Ruta en el bucket publico `prize-images`. Solo para prize_kind objeto. */
+  prize_image_path: string | null;
 
   points_exact: number;
   points_one_team: number;
@@ -36,6 +51,12 @@ export interface CasaPolla {
   status: CasaPollaStatus;
   opens_at: string;
   closes_at: string;
+  /**
+   * Como se calculo `closes_at` (migracion 089). No lo lee la logica de
+   * apertura — para eso esta closes_at — pero deja explicar en la UI por que
+   * cierra a esa hora, y permitiria recalcularlo si se reprograma un partido.
+   */
+  close_mode: CasaCloseMode;
 
   ticket_count: number | null;
   draw_method: string | null;
@@ -147,7 +168,7 @@ export interface CasaDistribution {
    Regla dura del repo: nunca `select("*")` en tablas con datos de usuario.
    Enumerar evita que una columna sensible futura se filtre sola. */
 export const CASA_POLLA_COLUMNS =
-  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_object, points_exact, points_one_team, points_result, status, opens_at, closes_at, ticket_count, draw_method, drawn_number, settled_at, settle_notes, payout_method, payout_account, payout_account_name, created_by, created_at" as const;
+  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_kind, prize_object, prize_image_path, points_exact, points_one_team, points_result, status, opens_at, closes_at, close_mode, ticket_count, draw_method, drawn_number, settled_at, settle_notes, payout_method, payout_account, payout_account_name, created_by, created_at" as const;
 
 export const CASA_ENTRY_COLUMNS =
   "id, polla_id, user_id, status, amount_cop, proof_path, proof_uploaded_at, reviewed_at, reject_reason, ticket_number, created_at" as const;

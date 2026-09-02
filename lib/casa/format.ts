@@ -5,6 +5,19 @@
 // se escribe un peso.
 
 /** $1.250.000 — sin decimales, separador de miles con punto (es-CO). */
+/**
+ * URL publica de la foto del premio (bucket `prize-images`, migracion 089).
+ *
+ * Se arma a mano en vez de pedirle a supabase-js un cliente: es una URL fija y
+ * publica, y esto lo usan Server Components donde crear un cliente de Storage
+ * para resolver una cadena seria puro peso. Si el bucket dejara de ser publico,
+ * este es el unico lugar que hay que cambiar.
+ */
+export function prizeImageUrl(path: string): string {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  return `${base}/storage/v1/object/public/prize-images/${path}`;
+}
+
 export function formatCop(cop: number): string {
   return `$${Math.round(cop).toLocaleString("es-CO")}`;
 }

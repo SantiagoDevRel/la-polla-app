@@ -12,6 +12,7 @@ import { isCurrentUserAdmin, getAuthenticatedUser } from "@/lib/auth/admin";
 import { slugify } from "@/lib/casa/format";
 import { listAllPollas } from "@/lib/casa/queries";
 import { isCreatableTournament } from "@/lib/tournaments";
+import { LOCK_MINUTES } from "@/lib/casa/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,7 +23,13 @@ const baseSchema = z.object({
   entryPriceCop: z.number().int().min(0).max(10_000_000),
   houseCutPct: z.number().int().min(0).max(100).default(30),
   closesAt: z.string().datetime(),
+  // Como se calcula el cierre (migracion 089). En "auto" el server IGNORA el
+  // closesAt que mande el cliente y lo deriva del primer partido: el navegador
+  // no es fuente de verdad para algo que decide hasta cuando entra plata.
+  closeMode: z.enum(["auto", "manual"]).default("manual"),
+  prizeKind: z.enum(["pozo", "objeto"]).default("pozo"),
   prizeObject: z.string().trim().max(160).optional(),
+  prizeImagePath: z.string().trim().max(300).optional(),
   // A dónde transfiere la gente. Opcional en el schema porque un borrador
   // puede quedar a medias, pero obligatorio para PUBLICAR una polla paga
   // (se valida abajo): sin esto nadie puede completar el pago.
@@ -107,9 +114,60 @@ export async function POST(req: NextRequest) {
   }
   const body = parsed.data;
 
-  if (new Date(body.closesAt) <= new Date()) {
+  const db = createAdminClient();
+
+  // ── Cuando cierra ──────────────────────────────────────────────────────
+  // En modo AUTO el cierre se deriva del primer partido menos 5 minutos, y se
+  // calcula ACA, no en el navegador: `closes_at` decide hasta cuando entra
+  // plata, asi que la hora la pone el server leyendo `matches`, no un valor
+  // que el cliente puede editar con las devtools.
+  //
+  // Los 5 minutos son el mismo margen que el lock por partido de
+  // app/api/casa/pollas/[slug]/picks/route.ts. Que sean el mismo numero no es
+  // casual: en auto, cerrar la polla y bloquear el primer partido pasan a la
+  // vez, que es justo lo que se espera de "cierra cuando arranca".
+  let closesAt = body.closesAt;
+
+  if (body.closeMode === "auto") {
+    if (body.kind !== "partidos") {
+      return NextResponse.json(
+        { error: "El cierre automático solo aplica a las pollas de partidos." },
+        { status: 400 },
+      );
+    }
+    const { data: elegidos, error: mErr } = await db
+      .from("matches")
+      .select("scheduled_at")
+      .in("id", body.matchIds);
+
+    if (mErr || !elegidos || elegidos.length === 0) {
+      return NextResponse.json(
+        { error: "No pude leer los partidos para calcular el cierre." },
+        { status: 500 },
+      );
+    }
+    const primerKickoff = Math.min(
+      ...elegidos.map((m: { scheduled_at: string }) =>
+        new Date(m.scheduled_at).getTime(),
+      ),
+    );
+    if (!Number.isFinite(primerKickoff)) {
+      return NextResponse.json(
+        { error: "Alguno de los partidos no tiene fecha válida." },
+        { status: 500 },
+      );
+    }
+    closesAt = new Date(primerKickoff - LOCK_MINUTES * 60_000).toISOString();
+  }
+
+  if (new Date(closesAt) <= new Date()) {
     return NextResponse.json(
-      { error: "La fecha de cierre tiene que ser futura." },
+      {
+        error:
+          body.closeMode === "auto"
+            ? "El primer partido que elegiste ya arrancó (o le faltan menos de 5 minutos)."
+            : "La fecha de cierre tiene que ser futura.",
+      },
       { status: 400 },
     );
   }
@@ -127,8 +185,6 @@ export async function POST(req: NextRequest) {
       );
     }
   }
-
-  const db = createAdminClient();
 
   // Slug unico: si ya existe, le pega un sufijo corto en vez de fallar.
   let slug = slugify(body.name);
@@ -150,7 +206,13 @@ export async function POST(req: NextRequest) {
       scoring_mode: body.kind === "partidos" ? body.scoringMode : null,
       entry_price_cop: body.entryPriceCop,
       house_cut_pct: body.houseCutPct,
-      prize_object: body.prizeObject ?? null,
+      prize_kind: body.prizeKind,
+      // La descripcion y la foto SOLO tienen sentido si el premio es un objeto.
+      // Guardarlas en una polla de pozo dejaria texto huerfano que la UI no
+      // muestra y que confunde al que abre la fila en la base.
+      prize_object: body.prizeKind === "objeto" ? (body.prizeObject ?? null) : null,
+      prize_image_path:
+        body.prizeKind === "objeto" ? (body.prizeImagePath ?? null) : null,
       // En 1X2 el marcador exacto no aplica; dejamos los puntos coherentes con
       // el modo para que la tabla no muestre reglas que no se usan.
       points_result: 3,
@@ -161,7 +223,8 @@ export async function POST(req: NextRequest) {
       // dejaba una polla visible y cobrable aunque el insert de los partidos
       // fallara justo despues.
       status: "borrador",
-      closes_at: body.closesAt,
+      closes_at: closesAt,
+      close_mode: body.closeMode,
       ticket_count: body.kind === "rifa" ? body.ticketCount : null,
       draw_method: body.kind === "rifa" ? body.drawMethod : null,
       payout_method: body.payoutMethod ?? null,
