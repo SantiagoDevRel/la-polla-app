@@ -196,32 +196,64 @@ function findFdMatch(match: MatchRow, fdMatches: FDMatch[]): FDMatch | null {
 export async function verifyPendingFinals(): Promise<VerifyResult[]> {
   const admin = createAdminClient();
 
-  // Solo matches recién finalizados sin verificar QUE TIENEN AL MENOS
-  // UNA PREDICCIÓN ASOCIADA. Si un match no está en ninguna polla, no
-  // hay scoring que ejecutar.
-  const { data, error } = await admin
-    .from("matches")
-    .select(
-      "id, external_id, espn_id, tournament, phase, home_team, away_team, home_score, away_score, status, scheduled_at, final_verified_at, final_verification_notes, live_status_detail, regulation_home_score, regulation_away_score, predictions!inner(id)",
-    )
-    .eq("status", "finished")
-    .is("final_verified_at", null)
-    // Bound temporal: legacy finished-unverified de torneos viejos no deben
-    // quemar cuota football-data cada minuto — esos van por el cron diario
-    // de discrepancias + resolución manual.
-    .gte("scheduled_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+  // Solo matches recién finalizados sin verificar QUE ESTÁN EN ALGUNA POLLA.
+  // Si un match no lo juega nadie, no hay scoring que ejecutar y no vale
+  // quemarle cuota a football-data.
+  //
+  // 🚨 (2026-09-02) SON DOS CONSULTAS, Y ESO NO ES UN CAPRICHO.
+  // Hasta hoy había una sola, con `predictions!inner(id)` — o sea el modelo
+  // P2P viejo. Un partido que SOLO vive en una polla de la casa se relaciona
+  // por `casa_polla_matches`, nunca tiene filas en `predictions`, y el INNER
+  // JOIN lo descartaba en silencio. Consecuencia en cadena:
+  //   sin candidato -> nunca se escribe final_verified_at
+  //   -> casa_score_polla devuelve 0 (082_casa_scoring_and_pot.sql:79 corta
+  //      con `WHEN m.final_verified_at IS NULL THEN 0`)
+  //   -> el trigger de la 086 tampoco dispara, porque dispara EN esa
+  //      transición
+  // O sea: ninguna polla de la casa habría puntuado jamás, y el único
+  // desbloqueo era llamar finalize_match_result a mano por SQL.
+  //
+  // No se puede hacer con un OR: PostgREST no sabe expresar "inner join con A
+  // O inner join con B" en un solo select. Se piden las dos listas y se
+  // fusionan por id — el `seen` de abajo ya estaba preparado para deduplicar.
+  const COLS =
+    "id, external_id, espn_id, tournament, phase, home_team, away_team, home_score, away_score, status, scheduled_at, final_verified_at, final_verification_notes, live_status_detail, regulation_home_score, regulation_away_score";
+  // Bound temporal: legacy finished-unverified de torneos viejos no deben
+  // quemar cuota football-data cada minuto — esos van por el cron diario
+  // de discrepancias + resolución manual.
+  const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  if (error) {
-    console.error("[verify-final] db query failed:", error.message);
-    return [];
-  }
+  const [p2p, casa] = await Promise.all([
+    admin
+      .from("matches")
+      .select(`${COLS}, predictions!inner(id)`)
+      .eq("status", "finished")
+      .is("final_verified_at", null)
+      .gte("scheduled_at", desde),
+    admin
+      .from("matches")
+      .select(`${COLS}, casa_polla_matches!inner(id)`)
+      .eq("status", "finished")
+      .is("final_verified_at", null)
+      .gte("scheduled_at", desde),
+  ]);
+
+  // Si UNA de las dos falla, se sigue con la otra: perder los candidatos de
+  // un modelo es malo, perder los de los dos porque uno se cayó es peor.
+  if (p2p.error) console.error("[verify-final] query p2p falló:", p2p.error.message);
+  if (casa.error) console.error("[verify-final] query casa falló:", casa.error.message);
+  if (p2p.error && casa.error) return [];
+
   const seen = new Set<string>();
   const candidates: MatchRow[] = [];
-  for (const row of (data ?? []) as Array<MatchRow & { predictions: unknown }>) {
+  for (const row of [...(p2p.data ?? []), ...(casa.data ?? [])] as Array<
+    MatchRow & { predictions?: unknown; casa_polla_matches?: unknown }
+  >) {
     if (seen.has(row.id)) continue;
     seen.add(row.id);
-    const { predictions: _join, ...rest } = row;
-    void _join;
+    const { predictions: _p, casa_polla_matches: _c, ...rest } = row;
+    void _p;
+    void _c;
     candidates.push(rest as MatchRow);
   }
   if (candidates.length === 0) return [];

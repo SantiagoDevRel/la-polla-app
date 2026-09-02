@@ -103,16 +103,16 @@ export default async function PagarPage({
               </p>
             )}
             <p className="mt-3 border-t border-border-subtle pt-3 text-[12px] text-text-muted">
-              Manda exactamente {formatCop(entrada)}. Después subes el pantallazo
-              acá abajo y Tama lo confirma.
+              Transfiere exactamente {formatCop(entrada)}. Luego subes el
+              comprobante aquí abajo y lo confirmamos.
             </p>
           </StreetCard>
         ) : (
           <div className="border border-red-alert/40 bg-red-alert/10 p-3">
             <p className="lp-label text-red-alert">Falta la cuenta de cobro</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              Esta polla todavía no tiene a dónde transferir. Avísale a Tama
-              antes de mandar plata a ningún lado.
+              Esta polla todavía no tiene cuenta de cobro. Avisa al
+              administrador antes de transferir dinero.
             </p>
           </div>
         )}
@@ -124,8 +124,8 @@ export default async function PagarPage({
         />
 
         <p className="text-center text-[11px] leading-relaxed text-text-muted">
-          El pantallazo lo revisa Tama a mano. Se guarda solo para verificar tu
-          pago. Si algo no cuadra, te lo rechaza y te avisa.
+          El administrador revisa el comprobante. Se guarda solo para verificar
+          tu pago. Si hay un error, lo rechaza y te avisa.
         </p>
       </div>
     </div>

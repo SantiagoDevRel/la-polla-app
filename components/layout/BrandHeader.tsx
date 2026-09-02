@@ -1,10 +1,18 @@
 // components/layout/BrandHeader.tsx — la marca, arriba, en todas las pantallas.
 //
-// PARCHE v1.0 (2026-08-25): el wordmark era tricolor (dorado/azul/rojo) con
-// sombra y blur detrás. Tres colores compitiendo en 20px se leen como banner
-// de página vieja, no como marca. Ahora es monocromo con UNA palabra en el
-// acento, sobre una barra sólida con hairline abajo. El pollito se queda —
-// es la marca — pero baja a 26px: pasa de mascota protagonista a firma.
+// (2026-09-02) Vuelve el header de Tribuna Caliente. El interludio "Parche"
+// lo habia dejado monocromo, sobre una barra opaca, con el pollito reducido a
+// 26px "de firma". El resultado era un encabezado que podia ser el de
+// cualquier app: sin bandera, sin mascota y sin el fondo asomandose.
+//
+// Lo que vuelve, y por que:
+//   · Pollito a 40px. Es LA marca de este producto, no una firma al pie.
+//     (40 y no los 44 originales: con el text-zoom de accesibilidad al 200%
+//     los 44 empujaban el wordmark contra las burbujas.)
+//   · Wordmark tricolor — oro/azul/rojo es la bandera, y es lo que hace que
+//     se lea "colombiana" antes de leer la palabra.
+//   · Barra translucida con blur en vez de opaca: deja ver el estadio
+//     pasando por debajo al hacer scroll, que es la capa que da profundidad.
 "use client";
 
 import { useTranslations } from "next-intl";
@@ -18,31 +26,53 @@ export default function BrandHeader() {
   const part3 = t("wordmarkPart3");
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border-subtle bg-bg-base px-4 py-3">
+    <header
+      className="sticky top-0 z-40 px-4 pb-3 pt-3.5 backdrop-blur-md"
+      style={{
+        // Translucido a proposito: lo que scrollea por debajo se difumina
+        // pero el estadio sigue insinuandose. Opaco mataba esa capa.
+        background: "rgba(8, 12, 16, 0.85)",
+      }}
+    >
       <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
         {/* min-w-0 + overflow-hidden: con el text-zoom de accesibilidad el
-            wordmark crecía y se metía DEBAJO de las burbujas. Preferimos
-            clipearlo antes que dejar que se monte encima. */}
+            wordmark crecia y se metia DEBAJO de las burbujas (feedback real
+            2026-06-11). Preferimos clipearlo antes que dejar que se monte. */}
         <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* Responsive a proposito: a 390px (el ancho real de la mayoria)
+              el wordmark entra con 50px de sobra, pero a 320px — un iPhone SE
+              — se comia la ultima "A" de COLOMBIANA. Bajar el pollito a 32 y
+              el texto a 17 recupera los ~57px que faltaban, y arriba de 360
+              todo vuelve al tamano pleno. */}
           <img
             src="/pollitos/pollito_pibe_lider.webp"
             alt=""
-            width={26}
-            height={26}
-            className="h-[26px] w-[26px] max-w-none shrink-0 object-contain"
+            width={40}
+            height={40}
+            className="h-8 w-8 max-w-none shrink-0 object-contain min-[360px]:h-10 min-[360px]:w-10"
           />
-          <span className="lp-stencil flex items-baseline gap-[6px] whitespace-nowrap text-[17px] text-text-primary">
-            <span>{part1}</span>
-            {/* Una sola palabra en el acento. El resto, papel. */}
-            <span className="text-gold">{part2}</span>
-            {part3 ? <span>{part3}</span> : null}
+          <span className="lp-stencil flex items-baseline gap-[5px] whitespace-nowrap text-[17px] min-[360px]:text-[20px]">
+            {part3 ? (
+              <>
+                {/* Tricolor — los colores de la bandera. */}
+                <span className="text-gold">{part1}</span>
+                <span style={{ color: "#2F6DF4" }}>{part2}</span>
+                <span style={{ color: "#E4463A" }}>{part3}</span>
+              </>
+            ) : (
+              // Locales sin la metafora de la bandera: todo en el acento.
+              <>
+                <span className="text-gold">{part1}</span>
+                <span className="text-gold">{part2}</span>
+              </>
+            )}
           </span>
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-2">
-          <ReportProblemBubble size={32} />
-          <WhatsAppBubble size={32} />
+          <ReportProblemBubble size={34} />
+          <WhatsAppBubble size={34} />
         </div>
       </div>
     </header>

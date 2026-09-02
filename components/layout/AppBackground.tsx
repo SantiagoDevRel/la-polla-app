@@ -1,52 +1,57 @@
-// components/layout/AppBackground.tsx — el fondo de la app.
+// components/layout/AppBackground.tsx — el fondo ambiente de la app.
 //
-// PARCHE v1.0 (2026-08-25): antes esto era un video de estadio en loop con
-// el pollito gigante de fondo. Se sacó por dos razones concretas:
-//   1. Peleaba con el skin nuevo. Todo el lenguaje es plano, duro y de alto
-//      contraste; un video con blur encima convierte cada tarjeta en un
-//      sticker flotando y devuelve el look "burbuja" que justamente se quiso
-//      matar.
-//   2. Pesaba. 5 variantes de video en una app que se usa en la calle, con
-//      datos móviles, en teléfonos de gama media.
+// (2026-09-02) VUELVE el estadio. Entre agosto y hoy esto fue un plano negro
+// con una caida de luz, y esa pantalla es exactamente la que el dueño llamo
+// "basica": sin el fondo, cada tarjeta flota sobre la nada y la app pierde la
+// unica capa que le daba profundidad.
 //
-// Queda un fondo de concreto: negro profundo, una caída de luz muy sutil
-// arriba (como el resplandor de un reflector lejano) y el grano que ya define
-// globals.css. Sin video, sin blur, sin autoplay.
+// Lo que SI era cierto de la objecion vieja (y por eso no se revierte a ciegas)
+// es el costo en datos moviles. Se resuelve en el cliente, no matando el
+// fondo: el poster (~80 kB) se pinta siempre y el video solo arranca si la
+// conexion lo aguanta — ver el guard de Save-Data en AppBackgroundClient.
+// Asi el que tiene wifi ve el estadio y el que anda con 3G ve la foto.
 //
-// Los archivos de video siguen en /public/videos por si se quieren usar en
-// otro lado; simplemente ya nadie los pide.
+// Server component que en CADA request elige uno de los 5 videos del pool
+// (ver background-variants.ts) y renderea el client renderer con esa variant:
+//   - El SSR HTML ya trae el poster correcto horneado: primer frame al
+//     instante, sin flash a negro mientras carga el JS.
+//   - Cada refresh = nuevo render server = nuevo video.
+//   - Cero "play button" nativo: el client intenta autoplay; si falla, queda
+//     con la imagen estatica.
+//
+// Forzamos render dinamico via `headers()` para que Next no estatice el layout
+// y termine sirviendo siempre el mismo video.
 
-interface AppBackgroundProps {
+import { headers } from "next/headers";
+import { AppBackgroundClient } from "./AppBackgroundClient";
+import { pickRandomVariant, type BackgroundVariant } from "./background-variants";
+
+export interface AppBackgroundProps {
   className?: string;
-  /** Se acepta por compatibilidad con los llamados existentes; ya no aplica. */
+  /** Opacidad del velo oscuro sobre el video (0-1). El default 0.78 deja ver
+   *  el movimiento y garantiza el contraste del texto que va encima. */
   overlayOpacity?: number;
-  variant?: string;
+  /** Forzar una variant especifica (testing / pantallas tematicas). Si se
+   *  omite, el server elige una por request. */
+  variant?: BackgroundVariant;
 }
 
-export function AppBackground({ className }: AppBackgroundProps) {
+export async function AppBackground({
+  className,
+  overlayOpacity,
+  variant,
+}: AppBackgroundProps) {
+  // Llamar `headers()` opta el render por request (no estatico). Sin esto Next
+  // puede cachear el HTML del layout y servirle el mismo video a todos.
+  await headers();
+  const picked = variant ?? pickRandomVariant();
+
   return (
-    <div
-      aria-hidden="true"
-      className={`pointer-events-none fixed inset-0 -z-10 bg-bg-base ${className ?? ""}`}
-    >
-      {/* Caída de luz superior. Muy tenue: da profundidad sin ensuciar el
-          contraste del texto que va encima. */}
-      <div
-        className="absolute inset-x-0 top-0 h-[46vh]"
-        style={{
-          background:
-            "radial-gradient(120% 100% at 50% 0%, rgba(216,255,71,0.055) 0%, rgba(216,255,71,0.018) 34%, transparent 68%)",
-        }}
-      />
-      {/* Piso: refuerza el negro abajo para que el nav flotante despegue. */}
-      <div
-        className="absolute inset-x-0 bottom-0 h-[30vh]"
-        style={{
-          background:
-            "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.55) 100%)",
-        }}
-      />
-    </div>
+    <AppBackgroundClient
+      variant={picked}
+      className={className}
+      overlayOpacity={overlayOpacity}
+    />
   );
 }
 

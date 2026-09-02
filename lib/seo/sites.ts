@@ -47,9 +47,9 @@ const ES: SiteConfig = {
   origin: "https://lapollacolombiana.com",
   lang: "es-CO",
   name: "La Polla Colombiana",
-  tagline: "La polla deportiva de tus parceros",
+  tagline: "Pollas de fútbol con entrada y pozo",
   description:
-    "Crea tu polla del Mundial 2026, Champions League, Copa Libertadores, Sudamericana o Liga BetPlay. Invita a tus amigos, predice resultados y gana. Gratis y en español.",
+    "La casa publica pollas de fútbol cada fin de semana. Paga la entrada y pronostica: el 70% de lo recaudado va al pozo de los ganadores; la casa conserva el 30%.",
   alternate: { hrefLang: "en", origin: "https://chickenpicks.app" },
   verification: {
     google: "tbazUHUuL8rLc_PIdy50ONQNnf38oMZRHQ0P0NlgrQE",
@@ -63,9 +63,9 @@ const EN: SiteConfig = {
   origin: "https://chickenpicks.app",
   lang: "en",
   name: "Chicken Picks",
-  tagline: "The football pool app for friends",
+  tagline: "Football pools with entry fees and a prize pool",
   description:
-    "Create your World Cup 2026, Champions League, Copa Libertadores, Sudamericana or Liga BetPlay pool. Invite your friends, predict scores and win. Free.",
+    "The house publishes football pools every weekend. Pay the entry fee and make your picks: 70% of entry fees funds the winners' prize pool; the house keeps 30%.",
   alternate: { hrefLang: "es-CO", origin: "https://lapollacolombiana.com" },
   verification: {
     // Google emite un token único por property — el de chickenpicks.app

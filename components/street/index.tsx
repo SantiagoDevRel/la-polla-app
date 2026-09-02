@@ -28,17 +28,37 @@ export function HeroFrame({
   return (
     <div className={cn("relative overflow-hidden lp-grain", height, className)}>
       {image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={image}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={image}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <div className="lp-scrim absolute inset-0" />
+        </>
       ) : (
-        <TribunaArt className="absolute inset-0 h-full w-full" />
+        // (2026-09-02) Sin foto, el heroe NO dibuja nada propio: deja ver el
+        // fondo del estadio que AppBackground ya tiene montado detras.
+        //
+        // Antes caia a TribunaArt (el SVG de hinchada + reflectores). Eso tenia
+        // sentido cuando el fondo de la app era negro plano y habia que poner
+        // algo; con el video de vuelta son DOS estadios peleando, y el bloque
+        // opaco del SVG corta la pantalla en una banda oscura. Un velo de dos
+        // paradas alcanza: oscurece lo justo para que el texto tenga contraste
+        // sin apagar el fondo.
+        // TribunaArt se conserva exportado — sigue siendo el fallback correcto
+        // para superficies que no tienen el fondo ambiente detras.
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(8,12,16,0.10) 0%, rgba(8,12,16,0.45) 55%, rgba(8,12,16,0.88) 100%)",
+          }}
+        />
       )}
-      <div className="lp-scrim absolute inset-0" />
       {children ? (
         <div className="relative flex h-full flex-col justify-end p-4">{children}</div>
       ) : null}

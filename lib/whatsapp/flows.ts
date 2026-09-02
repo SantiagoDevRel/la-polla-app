@@ -1,5 +1,5 @@
 // lib/whatsapp/flows.ts — All WhatsApp bot conversation flows
-// Colombian parcero Spanish + rich formatting + interactive messages
+// Español neutro (registro de casa de apuestas) + rich formatting + interactive messages
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTextMessage } from "./bot";
 import {
@@ -157,7 +157,7 @@ async function verifyMemberAndPolla(
     .single();
 
   if (!polla) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré esa polla.", { userId });
+    await sendTextMessage(phone, "🤔 No encontré esa polla.", { userId });
     return null;
   }
 
@@ -169,7 +169,7 @@ async function verifyMemberAndPolla(
     .maybeSingle();
 
   if (!participant || participant.status !== "approved") {
-    await sendTextMessage(phone, "No eres participante de esta polla parce.", { userId });
+    await sendTextMessage(phone, "No eres participante de esta polla.", { userId });
     return null;
   }
 
@@ -183,7 +183,7 @@ async function verifyMemberAndPolla(
   ) {
     await sendTextMessage(
       phone,
-      "Tu pago aún no ha sido aprobado por el organizador. Esperá a que confirme y volvé a intentar.",
+      "Tu pago aún no ha sido aprobado por el organizador. Espera a que lo confirme e intenta de nuevo.",
       { userId }
     );
     return null;
@@ -264,7 +264,7 @@ export async function handleMisPollas(phone: string, userId: string) {
     await setState(phone, { action: "waiting_join_code" });
     await sendTextMessage(
       phone,
-      "😴 No tienes pollas activas en este momento parce.\n\n" +
+      "😴 No tienes pollas activas en este momento.\n\n" +
         "Si te invitaron a una polla nueva, mándame el *código de 6 caracteres* y te uno 🐥",
       { userId },
     );
@@ -288,7 +288,7 @@ export async function handleMisPollas(phone: string, userId: string) {
   if (pollas.length <= 3) {
     await sendReplyButtons(
       phone,
-      "Tus pollas activas parce 👇 Tocá una para abrirla.",
+      "Tus pollas activas 👇 Toca una para abrirla.",
       pollas.map((polla) => ({
         id: `polla_${polla.id}`,
         // Reply-button title cap is 20 chars — name alone, with a graceful
@@ -347,7 +347,7 @@ export async function handlePollaMenu(
         `⚽ Torneo: ${trnLabel}\n` +
         `📊 Tu posición final: *#${participant.rank ?? "—"}*\n` +
         `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
-        `Esta polla ya terminó parce. Solo puedes ver los resultados finales.`,
+        `Esta polla ya terminó. Solo puedes ver los resultados finales.`,
       [
         { id: `rank_${pollaId}`, title: "Ver Tabla 📊" },
         { id: `results_${pollaId}`, title: "Resultados ⚽" },
@@ -363,7 +363,7 @@ export async function handlePollaMenu(
     `⚽ Torneo: ${trnLabel}\n` +
     `📊 Tu posición: *#${participant.rank ?? "—"}*\n` +
     `🎯 Tus puntos: *${participant.total_points ?? 0}*\n\n` +
-    `¿Qué quieres hacer parce?`;
+    `¿Qué quieres hacer?`;
 
   // Solo el menú con 3 reply buttons. Antes se mandaba un follow-up
   // "Invitar a la polla" con CTA URL — sacado por feedback del user
@@ -465,7 +465,7 @@ export async function handlePronosticar(
     if (!match) {
       await sendTextMessage(
         phone,
-        "Ese partido ya no está abierto parce, elegí uno de la lista.",
+        "Ese partido ya no está abierto. Elige uno de la lista.",
         { userId }
       );
       return handlePronosticar(phone, userId, pollaId, undefined, 0, true);
@@ -487,7 +487,7 @@ export async function handlePronosticar(
   if (unpredicted.length === 0) {
     await sendReplyButtons(
       phone,
-      `✅ ¡Eso es! Ya pronosticaste los *${matches.length}* partidos abiertos de *${polla.name}*.\n\n_Te aviso apenas se programen nuevos._`,
+      `✅ Ya pronosticaste los *${matches.length}* partidos abiertos de *${polla.name}*.\n\n_Te aviso apenas se programen nuevos._`,
       [
         { id: `rank_${pollaId}`, title: "Ver Tabla 📊" },
         { id: `results_${pollaId}`, title: "Resultados ⚽" },
@@ -624,9 +624,9 @@ async function showPredictionPrompt(
     await sendReplyButtons(
       phone,
       header +
-        `\nYa pronosticaste este partido parce.\n` +
+        `\nYa pronosticaste este partido.\n` +
         `Tu pronóstico actual: *${match.home_team} ${existing.predicted_home} - ${existing.predicted_away} ${match.away_team}*\n\n` +
-        `Escribí un nuevo marcador para cambiarlo (ej: *2-2*), o *cancelar* para dejarlo igual.`,
+        `Escribe un nuevo marcador para cambiarlo (ej: *2-2*), o *cancelar* para dejarlo igual.`,
       buttons,
       undefined,
       FOOTER
@@ -637,7 +637,7 @@ async function showPredictionPrompt(
   await sendReplyButtons(
     phone,
     header +
-      `\n¿Cómo va a quedar? Escribí el marcador así:\n*2-1* _(local primero)_\n\n` +
+      `\n¿Cómo va a quedar? Escribe el marcador así:\n*2-1* _(local primero)_\n\n` +
       `_Tienes hasta ${dateStr} para pronosticar_ ⏰`,
     buttons,
     undefined,
@@ -673,11 +673,11 @@ export async function handleCancelPrediction(
   if (match && existing) {
     await sendTextMessage(
       phone,
-      `Listo parce, dejé tu pronóstico como estaba (*${match.home_team} ${existing.predicted_home} - ${existing.predicted_away} ${match.away_team}*)`,
+      `Dejé tu pronóstico como estaba (*${match.home_team} ${existing.predicted_home} - ${existing.predicted_away} ${match.away_team}*)`,
       { userId }
     );
   } else {
-    await sendTextMessage(phone, "Listo parce, cancelé.", { userId });
+    await sendTextMessage(phone, "Cancelado.", { userId });
   }
 
   await handlePollaMenu(phone, userId, pollaId);
@@ -702,7 +702,7 @@ export async function handlePredictionInput(
     .single();
 
   if (!match) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré el partido.", { userId: user.id });
+    await sendTextMessage(phone, "🤔 No encontré el partido.", { userId: user.id });
     return;
   }
 
@@ -711,7 +711,7 @@ export async function handlePredictionInput(
   if (match.status !== "scheduled" || Date.now() >= lockTime) {
     await sendTextMessage(
       phone,
-      "Este partido ya está cerrado parce, no se pueden cambiar pronósticos a menos de 5 minutos del inicio.",
+      "Este partido ya está cerrado. No se pueden cambiar pronósticos a menos de 5 minutos del inicio.",
       { userId: user.id }
     );
     return;
@@ -732,7 +732,7 @@ export async function handlePredictionInput(
   const awayFlag = getTeamFlag(match.away_team);
   await sendReplyButtons(
     phone,
-    `¿Confirmás tu predicción? 🎯\n\n` +
+    `¿Confirmas tu pronóstico? 🎯\n\n` +
       `${homeFlag} *${match.home_team}* *${predictedHome}* - *${predictedAway}* *${match.away_team}* ${awayFlag}`,
     [
       { id: "confirm_yes", title: "✅ Confirmar" },
@@ -769,7 +769,7 @@ export async function handleConfirmPrediction(
     .single();
 
   if (!match) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré el partido.", { userId: user.id });
+    await sendTextMessage(phone, "🤔 No encontré el partido.", { userId: user.id });
     return;
   }
 
@@ -779,7 +779,7 @@ export async function handleConfirmPrediction(
   if (match.status !== "scheduled" || Date.now() >= lockTime) {
     await sendTextMessage(
       phone,
-      "Este partido ya está cerrado parce, no se pueden cambiar pronósticos a menos de 5 minutos del inicio.",
+      "Este partido ya está cerrado. No se pueden cambiar pronósticos a menos de 5 minutos del inicio.",
       { userId: user.id }
     );
     return;
@@ -811,7 +811,7 @@ export async function handleConfirmPrediction(
     console.error("[WA] Error saving prediction:", error);
     await sendTextMessage(
       phone,
-      "❌ Uy parce, hubo un error guardando tu pronóstico. Intentá de nuevo.",
+      "❌ Hubo un error guardando tu pronóstico. Intenta de nuevo.",
       { userId: user.id }
     );
     return;
@@ -884,8 +884,8 @@ export async function handleConfirmPrediction(
   const awayFlag = getTeamFlag(match.away_team);
   await sendReplyButtons(
     phone,
-    `✅ ¡Listo parce! Guardé tu pronóstico: ${homeFlag} *${match.home_team}* *${predictedHome}* - *${predictedAway}* *${match.away_team}* ${awayFlag}\n\n` +
-      `_Eso es, a esperar el partido_ 🐥`,
+    `✅ Guardé tu pronóstico: ${homeFlag} *${match.home_team}* *${predictedHome}* - *${predictedAway}* *${match.away_team}* ${awayFlag}\n\n` +
+      `_Ahora, a esperar el partido_ 🐥`,
     [
       { id: `pred_next_${pollaId}`, title: "Siguiente ➡️" },
       { id: "menu", title: "🏠 Menú" },
@@ -914,7 +914,7 @@ export async function handleAdvancePick(
   if (!state || state.action !== "confirm_advance" || !state.pollaId || !state.matchId) {
     await sendTextMessage(
       phone,
-      "Parce, perdí el hilo. Dale a Pronosticar de nuevo.",
+      "Se perdió el proceso. Toca Pronosticar de nuevo.",
       { userId: user.id }
     );
     await handleMisPollas(phone, user.id);
@@ -928,7 +928,7 @@ export async function handleAdvancePick(
     .eq("id", state.matchId)
     .single();
   if (!match) {
-    await sendTextMessage(phone, "🤔 Parce, no encontré el partido.", { userId: user.id });
+    await sendTextMessage(phone, "🤔 No encontré el partido.", { userId: user.id });
     await clearState(phone);
     return;
   }
@@ -938,7 +938,7 @@ export async function handleAdvancePick(
   if (match.status !== "scheduled" || Date.now() >= lockTime) {
     await sendTextMessage(
       phone,
-      "Este partido ya está cerrado parce, no se puede cambiar a menos de 5 minutos del inicio.",
+      "Este partido ya está cerrado. No se puede cambiar a menos de 5 minutos del inicio.",
       { userId: user.id }
     );
     await clearState(phone);
@@ -955,7 +955,7 @@ export async function handleAdvancePick(
     console.error("[WA] Error saving advance_pick:", error);
     await sendTextMessage(
       phone,
-      "❌ Uy parce, no pude guardar quién avanza. Intentá de nuevo.",
+      "❌ No pude guardar quién avanza. Intenta de nuevo.",
       { userId: user.id }
     );
     return;
@@ -966,7 +966,7 @@ export async function handleAdvancePick(
   const pickedFlag = getTeamFlag(pickedTeam);
   await sendReplyButtons(
     phone,
-    `✅ ¡Listo parce! Marcaste que avanza ${pickedFlag} *${pickedTeam}* 🎯\n\n_Suma +1 si aciertas_`,
+    `✅ Registré que avanza ${pickedFlag} *${pickedTeam}* 🎯\n\n_Suma +1 si aciertas_`,
     [
       { id: `pred_next_${state.pollaId}`, title: "Siguiente ➡️" },
       { id: "menu", title: "🏠 Menú" },
@@ -1001,7 +1001,7 @@ export async function handleLeaderboard(
   if (!participants || participants.length === 0) {
     await sendTextMessage(
       phone,
-      "😅 No hay participantes en esta polla aún parce.",
+      "😅 Aún no hay participantes en esta polla.",
       { userId }
     );
     return;
@@ -1057,7 +1057,7 @@ export async function handleResults(
   if (!matches || matches.length === 0) {
     await sendReplyButtons(
       phone,
-      "😴 No hay resultados disponibles aún parce.\n\n_Pilas, te aviso cuando se jueguen partidos_",
+      "😴 Aún no hay resultados disponibles.\n\n_Te aviso cuando se jueguen partidos_",
       [
         { id: `polla_${pollaId}`, title: "⬅️ Volver" },
         { id: "menu", title: "🏠 Menú" },
@@ -1130,7 +1130,7 @@ export async function handleJoinPolla(
   if (!polla) {
     await sendTextMessage(
       phone,
-      "🤔 Parce, no encontré una polla con ese link.",
+      "🤔 No encontré una polla con ese link.",
       { userId: user.id }
     );
     return;
@@ -1139,7 +1139,7 @@ export async function handleJoinPolla(
   if (polla.status !== "active") {
     await sendTextMessage(
       phone,
-      `😅 La polla *${polla.name}* ya no está activa parce.`,
+      `😅 La polla *${polla.name}* ya no está activa.`,
       { userId: user.id }
     );
     return;
@@ -1156,7 +1156,7 @@ export async function handleJoinPolla(
   if (existing) {
     await sendReplyButtons(
       phone,
-      `¡Parce, ya sos parte de *${polla.name}*! 🐥\n\n_Dale, poné tus pronósticos_`,
+      `¡Ya eres parte de *${polla.name}*! 🐥\n\n_Registra tus pronósticos_`,
       [
         { id: `pred_${polla.id}`, title: "Pronosticar 🎯" },
         { id: `rank_${polla.id}`, title: "Ver Tabla 📊" },
@@ -1172,7 +1172,7 @@ export async function handleJoinPolla(
   // lo procesa).
   await sendTextMessage(
     phone,
-    `Esa polla es privada parce 🔒\n\nPedile al admin el código de 6 caracteres y mandámelo aquí.`,
+    `Esa polla es privada 🔒\n\nPídele al administrador el código de 6 caracteres y envíalo aquí.`,
     { userId: user.id },
   );
 }
@@ -1182,7 +1182,7 @@ export async function handleJoinPolla(
 export async function handleHelp(phone: string) {
   await sendListMessage(
     phone,
-    "Escoge una opción parce 👇",
+    "Escoge una opción 👇",
     "Ver opciones",
     [
       {
@@ -1248,10 +1248,10 @@ export async function handleHelpTopic(
       `🎯 *¿Cómo se puntúa?*\n\n` +
         `Depende del modo de la polla, y siempre está escrito adentro antes de que entres.\n\n` +
         `*Local / Empate / Visitante*\n` +
-        `*3 pts* si le achuntas. Esas son las únicas 3 opciones 🐥\n\n` +
+        `*3 pts* si aciertas. Esas son las únicas 3 opciones 🐥\n\n` +
         `*Al marcador*\n` +
-        `*3 pts* si clavas el marcador exacto 🔥\n` +
-        `*1 pt* si le achuntas a los goles de uno solo de los dos equipos\n\n` +
+        `*3 pts* si aciertas el marcador exacto 🔥\n` +
+        `*1 pt* si aciertas los goles de uno solo de los dos equipos\n\n` +
         `_Ojo: los puntos van por los 90 minutos. El alargue y los penales no suman._ ⏱️`,
       { userId: user.id }
     );
@@ -1261,7 +1261,7 @@ export async function handleHelpTopic(
   if (topic === "help_crear") {
     await sendCTAButton(
       phone,
-      "Ahora las pollas las armamos nosotros 🐥\n\n_Cada fin de semana subimos las del finde. Entras, mandas el pantallazo del pago y marcas tus partidos._",
+      "Ahora las pollas las creamos nosotros 🐥\n\n_Cada fin de semana publicamos las nuevas. Entras, envías el comprobante de pago y haces tus pronósticos._",
       "Ver las pollas 🏆",
       `${APP_URL}/casa`,
       FOOTER
@@ -1318,7 +1318,7 @@ export async function handleProfile(phone: string, userId: string) {
     return p.rank < best ? p.rank : best;
   }, 999);
 
-  const name = user?.display_name || "Parcero";
+  const name = user?.display_name || "Jugador";
 
   await sendTextMessage(
     phone,
@@ -1352,7 +1352,7 @@ export async function handleJoinByCodeConfirm(phone: string, code: string) {
   if (!validateJoinCodeFormat(normalized)) {
     await sendTextMessage(
       phone,
-      "Parce, ese código no tiene el formato correcto. Deben ser 6 letras o números.",
+      "Ese código no tiene el formato correcto. Deben ser 6 letras o números.",
     );
     return;
   }
@@ -1433,21 +1433,21 @@ export async function handleJoinByCode(
     case "invalid_format":
       await sendTextMessage(
         phone,
-        "Parce, ese código no tiene el formato correcto. Deben ser 6 letras o números.",
+        "Ese código no tiene el formato correcto. Deben ser 6 letras o números.",
         { userId },
       );
       return;
     case "rate_limited":
       await sendTextMessage(
         phone,
-        "Muchos intentos seguidos parce. Esperá 10 minutos y volvés a probar.",
+        "Demasiados intentos seguidos. Espera 10 minutos e intenta de nuevo.",
         { userId },
       );
       return;
     case "not_found":
       await sendTextMessage(
         phone,
-        "Ese código no existe. Pedile al admin de la polla que te lo mande de nuevo.",
+        "Ese código no existe. Pídeselo de nuevo al administrador de la polla.",
         { userId },
       );
       return;
@@ -1459,7 +1459,7 @@ export async function handleJoinByCode(
       );
       return;
     case "already_member":
-      await sendTextMessage(phone, "Ya sos parte de esa polla parce.", { userId });
+      await sendTextMessage(phone, "Ya eres parte de esa polla.", { userId });
       return;
   }
 }

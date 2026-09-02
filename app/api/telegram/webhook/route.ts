@@ -120,7 +120,7 @@ async function handleMessage(msg: TelegramMessage) {
     await sendMessage(
       chatId,
       [
-        `Listo ${esc(msg.from?.first_name ?? "")} 👊 quedaste conectado al panel.`,
+        `Quedaste conectado al panel.`,
         "",
         AYUDA,
       ].join("\n"),
@@ -260,7 +260,7 @@ async function handleCallback(cb: TelegramCallbackQuery) {
   if (updErr || !actualizada) {
     await answerCallback(
       cb.id,
-      updErr ? "No pude guardarlo. Probá otra vez." : "Ya la habían resuelto.",
+      updErr ? "No pude guardarlo. Intenta de nuevo." : "Ya la habían resuelto.",
     );
     return;
   }
@@ -317,7 +317,7 @@ async function handleCallback(cb: TelegramCallbackQuery) {
 async function sendPending(chatId: number) {
   const pending = await listPendingProofs(10);
   if (pending.length === 0) {
-    await sendMessage(chatId, "No hay pagos esperando. Todo al día 👊");
+    await sendMessage(chatId, "No hay pagos pendientes. Todo al día.");
     return;
   }
 
@@ -426,7 +426,7 @@ async function settlePolla(chatId: number, slug: string) {
     await sendMessage(
       chatId,
       `Esa rifa todavía no tiene número ganador.
-Mandame <code>/numero ${esc(slug)} 47</code> con el que salió.`,
+Envíame <code>/numero ${esc(slug)} 47</code> con el número que salió.`,
     );
     return;
   }
@@ -732,12 +732,12 @@ async function notificarAlJugador(n: {
           "",
           `Tu pago quedó confirmado. El pozo va en ${formatCop(n.pozoCop)}.`,
           "",
-          `Marca tus partidos antes de que cierre 👉 ${url}`,
+          `Pronostica tus partidos antes del cierre 👉 ${url}`,
         ].join("\n")
       : [
           `❌ *No pude confirmar tu pago de ${n.pollaName}*`,
           "",
-          "Revisa el pantallazo y vuelve a subirlo, o escríbeme para resolverlo.",
+          "Revisa el comprobante y vuelve a subirlo, o escríbeme para resolverlo.",
           "",
           url,
         ].join("\n");

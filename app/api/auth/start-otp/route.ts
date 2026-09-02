@@ -1,12 +1,15 @@
 // app/api/auth/start-otp/route.ts — Origen único para iniciar el OTP.
 //
-// Llama a Supabase signInWithOtp que dispara el SMS via Twilio.
+// Llama a Supabase signInWithOtp. Hoy el SMS sale por Twilio Verify
+// (proveedor nativo de Phone Auth). El cutover a LabsMobile es el
+// "Send SMS Hook" (`/api/auth/sms-hook`) — este archivo no cambia:
+// Supabase genera el OTP y el hook solo lo entrega.
 // Aplica rate-limit por phone para no abrir la puerta a fuerza bruta
 // del verify-otp.
 //
 // NOTA: el gate Turnstile fue rolleado back temporalmente porque el
 // widget interaction-only no rendereaba en algunos browsers y bloqueaba
-// login. El vector Twilio bill-bombing por phones rotados queda abierto
+// login. El vector de bill-bombing de SMS por phones rotados queda abierto
 // hasta que cablemos un widget visible probado (TaskList #8).
 
 import { NextRequest, NextResponse } from "next/server";
@@ -57,7 +60,7 @@ export async function POST(request: NextRequest) {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
 
-  // Rate limit por IP (defensa anti Twilio bill-bombing). El límite por
+  // Rate limit por IP (defensa anti bill-bombing de SMS). El límite por
   // phone de abajo NO frena al bot que rota números; este sí, porque el
   // atacante scriptea desde un set acotado de IPs. Si no hay IP, se
   // saltea y el límite por phone queda como único gate.
@@ -95,7 +98,7 @@ export async function POST(request: NextRequest) {
   // Rate limit por phone (5 generate-attempts / hora). El verify-otp
   // tiene su propio limit de 5/15min, pero limitar generates evita
   // que un atacante use signInWithOtp como un canal para inundar
-  // Twilio costos.
+  // costos de SMS.
   const limit = await checkAndRecordAttempt(phoneNormalized, "generate", ip);
   if (limit.blocked) {
     return NextResponse.json(
@@ -107,7 +110,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Supabase signInWithOtp dispara el SMS via Twilio.
+  // Supabase signInWithOtp dispara el SMS (Twilio hoy; LabsMobile cuando
+  // el Send SMS Hook esté cableado en el dashboard de Auth).
   // Anon client (no cookies — no hay sesión todavía).
   const supabase = createSbClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

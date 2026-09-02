@@ -17,7 +17,7 @@ export const BOT_PHONE: string =
 // is URL-encoded so the user lands in the chat with the message already
 // typed; the bot answers with the main menu regardless of the exact
 // wording (see lib/whatsapp/flows.ts greeting handler).
-export function botDeepLink(prefilledText: string = "hola parce"): string {
+export function botDeepLink(prefilledText: string = "hola"): string {
   const phone = BOT_PHONE;
   const text = encodeURIComponent(prefilledText);
   return `https://wa.me/${phone}?text=${text}`;

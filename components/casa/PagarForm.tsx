@@ -31,7 +31,7 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
     setError(null);
     if (!f) return;
     if (f.size > MAX_MB * 1024 * 1024) {
-      setError(`Esa imagen pesa mucho (máx ${MAX_MB} MB).`);
+      setError(`La imagen supera los ${MAX_MB} MB.`);
       return;
     }
     setFile(f);
@@ -40,7 +40,7 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
 
   async function enviar() {
     if (!file) {
-      setError("Sube el pantallazo de la transferencia.");
+      setError("Sube el comprobante de la transferencia.");
       return;
     }
     if (esRifa && !ticket) {
@@ -62,14 +62,14 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.error ?? "No pude registrar tu pago.");
+        setError(json.error ?? "No se pudo registrar tu pago.");
         return;
       }
       setListo(true);
       // Un respiro para que se lea la confirmación antes de volver.
       setTimeout(() => router.push(`/casa/${slug}`), 1600);
     } catch {
-      setError("Se cayó la conexión. Prueba otra vez.");
+      setError("Error de conexión. Intenta de nuevo.");
     } finally {
       setEnviando(false);
     }
@@ -78,9 +78,9 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
   if (listo) {
     return (
       <StreetCard hero className="p-6 text-center">
-        <p className="lp-display-sm text-gold">Listo, ya quedó</p>
+        <p className="lp-display-sm text-gold">Pago registrado</p>
         <p className="mt-2 text-[13px] text-text-secondary">
-          A Tama le llegó tu pantallazo. Apenas lo confirme, entras al pozo y
+          Recibimos tu comprobante. Apenas lo confirmemos, entras al pozo y
           tus pronósticos cuentan.
         </p>
       </StreetCard>
@@ -105,7 +105,7 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
         </div>
       )}
 
-      <Label>Pantallazo de la transferencia</Label>
+      <Label>Comprobante de la transferencia</Label>
 
       <input
         ref={inputRef}
@@ -133,7 +133,7 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
           />
         ) : (
           <span className="text-[13px] text-text-muted">
-            Toca acá para subir la foto
+            Sube aquí el comprobante
           </span>
         )}
       </button>
@@ -156,7 +156,7 @@ export function PagarForm({ slug, esRifa, ticketCount }: Props) {
         disabled={enviando || !file}
         className="lp-btn lp-btn-primary mt-4 w-full"
       >
-        {enviando ? "Mandando..." : "Mandar el comprobante"}
+        {enviando ? "Enviando..." : "Enviar el comprobante"}
       </button>
     </StreetCard>
   );

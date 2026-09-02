@@ -179,35 +179,27 @@ export function WelcomeIntro() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: SMOOTH }}
-          className="fixed inset-0 z-[10000] overflow-hidden bg-bg-base"
+          className="fixed inset-0 z-[10000] overflow-hidden"
         >
-          {/* El video de estadio SE FUE (2026-08-25). Dos razones:
-              1. Se descargaba en la PRIMERA visita, con datos moviles, antes
-                 de que la persona hubiera visto nada de la app. Un webm de
-                 fondo es lo ultimo que uno quiere pagarle a alguien que
-                 todavia no sabe si le interesa el producto.
-              2. El resto de la app dejo de usar video cuando el skin paso a
-                 concreto plano; esta pantalla quedaba siendo la unica con
-                 movimiento, y ademas mostraba el pollito gigante — el
-                 lenguaje que justamente se abandono.
-              Queda la caida de luz del fondo, igual que en el resto. */}
-          <div
-            aria-hidden="true"
-            className="absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(120% 90% at 50% 0%, rgba(216,255,71,0.07) 0%, rgba(216,255,71,0.02) 38%, transparent 70%)",
-            }}
-          />
-
-          <div className="absolute inset-0 bg-bg-base/40" />
+          {/* (2026-09-02) El estadio vuelve a verse aca — sin descargar un
+              solo byte extra.
+              La objecion de agosto era legitima: esta pantalla cargaba SU
+              PROPIO <video> a pantalla completa en la primerisima visita, con
+              datos moviles, antes de que la persona supiera de que se trata.
+              Pero la respuesta correcta no era apagar el fondo: era dejar de
+              pedirlo dos veces. `AppBackground` ya esta montado en
+              app/(auth)/layout.tsx, asi que basta con NO pintar un fondo
+              opaco encima y el estadio se ve a traves. Cero descarga nueva, y
+              la bienvenida deja de ser la unica pantalla plana de la app.
+              El velo de abajo es el que garantiza el contraste del texto. */}
+          <div className="absolute inset-0 bg-bg-base/70" />
 
           {/* Soft radial vignette pulling focus to the center column. */}
           <div
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(70% 70% at 50% 45%, transparent 45%, rgba(10,10,11,0.75) 100%)",
+                "radial-gradient(70% 70% at 50% 45%, transparent 45%, rgba(8,12,16,0.75) 100%)",
             }}
           />
 
@@ -217,7 +209,7 @@ export function WelcomeIntro() {
             className="absolute bottom-0 left-0 right-0 h-[200px] pointer-events-none"
             style={{
               background:
-                "linear-gradient(180deg, transparent 0%, rgba(10,10,11,0.75) 50%, rgba(8,12,16,1) 100%)",
+                "linear-gradient(180deg, transparent 0%, rgba(8,12,16,0.75) 50%, rgba(8,12,16,1) 100%)",
             }}
           />
 
@@ -412,7 +404,7 @@ export function WelcomeIntro() {
                   ease: [0.34, 1.4, 0.64, 1],
                 }}
                 className="inline-block font-display text-gold text-[26px] tracking-wide align-[-0.05em]"
-                style={{ textShadow: "0 2px 8px rgba(216, 255, 71, 0.35)" }}
+                style={{ textShadow: "0 2px 8px rgba(255, 215, 0, 0.35)" }}
               >
                 {t("taglineAccent")}
               </motion.span>

@@ -8,7 +8,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { listPublicPollas, getPots } from "@/lib/casa/queries";
+import {
+  listPublicPollas,
+  getPots,
+  listPollasConPicksPendientes,
+} from "@/lib/casa/queries";
 import { isPollaOpen, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import { getTournamentLogo, getTournamentName } from "@/lib/tournaments";
@@ -31,6 +35,7 @@ export default async function CasaPage() {
 
   const pollas = await listPublicPollas();
   const pots = await getPots(pollas.map((p) => p.id));
+  const pendientes = await listPollasConPicksPendientes(user.id);
 
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
   // paso sigue con status abierta hasta que alguien la cierre, y quedaba
@@ -52,14 +57,51 @@ export default async function CasaPage() {
         </div>
         <p className="mt-2 text-[13px] text-text-secondary">
           {abiertas.length === 0
-            ? "Todavía no hay pollas abiertas. Tama las arma para el fin de semana."
+            ? "Todavía no hay pollas abiertas. Se publican para el fin de semana."
             : `${abiertas.length} polla${abiertas.length === 1 ? "" : "s"} abierta${
                 abiertas.length === 1 ? "" : "s"
-              } · ${jugando} jugando`}
+              } · ${jugando} inscritos`}
         </p>
       </HeroFrame>
 
       <div className="px-4 pt-6">
+        {/* ── Te falta pronosticar ─────────────────────────────────────────
+              (2026-09-02) El único aviso que existía era el numerito del
+              BottomNav, y un badge no dice ni en cuál polla ni cuánto falta.
+              Tampoco hay recordatorio por SMS o WhatsApp: el cron de
+              recordatorios lee el modelo P2P viejo y no sabe que existe
+              `casa_*`. Dentro de la app el aviso es gratis y llega igual,
+              porque para pronosticar hay que abrirla de todas formas.
+              Ámbar y no dorado: es urgencia, no premio. */}
+        {pendientes.length > 0 && (
+          <ul className="mb-6 space-y-2">
+            {pendientes.map(({ polla, faltan }) => (
+              <li key={polla.id}>
+                <Link href={`/casa/${polla.slug}`} className="block">
+                  <div className="flex items-center gap-3 border border-amber/40 bg-amber/10 p-3">
+                    <span className="min-w-0 flex-1">
+                      <span className="lp-label block text-amber">
+                        Te falta pronosticar
+                      </span>
+                      <span className="mt-0.5 block truncate text-[14px] text-text-primary">
+                        {polla.name}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="lp-money block text-[18px] leading-none text-amber">
+                        {faltan}
+                      </span>
+                      <span className="lp-label mt-0.5 block">
+                        {faltan === 1 ? "partido" : "partidos"}
+                      </span>
+                    </span>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+
         {/* ── Pollas abiertas ─────────────────────────────────────────── */}
         <SectionHead
           title="Del fin de semana"
@@ -67,10 +109,26 @@ export default async function CasaPage() {
         />
 
         {abiertas.length === 0 ? (
-          <StreetCard className="p-6 text-center">
+          // `bg-bg-card` pisa a proposito el 80% de opacidad de .lp-card: es la
+          // unica card de la app que lleva ilustracion adentro, y sobre el video
+          // del fondo (que tiene su propio pollito) el translucido superponia las
+          // dos y no se leia ninguna.
+          <StreetCard className="bg-bg-card p-6 text-center">
+            {/* (2026-09-02) El pollito vuelve al estado vacio. No es adorno:
+                el design system lo reserva para los momentos en que la
+                pantalla no tiene nada que mostrar, que es justo cuando una
+                caja de texto sola se siente como un error de la app. */}
+            <Image
+              src="/pollitos/Pollito_esperando.webp"
+              alt=""
+              aria-hidden="true"
+              width={112}
+              height={112}
+              className="mx-auto mb-3 h-28 w-28 max-w-none object-contain opacity-90"
+            />
             <p className="lp-display-sm text-text-primary">Sin pollas abiertas</p>
             <p className="mt-2 text-[13px] text-text-muted">
-              Apenas Tama arme la del finde, te aparece acá.
+              La del fin de semana aparecerá aquí.
             </p>
           </StreetCard>
         ) : (
@@ -84,7 +142,7 @@ export default async function CasaPage() {
         {/* ── Ya cerradas ─────────────────────────────────────────────── */}
         {cerradas.length > 0 && (
           <>
-            <SectionHead title="Ya jugadas" className="mt-9" />
+            <SectionHead title="Anteriores" className="mt-9" />
             <ul className="space-y-3 opacity-70">
               {cerradas.slice(0, 8).map((polla) => (
                 <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} />
@@ -156,7 +214,7 @@ function PollaRow({
           {/* Fila 3 — el apuro y la gente. Hairline arriba para separar sin peso. */}
           <div className="mt-4 flex items-center justify-between border-t border-border-subtle pt-3">
             <span className="text-[12px] text-text-muted">
-              {pot?.paid_entries ?? 0} jugando
+              {pot?.paid_entries ?? 0} inscritos
             </span>
             <span
               className={`lp-money text-[12px] ${abierta ? "text-gold" : "text-text-muted"}`}

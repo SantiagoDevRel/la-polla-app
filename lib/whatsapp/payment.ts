@@ -86,7 +86,7 @@ export async function handlePaymentMethodSelected(
   if (!method) {
     await sendTextMessage(
       phone,
-      "No reconocí esa opción parce. Escribe *pago* para empezar de nuevo.",
+      "No reconocí esa opción. Escribe *pago* para empezar de nuevo.",
     );
     await clearState(phone);
     return;
@@ -143,7 +143,7 @@ export async function handlePaymentAccountSubmit(
     if (trimmed.length < 6 || trimmed.length > 120) {
       await sendTextMessage(
         phone,
-        "Eso no parece info válida parce. Mandame algo como *Bancolombia ahorros 379...*",
+        "Esos datos no son válidos. Envíame algo como *Bancolombia ahorros 379...*",
         { userId },
       );
       return;
@@ -152,7 +152,7 @@ export async function handlePaymentAccountSubmit(
     await clearState(phone);
     await sendTextMessage(
       phone,
-      `✅ Listo. Guardé tu info de pago:\n*${trimmed}*\n\n` +
+      `✅ Guardé tu información de pago:\n*${trimmed}*\n\n` +
         `_Para cambiarla, escribe_ *pago* _en cualquier momento._\n` +
         `_Escribe_ *menu* _para volver al menú principal._`,
       { userId },
@@ -167,7 +167,7 @@ export async function handlePaymentAccountSubmit(
     await sendTextMessage(
       phone,
       `Necesito solo *números*, sin espacios ni letras (entre 8 y 15 dígitos).\n\n` +
-        `Mandame tu número de *${method.label}* otra vez.`,
+        `Envíame tu número de *${method.label}* otra vez.`,
       { userId },
     );
     return;
@@ -177,7 +177,7 @@ export async function handlePaymentAccountSubmit(
   await clearState(phone);
   await sendTextMessage(
     phone,
-    `✅ Listo parce. Guardé tu *${method.label}* al *${digits}*.\n\n` +
+    `✅ Guardé tu *${method.label}* al *${digits}*.\n\n` +
       `_Para cambiarla, escribe_ *pago* _en cualquier momento._\n` +
       `_Escribe_ *menu* _para volver al menú principal._`,
     { userId },
@@ -271,9 +271,9 @@ export async function handlePaymentProofImage(
     await sendTextMessage(
       phone,
       [
-        "Ya no recibo comprobantes por acá, parce 🐥",
+        "Ya no recibo comprobantes por aquí 🐥",
         "",
-        "Ahora las pollas las armamos nosotros y el pago se sube desde la app. Entra, escoge tu polla y ahí mismo mandas el pantallazo.",
+        "Ahora las pollas las creamos nosotros y el pago se sube desde la app. Entra, escoge tu polla y ahí mismo envías el comprobante.",
       ].join("\n"),
       { userId },
     );
@@ -286,7 +286,7 @@ export async function handlePaymentProofImage(
   if (!pollaId) {
     await sendTextMessage(
       phone,
-      "No tengo claro a qué polla pertenece este comprobante, parce. Escribe *menu* y elige tu polla primero.",
+      "No tengo claro a qué polla pertenece este comprobante. Escribe *menu* y elige tu polla primero.",
       { userId },
     );
     await clearState(phone);
@@ -387,7 +387,7 @@ export async function handlePaymentProofImage(
     console.error("[wa/payment-proof] download failed:", err);
     await sendTextMessage(
       phone,
-      "No pude descargar la foto, parce. Intenta enviarla de nuevo.",
+      "No pude descargar la imagen. Intenta enviarla de nuevo.",
       { userId },
     );
     return;
