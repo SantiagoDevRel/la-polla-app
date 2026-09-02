@@ -1,4 +1,14 @@
-// components/shared/WhatsAppBubble.tsx — Small clickable WhatsApp icon that
+// components/shared/WhatsAppBubble.tsx
+//
+// SIN USAR desde el 2026-09-02. Decision del dueno: "por ahora nada de bots,
+// solo la UI del website", asi que se saco del BrandHeader — que era la unica
+// pantalla que lo montaba. El componente se conserva a proposito (no se
+// borra) porque el bot de WhatsApp sigue vivo en el backend y este boton es
+// lo unico que habria que volver a montar si se decide reactivarlo.
+// No confundir con el boton de WhatsApp de /login: ese NO es un bot, es el
+// segundo metodo de entrada a la cuenta cuando el SMS no llega, y sigue en pie.
+//
+// Small clickable WhatsApp icon that
 // opens a chat with the bot. Drops into the header next to "LA POLLA
 // COLOMBIANA" so users always have a one-tap entry to the bot menu without
 // the login flow needing to push them through it.

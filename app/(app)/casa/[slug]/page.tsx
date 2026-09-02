@@ -28,7 +28,7 @@ import {
   type CasaPolla,
   type Pick1x2,
 } from "@/lib/casa/types";
-import { formatCop, timeLeft } from "@/lib/casa/format";
+import { formatCop, prizeImageUrl, timeLeft } from "@/lib/casa/format";
 import { getTournamentLogo, getTournamentName } from "@/lib/tournaments";
 import { HeroFrame, Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { PicksBoard } from "@/components/casa/PicksBoard";
@@ -179,11 +179,26 @@ export default async function PollaPage({
               </div>
             </div>
           </div>
-          {polla.prize_object && (
-            <p className="mt-3 border-t border-border-subtle pt-3 text-[13px] text-text-secondary">
-              <span className="lp-label mr-2 inline">Además</span>
-              {polla.prize_object}
-            </p>
+          {/* El premio en objeto (migración 089). Cuando `prize_kind` es
+              "pozo" no se dibuja nada acá: la cifra del pozo ya está arriba en
+              el hero y repetirla en palabras la haría envejecer mal — el pozo
+              crece con cada inscripción y un texto no. */}
+          {polla.prize_kind === "objeto" && polla.prize_object && (
+            <div className="mt-3 flex items-center gap-3 border-t border-border-subtle pt-3">
+              {polla.prize_image_path && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={prizeImageUrl(polla.prize_image_path)}
+                  alt=""
+                  aria-hidden="true"
+                  className="h-16 w-16 max-w-none shrink-0 rounded-md object-cover"
+                />
+              )}
+              <p className="min-w-0 text-[13px] text-text-secondary">
+                <span className="lp-label mb-0.5 block">El premio</span>
+                {polla.prize_object}
+              </p>
+            </div>
           )}
           {polla.kind === "rifa" && polla.draw_method && (
             <p className="mt-3 border-t border-border-subtle pt-3 text-[13px] text-text-secondary">

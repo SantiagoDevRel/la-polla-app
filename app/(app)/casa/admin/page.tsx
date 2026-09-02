@@ -13,7 +13,7 @@ import { formatCop, timeLeft } from "@/lib/casa/format";
 import { HeroFrame, Label, SectionHead, Tape } from "@/components/street";
 import { CrearPollaForm } from "@/components/casa/CrearPollaForm";
 import { ColaDePagos } from "@/components/casa/ColaDePagos";
-import { AccionesBorrador } from "@/components/casa/AccionesBorrador";
+import { AccionesPolla } from "@/components/casa/AccionesPolla";
 
 export const dynamic = "force-dynamic";
 
@@ -118,7 +118,9 @@ export default async function CasaAdminPage() {
                         {contenido}
                       </Link>
                     )}
-                    {esBorrador && <AccionesBorrador id={p.id} />}
+                    {/* El ciclo completo — publicar, cerrar, repartir —
+                        vive acá desde que se sacaron los bots de la UI. */}
+                    <AccionesPolla id={p.id} status={p.status} nombre={p.name} />
                   </li>
                 );
               })}
