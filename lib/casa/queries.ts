@@ -15,6 +15,7 @@ import {
   type CasaDistribution,
   type CasaEntry,
   type CasaLeaderboardRow,
+  type CasaPayout,
   type CasaPick,
   type CasaPolla,
   type CasaPot,
@@ -239,6 +240,115 @@ export async function getLeaderboard(
   });
   if (error) throw error;
   return (data ?? []) as CasaLeaderboardRow[];
+}
+
+/**
+ * Las pollas donde ya pagaste (o estas esperando aprobacion) y TE FALTAN
+ * pronosticos, con cuantos faltan y cuanto queda para el cierre.
+ *
+ * (2026-09-02) El unico aviso que existia era el numerito del BottomNav, y
+ * un badge no dice ni en cual polla ni cuanto falta. No hay recordatorio por
+ * SMS ni por WhatsApp para las pollas de la casa: el cron de recordatorios
+ * (app/api/cron/match-reminders) lee `pollas`/`predictions`, o sea el modelo
+ * P2P viejo, y no sabe que existe `casa_*`.
+ *
+ * Un SMS de recordatorio ademas costaria creditos por cada persona y cada
+ * polla; dentro de la app es gratis y llega igual, porque para pronosticar
+ * hay que abrirla de todas formas.
+ */
+export async function listPollasConPicksPendientes(
+  userId: string,
+): Promise<Array<{ polla: CasaPolla; faltan: number; total: number }>> {
+  const db = createAdminClient();
+
+  // Filtro explicito por user_id ademas de RLS — ver el TODO de auth.uid().
+  const { data: entries } = await db
+    .from("casa_entries")
+    .select("id, polla_id")
+    .eq("user_id", userId)
+    .in("status", ["pagada", "pendiente"]);
+  if (!entries || entries.length === 0) return [];
+
+  const { data: pollas } = await db
+    .from("casa_pollas")
+    .select(CASA_POLLA_COLUMNS)
+    .in(
+      "id",
+      entries.map((e: { polla_id: string }) => e.polla_id),
+    )
+    .eq("status", "abierta")
+    .gt("closes_at", new Date().toISOString())
+    .order("closes_at", { ascending: true });
+  if (!pollas || pollas.length === 0) return [];
+
+  const porId = new Map(
+    (pollas as CasaPolla[]).map((p) => [p.id, p]),
+  );
+
+  const salida: Array<{ polla: CasaPolla; faltan: number; total: number }> = [];
+  for (const entry of entries as Array<{ id: string; polla_id: string }>) {
+    const polla = porId.get(entry.polla_id);
+    if (!polla) continue;
+
+    const [{ count: total }, { count: hechos }] = await Promise.all([
+      db
+        .from("casa_polla_matches")
+        .select("match_id", { count: "exact", head: true })
+        .eq("polla_id", polla.id),
+      db
+        .from("casa_picks")
+        .select("id", { count: "exact", head: true })
+        .eq("entry_id", entry.id),
+    ]);
+
+    const faltan = (total ?? 0) - (hechos ?? 0);
+    if (faltan > 0) salida.push({ polla, faltan, total: total ?? 0 });
+  }
+  return salida;
+}
+
+/**
+ * Quien gano y cuanto, cuando la polla ya se repartio.
+ *
+ * (2026-09-02) `casa_settle_polla` escribia estas filas desde el dia uno y
+ * ningun archivo de la app las leia — la unica forma de saber el resultado
+ * era que el admin mirara la respuesta del bot de Telegram. Esto lo arregla.
+ *
+ * Adorna con nombre y pollito igual que el leaderboard. Se enumeran las
+ * columnas a mano (regla dura del repo: nunca `select("*")` sobre tablas con
+ * datos de usuario).
+ */
+export async function getPayouts(pollaId: string): Promise<CasaPayout[]> {
+  const db = createAdminClient();
+  const { data, error } = await db
+    .from("casa_payouts")
+    .select("user_id, place, points, amount_cop, paid_at")
+    .eq("polla_id", pollaId)
+    .order("place", { ascending: true });
+  if (error) throw error;
+
+  const filas = (data ?? []) as Array<Omit<CasaPayout, "display_name" | "avatar_url">>;
+  if (filas.length === 0) return [];
+
+  const { data: users } = await db
+    .from("users")
+    .select("id, display_name, avatar_url")
+    .in(
+      "id",
+      filas.map((f) => f.user_id),
+    );
+  const porId = new Map(
+    (users ?? []).map((u: { id: string; display_name: string | null; avatar_url: string | null }) => [
+      u.id,
+      u,
+    ]),
+  );
+
+  return filas.map((f) => ({
+    ...f,
+    display_name: porId.get(f.user_id)?.display_name ?? null,
+    avatar_url: porId.get(f.user_id)?.avatar_url ?? null,
+  }));
 }
 
 /**

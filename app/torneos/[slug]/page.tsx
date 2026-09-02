@@ -149,10 +149,10 @@ export default async function TorneoPage({ params }: PageProps) {
         <p className="text-white/70 mb-8 text-lg">{t.description[site.locale]}</p>
 
         <Link
-          href="/login"
+          href="/login?returnTo=%2Fcasa"
           className="inline-block bg-[#FCD116] text-black font-semibold px-6 py-3 rounded-full mb-10"
         >
-          {isEs ? `Crear polla del ${t.name.es} →` : `Create ${t.name.en} pool →`}
+          {isEs ? `Ingresar para participar en ${t.name.es} →` : `Sign in to enter a ${t.name.en} pool →`}
         </Link>
 
         {structure && structure.phases.length > 0 && (
@@ -217,20 +217,20 @@ export default async function TorneoPage({ params }: PageProps) {
 
         <section className="rounded-xl bg-[#FCD116] text-black p-6 text-center">
           <h2 className="font-bold text-xl mb-2">
-            {isEs ? `¿Cómo armar tu polla del ${t.name.es}?` : `How to start your ${t.name.en} pool`}
+            {isEs ? `Cómo participar en ${t.name.es}` : `How to enter a ${t.name.en} pool`}
           </h2>
           <ol className="text-left max-w-md mx-auto mb-4 list-decimal list-inside text-sm space-y-1">
             <li>{isEs ? "Entra con tu número de celular." : "Sign in with your phone number."}</li>
-            <li>{isEs ? `Elige "${t.name.es}" como torneo.` : `Pick "${t.name.en}" as the tournament.`}</li>
-            <li>{isEs ? "Pon nombre y costo de entrada." : "Set name and entry cost."}</li>
-            <li>{isEs ? "Comparte el código con tus parceros." : "Share the code with your friends."}</li>
-            <li>{isEs ? "Predicen, juegan, ganan." : "Predict, play, win."}</li>
+            <li>{isEs ? "Elige una polla publicada por la casa." : "Choose a pool published by the house."}</li>
+            <li>{isEs ? "Paga la entrada." : "Pay the entry fee."}</li>
+            <li>{isEs ? "Envía el comprobante." : "Submit the receipt."}</li>
+            <li>{isEs ? "Pronostica; el 70% va al pozo de los ganadores." : "Make your picks; 70% goes to the winners' prize pool."}</li>
           </ol>
           <Link
-            href="/login"
+            href="/login?returnTo=%2Fcasa"
             className="inline-block bg-black text-white font-semibold px-6 py-3 rounded-full"
           >
-            {isEs ? "Empezar gratis" : "Start free"}
+            {isEs ? "Ingresar para participar" : "Sign in to enter"}
           </Link>
         </section>
       </div>

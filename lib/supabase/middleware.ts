@@ -122,6 +122,22 @@ export async function updateSession(request: NextRequest) {
   ];
   const isPublicRoute = publicRoutes.some((route) => path.startsWith(route));
 
+  // `/casa/<slug>` — la ÚNICA pantalla de la casa que se comparte por fuera.
+  //
+  // (2026-09-02) Se abre porque el link que el admin pega en el grupo de
+  // WhatsApp mandaba a `/login`: el que no tiene cuenta no veía ni de qué se
+  // trataba, y el que sí la tiene perdía la vista previa. La página detecta
+  // que no hay sesión y renderiza una versión REDUCIDA — torneo, nombre,
+  // pozo, entrada y cierre — sin tabla de posiciones, sin nombres y sin
+  // pronósticos. Cero datos de otras personas.
+  //
+  // NO se hace con `startsWith("/casa")` a propósito: eso abriría también el
+  // hub `/casa` y, mucho peor, `/casa/admin`. El patrón exige exactamente 3
+  // segmentos, así que `/casa`, `/casa/<slug>/pagar` y `/casa/admin` (bloqueado
+  // además explícito) siguen pidiendo sesión.
+  const isCasaPollaPublica =
+    /^\/casa\/[^/]+$/.test(path) && !path.startsWith("/casa/admin");
+
   // These routes handle their own auth (cron secret, webhook signature, etc.)
   const isApiWebhook =
     path.startsWith("/api/whatsapp/webhook") ||
@@ -131,11 +147,16 @@ export async function updateSession(request: NextRequest) {
     // X-Telegram-Bot-Api-Secret-Token, que el handler verifica antes de leer
     // una sola línea del body (ver app/api/telegram/webhook/route.ts).
     path.startsWith("/api/telegram/webhook") ||
+    // DLR de LabsMobile. Quien llama es el proveedor, no un browser: si esto
+    // cae al gate de sesión, el middleware responde 307 a /login y el acuse
+    // muere (y el secreto de la query viajaría en returnTo). Auth propia:
+    // `?k=<SMS_ACK_SECRET>` comparado en tiempo constante.
+    path.startsWith("/api/sms/ack") ||
     path.startsWith("/api/matches/sync") ||
     path.startsWith("/api/matches/discover") ||
     path.startsWith("/api/admin/");
 
-  if (!user && !isPublicRoute && !isApiWebhook) {
+  if (!user && !isPublicRoute && !isApiWebhook && !isCasaPollaPublica) {
     const url = request.nextUrl.clone();
     const original = path + request.nextUrl.search;
     url.pathname = "/login";

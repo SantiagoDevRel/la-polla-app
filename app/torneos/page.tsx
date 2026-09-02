@@ -16,10 +16,10 @@ export const revalidate = 3600;
 export async function generateMetadata(): Promise<Metadata> {
   const site = getSiteFromHeaders();
   const isEs = site.locale === "es";
-  const title = isEs ? "Torneos disponibles para tu polla" : "Tournaments you can pool";
+  const title = isEs ? "Torneos con pollas de fútbol" : "Football pool tournaments";
   const description = isEs
-    ? "Mundial 2026, Champions League, Copa Libertadores, Sudamericana, Liga BetPlay, LaLiga, Premier League y Serie A. Crea una polla en minutos con tus amigos."
-    : "World Cup 2026, Champions League, Copa Libertadores, Sudamericana, Liga BetPlay, LaLiga, Premier League, Serie A. Create a pool with friends in minutes.";
+    ? "Explora los torneos incluidos en las pollas de la casa. Paga la entrada y pronostica: el 70% de lo recaudado va al pozo de los ganadores."
+    : "Explore the tournaments featured in pools published by the house. Pay the entry fee and make your picks: 70% of entry fees is allocated to the winners' prize pool.";
   const canonical = pathForLocale(site.locale, "torneos-index");
   return {
     title,
@@ -62,12 +62,12 @@ export default function TorneosIndexPage() {
           {isEs ? "Torneos" : "Tournaments"}
         </p>
         <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
-          {isEs ? "Crea tu polla del torneo que más te guste" : "Create a pool for any tournament"}
+          {isEs ? "Pollas de los principales torneos" : "Pools for the biggest tournaments"}
         </h1>
         <p className="text-white/70 mb-8 text-lg">
           {isEs
-            ? "Elige un torneo, invita a tus parceros y compitan prediciendo resultados. Gratis."
-            : "Pick a tournament, invite your friends, and compete by predicting results. Free."}
+            ? "La casa publica las pollas del fin de semana. Paga la entrada, pronostica y compite por el pozo."
+            : "The house publishes weekend pools. Pay the entry fee, make your picks and compete for the prize pool."}
         </p>
 
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -89,13 +89,13 @@ export default function TorneosIndexPage() {
 
         <div className="mt-10 rounded-xl bg-[#FCD116] text-black p-6 text-center">
           <p className="font-bold text-xl mb-2">
-            {isEs ? "¿Listo para armar la polla?" : "Ready to build your pool?"}
+            {isEs ? "¿Quieres participar?" : "Ready to enter?"}
           </p>
           <Link
-            href="/login"
+            href="/login?returnTo=%2Fcasa"
             className="inline-block bg-black text-white font-semibold px-6 py-3 rounded-full"
           >
-            {isEs ? "Crear polla gratis" : "Create pool — free"}
+            {isEs ? "Ingresar para participar" : "Sign in to enter"}
           </Link>
         </div>
       </div>

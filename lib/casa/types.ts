@@ -118,6 +118,24 @@ export interface CasaLeaderboardRow {
   puesto: number;
 }
 
+/**
+ * Una fila de casa_payouts: a quien le toco cuanto cuando se repartio.
+ *
+ * (2026-09-02) La tabla existia desde la migracion 081 y `casa_settle_polla`
+ * la escribia, pero NADIE la leia en toda la app: la plata entraba, se
+ * puntuaba, se repartia en SQL... y ahi se acababa. El jugador nunca se
+ * enteraba de que habia ganado.
+ */
+export interface CasaPayout {
+  user_id: string;
+  place: number;
+  points: number | null;
+  amount_cop: number;
+  paid_at: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
 /** Lo que devuelve casa_pick_distribution: conteos crudos por clave. */
 export interface CasaDistribution {
   resultado: Record<string, { conteo: Record<string, number>; total: number }>;

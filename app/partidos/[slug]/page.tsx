@@ -93,8 +93,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     ? `${m.home_team} vs ${m.away_team} — ${tournamentName}`
     : `${m.home_team} vs ${m.away_team} — ${tournamentName}`;
   const description = isEs
-    ? `${m.home_team} contra ${m.away_team} el ${dateLabel}${m.venue ? ` en ${m.venue}` : ""}. Pronóstico, hora y cómo armar tu polla para predecir el resultado.`
-    : `${m.home_team} vs ${m.away_team} on ${dateLabel}${m.venue ? ` at ${m.venue}` : ""}. Preview, kickoff time and how to set up your pool to predict the result.`;
+    ? `${m.home_team} contra ${m.away_team} el ${dateLabel}${m.venue ? ` en ${m.venue}` : ""}. Consulta la hora. Si la casa publica una polla, paga la entrada y pronostica el marcador.`
+    : `${m.home_team} vs ${m.away_team} on ${dateLabel}${m.venue ? ` at ${m.venue}` : ""}. Check the kickoff time. If the house publishes a pool, pay the entry fee and predict the score.`;
   const canonical = pathForLocale(site.locale, "partido", params.slug);
   return {
     title,
@@ -224,19 +224,19 @@ export default async function PartidoPage({ params }: PageProps) {
         <section className="rounded-xl bg-[#FCD116] text-black p-6 text-center mb-10">
           <h2 className="font-bold text-xl mb-2">
             {isEs
-              ? `Predice ${m.home_team} vs ${m.away_team} en tu polla`
-              : `Predict ${m.home_team} vs ${m.away_team} in your pool`}
+              ? `Pronostica ${m.home_team} vs ${m.away_team} en una polla`
+              : `Predict ${m.home_team} vs ${m.away_team} in a pool`}
           </h2>
           <p className="text-sm mb-4 opacity-80">
             {isEs
-              ? "Crea una polla con tus parceros, predice el marcador y compitan por puntos."
-              : "Create a pool with friends, predict the score and compete for points."}
+              ? "La casa confirma cada entrada y destina el 70% de lo recaudado al pozo de los ganadores."
+              : "The house confirms each entry and allocates 70% of entry fees to the winners' prize pool."}
           </p>
           <Link
-            href="/login"
+            href="/login?returnTo=%2Fcasa"
             className="inline-block bg-black text-white font-semibold px-6 py-3 rounded-full"
           >
-            {isEs ? "Crear polla gratis" : "Create pool — free"}
+            {isEs ? "Ingresar para participar" : "Sign in to enter"}
           </Link>
         </section>
 
@@ -251,8 +251,8 @@ export default async function PartidoPage({ params }: PageProps) {
           </p>
           <p>
             {isEs
-              ? "Si querés pronosticar este partido con tus amigos, podés crear una polla en minutos."
-              : "If you want to predict this match with friends, you can create a pool in minutes."}
+              ? "Puedes participar cuando la casa publique una polla que incluya este partido."
+              : "You can enter when the house publishes a pool that includes this match."}
           </p>
         </section>
       </div>

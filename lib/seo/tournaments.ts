@@ -27,12 +27,12 @@ export const TOURNAMENTS_SEO: TournamentSeo[] = [
     publicSlug: "mundial-2026",
     name: { es: "Mundial 2026", en: "World Cup 2026" },
     description: {
-      es: "Polla del Mundial 2026 con todos los partidos, fases de grupos, eliminatorias y final. Invita a tus parceros y compitan por puntos.",
-      en: "World Cup 2026 pool with every match: group stage, knockouts and final. Invite friends and compete on points.",
+      es: "Pollas del Mundial 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "World Cup 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
     },
     heading: {
-      es: "Crea tu polla del Mundial 2026",
-      en: "Create your World Cup 2026 pool",
+      es: "Pollas del Mundial 2026",
+      en: "World Cup 2026 pools",
     },
     keywords: {
       es: ["polla mundial 2026", "quiniela mundial", "pronosticos mundial", "polla copa del mundo"],
@@ -44,12 +44,12 @@ export const TOURNAMENTS_SEO: TournamentSeo[] = [
     publicSlug: "champions-league",
     name: { es: "Champions League 2025/26", en: "Champions League 2025/26" },
     description: {
-      es: "Polla de la UEFA Champions League. Predice fase de liga, octavos, cuartos, semifinales y final con tus amigos.",
-      en: "UEFA Champions League pool. Predict league phase, round of 16, quarter-finals, semi-finals and final with friends.",
+      es: "Pollas de la UEFA Champions League publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "UEFA Champions League pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
     },
     heading: {
-      es: "Polla de la Champions League",
-      en: "Champions League pool",
+      es: "Pollas de la Champions League",
+      en: "Champions League pools",
     },
     keywords: {
       es: ["polla champions league", "quiniela champions", "pronosticos champions"],
@@ -61,12 +61,12 @@ export const TOURNAMENTS_SEO: TournamentSeo[] = [
     publicSlug: "copa-libertadores",
     name: { es: "Copa Libertadores 2026", en: "Copa Libertadores 2026" },
     description: {
-      es: "Polla de la Copa Libertadores 2026. Predice todos los partidos de la fase de grupos, octavos, cuartos, semis y la final.",
-      en: "Copa Libertadores 2026 pool. Predict every match from group stage to the final.",
+      es: "Pollas de la Copa Libertadores 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Copa Libertadores 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
     },
     heading: {
-      es: "Polla de la Copa Libertadores",
-      en: "Copa Libertadores pool",
+      es: "Pollas de la Copa Libertadores",
+      en: "Copa Libertadores pools",
     },
     keywords: {
       es: ["polla libertadores", "quiniela copa libertadores", "pronosticos libertadores"],
@@ -78,12 +78,12 @@ export const TOURNAMENTS_SEO: TournamentSeo[] = [
     publicSlug: "copa-sudamericana",
     name: { es: "Copa Sudamericana 2026", en: "Copa Sudamericana 2026" },
     description: {
-      es: "Polla de la Copa Sudamericana 2026. Predice resultados desde la fase de grupos hasta la final.",
-      en: "Copa Sudamericana 2026 pool. Predict results from group stage to the final.",
+      es: "Pollas de la Copa Sudamericana 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Copa Sudamericana 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
     },
     heading: {
-      es: "Polla de la Copa Sudamericana",
-      en: "Copa Sudamericana pool",
+      es: "Pollas de la Copa Sudamericana",
+      en: "Copa Sudamericana pools",
     },
     keywords: {
       es: ["polla sudamericana", "pronosticos sudamericana"],
@@ -95,12 +95,12 @@ export const TOURNAMENTS_SEO: TournamentSeo[] = [
     publicSlug: "liga-betplay",
     name: { es: "Liga BetPlay Dimayor 2026", en: "Liga BetPlay 2026" },
     description: {
-      es: "Polla de la Liga BetPlay 2026. Todos contra todos, cuartos, semifinales y final del fútbol profesional colombiano.",
-      en: "Liga BetPlay 2026 pool. Round-robin, quarter-finals, semi-finals and final of Colombian football.",
+      es: "Pollas de la Liga BetPlay 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Liga BetPlay 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
     },
     heading: {
-      es: "Polla de la Liga BetPlay",
-      en: "Liga BetPlay pool",
+      es: "Pollas de la Liga BetPlay",
+      en: "Liga BetPlay pools",
     },
     keywords: {
       es: ["polla liga betplay", "polla dimayor", "pronosticos liga colombiana", "polla nacional"],
@@ -112,10 +112,10 @@ export const TOURNAMENTS_SEO: TournamentSeo[] = [
     publicSlug: "laliga",
     name: { es: "LaLiga 2025/26", en: "LaLiga 2025/26" },
     description: {
-      es: "Polla de LaLiga española. Predice todos los partidos de la temporada con tus amigos.",
-      en: "Spanish LaLiga pool. Predict every match of the season with friends.",
+      es: "Pollas de LaLiga publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "LaLiga pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
     },
-    heading: { es: "Polla de LaLiga", en: "LaLiga pool" },
+    heading: { es: "Pollas de LaLiga", en: "LaLiga pools" },
     keywords: {
       es: ["polla laliga", "polla liga española", "pronosticos laliga"],
       en: ["laliga pool", "spanish league predictions"],
@@ -126,10 +126,10 @@ export const TOURNAMENTS_SEO: TournamentSeo[] = [
     publicSlug: "premier-league",
     name: { es: "Premier League 2025/26", en: "Premier League 2025/26" },
     description: {
-      es: "Polla de la Premier League inglesa. Predice todos los partidos de la temporada con tus amigos.",
-      en: "English Premier League pool. Predict every match of the season with friends.",
+      es: "Pollas de la Premier League publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Premier League pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
     },
-    heading: { es: "Polla de la Premier League", en: "Premier League pool" },
+    heading: { es: "Pollas de la Premier League", en: "Premier League pools" },
     keywords: {
       es: ["polla premier league", "polla premier", "pronosticos premier"],
       en: ["premier league pool", "premier league predictions"],
@@ -140,10 +140,10 @@ export const TOURNAMENTS_SEO: TournamentSeo[] = [
     publicSlug: "serie-a",
     name: { es: "Serie A 2025/26", en: "Serie A 2025/26" },
     description: {
-      es: "Polla de la Serie A italiana. Predice todos los partidos de la temporada con tus amigos.",
-      en: "Italian Serie A pool. Predict every match of the season with friends.",
+      es: "Pollas de la Serie A publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Serie A pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
     },
-    heading: { es: "Polla de la Serie A", en: "Serie A pool" },
+    heading: { es: "Pollas de la Serie A", en: "Serie A pools" },
     keywords: {
       es: ["polla serie a", "polla calcio", "pronosticos serie a"],
       en: ["serie a pool", "italian league predictions"],
