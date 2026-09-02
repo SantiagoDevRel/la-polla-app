@@ -61,7 +61,7 @@ export function ColaDePagos() {
   if (pendientes === null) {
     return (
       <StreetCard className="p-4 text-[13px] text-text-muted">
-        Buscando pagos...
+        Cargando pagos...
       </StreetCard>
     );
   }
@@ -69,7 +69,7 @@ export function ColaDePagos() {
   if (pendientes.length === 0) {
     return (
       <StreetCard className="p-4 text-[13px] text-text-muted">
-        No hay pagos esperando. Todo al día.
+        No hay pagos pendientes.
       </StreetCard>
     );
   }

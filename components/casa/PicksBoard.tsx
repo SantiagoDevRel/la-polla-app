@@ -140,7 +140,7 @@ export function PicksBoard({
       const json = await res.json();
 
       if (!res.ok) {
-        setMsg({ text: json.error ?? "No pude guardar.", bad: true });
+        setMsg({ text: json.error ?? "No se pudo guardar.", bad: true });
         return;
       }
       setDirty(false);
@@ -152,11 +152,11 @@ export function PicksBoard({
           ? `Guardado. ${json.avisos[0]}`
           : faltan > 0
             ? `Guardado ${marcados} de ${matches.length}. Te faltan ${faltan}.`
-            : "Guardado, quedaste con todo marcado.",
+            : "Guardado. No te falta ningún partido.",
         bad: faltan > 0,
       });
     } catch {
-      setMsg({ text: "Se cayó la conexión. Prueba otra vez.", bad: true });
+      setMsg({ text: "Error de conexión. Intenta de nuevo.", bad: true });
     } finally {
       setSaving(false);
     }
@@ -276,8 +276,8 @@ export function PicksBoard({
                   return (
                     <p className="mt-3 text-center text-[11px] text-text-muted">
                       {n === 0
-                        ? `Nadie más puso ${clave}.`
-                        : `${n} de ${d.total} pusieron ${clave} (${Math.round((n / d.total) * 100)}%)`}
+                        ? `Nadie más eligió ${clave}.`
+                        : `${n} de ${d.total} eligieron ${clave} (${Math.round((n / d.total) * 100)}%)`}
                     </p>
                   );
                 })()}

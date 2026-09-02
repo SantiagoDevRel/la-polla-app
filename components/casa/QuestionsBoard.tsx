@@ -84,13 +84,13 @@ export function QuestionsBoard({
       });
       const json = await res.json();
       if (!res.ok) {
-        setMsg({ text: json.error ?? "No pude guardar.", bad: true });
+        setMsg({ text: json.error ?? "No se pudo guardar.", bad: true });
         return;
       }
       setDirty(false);
       setMsg({ text: "Guardado." });
     } catch {
-      setMsg({ text: "Se cayó la conexión.", bad: true });
+      setMsg({ text: "Error de conexión.", bad: true });
     } finally {
       setSaving(false);
     }
@@ -182,8 +182,8 @@ export function QuestionsBoard({
                         const clave = mine.freeText!.trim().toLowerCase();
                         const n = dist?.conteo?.[clave] ?? 0;
                         return n <= 1
-                          ? "Nadie más puso eso."
-                          : `${n} de ${total} pusieron lo mismo (${Math.round((n / total) * 100)}%)`;
+                          ? "Nadie más respondió eso."
+                          : `${n} de ${total} respondieron lo mismo (${Math.round((n / total) * 100)}%)`;
                       })()}
                     </p>
                   )}
@@ -228,7 +228,7 @@ export function QuestionsBoard({
         </p>
       )}
 
-      {canEdit && <Label className="mt-3 px-4 text-center">Las resuelve Tama a mano</Label>}
+      {canEdit && <Label className="mt-3 px-4 text-center">Las resuelve el administrador</Label>}
     </div>
   );
 }

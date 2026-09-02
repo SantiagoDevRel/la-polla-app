@@ -349,7 +349,7 @@ function LoginInner() {
                 type="submit"
                 disabled={sending || cooldownRemaining > 0}
                 className="bg-gold text-bg-base font-bold py-3.5 px-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base inline-flex items-center justify-center gap-2"
-                style={{ boxShadow: "0 0 20px rgba(216, 255, 71, 0.15)" }}
+                style={{ boxShadow: "0 0 20px rgba(255, 215, 0, 0.15)" }}
               >
                 {sending ? (
                   <>
@@ -447,7 +447,7 @@ function LoginInner() {
               type="submit"
               disabled={verifying || otp.length !== 6}
               className="w-full bg-gold text-bg-base font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base inline-flex items-center justify-center gap-2"
-              style={{ boxShadow: "0 0 20px rgba(216, 255, 71, 0.15)" }}
+              style={{ boxShadow: "0 0 20px rgba(255, 215, 0, 0.15)" }}
             >
               {verifying ? (
                 <>

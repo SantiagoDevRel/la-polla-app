@@ -41,6 +41,21 @@ export function AppBackgroundClient({
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (mq.matches) return;
 
+    // Guard de datos moviles (2026-09-02). El fondo se habia sacado entero por
+    // lo que costaba en un plan prepago, y esa parte de la objecion era real:
+    // el poster son ~80 kB pero el video son ~2 MB. En vez de matar el fondo
+    // para todos, no se pide el video cuando el telefono avisa que no conviene.
+    // `connection` no existe en Safari, y ahi el default correcto es dejarlo
+    // pasar: el usuario de iPhone ya tiene el control de Low Power Mode, que
+    // hace fallar el play() solo y nos deja igual con el poster.
+    const conn = (
+      navigator as Navigator & {
+        connection?: { saveData?: boolean; effectiveType?: string };
+      }
+    ).connection;
+    if (conn?.saveData) return;
+    if (conn?.effectiveType && /(^|-)2g$|^3g$/.test(conn.effectiveType)) return;
+
     const v = videoRef.current;
     if (!v) return;
 

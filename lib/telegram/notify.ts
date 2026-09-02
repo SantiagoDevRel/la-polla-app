@@ -76,7 +76,7 @@ export async function notifyNewProof(n: ProofNotice): Promise<void> {
       ? await sendPhoto(chat, url, lineas, buttons)
       : await sendMessage(
           chat,
-          `${lineas}\n\n⚠️ No pude cargar el pantallazo. Revisalo en la web.`,
+          `${lineas}\n\n⚠️ No pude cargar el comprobante. Revísalo en la web.`,
           buttons,
         );
 

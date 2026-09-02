@@ -1,14 +1,17 @@
-// tailwind.config.ts — "Parche" v1.0 · el lenguaje visual de calle
+// tailwind.config.ts — Tribuna Caliente v1.1 · el skin de siempre, de vuelta
 //
-// Reemplaza a Tribuna Caliente v0.1 (premium, dorado, redondeado). Los NOMBRES
-// de los tokens se mantienen a proposito: repuntando los valores, los ~600 usos
-// de `bg-card`, `text-gold`, `border-subtle`, etc. que ya existen en la app se
-// reskinnean solos, sin tocar 100 componentes a mano.
+// (2026-09-02) Deshace "Parche v1.0". Ese intento apago la app: radio 0 en
+// TODO, dorado cambiado por verde cal y las dos familias cambiadas por Anton +
+// Barlow. El resultado se leia como plantilla, no como producto.
 //
-// La jugada clave: `borderRadius` queda en 0 ENTERO, incluido `full`. Eso mata
-// de un golpe las 201 `rounded-full` y las 400 y pico `rounded-xl/lg/2xl` que
-// daban el look burbuja. Si algun dia hace falta una esquina redonda puntual,
-// esta `rounded-pill` — pero es la excepcion, no el default.
+// La mecanica que si valia la pena se conserva: los NOMBRES de los tokens no
+// cambian nunca, solo sus valores. Por eso este archivo revierte los ~600 usos
+// de `bg-card`, `text-gold`, `border-subtle` sin tocar un solo componente.
+//
+// `borderRadius` vuelve a la escala 8/12/18/24 y `full` vuelve a ser 9999px:
+// eso solo devuelve las 201 `rounded-full` y las ~400 `rounded-xl/lg/2xl` que
+// daban la silueta de la app. `rounded-pill` se queda como alias de `full`
+// para no romper lo que ya lo escribio durante el interludio Parche.
 import type { Config } from "tailwindcss";
 
 const config: Config = {
@@ -20,16 +23,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Superficies: concreto, no vidrio.
+        // Superficies: vidrio oscuro sobre el estadio, no concreto.
         "bg-base": "rgb(var(--bg-base-rgb) / <alpha-value>)",
         "bg-card": "rgb(var(--bg-card-rgb) / <alpha-value>)",
         "bg-elevated": "rgb(var(--bg-elevated-rgb) / <alpha-value>)",
         "bg-subtle": "rgb(var(--bg-subtle-rgb) / <alpha-value>)",
 
-        // El acento. `gold` ahora es CAL (verde limon de spray): conserva el
-        // nombre para no romper los usos existentes, pero ya no es premium.
+        // El acento. `gold` vuelve a ser ORO (#FFD700) y es SAGRADO: senal de
+        // premio, maximo 3 apariciones por pantalla. `cal` queda apuntando al
+        // mismo token para no romper lo que se escribio en el interludio.
         gold: "rgb(var(--gold-rgb) / <alpha-value>)",
-        cal: "rgb(var(--gold-rgb) / <alpha-value>)", // alias legible
+        cal: "rgb(var(--gold-rgb) / <alpha-value>)", // alias heredado
         amber: "rgb(var(--amber-rgb) / <alpha-value>)",
         "amber-dim": "var(--amber-dim)",
         turf: "rgb(var(--turf-rgb) / <alpha-value>)",
@@ -40,7 +44,7 @@ const config: Config = {
         "text-secondary": "rgb(var(--text-secondary-rgb) / <alpha-value>)",
         "text-muted": "rgb(var(--text-muted-rgb) / <alpha-value>)",
 
-        // Bordes SOLIDOS. El look de calle es linea dura, no velo translucido.
+        // Bordes: velo translucido otra vez — el fondo tiene que respirar.
         "border-subtle": "var(--border-subtle)",
         "border-default": "var(--border-default)",
         "border-strong": "var(--border-strong)",
@@ -56,22 +60,22 @@ const config: Config = {
         "blue-info": "var(--blue-info)",
       },
       fontFamily: {
-        sans: ["var(--font-body)", "'Barlow'", "Arial", "sans-serif"],
-        display: ["var(--font-display)", "'Anton'", "Impact", "sans-serif"],
-        body: ["var(--font-body)", "'Barlow'", "sans-serif"],
+        sans: ["var(--font-body)", "'Outfit'", "Arial", "sans-serif"],
+        display: ["var(--font-display)", "'Bebas Neue'", "sans-serif"],
+        body: ["var(--font-body)", "'Outfit'", "sans-serif"],
       },
-      // Todo cuadrado. `full` incluido: es lo que borra el look burbuja.
+      // La escala de siempre. `full` vuelve a redondear de verdad; `pill` se
+      // queda como alias para no romper lo escrito durante Parche.
       borderRadius: {
         none: "0",
-        DEFAULT: "0",
-        sm: "0",
-        md: "0",
-        lg: "0",
-        xl: "0",
-        "2xl": "0",
-        "3xl": "0",
-        full: "0",
-        // Escotilla de escape para el caso puntual que de verdad la pida.
+        DEFAULT: "12px",
+        sm: "8px",
+        md: "12px",
+        lg: "18px",
+        xl: "24px",
+        "2xl": "18px",
+        "3xl": "24px",
+        full: "9999px",
         pill: "9999px",
       },
       borderWidth: {
@@ -83,11 +87,12 @@ const config: Config = {
         shout: "0.12em",
       },
       backgroundImage: {
-        // Cinta de peligro amarillo/negro para avisos.
+        // Cinta de aviso. Se conserva la utilidad (hay avisos que la usan) pero
+        // en dorado sobre negro, que es la paleta de la casa.
         hazard:
           "repeating-linear-gradient(45deg, var(--hazard-a) 0 10px, var(--hazard-b) 10px 20px)",
-        // Concreto: ruido finito, casi imperceptible, que le quita el plano
-        // digital al fondo.
+        // Grano fino. Ya no hace de "concreto": protege del banding en OLED
+        // sobre el video del fondo.
         concrete: "var(--concrete-noise)",
       },
       keyframes: {

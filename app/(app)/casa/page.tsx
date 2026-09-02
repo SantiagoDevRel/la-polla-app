@@ -52,10 +52,10 @@ export default async function CasaPage() {
         </div>
         <p className="mt-2 text-[13px] text-text-secondary">
           {abiertas.length === 0
-            ? "Todavía no hay pollas abiertas. Tama las arma para el fin de semana."
+            ? "Todavía no hay pollas abiertas. Se publican para el fin de semana."
             : `${abiertas.length} polla${abiertas.length === 1 ? "" : "s"} abierta${
                 abiertas.length === 1 ? "" : "s"
-              } · ${jugando} jugando`}
+              } · ${jugando} inscritos`}
         </p>
       </HeroFrame>
 
@@ -67,10 +67,26 @@ export default async function CasaPage() {
         />
 
         {abiertas.length === 0 ? (
-          <StreetCard className="p-6 text-center">
+          // `bg-bg-card` pisa a proposito el 80% de opacidad de .lp-card: es la
+          // unica card de la app que lleva ilustracion adentro, y sobre el video
+          // del fondo (que tiene su propio pollito) el translucido superponia las
+          // dos y no se leia ninguna.
+          <StreetCard className="bg-bg-card p-6 text-center">
+            {/* (2026-09-02) El pollito vuelve al estado vacio. No es adorno:
+                el design system lo reserva para los momentos en que la
+                pantalla no tiene nada que mostrar, que es justo cuando una
+                caja de texto sola se siente como un error de la app. */}
+            <Image
+              src="/pollitos/Pollito_esperando.webp"
+              alt=""
+              aria-hidden="true"
+              width={112}
+              height={112}
+              className="mx-auto mb-3 h-28 w-28 max-w-none object-contain opacity-90"
+            />
             <p className="lp-display-sm text-text-primary">Sin pollas abiertas</p>
             <p className="mt-2 text-[13px] text-text-muted">
-              Apenas Tama arme la del finde, te aparece acá.
+              La del fin de semana aparecerá aquí.
             </p>
           </StreetCard>
         ) : (
@@ -84,7 +100,7 @@ export default async function CasaPage() {
         {/* ── Ya cerradas ─────────────────────────────────────────────── */}
         {cerradas.length > 0 && (
           <>
-            <SectionHead title="Ya jugadas" className="mt-9" />
+            <SectionHead title="Anteriores" className="mt-9" />
             <ul className="space-y-3 opacity-70">
               {cerradas.slice(0, 8).map((polla) => (
                 <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} />
@@ -156,7 +172,7 @@ function PollaRow({
           {/* Fila 3 — el apuro y la gente. Hairline arriba para separar sin peso. */}
           <div className="mt-4 flex items-center justify-between border-t border-border-subtle pt-3">
             <span className="text-[12px] text-text-muted">
-              {pot?.paid_entries ?? 0} jugando
+              {pot?.paid_entries ?? 0} inscritos
             </span>
             <span
               className={`lp-money text-[12px] ${abierta ? "text-gold" : "text-text-muted"}`}

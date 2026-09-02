@@ -31,9 +31,9 @@ export function TribunaArt({ className, glow = 1 }: TribunaArtProps) {
       <defs>
         {/* Haz de reflector: cono suave que baja desde arriba. */}
         <linearGradient id="ta-beam" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#D8FF47" stopOpacity={0.16 * glow} />
-          <stop offset="55%" stopColor="#D8FF47" stopOpacity={0.05 * glow} />
-          <stop offset="100%" stopColor="#D8FF47" stopOpacity="0" />
+          <stop offset="0%" stopColor="#FFD700" stopOpacity={0.16 * glow} />
+          <stop offset="55%" stopColor="#FFD700" stopOpacity={0.05 * glow} />
+          <stop offset="100%" stopColor="#FFD700" stopOpacity="0" />
         </linearGradient>
         <linearGradient id="ta-beam-warm" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#FFD9A0" stopOpacity={0.13 * glow} />
@@ -46,9 +46,9 @@ export function TribunaArt({ className, glow = 1 }: TribunaArtProps) {
         </radialGradient>
         {/* Desvanecido inferior: entrega la imagen al fondo solido sin corte. */}
         <linearGradient id="ta-fade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#0A0A0B" stopOpacity="0" />
-          <stop offset="72%" stopColor="#0A0A0B" stopOpacity="0.82" />
-          <stop offset="100%" stopColor="#0A0A0B" stopOpacity="1" />
+          <stop offset="0%" stopColor="#080c10" stopOpacity="0" />
+          <stop offset="72%" stopColor="#080c10" stopOpacity="0.82" />
+          <stop offset="100%" stopColor="#080c10" stopOpacity="1" />
         </linearGradient>
       </defs>
 
@@ -69,7 +69,7 @@ export function TribunaArt({ className, glow = 1 }: TribunaArtProps) {
             y={128 - ((i * 7) % 19)}
             width="13"
             height="120"
-            fill="#1A1A1D"
+            fill="#131b2b"
           />
         ))}
       </g>
@@ -78,7 +78,7 @@ export function TribunaArt({ className, glow = 1 }: TribunaArtProps) {
           la de adelante casi negra: eso es lo que da sensacion de multitud. */}
       <CrowdRow y={150} scale={0.74} fill="#141416" seed={3} />
       <CrowdRow y={172} scale={0.9} fill="#0F0F11" seed={7} />
-      <CrowdRow y={196} scale={1.08} fill="#0A0A0B" seed={11} />
+      <CrowdRow y={196} scale={1.08} fill="#080c10" seed={11} />
 
       {/* Desvanecido al fondo. */}
       <rect x="0" y="0" width="390" height="220" fill="url(#ta-fade)" />

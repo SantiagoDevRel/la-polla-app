@@ -9,7 +9,7 @@
 //   manual   → escribís vos las preguntas y sus opciones ("primer goleador").
 //   rifa     → cuántas boletas, cuánto vale, y cómo se sortea.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Label, SectionHead, StreetCard, Tape } from "@/components/street";
@@ -77,6 +77,36 @@ export function CrearPollaForm() {
   const [seleccion, setSeleccion] = useState<string[]>([]);
   const [cargando, setCargando] = useState(false);
 
+  // ── Cierre vs primer pitazo ──────────────────────────────────────────
+  // (2026-09-02) El default era "el proximo sabado a las 12:00", fijo. Para
+  // la fecha 5 de Premier los 7 partidos del sabado arrancan entre 06:30 y
+  // 11:30 hora de Bogota: TODOS antes del cierre. O sea que alguien podia
+  // pagar, ver que Liverpool ya iba ganando, y recien ahi pronosticar.
+  // El lock por partido de 5 minutos limitaba el daño, pero la polla nacia
+  // con una ventana de trampa abierta y nada lo advertia.
+  //
+  // Ahora el cierre se deriva del primer partido elegido (menos 15 min) y se
+  // avisa en rojo si el admin lo mueve mas alla del pitazo.
+  const primerKickoff = useMemo(() => {
+    if (seleccion.length === 0) return null;
+    const elegidos = matches
+      .filter((m) => seleccion.includes(m.id))
+      .map((m) => new Date(m.scheduled_at).getTime())
+      .filter((t) => Number.isFinite(t));
+    return elegidos.length ? Math.min(...elegidos) : null;
+  }, [matches, seleccion]);
+
+  // Se respeta la decision del admin: si toco el campo, no se lo pisamos.
+  const cierreTocado = useRef(false);
+
+  useEffect(() => {
+    if (cierreTocado.current || primerKickoff === null) return;
+    setClosesAt(toLocalInput(new Date(primerKickoff - 15 * 60_000)));
+  }, [primerKickoff]);
+
+  const cierreTarde =
+    primerKickoff !== null && new Date(closesAt).getTime() > primerKickoff;
+
   // manual
   const [preguntas, setPreguntas] = useState<Pregunta[]>([
     { prompt: "", points: 3, inputKind: "opciones", options: ["", ""] },
@@ -131,7 +161,7 @@ export function CrearPollaForm() {
 
   async function crear(publicar: boolean) {
     setError(null);
-    if (name.trim().length < 3) return setError("Ponle un nombre a la polla.");
+    if (name.trim().length < 3) return setError("Escribe el nombre de la polla.");
     if (kind === "partidos" && seleccion.length === 0)
       return setError("Elige al menos un partido.");
     if (kind === "manual" && preguntas.every((q) => !q.prompt.trim()))
@@ -180,7 +210,7 @@ export function CrearPollaForm() {
         body: JSON.stringify(body),
       });
       const json = await res.json();
-      if (!res.ok) return setError(json.error ?? "No pude crear la polla.");
+      if (!res.ok) return setError(json.error ?? "No se pudo crear la polla.");
 
       // Un borrador NO es visible en /casa/<slug> (esa ruta hace notFound()
       // para los borradores), asi que mandar ahi era mandar a un 404.
@@ -192,7 +222,7 @@ export function CrearPollaForm() {
       }
       router.refresh();
     } catch {
-      setError("Se cayó la conexión.");
+      setError("Error de conexión.");
     } finally {
       setGuardando(false);
     }
@@ -314,8 +344,8 @@ export function CrearPollaForm() {
             className="lp-input mt-2"
           />
           <p className="mt-2 text-[11px] text-text-muted">
-            Es lo que la gente ve para transferir. Sin esto no puedes publicar
-            una polla con precio.
+            Es la cuenta que ven los inscritos para transferir. Sin esto no
+            puedes publicar una polla con precio.
           </p>
         </div>
 
@@ -324,9 +354,27 @@ export function CrearPollaForm() {
           <input
             type="datetime-local"
             value={closesAt}
-            onChange={(e) => setClosesAt(e.target.value)}
+            onChange={(e) => {
+              // Tocarlo a mano apaga el ajuste automatico: a partir de aca
+              // manda el criterio del admin, no el calculo.
+              cierreTocado.current = true;
+              setClosesAt(e.target.value);
+            }}
             className="lp-input mt-2"
           />
+          {cierreTarde ? (
+            <p className="mt-2 text-[12px] font-semibold text-red-alert">
+              El cierre queda DESPUES de que arranque el primer partido
+              seleccionado. Quien entre despues del pitazo ya sabria el
+              resultado.
+            </p>
+          ) : (
+            <p className="mt-2 text-[11px] text-text-muted">
+              {primerKickoff
+                ? "Se ajusto solo a 15 minutos antes del primer partido. Puedes cambiarlo."
+                : "Hora de tu telefono."}
+            </p>
+          )}
         </div>
 
         {kind !== "rifa" && (
@@ -412,7 +460,7 @@ export function CrearPollaForm() {
             />
             {cargando ? (
               <StreetCard className="p-6 text-center text-[13px] text-text-muted">
-                Buscando partidos...
+                Cargando partidos...
               </StreetCard>
             ) : matches.length === 0 ? (
               <StreetCard className="p-6 text-center text-[13px] text-text-muted">
@@ -528,7 +576,7 @@ export function CrearPollaForm() {
 
                 {q.inputKind === "opciones" && (
                   <div>
-                    <Label>Opciones que puede elegir la gente</Label>
+                    <Label>Opciones disponibles</Label>
                     <div className="mt-2 space-y-px">
                       {q.options.map((op, j) => (
                         <input
@@ -590,7 +638,7 @@ export function CrearPollaForm() {
               className="lp-input mt-2"
             />
             <p className="mt-2 text-[11px] text-text-muted">
-              Obligatorio. Es lo primero que va a leer la gente.
+              Obligatorio. Es lo primero que se lee.
             </p>
           </div>
 
@@ -618,7 +666,7 @@ export function CrearPollaForm() {
               className="lp-input mt-2 min-h-[84px] resize-none py-3"
             />
             <p className="mt-2 text-[11px] text-text-muted">
-              Escríbelo clarito: es lo que la gente va a leer antes de pagar.
+              Escríbelo con claridad: es lo que se lee antes de pagar.
             </p>
           </div>
         </StreetCard>

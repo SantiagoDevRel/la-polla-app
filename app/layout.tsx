@@ -1,6 +1,6 @@
 // app/layout.tsx — Layout raíz de la aplicación La Polla App con configuración PWA
 import type { Metadata, Viewport } from "next";
-import { Anton, Barlow } from "next/font/google";
+import { Bebas_Neue, Outfit } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import "./globals.css";
@@ -16,18 +16,22 @@ import { PlatformProvider } from "@/components/platform/PlatformProvider";
 import { PostHogProvider } from "./providers";
 import { AgentationDev } from "@/components/dev/AgentationDev";
 
-// Parche v1.0 — tipografia de calle. Anton para todo lo que grita (titulos,
-// cifras, botones): condensada, pesada, de afiche. Barlow para leer: es
-// utilitaria y aguanta bien los tamanos chicos en telefonos de gama media.
+// Tribuna Caliente — las dos familias de siempre, de vuelta (2026-09-02).
+//
+// Anton + Barlow eran el registro de afiche fotocopiado: gritaban parejo y
+// aplanaban la pantalla. Bebas Neue tiene la misma condensada deportiva pero
+// con hombros redondeados, que es lo que deja que el dorado se lea como premio
+// y no como advertencia. Outfit es geometrica y respira: aguanta los tamanos
+// chicos en telefonos de gama media sin volverse rigida.
 // Siguen siendo DOS familias, como manda el design system.
-const anton = Anton({
+const bebas = Bebas_Neue({
   subsets: ["latin"],
   weight: "400",
   variable: "--font-display",
   display: "swap",
 });
 
-const barlow = Barlow({
+const outfit = Outfit({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-body",
@@ -147,7 +151,7 @@ export default async function RootLayout({
   };
 
   return (
-    <html lang={locale} className={`${anton.variable} ${barlow.variable}`}>
+    <html lang={locale} className={`${bebas.variable} ${outfit.variable}`}>
       <body className="antialiased lp-concrete">
         <script
           type="application/ld+json"

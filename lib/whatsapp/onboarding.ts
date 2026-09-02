@@ -60,7 +60,7 @@ export async function handleNameSubmit(
     // Invalid: too short, too long, or phone-shaped. Re-prompt.
     await sendTextMessage(
       phone,
-      "Eso no me sirve como nombre, parce 🤔\n\n" +
+      "Eso no me sirve como nombre 🤔\n\n" +
         "Necesito mínimo 2 letras y que no sea un número de teléfono.\n\n" +
         "Mándame tu nombre de nuevo.",
     );
@@ -147,7 +147,7 @@ export async function handleNameConfirmed(
         console.error("[onboarding] createUser failed:", createErr);
         await sendTextMessage(
           phone,
-          "Algo falló creando tu cuenta, parce. Intenta de nuevo en un minuto.",
+          "Algo falló creando tu cuenta. Intenta de nuevo en un minuto.",
         );
         return;
       }
@@ -176,7 +176,7 @@ export async function handleNameConfirmed(
     console.error("[onboarding] save profile failed:", upsertErr);
     await sendTextMessage(
       phone,
-      "Algo falló guardando tu perfil, parce. Intenta de nuevo en un minuto.",
+      "Algo falló guardando tu perfil. Intenta de nuevo en un minuto.",
       { userId: authUserId },
     );
     return;
@@ -192,7 +192,7 @@ export async function handleNameConfirmed(
     const { handleJoinByCode } = await import("./flows");
     await sendTextMessage(
       phone,
-      "¡Listo parce! 🎉 Tu perfil está armado.\n\n" +
+      "🎉 Tu perfil está listo.\n\n" +
         "Te uno a la polla 👇",
       { userId: authUserId },
     );
@@ -205,7 +205,7 @@ export async function handleNameConfirmed(
   await setState(phone, { action: "waiting_join_code" });
   await sendTextMessage(
     phone,
-    "¡Listo parce! 🎉 Tu perfil está armado.\n\n" +
+    "🎉 Tu perfil está listo.\n\n" +
       "Mándame el *código de 6 caracteres* de la polla a la que te invitaron 🐥",
     { userId: authUserId },
   );

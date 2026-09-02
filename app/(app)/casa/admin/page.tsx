@@ -13,6 +13,7 @@ import { formatCop, timeLeft } from "@/lib/casa/format";
 import { HeroFrame, Label, SectionHead, Tape } from "@/components/street";
 import { CrearPollaForm } from "@/components/casa/CrearPollaForm";
 import { ColaDePagos } from "@/components/casa/ColaDePagos";
+import { AccionesBorrador } from "@/components/casa/AccionesBorrador";
 
 export const dynamic = "force-dynamic";
 
@@ -62,8 +63,8 @@ export default async function CasaAdminPage() {
         <div className="mb-9">
           <ColaDePagos />
           <p className="mt-2 text-[11px] text-text-muted">
-            También te llegan al bot de Telegram apenas alguien sube el
-            pantallazo. Da igual por dónde lo resuelvas: es la misma decisión.
+            También llegan al bot de Telegram cuando alguien sube el
+            comprobante. Puedes resolverlo por cualquiera de las dos vías.
           </p>
         </div>
 
@@ -75,18 +76,19 @@ export default async function CasaAdminPage() {
               {pollas.slice(0, 12).map((p) => {
                 const estado = pollaStatusLabel(p);
                 const pot = pots[p.id];
-                return (
-                  <li key={p.id}>
-                    <Link
-                      href={`/casa/${p.slug}`}
-                      className="flex items-center gap-3 bg-bg-card p-3"
-                    >
+                // Un borrador NO es navegable: /casa/[slug] hace notFound
+                // mientras el status sea 'borrador', asi que enlazarlo era
+                // mandar al admin a un 404. Se pinta como bloque muerto y
+                // debajo va el boton que lo publica.
+                const esBorrador = p.status === "borrador";
+                const contenido = (
+                  <>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[14px] text-text-primary">
                           {p.name}
                         </span>
                         <span className="lp-label mt-0.5 block">
-                          {pot?.paid_entries ?? 0} jugando ·{" "}
+                          {pot?.paid_entries ?? 0} inscritos ·{" "}
                           {p.status === "abierta"
                             ? `cierra en ${timeLeft(p.closes_at)}`
                             : estado.text}
@@ -100,7 +102,23 @@ export default async function CasaAdminPage() {
                           {estado.text}
                         </Tape>
                       </span>
-                    </Link>
+                  </>
+                );
+                return (
+                  <li key={p.id}>
+                    {esBorrador ? (
+                      <div className="flex items-center gap-3 bg-bg-card p-3">
+                        {contenido}
+                      </div>
+                    ) : (
+                      <Link
+                        href={`/casa/${p.slug}`}
+                        className="flex items-center gap-3 bg-bg-card p-3"
+                      >
+                        {contenido}
+                      </Link>
+                    )}
+                    {esBorrador && <AccionesBorrador id={p.id} />}
                   </li>
                 );
               })}
@@ -109,7 +127,7 @@ export default async function CasaAdminPage() {
         )}
 
         {/* ── Crear ────────────────────────────────────────────────────── */}
-        <SectionHead title="Armar una polla nueva" />
+        <SectionHead title="Crear una polla nueva" />
         <CrearPollaForm />
       </div>
     </div>

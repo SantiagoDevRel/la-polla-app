@@ -80,34 +80,50 @@ Archivos: `lib/casa/*`, `lib/telegram/*`, `app/api/casa/**`,
 
 ---
 
-## 🎨 DISEÑO — "Parche v1.0" (reemplaza a Tribuna Caliente v0.1)
+## 🎨 DISEÑO — "Tribuna Caliente v1.1" (revierte a "Parche v1.0")
 
-El lenguaje visual cambió a **calle premium**: la referencia es una marca de
-cultura futbolera bien dirigida, no un volante fotocopiado. Lo que hace que
-se vea caro no es el color — es la distancia entre la jerarquía grande y la
-chica, y los hairlines finos.
+**(2026-09-02) El interludio "Parche" se deshizo.** Entre el 25-ago y el
+02-sep la app corrió con un skin de calle: negro plano, acento verde cal,
+`borderRadius` en 0 entero, Anton + Barlow, y sin el video de estadio.
+El dueño lo resumió así: *"se ve mucho más básico"*. Tenía razón — sin el
+fondo, cada tarjeta flotaba sobre la nada y la app perdía su única capa de
+profundidad.
 
-**La jugada estructural:** los tokens conservan el NOMBRE y cambian de
-valor, así que los ~600 usos ya escritos en la app se reskinean solos. Si
-vas a cambiar la paleta, cambiá `app/globals.css`, no los componentes.
+**La jugada estructural sigue siendo la misma, y es lo bueno que dejó
+Parche:** los tokens conservan el NOMBRE y cambian de valor, así que los
+~600 usos ya escritos se reskinean solos. Si vas a cambiar la paleta,
+cambiá `app/globals.css` y `tailwind.config.ts`, NUNCA los componentes.
 
-- **`borderRadius` está en 0 ENTERO, `full` incluido** (`tailwind.config.ts`).
-  Eso es lo que mata el look burbuja de un golpe. Hay una escotilla,
-  `rounded-pill`, para el caso puntual que de verdad la pida.
-- **`gold` ya no es dorado: es cal (`#D8FF47`)**. Conserva el nombre para no
-  romper los usos viejos. Regla dura: **máximo 2 apariciones del acento por
-  pantalla**; todo lo demás es neutro.
-- **Anton (display) + Barlow (texto)**, siguen siendo dos familias.
-- Bordes SÓLIDOS y sutiles (`#1F1F22`), no velos translúcidos.
-- **Se fue el video de estadio de fondo.** `AppBackground` es concreto plano
-  con una caída de luz. Peleaba con el skin y pesaba en datos móviles.
-- El héroe es `components/street/TribunaArt.tsx` — hinchada, humo y
-  reflectores en SVG (~3KB). Es el **fallback**: `<HeroFrame image="...">`
-  ya acepta fotografía cuando la haya.
-- Utilidades nuevas en `globals.css`: `.lp-display` `.lp-label` `.lp-money`
-  `.lp-btn` `.lp-tape` `.lp-pct` `.lp-input` `.lp-scrim` `.lp-grain`.
-- El pollito sigue siendo la marca, pero a 26px en el header: pasó de
-  mascota protagonista a firma.
+- **`borderRadius` vuelve a la escala 8/12/18/24**, y `full` vuelve a ser
+  9999px. `rounded-pill` queda como alias de `full` para no romper lo que
+  se escribió durante Parche.
+- **`gold` vuelve a ser ORO `#FFD700`.** Es SAGRADO: señal de premio, no
+  decoración. Máximo 3 apariciones por pantalla. `cal` queda como alias
+  del mismo token.
+- **Bebas Neue (display) + Outfit (texto)**, las dos familias de siempre.
+  Bebas NECESITA tracking positivo: sin él las mayúsculas se pegan.
+- Superficies de **vidrio oscuro**: `rgb(bg-card / 0.80)` + `blur(8px)` +
+  bordes translúcidos. Toda card tiene hover; ninguna es estática.
+- **VOLVIÓ el video de estadio de fondo.** `AppBackground` es el server
+  picker de `background-variants.ts` (5 clips en `/public/videos`).
+  ⚠️ La objeción de agosto (costo en datos móviles) era real y NO se
+  ignoró: `AppBackgroundClient` tiene un guard de `navigator.connection`
+  — con `saveData` o en 2G/3G no pide el video y se queda con el poster
+  (~80 kB). El que tiene wifi ve el estadio; el que anda con datos, la foto.
+- `WelcomeIntro` ya no monta su propio `<video>`: se dejó transparente y
+  deja ver el `AppBackground` que su layout ya tenía montado. Cero bytes
+  nuevos en la primera visita.
+- `components/street/TribunaArt.tsx` **sigue existiendo** pero `HeroFrame`
+  ya NO cae a él cuando no hay foto: con el video detrás eran dos estadios
+  peleando. Ahora pinta solo un velo. TribunaArt es el fallback correcto
+  para superficies sin fondo ambiente.
+- **El pollito vuelve a 40px en el header** y el wordmark vuelve a ser
+  tricolor (oro/azul/rojo). A 26px y monocromo el header podía ser el de
+  cualquier app.
+- Utilidades en `globals.css` (mismos NOMBRES que traía Parche, valores
+  del skin bueno): `.lp-card` `.lp-card-hero` `.lp-display` `.lp-label`
+  `.lp-money` `.lp-btn` `.lp-tape` `.lp-pct` `.lp-input` `.lp-scrim`
+  `.lp-grain` `.lp-accent-rule` `.lp-stencil` `.lp-cifra`.
 
 ⚠️ **`npx tsgo` no alcanza.** El target del repo es ES5 y tsgo deja pasar
 cosas que `tsc` (el source of truth) rechaza: `.entries()` sobre un array y
@@ -973,11 +989,32 @@ Where it matters most we use reply buttons:
 - `META_WA_WEBHOOK_VERIFY_TOKEN` — Meta subscription handshake.
 - `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` — bot's E.164 number (no plus).
 
-### Tone Rules (non-negotiable)
-- Colombian parcero Spanish: "parce", "listo", "eso es", "pilas", "bacano"
-- Emojis: 🐥 chick (brand, default), 🐣 chick-with-egg (occasional), ⚽ matches, 🏆 leaderboard, 💰 buy-in, 🎯 predictions, 📊 standings. Never 🐔 or 🐓 — no rooster, no hen.
-- Footer: "La Polla Colombiana 🐥"
-- Never formal language. Never "estimado usuario"
+### Tone Rules (non-negotiable) — REESCRITAS 2026-09-02
+
+🚨 **La regla vieja decía "Colombian parcero Spanish: parce, listo, eso es,
+pilas, bacano". YA NO APLICA.** El dueño la revocó explícitamente:
+
+> "quiero que uses palabras normales... usa un vocabulario neutro como lo
+>  usaría BetPlay o WPlay"
+
+El registro es el de una **casa de apuestas colombiana seria**. Claro,
+directo, adulto, en **tú** (nunca voseo). Que un señor de 55 y un pelado de
+20 lo lean igual de bien.
+
+- **Fuera:** "parce", "parcero", "el parche", "finde", "pantallazo",
+  "plata", "bacano", "pilas", "marcar" como verbo de pronosticar, y el
+  apodo del admin ("Tama") en cualquier texto que lea un usuario.
+- **Dentro:** "fin de semana", "comprobante", "dinero", "pronosticar",
+  "inscritos", "el administrador" (o la casa hablando en primera persona
+  del plural: "confirmamos tu pago").
+- **Se queda** el vocabulario propio del producto: "polla", "pozo",
+  "entrada", "inscripción", "pronóstico", "marcador", "reparto".
+- **Emojis: solo en el bot de WhatsApp**, no en la UI de la app (la UI
+  nunca los usó). 🐥 chick es la marca. Nunca 🐔 ni 🐓.
+- Nada de "estimado usuario" tampoco: neutro no es acartonado.
+
+⚠️ Los comentarios de código todavía dicen "Tama" y está bien — es el
+panel interno. La regla aplica a lo que LEE UN USUARIO.
 
 ---
 

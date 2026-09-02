@@ -161,7 +161,7 @@ export async function processIncomingMessage(
       if (!predMatch) {
         await sendTextMessage(
           from,
-          "Ingresá solo números parce, sin letras ni símbolos. Escribí el marcador así: *2-1* _(local primero)_",
+          "Ingresa solo números, sin letras ni símbolos. Escribe el marcador así: *2-1* _(local primero)_",
           { userId: user.id },
         );
         return;
@@ -171,7 +171,7 @@ export async function processIncomingMessage(
       if (h > 20 || a > 20) {
         await sendTextMessage(
           from,
-          "Eso parece mucho parce 😅 ¿Estás seguro? Escribí el marcador de nuevo (ej: *2-1*).",
+          "Eso parece mucho 😅 ¿Estás seguro? Escribe el marcador de nuevo (ej: *2-1*).",
           { userId: user.id },
         );
         return;
@@ -311,7 +311,7 @@ async function routePayload(
     } else {
       await sendTextMessage(
         from,
-        "Parce, se me perdió el código. Mándalo de nuevo porfa.",
+        "Se perdió el código. Envíalo de nuevo, por favor.",
         { userId: user.id },
       );
     }
@@ -382,7 +382,7 @@ async function routePayload(
     } else {
       await sendTextMessage(
         from,
-        "Ups parce, se me perdió el hilo. ¿Cuál polla querías pronosticar?",
+        "Se perdió el proceso. ¿Cuál polla querías pronosticar?",
         { userId: user.id },
       );
       await handleMisPollas(from, user.id);
@@ -412,7 +412,7 @@ async function routePayload(
     } else {
       await sendTextMessage(
         from,
-        "Parce, perdí tu pronóstico. Dale de nuevo a Pronosticar para volver a mandarlo.",
+        "Se perdió tu pronóstico. Toca Pronosticar para enviarlo de nuevo.",
         { userId: user.id },
       );
       await handleMisPollas(from, user.id);
@@ -432,7 +432,7 @@ async function routePayload(
     } else {
       await sendTextMessage(
         from,
-        "Ups, se me olvidó que ibas a cambiar. Dale a Pronosticar de nuevo.",
+        "Se perdió el proceso de cambio. Toca Pronosticar de nuevo.",
         { userId: user.id },
       );
       await handleMisPollas(from, user.id);

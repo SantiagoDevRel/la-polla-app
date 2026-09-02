@@ -112,7 +112,7 @@ export default async function PollaPage({
             </div>
           </div>
           <span className="text-[12px] text-text-secondary">
-            {pot.paid_entries} jugando ·{" "}
+            {pot.paid_entries} inscritos ·{" "}
             {abierta ? `cierra en ${timeLeft(polla.closes_at)}` : estado.text}
           </span>
         </div>
@@ -179,8 +179,8 @@ export default async function PollaPage({
           <div className="mt-4 border border-turf/40 bg-turf/10 p-3">
             <p className="lp-label text-turf">Estás dentro</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              Tama confirmó tu pago y ya cuentas para el pozo.
-              {abierta ? " Marca tus partidos antes de que cierre." : ""}
+              Confirmamos tu pago y ya cuentas para el pozo.
+              {abierta ? " Haz tus pronósticos antes del cierre." : ""}
             </p>
           </div>
         )}
@@ -189,8 +189,8 @@ export default async function PollaPage({
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">Pago en revisión</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              Ya le llegó tu pantallazo a Tama. Puedes ir marcando mientras tanto,
-              pero no contás para el pozo hasta que lo confirme.
+              Recibimos tu comprobante. Puedes pronosticar mientras tanto, pero
+              no cuentas para el pozo hasta que lo confirmemos.
             </p>
           </div>
         )}
@@ -199,7 +199,7 @@ export default async function PollaPage({
           <div className="mt-4 border border-red-alert/40 bg-red-alert/10 p-3">
             <p className="lp-label text-red-alert">Pago rechazado</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              {entry.reject_reason ?? "Habla con Tama para resolverlo."}
+              {entry.reject_reason ?? "Comunícate con el administrador."}
             </p>
           </div>
         )}
@@ -222,7 +222,7 @@ export default async function PollaPage({
                 canEdit={inscrito && abierta}
                 lockedReason={
                   !inscrito
-                    ? "Entra a la polla para poder marcar."
+                    ? "Inscríbete para pronosticar."
                     : "Esta polla ya cerró."
                 }
               />
@@ -247,7 +247,7 @@ export default async function PollaPage({
                 canEdit={inscrito && abierta}
                 lockedReason={
                   !inscrito
-                    ? "Entra a la polla para poder responder."
+                    ? "Inscríbete para responder."
                     : "Esta polla ya cerró."
                 }
               />
@@ -278,7 +278,7 @@ export default async function PollaPage({
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">
                       {row.display_name ?? "Sin nombre"}
-                      {yo && <span className="lp-label ml-2 inline">vos</span>}
+                      {yo && <span className="lp-label ml-2 inline">tú</span>}
                     </span>
                     <span className="lp-money shrink-0 text-[18px] text-text-primary">
                       {row.points}
