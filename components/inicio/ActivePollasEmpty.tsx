@@ -41,7 +41,7 @@ export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
       <div className="rounded-lg border border-border-subtle bg-bg-card/80 backdrop-blur-sm px-5 py-6 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/pollitos/Pollito_esperando.webp"
+          src="/pollitos/Pollito_esperando-256.webp"
           alt=""
           width={80}
           height={80}

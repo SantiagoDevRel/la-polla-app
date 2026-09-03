@@ -34,7 +34,7 @@ export default async function SeasonClosedBanner() {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/pollitos/Pollito_esperando.webp"
+        src="/pollitos/Pollito_esperando-256.webp"
         alt=""
         width={40}
         height={40}

@@ -475,7 +475,7 @@ function ResultadoPolla({
         // pantalla, y acá está claramente justificado.
         <StreetCard hero className="bg-bg-card p-5 text-center">
           <Image
-            src="/pollitos/pollito_pibe_lider.webp"
+            src="/pollitos/pollito_pibe_lider-128.webp"
             alt=""
             aria-hidden="true"
             width={96}

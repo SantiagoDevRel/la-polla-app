@@ -15,7 +15,7 @@ export default function AppLoading() {
       <div className="flex flex-col items-center gap-3">
         <div className="relative w-24 h-24 animate-pulse-live">
           <Image
-            src="/pollitos/pollito_pibe_lider.webp"
+            src="/pollitos/pollito_pibe_lider-128.webp"
             alt=""
             fill
             sizes="96px"

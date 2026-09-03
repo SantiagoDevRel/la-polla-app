@@ -10,7 +10,6 @@
 
 "use client";
 
-import Image from "next/image";
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -83,15 +82,15 @@ export function SplashScreen() {
       </div>
       <div className="absolute inset-0 bg-bg-base/60" />
       <div className="absolute top-4 left-0 right-0 flex items-center justify-center gap-3 px-4">
-        {/* next/image y no <img>: el archivo original pesa 116 KB y aca se
-            dibuja a 52 px. Sin optimizar, el browser bajaba los 116 KB
-            enteros para escalarlos hacia abajo. */}
-        <Image
-          src="/pollitos/pollito_pibe_lider.webp"
+        {/* Variante de 128 px (6,6 KB) en vez del original de 1024x1024
+            (116 KB), que aca se dibujaba a 52. Sin next/image: en Vercel
+            gastaria cuota de Image Optimization. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/pollitos/pollito_pibe_lider-128.webp"
           alt=""
           width={52}
           height={52}
-          priority
           className="h-[52px] w-[52px] max-w-none object-contain"
         />
         <span

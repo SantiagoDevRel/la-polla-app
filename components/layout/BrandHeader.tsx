@@ -15,7 +15,6 @@
 //     pasando por debajo al hacer scroll, que es la capa que da profundidad.
 "use client";
 
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 import ReportProblemBubble from "@/components/shared/ReportProblemBubble";
 
@@ -45,17 +44,19 @@ export default function BrandHeader() {
               el texto a 17 recupera los ~57px que faltaban, y arriba de 360
               todo vuelve al tamano pleno.
 
-              (2026-09-03) next/image y no <img>: el archivo pesa 116 KB y aca
-              se dibuja a 40 px. Con <img> el browser bajaba los 116 KB
-              enteros para escalarlos hacia abajo, y como el header es global
-              lo hacia en TODAS las pantallas. Era el segundo recurso mas
-              pesado de la app despues del favicon. */}
-          <Image
-            src="/pollitos/pollito_pibe_lider.webp"
+              (2026-09-03) El archivo pesaba 116 KB (1024x1024) y aca se dibuja a 40 px:
+              el browser bajaba los 116 KB enteros para escalarlos hacia
+              abajo, en TODAS las pantallas porque el header es global. Ahora
+              apunta a la variante de 128 px, que pesa 6,6 KB.
+              NO se usa next/image a proposito: en Vercel consume cuota de
+              Image Optimization, y el repo tiene regla dura de free-tier.
+              Un archivo ya del tamano correcto no gasta nada. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/pollitos/pollito_pibe_lider-128.webp"
             alt=""
             width={40}
             height={40}
-            priority
             className="h-8 w-8 max-w-none shrink-0 object-contain min-[360px]:h-10 min-[360px]:w-10"
           />
           <span className="lp-stencil flex items-baseline gap-[5px] whitespace-nowrap text-[17px] min-[360px]:text-[20px]">

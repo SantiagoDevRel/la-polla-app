@@ -239,7 +239,7 @@ export function WelcomeIntro() {
             <div className="flex items-center gap-3 mb-7">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/pollitos/pollito_pibe_lider.webp"
+                src="/pollitos/pollito_pibe_lider-128.webp"
                 alt=""
                 width={52}
                 height={52}

@@ -119,7 +119,7 @@ export default async function CasaPage() {
                 pantalla no tiene nada que mostrar, que es justo cuando una
                 caja de texto sola se siente como un error de la app. */}
             <Image
-              src="/pollitos/Pollito_esperando.webp"
+              src="/pollitos/Pollito_esperando-256.webp"
               alt=""
               aria-hidden="true"
               width={112}

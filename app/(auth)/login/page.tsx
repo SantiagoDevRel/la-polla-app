@@ -274,7 +274,7 @@ function LoginInner() {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/pollitos/logo_realistic.webp"
+                src="/pollitos/logo_realistic-192.webp"
                 alt={t("brand")}
                 width={80}
                 height={80}
