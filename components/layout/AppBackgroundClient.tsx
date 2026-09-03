@@ -155,32 +155,40 @@ export function AppBackgroundClient({
         <span className="lp-humo-c" />
       </div>
 
+      {/* El video Y SU VELO viajan juntos en el mismo contenedor, y esto es
+          lo que arregla un error de la primera version: el velo estaba
+          suelto encima de TODO, asi que tambien tapaba el humo. Con el velo
+          a 0.78 sobre un humo que ya es sutil, el fondo se veia negro y la
+          idea entera se perdia. Ahora el humo se ve a su intensidad real
+          mientras no hay video, y el velo aparece solo cuando aparece el
+          video — que si lo necesita, porque el estadio es brillante. */}
       {src && (
-        <video
-          key={src}
-          ref={videoRef}
-          muted
-          loop
-          playsInline
-          controls={false}
-          disablePictureInPicture
-          preload="auto"
-          onCanPlay={() => setVisible(true)}
+        <div
           className={cn(
-            "absolute inset-0 h-full w-full object-cover transition-opacity duration-700 motion-reduce:hidden",
+            "absolute inset-0 transition-opacity duration-700 motion-reduce:hidden",
             visible ? "opacity-100" : "opacity-0",
           )}
-          style={{ transform: "scale(1.18) translateY(-7%)" }}
-          src={src}
-        />
+        >
+          <video
+            key={src}
+            ref={videoRef}
+            muted
+            loop
+            playsInline
+            controls={false}
+            disablePictureInPicture
+            preload="auto"
+            onCanPlay={() => setVisible(true)}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ transform: "scale(1.18) translateY(-7%)" }}
+            src={src}
+          />
+          <div
+            className="absolute inset-0 bg-bg-base"
+            style={{ opacity: overlayOpacity }}
+          />
+        </div>
       )}
-
-      {/* Velo oscuro: garantiza el contraste del texto sobre lo que haya
-          detras, humo o video. */}
-      <div
-        className="absolute inset-0 bg-bg-base"
-        style={{ opacity: overlayOpacity }}
-      />
 
       {/* Piso: refuerza el negro abajo para que el nav despegue. */}
       <div
