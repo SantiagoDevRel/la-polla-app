@@ -70,8 +70,8 @@ export default async function CasaAdminPage() {
         <div className="mb-9">
           <ColaDePagos />
           <p className="mt-2 text-[11px] text-text-muted">
-            También llegan al bot de Telegram cuando alguien sube el
-            comprobante. Puedes resolverlo por cualquiera de las dos vías.
+            Cada comprobante que sube alguien aparece acá para que lo
+            apruebes o lo rechaces.
           </p>
         </div>
 
