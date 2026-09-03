@@ -9,6 +9,7 @@
 // re-chequeamos en cada handler como defensa en profundidad.
 
 import { NextResponse } from "next/server";
+import { matchesEnJuego } from "@/lib/matches/en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import {
@@ -40,31 +41,29 @@ export async function GET() {
   }
 
   const admin = createAdminClient();
-  // Igual que el cron de verify-final: solo mostramos discrepancias de
-  // matches que tienen al menos 1 prediction. Si no hay nadie esperando
-  // que se le puntue ese partido, no es trabajo del admin resolverlo.
-  const { data, error } = await admin
-    .from("matches")
-    .select(
-      "id, external_id, espn_id, tournament, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, scheduled_at, final_verification_notes, predictions!inner(id)",
-    )
-    .eq("status", "finished")
-    .is("final_verified_at", null)
-    .order("scheduled_at", { ascending: false });
+  // Solo discrepancias de partidos que ESTÁ JUGANDO ALGUIEN: si nadie espera
+  // que se le puntúe, no es trabajo del admin resolverlo.
+  //
+  // 🚨 (2026-09-03) Preguntaba solo por `predictions`, o sea por el modelo
+  // P2P viejo. Esta pantalla es el ÚNICO lugar donde un humano puede
+  // destrabar un partido en disputa, así que dejar fuera a los de la casa
+  // significaba que una polla trabada no tenía salida por la interfaz —
+  // solo corriendo SQL a mano.
+  const { filas: matches, errores } = await matchesEnJuego<MatchRow>(
+    admin,
+    "id, external_id, espn_id, tournament, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, scheduled_at, final_verification_notes",
+    (q) =>
+      q
+        .eq("status", "finished")
+        .is("final_verified_at", null)
+        .order("scheduled_at", { ascending: false }),
+  );
 
-  if (error) {
-    console.error("[admin/discrepancies] db query failed:", error);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  }
-
-  const seen = new Set<string>();
-  const matches: MatchRow[] = [];
-  for (const row of (data ?? []) as Array<MatchRow & { predictions: unknown }>) {
-    if (seen.has(row.id)) continue;
-    seen.add(row.id);
-    const { predictions: _join, ...rest } = row;
-    void _join;
-    matches.push(rest as MatchRow);
+  if (errores.length > 0) {
+    console.error("[admin/discrepancies] db query failed:", errores.join(" | "));
+    if (matches.length === 0) {
+      return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    }
   }
 
   // Agrupamos por tournament para hacer 1 fetch ESPN por liga, no N.

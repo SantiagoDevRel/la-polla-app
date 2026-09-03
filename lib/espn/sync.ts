@@ -16,6 +16,7 @@
 //
 // Llamado desde /api/matches/sync-live cuando el cron pega.
 
+import { matchesEnJuego } from "@/lib/matches/en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ESPN_LEAGUE_BY_TOURNAMENT,
@@ -163,35 +164,38 @@ export async function syncEspnLive(): Promise<EspnSyncResult[]> {
     const fromIso = new Date(minMs - KICKOFF_TOLERANCE_MS).toISOString();
     const toIso = new Date(maxMs + KICKOFF_TOLERANCE_MS).toISOString();
 
-    // Solo matches con AL MENOS 1 PREDICTION. Si nadie pronosticó el
-    // partido, no lo necesitamos en DB live — ahorramos compute /
-    // requests / costo Twilio en alertas innecesarias. Cuando un user
-    // pronostique por primera vez, el partido entra al sync en el
-    // próximo tick.
-    const { data: candidates, error: queryErr } = await supabase
-      .from("matches")
-      .select("id, external_id, espn_id, tournament, home_team, away_team, scheduled_at, predictions!inner(id)")
-      .eq("tournament", tournament)
-      .gte("scheduled_at", fromIso)
-      .lte("scheduled_at", toIso);
+    // Solo matches que ESTÁ JUGANDO ALGUIEN. Si nadie lo pronosticó, no hace
+    // falta tenerlo al día en vivo — se ahorra compute y requests. Cuando
+    // alguien lo pronostique por primera vez entra al sync en el próximo tick.
+    //
+    // 🚨 (2026-09-03) Esto preguntaba SOLO por `predictions`, o sea por el
+    // modelo P2P viejo. Los partidos de una polla de la casa se atan por
+    // `casa_polla_matches` y no tienen ni una fila en `predictions`, así que
+    // quedaban fuera del sync en vivo. Y eso rompía la cadena entera: sin
+    // sync nunca pasaban a `finished`, sin `finished` el verificador no los
+    // miraba, y sin `final_verified_at` casa_score_polla devuelve 0 para
+    // todos. Ninguna polla de la casa habría puntuado jamás.
+    // matchesEnJuego() le pregunta a los DOS modelos.
+    const { filas: candidateRowsRaw, errores } = await matchesEnJuego<DbMatch>(
+      supabase,
+      "id, external_id, espn_id, tournament, home_team, away_team, scheduled_at",
+      (q) =>
+        q
+          .eq("tournament", tournament)
+          .gte("scheduled_at", fromIso)
+          .lte("scheduled_at", toIso),
+    );
 
-    if (queryErr) {
-      console.error(`[espn-sync] db query failed for ${tournament}:`, queryErr.message);
+    if (errores.length > 0) {
+      console.error(`[espn-sync] db query failed for ${tournament}:`, errores.join(" | "));
       result.errors++;
-      results.push(result);
-      continue;
+      if (candidateRowsRaw.length === 0) {
+        results.push(result);
+        continue;
+      }
     }
-    // De-dup por id — el join puede traer la misma row varias veces
-    // si tiene múltiples predictions.
-    const seen = new Set<string>();
-    const candidateRows: DbMatch[] = [];
-    for (const row of (candidates ?? []) as Array<DbMatch & { predictions: unknown }>) {
-      if (seen.has(row.id)) continue;
-      seen.add(row.id);
-      const { predictions: _join, ...rest } = row;
-      void _join;
-      candidateRows.push(rest as DbMatch);
-    }
+    // matchesEnJuego ya viene deduplicado por id y sin el embed.
+    const candidateRows: DbMatch[] = candidateRowsRaw;
 
     // 3. Iterar eventos y aplicar updates.
     for (const event of events) {

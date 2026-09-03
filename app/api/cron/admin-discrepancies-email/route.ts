@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { matchesEnJuego } from "@/lib/matches/en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { collectPollaHealth } from "@/lib/admin/polla-health";
 
@@ -43,13 +44,17 @@ export async function POST(request: NextRequest) {
   // 1. Polla health (trabadas + ended-sin-payouts).
   const { stuckPollas, endedNoPayouts } = await collectPollaHealth();
 
-  // 2. Match discrepancies (finished sin final_verified_at, con predictions).
+  // 2. Partidos terminados sin verificar que alguien está jugando.
+  //    (2026-09-03) Contaba solo los del modelo P2P viejo, así que una polla
+  //    de la casa trabada no disparaba ninguna alerta: se quedaba sin puntuar
+  //    y nadie se enteraba.
   const admin = createAdminClient();
-  const { count: matchDiscrepancies } = await admin
-    .from("matches")
-    .select("id, predictions!inner(id)", { count: "exact", head: true })
-    .eq("status", "finished")
-    .is("final_verified_at", null);
+  const { filas: trabados } = await matchesEnJuego<{ id: string }>(
+    admin,
+    "id",
+    (q) => q.eq("status", "finished").is("final_verified_at", null),
+  );
+  const matchDiscrepancies = trabados.length;
 
   const total =
     stuckPollas.length + endedNoPayouts.length + (matchDiscrepancies ?? 0);

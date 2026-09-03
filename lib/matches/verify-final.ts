@@ -36,6 +36,7 @@
 //      que antes — pero NUNCA auto-verifican si hay señal de alargue
 //      sin snapshot 90'.
 
+import { matchesEnJuego } from "./en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ESPN_LEAGUE_BY_TOURNAMENT,
@@ -223,39 +224,20 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
   // de discrepancias + resolución manual.
   const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [p2p, casa] = await Promise.all([
-    admin
-      .from("matches")
-      .select(`${COLS}, predictions!inner(id)`)
-      .eq("status", "finished")
-      .is("final_verified_at", null)
-      .gte("scheduled_at", desde),
-    admin
-      .from("matches")
-      .select(`${COLS}, casa_polla_matches!inner(id)`)
-      .eq("status", "finished")
-      .is("final_verified_at", null)
-      .gte("scheduled_at", desde),
-  ]);
-
-  // Si UNA de las dos falla, se sigue con la otra: perder los candidatos de
-  // un modelo es malo, perder los de los dos porque uno se cayó es peor.
-  if (p2p.error) console.error("[verify-final] query p2p falló:", p2p.error.message);
-  if (casa.error) console.error("[verify-final] query casa falló:", casa.error.message);
-  if (p2p.error && casa.error) return [];
-
-  const seen = new Set<string>();
-  const candidates: MatchRow[] = [];
-  for (const row of [...(p2p.data ?? []), ...(casa.data ?? [])] as Array<
-    MatchRow & { predictions?: unknown; casa_polla_matches?: unknown }
-  >) {
-    if (seen.has(row.id)) continue;
-    seen.add(row.id);
-    const { predictions: _p, casa_polla_matches: _c, ...rest } = row;
-    void _p;
-    void _c;
-    candidates.push(rest as MatchRow);
+  const { filas: candidates, errores } = await matchesEnJuego<MatchRow>(
+    admin,
+    COLS,
+    (q) =>
+      q
+        .eq("status", "finished")
+        .is("final_verified_at", null)
+        .gte("scheduled_at", desde),
+  );
+  if (errores.length > 0) {
+    console.error("[verify-final] db query:", errores.join(" | "));
+    if (candidates.length === 0) return [];
   }
+
   if (candidates.length === 0) return [];
 
   // UN fetch a football-data por torneo por tick (no por match) — cubre
