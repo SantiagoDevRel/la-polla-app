@@ -186,16 +186,16 @@ export default function AdminPage() {
       </HeroFrame>
 
       <div className="px-4 pt-5">
-        {/* El panel de la casa es donde se opera de verdad: se crean las
-            pollas y se revisan los comprobantes. Es el único acento de la
-            pantalla. */}
+        {/* Donde se opera de verdad. Es el único acento de la pantalla, y
+            desde que el nav dejó de tener pestaña de administración, es
+            también la ÚNICA puerta a crear una polla. */}
         <div className="mb-9 bg-bg-card p-4">
-          <p className="text-[14px] text-text-primary">Panel de la casa</p>
+          <p className="text-[14px] text-text-primary">Pollas</p>
           <p className="mt-1 text-[12px] text-text-muted">
-            Crear pollas, revisar comprobantes y ver el acumulado.
+            Crear una polla, revisar comprobantes, cerrar y repartir.
           </p>
-          <Link href="/casa/admin" className="lp-btn lp-btn-primary mt-4 w-full">
-            Ir al panel de la casa
+          <Link href="/admin/pollas" className="lp-btn lp-btn-primary mt-4 w-full">
+            Crear y administrar pollas
           </Link>
         </div>
 

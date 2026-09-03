@@ -22,15 +22,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Ticket, User, SlidersHorizontal } from "lucide-react";
+import { Ticket, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 
-type NavKey = "pollas" | "perfil" | "admin";
+type NavKey = "pollas" | "perfil";
 
 export interface BottomNavProps {
   active?: NavKey;
-  /** Muestra el tab de administración. Lo decide el layout con users.is_admin. */
+  /**
+   * Se sigue aceptando para no romper a quien lo pase, pero YA NO DIBUJA
+   * NADA (2026-09-03): el nav es idéntico para todos. Ver el comentario en
+   * el cuerpo del componente.
+   */
   isAdmin?: boolean;
   /**
    * Pollas donde te falta marcar algo. Badge en el tab de pollas: es la
@@ -44,22 +48,16 @@ interface Tab {
   key: NavKey;
   href: string;
   Icon: typeof Ticket;
-  labelKey: "tabPollas" | "tabPerfil" | "tabAdmin";
+  labelKey: "tabPollas" | "tabPerfil";
 }
 
 const TAB_POLLAS: Tab = { key: "pollas", href: "/casa", Icon: Ticket, labelKey: "tabPollas" };
 const TAB_PERFIL: Tab = { key: "perfil", href: "/perfil", Icon: User, labelKey: "tabPerfil" };
-const TAB_ADMIN: Tab = {
-  key: "admin",
-  href: "/casa/admin",
-  Icon: SlidersHorizontal,
-  labelKey: "tabAdmin",
-};
-
 function deriveActive(pathname: string | null): NavKey | undefined {
   if (!pathname) return undefined;
-  // El orden importa: /casa/admin es más específico que /casa.
-  if (pathname.startsWith("/casa/admin")) return "admin";
+  // /admin/* no tiene tab propia: no se marca ninguna. Va ANTES que /casa
+  // por si alguna ruta futura los comparte.
+  if (pathname.startsWith("/admin")) return undefined;
   if (pathname.startsWith("/casa")) return "pollas";
   if (pathname.startsWith("/perfil")) return "perfil";
   // Las rutas del modelo viejo (/inicio, /pollas, /road-to-worldcup) ya no
@@ -73,9 +71,13 @@ export function BottomNav({ active, isAdmin = false, pollasPending = 0 }: Bottom
   const pathname = usePathname();
   const resolvedActive = active ?? deriveActive(pathname);
 
-  const tabs: Tab[] = isAdmin
-    ? [TAB_POLLAS, TAB_ADMIN, TAB_PERFIL]
-    : [TAB_POLLAS, TAB_PERFIL];
+  // (2026-09-03) DOS tabs, siempre, sea quien sea. Antes el admin veia una
+  // tercera ("Casa") y eso tenia un costo que no valia la pena: el dueño no
+  // podia mirar la app como la mira un jugador sin que le apareciera un
+  // acceso que nadie mas tiene. Todo lo de administracion cuelga de /admin,
+  // al que se entra desde el perfil.
+  void isAdmin;
+  const tabs: Tab[] = [TAB_POLLAS, TAB_PERFIL];
 
   return (
     <nav
