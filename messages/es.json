@@ -1,7 +1,7 @@
 {
   "App": {
     "title": "La Polla Colombiana 🐥",
-    "description": "La polla del fin de semana. Cada semana subimos las pollas de Premier, La Liga, Serie A, Bundesliga, Ligue 1, Champions, Libertadores y BetPlay. Entras, pronosticas y el 70% del pozo va para los ganadores."
+    "description": "La polla del fin de semana. Cada semana subimos las pollas de Premier, La Liga, Serie A, Bundesliga, Ligue 1, Champions, Libertadores y BetPlay. Entras, pronosticas y compites por el pozo."
   },
   "Common": {
     "loading": "Cargando...",
@@ -97,8 +97,8 @@
     "step3": "Eliges local, empate o visitante",
     "step4": "Esperas el resultado",
     "step5": "El que más acierta, gana",
-    "taglineBefore": "Del pozo, el",
-    "taglineAccent": "70% ES PARA USTEDES",
+    "taglineBefore": "El que más acierta",
+    "taglineAccent": "SE LLEVA EL POZO",
     "skip": "Saltar",
     "start": "Empezar",
     "madeBy": "Desarrollado por Santiago",
@@ -486,7 +486,7 @@
     "q4": "No me llega el SMS de verificación",
     "a4": "Verifica que el número esté escrito con el indicativo del país (ej. +57 para Colombia). Si después de un minuto no llega, usa la opción \"Recibir por WhatsApp\" en la pantalla de login.",
     "q5": "¿La app maneja dinero?",
-    "a5": "La app no cobra ni transfiere dinero: no hay pasarela de pagos. Tú transfieres por fuera (Nequi, Daviplata, banco) y la app solo guarda el comprobante para que el administrador verifique el pago manualmente. Lo que sí lleva la app es la cuenta: cuánto entró, cuánto va al pozo y a quién le corresponde. De cada entrada, el 70% va al pozo de los ganadores y el 30% se lo queda la casa; eso está escrito en cada polla antes de que pagues.",
+    "a5": "La app no cobra ni transfiere dinero: no hay pasarela de pagos. Tú transfieres por fuera (Nequi, Daviplata, banco) y la app solo guarda el comprobante para que el administrador verifique el pago manualmente. Lo que sí lleva la app es la cuenta: cuánto entró, cuánto hay en el pozo y a quién le corresponde. El monto del pozo está a la vista en cada polla antes de que pagues.",
     "q6": "¿Cómo elimino mi cuenta?",
     "a6Before": "Escríbenos a ",
     "a6After": " con tu número de WhatsApp registrado. Eliminamos tu cuenta y todos tus datos asociados en máximo 30 días.",

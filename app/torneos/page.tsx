@@ -18,8 +18,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const isEs = site.locale === "es";
   const title = isEs ? "Torneos con pollas de fútbol" : "Football pool tournaments";
   const description = isEs
-    ? "Explora los torneos incluidos en las pollas de la casa. Paga la entrada y pronostica: el 70% de lo recaudado va al pozo de los ganadores."
-    : "Explore the tournaments featured in pools published by the house. Pay the entry fee and make your picks: 70% of entry fees is allocated to the winners' prize pool.";
+    ? "Explora los torneos incluidos en las pollas de la casa. Paga la entrada, pronostica y compite por el pozo."
+    : "Explore the tournaments featured in pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.";
   const canonical = pathForLocale(site.locale, "torneos-index");
   return {
     title,

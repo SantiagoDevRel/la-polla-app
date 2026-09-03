@@ -224,7 +224,7 @@ export default async function TorneoPage({ params }: PageProps) {
             <li>{isEs ? "Elige una polla publicada por la casa." : "Choose a pool published by the house."}</li>
             <li>{isEs ? "Paga la entrada." : "Pay the entry fee."}</li>
             <li>{isEs ? "Envía el comprobante." : "Submit the receipt."}</li>
-            <li>{isEs ? "Pronostica; el 70% va al pozo de los ganadores." : "Make your picks; 70% goes to the winners' prize pool."}</li>
+            <li>{isEs ? "Pronostica y compite por el pozo." : "Make your picks and compete for the prize pool."}</li>
           </ol>
           <Link
             href="/login?returnTo=%2Fcasa"

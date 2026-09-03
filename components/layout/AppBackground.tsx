@@ -1,54 +1,40 @@
 // components/layout/AppBackground.tsx — el fondo ambiente de la app.
 //
-// (2026-09-02) VUELVE el estadio. Entre agosto y hoy esto fue un plano negro
-// con una caida de luz, y esa pantalla es exactamente la que el dueño llamo
-// "basica": sin el fondo, cada tarjeta flota sobre la nada y la app pierde la
-// unica capa que le daba profundidad.
+// (2026-09-03) Este archivo dejo de hacer trabajo de servidor.
 //
-// Lo que SI era cierto de la objecion vieja (y por eso no se revierte a ciegas)
-// es el costo en datos moviles. Se resuelve en el cliente, no matando el
-// fondo: el poster (~80 kB) se pinta siempre y el video solo arranca si la
-// conexion lo aguanta — ver el guard de Save-Data en AppBackgroundClient.
-// Asi el que tiene wifi ve el estadio y el que anda con 3G ve la foto.
+// Antes llamaba a `headers()` para elegir una variante de video AL AZAR en
+// cada request. Dos problemas, los dos caros:
+//   · Un video distinto por navegacion = el cache del browser no servia para
+//     nada. Cada visita bajaba entre 0,8 y 2,4 MB otra vez.
+//   · `headers()` opta a TODO el layout por render dinamico. O sea: la
+//     aleatoriedad de una decoracion le estaba costando el render estatico a
+//     la aplicacion entera.
 //
-// Server component que en CADA request elige uno de los 5 videos del pool
-// (ver background-variants.ts) y renderea el client renderer con esa variant:
-//   - El SSR HTML ya trae el poster correcto horneado: primer frame al
-//     instante, sin flash a negro mientras carga el JS.
-//   - Cada refresh = nuevo render server = nuevo video.
-//   - Cero "play button" nativo: el client intenta autoplay; si falla, queda
-//     con la imagen estatica.
-//
-// Forzamos render dinamico via `headers()` para que Next no estatice el layout
-// y termine sirviendo siempre el mismo video.
+// Ahora es un componente sin logica y la rotacion vive en el cliente, DESPUES
+// de `load` (ver AppBackgroundClient). El primer video es siempre el mismo,
+// asi que se cachea; los que rotan entran cuando ya no le quitan ancho de
+// banda a nadie. Mientras tanto se ve el humo en CSS, que no cuesta bytes.
 
-import { headers } from "next/headers";
 import { AppBackgroundClient } from "./AppBackgroundClient";
-import { pickRandomVariant, type BackgroundVariant } from "./background-variants";
+import type { BackgroundVariant } from "./background-variants";
 
 export interface AppBackgroundProps {
   className?: string;
   /** Opacidad del velo oscuro sobre el video (0-1). El default 0.78 deja ver
    *  el movimiento y garantiza el contraste del texto que va encima. */
   overlayOpacity?: number;
-  /** Forzar una variant especifica (testing / pantallas tematicas). Si se
-   *  omite, el server elige una por request. */
+  /** Forzar una variante (testing / pantallas tematicas). Si se pasa, no rota. */
   variant?: BackgroundVariant;
 }
 
-export async function AppBackground({
+export function AppBackground({
   className,
   overlayOpacity,
   variant,
 }: AppBackgroundProps) {
-  // Llamar `headers()` opta el render por request (no estatico). Sin esto Next
-  // puede cachear el HTML del layout y servirle el mismo video a todos.
-  await headers();
-  const picked = variant ?? pickRandomVariant();
-
   return (
     <AppBackgroundClient
-      variant={picked}
+      variant={variant}
       className={className}
       overlayOpacity={overlayOpacity}
     />
