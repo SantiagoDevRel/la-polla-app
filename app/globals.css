@@ -574,3 +574,69 @@ a:focus-visible {
   border-radius: 9999px;
   background: linear-gradient(90deg, var(--gold) 0%, var(--amber) 100%);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HUMO — el fondo instantaneo, CERO bytes.
+   (2026-09-03) Reemplaza al poster de 93 KB como primer frame. Tres manchas
+   difuminadas en amarillo, azul y rojo (la bandera) que se mueven despacio;
+   el video del estadio entra encima recien despues de `load`.
+   El blur alto es lo que las convierte en humo y no en tres circulos.
+   ═══════════════════════════════════════════════════════════════════════ */
+.lp-humo {
+  overflow: hidden;
+  /* Base oscura para que el humo tenga sobre que respirar. */
+  background:
+    radial-gradient(120% 80% at 50% 0%, #10192a 0%, #080c10 60%, #05080b 100%);
+}
+.lp-humo > span {
+  position: absolute;
+  display: block;
+  border-radius: 9999px;
+  /* El filtro va en el elemento y no en el padre: asi el navegador puede
+     promoverlo a su propia capa y la animacion no repinta el resto. */
+  filter: blur(70px);
+  will-change: transform;
+  opacity: 0.5;
+}
+.lp-humo-a {
+  width: 62vw;
+  height: 62vw;
+  top: -12vw;
+  left: -10vw;
+  background: radial-gradient(circle, #FFD700 0%, rgba(255, 215, 0, 0) 70%);
+  animation: lp-humo-deriva-a 26s ease-in-out infinite alternate;
+}
+.lp-humo-b {
+  width: 58vw;
+  height: 58vw;
+  top: 22vh;
+  right: -18vw;
+  background: radial-gradient(circle, #2F6DF4 0%, rgba(47, 109, 244, 0) 70%);
+  animation: lp-humo-deriva-b 32s ease-in-out infinite alternate;
+  opacity: 0.42;
+}
+.lp-humo-c {
+  width: 54vw;
+  height: 54vw;
+  bottom: -14vh;
+  left: 12vw;
+  background: radial-gradient(circle, #E4463A 0%, rgba(228, 70, 58, 0) 70%);
+  animation: lp-humo-deriva-c 29s ease-in-out infinite alternate;
+  opacity: 0.38;
+}
+@keyframes lp-humo-deriva-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(6vw, 7vh, 0) scale(1.15); }
+}
+@keyframes lp-humo-deriva-b {
+  from { transform: translate3d(0, 0, 0) scale(1.08); }
+  to   { transform: translate3d(-8vw, -5vh, 0) scale(0.95); }
+}
+@keyframes lp-humo-deriva-c {
+  from { transform: translate3d(0, 0, 0) scale(0.98); }
+  to   { transform: translate3d(5vw, -8vh, 0) scale(1.18); }
+}
+/* Sin movimiento: el humo se queda quieto, pero se sigue viendo. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-humo > span { animation: none; }
+}

@@ -15,6 +15,7 @@
 //     pasando por debajo al hacer scroll, que es la capa que da profundidad.
 "use client";
 
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import ReportProblemBubble from "@/components/shared/ReportProblemBubble";
 
@@ -38,17 +39,23 @@ export default function BrandHeader() {
             wordmark crecia y se metia DEBAJO de las burbujas (feedback real
             2026-06-11). Preferimos clipearlo antes que dejar que se monte. */}
         <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           {/* Responsive a proposito: a 390px (el ancho real de la mayoria)
               el wordmark entra con 50px de sobra, pero a 320px — un iPhone SE
               — se comia la ultima "A" de COLOMBIANA. Bajar el pollito a 32 y
               el texto a 17 recupera los ~57px que faltaban, y arriba de 360
-              todo vuelve al tamano pleno. */}
-          <img
+              todo vuelve al tamano pleno.
+
+              (2026-09-03) next/image y no <img>: el archivo pesa 116 KB y aca
+              se dibuja a 40 px. Con <img> el browser bajaba los 116 KB
+              enteros para escalarlos hacia abajo, y como el header es global
+              lo hacia en TODAS las pantallas. Era el segundo recurso mas
+              pesado de la app despues del favicon. */}
+          <Image
             src="/pollitos/pollito_pibe_lider.webp"
             alt=""
             width={40}
             height={40}
+            priority
             className="h-8 w-8 max-w-none shrink-0 object-contain min-[360px]:h-10 min-[360px]:w-10"
           />
           <span className="lp-stencil flex items-baseline gap-[5px] whitespace-nowrap text-[17px] min-[360px]:text-[20px]">

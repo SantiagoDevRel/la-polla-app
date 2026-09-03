@@ -63,13 +63,13 @@ export default async function PagarPage({
           <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
             <div className="flex justify-between">
               <span className="text-text-secondary">
-                Va al pozo ({100 - polla.house_cut_pct}%)
+                Va al pozo
               </span>
               <span className="lp-money text-text-primary">{formatCop(alPozo)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">
-                Se queda la casa ({polla.house_cut_pct}%)
+                Costo del servicio
               </span>
               <span className="lp-money text-text-muted">
                 {formatCop(entrada - alPozo)}

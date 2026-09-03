@@ -229,8 +229,8 @@ export default async function PartidoPage({ params }: PageProps) {
           </h2>
           <p className="text-sm mb-4 opacity-80">
             {isEs
-              ? "La casa confirma cada entrada y destina el 70% de lo recaudado al pozo de los ganadores."
-              : "The house confirms each entry and allocates 70% of entry fees to the winners' prize pool."}
+              ? "La casa confirma cada entrada y el pozo se reparte entre quienes más aciertan."
+              : "The house confirms each entry and the prize pool goes to whoever gets the most right."}
           </p>
           <Link
             href="/login?returnTo=%2Fcasa"

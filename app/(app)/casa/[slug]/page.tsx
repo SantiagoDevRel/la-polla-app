@@ -156,10 +156,14 @@ export default async function PollaPage({
           <ResultadoPolla payouts={payouts} miUserId={user.id} />
         )}
 
-        {/* ── Cómo se reparte. Que la casa se quede el 30% tiene que estar
-              escrito, no escondido: es plata de la gente. ─────────────── */}
+        {/* (2026-09-03) Antes esto desglosaba "A los ganadores 70% / A la
+              casa 30%". El dueño pidió sacar el porcentaje, así que queda lo
+              que de verdad le sirve a quien va a pagar: cuánto cuesta entrar y
+              cuánto hay para el ganador, en pesos. La cifra del pozo es viva
+              — sale de casa_polla_pot — así que sigue siendo verdad sin tener
+              que explicar la aritmética. */}
         <StreetCard className="p-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Entrada</Label>
               <div className="lp-money mt-1 text-[17px] text-text-primary">
@@ -167,15 +171,9 @@ export default async function PollaPage({
               </div>
             </div>
             <div>
-              <Label>A los ganadores</Label>
-              <div className="lp-money mt-1 text-[17px] text-text-primary">
-                {100 - polla.house_cut_pct}%
-              </div>
-            </div>
-            <div>
-              <Label>A la casa</Label>
-              <div className="lp-money mt-1 text-[17px] text-text-secondary">
-                {polla.house_cut_pct}%
+              <Label>Se lleva el ganador</Label>
+              <div className="lp-money mt-1 text-[17px] text-gold">
+                {formatCop(pot.prize_cop)}
               </div>
             </div>
           </div>
@@ -430,9 +428,8 @@ function PollaPublica({
           </div>
 
           <p className="mt-4 border-t border-border-subtle pt-4 text-[13px] leading-relaxed text-text-secondary">
-            Entras, pronosticas y el {100 - polla.house_cut_pct}% de todo lo
-            recaudado se reparte entre quienes más acierten. El resto es de la
-            casa.
+            Entras, pronosticas y el pozo se reparte entre quienes más
+            acierten.
           </p>
 
           <Link href={entrar} className="lp-btn lp-btn-primary mt-5 w-full">

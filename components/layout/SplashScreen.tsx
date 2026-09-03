@@ -10,6 +10,8 @@
 
 "use client";
 
+import Image from "next/image";
+
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -64,26 +66,33 @@ export function SplashScreen() {
         transitionDuration: `${FADE_MS}ms`,
       }}
     >
-      <video
-        autoPlay
-        muted
-        playsInline
-        preload="auto"
-        poster="/videos/nuevo-background-poster.webp"
-        className="absolute inset-0 w-full h-full object-cover"
-        style={{ transform: "scale(1.18) translateY(-7%)" }}
-      >
-        <source src="/videos/nuevo-background.webm" type="video/webm" />
-        <source src="/videos/nuevo-background-lite.mp4" type="video/mp4" />
-      </video>
+      {/* (2026-09-03) SE FUE EL VIDEO DE ACA, y es el cambio de rendimiento
+          mas grande de esta pantalla.
+          El splash cubre los primeros ~3 segundos de la primerisima visita, o
+          sea el momento EXACTO en que el browser deberia estar bajando el JS
+          y los datos. En vez de eso montaba un <video preload="auto"> con dos
+          <source>, que se llevaba el ancho de banda y ademas duplicaba lo que
+          ya estaba pidiendo AppBackground: en la medicion en frio se veian
+          CUATRO requests de video y DOS posters para una sola pantalla.
+          Queda el mismo humo en CSS del fondo — cero bytes, pinta al
+          instante, y visualmente es continuo con lo que hay debajo. */}
+      <div className="lp-humo absolute inset-0">
+        <span className="lp-humo-a" />
+        <span className="lp-humo-b" />
+        <span className="lp-humo-c" />
+      </div>
+      <div className="absolute inset-0 bg-bg-base/60" />
       <div className="absolute top-4 left-0 right-0 flex items-center justify-center gap-3 px-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        {/* next/image y no <img>: el archivo original pesa 116 KB y aca se
+            dibuja a 52 px. Sin optimizar, el browser bajaba los 116 KB
+            enteros para escalarlos hacia abajo. */}
+        <Image
           src="/pollitos/pollito_pibe_lider.webp"
           alt=""
           width={52}
           height={52}
-          style={{ objectFit: "contain" }}
+          priority
+          className="h-[52px] w-[52px] max-w-none object-contain"
         />
         <span
           className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px]"
