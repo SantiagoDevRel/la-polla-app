@@ -192,7 +192,7 @@ export function WelcomeIntro() {
               opaco encima y el estadio se ve a traves. Cero descarga nueva, y
               la bienvenida deja de ser la unica pantalla plana de la app.
               El velo de abajo es el que garantiza el contraste del texto. */}
-          <div className="absolute inset-0 bg-bg-base/70" />
+          <div className="absolute inset-0 bg-bg-base/45" />
 
           {/* Soft radial vignette pulling focus to the center column. */}
           <div

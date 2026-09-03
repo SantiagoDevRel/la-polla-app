@@ -596,7 +596,7 @@ a:focus-visible {
      promoverlo a su propia capa y la animacion no repinta el resto. */
   filter: blur(80px);
   will-change: transform;
-  opacity: 0.30;
+  opacity: 0.48;
 }
 .lp-humo-a {
   width: 62vw;
@@ -613,7 +613,7 @@ a:focus-visible {
   right: -18vw;
   background: radial-gradient(circle, #2F6DF4 0%, rgba(47, 109, 244, 0) 70%);
   animation: lp-humo-deriva-b 32s ease-in-out infinite alternate;
-  opacity: 0.26;
+  opacity: 0.40;
 }
 .lp-humo-c {
   width: 54vw;
@@ -622,7 +622,7 @@ a:focus-visible {
   left: 12vw;
   background: radial-gradient(circle, #E4463A 0%, rgba(228, 70, 58, 0) 70%);
   animation: lp-humo-deriva-c 29s ease-in-out infinite alternate;
-  opacity: 0.24;
+  opacity: 0.36;
 }
 @keyframes lp-humo-deriva-a {
   from { transform: translate3d(0, 0, 0) scale(1); }
