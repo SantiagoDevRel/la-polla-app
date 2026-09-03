@@ -120,6 +120,33 @@ cambiá `app/globals.css` y `tailwind.config.ts`, NUNCA los componentes.
 - **El pollito vuelve a 40px en el header** y el wordmark vuelve a ser
   tricolor (oro/azul/rojo). A 26px y monocromo el header podía ser el de
   cualquier app.
+### ⚡ El fondo NO puede bloquear la carga (2026-09-03)
+
+Medido en frío en producción, `/login` tardaba **8,1 s** en `load` con el DOM
+listo a los **631 ms**. Todo ese tiempo era decoración. Después del arreglo:
+**776 KB** totales (eran 1.520) y **880 ms** en visita repetida, con **0 KB**
+bloqueando `load`.
+
+Las cuatro reglas que salieron de ahí, y por qué:
+
+1. **El primer frame es HUMO EN CSS (`.lp-humo`), cero bytes.** Tres manchas
+   difuminadas en amarillo/azul/rojo. NO se pone un poster de imagen: eran
+   93 KB para tapar un hueco de medio segundo.
+2. **El video entra DESPUÉS de `load` + idle, nunca antes.** Si lo montás
+   durante la carga, compite por ancho de banda con el JS y los datos.
+3. **UNA sola `<source>`.** Con dos, el browser tantea webm *y* mp4 — eran
+   4 requests de video para una sola pantalla.
+4. **La rotación es del CLIENTE y el primer video es siempre el mismo.**
+   Elegir al azar en el server hacía inútil el cache (otro archivo de 2 MB
+   por navegación) y, peor, el `headers()` que lo hacía obligaba a render
+   dinámico de TODO el layout.
+
+⚠️ **Las imágenes se sirven en su tamaño real, no con `next/image`.** Los
+originales son de 1024×1024 y se dibujan a 40-80 px; hay variantes
+`-128/-192/-256`. `next/image` consume cuota de Image Optimization en Vercel
+y este repo es free-tier: un archivo del tamaño correcto no gasta nada.
+Para generar una variante nueva: `sharp(src).resize(N,N).webp({quality:82})`.
+
 - Utilidades en `globals.css` (mismos NOMBRES que traía Parche, valores
   del skin bueno): `.lp-card` `.lp-card-hero` `.lp-display` `.lp-label`
   `.lp-money` `.lp-btn` `.lp-tape` `.lp-pct` `.lp-input` `.lp-scrim`
