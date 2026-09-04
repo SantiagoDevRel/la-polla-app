@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Share2, Download, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useToast } from "@/components/ui/Toast";
 
 type SubistePayload = {
   type: "subiste";
@@ -90,6 +91,7 @@ function captionFor(
 export function ShareButton({ payload, className, label }: ShareButtonProps) {
   const t = useTranslations("Share");
   const tCommon = useTranslations("Common");
+  const { showToast } = useToast();
   const effectiveLabel = label ?? t("defaultLabel");
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -130,7 +132,7 @@ export function ShareButton({ payload, className, label }: ShareButtonProps) {
       setPreviewUrl(objectUrl);
     } catch (err) {
       console.warn("[share-card] share failed", err);
-      alert(t("errImage"));
+      showToast(t("errImage"), "error");
     } finally {
       setBusy(false);
     }
@@ -161,7 +163,7 @@ export function ShareButton({ payload, className, label }: ShareButtonProps) {
         disabled={busy}
         className={
           className ??
-          "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-body text-[10px] font-semibold tracking-[0.06em] uppercase bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20 transition-colors disabled:opacity-60"
+          "inline-flex min-h-11 items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-3 font-body text-[10px] font-semibold uppercase tracking-[0.06em] text-gold transition-colors hover:bg-gold/20 disabled:opacity-60"
         }
         aria-label={effectiveLabel}
       >
@@ -185,7 +187,7 @@ export function ShareButton({ payload, className, label }: ShareButtonProps) {
               type="button"
               onClick={closePreview}
               aria-label={tCommon("close")}
-              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-bg-elevated border border-border-subtle grid place-items-center text-text-muted hover:text-text-primary"
+              className="absolute right-2 top-2 grid h-11 w-11 place-items-center rounded-full border border-border-subtle bg-bg-elevated text-text-muted hover:text-text-primary"
             >
               <X className="w-4 h-4" strokeWidth={2} aria-hidden="true" />
             </button>
@@ -204,7 +206,7 @@ export function ShareButton({ payload, className, label }: ShareButtonProps) {
             <button
               type="button"
               onClick={download}
-              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-full font-body text-[13px] font-extrabold tracking-[0.04em] text-bg-base bg-gradient-to-b from-gold to-amber"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-b from-gold to-amber py-2.5 font-body text-[13px] font-extrabold tracking-[0.04em] text-bg-base"
             >
               <Download className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
               {t("downloadImage")}

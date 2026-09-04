@@ -29,9 +29,9 @@ const HOST_ES = "lapollacolombiana.com";
 const HOST_EN = "chickenpicks.app";
 const LOADER_DELAY_MS = 200;
 
-const OPTIONS: { value: Locale; flag: string; label: string }[] = [
-  { value: "es", flag: "🇨🇴", label: "Español" },
-  { value: "en", flag: "🇺🇸", label: "English" },
+const OPTIONS: { value: Locale; code: string; label: string }[] = [
+  { value: "es", code: "ES", label: "Español" },
+  { value: "en", code: "EN", label: "English" },
 ];
 
 function setLocaleCookie(locale: Locale) {
@@ -147,25 +147,15 @@ export default function LanguageToggle() {
   if (isNativeApp) return null;
 
   return (
-    <section className="lp-card relative" style={{ padding: 14 }}>
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 700,
-          color: "#f0f4ff",
-          marginBottom: 10,
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-        }}
-      >
-        <Languages className="w-3.5 h-3.5" style={{ color: "#FFD700" }} />
+    <section className="lp-card relative p-3.5">
+      <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-bold text-text-primary">
+        <Languages className="h-3.5 w-3.5 text-text-secondary" aria-hidden="true" />
         {current === "es" ? "Idioma" : "Language"}
       </div>
       <div
         role="radiogroup"
         aria-label={current === "es" ? "Idioma" : "Language"}
-        style={{ display: "flex", gap: 8 }}
+        className="flex gap-2"
       >
         {OPTIONS.map((opt) => {
           const active = current === opt.value;
@@ -178,26 +168,16 @@ export default function LanguageToggle() {
               aria-checked={active}
               disabled={switching !== null}
               onClick={() => pick(opt.value)}
-              className="flex-1 rounded-xl flex items-center justify-center gap-2 transition-all"
-              style={{
-                background: active
-                  ? "rgba(255,215,0,0.12)"
-                  : "var(--bg-elevated, #131b2b)",
-                border: active
-                  ? "1px solid rgba(255,215,0,0.4)"
-                  : "1px solid rgba(255,255,255,0.08)",
-                color: active ? "#FFD700" : "#F5F7FA",
-                padding: "10px 6px",
-                fontFamily: "'Outfit', sans-serif",
-                fontWeight: active ? 700 : 500,
-                fontSize: 13,
-                lineHeight: 1,
-                cursor: switching !== null ? "wait" : "pointer",
-                opacity: switching !== null && !busy ? 0.5 : 1,
-              }}
+              className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border px-2 text-[13px] leading-none transition-all ${
+                active
+                  ? "border-gold/40 bg-gold/10 font-bold text-gold"
+                  : "border-border-subtle bg-bg-elevated font-medium text-text-primary hover:border-gold/30"
+              } ${switching !== null ? "cursor-wait" : "cursor-pointer"} ${
+                switching !== null && !busy ? "opacity-50" : "opacity-100"
+              }`}
             >
-              <span style={{ fontSize: 18 }} aria-hidden>
-                {opt.flag}
+              <span className="lp-display text-[13px] tracking-[0.08em]" aria-hidden="true">
+                {opt.code}
               </span>
               <span>{opt.label}</span>
             </button>
@@ -207,18 +187,8 @@ export default function LanguageToggle() {
 
       {showLoader && (
         <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(8, 12, 16, 0.7)",
-            backdropFilter: "blur(2px)",
-            borderRadius: "inherit",
-            zIndex: 10,
-          }}
+          aria-hidden="true"
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-bg-base/70 backdrop-blur-sm"
         >
           <FootballLoader size={48} />
         </div>

@@ -10,10 +10,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { getSiteFromHeaders, pathForLocale, SITES } from "@/lib/seo/sites";
 import { findByInternalSlug } from "@/lib/seo/tournaments";
 import { buildMatchSlug, extractDate } from "@/lib/seo/match-slug";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getTournamentName } from "@/lib/tournaments";
+import { TeamMark } from "@/components/match/TeamMark";
 
 export const revalidate = 600;
 
@@ -82,9 +85,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const site = getSiteFromHeaders();
   const isEs = site.locale === "es";
   const seoT = findByInternalSlug(m.tournament);
-  const tournamentName = seoT ? seoT.name[site.locale] : m.tournament;
+  const tournamentName = seoT
+    ? seoT.name[site.locale]
+    : getTournamentName(m.tournament, site.locale);
   const date = new Date(m.scheduled_at);
   const dateLabel = new Intl.DateTimeFormat(isEs ? "es-CO" : "en-US", {
+    timeZone: "America/Bogota",
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -117,8 +123,12 @@ export default async function PartidoPage({ params }: PageProps) {
   const site = getSiteFromHeaders();
   const isEs = site.locale === "es";
   const seoT = findByInternalSlug(m.tournament);
+  const tournamentName = seoT
+    ? seoT.name[site.locale]
+    : getTournamentName(m.tournament, site.locale);
   const date = new Date(m.scheduled_at);
   const dateLabel = new Intl.DateTimeFormat(isEs ? "es-CO" : "en-US", {
+    timeZone: "America/Bogota",
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -152,96 +162,81 @@ export default async function PartidoPage({ params }: PageProps) {
   };
 
   return (
-    <main className="min-h-screen bg-[#0d0d0d] text-white px-5 py-10">
+    <main className="min-h-screen bg-bg-base px-4 py-10 text-text-primary sm:px-6">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(sportsEventJsonLd) }}
       />
       <div className="max-w-[720px] mx-auto">
-        <p className="text-xs tracking-[0.2em] uppercase text-[#FCD116] mb-3">
-          <Link href={pathForLocale(site.locale, "partidos-index")} className="hover:underline">
-            {isEs ? "← Todos los partidos" : "← All matches"}
+        <nav className="mb-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-gold" aria-label={isEs ? "Ruta del partido" : "Match breadcrumb"}>
+          <Link href={pathForLocale(site.locale, "partidos-index")} className="inline-flex min-h-11 items-center gap-2 transition-opacity hover:opacity-80">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            {isEs ? "Todos los partidos" : "All matches"}
           </Link>
           {seoT && (
             <>
               {" · "}
-              <Link href={pathForLocale(site.locale, "torneo", seoT.publicSlug)} className="hover:underline">
+              <Link href={pathForLocale(site.locale, "torneo", seoT.publicSlug)} className="inline-flex min-h-11 items-center transition-opacity hover:opacity-80">
                 {seoT.name[site.locale]}
               </Link>
             </>
           )}
-        </p>
+        </nav>
 
-        <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-3">
-          {m.home_team} <span className="text-white/40">vs</span> {m.away_team}
+        <h1 className="lp-display mb-3 text-[42px] leading-none tracking-[0.03em] md:text-[54px]">
+          {m.home_team} <span className="text-text-secondary">vs</span> {m.away_team}
         </h1>
-        <p className="text-white/70 text-lg mb-2">
+        <p className="mb-2 text-lg leading-relaxed text-text-secondary">
           <time dateTime={m.scheduled_at}>{dateLabel}</time>
           {m.venue ? ` · ${m.venue}` : ""}
         </p>
-        {seoT && (
-          <p className="text-white/60 text-sm mb-8">{seoT.name[site.locale]}</p>
-        )}
+        <p className="mb-8 text-sm text-text-muted">{tournamentName}</p>
 
         <div className="grid grid-cols-2 gap-3 mb-10">
-          <article className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-center">
-            {m.home_team_flag && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={m.home_team_flag}
-                alt=""
-                className="h-12 w-12 mx-auto mb-3 object-contain"
-              />
-            )}
-            <p className="text-xs text-white/40 mb-1">{isEs ? "Local" : "Home"}</p>
+          <article className="lp-card p-5 text-center transition-all hover:border-gold/20">
+            <TeamMark name={m.home_team} src={m.home_team_flag} />
+            <p className="mb-1 text-xs text-text-muted">{isEs ? "Local" : "Home"}</p>
             <p className="font-semibold text-lg">{m.home_team}</p>
           </article>
-          <article className="rounded-xl border border-white/10 bg-white/[0.03] p-5 text-center">
-            {m.away_team_flag && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={m.away_team_flag}
-                alt=""
-                className="h-12 w-12 mx-auto mb-3 object-contain"
-              />
-            )}
-            <p className="text-xs text-white/40 mb-1">{isEs ? "Visitante" : "Away"}</p>
+          <article className="lp-card p-5 text-center transition-all hover:border-gold/20">
+            <TeamMark name={m.away_team} src={m.away_team_flag} />
+            <p className="mb-1 text-xs text-text-muted">{isEs ? "Visitante" : "Away"}</p>
             <p className="font-semibold text-lg">{m.away_team}</p>
           </article>
         </div>
 
         {m.status === "finished" && m.home_score !== null && m.away_score !== null && (
-          <section className="mb-10 rounded-xl border border-white/10 p-5">
-            <h2 className="text-xs uppercase tracking-wider text-white/50 mb-2">
+          <section className="lp-card-hero mb-10 p-5">
+            <h2 className="mb-2 text-xs uppercase tracking-wider text-text-secondary">
               {isEs ? "Resultado final" : "Final score"}
             </h2>
-            <p className="text-3xl font-bold">
-              {m.home_score} <span className="text-white/40">—</span> {m.away_score}
+            <p className="lp-display text-[40px] tabular-nums tracking-[0.06em]">
+              {m.home_score} <span className="text-text-muted">—</span> {m.away_score}
             </p>
           </section>
         )}
 
-        <section className="rounded-xl bg-[#FCD116] text-black p-6 text-center mb-10">
-          <h2 className="font-bold text-xl mb-2">
+        <section className="lp-card-hero mb-10 p-6 text-center">
+          <h2 className="text-xl font-bold text-text-primary">
             {isEs
               ? `Pronostica ${m.home_team} vs ${m.away_team} en una polla`
               : `Predict ${m.home_team} vs ${m.away_team} in a pool`}
           </h2>
-          <p className="text-sm mb-4 opacity-80">
+          <p className="mt-2 text-sm leading-relaxed text-text-secondary">
             {isEs
               ? "La casa confirma cada entrada y el pozo se reparte entre quienes más aciertan."
               : "The house confirms each entry and the prize pool goes to whoever gets the most right."}
           </p>
           <Link
             href="/login?returnTo=%2Fcasa"
-            className="inline-block bg-black text-white font-semibold px-6 py-3 rounded-full"
+            className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-gold px-6 font-semibold text-bg-base transition-all hover:brightness-110"
           >
             {isEs ? "Ingresar para participar" : "Sign in to enter"}
           </Link>
         </section>
 
-        <section className="text-white/60 text-sm space-y-3">
-          <h2 className="text-white text-lg font-semibold">
+        <section className="space-y-3 text-sm leading-relaxed text-text-secondary">
+          <h2 className="text-lg font-semibold text-text-primary">
             {isEs ? "Sobre este partido" : "About this match"}
           </h2>
           <p>

@@ -4,7 +4,7 @@
 // Paso 3: Configuración (cuota de entrada + modo de pago)
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import axios from "axios";
@@ -269,6 +269,24 @@ export default function CrearPollaPage() {
     subgroups: SubGroup[];
   }
 
+  const formatPhase = useCallback((phase: string | null): string => {
+    const phaseKeys: Record<string, string> = {
+      group_stage: "phaseGroupStage",
+      league_stage: "phaseLeagueStage",
+      regular_season: "phaseRegularSeason",
+      round_of_32: "phaseRoundOf32",
+      round_of_16: "phaseRoundOf16",
+      quarter_finals: "phaseQuarterFinals",
+      semi_finals: "phaseSemiFinals",
+      final: "phaseFinal",
+      third_place: "phaseThirdPlace",
+      playoff: "phasePlayoff",
+    };
+    const key = phaseKeys[phase || ""];
+    if (key) return t(key);
+    return phase || t("phaseOther");
+  }, [t]);
+
   const tournamentBlocks = useMemo<TournamentBlock[]>(() => {
     if (matches.length === 0) return [];
     // Buckets por torneo en el orden de form.tournaments para
@@ -350,25 +368,7 @@ export default function CrearPollaPage() {
       });
     }
     return blocks;
-  }, [matches, groupBy, form.tournaments]);
-
-  function formatPhase(phase: string | null): string {
-    const phaseKeys: Record<string, string> = {
-      group_stage: "phaseGroupStage",
-      league_stage: "phaseLeagueStage",
-      regular_season: "phaseRegularSeason",
-      round_of_32: "phaseRoundOf32",
-      round_of_16: "phaseRoundOf16",
-      quarter_finals: "phaseQuarterFinals",
-      semi_finals: "phaseSemiFinals",
-      final: "phaseFinal",
-      third_place: "phaseThirdPlace",
-      playoff: "phasePlayoff",
-    };
-    const key = phaseKeys[phase || ""];
-    if (key) return t(key);
-    return phase || t("phaseOther");
-  }
+  }, [matches, groupBy, form.tournaments, locale, t, formatPhase]);
 
   function toggleMatch(id: string) {
     setSelectedMatchIds((prev) => {

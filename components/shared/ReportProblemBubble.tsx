@@ -12,12 +12,10 @@ import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 
 interface Props {
-  /** Visual size in px. Default 34. */
-  size?: number;
   className?: string;
 }
 
-export default function ReportProblemBubble({ size = 34, className = "" }: Props) {
+export default function ReportProblemBubble({ className = "" }: Props) {
   const t = useTranslations("Report");
   const tCommon = useTranslations("Common");
   const [open, setOpen] = useState(false);
@@ -37,10 +35,18 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !submitting) {
+        setOpen(false);
+        setError(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, submitting]);
 
   async function submit() {
     const trimmed = message.trim();
@@ -91,19 +97,19 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t("ariaButton")}
-        className={`inline-flex items-center justify-center border border-border-default bg-bg-elevated text-text-secondary transition-colors hover:border-red-alert hover:text-red-alert ${className}`}
-        style={{ width: size, height: size, borderRadius: 0 }}
+        className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-border-default bg-bg-elevated text-text-secondary transition-colors hover:border-red-alert hover:text-red-alert ${className}`}
       >
         <MessageSquareWarning
-          size={Math.round(size * 0.55)}
+          size={22}
           color="currentColor"
           strokeWidth={2.25}
+          aria-hidden="true"
         />
       </button>
 
       {open && mounted && createPortal(
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-bg-base/80 p-4 backdrop-blur-md"
           onClick={close}
           role="dialog"
           aria-modal="true"
@@ -111,18 +117,12 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl p-5 animate-slide-up"
-            style={{
-              backgroundColor: "var(--bg-card-elevated)",
-              border: "1px solid var(--border-medium)",
-              boxShadow: "0 12px 48px rgba(0,0,0,0.7)",
-            }}
+            className="animate-slide-up w-full max-w-md rounded-2xl border border-border-medium bg-bg-elevated p-5 shadow-2xl"
           >
             <div className="flex items-center justify-between mb-4">
               <h2
                 id="report-problem-title"
-                className="font-display text-lg leading-none"
-                style={{ color: "var(--text-primary)" }}
+                className="font-display text-lg leading-none text-text-primary"
               >
                 {t("title")}
               </h2>
@@ -131,20 +131,15 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
                 onClick={close}
                 aria-label={tCommon("close")}
                 disabled={submitting}
-                className="p-1 rounded-full hover:bg-white/10 disabled:opacity-50 transition-colors shrink-0"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-bg-card disabled:opacity-50"
               >
-                <X size={20} color="var(--text-secondary)" />
+                <X size={20} className="text-text-secondary" aria-hidden="true" />
               </button>
             </div>
 
             {error && (
               <div
-                className="mb-3 rounded-lg px-3 py-2 text-sm"
-                style={{
-                  backgroundColor: "rgba(228,70,58,0.12)",
-                  border: "1px solid var(--red-alert, #E4463A)",
-                  color: "var(--red-alert, #E4463A)",
-                }}
+                className="mb-3 rounded-lg border border-red-alert bg-red-alert/10 px-3 py-2 text-sm text-red-alert"
                 role="alert"
               >
                 {error}
@@ -160,34 +155,22 @@ export default function ReportProblemBubble({ size = 34, className = "" }: Props
               maxLength={4000}
               rows={6}
               placeholder={t("placeholder")}
-              className="w-full rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--green-live)]"
-              style={{
-                backgroundColor: "var(--bg-base)",
-                border: "1px solid var(--border-medium)",
-                color: "var(--text-primary)",
-              }}
+              className="w-full resize-none rounded-xl border border-border-medium bg-bg-base p-3 text-sm text-text-primary focus:border-turf/50 focus:outline-none focus:ring-2 focus:ring-turf/30"
               autoFocus
               disabled={submitting}
             />
 
             <div className="flex items-center justify-between mt-3">
-              <span
-                className="text-xs"
-                style={{ color: "var(--text-secondary)" }}
-              >
+              <span className="text-xs text-text-secondary">
                 {message.length}/4000
               </span>
               <button
                 type="button"
                 onClick={submit}
                 disabled={submitting || message.trim().length < 1}
-                className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  backgroundColor: "var(--green-live)",
-                  color: "var(--bg-base)",
-                }}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-turf px-4 py-2 text-sm font-medium text-bg-base transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Send size={16} strokeWidth={2.5} />
+                <Send size={16} strokeWidth={2.5} aria-hidden="true" />
                 {submitting ? t("sending") : t("send")}
               </button>
             </div>

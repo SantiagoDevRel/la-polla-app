@@ -19,7 +19,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
@@ -104,10 +104,32 @@ export function WelcomeIntro() {
       setStage("ready");
     }
     setShouldShow(true);
-    // INTRO depends on locale — but localStorage check should run only
-    // once on mount; if locale changes mid-session the user has bigger
-    // problems. eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // `INTRO` only changes with the active locale. If that happens before
+    // dismissal, keep the fully rendered reduced-motion copy in sync.
+  }, [INTRO]);
+
+  // Keep the login/onboarding UI out of sight and out of the tab order while
+  // the first-visit story is active. The global AppBackground is a sibling,
+  // so it remains visible without mounting or downloading a second video.
+  useLayoutEffect(() => {
+    if (!shouldShow) return;
+    const content = document.querySelector<HTMLElement>("[data-auth-content]");
+    if (!content) return;
+
+    const wasInvisible = content.classList.contains("invisible");
+    const previousAriaHidden = content.getAttribute("aria-hidden");
+    const previousInert = content.inert;
+    content.classList.add("invisible");
+    content.setAttribute("aria-hidden", "true");
+    content.inert = true;
+
+    return () => {
+      if (!wasInvisible) content.classList.remove("invisible");
+      if (previousAriaHidden === null) content.removeAttribute("aria-hidden");
+      else content.setAttribute("aria-hidden", previousAriaHidden);
+      content.inert = previousInert;
+    };
+  }, [shouldShow]);
 
   // Typewriter cadence for the intro line.
   useEffect(() => {
@@ -218,7 +240,7 @@ export function WelcomeIntro() {
             <button
               type="button"
               onClick={fastForward}
-              className="absolute top-4 right-4 z-10 text-[11px] uppercase tracking-wider text-text-secondary hover:text-gold transition-colors px-3 py-1.5 rounded-full border border-border-subtle bg-bg-card/50 backdrop-blur-sm"
+              className="absolute right-4 top-4 z-10 inline-flex min-h-11 items-center rounded-full border border-border-subtle bg-bg-card/70 px-4 text-[11px] uppercase tracking-wider text-text-secondary backdrop-blur-sm transition-colors hover:text-gold"
             >
               {t("skip")}
             </button>
@@ -424,7 +446,7 @@ export function WelcomeIntro() {
               <button
                 type="button"
                 onClick={dismiss}
-                className="bg-gold text-bg-base font-bold px-10 py-3 rounded-full text-base hover:brightness-110 transition-all"
+                className="min-h-11 rounded-full bg-gold px-10 py-3 text-base font-bold text-bg-base transition-all hover:brightness-110"
               >
                 {t("start")}
               </button>

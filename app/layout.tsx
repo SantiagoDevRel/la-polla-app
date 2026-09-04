@@ -120,7 +120,6 @@ export const viewport: Viewport = {
   themeColor: "#FCD116",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default async function RootLayout({
@@ -152,15 +151,19 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} className={`${bebas.variable} ${outfit.variable}`}>
-      <body className="antialiased lp-concrete">
+      <head>
         <script
+          id="organization-jsonld"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
         />
         <script
+          id="website-jsonld"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
         />
+      </head>
+      <body className="antialiased lp-concrete">
         <PostHogProvider>
           <NextIntlClientProvider locale={locale} messages={messages}>
             <PlatformProvider isIOSApp={isIOSApp}>

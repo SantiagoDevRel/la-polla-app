@@ -12,16 +12,15 @@
 // Queda lo que el producto realmente tiene: ver las pollas, y tu perfil.
 // Dos destinos. Si sos admin aparece un tercero para armarlas.
 //
-// También cambió la forma: era una píldora de vidrio flotante con blur, que
-// es exactamente el lenguaje "burbuja premium" que el skin nuevo dejó atrás.
-// Ahora es una barra sólida pegada abajo, con hairline arriba y el tab
-// activo marcado por una barra de acento. Bonus: sin blur ni backdrop-filter
-// desaparece el bug de WebKit que hacía flotar la barra en medio de la
-// pantalla durante el momentum-scroll en iPhone.
+// (2026-09-04) La auditoría visual posterior al regreso de Tribuna Caliente
+// restauró la píldora de vidrio del sistema vigente. Conserva los dos destinos
+// del producto centralizado, respeta safe-area y reduce motion, y mantiene un
+// único `position: fixed` para no repetir el bug de momentum-scroll de WebKit.
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion, useReducedMotion } from "framer-motion";
 import { Ticket, User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
@@ -69,6 +68,7 @@ function deriveActive(pathname: string | null): NavKey | undefined {
 export function BottomNav({ active, isAdmin = false, pollasPending = 0 }: BottomNavProps) {
   const t = useTranslations("Nav");
   const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
   const resolvedActive = active ?? deriveActive(pathname);
 
   // (2026-09-03) DOS tabs, siempre, sea quien sea. Antes el admin veia una
@@ -82,9 +82,9 @@ export function BottomNav({ active, isAdmin = false, pollasPending = 0 }: Bottom
   return (
     <nav
       aria-label={t("ariaNav")}
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border-default bg-bg-base"
+      className="fixed bottom-[calc(14px+env(safe-area-inset-bottom))] left-[14px] right-[14px] z-50 mx-auto h-[64px] max-w-[480px] rounded-full border border-white/[0.12] bg-bg-card/[0.42] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_40px_rgba(0,0,0,0.45)] backdrop-blur-3xl backdrop-saturate-[1.8]"
     >
-      <div className="mx-auto flex max-w-[480px] safe-bottom">
+      <div className="flex h-full">
         {tabs.map((tab) => (
           <TabItem
             key={tab.key}
@@ -92,6 +92,7 @@ export function BottomNav({ active, isAdmin = false, pollasPending = 0 }: Bottom
             active={resolvedActive === tab.key}
             badge={tab.key === "pollas" ? pollasPending : 0}
             badgeLabelPrefix={t("ariaToPredict")}
+            reduceMotion={reduceMotion}
           />
         ))}
       </div>
@@ -104,11 +105,13 @@ function TabItem({
   active,
   badge = 0,
   badgeLabelPrefix,
+  reduceMotion,
 }: {
   tab: Tab;
   active: boolean;
   badge?: number;
   badgeLabelPrefix?: string;
+  reduceMotion: boolean | null;
 }) {
   const t = useTranslations("Nav");
   const { Icon, labelKey, href } = tab;
@@ -120,22 +123,26 @@ function TabItem({
       aria-label={t(labelKey)}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex min-h-[58px] flex-1 flex-col items-center justify-center gap-1",
-        "transition-colors duration-150",
+        "relative flex min-h-[48px] flex-1 items-center justify-center rounded-full",
+        "transition-all duration-200 active:scale-90",
         active ? "text-gold" : "text-text-muted hover:text-text-secondary",
       )}
     >
-      {/* Marca del tab activo: una barra de acento arriba. Reemplaza al
-          "lozenge" redondeado que se deslizaba — cuadrado y quieto. */}
       {active && (
-        <span
+        <motion.span
           aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-[2px] bg-gold"
+          layoutId="nav-active-lozenge"
+          transition={
+            reduceMotion
+              ? { duration: 0 }
+              : { type: "spring", stiffness: 600, damping: 38 }
+          }
+          className="absolute h-[40px] w-[52px] rounded-full border border-white/[0.08] bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]"
         />
       )}
 
-      <span className="relative">
-        <Icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
+      <span className="relative z-10">
+        <Icon className="h-[24px] w-[24px]" strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
         {showBadge && (
           <span
             className="absolute -right-2 -top-1 min-w-[15px] border-2 border-bg-base bg-gold px-[3px] text-center text-[9px] font-bold leading-[13px] text-bg-base"
@@ -146,12 +153,6 @@ function TabItem({
         )}
       </span>
 
-      {/* Con solo dos o tres destinos, la etiqueta cabe y ahorra que la gente
-          adivine qué significa el ícono. El nav anterior las escondía porque
-          tenía cinco elementos y no había espacio. */}
-      <span className="lp-label text-[9px] leading-none" style={{ color: "inherit" }}>
-        {t(labelKey)}
-      </span>
     </Link>
   );
 }

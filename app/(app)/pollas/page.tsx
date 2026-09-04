@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { SEASON_CLOSED } from "@/lib/closure";
 import { AnimatedList, AnimatedItem } from "@/components/ui/AnimatedList";
-import { Plus, Mail, ChevronDown, ChevronRight, KeyRound, ArrowRight } from "lucide-react";
+import { Plus, Mail, ChevronDown, ChevronRight, KeyRound, ArrowLeft, ArrowRight } from "lucide-react";
 import FootballLoader from "@/components/ui/FootballLoader";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
@@ -82,6 +82,7 @@ function adaptPolla(
 
 export default function MisPollasPage() {
   const t = useTranslations("Pollas");
+  const tCommon = useTranslations("Common");
   const locale = useLocale();
   const tNav = useTranslations("Nav");
   const tClosure = useTranslations("Closure");
@@ -137,8 +138,13 @@ export default function MisPollasPage() {
     <div className="min-h-screen">
       <header className="px-4 pt-4 pb-3">
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => router.push("/inicio")} className="text-text-secondary text-xl">
-            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#F5F7FA" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
+          <button
+            type="button"
+            onClick={() => router.push("/perfil")}
+            aria-label={tCommon("back")}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
+          >
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </button>
           <h1 className="lp-section-title flex items-center gap-2 text-[22px]">
             <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="2">
@@ -259,7 +265,7 @@ export default function MisPollasPage() {
             <button
               type="button"
               onClick={() => setEndedOpen((v) => !v)}
-              className="w-full flex items-center gap-2 text-sm font-bold text-text-secondary cursor-pointer"
+              className="flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg text-sm font-bold text-text-secondary transition-colors hover:bg-bg-elevated/60"
             >
               {endedOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               {t("endedSection")}

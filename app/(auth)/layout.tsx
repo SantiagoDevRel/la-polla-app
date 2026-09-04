@@ -31,7 +31,9 @@ export default function AuthLayout({
     <>
       <AppBackground />
       <WelcomeIntro />
-      {children}
+      <div className="contents" data-auth-content>
+        {children}
+      </div>
     </>
   );
 }

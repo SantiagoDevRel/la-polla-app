@@ -55,7 +55,7 @@ export function HeroFrame({
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(180deg, rgba(8,12,16,0.10) 0%, rgba(8,12,16,0.45) 55%, rgba(8,12,16,0.88) 100%)",
+              "linear-gradient(180deg, rgba(8,12,16,0.10) 0%, rgba(8,12,16,0.45) 54%, rgba(8,12,16,0.72) 78%, rgba(8,12,16,0) 100%)",
           }}
         />
       )}

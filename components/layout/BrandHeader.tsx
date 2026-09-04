@@ -87,7 +87,7 @@ export default function BrandHeader() {
             flex-shrink-0 se queda porque con el text-zoom de accesibilidad es
             lo que evita que el wordmark aplaste la burbuja. */}
         <div className="flex flex-shrink-0 items-center">
-          <ReportProblemBubble size={34} />
+          <ReportProblemBubble />
         </div>
       </div>
     </header>

@@ -13,13 +13,20 @@ test.beforeEach(async ({ page }) => {
 });
 
 // "/" redirige a /login con la app cerrada — se testean las públicas reales.
-const PAGES = [
+const VISUAL_PAGES = [
   { path: "/login", name: "login" },
   { path: "/privacy", name: "privacy" },
   { path: "/soporte", name: "soporte" },
 ] as const;
 
-for (const { path, name } of PAGES) {
+const A11Y_PAGES = [
+  ...VISUAL_PAGES,
+  { path: "/torneos", name: "torneos" },
+  { path: "/torneos/mundial-2026", name: "torneo-mundial" },
+  { path: "/partidos", name: "partidos" },
+] as const;
+
+for (const { path, name } of VISUAL_PAGES) {
   test(`visual: ${name}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(path);
@@ -29,6 +36,9 @@ for (const { path, name } of PAGES) {
     });
   });
 
+}
+
+for (const { path, name } of A11Y_PAGES) {
   test(`a11y: ${name}`, async ({ page }) => {
     await page.goto(path);
     const { violations } = await new AxeBuilder({ page })
