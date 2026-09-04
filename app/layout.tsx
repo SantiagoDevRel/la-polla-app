@@ -40,7 +40,7 @@ const outfit = Outfit({
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("App");
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const title = t("title");
   const description = t("description");
   return {
@@ -129,8 +129,8 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale();
   const messages = await getMessages();
-  const site = getSiteFromHeaders();
-  const isIOSApp = isIOSAppRequest();
+  const site = await getSiteFromHeaders();
+  const isIOSApp = await isIOSAppRequest();
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",

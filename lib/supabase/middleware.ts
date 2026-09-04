@@ -26,7 +26,7 @@ function getAdmin() {
 
 // Public SEO surfaces que NUNCA necesitan saber el user. Saltamos
 // Supabase auth y la query a public.users por completo. El locale ya
-// fue resuelto por el outer middleware.ts (x-locale en headers) ANTES
+// fue resuelto por el proxy.ts raíz (x-locale en headers) ANTES
 // de entrar acá, así que /torneos/* y /partidos/* siguen sabiendo qué
 // locale renderear. Cualquier ruta que necesite "redirect-if-logged-in"
 // (login, verify, onboarding, unirse, invites) NO va acá — esas siguen

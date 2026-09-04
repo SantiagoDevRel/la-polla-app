@@ -14,7 +14,7 @@ import { materializePayoutsIfNeeded } from "@/lib/pollas/materialize-payouts";
 
 export async function POST(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   if (!(await isCurrentUserAdmin())) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -24,7 +24,7 @@ export async function POST(
   const { data: polla } = await admin
     .from("pollas")
     .select("id, status, match_ids")
-    .eq("id", params.id)
+    .eq("id", (await params).id)
     .maybeSingle();
 
   if (!polla) {

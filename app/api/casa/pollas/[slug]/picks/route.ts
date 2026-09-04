@@ -46,15 +46,15 @@ const bodySchema = z.object({ picks: z.array(pickSchema).min(1).max(60) });
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sin sesión." }, { status: 401 });
 
-  const polla = await getPollaBySlug(params.slug);
+  const polla = await getPollaBySlug((await params).slug);
   if (!polla) return NextResponse.json({ error: "No existe." }, { status: 404 });
 
   const picks = await getMyPicks(polla.id, user.id);
@@ -63,15 +63,15 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Sin sesión." }, { status: 401 });
 
-  const polla = await getPollaBySlug(params.slug);
+  const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador") {
     return NextResponse.json({ error: "Esa polla no existe." }, { status: 404 });
   }

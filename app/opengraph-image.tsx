@@ -11,7 +11,7 @@ export const contentType = "image/png";
 export const alt = "La Polla Colombiana / Chicken Picks";
 
 export default async function Image() {
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
   return new ImageResponse(
     (

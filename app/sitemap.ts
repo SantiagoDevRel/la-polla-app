@@ -43,7 +43,7 @@ function alternatesFor(path: string): SitemapEntry["alternates"] {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const now = new Date();
 
   // Paths estables (mismos en ambos idiomas).

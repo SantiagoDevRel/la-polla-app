@@ -77,10 +77,10 @@ async function resolveEventIdFromScoreboard(
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -90,7 +90,7 @@ export async function GET(
     const { data, error } = await admin
       .from("matches")
       .select("id, tournament, external_id, scheduled_at, status, home_team, away_team")
-      .eq("id", params.id)
+      .eq("id", (await params).id)
       .maybeSingle<MatchRow>();
 
     if (error) {

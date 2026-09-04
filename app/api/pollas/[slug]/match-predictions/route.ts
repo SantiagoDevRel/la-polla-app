@@ -11,10 +11,10 @@ import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -31,7 +31,7 @@ export async function GET(
     const { data: polla, error: pollaError } = await adminSupabase
       .from("pollas")
       .select("id, created_by")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
     if (pollaError || !polla) {
       return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });

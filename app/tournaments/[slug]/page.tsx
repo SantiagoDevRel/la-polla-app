@@ -3,5 +3,6 @@ export {
   default,
   generateMetadata,
   generateStaticParams,
-  revalidate,
 } from "@/app/torneos/[slug]/page";
+
+export const revalidate = 600;

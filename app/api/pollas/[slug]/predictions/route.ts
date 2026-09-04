@@ -8,10 +8,10 @@ import { z } from "zod";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -24,7 +24,7 @@ export async function GET(
     const { data: polla } = await admin
       .from("pollas")
       .select("id")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
     if (!polla) {
       return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
@@ -64,10 +64,10 @@ const predictionSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -91,7 +91,7 @@ export async function POST(
     const { data: polla, error: pollaError } = await admin
       .from("pollas")
       .select("id, match_ids, payment_mode")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
 
     if (pollaError || !polla) {

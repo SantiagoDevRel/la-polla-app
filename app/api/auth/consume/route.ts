@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       ? payload.target_path
       : "/perfil";
 
-  const supabase = createClient();
+  const supabase = await createClient();
   try {
     const { error } = await supabase.auth.setSession({
       access_token: payload.access_token,

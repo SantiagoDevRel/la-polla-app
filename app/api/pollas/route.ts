@@ -106,7 +106,7 @@ const createPollaSchema = z
 // GET — Listar pollas del usuario
 export async function GET() {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const admin = createAdminClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -337,7 +337,7 @@ export async function GET() {
 // POST — Crear nueva polla con modo de pago seleccionado
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {

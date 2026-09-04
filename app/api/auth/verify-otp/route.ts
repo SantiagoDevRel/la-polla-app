@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = await createClient();
     // Defensive: clear any existing session BEFORE verifying. Users
     // legitimately have multiple accounts (one per phone), and if they
     // come into /login already logged into account A and then submit

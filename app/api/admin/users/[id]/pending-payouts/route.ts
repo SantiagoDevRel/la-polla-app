@@ -14,7 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { materializePayoutsIfNeeded } from "@/lib/pollas/materialize-payouts";
 
 interface Params {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 interface PayoutRow {
@@ -56,7 +56,7 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const targetUserId = params.id;
+  const targetUserId = (await params).id;
   const admin = createAdminClient();
 
   const { data: target } = await admin

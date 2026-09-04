@@ -40,9 +40,9 @@ interface ParticipantRow {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -56,7 +56,7 @@ export async function GET(
     .select(
       "id, slug, name, status, payment_mode, buy_in_amount, prize_distribution, created_by",
     )
-    .eq("slug", params.slug)
+    .eq("slug", (await params).slug)
     .maybeSingle();
 
   if (pollaErr) {

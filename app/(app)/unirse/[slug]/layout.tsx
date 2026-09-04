@@ -7,7 +7,7 @@ import { getTournamentName } from "@/lib/tournaments";
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const t = await getTranslations("Invites");
   const locale = await getLocale();
@@ -17,7 +17,7 @@ export async function generateMetadata({
     const { data: polla } = await supabase
       .from("pollas")
       .select("id, name, tournament, buy_in_amount")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
 
     if (!polla) return { title: t("ogFallback") };

@@ -8,7 +8,12 @@ const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  // Next's webpack dev server can invalidate an in-flight page while another
+  // worker compiles a new route. Serial execution keeps axe and screenshots
+  // attached to one stable document on cold Windows boots.
+  fullyParallel: false,
+  workers: 1,
+  timeout: 60_000,
   reporter: "list",
   expect: {
     timeout: 10_000,
@@ -21,7 +26,9 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: `npx next dev -p ${port}`,
+    // Keep the browser gate on the same webpack path used by `npm run dev`
+    // and production builds. Serwist's Next integration is webpack-based.
+    command: `npm run dev -- --port ${port}`,
     // A service unrelated to La Polla once occupied the old port and still
     // answered 200 at `/`, so Playwright silently tested the wrong app. A
     // real app route makes the readiness check specific to this project.

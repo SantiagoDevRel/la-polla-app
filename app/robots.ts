@@ -10,8 +10,8 @@
 import type { MetadataRoute } from "next";
 import { getSiteFromHeaders } from "@/lib/seo/sites";
 
-export default function robots(): MetadataRoute.Robots {
-  const site = getSiteFromHeaders();
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const site = await getSiteFromHeaders();
   return {
     rules: [
       {

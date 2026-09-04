@@ -30,6 +30,12 @@ for (const { path, name } of VISUAL_PAGES) {
   test(`visual: ${name}`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(path);
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    if (name === "login") {
+      await expect(
+        page.locator('[data-testid="welcome-intro"][data-welcome-stage="ready"]'),
+      ).toBeVisible();
+    }
     await expect(page).toHaveScreenshot(`${name}.png`, {
       fullPage: true,
       animations: "disabled",

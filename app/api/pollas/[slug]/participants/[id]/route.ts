@@ -12,10 +12,10 @@ const patchSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { slug: string; id: string } }
+  { params }: { params: Promise<{ slug: string; id: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -29,7 +29,7 @@ export async function PATCH(
     const { data: polla } = await admin
       .from("pollas")
       .select("id")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .maybeSingle();
     if (!polla) return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
 
@@ -46,7 +46,7 @@ export async function PATCH(
     const { data: target } = await admin
       .from("polla_participants")
       .select("id, role, polla_id")
-      .eq("id", params.id)
+      .eq("id", (await params).id)
       .eq("polla_id", polla.id)
       .maybeSingle();
     if (!target) return NextResponse.json({ error: "Participante no encontrado" }, { status: 404 });

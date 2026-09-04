@@ -19,7 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const revalidate = 1800;
 
 interface PageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export function generateStaticParams() {
@@ -27,9 +27,9 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const t = findByPublicSlug(params.slug);
+  const t = findByPublicSlug((await params).slug);
   if (!t) return {};
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const title = t.heading[site.locale];
   const description = t.description[site.locale];
   const canonical = pathForLocale(site.locale, "torneo", t.publicSlug);
@@ -82,10 +82,10 @@ async function fetchUpcoming(internalSlug: string): Promise<UpcomingMatchRow[]> 
 }
 
 export default async function TorneoPage({ params }: PageProps) {
-  const t = findByPublicSlug(params.slug);
+  const t = findByPublicSlug((await params).slug);
   if (!t) notFound();
 
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
   const upcoming = await fetchUpcoming(t.internalSlug);
   const structure = TOURNAMENT_STRUCTURE[t.internalSlug];

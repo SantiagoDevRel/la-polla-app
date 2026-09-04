@@ -14,7 +14,7 @@ const DEV_USER = {
 export async function ensureDevUser() {
   if (process.env.NODE_ENV !== "development") return;
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: existing } = await supabase
     .from("users")

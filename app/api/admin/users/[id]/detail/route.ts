@@ -13,7 +13,7 @@ import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 interface Params {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 interface LoginEventRow {
@@ -62,12 +62,12 @@ export async function GET(_request: Request, { params }: Params) {
       .select(
         "id, display_name, whatsapp_number, whatsapp_verified, email, avatar_url, avatar_emoji, is_admin, created_at, default_payout_method, default_payout_account, default_payout_account_name, default_payout_account_type, default_payout_set_at",
       )
-      .eq("id", params.id)
+      .eq("id", (await params).id)
       .maybeSingle(),
     admin
       .from("notifications")
       .select("created_at, metadata")
-      .eq("user_id", params.id)
+      .eq("user_id", (await params).id)
       .eq("type", "login_event")
       .order("created_at", { ascending: false })
       .limit(10),
@@ -76,12 +76,12 @@ export async function GET(_request: Request, { params }: Params) {
       .select(
         "polla_id, role, status, paid, total_points, rank, joined_at, pollas:polla_id (id, slug, name, status, tournament)",
       )
-      .eq("user_id", params.id)
+      .eq("user_id", (await params).id)
       .order("joined_at", { ascending: false }),
     admin
       .from("predictions")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", params.id),
+      .eq("user_id", (await params).id),
   ]);
 
   if (!profile) {

@@ -20,7 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 interface Params {
-  params: { slug: string; transactionId: string };
+  params: Promise<{ slug: string; transactionId: string }>;
 }
 
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -65,7 +65,7 @@ async function loadTxAndPermissions(
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -74,8 +74,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const ctx = await loadTxAndPermissions(
-    params.slug,
-    params.transactionId,
+    (await params).slug,
+    (await params).transactionId,
     user.id,
   );
   if ("error" in ctx) {
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 }
 
 export async function GET(_request: NextRequest, { params }: Params) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -175,8 +175,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
   }
 
   const ctx = await loadTxAndPermissions(
-    params.slug,
-    params.transactionId,
+    (await params).slug,
+    (await params).transactionId,
     user.id,
   );
   if ("error" in ctx) {
@@ -204,7 +204,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_request: NextRequest, { params }: Params) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -213,8 +213,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   }
 
   const ctx = await loadTxAndPermissions(
-    params.slug,
-    params.transactionId,
+    (await params).slug,
+    (await params).transactionId,
     user.id,
   );
   if ("error" in ctx) {

@@ -19,8 +19,10 @@
 
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- pre-sized public assets avoid Vercel image-optimization quota */
+
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
@@ -72,6 +74,7 @@ export function WelcomeIntro() {
   const t = useTranslations("Welcome");
   const tBrand = useTranslations("Brand");
   const isIOSApp = useIsIOSApp();
+  const prefersReducedMotion = useReducedMotion();
   const INTRO = t("introLine");
   const INTRO_CHARS = useMemo(() => INTRO.split(""), [INTRO]);
   const STEPS = useMemo(
@@ -96,17 +99,14 @@ export function WelcomeIntro() {
       /* storage unavailable — fall through and show the intro */
     }
     if (seen) return;
-    const reduce = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    if (reduce) {
+    if (prefersReducedMotion) {
       setTyped(INTRO);
       setStage("ready");
     }
     setShouldShow(true);
     // `INTRO` only changes with the active locale. If that happens before
     // dismissal, keep the fully rendered reduced-motion copy in sync.
-  }, [INTRO]);
+  }, [INTRO, prefersReducedMotion]);
 
   // Keep the login/onboarding UI out of sight and out of the tab order while
   // the first-visit story is active. The global AppBackground is a sibling,
@@ -197,11 +197,17 @@ export function WelcomeIntro() {
     <AnimatePresence>
       {!exiting && (
         <motion.div
-          initial={{ opacity: 0 }}
+          initial={prefersReducedMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.7, ease: SMOOTH }}
+          transition={
+            prefersReducedMotion
+              ? { duration: 0 }
+              : { duration: 0.7, ease: SMOOTH }
+          }
           className="fixed inset-0 z-[10000] overflow-hidden"
+          data-testid="welcome-intro"
+          data-welcome-stage={stage}
         >
           {/* (2026-09-02) El estadio vuelve a verse aca — sin descargar un
               solo byte extra.
@@ -259,7 +265,6 @@ export function WelcomeIntro() {
           >
             {/* Wordmark */}
             <div className="flex items-center gap-3 mb-7">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/pollitos/pollito_pibe_lider-128.webp"
                 alt=""
@@ -321,7 +326,9 @@ export function WelcomeIntro() {
                       key={i}
                       style={{
                         opacity: visible ? 1 : 0,
-                        transition: `opacity ${CHAR_FADE_MS}ms ease-out`,
+                        transition: prefersReducedMotion
+                          ? "none"
+                          : `opacity ${CHAR_FADE_MS}ms ease-out`,
                       }}
                     >
                       {ch}
@@ -348,13 +355,13 @@ export function WelcomeIntro() {
                       : { opacity: 0, scale: 0.92, filter: "blur(6px)" }
                   }
                   transition={{
-                    duration: 0.45,
-                    delay: showTournaments ? i * 0.13 : 0,
+                    duration: prefersReducedMotion ? 0 : 0.45,
+                    delay:
+                      prefersReducedMotion || !showTournaments ? 0 : i * 0.13,
                     ease: SMOOTH,
                   }}
                   className="flex flex-col items-center gap-1.5"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   {isIOSApp ? null : (
                     <img
                       src={TOURNAMENT_ICONS[tournament.slug]}
@@ -385,8 +392,8 @@ export function WelcomeIntro() {
                       : { opacity: 0, filter: "blur(4px)" }
                   }
                   transition={{
-                    duration: 0.7,
-                    delay: showSteps ? i * 0.32 : 0,
+                    duration: prefersReducedMotion ? 0 : 0.7,
+                    delay: prefersReducedMotion || !showSteps ? 0 : i * 0.32,
                     ease: SMOOTH,
                   }}
                   className="flex items-center gap-3 text-text-primary text-[14px] font-medium w-full"
@@ -408,7 +415,10 @@ export function WelcomeIntro() {
                   ? { opacity: 1, filter: "blur(0px)" }
                   : { opacity: 0, filter: "blur(4px)" }
               }
-              transition={{ duration: 0.85, ease: SMOOTH }}
+              transition={{
+                duration: prefersReducedMotion ? 0 : 0.85,
+                ease: SMOOTH,
+              }}
               className="mt-8 text-text-primary text-[16px] font-semibold text-center"
               style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
             >
@@ -421,8 +431,9 @@ export function WelcomeIntro() {
                     : { scale: 0.7, opacity: 0 }
                 }
                 transition={{
-                  duration: 1.1,
-                  delay: showGratis ? 0.45 : 0,
+                  duration: prefersReducedMotion ? 0 : 1.1,
+                  delay:
+                    prefersReducedMotion || !showGratis ? 0 : 0.45,
                   ease: [0.34, 1.4, 0.64, 1],
                 }}
                 className="inline-block font-display text-gold text-[26px] tracking-wide align-[-0.05em]"
@@ -438,7 +449,10 @@ export function WelcomeIntro() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: showReady ? 1 : 0 }}
-              transition={{ duration: 0.8, ease: SMOOTH }}
+              transition={{
+                duration: prefersReducedMotion ? 0 : 0.8,
+                ease: SMOOTH,
+              }}
               className="mt-10 flex flex-col items-center gap-4"
               style={{ pointerEvents: showReady ? "auto" : "none" }}
               onClick={(e) => e.stopPropagation()}

@@ -39,7 +39,7 @@ const BodySchema = z.discriminatedUnion("source", [
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { matchId: string } },
+  { params }: { params: Promise<{ matchId: string }> },
 ) {
   if (!(await isCurrentUserAdmin())) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -66,7 +66,7 @@ export async function POST(
   const { data: match, error: matchErr } = await admin
     .from("matches")
     .select("id, status, home_score, away_score, final_verified_at, final_verification_notes, tournament, phase, home_team, away_team, scheduled_at, espn_id")
-    .eq("id", params.matchId)
+    .eq("id", (await params).matchId)
     .maybeSingle();
   if (matchErr || !match) {
     return NextResponse.json({ error: "Match no encontrado" }, { status: 404 });
@@ -152,7 +152,7 @@ export async function POST(
   const { error: updErr } = await admin
     .from("matches")
     .update(updates)
-    .eq("id", params.matchId);
+    .eq("id", (await params).matchId);
   if (updErr) {
     console.error("[admin/discrepancies/resolve] update failed:", updErr);
     return NextResponse.json({ error: "No se pudo resolver" }, { status: 500 });
@@ -160,7 +160,7 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
-    matchId: params.matchId,
+    matchId: (await params).matchId,
     finalVerifiedAt: verifiedAt,
     appliedScore: {
       home: updates.home_score ?? match.home_score,

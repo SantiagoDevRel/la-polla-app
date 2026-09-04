@@ -35,19 +35,21 @@ usuario decida — no asumas que pagar está OK. Mismo principio en
 
 ## Stack
 
-- **Next.js 14** App Router + TypeScript
+- **Next.js 16** App Router + TypeScript
 - **Supabase** (PostgreSQL + Auth + RLS) — phone+password con OTP de WhatsApp solo en el primer login
 - **Meta WhatsApp Cloud API** — bot conversacional para predecir/ver tabla, OTP de signup, recovery de clave
 - **football-data.org** — fuente de fixtures y resultados (UCL + Mundial 2026)
 - **Cloudflare Turnstile** — anti-bot en el flujo OTP (validado server-side)
 - **Tailwind CSS** + **Framer Motion** + **lucide-react**
 - **@serwist/next** — PWA instalable + service worker
-- **Vitest** — unit tests (41 cubriendo helpers críticos)
+- **Vitest** — unit tests (111 cubriendo helpers críticos)
 - **Vercel** — deploy target con auto-deploy desde `main`
 
 ## Primeros pasos
 
 ### 1. Clonar e instalar
+
+Requiere Node.js 22.12 o superior (Capacitor 8 y Vite 8).
 
 ```bash
 git clone https://github.com/SantiagoDevRel/la-polla-app
@@ -105,8 +107,8 @@ Abre [http://localhost:3000](http://localhost:3000).
 ### Validación pre-commit (manual)
 
 ```bash
-npm run validate    # tsc --noEmit && next lint
-npm test            # vitest unit tests (41 tests)
+npm run validate    # tsc --noEmit && eslint .
+npm test            # vitest unit tests (111 tests)
 ```
 
 ---

@@ -18,11 +18,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 interface Params {
-  params: { slug: string; transactionId: string };
+  params: Promise<{ slug: string; transactionId: string }>;
 }
 
 export async function POST(_request: NextRequest, { params }: Params) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -34,7 +34,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
   const { data: polla } = await admin
     .from("pollas")
     .select("id, created_by")
-    .eq("slug", params.slug)
+    .eq("slug", (await params).slug)
     .maybeSingle();
   if (!polla) {
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
@@ -43,7 +43,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
   const { data: tx } = await admin
     .from("polla_payouts")
     .select("id, polla_id, from_user_id, to_user_id, paid_at")
-    .eq("id", params.transactionId)
+    .eq("id", (await params).transactionId)
     .maybeSingle();
   if (!tx || tx.polla_id !== polla.id) {
     return NextResponse.json(
@@ -93,7 +93,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_request: NextRequest, { params }: Params) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -105,7 +105,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   const { data: polla } = await admin
     .from("pollas")
     .select("id, created_by")
-    .eq("slug", params.slug)
+    .eq("slug", (await params).slug)
     .maybeSingle();
   if (!polla) {
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
@@ -114,7 +114,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   const { data: tx } = await admin
     .from("polla_payouts")
     .select("id, polla_id, paid_by_user_id, paid_at")
-    .eq("id", params.transactionId)
+    .eq("id", (await params).transactionId)
     .maybeSingle();
   if (!tx || tx.polla_id !== polla.id) {
     return NextResponse.json(

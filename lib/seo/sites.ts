@@ -89,8 +89,8 @@ const HOST_TO_SITE: Record<string, SiteConfig> = {
  * En localhost / preview, decide por el header `x-locale` que setea el
  * middleware (resolveLocale → 'es' | 'en'). Default: ES (mercado primario).
  */
-export function getSiteFromHeaders(): SiteConfig {
-  const h = headers();
+export async function getSiteFromHeaders(): Promise<SiteConfig> {
+  const h = await headers();
   const host = (h.get("host") ?? "").toLowerCase().split(":")[0];
   const exact = HOST_TO_SITE[host];
   if (exact) return exact;

@@ -14,7 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const revalidate = 600;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
   const title = isEs ? "Próximos partidos de fútbol" : "Upcoming football matches";
   const description = isEs
@@ -66,7 +66,7 @@ async function fetchUpcoming(): Promise<MatchRow[]> {
 }
 
 export default async function PartidosIndexPage() {
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
   const matches = await fetchUpcoming();
 

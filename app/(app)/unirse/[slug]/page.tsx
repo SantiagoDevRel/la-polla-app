@@ -6,17 +6,17 @@
 // invite page. Without a token we fall through to the polla detail.
 import { redirect } from "next/navigation";
 
-export default function UnirseLegacyRedirect({
+export default async function UnirseLegacyRedirect({
   params,
   searchParams,
 }: {
-  params: { slug: string };
-  searchParams: { token?: string | string[] };
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ token?: string | string[] }>;
 }) {
-  const rawToken = searchParams?.token;
+  const rawToken = (await searchParams).token;
   const token = Array.isArray(rawToken) ? rawToken[0] : rawToken;
   if (token && token.length > 0) {
     redirect(`/invites/polla/${encodeURIComponent(token)}`);
   }
-  redirect(`/pollas/${params.slug}`);
+  redirect(`/pollas/${(await params).slug}`);
 }

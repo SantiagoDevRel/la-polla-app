@@ -15,7 +15,7 @@ import { TOURNAMENTS_SEO } from "@/lib/seo/tournaments";
 export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
   const title = isEs ? "Torneos con pollas de fútbol" : "Football pool tournaments";
   const description = isEs
@@ -36,8 +36,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function TorneosIndexPage() {
-  const site = getSiteFromHeaders();
+export default async function TorneosIndexPage() {
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
 
   const itemListJsonLd = {

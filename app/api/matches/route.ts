@@ -41,7 +41,7 @@ async function maybeAutoDiscover(tournament: string): Promise<void> {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {

@@ -1,5 +1,4 @@
-// sentry.client.config.ts — Init de Sentry en el navegador / WebView Capacitor.
-// (Next 14 todavía usa este archivo; instrumentation-client.ts es 15.3+.)
+// instrumentation-client.ts — Init de Sentry en browser / WebView Capacitor.
 import * as Sentry from "@sentry/nextjs";
 import { scrubEvent } from "@/lib/sentry-scrub";
 
@@ -28,3 +27,5 @@ Sentry.init({
   sendDefaultPii: false,
   beforeSend: scrubEvent,
 });
+
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

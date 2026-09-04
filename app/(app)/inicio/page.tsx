@@ -605,10 +605,10 @@ export default async function InicioPage() {
   void ensureMatchesFresh();
   // iOS app: oculta toda la UI de plata/cobros/payouts por compliance
   // Apple 5.3.4. Web y Android no se afectan.
-  const isIOSApp = isIOSAppRequest();
+  const isIOSApp = await isIOSAppRequest();
   // Validate session. Middleware already gates /inicio, but the explicit
   // redirect keeps the page safe if middleware order ever changes.
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 

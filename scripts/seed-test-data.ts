@@ -54,7 +54,22 @@ const now = new Date();
 const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000).toISOString();
 const daysFromNow = (n: number) => new Date(now.getTime() + n * 24 * 60 * 60 * 1000).toISOString();
 
-const TEST_MATCHES = [
+interface TestMatch {
+  key: string;
+  external_id: string;
+  tournament: string;
+  home_team: string;
+  away_team: string;
+  home_team_flag: string | null;
+  away_team_flag: string | null;
+  scheduled_at: string;
+  status: "scheduled" | "live" | "finished";
+  home_score: number | null;
+  away_score: number | null;
+  phase: string;
+}
+
+const TEST_MATCHES: TestMatch[] = [
   {
     key: "col-bra",
     external_id: "seed-col-bra-001",

@@ -29,10 +29,10 @@ const reviewPaymentSchema = z.object({
 // GET — Listar pagos de la polla (admin ve todos, participante ve los suyos)
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -46,7 +46,7 @@ export async function GET(
     const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
       .select("id, payment_mode, admin_payment_instructions, admin_payout_method, admin_payout_account, admin_payout_account_name, admin_payout_account_type, buy_in_amount, currency")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
 
     if (pollaError || !polla) {
@@ -138,10 +138,10 @@ export async function GET(
 // POST — Participante sube comprobante de pago
 export async function POST(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -166,7 +166,7 @@ export async function POST(
     const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
       .select("id, payment_mode")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
 
     if (pollaError || !polla) {
@@ -235,10 +235,10 @@ export async function POST(
 // PATCH — Admin aprueba o rechaza un pago
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -261,7 +261,7 @@ export async function PATCH(
     const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
       .select("id, payment_mode")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
 
     if (pollaError || !polla) {

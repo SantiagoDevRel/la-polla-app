@@ -4,7 +4,7 @@
 // app/sw.ts en lugar de inferirse del config.
 import withSerwistInit from "@serwist/next";
 import createNextIntlPlugin from "next-intl/plugin";
-import { withSentryConfig } from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
@@ -22,6 +22,12 @@ const withSerwist = withSerwistInit({
 const nextConfig = {
   reactStrictMode: true,
   generateEtags: false,
+  // Playwright serves the app on localhost but opens it through 127.0.0.1.
+  // Declare that local origin explicitly for Next's development CSRF guard.
+  allowedDevOrigins: ["127.0.0.1"],
+  // Keep framework chrome out of visual regression screenshots and prevent
+  // the dev-tools badge from covering controls near the bottom-left corner.
+  devIndicators: false,
   images: {
     // Whitelist explícita de los hosts que servimos via next/image.
     // hostname: "**" actuaba como proxy abierto bajo nuestra cuota Vercel

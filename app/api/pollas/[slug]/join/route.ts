@@ -14,10 +14,10 @@ import { recomputePollaStandings } from "@/lib/scoring";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -45,7 +45,7 @@ export async function POST(
     const { data: polla, error: pollaError } = await admin
       .from("pollas")
       .select("id, type, status, slug, payment_mode, buy_in_amount, currency, invite_token")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
 
     if (pollaError || !polla) {

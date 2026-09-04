@@ -42,7 +42,7 @@ para queries autenticadas, y que RLS gatee correctamente.
    `@supabase/ssr` que usan los Server Components.
 2. **`lib/supabase/middleware.ts`** — el middleware de auth, también
    crea un `createServerClient` con su propia config de cookies.
-3. **`middleware.ts`** (root) — wrapper, llama a `updateSession`.
+3. **`proxy.ts`** (root) — wrapper de Next.js 16, llama a `updateSession`.
 4. **`app/api/pollas/route.ts`** — ejemplo concreto donde se manifiesta
    el bug (commit comments lo documentan).
 5. **`lib/supabase/admin.ts`** — el workaround (service-role).
@@ -246,7 +246,7 @@ Para cada call site:
 Cuando termines el fix:
 
 ```bash
-npm test                # 41 tests deben seguir pasando
+npm test                # 111 tests deben seguir pasando
 npm run typecheck       # 0 errores
 npm run lint            # solo warnings preexistentes de img tags
 ```
@@ -392,4 +392,3 @@ Los archivos en estos paths NO se tocan (admin legítimo):
 ### Tag de rollback
 
 `pre-auth-uid-fix` (creado antes del fix).
-

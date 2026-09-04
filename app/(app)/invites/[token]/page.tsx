@@ -7,9 +7,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export default async function AcceptInvitePage({
   params,
 }: {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -25,7 +25,7 @@ export default async function AcceptInvitePage({
   const { data: invite, error: inviteError } = await admin
     .from("polla_invites")
     .select("id, polla_id, status, expires_at")
-    .eq("token", params.token)
+    .eq("token", (await params).token)
     .single();
 
   if (inviteError || !invite) {

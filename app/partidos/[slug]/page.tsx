@@ -21,7 +21,7 @@ import { TeamMark } from "@/components/match/TeamMark";
 export const revalidate = 600;
 
 interface PageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 interface MatchRow {
@@ -80,9 +80,9 @@ async function fetchMatch(slug: string): Promise<MatchRow | null> {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const m = await fetchMatch(params.slug);
+  const m = await fetchMatch((await params).slug);
   if (!m) return { robots: { index: false, follow: false } };
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
   const seoT = findByInternalSlug(m.tournament);
   const tournamentName = seoT
@@ -101,15 +101,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description = isEs
     ? `${m.home_team} contra ${m.away_team} el ${dateLabel}${m.venue ? ` en ${m.venue}` : ""}. Consulta la hora. Si la casa publica una polla, paga la entrada y pronostica el marcador.`
     : `${m.home_team} vs ${m.away_team} on ${dateLabel}${m.venue ? ` at ${m.venue}` : ""}. Check the kickoff time. If the house publishes a pool, pay the entry fee and predict the score.`;
-  const canonical = pathForLocale(site.locale, "partido", params.slug);
+  const canonical = pathForLocale(site.locale, "partido", (await params).slug);
   return {
     title,
     description,
     alternates: {
       canonical,
       languages: {
-        "es-CO": `${SITES.ES.origin}${pathForLocale("es", "partido", params.slug)}`,
-        en: `${SITES.EN.origin}${pathForLocale("en", "partido", params.slug)}`,
+        "es-CO": `${SITES.ES.origin}${pathForLocale("es", "partido", (await params).slug)}`,
+        en: `${SITES.EN.origin}${pathForLocale("en", "partido", (await params).slug)}`,
       },
     },
     openGraph: { title, description, url: canonical, type: "website" },
@@ -117,10 +117,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function PartidoPage({ params }: PageProps) {
-  const m = await fetchMatch(params.slug);
+  const m = await fetchMatch((await params).slug);
   if (!m) notFound();
 
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
   const seoT = findByInternalSlug(m.tournament);
   const tournamentName = seoT

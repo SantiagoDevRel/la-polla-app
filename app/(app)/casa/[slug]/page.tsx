@@ -40,14 +40,14 @@ export const dynamic = "force-dynamic";
 export default async function PollaPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const polla = await getPollaBySlug(params.slug);
+  const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador") notFound();
 
   // ── Visitante sin sesión ────────────────────────────────────────────────
@@ -64,7 +64,7 @@ export default async function PollaPage({
   if (!user) {
     const potPublico = await getPot(polla.id);
     return (
-      <PollaPublica polla={polla} pot={potPublico} slug={params.slug} />
+      <PollaPublica polla={polla} pot={potPublico} slug={(await params).slug} />
     );
   }
 
