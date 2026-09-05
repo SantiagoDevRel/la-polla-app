@@ -1,2 +1,3 @@
-# Secretos de build — el build los toma de Vercel env, no de archivos subidos
-.env.sentry-build-plugin
+# Secretos locales: los builds toman sus variables del proyecto en Vercel.
+.env
+.env.*

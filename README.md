@@ -251,7 +251,6 @@ Guía completa: [docs/backup-restore.md](docs/backup-restore.md).
 
 - **`auth.uid()` raíz** — el JWT de SSR no llega al PostgREST → `auth.uid()` devuelve NULL. El workaround: 46 archivos usan `createAdminClient()` con filtros `.eq("user_id", user.id)` manuales. Ver `docs/auth-uid-handoff.md`.
 - Optional: husky pre-commit hook + GitHub Actions CI cuando entren colaboradores.
-- Optional: error reporting (Sentry/Axiom) cuando el volumen lo justifique.
 
 ---
 

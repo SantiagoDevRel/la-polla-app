@@ -535,7 +535,7 @@
   },
   "Privacy": {
     "title": "Política de Privacidad",
-    "subtitle": "Última actualización: junio 2026",
+    "subtitle": "Última actualización: septiembre 2026",
     "section1Title": "1. Información que recopilamos",
     "section1Body": "Recopilamos la siguiente información cuando usas la app: tu nombre de perfil, número de WhatsApp, tus pronósticos de partidos y los resultados de tus predicciones (puntos, posición en la tabla). Cuando entras a una polla paga, también guardamos el comprobante de pago que subes (la captura de tu transferencia) y el monto de la inscripción, únicamente para que el administrador pueda verificar el pago. Ese comprobante lo ve solo el administrador, se guarda en almacenamiento privado y no se comparte con nadie más. No recopilamos datos de ubicación, contactos, ni números de tarjeta o credenciales bancarias: la app no procesa pagos y nunca te pide esos datos.",
     "section2Title": "2. Cómo usamos tu información",
@@ -543,7 +543,7 @@
     "section3Title": "3. Cómo compartimos tu información",
     "section3Body": "No vendemos tus datos ni los entregamos a terceros con fines comerciales. Para operar y mejorar la app usamos proveedores de servicio que actúan como encargados del tratamiento, procesando datos en nuestro nombre y bajo nuestras instrucciones (ver sección 4). La única información visible para otros usuarios es tu nombre y puntuación dentro de las pollas en las que participas; tu número de WhatsApp no es visible para otros participantes.",
     "section4Title": "4. Proveedores y herramientas de terceros",
-    "section4Body": "Usamos herramientas de terceros que actúan como encargados del tratamiento y procesan datos en servidores ubicados en Estados Unidos: (a) PostHog — analítica de producto: registra de forma seudonimizada las páginas que visitas y tus interacciones (clics) para entender el uso y mejorar la experiencia; no le enviamos tu número de WhatsApp y los valores que escribes en los formularios no se capturan. (b) Sentry — monitoreo de errores: registra fallos técnicos para poder corregirlos; depuramos teléfonos, correos y datos sensibles antes de enviarlos. No usamos grabación de sesiones (session replay) ni vendemos esta información.",
+    "section4Body": "Usamos PostHog como encargado del tratamiento para analítica de producto en servidores ubicados en Estados Unidos. Registra de forma seudonimizada las páginas que visitas y tus interacciones (clics) para entender el uso y mejorar la experiencia; no le enviamos tu número de WhatsApp y los valores que escribes en los formularios no se capturan. No usamos grabación de sesiones (session replay) ni vendemos esta información.",
     "section5Title": "5. Eliminación de datos",
     "section5BodyBefore": "Si deseas eliminar tu cuenta y todos tus datos, escríbenos a ",
     "section5BodyAfter": " y procesaremos tu solicitud en un plazo máximo de 30 días.",

@@ -1,21 +1,14 @@
 "use client";
 
 // app/global-error.tsx — Fallback de último recurso cuando un error rompe el
-// render del root layout. Reporta a Sentry y muestra una pantalla mínima.
-import * as Sentry from "@sentry/nextjs";
-import { useEffect } from "react";
+// render del root layout.
 
 export default function GlobalError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
-
   return (
     <html lang="es">
       <body
@@ -39,8 +32,8 @@ export default function GlobalError({
           Algo salió mal
         </h1>
         <p style={{ color: "#AEB7C7", maxWidth: "360px", margin: 0 }}>
-          Tuvimos un problema cargando la app. Ya quedó registrado y lo estamos
-          revisando.
+          Tuvimos un problema cargando la app. Intenta nuevamente en unos
+          segundos.
         </p>
         <button
           onClick={() => reset()}

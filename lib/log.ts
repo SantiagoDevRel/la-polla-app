@@ -1,6 +1,6 @@
 // lib/log.ts — PII redaction helpers for server-side logs.
 //
-// We don't ship Sentry/Axiom on the free tier; runtime logs land in Vercel
+// We don't ship an external error-reporting service; runtime logs land in Vercel
 // where anyone with team access can grep them. To not leak phone numbers,
 // user IDs, and message bodies into that surface, every log line touching
 // those fields runs through one of the helpers here. Redaction keeps just

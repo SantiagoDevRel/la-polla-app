@@ -5,24 +5,17 @@
 // Por qué existe: sin un error.tsx de segmento, un error de render en
 // cualquier página de (app) (p.ej. /inicio) burbujea hasta las internals del
 // App Router de Next y revienta con "Cannot read parallelRoutes of null" →
-// pantalla blanca. Este boundary lo atrapa, reporta a Sentry y muestra una UI
-// branded con un botón para reintentar el segmento sin recargar toda la app.
+// pantalla blanca. Este boundary lo atrapa y muestra una UI branded con un
+// botón para reintentar el segmento sin recargar toda la app.
 // (global-error.tsx solo cubre errores del root layout, no de las páginas.)
-import * as Sentry from "@sentry/nextjs";
-import { useEffect } from "react";
 import { RotateCw } from "lucide-react";
 
 export default function AppError({
-  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
-
   return (
     <main className="min-h-[60vh] px-6 flex flex-col items-center justify-center text-center gap-4">
       <div className="w-16 h-16 rounded-full bg-bg-elevated border border-border-subtle flex items-center justify-center">
@@ -32,8 +25,7 @@ export default function AppError({
         Se nos enredó la cancha
       </h1>
       <p className="font-body text-[14px] text-text-secondary max-w-[320px] leading-snug">
-        Tuvimos un problema cargando esta pantalla. Ya quedó registrado y lo
-        estamos revisando. Probá de nuevo.
+        Tuvimos un problema cargando esta pantalla. Intenta de nuevo.
       </p>
       <button
         type="button"
