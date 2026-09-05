@@ -32,9 +32,9 @@ const BodySchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -60,7 +60,7 @@ export async function PATCH(
   const { data: polla } = await admin
     .from("pollas")
     .select("id")
-    .eq("slug", params.slug)
+    .eq("slug", (await params).slug)
     .maybeSingle();
   if (!polla) {
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });

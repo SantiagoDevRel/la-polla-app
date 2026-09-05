@@ -204,7 +204,7 @@ export function AvisosList({ initialItems, initialUnread }: AvisosListProps) {
           <button
             type="button"
             onClick={markAll}
-            className="flex items-center gap-1 font-body text-[11px] font-semibold tracking-[0.06em] uppercase text-text-primary hover:text-gold transition-colors"
+            className="flex min-h-11 items-center gap-1 rounded-full px-2 font-body text-[11px] font-semibold uppercase tracking-[0.06em] text-text-primary transition-colors hover:bg-bg-elevated/70 hover:text-gold"
           >
             <Check className="w-3.5 h-3.5" strokeWidth={2.5} aria-hidden="true" />
             {t("markAll")}

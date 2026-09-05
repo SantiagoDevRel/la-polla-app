@@ -31,7 +31,7 @@
 // Config en Supabase: Auth → Hooks → Send SMS Hook → HTTP →
 //   https://lapollacolombiana.com/api/auth/sms-hook
 // ⚠️ El host tiene que ser el que NO redirige. Supabase no sigue un 308 y el
-// SMS no saldría. www ya redirige a apex en middleware.ts; apuntar al apex.
+// SMS no saldría. www ya redirige a apex en proxy.ts; apuntar al apex.
 
 import { NextResponse } from "next/server";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";

@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 
 async function getNavContext(): Promise<{ isAdmin: boolean; pollasPending: number }> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { isAdmin: false, pollasPending: 0 };
 
@@ -102,7 +102,7 @@ async function contarPendientes(
 
 async function getDisplayName(): Promise<string | null | undefined> {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

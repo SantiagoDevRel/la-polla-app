@@ -11,12 +11,12 @@ export const contentType = "image/png";
 export const alt = "Polla por torneo";
 
 interface Props {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export default async function Image({ params }: Props) {
-  const t = findByPublicSlug(params.slug);
-  const site = getSiteFromHeaders();
+  const t = findByPublicSlug((await params).slug);
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
 
   return new ImageResponse(

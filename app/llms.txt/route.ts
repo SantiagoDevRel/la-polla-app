@@ -11,8 +11,8 @@ import { TOURNAMENTS_SEO } from "@/lib/seo/tournaments";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  const site = getSiteFromHeaders();
+export async function GET() {
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
 
   const tournamentLines = TOURNAMENTS_SEO.map(

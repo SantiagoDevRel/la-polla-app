@@ -14,9 +14,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -29,7 +29,7 @@ export async function POST(
   const { data: polla, error: pollaErr } = await admin
     .from("pollas")
     .select("id, slug")
-    .eq("slug", params.slug)
+    .eq("slug", (await params).slug)
     .maybeSingle();
   if (pollaErr) throw pollaErr;
   if (!polla) {

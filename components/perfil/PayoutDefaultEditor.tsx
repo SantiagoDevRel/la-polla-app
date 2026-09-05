@@ -176,7 +176,7 @@ export default function PayoutDefaultEditor({
           type="button"
           onClick={startEdit}
           aria-label={t("editorAriaEdit")}
-          className="flex-shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-border-subtle hover:border-gold/50 hover:bg-gold/5 transition-colors"
+          className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-border-subtle transition-colors hover:border-gold/50 hover:bg-gold/5"
         >
           <Pencil className="w-4 h-4 text-text-secondary" />
         </button>
@@ -197,7 +197,7 @@ export default function PayoutDefaultEditor({
             key={m.id}
             type="button"
             onClick={() => setMethod(m.id)}
-            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+            className={`min-h-11 rounded-full border px-3 py-1.5 text-xs transition-colors ${
               method === m.id
                 ? "bg-gold text-bg-base border-gold"
                 : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
@@ -223,7 +223,7 @@ export default function PayoutDefaultEditor({
               key={accType}
               type="button"
               onClick={() => setAccountType(accType)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+              className={`min-h-11 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                 accountType === accType
                   ? "bg-gold text-bg-base border-gold"
                   : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
@@ -250,7 +250,7 @@ export default function PayoutDefaultEditor({
           type="button"
           onClick={save}
           disabled={!canSave}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gold text-bg-base font-semibold text-sm hover:brightness-110 transition-all disabled:opacity-50"
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-gold px-3 py-2 text-sm font-semibold text-bg-base transition-all hover:brightness-110 disabled:opacity-50"
         >
           {saving ? t("savingShort") : (<><Check className="w-4 h-4" /> {t("saveShort")}</>)}
         </button>
@@ -263,7 +263,7 @@ export default function PayoutDefaultEditor({
               setAccountName(initialAccountName ?? "");
               setMode("view");
             }}
-            className="px-3 py-2 rounded-xl border border-border-subtle text-text-secondary text-sm hover:border-text-secondary/40 transition-colors"
+            className="min-h-11 rounded-xl border border-border-subtle px-3 py-2 text-sm text-text-secondary transition-colors hover:border-text-secondary/40"
           >
             {tCommon("cancel")}
           </button>
@@ -272,7 +272,7 @@ export default function PayoutDefaultEditor({
           <button
             type="button"
             onClick={clearAccount}
-            className="px-3 py-2 rounded-xl border border-border-subtle text-text-muted text-sm hover:border-red-alert/40 hover:text-red-alert transition-colors"
+            className="min-h-11 rounded-xl border border-border-subtle px-3 py-2 text-sm text-text-muted transition-colors hover:border-red-alert/40 hover:text-red-alert"
           >
             {t("delete")}
           </button>

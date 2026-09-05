@@ -13,25 +13,25 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ member: false, slug: params.slug });
+    return NextResponse.json({ member: false, slug: (await params).slug });
   }
 
   const admin = createAdminClient();
   const { data: polla } = await admin
     .from("pollas")
     .select("id")
-    .eq("slug", params.slug)
+    .eq("slug", (await params).slug)
     .maybeSingle();
   if (!polla) {
-    return NextResponse.json({ member: false, slug: params.slug });
+    return NextResponse.json({ member: false, slug: (await params).slug });
   }
 
   const { data: existing } = await admin
@@ -41,5 +41,5 @@ export async function GET(
     .eq("user_id", user.id)
     .maybeSingle();
 
-  return NextResponse.json({ member: !!existing, slug: params.slug });
+  return NextResponse.json({ member: !!existing, slug: (await params).slug });
 }

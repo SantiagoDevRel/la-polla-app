@@ -39,10 +39,10 @@ function dayLabel(isoDate: string): string {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -55,7 +55,7 @@ export async function GET(
     const { data: polla, error: pollaError } = await admin
       .from("pollas")
       .select(POLLA_COLUMNS)
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
     if (pollaError || !polla) {
       return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });

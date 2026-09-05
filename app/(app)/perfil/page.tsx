@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useTranslations } from "next-intl";
+import { X } from "lucide-react";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
@@ -17,6 +18,7 @@ import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 import FontScalePicker from "@/components/perfil/FontScalePicker";
 import LanguageToggle from "@/components/perfil/LanguageToggle";
 import PayoutDefaultEditor, { type PayoutMethod, type PayoutAccountType } from "@/components/perfil/PayoutDefaultEditor";
+import { formatPhone } from "@/lib/format-phone";
 
 interface UserProfile {
   display_name: string;
@@ -37,6 +39,7 @@ interface ActivityItem {
 
 export default function PerfilPage() {
   const t = useTranslations("Perfil");
+  const tCommon = useTranslations("Common");
   const isIOSApp = useIsIOSApp();
   const router = useRouter();
   const { showToast } = useToast();
@@ -63,8 +66,6 @@ export default function PerfilPage() {
         const { data } = await axios.get("/api/users/me");
 
         if (data.profile) {
-          // eslint-disable-next-line no-console
-          console.log("[perfil] /api/users/me profile payload:", data.profile);
           setProfile(data.profile);
           setEditName(data.profile.display_name);
         }
@@ -248,18 +249,24 @@ export default function PerfilPage() {
           {isEditing ? (
             <div className="flex items-center gap-2 w-full max-w-xs">
               <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus
-                className="flex-1 px-3 py-2 rounded-lg text-center outline-none text-text-primary bg-bg-elevated border border-border-medium focus:border-gold" />
+                className="min-h-11 flex-1 rounded-lg border border-border-medium bg-bg-elevated px-3 py-2 text-center text-text-primary outline-none focus:border-gold" />
               <button onClick={handleSaveName} disabled={saving}
-                className="bg-gold text-bg-base font-semibold px-4 py-2 rounded-lg text-sm">
+                className="min-h-11 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg-base">
                 {saving ? "..." : "OK"}
               </button>
-              <button onClick={() => { setIsEditing(false); setEditName(profile.display_name); }}
-                className="text-text-muted text-sm">✕</button>
+              <button
+                type="button"
+                aria-label={tCommon("cancel")}
+                onClick={() => { setIsEditing(false); setEditName(profile.display_name); }}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-sm text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-primary"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
             </div>
           ) : (
             <button
               onClick={() => setIsEditing(true)}
-              className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-bg-elevated/50 transition-colors text-text-primary"
+              className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-1 text-text-primary transition-colors hover:bg-bg-elevated/50"
             >
               <span className="text-lg font-bold">{profile.display_name}</span>
               <span className="text-[10px] uppercase tracking-wider text-text-muted font-medium">{t("edit")}</span>
@@ -269,7 +276,7 @@ export default function PerfilPage() {
             <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="5" y="2" width="14" height="20" rx="2" /><circle cx="12" cy="17" r="1" />
             </svg>
-            {profile.whatsapp_number}
+            {formatPhone(profile.whatsapp_number)}
           </p>
         </div>
 
@@ -363,7 +370,7 @@ export default function PerfilPage() {
             inalcanzable, que en la práctica es lo mismo que perderlo. */}
         <Link
           href="/pollas"
-          className="w-full flex items-center justify-center py-3 font-medium text-text-secondary border border-border-default hover:border-gold hover:text-gold transition-colors"
+          className="flex min-h-11 w-full items-center justify-center rounded-xl border border-border-default py-3 font-medium text-text-secondary transition-colors hover:border-gold hover:text-gold"
         >
           {t("oldPollas")}
         </Link>
@@ -377,7 +384,7 @@ export default function PerfilPage() {
         {/* Eliminar cuenta — Apple 5.1.1(v). Borrado self-service in-app. */}
         <button
           onClick={() => setShowDeleteConfirm(true)}
-          className="w-full py-2.5 text-sm font-medium text-text-muted hover:text-red-alert transition-colors"
+          className="min-h-11 w-full py-2.5 text-sm font-medium text-text-muted transition-colors hover:text-red-alert"
         >
           {t("deleteAccount")}
         </button>

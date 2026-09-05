@@ -1,6 +1,8 @@
 // components/pollito/PollitoMoment.tsx — Tribuna Caliente §5
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- pollitos are already exported at their rendered sizes */
+
 import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "vaul";
 import { X } from "lucide-react";
@@ -95,7 +97,6 @@ function PollitoImg({
     );
   }
 
-  // eslint-disable-next-line @next/next/no-img-element
   return (
     <img
       src={src}

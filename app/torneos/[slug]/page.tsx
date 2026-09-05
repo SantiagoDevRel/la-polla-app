@@ -9,6 +9,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { getSiteFromHeaders, pathForLocale, SITES } from "@/lib/seo/sites";
 import { TOURNAMENTS_SEO, findByPublicSlug } from "@/lib/seo/tournaments";
 import { buildMatchSlug } from "@/lib/seo/match-slug";
@@ -18,7 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const revalidate = 1800;
 
 interface PageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export function generateStaticParams() {
@@ -26,9 +27,9 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const t = findByPublicSlug(params.slug);
+  const t = findByPublicSlug((await params).slug);
   if (!t) return {};
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const title = t.heading[site.locale];
   const description = t.description[site.locale];
   const canonical = pathForLocale(site.locale, "torneo", t.publicSlug);
@@ -81,15 +82,21 @@ async function fetchUpcoming(internalSlug: string): Promise<UpcomingMatchRow[]> 
 }
 
 export default async function TorneoPage({ params }: PageProps) {
-  const t = findByPublicSlug(params.slug);
+  const t = findByPublicSlug((await params).slug);
   if (!t) notFound();
 
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
   const upcoming = await fetchUpcoming(t.internalSlug);
   const structure = TOURNAMENT_STRUCTURE[t.internalSlug];
+  const phaseGridColumns = !structure || structure.phases.length <= 2
+    ? "sm:grid-cols-2"
+    : structure.phases.length === 4 || structure.phases.length === 7 || structure.phases.length % 4 === 0
+      ? "sm:grid-cols-4"
+      : "sm:grid-cols-3";
 
   const dateFmt = new Intl.DateTimeFormat(isEs ? "es-CO" : "en-US", {
+    timeZone: "America/Bogota",
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -125,7 +132,7 @@ export default async function TorneoPage({ params }: PageProps) {
   };
 
   return (
-    <main className="min-h-screen bg-[#0d0d0d] text-white px-5 py-10">
+    <main className="min-h-screen bg-bg-base px-4 py-10 text-text-primary sm:px-6">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
@@ -138,37 +145,42 @@ export default async function TorneoPage({ params }: PageProps) {
       )}
 
       <div className="max-w-[720px] mx-auto">
-        <p className="text-xs tracking-[0.2em] uppercase text-[#FCD116] mb-3">
-          <Link href={pathForLocale(site.locale, "torneos-index")} className="hover:underline">
-            {isEs ? "← Todos los torneos" : "← All tournaments"}
+        <p className="mb-3">
+          <Link
+            href={pathForLocale(site.locale, "torneos-index")}
+            className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-gold transition-opacity hover:opacity-80"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            {isEs ? "Todos los torneos" : "All tournaments"}
           </Link>
         </p>
-        <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-3">
+        <h1 className="lp-display mb-3 text-[42px] leading-none tracking-[0.03em] md:text-[54px]">
           {t.heading[site.locale]}
         </h1>
-        <p className="text-white/70 mb-8 text-lg">{t.description[site.locale]}</p>
+        <p className="mb-8 text-lg leading-relaxed text-text-secondary">{t.description[site.locale]}</p>
 
         <Link
           href="/login?returnTo=%2Fcasa"
-          className="inline-block bg-[#FCD116] text-black font-semibold px-6 py-3 rounded-full mb-10"
+          className="mb-10 inline-flex min-h-11 items-center justify-center rounded-full bg-gold px-6 font-semibold text-bg-base transition-all hover:brightness-110"
         >
-          {isEs ? `Ingresar para participar en ${t.name.es} →` : `Sign in to enter a ${t.name.en} pool →`}
+          {isEs ? `Ingresar para participar en ${t.name.es}` : `Sign in to enter a ${t.name.en} pool`}
+          <ChevronRight className="ml-1 h-4 w-4" aria-hidden="true" />
         </Link>
 
         {structure && structure.phases.length > 0 && (
           <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">
+            <h2 className="lp-display mb-4 text-[28px] tracking-[0.04em]">
               {isEs ? "Fases del torneo" : "Tournament phases"}
             </h2>
-            <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <ul className={`grid grid-cols-1 gap-2 ${phaseGridColumns}`}>
               {structure.phases.map((p) => (
                 <li
                   key={p.phase}
-                  className="rounded-lg border border-white/10 bg-white/[0.03] p-3"
+                  className="lp-card p-3"
                 >
                   <p className="font-medium">{p.label}</p>
                   {p.estimatedDate && (
-                    <p className="text-white/50 text-xs">
+                    <p className="mt-1 text-xs text-text-muted">
                       {isEs ? "Desde" : "From"} {p.estimatedDate}
                     </p>
                   )}
@@ -180,7 +192,7 @@ export default async function TorneoPage({ params }: PageProps) {
 
         {upcoming.length > 0 && (
           <section className="mb-10">
-            <h2 className="text-2xl font-bold mb-4">
+            <h2 className="lp-display mb-4 text-[28px] tracking-[0.04em]">
               {isEs ? "Próximos partidos" : "Upcoming matches"}
             </h2>
             <ul className="space-y-2">
@@ -195,18 +207,18 @@ export default async function TorneoPage({ params }: PageProps) {
                   <li key={m.id}>
                     <Link
                       href={pathForLocale(site.locale, "partido", slug)}
-                      className="flex justify-between items-center rounded-lg border border-white/10 hover:border-[#FCD116] transition p-3 bg-white/[0.03]"
+                      className="group lp-card flex min-h-[72px] items-center justify-between gap-3 p-3 transition-all hover:border-gold/30"
                     >
                       <div>
-                        <p className="font-medium">
-                          {m.home_team} <span className="text-white/40">vs</span> {m.away_team}
+                        <p className="font-medium text-text-primary">
+                          {m.home_team} <span className="text-text-secondary">vs</span> {m.away_team}
                         </p>
-                        <p className="text-white/50 text-xs">
+                        <p className="mt-1 text-xs text-text-secondary">
                           {dateFmt.format(new Date(m.scheduled_at))}
                           {m.venue ? ` · ${m.venue}` : ""}
                         </p>
                       </div>
-                      <span className="text-[#FCD116] text-sm">→</span>
+                      <ChevronRight className="h-5 w-5 shrink-0 text-text-muted transition-colors group-hover:text-gold" aria-hidden="true" />
                     </Link>
                   </li>
                 );
@@ -215,11 +227,11 @@ export default async function TorneoPage({ params }: PageProps) {
           </section>
         )}
 
-        <section className="rounded-xl bg-[#FCD116] text-black p-6 text-center">
-          <h2 className="font-bold text-xl mb-2">
+        <section className="lp-card-hero p-6 text-center">
+          <h2 className="text-xl font-bold text-text-primary">
             {isEs ? `Cómo participar en ${t.name.es}` : `How to enter a ${t.name.en} pool`}
           </h2>
-          <ol className="text-left max-w-md mx-auto mb-4 list-decimal list-inside text-sm space-y-1">
+          <ol className="mx-auto mt-3 max-w-md list-inside list-decimal space-y-1 text-left text-sm text-text-secondary">
             <li>{isEs ? "Entra con tu número de celular." : "Sign in with your phone number."}</li>
             <li>{isEs ? "Elige una polla publicada por la casa." : "Choose a pool published by the house."}</li>
             <li>{isEs ? "Paga la entrada." : "Pay the entry fee."}</li>
@@ -228,7 +240,7 @@ export default async function TorneoPage({ params }: PageProps) {
           </ol>
           <Link
             href="/login?returnTo=%2Fcasa"
-            className="inline-block bg-black text-white font-semibold px-6 py-3 rounded-full"
+            className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-gold px-6 font-semibold text-bg-base transition-all hover:brightness-110"
           >
             {isEs ? "Ingresar para participar" : "Sign in to enter"}
           </Link>

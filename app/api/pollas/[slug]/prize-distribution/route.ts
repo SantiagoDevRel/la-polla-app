@@ -107,9 +107,9 @@ async function resolveAdminPolla(slug: string, userId: string) {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -119,7 +119,7 @@ export async function PATCH(
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  const ctx = await resolveAdminPolla(params.slug, user.id);
+  const ctx = await resolveAdminPolla((await params).slug, user.id);
   if ("error" in ctx) return ctx.error;
 
   const { error: updateErr } = await ctx.admin
@@ -134,13 +134,13 @@ export async function PATCH(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const ctx = await resolveAdminPolla(params.slug, user.id);
+  const ctx = await resolveAdminPolla((await params).slug, user.id);
   if ("error" in ctx) return ctx.error;
 
   const { error: updateErr } = await ctx.admin

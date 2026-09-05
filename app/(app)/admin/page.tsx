@@ -16,7 +16,6 @@
 //   · components/admin/KnockoutModeCard        — modo de 120 minutos (mig. 077)
 //   · components/admin/EngagementCard          — actividad de pollas P2P
 //   · components/admin/WebAnalyticsCard        — PostHog
-//   · components/admin/SentryHealthCard        — Sentry
 //   · components/admin/PayoutsByPolla          — pagos de las pollas viejas
 //   · components/admin/UserDetailModal         — ficha de usuario
 // Y con ellos los bloques de Twilio (costo y top números), plantillas de

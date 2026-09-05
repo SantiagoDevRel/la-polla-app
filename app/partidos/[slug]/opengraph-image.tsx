@@ -16,7 +16,7 @@ export const contentType = "image/png";
 export const alt = "Match preview";
 
 interface Props {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 interface Row {
@@ -63,8 +63,8 @@ async function fetchMatch(slug: string): Promise<Row | null> {
 }
 
 export default async function Image({ params }: Props) {
-  const m = await fetchMatch(params.slug);
-  const site = getSiteFromHeaders();
+  const m = await fetchMatch((await params).slug);
+  const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
   const seoT = m ? findByInternalSlug(m.tournament) : null;
   const tournamentLabel = seoT ? seoT.name[site.locale] : "";

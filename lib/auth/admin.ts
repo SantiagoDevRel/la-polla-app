@@ -10,7 +10,7 @@ import type { UserWithAdmin } from "@/lib/types/user"
  * Returns null if unauthenticated.
  */
 export async function getAuthenticatedUser(): Promise<UserWithAdmin | null> {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
     error,

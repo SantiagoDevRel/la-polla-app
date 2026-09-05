@@ -36,10 +36,10 @@ export default function LogoHaloPreview() {
   // Para otros colores damos el inline-style (Tailwind no permite
   // arbitrary RGBA con presets fijos sin custom config).
   const bgClass =
-    bgColor === "white" ? `bg-white/${bgOpacity}` : `bg-[${bgRgba}]`;
+    bgColor === "white" ? `bg-text-primary/${bgOpacity}` : `bg-[${bgRgba}]`;
   const ringClass =
     ringColor === "white"
-      ? `ring-1 ring-white/${ringOpacity}`
+      ? `ring-1 ring-text-primary/${ringOpacity}`
       : `ring-1 ring-[${ringRgba}]`;
   const cssSnippet = `${bgClass} ${ringClass}`;
 

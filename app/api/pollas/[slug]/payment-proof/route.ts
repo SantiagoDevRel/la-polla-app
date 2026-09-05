@@ -56,7 +56,7 @@ const TESTER_USER_IDS = new Set<string>(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   // ── RETIRADO con el pivote a la casa (2026-08-25) ───────────────────────
   // Este endpoint AUTO-APRUEBA pagos: si el modelo de visión dice que el
@@ -78,7 +78,7 @@ export async function POST(
     );
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -94,7 +94,7 @@ export async function POST(
     .select(
       "id, slug, payment_mode, buy_in_amount, admin_payout_method, admin_payout_account, admin_payout_account_name, created_by",
     )
-    .eq("slug", params.slug)
+    .eq("slug", (await params).slug)
     .maybeSingle();
   if (!polla) {
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });

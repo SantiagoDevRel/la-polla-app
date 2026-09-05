@@ -11,9 +11,9 @@ import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -25,7 +25,7 @@ export async function GET(
   const { data: polla } = await admin
     .from("pollas")
     .select("id, created_by")
-    .eq("slug", params.slug)
+    .eq("slug", (await params).slug)
     .maybeSingle();
   if (!polla) {
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });

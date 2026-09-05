@@ -10,7 +10,7 @@
 // approximated with letter-spacing + uppercase. Pollito WebPs are
 // fetched from the same origin as absolute URLs (satori supports this).
 
-import { ImageResponse } from "@vercel/og";
+import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 import { pickCopy, type ShareMoment } from "@/lib/share-card/copy";
 

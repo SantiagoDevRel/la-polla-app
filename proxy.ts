@@ -1,4 +1,4 @@
-// middleware.ts — Resolución de locale por dominio (host-pinned).
+// proxy.ts — Resolución de locale por dominio (host-pinned).
 //
 // Diseño:
 //   - lapollacolombiana.com → siempre 'es'. Punto.
@@ -58,7 +58,7 @@ function resolveLocale(request: NextRequest, host: string): Locale {
   return "es";
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const host = (request.headers.get("host") ?? "").toLowerCase();
 
   // www → apex, 308 permanente. Las cookies de Supabase son host-only
@@ -137,7 +137,7 @@ export const config = {
      *   css/js/maps, ico, html
      *
      * IMPORTANTE: sitemap.xml, robots.txt, llms.txt NO se excluyen acá
-     * porque el outer middleware setea x-locale en headers, que esos
+     * porque el proxy raíz setea x-locale en headers, que esos
      * route handlers leen en localhost/preview (en prod usan Host).
      * Igualmente son baratos: updateSession() hace early-return para
      * ellos antes de tocar Supabase.

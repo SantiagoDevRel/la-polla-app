@@ -16,10 +16,10 @@ import {
 // Labels are real percentages so the buttons look like the standard
 // "zoom out / 100% / zoom in" trio users expect. Numbers match the
 // multipliers in lib/font-scale.ts.
-const OPTIONS: { value: FontScale; label: string; size: number }[] = [
-  { value: "sm", label: "−30%", size: 13 },
-  { value: "md", label: "100%", size: 13 },
-  { value: "lg", label: "+60%", size: 13 },
+const OPTIONS: { value: FontScale; label: string }[] = [
+  { value: "sm", label: "−30%" },
+  { value: "md", label: "100%" },
+  { value: "lg", label: "+60%" },
 ];
 
 export default function FontScalePicker() {
@@ -40,25 +40,15 @@ export default function FontScalePicker() {
   }
 
   return (
-    <section className="lp-card" style={{ padding: 14 }}>
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 700,
-          color: "#f0f4ff",
-          marginBottom: 10,
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-        }}
-      >
-        <Type className="w-3.5 h-3.5" style={{ color: "#FFD700" }} />
+    <section className="lp-card p-3.5">
+      <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-bold text-text-primary">
+        <Type className="h-3.5 w-3.5 text-text-secondary" aria-hidden="true" />
         {t("fontSizeLabel")}
       </div>
       <div
         role="radiogroup"
         aria-label={t("fontSizeLabel")}
-        style={{ display: "flex", gap: 8 }}
+        className="flex gap-2"
       >
         {OPTIONS.map((opt) => {
           const active = scale === opt.value;
@@ -69,22 +59,11 @@ export default function FontScalePicker() {
               role="radio"
               aria-checked={active}
               onClick={() => pick(opt.value)}
-              className="flex-1 rounded-xl flex items-center justify-center transition-all"
-              style={{
-                background: active
-                  ? "rgba(255,215,0,0.12)"
-                  : "var(--bg-elevated, #131b2b)",
-                border: active
-                  ? "1px solid rgba(255,215,0,0.4)"
-                  : "1px solid rgba(255,255,255,0.08)",
-                color: active ? "#FFD700" : "#F5F7FA",
-                padding: "10px 6px",
-                fontFamily: "'Outfit', sans-serif",
-                fontWeight: active ? 700 : 500,
-                fontSize: opt.size,
-                lineHeight: 1,
-                cursor: "pointer",
-              }}
+              className={`flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-xl border px-2 text-[13px] leading-none transition-all ${
+                active
+                  ? "border-gold/40 bg-gold/10 font-bold text-gold"
+                  : "border-border-subtle bg-bg-elevated font-medium text-text-primary hover:border-gold/30"
+              }`}
             >
               {opt.label}
             </button>

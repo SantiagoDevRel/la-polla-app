@@ -23,10 +23,10 @@ function normalizePhone(phone: string): string {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -50,7 +50,7 @@ export async function POST(
     const { data: polla, error: pollaError } = await admin
       .from("pollas")
       .select("id, name, type, slug")
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
 
     if (pollaError || !polla) {

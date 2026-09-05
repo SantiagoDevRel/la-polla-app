@@ -3,6 +3,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 import Image from "next/image";
@@ -317,7 +318,7 @@ function PollaSelectorWithLeaderboard({
           })}
           {/* "Ver todas" link */}
           {pollas.length > 3 && (
-            <a
+            <Link
               href="/pollas"
               style={{
                 flexShrink: 0,
@@ -338,7 +339,7 @@ function PollaSelectorWithLeaderboard({
               }}
             >
               Ver todas →
-            </a>
+            </Link>
           )}
         </div>
       </div>

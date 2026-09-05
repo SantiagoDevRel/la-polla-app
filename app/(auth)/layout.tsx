@@ -8,19 +8,15 @@
 // the first two surfaces a brand-new visitor lands on. It self-gates
 // via localStorage and renders nothing for returning users.
 //
-// IT IS DYNAMICALLY IMPORTED (ssr: false) so its framer-motion bundle
+// WelcomeIntroLoader owns the client-only dynamic import (`ssr: false`) so
+// this layout can remain a Server Component on Next.js 16. Its motion bundle
 // (~50 kB) only loads in the browser, after the login form has
 // painted. On returning users (sessionStorage gate), the component
 // early-returns, so the chunk download is wasted only on the first
 // visit per session — acceptable trade for shaving ~50 kB off /login
 // First Load JS (was 312 kB, now ~260 kB).
-import dynamic from "next/dynamic";
 import { AppBackground } from "@/components/layout/AppBackground";
-
-const WelcomeIntro = dynamic(
-  () => import("@/components/auth/WelcomeIntro").then((m) => m.WelcomeIntro),
-  { ssr: false },
-);
+import { WelcomeIntroLoader } from "@/components/auth/WelcomeIntroLoader";
 
 export default function AuthLayout({
   children,
@@ -30,8 +26,10 @@ export default function AuthLayout({
   return (
     <>
       <AppBackground />
-      <WelcomeIntro />
-      {children}
+      <WelcomeIntroLoader />
+      <div className="contents" data-auth-content>
+        {children}
+      </div>
     </>
   );
 }

@@ -14,7 +14,7 @@ const HOST_ES = "lapollacolombiana.com";
 const HOST_EN = "chickenpicks.app";
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = await createClient();
   // getUser valida el JWT contra Supabase (no solo lee la cookie),
   // así no emitimos handoff para sesiones revocadas.
   const {

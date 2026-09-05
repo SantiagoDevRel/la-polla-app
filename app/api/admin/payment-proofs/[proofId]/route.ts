@@ -20,9 +20,9 @@ const BodySchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { proofId: string } },
+  { params }: { params: Promise<{ proofId: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -48,7 +48,7 @@ export async function PATCH(
   const { data: proof } = await admin
     .from("payment_proofs")
     .select("id, polla_id, user_id, admin_decision")
-    .eq("id", params.proofId)
+    .eq("id", (await params).proofId)
     .maybeSingle();
   if (!proof) {
     return NextResponse.json({ error: "Proof no encontrado" }, { status: 404 });
@@ -105,9 +105,9 @@ export async function PATCH(
 // (o global admin) puede borrar.
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { proofId: string } },
+  { params }: { params: Promise<{ proofId: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -120,7 +120,7 @@ export async function DELETE(
   const { data: proof } = await admin
     .from("payment_proofs")
     .select("id, polla_id, user_id, storage_path")
-    .eq("id", params.proofId)
+    .eq("id", (await params).proofId)
     .maybeSingle();
   if (!proof) {
     return NextResponse.json({ error: "Proof no encontrado" }, { status: 404 });

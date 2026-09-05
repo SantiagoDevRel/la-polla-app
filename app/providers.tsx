@@ -24,7 +24,7 @@ if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
     capture_pageleave: true,
     // ANALYTICS-ONLY (decisión Santiago 2026-06-13): sin Session Replay ni
     // Surveys. La Polla tiene login por teléfono + reglas duras de Habeas Data,
-    // y replay quema la cuota free. Mismo criterio que Sentry (replay OFF).
+    // y replay quema la cuota free.
     // Si más adelante querés grabar sesiones puntuales, se prende acá con
     // masking. Autocapture (clicks) NO graba valores de inputs por default.
     disable_session_recording: true,

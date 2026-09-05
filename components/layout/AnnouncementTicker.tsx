@@ -74,7 +74,7 @@ export default function AnnouncementTicker({
 
   return (
     <div
-      className="relative flex h-[30px] items-center overflow-hidden border-b border-border-subtle bg-bg-elevated text-text-secondary"
+      className="relative flex h-11 items-center overflow-hidden border-b border-border-subtle bg-bg-elevated text-text-secondary"
       role="status"
       aria-label={msg}
     >
@@ -99,7 +99,7 @@ export default function AnnouncementTicker({
         type="button"
         onClick={dismiss}
         aria-label={t("dismissAria")}
-        className="absolute right-0 top-0 flex h-full w-11 cursor-pointer items-center justify-end bg-gradient-to-l from-bg-elevated via-bg-elevated/90 to-transparent pr-2.5 text-text-muted transition-colors hover:text-text-primary"
+        className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-end bg-gradient-to-l from-bg-elevated via-bg-elevated/90 to-transparent pr-2.5 text-text-muted transition-colors hover:text-text-primary"
       >
         <X className="w-4 h-4" strokeWidth={2.5} aria-hidden="true" />
       </button>

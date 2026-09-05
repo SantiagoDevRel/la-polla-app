@@ -15,7 +15,7 @@ function newToken(): string {
 // específicos de rol decidan si aceptan o rechazan. Los dos helpers de
 // abajo (ensureParticipant y ensureAdmin) comparten este paso base.
 async function loadContext(slug: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "No autorizado", status: 401 as const };
 
@@ -60,9 +60,9 @@ async function ensureAdmin(slug: string) {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
-  const ctx = await ensureParticipant(params.slug);
+  const ctx = await ensureParticipant((await params).slug);
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   let token = ctx.polla.invite_token;
@@ -82,9 +82,9 @@ export async function GET(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
-  const ctx = await ensureAdmin(params.slug);
+  const ctx = await ensureAdmin((await params).slug);
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const token = newToken();

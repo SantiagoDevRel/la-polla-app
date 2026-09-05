@@ -1223,7 +1223,7 @@ export default function PollaSlugPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [slug]);
+  }, [slug, t]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -1453,7 +1453,7 @@ export default function PollaSlugPage() {
       if (missing.length > 0) out.set(m.id, missing);
     }
     return out;
-  }, [matches, predictedUserIdsByMatch, participantInfoById]);
+  }, [matches, predictedUserIdsByMatch, participantInfoById, t]);
 
   // Agrupa los pronósticos de TODOS por match_id (incluido el usuario
   // actual marcado con is_me=true para que pueda verse junto a los demás).
@@ -1620,7 +1620,7 @@ export default function PollaSlugPage() {
                   TOURNAMENT_ICONS[slug] ? (
                     <span
                       key={slug}
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/90 ring-1 ring-white/30"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-text-primary/90 ring-1 ring-text-primary/30"
                     >
                       <Image
                         src={TOURNAMENT_ICONS[slug]!}

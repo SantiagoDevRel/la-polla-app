@@ -152,10 +152,11 @@ Para generar una variante nueva: `sharp(src).resize(N,N).webp({quality:82})`.
   `.lp-money` `.lp-btn` `.lp-tape` `.lp-pct` `.lp-input` `.lp-scrim`
   `.lp-grain` `.lp-accent-rule` `.lp-stencil` `.lp-cifra`.
 
-⚠️ **`npx tsgo` no alcanza.** El target del repo es ES5 y tsgo deja pasar
-cosas que `tsc` (el source of truth) rechaza: `.entries()` sobre un array y
-`[...new Set(x)]` rompen el build de producción aunque tsgo esté verde.
-Corré `npx next build` antes de dar algo por listo.
+⚠️ **`npx tsgo` no alcanza.** El target del repo es ES2017, pero el chequeo
+rápido no valida las restricciones de rutas, el bundling ni la generación
+estática que sí ejecuta Next.js.
+Corré `npm run build` antes de dar algo por listo. El script fuerza webpack
+porque la integración de Serwist todavía depende de ese compilador.
 
 ---
 
@@ -480,7 +481,7 @@ es altísimo. Ante la duda: **preguntá, no toques.**
 
 The repo serves **two domains** from the same Next app:
 `lapollacolombiana.com` (es-CO) and `chickenpicks.app` (en). Locale is
-host-pinned in `middleware.ts`. SEO is host-aware: each domain emits its
+host-pinned in `proxy.ts`. SEO is host-aware: each domain emits its
 own sitemap, robots, llms.txt, OG, JSON-LD, hreflang, and search-engine
 verification tokens.
 
@@ -843,15 +844,15 @@ grep -r "alert(" app/               # Must return nothing (except comments)
 
 ## E2E visual + a11y — Playwright (agregado 2026-08-06)
 
-- `npx playwright test` — 12 tests: screenshots (`toHaveScreenshot`, baselines win32 en
+- `npx playwright test` — 18 tests: screenshots (`toHaveScreenshot`, baselines win32 en
   `e2e/a11y-visual.spec.ts-snapshots/`, SÍ se versionan; no compartir con CI Linux) + axe
   WCAG A/AA (bloquea solo critical/serious, el resto se loguea) sobre `/login` `/privacy`
   `/soporte`, desktop + mobile, dark mode, con el Chrome instalado (channel, no descarga browser).
 - Cambio visual intencional → `npx playwright test --update-snapshots` re-siembra baselines.
-- Usa el dev server de :3001 si ya corre (`reuseExistingServer`); si no, lo bootea (timeout 300s
+- Usa el dev server aislado de :3101 si ya corre (`reuseExistingServer`); si no, lo bootea (timeout 300s
   — el boot frío es lento por los fetch de Google Fonts que timetean).
-- ⚠️ Si una corrida se mata a la mitad, su webServer puede quedar huérfano agarrando :3001 sin
-  responder → corridas siguientes "se cuelgan". Chequear `Get-NetTCPConnection -LocalPort 3001`
+- ⚠️ Si una corrida se mata a la mitad, su webServer puede quedar huérfano agarrando :3101 sin
+  responder → corridas siguientes "se cuelgan". Chequear `Get-NetTCPConnection -LocalPort 3101`
   y matar el `next start-server.js` zombie.
 - El overlay dev de Agentation (`components/dev/AgentationDev.tsx`) se auto-apaga en tests vía
   `window.__DISABLE_AGENTATION__` (sus botones sin label disparaban axe y ensuciaban screenshots).
@@ -1081,47 +1082,6 @@ panel interno. La regla aplica a lo que LEE UN USUARIO.
 ### Security Headers
 - Configured in `next.config.mjs` headers() for all routes
 - CSP, HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, Referrer-Policy, Permissions-Policy
-
----
-
-## Error monitoring · Sentry (added 2026-06-13)
-
-Monitoreo de errores prod (client + server + edge) con `@sentry/nextjs`.
-Plan **free** de Sentry (org `golem-bw`, proyecto `santi-apps` — proyecto
-GENÉRICO compartido por varias apps, separadas por el tag `app`). La Polla
-manda con `initialScope.tags.app = "la-polla"`.
-
-### Archivos
-- `sentry.client.config.ts` — init en browser/WebView Capacitor. (Next 14
-  usa este archivo; en Next 15.3+ migrar a `instrumentation-client.ts`.)
-- `sentry.server.config.ts` / `sentry.edge.config.ts` — runtimes node/edge.
-- `instrumentation.ts` — `register()` importa server/edge config (mergeado
-  con el `ensureDevUser` de dev) + `onRequestError`.
-- `app/global-error.tsx` — captura errores de render del root layout.
-- `lib/sentry-scrub.ts` — **scrubbing de PII** (Habeas Data): borra
-  teléfonos, emails, tokens en query, cookies y headers `Authorization`
-  antes de enviar. Corre como `beforeSend` en los 3 runtimes. Verificado
-  determinísticamente (2026-06-13).
-- `next.config.mjs` — `withSentryConfig` (outermost) + Sentry ingest
-  agregado al CSP `connect-src` (`https://*.ingest.us.sentry.io`) — sin eso
-  el browser bloquea el POST de eventos.
-
-### Reglas / config
-- **`enabled` solo en producción** (`NODE_ENV === "production"`). Local no
-  manda; para probar local: `NEXT_PUBLIC_SENTRY_FORCE=1` (client) /
-  `SENTRY_FORCE=1` (server).
-- **Session Replay APAGADO** + `tracesSampleRate: 0.1` → no quema la cuota
-  free (5k errores/mes). Los errores van al 100%.
-- **`sendDefaultPii: false`** + el scrub de `lib/sentry-scrub.ts`
-  (defense-in-depth). Si agregás captura de contexto de usuario, NUNCA
-  pongas teléfono/email — solo un id opaco.
-
-### Env vars
-- `NEXT_PUBLIC_SENTRY_DSN` — público (viaja al cliente). En `.env` local y
-  en Vercel (Production + Preview).
-- `SENTRY_AUTH_TOKEN` — **secreto**, solo build-time (sube source maps).
-  Vive en `.env.sentry-build-plugin` (gitignored) y debe estar en Vercel.
-  Si falta, el build NO falla: solo no sube source maps.
 
 ---
 
@@ -1646,3 +1606,13 @@ para Android App Links — está en el matcher exclude del middleware).
 ---
 
 *Last updated: 2026-05-04 | To update: say "update UI system" in Claude.ai chat*
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

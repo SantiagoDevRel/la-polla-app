@@ -43,7 +43,7 @@ const BodySchema = z.object({
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   // Auth ANTES de tocar la DB, y con la misma puerta que el resto de /casa/admin.
   const user = await getAuthenticatedUser();
@@ -70,7 +70,7 @@ export async function PATCH(
     const { data, error } = await db
       .from("casa_pollas")
       .update({ status: "abierta" })
-      .eq("id", params.id)
+      .eq("id", (await params).id)
       .eq("status", "borrador")
       .select("id, slug, status")
       .maybeSingle();
@@ -96,7 +96,7 @@ export async function PATCH(
     const { data, error } = await db
       .from("casa_pollas")
       .update({ status: "cerrada" })
-      .eq("id", params.id)
+      .eq("id", (await params).id)
       .eq("status", "abierta")
       .select("id, slug, status")
       .maybeSingle();
@@ -119,7 +119,7 @@ export async function PATCH(
     const { data: polla } = await db
       .from("casa_pollas")
       .select("id, slug, kind, status, drawn_number")
-      .eq("id", params.id)
+      .eq("id", (await params).id)
       .maybeSingle();
 
     if (!polla) {
@@ -223,7 +223,7 @@ export async function PATCH(
   const { data, error } = await db
     .from("casa_pollas")
     .update({ status: "anulada" })
-    .eq("id", params.id)
+    .eq("id", (await params).id)
     .in("status", ["borrador", "abierta"])
     .select("id, slug, status")
     .maybeSingle();

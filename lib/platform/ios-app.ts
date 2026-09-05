@@ -17,8 +17,8 @@ import { headers } from "next/headers";
 const UA_MARKER = "LaPollaIOS";
 const PREVIEW_COOKIE = "lp_ios_preview";
 
-export function isIOSAppRequest(): boolean {
-  const h = headers();
+export async function isIOSAppRequest(): Promise<boolean> {
+  const h = await headers();
   const ua = h.get("user-agent") ?? "";
   if (ua.includes(UA_MARKER)) return true;
   const cookie = h.get("cookie") ?? "";

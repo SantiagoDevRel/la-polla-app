@@ -15,7 +15,7 @@ const FALLBACK_OG_IMAGE = `${APP_URL}/pollitos/logo_realistic.webp`;
 export async function generateMetadata({
   params,
 }: {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 }): Promise<Metadata> {
   const fallbackTitle = "Unite a una polla en La Polla";
   try {
@@ -23,7 +23,7 @@ export async function generateMetadata({
     const { data: polla } = await supabase
       .from("pollas")
       .select("id, name, tournament, buy_in_amount")
-      .eq("invite_token", params.token)
+      .eq("invite_token", (await params).token)
       .maybeSingle();
 
     if (!polla) {

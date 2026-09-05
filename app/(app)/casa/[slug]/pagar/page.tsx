@@ -17,15 +17,15 @@ export const dynamic = "force-dynamic";
 export default async function PagarPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?returnTo=/casa/${params.slug}/pagar`);
+  if (!user) redirect(`/login?returnTo=/casa/${(await params).slug}/pagar`);
 
-  const polla = await getPollaBySlug(params.slug);
+  const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador") notFound();
 
   const [entry, pot] = await Promise.all([

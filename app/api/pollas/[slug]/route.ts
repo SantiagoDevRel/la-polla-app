@@ -13,13 +13,13 @@ import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     // Lazy sync de partidos recientes (fire-and-forget, no bloquea).
     void ensureMatchesFresh();
 
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -36,7 +36,7 @@ export async function GET(
     const { data: polla, error: pollaError } = await adminSupabase
       .from("pollas")
       .select(POLLA_COLUMNS)
-      .eq("slug", params.slug)
+      .eq("slug", (await params).slug)
       .single();
 
     if (pollaError || !polla) {
@@ -262,9 +262,9 @@ export async function GET(
 // future without needing a parallel column rename).
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -277,7 +277,7 @@ export async function DELETE(
   const { data: polla, error: pollaErr } = await admin
     .from("pollas")
     .select("id, name")
-    .eq("slug", params.slug)
+    .eq("slug", (await params).slug)
     .maybeSingle();
   if (pollaErr) {
     console.error("[pollas DELETE] lookup failed:", pollaErr);

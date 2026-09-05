@@ -13,31 +13,24 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SoportePage() {
   const t = await getTranslations("Soporte");
   return (
-    <div
-      style={{
-        background: "#080c10",
-        minHeight: "100vh",
-        color: "#f0f4ff",
-        fontFamily: "'Outfit', sans-serif",
-      }}
-    >
-      <div style={{ maxWidth: 680, margin: "0 auto", padding: "48px 20px" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
+    <main className="min-h-screen bg-bg-base font-body text-text-primary">
+      <div className="mx-auto max-w-[680px] px-[20px] py-[48px]">
+        <h1 className="mb-[4px] text-[24px] font-bold">
           {t("title")}
         </h1>
-        <p style={{ fontSize: 13, color: "#7a8499", marginBottom: 32 }}>
+        <p className="mb-[32px] text-[13px] text-text-muted">
           {t("subtitle")}
         </p>
 
-        <section style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 8, color: "#FFD700" }}>
+        <section className="mb-[28px]">
+          <h2 className="mb-[8px] text-[17px] font-semibold text-gold">
             {t("contactSection")}
           </h2>
-          <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
+          <p className="text-[14px] leading-[1.7] text-text-secondary">
             {t("contactBodyBefore")}
             <a
               href="mailto:santiagotrujillozuluaga@gmail.com"
-              style={{ color: "#FFD700", textDecoration: "underline" }}
+              className="text-gold underline underline-offset-2 transition-colors hover:text-amber"
             >
               santiagotrujillozuluaga@gmail.com
             </a>
@@ -45,32 +38,32 @@ export default async function SoportePage() {
           </p>
         </section>
 
-        <section style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 8, color: "#FFD700" }}>
+        <section className="mb-[28px]">
+          <h2 className="mb-[8px] text-[17px] font-semibold text-gold">
             {t("reportSection")}
           </h2>
-          <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
+          <p className="text-[14px] leading-[1.7] text-text-secondary">
             {t("reportBody")}
           </p>
         </section>
 
-        <section style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 8, color: "#FFD700" }}>
+        <section className="mb-[28px]">
+          <h2 className="mb-[8px] text-[17px] font-semibold text-gold">
             {t("faqSection")}
           </h2>
 
           {[1, 2, 3, 4, 5, 6].map((n) => (
             <div key={n}>
-              <h3 style={{ fontSize: 15, fontWeight: 600, marginTop: 18, marginBottom: 6, color: "#f0f4ff" }}>
+              <h3 className="mb-[6px] mt-[18px] text-[15px] font-semibold text-text-primary">
                 {t(`q${n}`)}
               </h3>
-              <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
+              <p className="text-[14px] leading-[1.7] text-text-secondary">
                 {n === 6 ? (
                   <>
                     {t("a6Before")}
                     <a
                       href="mailto:santiagotrujillozuluaga@gmail.com"
-                      style={{ color: "#FFD700", textDecoration: "underline" }}
+                      className="text-gold underline underline-offset-2 transition-colors hover:text-amber"
                     >
                       santiagotrujillozuluaga@gmail.com
                     </a>
@@ -84,15 +77,15 @@ export default async function SoportePage() {
           ))}
         </section>
 
-        <section style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 8, color: "#FFD700" }}>
+        <section className="mb-[28px]">
+          <h2 className="mb-[8px] text-[17px] font-semibold text-gold">
             {t("privacySection")}
           </h2>
-          <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
+          <p className="text-[14px] leading-[1.7] text-text-secondary">
             {t("privacyBodyBefore")}
             <a
               href="/privacy"
-              style={{ color: "#FFD700", textDecoration: "underline" }}
+              className="text-gold underline underline-offset-2 transition-colors hover:text-amber"
             >
               /privacy
             </a>
@@ -100,6 +93,6 @@ export default async function SoportePage() {
           </p>
         </section>
       </div>
-    </div>
+    </main>
   );
 }

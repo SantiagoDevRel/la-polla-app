@@ -40,7 +40,7 @@ const outfit = Outfit({
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("App");
-  const site = getSiteFromHeaders();
+  const site = await getSiteFromHeaders();
   const title = t("title");
   const description = t("description");
   return {
@@ -120,7 +120,6 @@ export const viewport: Viewport = {
   themeColor: "#FCD116",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default async function RootLayout({
@@ -130,8 +129,8 @@ export default async function RootLayout({
 }>) {
   const locale = await getLocale();
   const messages = await getMessages();
-  const site = getSiteFromHeaders();
-  const isIOSApp = isIOSAppRequest();
+  const site = await getSiteFromHeaders();
+  const isIOSApp = await isIOSAppRequest();
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -152,15 +151,19 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} className={`${bebas.variable} ${outfit.variable}`}>
-      <body className="antialiased lp-concrete">
+      <head>
         <script
+          id="organization-jsonld"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
         />
         <script
+          id="website-jsonld"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
         />
+      </head>
+      <body className="antialiased lp-concrete">
         <PostHogProvider>
           <NextIntlClientProvider locale={locale} messages={messages}>
             <PlatformProvider isIOSApp={isIOSApp}>

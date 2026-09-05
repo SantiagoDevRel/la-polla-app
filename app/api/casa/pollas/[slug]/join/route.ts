@@ -35,10 +35,10 @@ const bodySchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   // ── auth ANTES de tocar la DB ──────────────────────────────────────────
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -46,7 +46,7 @@ export async function POST(
     return NextResponse.json({ error: "Necesitas iniciar sesión." }, { status: 401 });
   }
 
-  const polla = await getPollaBySlug(params.slug);
+  const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador") {
     return NextResponse.json({ error: "Esa polla no existe." }, { status: 404 });
   }
