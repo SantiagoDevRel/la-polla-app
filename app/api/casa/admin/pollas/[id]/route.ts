@@ -38,7 +38,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
-  action: z.enum(["publicar", "cerrar", "repartir", "anular"]),
+  action: z.enum(["publicar", "cerrar", "repartir", "anular", "eliminar"]),
+  confirmName: z.string().trim().max(80).optional(),
 });
 
 export async function PATCH(
@@ -61,7 +62,32 @@ export async function PATCH(
     return NextResponse.json({ error: "Accion invalida." }, { status: 400 });
   }
 
+  const { id } = await params;
+  if (!z.string().uuid().safeParse(id).success) {
+    return NextResponse.json({ error: "Polla inválida." }, { status: 400 });
+  }
+
   const db = createAdminClient();
+
+  if (parsed.data.action === "eliminar") {
+    const { data: polla, error: readError } = await db.from("casa_pollas")
+      .select("id, name, archived_at").eq("id", id).maybeSingle();
+    if (readError) return NextResponse.json({ error: "No se pudo consultar la polla." }, { status: 500 });
+    if (!polla) return NextResponse.json({ error: "No existe esa polla." }, { status: 404 });
+    if (polla.archived_at) return NextResponse.json({ error: "Esta polla ya se eliminó." }, { status: 409 });
+    if (parsed.data.confirmName !== polla.name) {
+      return NextResponse.json({ error: "Escribe el nombre completo de la polla para confirmar." }, { status: 400 });
+    }
+    // Archive every lifecycle state, including settled pools, without changing
+    // the original status or deleting financial and prediction history.
+    const { data, error } = await db.from("casa_pollas")
+      .update({ archived_at: new Date().toISOString(), archived_by: user.id })
+      .eq("id", id).is("archived_at", null)
+      .select("id, slug, archived_at").maybeSingle();
+    if (error) return NextResponse.json({ error: "No se pudo eliminar la polla." }, { status: 500 });
+    if (!data) return NextResponse.json({ error: "Esta polla ya se eliminó." }, { status: 409 });
+    return NextResponse.json({ ok: true, slug: data.slug, archived: true });
+  }
 
   if (parsed.data.action === "publicar") {
     // El `.eq("status","borrador")` no es decorativo: es el guard contra el
@@ -72,6 +98,7 @@ export async function PATCH(
       .update({ status: "abierta" })
       .eq("id", (await params).id)
       .eq("status", "borrador")
+      .is("archived_at", null)
       .select("id, slug, status")
       .maybeSingle();
 
@@ -98,6 +125,7 @@ export async function PATCH(
       .update({ status: "cerrada" })
       .eq("id", (await params).id)
       .eq("status", "abierta")
+      .is("archived_at", null)
       .select("id, slug, status")
       .maybeSingle();
 
@@ -120,6 +148,7 @@ export async function PATCH(
       .from("casa_pollas")
       .select("id, slug, kind, status, drawn_number")
       .eq("id", (await params).id)
+      .is("archived_at", null)
       .maybeSingle();
 
     if (!polla) {
@@ -133,6 +162,18 @@ export async function PATCH(
         { error: "Primero ciérrala. Repartir con la polla abierta dejaría entrar gente después del reparto." },
         { status: 409 },
       );
+    }
+
+    const { count: pendientes, error: pendingError } = await db
+      .from("casa_entries")
+      .select("id", { count: "exact", head: true })
+      .eq("polla_id", polla.id).eq("status", "pendiente")
+      .not("proof_path", "is", null);
+    if (pendingError) {
+      return NextResponse.json({ error: "No se pudieron verificar los pagos pendientes." }, { status: 500 });
+    }
+    if ((pendientes ?? 0) > 0) {
+      return NextResponse.json({ error: "Revisa todos los comprobantes pendientes antes de repartir el pozo." }, { status: 409 });
     }
 
     // Guard de la rifa: sin numero sorteado no hay a quien pagarle.
@@ -202,9 +243,12 @@ export async function PATCH(
       p_polla_id: polla.id,
     });
     if (error) {
+      if (error.code === "55000") {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
       console.error("[casa/admin/pollas] repartir:", error.message);
       return NextResponse.json(
-        { error: `No pude repartir: ${error.message}` },
+        { error: "No se pudo repartir el pozo. Intenta de nuevo." },
         { status: 500 },
       );
     }
@@ -225,6 +269,7 @@ export async function PATCH(
     .update({ status: "anulada" })
     .eq("id", (await params).id)
     .in("status", ["borrador", "abierta"])
+    .is("archived_at", null)
     .select("id, slug, status")
     .maybeSingle();
 

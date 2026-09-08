@@ -711,10 +711,11 @@ Rules:
   + `border-white/[0.12]` + inset highlight arriba. El blur fuerte es lo
   que mantiene legibles los íconos sobre fondos ruidosos — si se baja el
   blur hay que subir la opacidad.
-- SOLO íconos, sin labels visibles (el nombre va en `aria-label`).
-  Bonus: sin labels el nav es inmune al text-zoom de accesibilidad.
+- Íconos con títulos visibles **POLLAS** y **PERFIL** debajo (pedido del
+  dueño, 2026-09-08). Mantener también `aria-label`; conservar los íconos
+  actuales y verificar los títulos con text-zoom de 150% en 320px.
 - Active: ícono gold strokeWidth 2.4 + "lozenge" de vidrio
-  (`w-[52px] h-[40px] bg-white/[0.12]`) que se desliza entre tabs via
+  (`w-[84px] h-[52px] bg-white/[0.12]`) que se desliza entre tabs via
   framer-motion `layoutId="nav-active-lozenge"` (spring stiffness 600,
   damping 38 — respeta useReducedMotion).
 - Inactive: ícono text-muted strokeWidth 2. Tap: `active:scale-90`.

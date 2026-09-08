@@ -5,11 +5,10 @@
 //   - chickenpicks.app → siempre 'en'. Punto.
 //   - Sin auto-redirect por geo. Si el user tipea chickenpicks.app, ve EN
 //     aunque esté en Colombia. Lo opuesto también.
-//   - Sin set-cookie en redirects. La cookie quedó en producción solo
-//     para localhost/preview/Capacitor (donde no hay un dominio "natural"
-//     que dicte el locale).
-//   - El toggle en /perfil es el ÚNICO mecanismo de cambio de locale en
-//     producción: redirige al otro dominio. Cero magia con cookies en prod.
+//   - La Polla, localhost, preview y Capacitor siempre usan español.
+//     Las cookies NEXT_LOCALE anteriores ya no cambian el idioma.
+//   - El perfil no ofrece selector de idioma. El dominio inglés conserva
+//     su configuración independiente, sin redirects por idioma o cookies.
 //
 // Razón: el diseño previo (geo-redirect + set-cookie en chickenpicks.app)
 // envenenaba el dominio EN con una cookie 'es' para visitantes desde CO,
@@ -19,43 +18,12 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 type Locale = "es" | "en";
 
-const HOST_ES = "lapollacolombiana.com";
 const HOST_EN = "chickenpicks.app";
 
-// Países hispanoparlantes — usado solo en non-prod (localhost/preview)
-// como fallback cuando no hay cookie ni Accept-Language.
-const ES_COUNTRIES = new Set([
-  "CO", "MX", "AR", "CL", "PE", "VE", "EC", "GT", "CU", "DO",
-  "BO", "HN", "PY", "SV", "NI", "CR", "PR", "UY", "PA", "ES", "GQ",
-]);
-
-function isLocale(value: string | undefined | null): value is Locale {
-  return value === "es" || value === "en";
-}
-
-function resolveLocale(request: NextRequest, host: string): Locale {
-  // 1. Producción: dominio dicta el locale, sin excepciones. La cookie
-  //    NO override en prod porque el user tipeó la URL — su intención
-  //    está clara.
-  if (host === HOST_EN) return "en";
-  if (host === HOST_ES) return "es";
-
-  // 2. Non-prod (localhost / Vercel preview / Capacitor WebView con host
-  //    no estándar): cookie → geo → Accept-Language → 'en'.
-  const cookie = request.cookies.get("NEXT_LOCALE")?.value;
-  if (isLocale(cookie)) return cookie;
-
-  const country = (request.headers.get("x-vercel-ip-country") ?? "").toUpperCase();
-  if (country && ES_COUNTRIES.has(country)) return "es";
-
-  const accept = request.headers.get("accept-language") ?? "";
-  if (/^\s*es\b/i.test(accept)) return "es";
-
-  // Fallback non-prod: default 'es' (la-polla es nuestro brand primario;
-  // chickenpicks.app es el satélite EN). Sin esto, browsers con
-  // Accept-Language=en (default Chrome en Windows) renderean Chicken Picks
-  // en localhost, lo cual confunde al preview.
-  return "es";
+function resolveLocale(host: string): Locale {
+  // Solo el dominio inglés usa sus traducciones. Las preferencias del
+  // navegador y las cookies antiguas no cambian el español de La Polla.
+  return host === HOST_EN ? "en" : "es";
 }
 
 export async function proxy(request: NextRequest) {
@@ -95,7 +63,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 307); // temporal: es una decisión de producto, no una URL muerta
   }
 
-  const locale = resolveLocale(request, host);
+  const locale = resolveLocale(host);
 
   // Stamp del locale en headers del request para que i18n/request.ts lo
   // lea al render de RSC. Mutamos request.headers in-place — updateSession

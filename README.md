@@ -1,16 +1,70 @@
 # La Polla ⚽🇨🇴
 
-App de pollas (predicciones de fútbol) para el Mundial Colombia 2026 y otras competencias. Crea grupos privados con tus amigos, predice marcadores, y compite en un ranking en tiempo real.
+App de pollas de fútbol. La Casa publica las pollas disponibles; los participantes
+se inscriben con un comprobante de pago, pronostican y compiten en el ranking.
+El modelo histórico de grupos privados permanece disponible.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
-> **Estado: temporada cerrada (julio 2026).** El Mundial 2026 terminó y no
-> hay torneos con partidos por delante, así que no se pueden armar pollas
-> nuevas: la app muestra un banner de cierre y queda de consulta (todas las
-> pollas, tablas y pronósticos siguen visibles). Se reabre agregando un
-> torneo a `CREATABLE_TOURNAMENT_SLUGS` en `lib/tournaments.ts` — ver
-> `lib/closure.ts`. Los datos están respaldados fuera de Supabase; ver
-> [docs/backup-restore.md](docs/backup-restore.md).
+## Directorio de administración
+
+En `/admin`, **Buscar un usuario** abre una lista con nombres y teléfonos.
+Puedes buscar por cualquiera de los dos; al bajar se cargan más usuarios en
+grupos de 50. El botón **Hacer admin** conserva la asignación de acceso global.
+`GET /api/admin/promote?directory=1&page=0` sirve este directorio únicamente
+a administradores autenticados, con respuestas privadas sin caché. La búsqueda
+viaja codificada con `encodeURIComponent` en el header `X-User-Search` para no
+incluir teléfonos en URLs. El panel
+`/admin/*` y las API también usan `NetworkOnly` en el service worker.
+
+## Crear y administrar pollas
+
+- `/admin/pollas/crear`: formulario independiente para crear una polla.
+- `/admin/pollas`: una card desplegable por polla, con su cantidad de pagos
+  pendientes. Al abrirla puedes ver cada comprobante y aprobar o rechazar el
+  pago. Los conteos se actualizan cada 30 segundos mientras el panel está visible;
+  la cola se carga por polla en páginas de 25.
+- `GET /api/casa/admin/entries?summary=1`: conteos completos, solo administradores.
+  `?pollaId=<uuid>`: comprobantes de esa polla, con respuestas privadas
+  sin caché y URLs firmadas para las imágenes. La siguiente página usa
+  `&cursor=<nextCursor>`; así revisar pagos desde otra sesión no salta filas.
+- Compartir incluye el nombre, el valor de entrada y el enlace público directo.
+- **Eliminar polla** aparece al final del detalle y en cada card administrativa.
+  Exige rol de administrador y confirmar el nombre. Archiva con `archived_at`
+  y `archived_by`: conserva pagos, pronósticos, estado y premios; no hace
+  devoluciones ni transferencias. El enlace archivado responde 404.
+
+Aplicar `supabase/migrations/091_casa_archive_and_lifecycle_guards.sql` antes
+de desplegar. El bloqueo de la fila de la polla serializa revisiones de pagos,
+archivo y reparto, también para Telegram. No permite repartir con comprobantes
+pendientes ni cambiar inscripciones después del reparto o del archivo.
+
+## Partidos, tabla e imágenes
+
+`/casa` muestra **Pollas disponibles** y **Pollas cerradas**, estas últimas
+comprimidas inicialmente. Cada polla muestra todos sus torneos, resueltos desde
+los partidos asociados. El detalle tiene pestañas **Partidos / Tabla**; cambiar
+de pestaña conserva los pronósticos sin guardar. La tabla muestra posiciones,
+nombres, avatares y puntos sin el antiguo límite visual de 20 jugadores.
+
+La tabla se actualiza cada 30 segundos mientras está visible mediante
+`GET /api/casa/pollas/[slug]/leaderboard` (autenticación y `private, no-store`).
+Los pagos en revisión pueden pronosticar dentro del plazo. El RPC SQL de tabla
+incluye únicamente pagos aprobados, con los puntos de sus pronósticos válidos.
+La cuenta para recibir premios se configura opcionalmente en `/perfil`; la
+transferencia al ganador sigue siendo manual.
+
+Los torneos usan variantes locales de 96 px. Los escudos usan
+`components/match/TeamCrest.tsx`, un catálogo local con procedencia en
+`public/team-crests/README.md` y respaldo del proveedor. Para actualizar las
+copias sin añadir servicios ni dependencias:
+`node --experimental-strip-types scripts/bake-team-crests.mjs`.
+La navegación conserva los íconos y añade **Pollas / Perfil**. La Polla usa
+español incluso con una antigua cookie de inglés; `chickenpicks.app` conserva
+su idioma por dominio y sus páginas SEO.
+
+Los datos históricos están respaldados; consulta
+[docs/backup-restore.md](docs/backup-restore.md).
 
 ## Filosofía: free-tier punta a punta
 

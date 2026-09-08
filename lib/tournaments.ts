@@ -12,6 +12,7 @@ export const TOURNAMENTS = [
     name: "Champions League",
     apiCode: "CL",
     logoPath: `/tournaments/champions_league.svg?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/champions_league-96.webp?v=${LOGO_V}`,
     color: "#1a1aff",
   },
   {
@@ -19,6 +20,7 @@ export const TOURNAMENTS = [
     name: "Mundial 2026",
     apiCode: "WC",
     logoPath: `/tournaments/mundial-2026.webp?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/mundial-2026-96.webp?v=${LOGO_V}`,
     color: "#c0392b",
   },
   {
@@ -26,6 +28,7 @@ export const TOURNAMENTS = [
     name: "La Liga",
     apiCode: "PD",
     logoPath: `/tournaments/la_liga.png?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/la_liga-96.webp?v=${LOGO_V}`,
     color: "#ff6b00",
   },
   {
@@ -33,6 +36,7 @@ export const TOURNAMENTS = [
     name: "Premier League",
     apiCode: "PL",
     logoPath: `/tournaments/premier_league.webp?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/premier_league-96.webp?v=${LOGO_V}`,
     color: "#3d195b",
   },
   {
@@ -40,6 +44,7 @@ export const TOURNAMENTS = [
     name: "Serie A",
     apiCode: "SA",
     logoPath: `/tournaments/seria_a.png?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/seria_a-96.webp?v=${LOGO_V}`,
     color: "#007bc0",
   },
   // Latin American leagues — ESPN-only (football-data plan free no las
@@ -50,6 +55,7 @@ export const TOURNAMENTS = [
     name: "Copa Libertadores",
     apiCode: "CLI",
     logoPath: `/tournaments/copa_libertadores.svg?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/copa_libertadores-96.webp?v=${LOGO_V}`,
     color: "#005f8e",
   },
   {
@@ -57,6 +63,7 @@ export const TOURNAMENTS = [
     name: "Copa Sudamericana",
     apiCode: "CSU",
     logoPath: `/tournaments/copa_sudamericana.svg?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/copa_sudamericana-96.webp?v=${LOGO_V}`,
     color: "#e9242a",
   },
   {
@@ -64,6 +71,7 @@ export const TOURNAMENTS = [
     name: "Liga BetPlay",
     apiCode: "BP",
     logoPath: `/tournaments/liga_betplay.svg?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/liga_betplay-96.webp?v=${LOGO_V}`,
     color: "#fcd116",
   },
   // Agregadas 2026-08-25 para la polla centralizada: el owner pidio las 5
@@ -74,6 +82,7 @@ export const TOURNAMENTS = [
     name: "Bundesliga",
     apiCode: "BL1",
     logoPath: `/tournaments/bundesliga.svg?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/bundesliga-96.webp?v=${LOGO_V}`,
     color: "#d20515",
   },
   {
@@ -81,6 +90,7 @@ export const TOURNAMENTS = [
     name: "Ligue 1",
     apiCode: "FL1",
     logoPath: `/tournaments/ligue_1.svg?v=${LOGO_V}`,
+    smallLogoPath: `/tournaments/ligue_1-96.webp?v=${LOGO_V}`,
     color: "#dae025",
   },
 ] as const;
@@ -176,8 +186,10 @@ export function getTournamentName(slug: string, locale: string = "es"): string {
   return getTournamentBySlug(slug)?.name ?? slug;
 }
 
-export function getTournamentLogo(slug: string): string {
-  return getTournamentBySlug(slug)?.logoPath || `/tournaments/champions_league.svg?v=${LOGO_V}`;
+export function getTournamentLogo(slug: string, size: "original" | "small" = "original"): string {
+  const tournament = getTournamentBySlug(slug) ?? TOURNAMENTS[0];
+  // Static 96 px assets cover a 32 px logo at 3x without Image Optimization.
+  return size === "small" ? tournament.smallLogoPath : tournament.logoPath;
 }
 
 // Flat slug → icon-path map. Relocated from components/shared/PollaCard.tsx

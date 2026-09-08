@@ -12,12 +12,13 @@
 //   2. No se puede quitar el ULTIMO administrador. Si se queda en cero, la
 //      unica forma de recuperar el acceso es correr SQL contra produccion.
 //
-// Nunca se devuelve el telefono: este repositorio es publico y el numero es
-// dato personal. Solo van id y nombre.
+// El directorio devuelve el telefono solo al administrador autenticado para
+// distinguir usuarios con el mismo nombre. Ninguna respuesta GET se cachea.
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
+import { normalizePhone } from "@/lib/auth/phone";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redactId } from "@/lib/log";
 
@@ -29,48 +30,109 @@ const schema = z.object({
   isAdmin: z.boolean(),
 });
 
+function privateJson(body: unknown, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "private, no-store" },
+  });
+}
+
 /**
  * GET — los administradores actuales y, con `?q=`, la busqueda por nombre
- * para encontrar a quien se quiere promover.
+ * para encontrar a quien se quiere promover. `?directory=1` entrega el
+ * directorio paginado, con busqueda por nombre o numero de telefono.
  */
 export async function GET(req: NextRequest) {
-  const user = await getAuthenticatedUser();
-  if (!user?.is_admin) {
-    return NextResponse.json({ error: "Solo el administrador." }, { status: 403 });
-  }
+  try {
+    const user = await getAuthenticatedUser();
+    if (!user?.is_admin) {
+      return privateJson({ error: "Solo el administrador." }, 403);
+    }
 
-  const db = createAdminClient();
+    const params = req.nextUrl.searchParams;
+    // El directorio usa un header para no registrar telefonos en la URL.
+    let search = params.get("q") ?? "";
+    if (params.get("directory") === "1") {
+      try {
+        search = decodeURIComponent(req.headers.get("x-user-search") ?? "");
+      } catch {
+        return privateJson({ error: "Búsqueda inválida." }, 400);
+      }
+    }
+    const crudo = search.trim().slice(0, 60);
+    // `.or()` recibe sintaxis PostgREST cruda. Quitamos delimitadores,
+    // escapes y comodines para que el texto no pueda agregar condiciones.
+    const termino = crudo.replace(/[%_,()*"\\]/g, "").trim();
 
-  const { data: admins } = await db
-    .from("users")
-    .select("id, display_name")
-    .eq("is_admin", true)
-    .order("display_name", { ascending: true });
+    if (params.get("directory") === "1") {
+      const rawPage = params.get("page") ?? "0";
+      const page = Number(rawPage);
+      const pageSize = 50;
+      const offset = page * pageSize;
+      if (!/^\d+$/.test(rawPage) || !Number.isSafeInteger(offset + pageSize)) {
+        return privateJson({ error: "Página inválida." }, 400);
+      }
 
-  const crudo = (req.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 60);
-  // Se limpian los caracteres que tienen significado en el filtro de PostgREST
-  // (`%` y `_` son comodines de LIKE; la coma y los parentesis separan
-  // condiciones). Sin esto una busqueda con coma arma un filtro invalido.
-  const termino = crudo.replace(/[%_,()*]/g, "");
+      // Una busqueda formada solo por comodines no equivale a pedir todo.
+      if (crudo && !termino) {
+        return privateJson({ usuarios: [], hasMore: false });
+      }
 
-  let resultados: { id: string; display_name: string; is_admin: boolean }[] = [];
-  if (termino.length >= 2) {
-    const { data } = await db
+      const db = createAdminClient();
+      let query = db
+        .from("users")
+        .select("id, display_name, whatsapp_number, is_admin")
+        .order("display_name", { ascending: true })
+        .order("id", { ascending: true });
+
+      if (termino) {
+        const filters = [`display_name.ilike.%${termino}%`];
+        const telefono = normalizePhone(crudo);
+        if (/^\d+$/.test(telefono)) {
+          filters.push(`whatsapp_number.ilike.%${telefono}%`);
+        }
+        query = query.or(filters.join(","));
+      }
+
+      // range es inclusivo: la fila 51 solo indica si hay otra pagina.
+      const { data, error } = await query.range(offset, offset + pageSize);
+      if (error) {
+        return privateJson({ error: "No se pudieron cargar los usuarios." }, 500);
+      }
+      return privateJson({
+        usuarios: (data ?? []).slice(0, pageSize),
+        hasMore: (data?.length ?? 0) > pageSize,
+      });
+    }
+
+    const db = createAdminClient();
+    const { data: admins } = await db
       .from("users")
-      .select("id, display_name, is_admin")
-      .ilike("display_name", `%${termino}%`)
-      .order("display_name", { ascending: true })
-      .limit(10);
-    resultados = (data ?? []) as typeof resultados;
-  }
+      .select("id, display_name")
+      .eq("is_admin", true)
+      .order("display_name", { ascending: true });
 
-  return NextResponse.json({
-    // El cliente lo necesita para no dibujar el boton de "quitar" sobre uno
-    // mismo. La guarda de verdad es la del POST, esta es solo la pantalla.
-    yoId: user.id,
-    admins: admins ?? [],
-    resultados,
-  });
+    let resultados: { id: string; display_name: string; is_admin: boolean }[] = [];
+    if (termino.length >= 2) {
+      const { data } = await db
+        .from("users")
+        .select("id, display_name, is_admin")
+        .ilike("display_name", `%${termino}%`)
+        .order("display_name", { ascending: true })
+        .limit(10);
+      resultados = (data ?? []) as typeof resultados;
+    }
+
+    return privateJson({
+      // El cliente lo necesita para no dibujar el boton de "quitar" sobre uno
+      // mismo. La guarda de verdad es la del POST, esta es solo la pantalla.
+      yoId: user.id,
+      admins: admins ?? [],
+      resultados,
+    });
+  } catch {
+    return privateJson({ error: "No se pudieron cargar los usuarios." }, 500);
+  }
 }
 
 /** POST — { userId, isAdmin }. Da o quita el acceso. */

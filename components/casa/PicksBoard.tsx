@@ -10,7 +10,7 @@
 // asi que se muestra SIEMPRE que haya al menos un pronostico cargado.
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
+import { TeamCrest } from "@/components/match/TeamCrest";
 import { Label, PctBar } from "@/components/street";
 import { formatMatchTime } from "@/lib/casa/format";
 import type { CasaDistribution, Pick1x2 } from "@/lib/casa/types";
@@ -189,16 +189,16 @@ export function PicksBoard({
 
               {/* Equipos. Escudos y nombres en su propia fila para que el
                   text-zoom de accesibilidad no los aplaste (regla del repo). */}
-              <div className="mb-3 flex items-center gap-2">
-                <TeamFlag src={m.home_team_flag} />
-                <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-text-primary">
-                  {m.home_team}
-                </span>
-                <span className="lp-label shrink-0">vs</span>
-                <span className="min-w-0 flex-1 truncate text-right text-[14px] font-semibold text-text-primary">
-                  {m.away_team}
-                </span>
-                <TeamFlag src={m.away_team_flag} />
+              <div className="mb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <TeamCrest team={m.home_team} src={m.home_team_flag} />
+                  <span className="lp-label">vs</span>
+                  <TeamCrest team={m.away_team} src={m.away_team_flag} />
+                </div>
+                <div className="mt-1.5 grid grid-cols-2 gap-3 text-[14px] font-semibold text-text-primary">
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{m.home_team}</span>
+                  <span className="min-w-0 text-right [overflow-wrap:anywhere]">{m.away_team}</span>
+                </div>
               </div>
 
               {scoringMode === "1x2" ? (
@@ -321,21 +321,5 @@ export function PicksBoard({
         </p>
       )}
     </div>
-  );
-}
-
-function TeamFlag({ src }: { src: string | null }) {
-  if (!src) {
-    return <span className="h-6 w-6 shrink-0 bg-bg-elevated" aria-hidden />;
-  }
-  return (
-    <Image
-      src={src}
-      alt=""
-      width={24}
-      height={24}
-      unoptimized
-      className="h-6 w-6 max-w-none shrink-0 object-contain"
-    />
   );
 }

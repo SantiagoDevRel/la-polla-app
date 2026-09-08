@@ -11,11 +11,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { formatCop, formatMatchTime } from "@/lib/casa/format";
 import { LOCK_MINUTES } from "@/lib/casa/types";
 import { CREATABLE_TOURNAMENTS, getTournamentLogo } from "@/lib/tournaments";
+import { TeamCrest } from "@/components/match/TeamCrest";
 
 type Kind = "partidos" | "manual" | "rifa";
 
@@ -613,26 +613,34 @@ export function CrearPollaForm() {
           <StreetCard className="space-y-4 p-4">
             <div>
               <Label>Torneo</Label>
-              <div className="mt-2 grid grid-cols-4 gap-px">
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 {CREATABLE_TOURNAMENTS.map((t) => (
                   <button
                     key={t.slug}
                     type="button"
                     onClick={() => setTournament(t.slug)}
                     title={t.name}
-                    className={`flex h-[52px] items-center justify-center border ${
+                    aria-pressed={tournament === t.slug}
+                    className={`flex min-h-[64px] min-w-0 cursor-pointer items-center gap-2 rounded-md border p-2 text-left transition-all duration-200 hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-[0.98] ${
                       tournament === t.slug
                         ? "border-gold bg-gold/10"
                         : "border-border-subtle bg-bg-elevated"
                     }`}
                   >
-                    <Image
-                      src={getTournamentLogo(t.slug)}
-                      alt={t.name}
-                      width={26}
-                      height={26}
-                      className="h-[26px] w-[26px] max-w-none object-contain"
-                    />
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-text-primary">
+                      {/* Pre-sized local assets avoid the image optimizer's query-string restriction. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={getTournamentLogo(t.slug, "small")}
+                        alt=""
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 max-w-none object-contain"
+                      />
+                    </span>
+                    <span className="min-w-0 text-[12px] font-medium leading-snug text-text-primary [overflow-wrap:anywhere]">
+                      {t.name}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -710,7 +718,9 @@ export function CrearPollaForm() {
                       <button
                         type="button"
                         onClick={() => toggleMatch(m.id)}
-                        className={`flex w-full items-center gap-3 p-3 text-left ${
+                        aria-label={`${m.home_team} vs ${m.away_team}`}
+                        aria-pressed={on}
+                        className={`flex w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${
                           on ? "bg-gold/10" : "bg-bg-card"
                         }`}
                       >
@@ -721,8 +731,15 @@ export function CrearPollaForm() {
                           aria-hidden
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] text-text-primary">
-                            {m.home_team} vs {m.away_team}
+                          <span className="grid grid-cols-2 gap-3 text-[13px] text-text-primary">
+                            <span className="min-w-0">
+                              <TeamCrest team={m.home_team} src={m.home_team_flag} />
+                              <span className="mt-1 block [overflow-wrap:anywhere]">{m.home_team}</span>
+                            </span>
+                            <span className="min-w-0 text-right">
+                              <TeamCrest team={m.away_team} src={m.away_team_flag} />
+                              <span className="mt-1 block [overflow-wrap:anywhere]">{m.away_team}</span>
+                            </span>
                           </span>
                           <span className="lp-label mt-0.5 block">
                             {formatMatchTime(m.scheduled_at)}

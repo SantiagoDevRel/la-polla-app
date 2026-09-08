@@ -123,7 +123,7 @@ function TabItem({
       aria-label={t(labelKey)}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex min-h-[48px] flex-1 items-center justify-center rounded-full",
+        "relative flex min-h-[48px] min-w-0 flex-1 flex-col items-center justify-center gap-[2px] rounded-full",
         "transition-all duration-200 active:scale-90",
         active ? "text-gold" : "text-text-muted hover:text-text-secondary",
       )}
@@ -137,11 +137,11 @@ function TabItem({
               ? { duration: 0 }
               : { type: "spring", stiffness: 600, damping: 38 }
           }
-          className="absolute h-[40px] w-[52px] rounded-full border border-white/[0.08] bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]"
+          className="absolute h-[52px] w-[84px] rounded-full border border-white/[0.08] bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]"
         />
       )}
 
-      <span className="relative z-10">
+      <span className="relative z-10 shrink-0">
         <Icon className="h-[24px] w-[24px]" strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
         {showBadge && (
           <span
@@ -152,7 +152,9 @@ function TabItem({
           </span>
         )}
       </span>
-
+      <span className="relative z-10 text-[11px] font-semibold uppercase leading-none tracking-[0.08em]">
+        {t(labelKey)}
+      </span>
     </Link>
   );
 }

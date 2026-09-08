@@ -117,7 +117,7 @@ const nextConfig = {
               // i.ytimg.com: thumbnails de los highlights del Mundial (FIFA
               // YouTube) en /inicio. a.espncdn.com: fotos de jugadores/escudos
               // para futuras fichas de equipo. Todo hotlink, sin self-host.
-              "img-src 'self' data: blob: https://api.dicebear.com https://avatars.dicebear.com https://crests.football-data.org https://a.espncdn.com https://i.ytimg.com https://*.supabase.co https://cdn.jsdelivr.net",
+              "img-src 'self' data: blob: https://api.dicebear.com https://avatars.dicebear.com https://crests.football-data.org https://a.espncdn.com https://upload.wikimedia.org https://i.ytimg.com https://*.supabase.co https://cdn.jsdelivr.net",
               // us.i.posthog.com + us-assets.i.posthog.com: ingest + assets de
               // PostHog (product analytics). Sin estos en connect-src el browser
               // bloquea el POST de eventos.

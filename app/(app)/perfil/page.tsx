@@ -16,7 +16,6 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 import FontScalePicker from "@/components/perfil/FontScalePicker";
-import LanguageToggle from "@/components/perfil/LanguageToggle";
 import PayoutDefaultEditor, { type PayoutMethod, type PayoutAccountType } from "@/components/perfil/PayoutDefaultEditor";
 import { formatPhone } from "@/lib/format-phone";
 
@@ -295,10 +294,6 @@ export default function PerfilPage() {
             onClear={handlePayoutClear}
           />
         )}
-
-        {/* Idioma — ES / EN. Setea cookie y, en prod, salta al dominio
-            correspondiente (lapollacolombiana.com vs chickenpicks.app). */}
-        <LanguageToggle />
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />

@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { ChevronDown } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -15,7 +16,8 @@ import {
 } from "@/lib/casa/queries";
 import { isPollaOpen, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
 import { formatCop, timeLeft } from "@/lib/casa/format";
-import { getTournamentLogo, getTournamentName } from "@/lib/tournaments";
+import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
+import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
 import {
   HeroFrame,
   Label,
@@ -34,8 +36,11 @@ export default async function CasaPage() {
   if (!user) redirect("/login?returnTo=/casa");
 
   const pollas = await listPublicPollas();
-  const pots = await getPots(pollas.map((p) => p.id));
-  const pendientes = await listPollasConPicksPendientes(user.id);
+  const [pots, pendientes, tournaments] = await Promise.all([
+    getPots(pollas.map((p) => p.id)),
+    listPollasConPicksPendientes(user.id),
+    getPollaTournamentSlugs(pollas),
+  ]);
 
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
   // paso sigue con status abierta hasta que alguien la cierre, y quedaba
@@ -57,7 +62,7 @@ export default async function CasaPage() {
         </div>
         <p className="mt-2 text-[13px] text-text-secondary">
           {abiertas.length === 0
-            ? "Todavía no hay pollas abiertas. Se publican para el fin de semana."
+            ? "Todavía no hay pollas disponibles. Las próximas aparecerán aquí."
             : `${abiertas.length} polla${abiertas.length === 1 ? "" : "s"} abierta${
                 abiertas.length === 1 ? "" : "s"
               } · ${jugando} inscritos`}
@@ -104,7 +109,7 @@ export default async function CasaPage() {
 
         {/* ── Pollas abiertas ─────────────────────────────────────────── */}
         <SectionHead
-          title="Del fin de semana"
+          title="POLLAS DISPONIBLES"
           meta={abiertas.length > 0 ? `${abiertas.length}` : undefined}
         />
 
@@ -126,30 +131,44 @@ export default async function CasaPage() {
               height={112}
               className="mx-auto mb-3 h-28 w-28 max-w-none object-contain opacity-90"
             />
-            <p className="lp-display-sm text-text-primary">Sin pollas abiertas</p>
+            <p className="lp-display-sm text-text-primary">Sin pollas disponibles</p>
             <p className="mt-2 text-[13px] text-text-muted">
-              La del fin de semana aparecerá aquí.
+              Las nuevas pollas aparecerán aquí cuando se publiquen.
             </p>
           </StreetCard>
         ) : (
           <ul className="space-y-3">
             {abiertas.map((polla) => (
-              <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} />
+              <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} />
             ))}
           </ul>
         )}
 
         {/* ── Ya cerradas ─────────────────────────────────────────────── */}
-        {cerradas.length > 0 && (
-          <>
-            <SectionHead title="Anteriores" className="mt-9" />
-            <ul className="space-y-3 opacity-70">
-              {cerradas.slice(0, 8).map((polla) => (
-                <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} />
-              ))}
-            </ul>
-          </>
-        )}
+        <details className="group mt-9">
+          <summary
+            aria-controls="pollas-cerradas-list"
+            className="flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-md border border-border-subtle bg-bg-card/80 px-3 py-3 transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:bg-bg-elevated [&::-webkit-details-marker]:hidden"
+          >
+            <h2 className="lp-display-sm min-w-0 flex-1 text-text-primary">POLLAS CERRADAS</h2>
+            <span className="lp-label shrink-0">{cerradas.length}</span>
+            <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-text-secondary transition-transform duration-200 group-open:rotate-180" />
+          </summary>
+          <div id="pollas-cerradas-list" className="mt-3">
+            {cerradas.length > 0 ? (
+              <ul className="space-y-3">
+                {cerradas.map((polla) => (
+                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} />
+                ))}
+              </ul>
+            ) : (
+              <StreetCard className="p-5 text-center">
+                <p className="lp-display-sm text-text-primary">Todavía no hay pollas cerradas</p>
+                <p className="mt-2 text-[13px] text-text-muted">Cuando una polla cierre, podrás consultarla aquí.</p>
+              </StreetCard>
+            )}
+          </div>
+        </details>
       </div>
     </div>
   );
@@ -158,9 +177,11 @@ export default async function CasaPage() {
 function PollaRow({
   polla,
   pot,
+  tournaments,
 }: {
   polla: CasaPolla;
   pot?: { prize_cop: number; paid_entries: number };
+  tournaments: string[];
 }) {
   const estado = pollaStatusLabel(polla);
   const abierta = isPollaOpen(polla);
@@ -171,26 +192,11 @@ function PollaRow({
         <StreetCard className="p-4 transition-colors hover:border-border-strong">
           {/* Fila 1 — identidad. El torneo va con su escudo; la etiqueta de
               estado a la derecha para que no compita con el nombre. */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              {polla.tournament && (
-                <Image
-                  src={getTournamentLogo(polla.tournament)}
-                  alt=""
-                  width={20}
-                  height={20}
-                  className="h-5 w-5 max-w-none shrink-0 object-contain"
-                />
-              )}
-              <span className="lp-label truncate">
-                {polla.kind === "rifa"
-                  ? "Rifa"
-                  : polla.tournament
-                    ? getTournamentName(polla.tournament)
-                    : "Manual"}
-              </span>
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <Tape tone={estado.tone}>{estado.text}</Tape>
             </div>
-            <Tape tone={estado.tone}>{estado.text}</Tape>
+            <TournamentIdentity tournaments={tournaments} kind={polla.kind} />
           </div>
 
           <h3 className="lp-display-sm mt-2 text-text-primary">{polla.name}</h3>
