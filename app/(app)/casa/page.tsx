@@ -137,7 +137,7 @@ export default async function CasaPage() {
             </p>
           </StreetCard>
         ) : (
-          <ul className="space-y-3">
+          <ul className="grid auto-rows-fr gap-3">
             {abiertas.map((polla) => (
               <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} />
             ))}
@@ -156,7 +156,7 @@ export default async function CasaPage() {
           </summary>
           <div id="pollas-cerradas-list" className="mt-3">
             {cerradas.length > 0 ? (
-              <ul className="space-y-3">
+              <ul className="grid auto-rows-fr gap-3">
                 {cerradas.map((polla) => (
                   <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} />
                 ))}
@@ -188,44 +188,46 @@ function PollaRow({
 
   return (
     <li>
-      <Link href={`/casa/${polla.slug}`} className="block">
-        <StreetCard className="p-4 transition-colors hover:border-border-strong">
-          {/* Fila 1 — identidad. El torneo va con su escudo; la etiqueta de
-              estado a la derecha para que no compita con el nombre. */}
-          <div className="space-y-3">
-            <div className="flex justify-end">
-              <Tape tone={estado.tone}>{estado.text}</Tape>
-            </div>
+      <Link href={`/casa/${polla.slug}`} className="block h-full">
+        <StreetCard className="flex h-full flex-col p-4 transition-colors hover:border-border-strong">
+          {/* Equal-height list rows let names wrap without shifting the
+              logos and amounts in neighboring cards. */}
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="min-w-0 flex-1 font-display text-[22px] leading-[1.2] tracking-[0.04em] text-text-primary [overflow-wrap:anywhere]">
+              {polla.name}
+            </h3>
+            <Tape tone={estado.tone} className="shrink-0">{estado.text}</Tape>
+          </div>
+
+          <div className="mt-auto min-h-8 pt-3">
             <TournamentIdentity tournaments={tournaments} kind={polla.kind} showNames={false} />
           </div>
 
-          <h3 className="lp-display-sm mt-2 text-text-primary">{polla.name}</h3>
-
-          {/* Fila 2 — la plata manda. El pozo es lo único grande. */}
-          <div className="mt-4 flex items-end justify-between gap-4">
-            <div className="min-w-0">
+          {/* Equal columns, label baselines and number sizes for both amounts. */}
+          <div className="mt-4 grid grid-cols-2">
+            <div className="min-w-0 border-r border-border-subtle">
               <Label>Pozo</Label>
-              <div className="lp-money mt-0.5 text-[30px] leading-none text-text-primary">
+              <div className="lp-money mt-1 text-[28px] leading-none text-text-primary [overflow-wrap:anywhere]">
                 {formatCop(pot?.prize_cop ?? 0)}
               </div>
             </div>
-            <div className="shrink-0 text-right">
+            <div className="min-w-0 text-right">
               <Label>Entrada</Label>
-              <div className="lp-money mt-0.5 text-[18px] leading-none text-text-secondary">
+              <div className="lp-money mt-1 text-[28px] leading-none text-text-primary [overflow-wrap:anywhere]">
                 {formatCop(polla.entry_price_cop)}
               </div>
             </div>
           </div>
 
           {/* Fila 3 — el apuro y la gente. Hairline arriba para separar sin peso. */}
-          <div className="mt-4 flex items-center justify-between border-t border-border-subtle pt-3">
-            <span className="text-[12px] text-text-muted">
+          <div className="mt-4 grid grid-cols-2 items-start gap-3 border-t border-border-subtle pt-3 text-[12px] leading-normal">
+            <span className="min-w-0 text-text-muted">
               {pot?.paid_entries ?? 0} inscritos
             </span>
             <span
-              className={`lp-money text-[12px] ${abierta ? "text-gold" : "text-text-muted"}`}
+              className={`min-w-0 text-right ${abierta ? "text-gold" : "text-text-muted"}`}
             >
-              {abierta ? `cierra en ${timeLeft(polla.closes_at)}` : estado.text}
+              {abierta ? `Cierra en ${timeLeft(polla.closes_at)}` : estado.text}
             </span>
           </div>
         </StreetCard>
