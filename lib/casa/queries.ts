@@ -35,6 +35,7 @@ export async function listPublicPollas(): Promise<CasaPolla[]> {
   const { data, error } = await db
     .from("casa_pollas")
     .select(CASA_POLLA_COLUMNS)
+    .is("archived_at", null)
     .neq("status", "borrador")
     .neq("status", "anulada")
     .order("closes_at", { ascending: true });
@@ -49,6 +50,7 @@ export async function listAllPollas(): Promise<CasaPolla[]> {
   const { data, error } = await db
     .from("casa_pollas")
     .select(CASA_POLLA_COLUMNS)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -61,6 +63,7 @@ export async function getPollaBySlug(slug: string): Promise<CasaPolla | null> {
     .from("casa_pollas")
     .select(CASA_POLLA_COLUMNS)
     .eq("slug", slug)
+    .is("archived_at", null)
     .maybeSingle();
 
   if (error) throw error;
@@ -277,6 +280,7 @@ export async function listPollasConPicksPendientes(
       entries.map((e: { polla_id: string }) => e.polla_id),
     )
     .eq("status", "abierta")
+    .is("archived_at", null)
     .gt("closes_at", new Date().toISOString())
     .order("closes_at", { ascending: true });
   if (!pollas || pollas.length === 0) return [];

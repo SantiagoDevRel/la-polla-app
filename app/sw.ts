@@ -37,6 +37,8 @@ declare const self: ServiceWorkerGlobalScope;
 // y el cache del cliente ya queda en headers HTTP de cada endpoint.
 const NEVER_CACHE_PATHS: RegExp[] = [
   /^\/api\//,
+  // El panel administra acceso y muestra datos personales del directorio.
+  /^\/admin(\/|$)/,
   /\/login/,
   /\/invites\/polla\//,
   /\/onboarding/,

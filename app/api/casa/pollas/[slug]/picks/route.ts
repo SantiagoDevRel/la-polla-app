@@ -181,6 +181,9 @@ export async function PUT(
       .from("casa_picks")
       .upsert(dePartidos, { onConflict: "entry_id,match_id" });
     if (error) {
+      if (["55000", "55P03"].includes(error.code)) {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
       console.error("[casa/picks] upsert partidos:", error.message);
       return NextResponse.json({ error: "No pude guardar." }, { status: 500 });
     }
@@ -190,6 +193,9 @@ export async function PUT(
       .from("casa_picks")
       .upsert(dePreguntas, { onConflict: "entry_id,question_id" });
     if (error) {
+      if (["55000", "55P03"].includes(error.code)) {
+        return NextResponse.json({ error: error.message }, { status: 409 });
+      }
       console.error("[casa/picks] upsert preguntas:", error.message);
       return NextResponse.json({ error: "No pude guardar." }, { status: 500 });
     }

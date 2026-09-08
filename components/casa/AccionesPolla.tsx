@@ -16,6 +16,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CasaPollaStatus } from "@/lib/casa/types";
+import { EliminarPolla } from "@/components/casa/EliminarPolla";
 
 type Accion = "publicar" | "cerrar" | "repartir";
 
@@ -63,9 +64,6 @@ export function AccionesPolla({
       setEnviando(null);
     }
   }
-
-  // Una polla resuelta o anulada ya no tiene siguiente paso.
-  if (status === "resuelta" || status === "anulada") return null;
 
   return (
     <div className="bg-bg-card px-3 pb-3">
@@ -135,6 +133,7 @@ export function AccionesPolla({
 
       {error && <p className="mt-2 text-[12px] text-red-alert">{error}</p>}
       {ok && <p className="mt-2 text-[12px] text-turf">{ok}</p>}
+      <EliminarPolla id={id} nombre={nombre} />
     </div>
   );
 }

@@ -12,35 +12,32 @@
 
 import { useState } from "react";
 import { Share2, Check } from "lucide-react";
+import { formatCop } from "@/lib/casa/format";
 
 export function CompartirPolla({
   slug,
   nombre,
   entradaCop,
-  pozoCop,
 }: {
   slug: string;
   nombre: string;
   entradaCop: number;
-  pozoCop: number;
 }) {
   const [copiado, setCopiado] = useState(false);
 
   function textoYUrl() {
-    // Se arma en el cliente y no en el server a proposito: el link tiene que
-    // ser el del host por el que la persona esta navegando (hay dos dominios,
-    // lapollacolombiana.com y chickenpicks.app) y no uno horneado en build.
-    const url = `${window.location.origin}/casa/${slug}`;
-    const cop = (n: number) =>
-      new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        maximumFractionDigits: 0,
-      }).format(n);
-    const texto =
-      pozoCop > 0
-        ? `${nombre}\nEntrada ${cop(entradaCop)} · pozo ${cop(pozoCop)}\n${url}`
-        : `${nombre}\nEntrada ${cop(entradaCop)}\n${url}`;
+    // Compartimos el dominio público, incluso desde localhost o un preview.
+    // Conservamos Chicken Picks cuando la visita viene de su propio dominio.
+    const english = ["chickenpicks.app", "www.chickenpicks.app"].includes(
+      window.location.hostname,
+    );
+    const origin = english
+      ? "https://chickenpicks.app"
+      : "https://lapollacolombiana.com";
+    const url = `${origin}/casa/${slug}`;
+    const texto = english
+      ? `Join ${nombre} on Chicken Picks.\nEntry: ${formatCop(entradaCop)} COP`
+      : `Únete a ${nombre} en La Polla Colombiana.\nEntrada: ${formatCop(entradaCop)}`;
     return { url, texto };
   }
 
@@ -52,13 +49,13 @@ export function CompartirPolla({
       try {
         await navigator.share({ title: nombre, text: texto, url });
         return;
-      } catch {
-        // El usuario cancelo la hoja nativa, o el navegador la rechazo.
-        // En los dos casos copiar es un fallback razonable, no un error.
+      } catch (error) {
+        // Cancelar no debe modificar el portapapeles del usuario.
+        if (error instanceof DOMException && error.name === "AbortError") return;
       }
     }
     try {
-      await navigator.clipboard.writeText(texto);
+      await navigator.clipboard.writeText(`${texto}\n${url}`);
       setCopiado(true);
       window.setTimeout(() => setCopiado(false), 2200);
     } catch {
@@ -77,7 +74,7 @@ export function CompartirPolla({
       {copiado ? (
         <>
           <Check className="h-4 w-4" aria-hidden="true" />
-          Link copiado
+          Mensaje copiado
         </>
       ) : (
         <>

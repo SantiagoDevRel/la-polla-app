@@ -10,6 +10,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import {
   getDistribution,
   getLeaderboard,
@@ -29,10 +30,13 @@ import {
   type Pick1x2,
 } from "@/lib/casa/types";
 import { formatCop, prizeImageUrl, timeLeft } from "@/lib/casa/format";
-import { getTournamentLogo, getTournamentName } from "@/lib/tournaments";
+import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
+import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
 import { HeroFrame, Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { PicksBoard } from "@/components/casa/PicksBoard";
 import { QuestionsBoard } from "@/components/casa/QuestionsBoard";
+import { PollaTabs } from "@/components/casa/PollaTabs";
+import { EliminarPolla } from "@/components/casa/EliminarPolla";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +52,7 @@ export default async function PollaPage({
   } = await supabase.auth.getUser();
 
   const polla = await getPollaBySlug((await params).slug);
-  if (!polla || polla.status === "borrador") notFound();
+  if (!polla || polla.status === "borrador" || polla.status === "anulada") notFound();
 
   // ── Visitante sin sesión ────────────────────────────────────────────────
   // (2026-09-02) Antes esto era un `redirect` a /login. Como el link de la
@@ -62,13 +66,16 @@ export default async function PollaPage({
   // línea la sostiene también el middleware, que solo abre `/casa/<slug>` y
   // deja `/casa`, `/casa/admin` y `/casa/<slug>/pagar` pidiendo sesión.
   if (!user) {
-    const potPublico = await getPot(polla.id);
+    const [potPublico, tournaments] = await Promise.all([
+      getPot(polla.id),
+      getPollaTournamentSlugs([polla]),
+    ]);
     return (
-      <PollaPublica polla={polla} pot={potPublico} slug={(await params).slug} />
+      <PollaPublica polla={polla} pot={potPublico} slug={(await params).slug} tournaments={tournaments[polla.id] ?? []} />
     );
   }
 
-  const [pot, entry, matches, questions, picks, distribution, tabla, payouts] =
+  const [pot, entry, matches, questions, picks, distribution, tabla, payouts, isAdmin] =
     await Promise.all([
       getPot(polla.id),
       getMyEntry(polla.id, user.id),
@@ -79,12 +86,14 @@ export default async function PollaPage({
       getLeaderboard(polla.id),
       // Solo tiene filas cuando la polla ya se repartio.
       getPayouts(polla.id),
+      isCurrentUserAdmin(),
     ]);
 
   const abierta = isPollaOpen(polla);
   const estado = pollaStatusLabel(polla);
   const inscrito = entry != null && entry.status !== "rechazada";
   const pagoPendiente = entry?.status === "pendiente";
+  const tournaments = resolveTournamentSlugs(polla, matches as { tournament: string | null }[]);
 
   const picksPorPartido: Record<
     string,
@@ -112,24 +121,13 @@ export default async function PollaPage({
   return (
     <div className="pb-32">
       {/* ── Hero ──────────────────────────────────────────────────────── */}
-      <HeroFrame height="h-[214px]">
-        <div className="flex items-center gap-2">
-          {polla.tournament && (
-            <Image
-              src={getTournamentLogo(polla.tournament)}
-              alt=""
-              width={18}
-              height={18}
-              className="h-[18px] w-[18px] max-w-none shrink-0 object-contain"
-            />
-          )}
-          <Label>
-            {polla.tournament ? getTournamentName(polla.tournament) : "Polla manual"}
-          </Label>
-          <Tape tone={estado.tone} className="ml-auto">
+      <HeroFrame height="min-h-[214px]" className="flex flex-col justify-end">
+        <div className="mb-3 flex justify-end">
+          <Tape tone={estado.tone}>
             {estado.text}
           </Tape>
         </div>
+        <TournamentIdentity tournaments={tournaments} kind={polla.kind} />
         <h1 className="lp-display mt-2 text-[34px]">{polla.name}</h1>
         <div className="mt-3 flex items-end justify-between gap-4">
           <div>
@@ -222,7 +220,6 @@ export default async function PollaPage({
               slug={polla.slug}
               nombre={polla.name}
               entradaCop={polla.entry_price_cop}
-              pozoCop={pot.prize_cop}
             />
           </div>
         )}
@@ -254,7 +251,7 @@ export default async function PollaPage({
             <p className="lp-label text-amber">Pago en revisión</p>
             <p className="mt-1 text-[13px] text-text-secondary">
               Recibimos tu comprobante. Puedes pronosticar mientras tanto, pero
-              no cuentas para el pozo hasta que lo confirmemos.
+              no cuentas para el pozo ni la tabla hasta que lo confirmemos.
             </p>
           </div>
         )}
@@ -268,6 +265,14 @@ export default async function PollaPage({
           </div>
         )}
 
+        <PollaTabs
+          slug={polla.slug}
+          firstLabel={polla.kind === "manual" ? "Preguntas" : polla.kind === "rifa" ? "Sorteo" : "Partidos"}
+          initialRows={tabla}
+          entryStatus={entry?.status ?? null}
+          pollaStatus={polla.status}
+          userId={user.id}
+        >
         {/* ── Los partidos ─────────────────────────────────────────────── */}
         {polla.kind === "partidos" && matches.length > 0 && (
           <>
@@ -319,40 +324,21 @@ export default async function PollaPage({
           </>
         )}
 
-        {/* ── Tabla ────────────────────────────────────────────────────── */}
-        {tabla.length > 0 && (
-          <>
-            <SectionHead title="Tabla" meta={`${tabla.length}`} className="mt-9" />
-            <ul className="space-y-px">
-              {tabla.slice(0, 20).map((row) => {
-                const yo = row.user_id === user.id;
-                return (
-                  <li
-                    key={row.entry_id}
-                    className={`flex items-center gap-3 p-3 ${
-                      yo ? "bg-gold/10" : "bg-bg-card"
-                    }`}
-                  >
-                    <span
-                      className={`lp-money w-7 shrink-0 text-[18px] ${
-                        row.puesto === 1 ? "text-gold" : "text-text-muted"
-                      }`}
-                    >
-                      {row.puesto}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">
-                      {row.display_name ?? "Sin nombre"}
-                      {yo && <span className="lp-label ml-2 inline">tú</span>}
-                    </span>
-                    <span className="lp-money shrink-0 text-[18px] text-text-primary">
-                      {row.points}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
+          {polla.kind === "partidos" && matches.length === 0 && (
+            <StreetCard className="mt-4 p-5 text-center">
+              <h2 className="lp-display-sm">Partidos por confirmar</h2>
+              <p className="mt-2 text-sm text-text-secondary">El administrador publicará los partidos de esta polla aquí.</p>
+            </StreetCard>
+          )}
+          {polla.kind === "rifa" && (
+            <StreetCard className="mt-4 p-5">
+              <h2 className="lp-display-sm">Sorteo</h2>
+              <p className="mt-2 text-sm text-text-secondary">{polla.draw_method ?? "El administrador publicará el resultado del sorteo aquí."}</p>
+              {entry?.ticket_number != null && <p className="lp-money mt-3">Tu número: {entry.ticket_number}</p>}
+            </StreetCard>
+          )}
+        </PollaTabs>
+        {isAdmin && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/casa" />}
       </div>
     </div>
   );
@@ -370,35 +356,20 @@ function PollaPublica({
   polla,
   pot,
   slug,
+  tournaments,
 }: {
   polla: CasaPolla;
   pot: { prize_cop: number };
   slug: string;
+  tournaments: string[];
 }) {
   const abierta = isPollaOpen(polla);
   const entrar = `/login?returnTo=${encodeURIComponent(`/casa/${slug}`)}`;
 
   return (
     <div className="pb-32">
-      <HeroFrame height="h-[236px]">
-        <div className="flex items-center gap-2">
-          {polla.tournament && (
-            <Image
-              src={getTournamentLogo(polla.tournament)}
-              alt=""
-              width={22}
-              height={22}
-              className="h-[22px] w-[22px] max-w-none shrink-0 object-contain"
-            />
-          )}
-          <Label>
-            {polla.kind === "rifa"
-              ? "Rifa"
-              : polla.tournament
-                ? getTournamentName(polla.tournament)
-                : "Polla"}
-          </Label>
-        </div>
+      <HeroFrame height="min-h-[236px]" className="flex flex-col justify-end">
+        <TournamentIdentity tournaments={tournaments} kind={polla.kind} />
         <h1 className="lp-display-sm mt-1 text-[28px] text-text-primary">
           {polla.name}
         </h1>

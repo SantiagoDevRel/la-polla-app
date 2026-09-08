@@ -29,9 +29,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Search, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { HeroFrame, Label, SectionHead } from "@/components/street";
 import { useToast } from "@/components/ui/Toast";
+import UserDirectory from "@/components/admin/UserDirectory";
 
 interface Metricas {
   usuarios: number;
@@ -50,22 +51,21 @@ export default function AdminPage() {
 
   const [metricas, setMetricas] = useState<Metricas | null>(null);
   const [admins, setAdmins] = useState<Persona[] | null>(null);
+  const [adminsError, setAdminsError] = useState(false);
   const [yoId, setYoId] = useState<string | null>(null);
 
-  const [termino, setTermino] = useState("");
-  const [resultados, setResultados] = useState<Persona[]>([]);
-  const [buscando, setBuscando] = useState(false);
   const [guardando, setGuardando] = useState<string | null>(null);
 
   const cargarAdmins = useCallback(async () => {
+    setAdminsError(false);
     try {
-      const r = await fetch("/api/admin/promote");
+      const r = await fetch("/api/admin/promote", { cache: "no-store" });
       if (!r.ok) throw new Error("no se pudo leer la lista");
       const j = await r.json();
       setAdmins(j.admins ?? []);
       setYoId(j.yoId ?? null);
     } catch {
-      setAdmins([]);
+      setAdminsError(true);
     }
   }, []);
 
@@ -81,34 +81,6 @@ export default function AdminPage() {
     })();
     cargarAdmins();
   }, [cargarAdmins]);
-
-  // La búsqueda espera a que la persona termine de escribir. `cancelado` evita
-  // que una respuesta lenta pise el resultado de una consulta más nueva.
-  useEffect(() => {
-    const q = termino.trim();
-    if (q.length < 2) {
-      setResultados([]);
-      setBuscando(false);
-      return;
-    }
-    let cancelado = false;
-    setBuscando(true);
-    const t = setTimeout(async () => {
-      try {
-        const r = await fetch(`/api/admin/promote?q=${encodeURIComponent(q)}`);
-        const j = await r.json();
-        if (!cancelado) setResultados(j.resultados ?? []);
-      } catch {
-        if (!cancelado) setResultados([]);
-      } finally {
-        if (!cancelado) setBuscando(false);
-      }
-    }, 300);
-    return () => {
-      cancelado = true;
-      clearTimeout(t);
-    };
-  }, [termino]);
 
   async function cambiarAcceso(persona: Persona, isAdmin: boolean) {
     setGuardando(persona.id);
@@ -130,11 +102,10 @@ export default function AdminPage() {
           : `${nombre} dejó de ser administrador.`,
         "success",
       );
+      setAdmins((previous) => previous === null ? null : isAdmin
+        ? [...previous.filter((admin) => admin.id !== persona.id), { ...persona, is_admin: true }]
+        : previous.filter((admin) => admin.id !== persona.id));
       await cargarAdmins();
-      // La lista de búsqueda refleja el estado nuevo sin repetir la consulta.
-      setResultados((prev) =>
-        prev.map((p) => (p.id === persona.id ? { ...p, is_admin: isAdmin } : p)),
-      );
     } catch {
       // Sin este catch, un fallo de RED (no de status, ese ya esta cubierto)
       // dejaba la promesa sin manejar: el boton volvia de "Quitando..." a
@@ -193,8 +164,11 @@ export default function AdminPage() {
           <p className="mt-1 text-[12px] text-text-muted">
             Crear una polla, revisar comprobantes, cerrar y repartir.
           </p>
-          <Link href="/admin/pollas" className="lp-btn lp-btn-primary mt-4 w-full">
-            Crear y administrar pollas
+          <Link href="/admin/pollas/crear" className="lp-btn lp-btn-primary mt-4 w-full">
+            Crear polla
+          </Link>
+          <Link href="/admin/pollas" className="lp-btn lp-btn-ghost mt-2 w-full">
+            Administrar pollas
           </Link>
         </div>
 
@@ -222,7 +196,13 @@ export default function AdminPage() {
           meta={admins ? `${admins.length}` : undefined}
         />
 
-        {admins === null ? (
+        {adminsError && (
+          <div role="alert" className="mb-3 rounded-lg bg-bg-card p-4 text-[13px] text-text-secondary">
+            <p>No se pudo actualizar la lista de administradores.</p>
+            <button type="button" onClick={cargarAdmins} className="lp-btn lp-btn-ghost mt-2 text-[13px]">Reintentar</button>
+          </div>
+        )}
+        {admins === null ? !adminsError && (
           <p className="bg-bg-card p-4 text-[13px] text-text-muted">
             Cargando administradores...
           </p>
@@ -267,62 +247,11 @@ export default function AdminPage() {
           administradores.
         </p>
 
-        <div className="mt-6">
-          <label htmlFor="buscar-usuario" className="lp-label mb-2 block">
-            Buscar un usuario
-          </label>
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
-              aria-hidden="true"
-            />
-            <input
-              id="buscar-usuario"
-              type="text"
-              value={termino}
-              onChange={(e) => setTermino(e.target.value)}
-              placeholder="Nombre del usuario"
-              autoComplete="off"
-              className="lp-input pl-11"
-            />
-          </div>
-
-          <div className="mt-2">
-            {termino.trim().length < 2 ? (
-              <p className="text-[11px] text-text-muted">
-                Escribe al menos 2 letras del nombre.
-              </p>
-            ) : buscando ? (
-              <p className="text-[11px] text-text-muted">Buscando...</p>
-            ) : resultados.length === 0 ? (
-              <p className="text-[11px] text-text-muted">
-                Ningún usuario con ese nombre.
-              </p>
-            ) : (
-              <ul className="space-y-px">
-                {resultados.map((p) => (
-                  <li key={p.id} className="flex items-center gap-3 bg-bg-card p-4">
-                    <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">
-                      {p.display_name || "Sin nombre"}
-                    </span>
-                    {p.is_admin ? (
-                      <span className="lp-label shrink-0">Ya es admin</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => cambiarAcceso(p, true)}
-                        disabled={guardando === p.id}
-                        className="lp-btn lp-btn-ghost shrink-0 px-4 text-[13px]"
-                      >
-                        {guardando === p.id ? "Guardando..." : "Hacer admin"}
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
+        <UserDirectory
+          admins={admins}
+          savingId={guardando}
+          onPromote={(persona) => cambiarAcceso(persona, true)}
+        />
       </div>
     </div>
   );
