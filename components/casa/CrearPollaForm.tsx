@@ -11,6 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import { Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { formatCop, formatMatchTime } from "@/lib/casa/format";
 import { LOCK_MINUTES } from "@/lib/casa/types";
@@ -26,6 +27,10 @@ interface MatchOption {
   home_team_flag: string | null;
   away_team_flag: string | null;
   scheduled_at: string;
+}
+
+interface SelectedMatch extends MatchOption {
+  tournament: string;
 }
 
 interface Pregunta {
@@ -89,7 +94,12 @@ export function CrearPollaForm() {
   );
   const [scoringMode, setScoringMode] = useState<"1x2" | "marcador">("1x2");
   const [matches, setMatches] = useState<MatchOption[]>([]);
-  const [seleccion, setSeleccion] = useState<string[]>([]);
+  // La liga visible es un filtro; la selección pertenece a toda la polla.
+  const [seleccion, setSeleccion] = useState<SelectedMatch[]>([]);
+  const selectedIds = useMemo(() => new Set(seleccion.map((m) => m.id)), [seleccion]);
+  const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [matchesRevision, setMatchesRevision] = useState(0);
+  const syncController = useRef<AbortController | null>(null);
   const [cargando, setCargando] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
@@ -102,16 +112,15 @@ export function CrearPollaForm() {
   // El lock por partido de 5 minutos limitaba el daño, pero la polla nacia
   // con una ventana de trampa abierta y nada lo advertia.
   //
-  // Ahora el cierre se deriva del primer partido elegido (menos 15 min) y se
+  // Ahora el cierre se deriva del primer partido elegido (menos LOCK_MINUTES) y se
   // avisa en rojo si el admin lo mueve mas alla del pitazo.
   const primerKickoff = useMemo(() => {
     if (seleccion.length === 0) return null;
-    const elegidos = matches
-      .filter((m) => seleccion.includes(m.id))
+    const elegidos = seleccion
       .map((m) => new Date(m.scheduled_at).getTime())
       .filter((t) => Number.isFinite(t));
     return elegidos.length ? Math.min(...elegidos) : null;
-  }, [matches, seleccion]);
+  }, [seleccion]);
 
   // Se respeta la decision del admin: si toco el campo, no se lo pisamos.
   const cierreTocado = useRef(false);
@@ -166,14 +175,36 @@ export function CrearPollaForm() {
 
   useEffect(() => {
     if (kind !== "partidos" || !tournament) return;
+    const controller = new AbortController();
     setCargando(true);
-    setSeleccion([]);
-    fetch(`/api/casa/admin/matches?tournament=${tournament}`)
-      .then((r) => r.json())
-      .then((j) => setMatches(j.matches ?? []))
-      .catch(() => setMatches([]))
-      .finally(() => setCargando(false));
-  }, [kind, tournament]);
+    setMatches([]);
+    setMatchesError(null);
+    setSyncMsg(null);
+    setSincronizando(false);
+    fetch(`/api/casa/admin/matches?tournament=${tournament}`, { signal: controller.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("No se pudieron cargar los partidos.");
+        return r.json();
+      })
+      .then((j) => {
+        if (controller.signal.aborted) return;
+        const loaded: MatchOption[] = j.matches ?? [];
+        setMatches(loaded);
+        // Refresca horarios de los elegidos sin perder los de otras ligas.
+        setSeleccion((prev) => prev.map((match) => {
+          const fresh = loaded.find((item) => item.id === match.id);
+          return fresh ? { ...fresh, tournament } : match;
+        }));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setMatchesError("No se pudieron cargar los partidos. Tu selección se conserva.");
+      })
+      .finally(() => { if (!controller.signal.aborted) setCargando(false); });
+    return () => {
+      controller.abort();
+      syncController.current?.abort();
+    };
+  }, [kind, tournament, matchesRevision]);
 
   /**
    * Trae el calendario de ESPN para el torneo elegido y vuelve a pedir los
@@ -181,6 +212,9 @@ export function CrearPollaForm() {
    * la lista vino vacia.
    */
   async function traerDeEspn() {
+    const controller = new AbortController();
+    syncController.current?.abort();
+    syncController.current = controller;
     setSincronizando(true);
     setSyncMsg(null);
     try {
@@ -188,14 +222,18 @@ export function CrearPollaForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tournament }),
+        signal: controller.signal,
       });
       const json = await res.json().catch(() => ({}));
+      if (controller.signal.aborted) return;
       if (!res.ok) {
         setSyncMsg(json.error ?? "No se pudo traer el calendario.");
         return;
       }
-      const r = await fetch(`/api/casa/admin/matches?tournament=${tournament}`);
+      const r = await fetch(`/api/casa/admin/matches?tournament=${tournament}`, { signal: controller.signal });
+      if (!r.ok) throw new Error("No se pudieron cargar los partidos.");
       const j = await r.json().catch(() => ({}));
+      if (controller.signal.aborted) return;
       const traidos = j.matches ?? [];
       setMatches(traidos);
       setSyncMsg(
@@ -204,9 +242,9 @@ export function CrearPollaForm() {
           : "ESPN tampoco tiene partidos próximos de este torneo. Puede estar fuera de temporada.",
       );
     } catch {
-      setSyncMsg("Se cayó la conexión.");
+      if (!controller.signal.aborted) setSyncMsg("Se cayó la conexión.");
     } finally {
-      setSincronizando(false);
+      if (!controller.signal.aborted) setSincronizando(false);
     }
   }
 
@@ -235,10 +273,12 @@ export function CrearPollaForm() {
     }
   }
 
-  function toggleMatch(id: string) {
-    setSeleccion((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+  function toggleMatch(match: MatchOption) {
+    setSeleccion((prev) => {
+      if (prev.some((item) => item.id === match.id)) return prev.filter((item) => item.id !== match.id);
+      if (prev.length >= 30) return prev;
+      return [...prev, { ...match, tournament }];
+    });
   }
 
   function setPregunta(i: number, patch: Partial<Pregunta>) {
@@ -281,7 +321,7 @@ export function CrearPollaForm() {
 
       const body =
         kind === "partidos"
-          ? { ...base, kind, tournament, scoringMode, matchIds: seleccion }
+          ? { ...base, kind, tournament: seleccion[0]?.tournament ?? tournament, scoringMode, matchIds: seleccion.map((m) => m.id) }
           : kind === "manual"
             ? {
                 ...base,
@@ -613,8 +653,13 @@ export function CrearPollaForm() {
           <StreetCard className="space-y-4 p-4">
             <div>
               <Label>Torneo</Label>
+              <p className="mt-1 text-[12px] text-text-secondary">
+                Puedes combinar ligas. Los partidos elegidos se conservan al cambiar de torneo.
+              </p>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                {CREATABLE_TOURNAMENTS.map((t) => (
+                {CREATABLE_TOURNAMENTS.map((t) => {
+                  const selectedCount = seleccion.filter((m) => m.tournament === t.slug).length;
+                  return (
                   <button
                     key={t.slug}
                     type="button"
@@ -640,9 +685,15 @@ export function CrearPollaForm() {
                     </span>
                     <span className="min-w-0 text-[12px] font-medium leading-snug text-text-primary [overflow-wrap:anywhere]">
                       {t.name}
+                      {selectedCount > 0 && (
+                        <span className="mt-1 block text-[11px] text-turf">
+                          {selectedCount} {selectedCount === 1 ? "elegido" : "elegidos"}
+                        </span>
+                      )}
                     </span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -681,11 +732,45 @@ export function CrearPollaForm() {
           <div>
             <SectionHead
               title="Partidos"
-              meta={seleccion.length > 0 ? `${seleccion.length} elegidos` : undefined}
+              meta={`${seleccion.length}/30 elegidos`}
             />
+            {seleccion.length > 0 && (
+              <details className="mb-3 rounded-lg border border-border-subtle bg-bg-card/80 transition-colors hover:border-border-strong">
+                <summary className="cursor-pointer rounded-lg p-3 text-[13px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+                  Ver selección ({seleccion.length})
+                </summary>
+                <ul className="divide-y divide-border-subtle px-3 pb-2" aria-label="Partidos elegidos">
+                  {seleccion.map((m) => (
+                    <li key={m.id} className="flex items-center gap-2 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] text-text-primary [overflow-wrap:anywhere]">{m.home_team} vs {m.away_team}</p>
+                        <p className="mt-1 text-[11px] text-text-secondary">
+                          {CREATABLE_TOURNAMENTS.find((t) => t.slug === m.tournament)?.name} · {formatMatchTime(m.scheduled_at)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSeleccion((prev) => prev.filter((item) => item.id !== m.id))}
+                        aria-label={`Quitar ${m.home_team} vs ${m.away_team}`}
+                        className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated hover:text-red-alert focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                      >
+                        <X className="h-4 w-4" aria-hidden />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {cargando ? (
               <StreetCard className="p-6 text-center text-[13px] text-text-muted">
                 Cargando partidos...
+              </StreetCard>
+            ) : matchesError ? (
+              <StreetCard className="p-5 text-center">
+                <p role="alert" className="text-[13px] text-text-secondary">{matchesError}</p>
+                <button type="button" onClick={() => setMatchesRevision((n) => n + 1)} className="lp-btn lp-btn-ghost mt-3 w-full text-[14px]">
+                  Reintentar
+                </button>
               </StreetCard>
             ) : matches.length === 0 ? (
               // (2026-09-02) Antes esto solo decía "no hay partidos" y se leía
@@ -712,15 +797,16 @@ export function CrearPollaForm() {
             ) : (
               <ul className="max-h-[420px] space-y-px overflow-y-auto">
                 {matches.map((m) => {
-                  const on = seleccion.includes(m.id);
+                  const on = selectedIds.has(m.id);
                   return (
                     <li key={m.id}>
                       <button
                         type="button"
-                        onClick={() => toggleMatch(m.id)}
+                        onClick={() => toggleMatch(m)}
+                        disabled={!on && seleccion.length >= 30}
                         aria-label={`${m.home_team} vs ${m.away_team}`}
                         aria-pressed={on}
-                        className={`flex w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold ${
+                        className={`flex w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-50 ${
                           on ? "bg-gold/10" : "bg-bg-card"
                         }`}
                       >
