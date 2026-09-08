@@ -196,7 +196,7 @@ function PollaRow({
             <div className="flex justify-end">
               <Tape tone={estado.tone}>{estado.text}</Tape>
             </div>
-            <TournamentIdentity tournaments={tournaments} kind={polla.kind} />
+            <TournamentIdentity tournaments={tournaments} kind={polla.kind} showNames={false} />
           </div>
 
           <h3 className="lp-display-sm mt-2 text-text-primary">{polla.name}</h3>
