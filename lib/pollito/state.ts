@@ -1,10 +1,12 @@
 /**
  * Pollito state resolver
  * Given user context, returns which of 4 emotional states the pollito should wear.
- * Assets live at /public/pollitos/pollito_{type}_{state}.webp
+ * Assets resolve through the shared versioned club-avatar catalog.
  */
 
-export type PollitoEstado = "base" | "lider" | "peleando" | "triste";
+import { getPollitoImage, type PollitoState } from "../pollitos";
+
+export type PollitoEstado = PollitoState;
 
 export interface PollitoContext {
   rank?: number;
@@ -27,5 +29,5 @@ export function resolvePollitoState(ctx: PollitoContext): PollitoEstado {
 }
 
 export function getPollitoAssetPath(type: string, estado: PollitoEstado): string {
-  return `/pollitos/pollito_${type}_${estado}.webp`;
+  return getPollitoImage(type, estado);
 }

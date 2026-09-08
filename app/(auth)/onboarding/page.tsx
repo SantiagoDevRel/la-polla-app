@@ -287,7 +287,7 @@ export default function OnboardingPage() {
               }}
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-              initial={{ opacity: 0.6, scale: 0.96 }}
+              initial={false}
               onAnimationStart={undefined}
             />
           </div>
@@ -301,13 +301,14 @@ export default function OnboardingPage() {
           </div>
 
           {/* Pollito grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+          <div className="grid grid-cols-2 gap-2 min-[400px]:grid-cols-4">
             {POLLITO_TYPES.map((p) => {
               const isSelected = selectedPollito === p.id;
               return (
                 <button
                   key={p.id}
                   type="button"
+                  className="min-w-0"
                   onClick={() => setSelectedPollito(p.id)}
                   style={{
                     background: isSelected ? "rgba(255, 215, 0, 0.08)" : "#131d2e",
@@ -327,7 +328,7 @@ export default function OnboardingPage() {
                     alt={p.label}
                     style={{ width: 48, height: 48, objectFit: "contain" }}
                   />
-                  <span style={{
+                  <span className="w-full [overflow-wrap:anywhere]" style={{
                     fontSize: 9,
                     color: isSelected ? "var(--gold)" : "#F5F7FA",
                     fontWeight: isSelected ? 600 : 400,

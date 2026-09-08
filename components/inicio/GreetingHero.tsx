@@ -12,10 +12,9 @@
 
 "use client";
 
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
-import { getPollitoByPosition, DEFAULT_POLLITO } from "@/lib/pollitos";
+import { getPollitoImage, getPollitoByPosition, DEFAULT_POLLITO } from "@/lib/pollitos";
 
 export interface GreetingHeroProps {
   firstName: string;
@@ -51,7 +50,7 @@ export function GreetingHero({
   const type = pollitoType || DEFAULT_POLLITO;
   const mood =
     rankCallout?.rank === 1 ? "lider" : rankCallout ? "peleando" : "base";
-  const src = `/pollitos/pollito_${type}_${mood}.webp`;
+  const src = getPollitoImage(type, mood);
   // Lider image variant is the "celebrate" pose — fall back gracefully.
   const fallbackSrc = getPollitoByPosition(type, 1, 1);
 
@@ -63,13 +62,12 @@ export function GreetingHero({
           animate={{ y: [0, -3, 0] }}
           transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Image
+          <img
             src={src}
             alt=""
             width={84}
             height={84}
             className="object-contain"
-            priority
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = fallbackSrc;
             }}

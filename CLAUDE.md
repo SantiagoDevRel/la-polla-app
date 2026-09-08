@@ -6,6 +6,14 @@
 
 ## READ THIS FIRST
 
+### Coordinación entre chats: datos y avatares (2026-09-08)
+
+Santiago acepta Supabase o Neon gratuitos y pide evitar bases duplicadas.
+Revisar primero la conexión existente de La Polla; elegir otro proveedor no
+autoriza una migración. El trabajo de camisetas de los avatares usa archivos
+estáticos y no crea bases, proyectos ni buckets. Catálogo, compatibilidad y
+detalle de esta coordinación: [docs/pollito-clubes.md](docs/pollito-clubes.md).
+
 Read this entire file before touching any component, any session.
 This is the design contract. Do not deviate from it.
 Visual changes ONLY. Never touch API routes, Supabase calls, middleware, auth flow, or any business logic.
