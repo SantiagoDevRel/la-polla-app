@@ -1,3 +1,25 @@
-# Secretos locales: los builds toman sus variables del proyecto en Vercel.
-.env
-.env.*
+# Deny all local files; upload only the Next.js build inputs.
+# Environment variables come from the existing Vercel project.
+/*
+!/app
+!/components
+!/i18n
+!/lib
+!/messages
+!/public
+!/package.json
+!/package-lock.json
+!/next.config.mjs
+!/next-env.d.ts
+!/postcss.config.mjs
+!/tailwind.config.ts
+!/tsconfig.json
+!/css.d.ts
+!/proxy.ts
+# Defense in depth inside allowed directories.
+**/.env*
+**/*.key
+**/*.pem
+**/keys.json
+**/secrets.json
+**/*.map
