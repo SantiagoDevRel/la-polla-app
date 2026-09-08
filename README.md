@@ -20,6 +20,10 @@ incluir teléfonos en URLs. El panel
 ## Crear y administrar pollas
 
 - `/admin/pollas/crear`: formulario independiente para crear una polla.
+  Puedes combinar hasta 30 partidos de distintas ligas; cambiar el torneo
+  visible conserva la selección. Cada liga muestra su cantidad de elegidos y
+  el resumen permite quitar partidos. El cierre automático usa el primer
+  partido de toda la selección, sin importar qué liga estás mirando.
 - `/admin/pollas`: una card desplegable por polla, con su cantidad de pagos
   pendientes. Al abrirla puedes ver cada comprobante y aprobar o rechazar el
   pago. Los conteos se actualizan cada 30 segundos mientras el panel está visible;
