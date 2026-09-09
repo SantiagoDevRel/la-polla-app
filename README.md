@@ -61,6 +61,11 @@ interno cuando supera 55 % de la pantalla (máximo 28 rem); los goles llevan un
 balón y las tarjetas, cambios y estadísticas tienen íconos acompañados de texto.
 Los enlaces de última alineación conservan su apertura directa en Alineaciones.
 
+La navegación presenta **INFO** con un balón. El calendario usa un único
+selector de fecha con el mes completo («Septiembre 08»), dentro de la ventana
+vigente de seis días antes/después; no presenta atajos Ayer/Hoy/Mañana ni meses
+numéricos ambiguos. El valor enviado a la API sigue siendo ISO.
+
 La creación es exclusivamente administrativa (`/admin/pollas/crear`). Los
 enlaces antiguos a `/pollas/crear` redirigen directamente a `/casa`, sin aviso
 de transición ni formulario para jugadores. El POST P2P continúa bloqueado.

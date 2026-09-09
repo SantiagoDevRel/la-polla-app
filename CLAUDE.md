@@ -39,6 +39,11 @@ Resumen conserva todos los eventos con scroll interno (`55dvh`, máximo `28rem`)
 y SVG de balón, tarjetas o cambios junto al texto. No repetir los goles en otra
 lista larga antes de las pestañas. El deep link a alineaciones sigue vigente.
 
+La pestaña de navegación se llama **INFO**, con SVG de balón (no CircleDot).
+El calendario ofrece solo un selector de fecha con mes completo y día de dos
+dígitos («Septiembre 08»). No volver a agregar Ayer/Hoy/Mañana ni mostrar fecha
+numérica mes/día. Conserva la ventana ±6 días del calendario compartido.
+
 **Escudos completos (mismo día):** `scripts/bake-team-crests.mjs` ahora incluye
 los nueve torneos, también Sudamericana y todas las fases de Champions.
 `lib/teams/crest-coverage.json` registra 258 clubes actuales y los 280 nombres

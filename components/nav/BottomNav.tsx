@@ -21,7 +21,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { Ticket, User, CircleDot } from "lucide-react";
+import { Ticket, User } from "lucide-react";
+import type { ComponentType } from 'react';
+import { FootballBall } from '@/components/football/FootballIcons';
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 
@@ -46,12 +48,12 @@ export interface BottomNavProps {
 interface Tab {
   key: NavKey;
   href: string;
-  Icon: typeof Ticket;
+  Icon: ComponentType<{className?:string;strokeWidth?:number|string}>;
   labelKey: "tabPollas" | "tabFutbol" | "tabPerfil";
 }
 
 const TAB_POLLAS: Tab = { key: "pollas", href: "/casa", Icon: Ticket, labelKey: "tabPollas" };
-const TAB_FUTBOL: Tab = { key: "futbol", href: "/futbol", Icon: CircleDot, labelKey: "tabFutbol" };
+const TAB_FUTBOL: Tab = { key: "futbol", href: "/futbol", Icon: FootballBall, labelKey: "tabFutbol" };
 const TAB_PERFIL: Tab = { key: "perfil", href: "/perfil", Icon: User, labelKey: "tabPerfil" };
 function deriveActive(pathname: string | null): NavKey | undefined {
   if (!pathname) return undefined;

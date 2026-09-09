@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, ChevronDown } from 'lucide-react';
 import { TOURNAMENTS, getTournamentName } from '@/lib/tournaments';
 import { RESULT_LEAGUES } from '@/lib/api-football/results';
 import { isLiveStatus, type FootballMatch } from '@/lib/api-football/detail-model';
@@ -13,27 +13,31 @@ const offsetDate=(date:string,days:number)=>new Date(Date.parse(date)+days*86400
 
 export default function FootballCenter() {
  const locale=useLocale(),en=locale==='en';
- const [today]=useState(bogotaToday),[date,setDate]=useState(bogotaToday),[league,setLeague]=useState('all'),[live,setLive]=useState(false),[calendar,setCalendar]=useState(false);
+ const [today]=useState(bogotaToday),[date,setDate]=useState(bogotaToday),[league,setLeague]=useState('all'),[live,setLive]=useState(false);
  const {data,error,loading,reload}=useFootballResource<CalendarResponse>(`/api/football?date=${date}`);
  const tournaments=TOURNAMENTS.filter(t=>RESULT_LEAGUES[t.slug]);
  const matches=(data?.matches??[]).filter(m=>(league==='all'||m.tournament===league)&&(!live||isLiveStatus(m.status)));
+ const dateOptions=Array.from({length:13},(_,i)=>offsetDate(today,i-6)).map(value=>{
+  const parts=new Intl.DateTimeFormat(en?'en-US':'es-CO',{month:'long',day:'2-digit',timeZone:'UTC'}).formatToParts(new Date(value));
+  const month=parts.find(p=>p.type==='month')!.value,day=parts.find(p=>p.type==='day')!.value.padStart(2,'0');
+  return {value,label:`${month.charAt(0).toUpperCase()+month.slice(1)} ${day}`};
+ });
  return <main className="space-y-5 px-4 pb-4">
   <header className="space-y-1">
-   <h1 className="font-display text-[32px] leading-tight tracking-wide text-text-primary">{en?'Football':'Fútbol'}</h1>
+   <h1 className="font-display text-[32px] leading-tight tracking-wide text-text-primary">{en?'Football info':'Información de fútbol'}</h1>
    <p className="text-[15px] leading-relaxed text-text-secondary">{en?'Scores, goals and your teams.':'Resultados, goles y tus equipos.'}</p>
   </header>
   <div className="lp-card space-y-4 p-4">
-   <div className="flex flex-wrap gap-2">
-    {[-1,0,1].map((n,i)=><button key={n} type="button" aria-pressed={date===offsetDate(today,n)} onClick={()=>setDate(offsetDate(today,n))}
-     className={`min-h-11 min-w-fit flex-1 rounded-full px-3 text-[15px] font-semibold transition-colors cursor-pointer ${date===offsetDate(today,n)?'bg-text-primary text-bg-base':'border border-border-subtle text-text-secondary hover:bg-bg-elevated'}`}>
-     {(en?['Yesterday','Today','Tomorrow']:['Ayer','Hoy','Mañana'])[i]}
-    </button>)}
-   </div>
-   <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-text-secondary">
-    <span>{new Intl.DateTimeFormat(en?'en-US':'es-CO',{weekday:'long',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(date))}</span>
-    <button type="button" aria-expanded={calendar} onClick={()=>setCalendar(!calendar)} className="flex min-h-11 items-center gap-2 rounded-full px-2 font-medium hover:bg-bg-elevated cursor-pointer"><CalendarDays className="h-4 w-4"/>{en?'Choose date':'Elegir fecha'}</button>
-   </div>
-   {calendar&&<label className="block space-y-1 text-[13px] text-text-secondary">{en?'Date':'Fecha'}<input aria-label={en?'Date':'Fecha'} type="date" value={date} min={offsetDate(today,-6)} max={offsetDate(today,6)} onChange={e=>{if(e.target.value)setDate(e.target.value);}} className="lp-input block min-h-11 w-full min-w-0 text-[15px]"/></label>}
+   <label className="block space-y-2 text-[13px] text-text-secondary">
+    <span className="flex items-center gap-2"><CalendarDays className="h-4 w-4" aria-hidden="true"/>{en?'Date':'Fecha'}</span>
+    <span className="lp-input relative flex min-h-11 w-full items-center gap-2 text-[15px] focus-within:ring-1 focus-within:ring-gold/40">
+     <span aria-hidden="true" className="min-w-0 flex-1 [overflow-wrap:anywhere]">{dateOptions.find(option=>option.value===date)?.label}</span>
+     <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0"/>
+     <select aria-label={en?'Date':'Fecha'} value={date} onChange={e=>setDate(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+      {dateOptions.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}
+     </select>
+    </span>
+   </label>
    <label className="block space-y-1 text-[13px] text-text-secondary"><span>{en?'Competition':'Torneo'}</span>
     <select value={league} onChange={e=>setLeague(e.target.value)} className="lp-input block min-h-11 w-full text-[15px]">
      <option value="all">{en?'All':'Todos'}</option>
