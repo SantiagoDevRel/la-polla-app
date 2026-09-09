@@ -6,6 +6,46 @@ El modelo histórico de grupos privados permanece disponible.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
+## Resultados API-Football Free
+
+El cierre automático incorpora API-Football para BetPlay, Libertadores,
+Sudamericana, Champions, Premier, Ligue 1, Bundesliga, La Liga y Serie A.
+Guarda el marcador de **90 minutos + adición**; el 1X2 se deriva de ese marcador.
+Alargue y penales se conservan aparte para los modos de puntaje existentes.
+
+Configuración server-side, después de aplicar `092_api_football_free_cache.sql`:
+
+```dotenv
+# Obtener la clave en https://dashboard.api-football.com/profile?access
+API_FOOTBALL_KEY=<clave privada>
+API_FOOTBALL_FINALS_ENABLED=true
+```
+
+El plan gratuito acepta `/fixtures?date=YYYY-MM-DD` para fechas actuales aunque
+rechace pedir la temporada completa. La integración consulta hoy/ayer en UTC,
+filtra los nueve torneos y comparte una caché de 20 minutos. Solo consulta cuando
+un partido vinculado a una polla necesita resultado. Una reserva atómica en la
+DB limita esta integración a **80 solicitudes/día UTC**, sin reintentos HTTP;
+quedan 20 de las 100 gratuitas para otras consultas. Con dos fechas activas y
+uso continuo puede alcanzar el límite; ESPN/football-data siguen disponibles.
+
+El cron existente `/api/matches/sync-live` ejecuta la verificación. Se exigen ambos
+equipos, torneo y horario para identificar un partido. Una discrepancia bloquea
+el cierre; sin corroboración se requieren dos respuestas nuevas del proveedor
+(releer la caché no cuenta). El cierre atómico pasa por `finalize_match_result`,
+sin escribir pronósticos directamente ni importar partidos duplicados.
+Los calendarios y el marcador en vivo mantienen sus fuentes existentes.
+
+Diagnóstico (solo lectura, acceso de servicio):
+
+```sql
+SELECT request_day, requests_used, last_attempt_at FROM api_football_budget;
+SELECT fixture_date, fetched_at, jsonb_array_length(fixtures) AS fixtures
+FROM api_football_cache ORDER BY fixture_date DESC;
+```
+
+Pruebas: `npm test -- lib/api-football/results.test.ts tests/api-football-cache.test.ts tests/api-football-verification.test.ts`.
+
 ## Directorio de administración
 
 En `/admin`, **Buscar un usuario** abre una lista con nombres y teléfonos.

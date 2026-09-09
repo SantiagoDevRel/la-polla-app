@@ -48,6 +48,8 @@ import {
 import { COMPETITIONS } from "@/lib/football-data/sync";
 import { fetchCompetitionMatches, type FDMatch } from "@/lib/football-data/client";
 import { notifyAdmin } from "@/lib/notifications/admin-alert";
+import { apiFootballFinalsEnabled, loadDailyResults, type DailyResults } from "@/lib/api-football/daily-results";
+import { confirmedObservation, findResultFixture, readFinalResult, resultTeamKey, scorePair } from "@/lib/api-football/results";
 
 export interface VerifyResult {
   match_id: string;
@@ -229,8 +231,10 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
     COLS,
     (q) =>
       q
-        .eq("status", "finished")
+        .in("status", apiFootballFinalsEnabled() ? ["finished", "live", "scheduled"] : ["finished"])
+        .or(`status.eq.finished,scheduled_at.gte.${new Date(Date.now() - 86400000).toISOString().slice(0, 10)}T00:00:00Z`)
         .is("final_verified_at", null)
+        .lte("scheduled_at", new Date(Date.now() - (apiFootballFinalsEnabled() ? 105 * 60000 : 0)).toISOString())
         .gte("scheduled_at", desde),
   );
   if (errores.length > 0) {
@@ -239,6 +243,8 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
   }
 
   if (candidates.length === 0) return [];
+
+  const apiFootballByDate = await loadDailyResults(candidates);
 
   // UN fetch a football-data por torneo por tick (no por match) — cubre
   // a todos los candidatos del torneo y respeta el rate limit de 10/min.
@@ -282,12 +288,25 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
 
   const results: VerifyResult[] = [];
   for (const match of candidates) {
-    const result = await verifyOneMatch(
+    const daily = apiFootballByDate.get(new Date(match.scheduled_at).toISOString().slice(0, 10));
+    // A delayed ESPN status must not hide a final from API-Football. Without
+    // an actual final response, scheduled/live rows never enter legacy scoring.
+    if (match.status !== "finished") {
+      const fixture = daily ? findResultFixture(match, daily.fixtures) : null;
+      if (!fixture || !readFinalResult(fixture)) continue;
+    }
+    try {
+      const result = await verifyOneMatch(
       match,
       fdByTournament.get(match.tournament),
       espnByTournament.get(match.tournament),
+      daily,
     );
     results.push(result);
+    } catch {
+      results.push({match_id: match.id, external_id: match.external_id, espn_id: match.espn_id,
+        status: "error", notes: "No se pudo guardar la verificación; se reintentará."});
+    }
   }
   return results;
 }
@@ -296,6 +315,7 @@ async function verifyOneMatch(
   match: MatchRow,
   fdMatches: FDMatch[] | null | undefined,
   espnEvents: Awaited<ReturnType<typeof fetchEspnScoreboard>> | null | undefined,
+  daily?: DailyResults,
 ): Promise<VerifyResult> {
   const result: VerifyResult = {
     match_id: match.id,
@@ -317,6 +337,7 @@ async function verifyOneMatch(
 
   // 1. ESPN — buscar el evento en el scoreboard (memoizado por torneo).
   let espnFinished = false;
+  let espnEt = false;
   let espnHome: number | null = null;
   let espnAway: number | null = null;
   // Extras de knockout (migración 077): el `score` de ESPN es el marcador de
@@ -350,6 +371,7 @@ async function verifyOneMatch(
     if (event) {
       const mapped = mapEspnStatus(event.status);
       espnFinished = mapped === "finished";
+      espnEt = ET_STATUS_DETAILS.has(event.status.type.name);
       const competition = event.competitions[0];
       const home = competition?.competitors.find((c) => c.homeAway === "home");
       const away = competition?.competitors.find((c) => c.homeAway === "away");
@@ -388,6 +410,66 @@ async function verifyOneMatch(
   const alertedSuffix = previousAlertedMatch ? previousAlertedMatch[0] : "";
 
   const etSignal = hasEtSignal(match);
+
+  const afFixture = daily ? findResultFixture(match, daily.fixtures) : null;
+  const af = afFixture ? readFinalResult(afFixture) : null;
+  if (af && afFixture && daily) {
+    // FD must match BOTH team names here. Provider numeric IDs are unrelated.
+    const fdCandidates = (fdMatches ?? []).filter(f => f.status === "FINISHED"
+      && Math.abs(Date.parse(f.utcDate) - Date.parse(match.scheduled_at)) <= 2 * 3600000
+      && resultTeamKey(f.homeTeam.name) === resultTeamKey(match.home_team)
+      && resultTeamKey(f.awayTeam.name) === resultTeamKey(match.away_team));
+    const fd = fdCandidates.length === 1 ? fdCandidates[0] : null;
+    const fd90 = fd?.score?.duration === "REGULAR" ? fd.score.fullTime : fd?.score?.regularTime;
+    const signals: Array<{home: number; away: number}> = [];
+    if (scorePair(fd90)) signals.push(fd90);
+    const snapshot = {home: match.regulation_home_score, away: match.regulation_away_score};
+    if (scorePair(snapshot)) signals.push(snapshot);
+    if (espnFinished && !espnEt && !etSignal && !af.wentToExtraTime && scorePair({home: espnHome, away: espnAway})) {
+      signals.push({home: espnHome!, away: espnAway!});
+    }
+    const fulltimeConflict = espnFinished && af.fulltime && espnHome !== null && espnAway !== null
+      && (af.fulltime.home !== espnHome || af.fulltime.away !== espnAway);
+    if (fulltimeConflict || signals.some(s => s.home !== af.home || s.away !== af.away)) {
+      result.status = "discrepancy";
+      result.notes = `DISCREPANCIA — API-Football 90': ${af.home}-${af.away}; otra fuente no coincide. No se puntúa.`;
+      await alertOnce(admin, match, result.notes, alertedSuffix);
+      return result;
+    }
+    if (signals.length === 0 && !confirmedObservation(previousNotes, afFixture.fixture.id, af.home, af.away, daily.fetchedAt)) {
+      result.notes = `API-Football 90': ${af.home}-${af.away}; esperando otra lectura del proveedor.`;
+      // Keep the FIRST observation of this score until an actual new fetch arrives.
+      const marker = ` afseen=${afFixture.fixture.id}:${af.home}-${af.away}@${daily.fetchedAt}`;
+      await persistNote(admin, match.id, result.notes + marker + alertedSuffix);
+      return result;
+    }
+    const isKnockout = match.phase !== null && KNOCKOUT_PHASES.has(match.phase);
+    let afAdvancer: "home" | "away" | null = null;
+    if (isKnockout) {
+      if (!af.fulltime || (afFixture.fixture.status.short === "PEN" && !af.penalty)) {
+        result.notes = "API-Football: faltan el marcador completo o los penales; esperando confirmación.";
+        await persistNote(admin, match.id, result.notes + alertedSuffix);
+        return result;
+      }
+      // Match winner != aggregate qualifier. Only ESPN's established advance
+      // signal or a decisive shootout supplies advancer; never teams.winner.
+      afAdvancer = espnFinished ? espnAdvancer : af.penalty && af.penalty.home !== af.penalty.away
+        ? af.penalty.home > af.penalty.away ? "home" : "away" : null;
+    }
+    result.notes = `Verificado API-Football: 90' ${af.home}-${af.away}, 1X2=${af.outcome}; ${signals.length ? "corroborado" : "dos lecturas del proveedor"}.`;
+    const {data: finalized, error} = await admin.rpc("finalize_api_football_result", {
+      p_match_id: match.id, p_home_score: af.home, p_away_score: af.away, p_notes: result.notes,
+      p_fulltime_home: isKnockout ? af.fulltime?.home ?? null : null,
+      p_fulltime_away: isKnockout ? af.fulltime?.away ?? null : null,
+      p_penalty_home: isKnockout ? af.penalty?.home ?? null : null,
+      p_penalty_away: isKnockout ? af.penalty?.away ?? null : null,
+      p_advancer: afAdvancer,
+    });
+    if (error) throw new Error("API-Football finalization failed");
+    result.status = finalized === true ? "verified" : "pending";
+    if (finalized !== true) result.notes = "Otro proceso ya verificó el partido o dejó de estar disponible.";
+    return result;
+  }
 
   // Persistir los extras de knockout (120'/penales/avance) ANTES de cualquier
   // finalize: score_match corre al setear final_verified_at dentro de
@@ -672,6 +754,7 @@ async function finalize(
   });
   if (error) {
     console.error(`[verify-final] finalize_match_result failed for ${matchId}:`, error.message);
+    throw new Error("Finalization failed");
   }
 }
 

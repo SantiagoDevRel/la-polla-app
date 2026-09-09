@@ -6,6 +6,24 @@
 
 ## READ THIS FIRST
 
+### API-Football Free: cierre de resultados (2026-09-09)
+
+- `lib/api-football/daily-results.ts` consulta `/fixtures?date=...` (hoy/ayer UTC),
+  nunca la temporada completa: Free puede rechazar `season` aunque sí entregue
+  resultados actuales por fecha. Nueve torneos mapeados en `results.ts`.
+- Clave privada `API_FOOTBALL_KEY` + `API_FOOTBALL_FINALS_ENABLED=true`, solo servidor.
+  Migración 092 antes de habilitar: caché compartida 20 min, reserva atómica,
+  techo 80 solicitudes/día UTC, sin retries que gasten cuota por fuera del contador.
+- `verify-final.ts` incorpora esta fuente al cron existente. Marcador de 90' para
+  1X2/puntos; extras separados. Dos nombres + torneo + horario y candidato único.
+  Discrepancia veta; dos lecturas de la misma caché NO corroboran entre sí.
+- `finalize_api_football_result` bloquea el match, guarda extras y llama al RPC
+  autoritativo `finalize_match_result` en la misma transacción. Nada de updates
+  directos de pronósticos, de partidos nuevos ni de recalcular resultados históricos.
+- ESPN/football-data siguen siendo calendario/live y fallback si falta cobertura,
+  hay error o se agota la cuota. No activar el poller legacy de API-Football.
+- Detalle de operación y pruebas en README, sección «Resultados API-Football Free».
+
 ### Coordinación entre chats: datos y avatares (2026-09-08)
 
 Santiago acepta Supabase o Neon gratuitos y pide evitar bases duplicadas.
