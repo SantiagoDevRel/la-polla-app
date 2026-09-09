@@ -1,11 +1,8 @@
 import { teamNameKey } from '@/lib/teams/team-name-key';
 import type { ApiFootballFixture } from './mappers';
 
-export const RESULT_LEAGUES: Record<string, number> = {
-  betplay_2026: 239, libertadores_2026: 13, sudamericana_2026: 11,
-  champions_2025: 2, premier_2025: 39, ligue1_2025: 61,
-  bundesliga_2025: 78, laliga_2025: 140, seriea_2025: 135,
-};
+import { RESULT_LEAGUES } from './leagues';
+export { RESULT_LEAGUES } from './leagues';
 
 const ALIASES: Record<string, string> = {
   'feyenoord rotterdam': 'feyenoord', 'viking fk': 'viking',

@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { TeamCrest as ClubCrest } from '@/components/match/TeamCrest';
 import axios from "axios";
 import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
@@ -165,6 +166,7 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
   // unoptimized: skipea el optimizador de imágenes de Vercel para
   // logos externos pequeños (24x24).
   const countryFlag = flagUrlForTeam(teamName);
+  if (!isIOSApp && !countryFlag) return <ClubCrest team={teamName} src={flagUrl}/>;
   const src = isIOSApp ? countryFlag : (countryFlag ?? flagUrl);
   if (src && !errored) {
     // Bandera de país (flag-icons, ratio 4:3): caja 4:3 (24×18) que la

@@ -15,6 +15,9 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === "development",
   // Reload de pestañas que estaban cargadas cuando vuelve la conexión.
   reloadOnOnline: true,
+  // Hundreds of club crests must not compete with fonts/data during SW install.
+  // They remain same-origin, with the existing image runtime cache on first use.
+  globPublicPatterns: ['*', '!(team-crests)/**/*'],
 });
 
 /** @type {import('next').NextConfig} */
@@ -27,6 +30,9 @@ const nextConfig = {
   // Keep framework chrome out of visual regression screenshots and prevent
   // the dev-tools badge from covering controls near the bottom-left corner.
   devIndicators: false,
+  async redirects() {
+    return [{ source: '/pollas/crear', destination: '/casa', permanent: false }];
+  },
   images: {
     // Whitelist explícita de los hosts que servimos via next/image.
     // hostname: "**" actuaba como proxy abierto bajo nuestra cuota Vercel

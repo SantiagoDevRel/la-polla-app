@@ -52,6 +52,44 @@ Código: `lib/api-football/{account,feed,details,teams,live}.ts`,
 `components/football/`, `app/api/football/`, `app/(app)/futbol/`.
 Pruebas del modelo: `npm test -- tests/api-football-detail.test.ts`.
 
+### Cobertura de escudos y logos
+
+La creación es exclusivamente administrativa (`/admin/pollas/crear`). Los
+enlaces antiguos a `/pollas/crear` redirigen directamente a `/casa`, sin aviso
+de transición ni formulario para jugadores. El POST P2P continúa bloqueado.
+
+El catálogo incluye **258 clubes de las temporadas actuales**, los **280 nombres
+de equipos observados en 3.515 partidos históricos** (incluidas selecciones) y
+los nueve logos de API-Football. Todos tienen imágenes locales; las selecciones
+conservan sus banderas. `crest-coverage.json` registra el inventario completo
+para comprobar faltantes; nunca se importa en el cliente.
+
+`TeamCrest` comparte la resolución en Fútbol, Casa, el creador y las vistas
+históricas. `crest-overrides.json` corrige identidades revisadas: Club Brugge
+tenía una URL histórica de Espanyol; Recoleta usa el escudo actual. La excepción
+de Brugge se aplica al nombre del club, para no cambiar el logo de Espanyol.
+
+Actualizar al incorporar equipos/temporadas:
+
+```bash
+node --experimental-strip-types scripts/bake-team-crests.mjs
+npm test -- tests/football-media.test.ts
+```
+
+El script verifica la temporada vigente con `/leagues`, inventaría `/teams`
+para los nueve torneos (18 llamadas con Pro), lee los partidos paginados y
+genera WebP de hasta 96 px. No escribe en la DB ni elimina assets anteriores.
+`--inventory <json> --fixtures <json>` permite repetir un inventario auditado
+sin más consultas. Aborta ante imágenes vacías, clubes sin escudo o imágenes
+idénticas para IDs de clubes diferentes. Los logos quedan en `league-logos.json`.
+Revisar visualmente cualquier proveedor nuevo o cambio de identidad antes de
+publicar: una imagen válida puede pertenecer al club equivocado.
+
+Los escudos se sirven desde el mismo origen y entran a la caché al usarlos;
+no se descargan cientos de imágenes durante la instalación del service worker.
+Los proveedores se conservan como respaldo. Las restricciones preexistentes
+de la app nativa iOS en las pantallas históricas permanecen separadas de la web.
+
 ## Resultados y alternativa gratuita
 
 El cierre automático incorpora API-Football para BetPlay, Libertadores,

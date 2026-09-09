@@ -1,0 +1,12 @@
+{
+  "club brugge": {
+    "source": "https://media.api-sports.io/football/teams/569.png",
+    "reference": "https://crests.football-data.org/851.png",
+    "reason": "The historical fixture URL ESPN 570 shows Espanyol. Override by club name, never globally by that URL."
+  },
+  "deportivo recoleta": {
+    "source": "https://a.espncdn.com/i/teamlogos/soccer/500/22517.png",
+    "reference": "https://recoleta.com.py/",
+    "reason": "Current black/gold Recoleta FC crest; API-Football still serves the former yellow crest."
+  }
+}

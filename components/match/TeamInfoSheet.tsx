@@ -20,6 +20,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { X, CalendarDays, Shield, Check, ExternalLink, Users, Newspaper, LayoutGrid } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
+import { TeamCrest } from './TeamCrest';
 import { getTeamFacts } from "@/lib/teams/worldcup-facts";
 import { positionLabel } from "@/lib/espn/labels-es";
 import { DURATION } from "@/lib/animations";
@@ -94,6 +95,7 @@ function isLockedForPrediction(scheduledAt: string): boolean {
 function FlagCircle({ team, apiFlag, size }: { team: string; apiFlag: string | null; size: number }) {
   const [errored, setErrored] = useState(false);
   const countryFlag = flagUrlForTeam(team);
+  if (!countryFlag) return <TeamCrest team={team} src={apiFlag} className={size===44?'h-11 w-11':size===18?'h-[18px] w-[18px]':'h-4 w-4'}/>;
   const src = countryFlag ?? apiFlag;
   if (src && !errored) {
     // Bandera de país (flag-icons 4:3): caja 4:3 que la bandera llena

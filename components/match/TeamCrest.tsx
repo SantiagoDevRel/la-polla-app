@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import { teamNameKey } from "@/lib/teams/team-name-key";
 import catalog from "@/lib/teams/crest-catalog.json";
-import { crestFallbackSource } from "@/lib/teams/crest-source";
+import { crestFallbackSource, localCrestSource } from "@/lib/teams/crest-source";
 
 const bySource: Record<string, string> = catalog.bySource;
 const byName: Record<string, string> = catalog.byName;
@@ -24,6 +24,7 @@ export function TeamCrest({
   const [failed, setFailed] = useState<string[]>([]);
   const countryFlag = flagUrlForTeam(team);
   const candidates = [
+    localCrestSource(team,src),
     countryFlag,
     src ? bySource[src] : undefined,
     byName[teamNameKey(team)],

@@ -1,0 +1,2691 @@
+{
+  "generatedAt": "2026-09-09T22:37:31.908Z",
+  "fixtures": 3515,
+  "leagues": [
+    {
+      "slug": "betplay_2026",
+      "id": 239,
+      "season": 2026,
+      "teams": [
+        {
+          "id": 1125,
+          "name": "Millonarios",
+          "source": "https://media.api-sports.io/football/teams/1125.png"
+        },
+        {
+          "id": 1126,
+          "name": "Deportivo Pasto",
+          "source": "https://media.api-sports.io/football/teams/1126.png"
+        },
+        {
+          "id": 1127,
+          "name": "Deportivo Cali",
+          "source": "https://media.api-sports.io/football/teams/1127.png"
+        },
+        {
+          "id": 1128,
+          "name": "Independiente Medellin",
+          "source": "https://media.api-sports.io/football/teams/1128.png"
+        },
+        {
+          "id": 1131,
+          "name": "Bucaramanga",
+          "source": "https://media.api-sports.io/football/teams/1131.png"
+        },
+        {
+          "id": 1132,
+          "name": "Chico",
+          "source": "https://media.api-sports.io/football/teams/1132.png"
+        },
+        {
+          "id": 1133,
+          "name": "Jaguares",
+          "source": "https://media.api-sports.io/football/teams/1133.png"
+        },
+        {
+          "id": 1134,
+          "name": "Internacional de Bogota",
+          "source": "https://media.api-sports.io/football/teams/1134.png"
+        },
+        {
+          "id": 1135,
+          "name": "Junior",
+          "source": "https://media.api-sports.io/football/teams/1135.png"
+        },
+        {
+          "id": 1136,
+          "name": "Once Caldas",
+          "source": "https://media.api-sports.io/football/teams/1136.png"
+        },
+        {
+          "id": 1137,
+          "name": "Atletico Nacional",
+          "source": "https://media.api-sports.io/football/teams/1137.png"
+        },
+        {
+          "id": 1138,
+          "name": "America de Cali",
+          "source": "https://media.api-sports.io/football/teams/1138.png"
+        },
+        {
+          "id": 1139,
+          "name": "Santa Fe",
+          "source": "https://media.api-sports.io/football/teams/1139.png"
+        },
+        {
+          "id": 1141,
+          "name": "Alianza Valledupar",
+          "source": "https://media.api-sports.io/football/teams/1141.png"
+        },
+        {
+          "id": 1142,
+          "name": "Deportes Tolima",
+          "source": "https://media.api-sports.io/football/teams/1142.png"
+        },
+        {
+          "id": 1144,
+          "name": "Águilas Doradas",
+          "source": "https://media.api-sports.io/football/teams/1144.png"
+        },
+        {
+          "id": 1147,
+          "name": "Fortaleza FC",
+          "source": "https://media.api-sports.io/football/teams/1147.png"
+        },
+        {
+          "id": 1462,
+          "name": "Deportivo Pereira",
+          "source": "https://media.api-sports.io/football/teams/1462.png"
+        },
+        {
+          "id": 1464,
+          "name": "Llaneros",
+          "source": "https://media.api-sports.io/football/teams/1464.png"
+        },
+        {
+          "id": 1470,
+          "name": "Cucuta",
+          "source": "https://media.api-sports.io/football/teams/1470.png"
+        }
+      ]
+    },
+    {
+      "slug": "libertadores_2026",
+      "id": 13,
+      "season": 2026,
+      "teams": [
+        {
+          "id": 118,
+          "name": "Bahia",
+          "source": "https://media.api-sports.io/football/teams/118.png"
+        },
+        {
+          "id": 120,
+          "name": "Botafogo",
+          "source": "https://media.api-sports.io/football/teams/120.png"
+        },
+        {
+          "id": 121,
+          "name": "Palmeiras",
+          "source": "https://media.api-sports.io/football/teams/121.png"
+        },
+        {
+          "id": 124,
+          "name": "Fluminense",
+          "source": "https://media.api-sports.io/football/teams/124.png"
+        },
+        {
+          "id": 127,
+          "name": "Flamengo",
+          "source": "https://media.api-sports.io/football/teams/127.png"
+        },
+        {
+          "id": 131,
+          "name": "Corinthians",
+          "source": "https://media.api-sports.io/football/teams/131.png"
+        },
+        {
+          "id": 135,
+          "name": "Cruzeiro",
+          "source": "https://media.api-sports.io/football/teams/135.png"
+        },
+        {
+          "id": 437,
+          "name": "Rosario Central",
+          "source": "https://media.api-sports.io/football/teams/437.png"
+        },
+        {
+          "id": 446,
+          "name": "Lanus",
+          "source": "https://media.api-sports.io/football/teams/446.png"
+        },
+        {
+          "id": 450,
+          "name": "Estudiantes L.P.",
+          "source": "https://media.api-sports.io/football/teams/450.png"
+        },
+        {
+          "id": 451,
+          "name": "Boca Juniors",
+          "source": "https://media.api-sports.io/football/teams/451.png"
+        },
+        {
+          "id": 458,
+          "name": "Argentinos JRS",
+          "source": "https://media.api-sports.io/football/teams/458.png"
+        },
+        {
+          "id": 473,
+          "name": "Independ. Rivadavia",
+          "source": "https://media.api-sports.io/football/teams/473.png"
+        },
+        {
+          "id": 1064,
+          "name": "Platense",
+          "source": "https://media.api-sports.io/football/teams/1064.png"
+        },
+        {
+          "id": 1128,
+          "name": "Independiente Medellin",
+          "source": "https://media.api-sports.io/football/teams/1128.png"
+        },
+        {
+          "id": 1135,
+          "name": "Junior",
+          "source": "https://media.api-sports.io/football/teams/1135.png"
+        },
+        {
+          "id": 1139,
+          "name": "Santa Fe",
+          "source": "https://media.api-sports.io/football/teams/1139.png"
+        },
+        {
+          "id": 1142,
+          "name": "Deportes Tolima",
+          "source": "https://media.api-sports.io/football/teams/1142.png"
+        },
+        {
+          "id": 1152,
+          "name": "Barcelona SC",
+          "source": "https://media.api-sports.io/football/teams/1152.png"
+        },
+        {
+          "id": 1153,
+          "name": "Independiente del Valle",
+          "source": "https://media.api-sports.io/football/teams/1153.png"
+        },
+        {
+          "id": 1157,
+          "name": "Universidad Catolica",
+          "source": "https://media.api-sports.io/football/teams/1157.png"
+        },
+        {
+          "id": 1158,
+          "name": "LDU de Quito",
+          "source": "https://media.api-sports.io/football/teams/1158.png"
+        },
+        {
+          "id": 1174,
+          "name": "Club Guarani",
+          "source": "https://media.api-sports.io/football/teams/1174.png"
+        },
+        {
+          "id": 1176,
+          "name": "Cerro Porteno",
+          "source": "https://media.api-sports.io/football/teams/1176.png"
+        },
+        {
+          "id": 1179,
+          "name": "Libertad Asuncion",
+          "source": "https://media.api-sports.io/football/teams/1179.png"
+        },
+        {
+          "id": 2140,
+          "name": "2 de Mayo",
+          "source": "https://media.api-sports.io/football/teams/2140.png"
+        },
+        {
+          "id": 2320,
+          "name": "O'Higgins",
+          "source": "https://media.api-sports.io/football/teams/2320.png"
+        },
+        {
+          "id": 2328,
+          "name": "Huachipato",
+          "source": "https://media.api-sports.io/football/teams/2328.png"
+        },
+        {
+          "id": 2330,
+          "name": "Coquimbo Unido",
+          "source": "https://media.api-sports.io/football/teams/2330.png"
+        },
+        {
+          "id": 2348,
+          "name": "Penarol",
+          "source": "https://media.api-sports.io/football/teams/2348.png"
+        },
+        {
+          "id": 2353,
+          "name": "Juventud",
+          "source": "https://media.api-sports.io/football/teams/2353.png"
+        },
+        {
+          "id": 2356,
+          "name": "Club Nacional",
+          "source": "https://media.api-sports.io/football/teams/2356.png"
+        },
+        {
+          "id": 2358,
+          "name": "Liverpool Montevideo",
+          "source": "https://media.api-sports.io/football/teams/2358.png"
+        },
+        {
+          "id": 2540,
+          "name": "Universitario",
+          "source": "https://media.api-sports.io/football/teams/2540.png"
+        },
+        {
+          "id": 2546,
+          "name": "Sporting Cristal",
+          "source": "https://media.api-sports.io/football/teams/2546.png"
+        },
+        {
+          "id": 2553,
+          "name": "Alianza Lima",
+          "source": "https://media.api-sports.io/football/teams/2553.png"
+        },
+        {
+          "id": 2807,
+          "name": "Deportivo Tachira FC",
+          "source": "https://media.api-sports.io/football/teams/2807.png"
+        },
+        {
+          "id": 2810,
+          "name": "Carabobo FC",
+          "source": "https://media.api-sports.io/football/teams/2810.png"
+        },
+        {
+          "id": 2813,
+          "name": "Deportivo La Guaira",
+          "source": "https://media.api-sports.io/football/teams/2813.png"
+        },
+        {
+          "id": 2840,
+          "name": "UCV",
+          "source": "https://media.api-sports.io/football/teams/2840.png"
+        },
+        {
+          "id": 2994,
+          "name": "U. Catolica",
+          "source": "https://media.api-sports.io/football/teams/2994.png"
+        },
+        {
+          "id": 3700,
+          "name": "Always Ready",
+          "source": "https://media.api-sports.io/football/teams/3700.png"
+        },
+        {
+          "id": 3702,
+          "name": "Bolívar",
+          "source": "https://media.api-sports.io/football/teams/3702.png"
+        },
+        {
+          "id": 3706,
+          "name": "Nacional Potosí",
+          "source": "https://media.api-sports.io/football/teams/3706.png"
+        },
+        {
+          "id": 3711,
+          "name": "The Strongest",
+          "source": "https://media.api-sports.io/football/teams/3711.png"
+        },
+        {
+          "id": 7848,
+          "name": "Mirassol",
+          "source": "https://media.api-sports.io/football/teams/7848.png"
+        },
+        {
+          "id": 10013,
+          "name": "Cusco",
+          "source": "https://media.api-sports.io/football/teams/10013.png"
+        }
+      ]
+    },
+    {
+      "slug": "sudamericana_2026",
+      "id": 11,
+      "season": 2026,
+      "teams": [
+        {
+          "id": 120,
+          "name": "Botafogo",
+          "source": "https://media.api-sports.io/football/teams/120.png"
+        },
+        {
+          "id": 126,
+          "name": "Sao Paulo",
+          "source": "https://media.api-sports.io/football/teams/126.png"
+        },
+        {
+          "id": 128,
+          "name": "Santos",
+          "source": "https://media.api-sports.io/football/teams/128.png"
+        },
+        {
+          "id": 130,
+          "name": "Gremio",
+          "source": "https://media.api-sports.io/football/teams/130.png"
+        },
+        {
+          "id": 133,
+          "name": "Vasco DA Gama",
+          "source": "https://media.api-sports.io/football/teams/133.png"
+        },
+        {
+          "id": 435,
+          "name": "River Plate",
+          "source": "https://media.api-sports.io/football/teams/435.png"
+        },
+        {
+          "id": 436,
+          "name": "Racing Club",
+          "source": "https://media.api-sports.io/football/teams/436.png"
+        },
+        {
+          "id": 446,
+          "name": "Lanus",
+          "source": "https://media.api-sports.io/football/teams/446.png"
+        },
+        {
+          "id": 451,
+          "name": "Boca Juniors",
+          "source": "https://media.api-sports.io/football/teams/451.png"
+        },
+        {
+          "id": 452,
+          "name": "Tigre",
+          "source": "https://media.api-sports.io/football/teams/452.png"
+        },
+        {
+          "id": 460,
+          "name": "San Lorenzo",
+          "source": "https://media.api-sports.io/football/teams/460.png"
+        },
+        {
+          "id": 476,
+          "name": "Deportivo Riestra",
+          "source": "https://media.api-sports.io/football/teams/476.png"
+        },
+        {
+          "id": 794,
+          "name": "RB Bragantino",
+          "source": "https://media.api-sports.io/football/teams/794.png"
+        },
+        {
+          "id": 1062,
+          "name": "Atletico-MG",
+          "source": "https://media.api-sports.io/football/teams/1062.png"
+        },
+        {
+          "id": 1125,
+          "name": "Millonarios",
+          "source": "https://media.api-sports.io/football/teams/1125.png"
+        },
+        {
+          "id": 1128,
+          "name": "Independiente Medellin",
+          "source": "https://media.api-sports.io/football/teams/1128.png"
+        },
+        {
+          "id": 1131,
+          "name": "Bucaramanga",
+          "source": "https://media.api-sports.io/football/teams/1131.png"
+        },
+        {
+          "id": 1137,
+          "name": "Atletico Nacional",
+          "source": "https://media.api-sports.io/football/teams/1137.png"
+        },
+        {
+          "id": 1138,
+          "name": "America de Cali",
+          "source": "https://media.api-sports.io/football/teams/1138.png"
+        },
+        {
+          "id": 1139,
+          "name": "Santa Fe",
+          "source": "https://media.api-sports.io/football/teams/1139.png"
+        },
+        {
+          "id": 1154,
+          "name": "Deportivo Cuenca",
+          "source": "https://media.api-sports.io/football/teams/1154.png"
+        },
+        {
+          "id": 1155,
+          "name": "Macara",
+          "source": "https://media.api-sports.io/football/teams/1155.png"
+        },
+        {
+          "id": 1175,
+          "name": "Nacional Asuncion",
+          "source": "https://media.api-sports.io/football/teams/1175.png"
+        },
+        {
+          "id": 1182,
+          "name": "Olimpia",
+          "source": "https://media.api-sports.io/football/teams/1182.png"
+        },
+        {
+          "id": 1187,
+          "name": "Sportivo Trinidense",
+          "source": "https://media.api-sports.io/football/teams/1187.png"
+        },
+        {
+          "id": 1992,
+          "name": "Orense SC",
+          "source": "https://media.api-sports.io/football/teams/1992.png"
+        },
+        {
+          "id": 2318,
+          "name": "Palestino",
+          "source": "https://media.api-sports.io/football/teams/2318.png"
+        },
+        {
+          "id": 2320,
+          "name": "O'Higgins",
+          "source": "https://media.api-sports.io/football/teams/2320.png"
+        },
+        {
+          "id": 2323,
+          "name": "Universidad de Chile",
+          "source": "https://media.api-sports.io/football/teams/2323.png"
+        },
+        {
+          "id": 2329,
+          "name": "A. Italiano",
+          "source": "https://media.api-sports.io/football/teams/2329.png"
+        },
+        {
+          "id": 2331,
+          "name": "Cobresal",
+          "source": "https://media.api-sports.io/football/teams/2331.png"
+        },
+        {
+          "id": 2350,
+          "name": "Defensor Sporting",
+          "source": "https://media.api-sports.io/football/teams/2350.png"
+        },
+        {
+          "id": 2353,
+          "name": "Juventud",
+          "source": "https://media.api-sports.io/football/teams/2353.png"
+        },
+        {
+          "id": 2356,
+          "name": "Club Nacional",
+          "source": "https://media.api-sports.io/football/teams/2356.png"
+        },
+        {
+          "id": 2359,
+          "name": "Racing Montevideo",
+          "source": "https://media.api-sports.io/football/teams/2359.png"
+        },
+        {
+          "id": 2361,
+          "name": "Boston River",
+          "source": "https://media.api-sports.io/football/teams/2361.png"
+        },
+        {
+          "id": 2365,
+          "name": "Atletico Torque",
+          "source": "https://media.api-sports.io/football/teams/2365.png"
+        },
+        {
+          "id": 2432,
+          "name": "Barracas Central",
+          "source": "https://media.api-sports.io/football/teams/2432.png"
+        },
+        {
+          "id": 2546,
+          "name": "Sporting Cristal",
+          "source": "https://media.api-sports.io/football/teams/2546.png"
+        },
+        {
+          "id": 2554,
+          "name": "FBC Melgar",
+          "source": "https://media.api-sports.io/football/teams/2554.png"
+        },
+        {
+          "id": 2560,
+          "name": "Alianza Atletico",
+          "source": "https://media.api-sports.io/football/teams/2560.png"
+        },
+        {
+          "id": 2562,
+          "name": "Cienciano",
+          "source": "https://media.api-sports.io/football/teams/2562.png"
+        },
+        {
+          "id": 2808,
+          "name": "Caracas FC",
+          "source": "https://media.api-sports.io/football/teams/2808.png"
+        },
+        {
+          "id": 2810,
+          "name": "Carabobo FC",
+          "source": "https://media.api-sports.io/football/teams/2810.png"
+        },
+        {
+          "id": 2811,
+          "name": "Monagas SC",
+          "source": "https://media.api-sports.io/football/teams/2811.png"
+        },
+        {
+          "id": 2825,
+          "name": "Metropolitanos FC",
+          "source": "https://media.api-sports.io/football/teams/2825.png"
+        },
+        {
+          "id": 2827,
+          "name": "Puerto Cabello",
+          "source": "https://media.api-sports.io/football/teams/2827.png"
+        },
+        {
+          "id": 2840,
+          "name": "UCV",
+          "source": "https://media.api-sports.io/football/teams/2840.png"
+        },
+        {
+          "id": 3701,
+          "name": "Blooming",
+          "source": "https://media.api-sports.io/football/teams/3701.png"
+        },
+        {
+          "id": 3702,
+          "name": "Bolívar",
+          "source": "https://media.api-sports.io/football/teams/3702.png"
+        },
+        {
+          "id": 3704,
+          "name": "Guabirá",
+          "source": "https://media.api-sports.io/football/teams/3704.png"
+        },
+        {
+          "id": 10476,
+          "name": "Deportivo Recoleta",
+          "source": "https://media.api-sports.io/football/teams/10476.png"
+        },
+        {
+          "id": 15702,
+          "name": "Independiente Petrolero",
+          "source": "https://media.api-sports.io/football/teams/15702.png"
+        },
+        {
+          "id": 17760,
+          "name": "San Antonio Bulo Bulo",
+          "source": "https://media.api-sports.io/football/teams/17760.png"
+        },
+        {
+          "id": 18762,
+          "name": "Libertad",
+          "source": "https://media.api-sports.io/football/teams/18762.png"
+        },
+        {
+          "id": 20960,
+          "name": "Deportivo Garcilaso",
+          "source": "https://media.api-sports.io/football/teams/20960.png"
+        }
+      ]
+    },
+    {
+      "slug": "champions_2025",
+      "id": 2,
+      "season": 2026,
+      "teams": [
+        {
+          "id": 33,
+          "name": "Manchester United",
+          "source": "https://media.api-sports.io/football/teams/33.png"
+        },
+        {
+          "id": 40,
+          "name": "Liverpool",
+          "source": "https://media.api-sports.io/football/teams/40.png"
+        },
+        {
+          "id": 42,
+          "name": "Arsenal",
+          "source": "https://media.api-sports.io/football/teams/42.png"
+        },
+        {
+          "id": 50,
+          "name": "Manchester City",
+          "source": "https://media.api-sports.io/football/teams/50.png"
+        },
+        {
+          "id": 66,
+          "name": "Aston Villa",
+          "source": "https://media.api-sports.io/football/teams/66.png"
+        },
+        {
+          "id": 79,
+          "name": "Lille",
+          "source": "https://media.api-sports.io/football/teams/79.png"
+        },
+        {
+          "id": 80,
+          "name": "Lyon",
+          "source": "https://media.api-sports.io/football/teams/80.png"
+        },
+        {
+          "id": 85,
+          "name": "Paris Saint Germain",
+          "source": "https://media.api-sports.io/football/teams/85.png"
+        },
+        {
+          "id": 116,
+          "name": "Lens",
+          "source": "https://media.api-sports.io/football/teams/116.png"
+        },
+        {
+          "id": 157,
+          "name": "Bayern München",
+          "source": "https://media.api-sports.io/football/teams/157.png"
+        },
+        {
+          "id": 165,
+          "name": "Borussia Dortmund",
+          "source": "https://media.api-sports.io/football/teams/165.png"
+        },
+        {
+          "id": 172,
+          "name": "VfB Stuttgart",
+          "source": "https://media.api-sports.io/football/teams/172.png"
+        },
+        {
+          "id": 173,
+          "name": "RB Leipzig",
+          "source": "https://media.api-sports.io/football/teams/173.png"
+        },
+        {
+          "id": 197,
+          "name": "PSV Eindhoven",
+          "source": "https://media.api-sports.io/football/teams/197.png"
+        },
+        {
+          "id": 209,
+          "name": "Feyenoord",
+          "source": "https://media.api-sports.io/football/teams/209.png"
+        },
+        {
+          "id": 212,
+          "name": "FC Porto",
+          "source": "https://media.api-sports.io/football/teams/212.png"
+        },
+        {
+          "id": 228,
+          "name": "Sporting CP",
+          "source": "https://media.api-sports.io/football/teams/228.png"
+        },
+        {
+          "id": 247,
+          "name": "Celtic",
+          "source": "https://media.api-sports.io/football/teams/247.png"
+        },
+        {
+          "id": 254,
+          "name": "Heart Of Midlothian",
+          "source": "https://media.api-sports.io/football/teams/254.png"
+        },
+        {
+          "id": 278,
+          "name": "Vikingur Reykjavik",
+          "source": "https://media.api-sports.io/football/teams/278.png"
+        },
+        {
+          "id": 327,
+          "name": "Bodo/Glimt",
+          "source": "https://media.api-sports.io/football/teams/327.png"
+        },
+        {
+          "id": 340,
+          "name": "Gornik Zabrze",
+          "source": "https://media.api-sports.io/football/teams/340.png"
+        },
+        {
+          "id": 347,
+          "name": "Lech Poznan",
+          "source": "https://media.api-sports.io/football/teams/347.png"
+        },
+        {
+          "id": 354,
+          "name": "The New Saints",
+          "source": "https://media.api-sports.io/football/teams/354.png"
+        },
+        {
+          "id": 406,
+          "name": "Aarhus",
+          "source": "https://media.api-sports.io/football/teams/406.png"
+        },
+        {
+          "id": 413,
+          "name": "NEC Nijmegen",
+          "source": "https://media.api-sports.io/football/teams/413.png"
+        },
+        {
+          "id": 492,
+          "name": "Napoli",
+          "source": "https://media.api-sports.io/football/teams/492.png"
+        },
+        {
+          "id": 497,
+          "name": "AS Roma",
+          "source": "https://media.api-sports.io/football/teams/497.png"
+        },
+        {
+          "id": 505,
+          "name": "Inter",
+          "source": "https://media.api-sports.io/football/teams/505.png"
+        },
+        {
+          "id": 529,
+          "name": "Barcelona",
+          "source": "https://media.api-sports.io/football/teams/529.png"
+        },
+        {
+          "id": 530,
+          "name": "Atletico Madrid",
+          "source": "https://media.api-sports.io/football/teams/530.png"
+        },
+        {
+          "id": 533,
+          "name": "Villarreal",
+          "source": "https://media.api-sports.io/football/teams/533.png"
+        },
+        {
+          "id": 541,
+          "name": "Real Madrid",
+          "source": "https://media.api-sports.io/football/teams/541.png"
+        },
+        {
+          "id": 543,
+          "name": "Real Betis",
+          "source": "https://media.api-sports.io/football/teams/543.png"
+        },
+        {
+          "id": 550,
+          "name": "Shakhtar Donetsk",
+          "source": "https://media.api-sports.io/football/teams/550.png"
+        },
+        {
+          "id": 553,
+          "name": "Olympiakos Piraeus",
+          "source": "https://media.api-sports.io/football/teams/553.png"
+        },
+        {
+          "id": 560,
+          "name": "Slavia Praha",
+          "source": "https://media.api-sports.io/football/teams/560.png"
+        },
+        {
+          "id": 563,
+          "name": "Hapoel Beer Sheva",
+          "source": "https://media.api-sports.io/football/teams/563.png"
+        },
+        {
+          "id": 569,
+          "name": "Club Brugge KV",
+          "source": "https://media.api-sports.io/football/teams/569.png"
+        },
+        {
+          "id": 574,
+          "name": "Vardar Skopje",
+          "source": "https://media.api-sports.io/football/teams/574.png"
+        },
+        {
+          "id": 575,
+          "name": "AEK Athens FC",
+          "source": "https://media.api-sports.io/football/teams/575.png"
+        },
+        {
+          "id": 598,
+          "name": "FK Crvena Zvezda",
+          "source": "https://media.api-sports.io/football/teams/598.png"
+        },
+        {
+          "id": 611,
+          "name": "Fenerbahçe",
+          "source": "https://media.api-sports.io/football/teams/611.png"
+        },
+        {
+          "id": 620,
+          "name": "Dinamo Zagreb",
+          "source": "https://media.api-sports.io/football/teams/620.png"
+        },
+        {
+          "id": 628,
+          "name": "Sparta Praha",
+          "source": "https://media.api-sports.io/football/teams/628.png"
+        },
+        {
+          "id": 632,
+          "name": "Universitatea Craiova",
+          "source": "https://media.api-sports.io/football/teams/632.png"
+        },
+        {
+          "id": 637,
+          "name": "Sturm Graz",
+          "source": "https://media.api-sports.io/football/teams/637.png"
+        },
+        {
+          "id": 645,
+          "name": "Galatasaray",
+          "source": "https://media.api-sports.io/football/teams/645.png"
+        },
+        {
+          "id": 646,
+          "name": "Levski Sofia",
+          "source": "https://media.api-sports.io/football/teams/646.png"
+        },
+        {
+          "id": 652,
+          "name": "Shamrock Rovers",
+          "source": "https://media.api-sports.io/football/teams/652.png"
+        },
+        {
+          "id": 656,
+          "name": "Slovan Bratislava",
+          "source": "https://media.api-sports.io/football/teams/656.png"
+        },
+        {
+          "id": 664,
+          "name": "Kairat Almaty",
+          "source": "https://media.api-sports.io/football/teams/664.png"
+        },
+        {
+          "id": 667,
+          "name": "Lincoln Red Imps FC",
+          "source": "https://media.api-sports.io/football/teams/667.png"
+        },
+        {
+          "id": 673,
+          "name": "Sutjeska",
+          "source": "https://media.api-sports.io/football/teams/673.png"
+        },
+        {
+          "id": 687,
+          "name": "Flora Tallinn",
+          "source": "https://media.api-sports.io/football/teams/687.png"
+        },
+        {
+          "id": 701,
+          "name": "KI Klaksvik",
+          "source": "https://media.api-sports.io/football/teams/701.png"
+        },
+        {
+          "id": 759,
+          "name": "Viking",
+          "source": "https://media.api-sports.io/football/teams/759.png"
+        },
+        {
+          "id": 895,
+          "name": "Como",
+          "source": "https://media.api-sports.io/football/teams/895.png"
+        },
+        {
+          "id": 1012,
+          "name": "FC Thun",
+          "source": "https://media.api-sports.io/football/teams/1012.png"
+        },
+        {
+          "id": 1026,
+          "name": "Lask Linz",
+          "source": "https://media.api-sports.io/football/teams/1026.png"
+        },
+        {
+          "id": 1165,
+          "name": "KuPS",
+          "source": "https://media.api-sports.io/football/teams/1165.png"
+        },
+        {
+          "id": 1393,
+          "name": "Union St. Gilloise",
+          "source": "https://media.api-sports.io/football/teams/1393.png"
+        },
+        {
+          "id": 2240,
+          "name": "Mjallby AIF",
+          "source": "https://media.api-sports.io/football/teams/2240.png"
+        },
+        {
+          "id": 2260,
+          "name": "Tre Fiori",
+          "source": "https://media.api-sports.io/football/teams/2260.png"
+        },
+        {
+          "id": 2271,
+          "name": "Petrocub",
+          "source": "https://media.api-sports.io/football/teams/2271.png"
+        },
+        {
+          "id": 2402,
+          "name": "Gyori ETO FC",
+          "source": "https://media.api-sports.io/football/teams/2402.png"
+        },
+        {
+          "id": 3327,
+          "name": "Egnatia Rrogozhinë",
+          "source": "https://media.api-sports.io/football/teams/3327.png"
+        },
+        {
+          "id": 3342,
+          "name": "Inter Club d'Escaldes",
+          "source": "https://media.api-sports.io/football/teams/3342.png"
+        },
+        {
+          "id": 3364,
+          "name": "Borac Banja Luka",
+          "source": "https://media.api-sports.io/football/teams/3364.png"
+        },
+        {
+          "id": 3402,
+          "name": "Omonia Nicosia",
+          "source": "https://media.api-sports.io/football/teams/3402.png"
+        },
+        {
+          "id": 3502,
+          "name": "FC Iberia 1999",
+          "source": "https://media.api-sports.io/football/teams/3502.png"
+        },
+        {
+          "id": 3683,
+          "name": "Ararat-Armenia",
+          "source": "https://media.api-sports.io/football/teams/3683.png"
+        },
+        {
+          "id": 3872,
+          "name": "Kauno Žalgiris",
+          "source": "https://media.api-sports.io/football/teams/3872.png"
+        },
+        {
+          "id": 4360,
+          "name": "Celje",
+          "source": "https://media.api-sports.io/football/teams/4360.png"
+        },
+        {
+          "id": 4625,
+          "name": "Floriana",
+          "source": "https://media.api-sports.io/football/teams/4625.png"
+        },
+        {
+          "id": 5354,
+          "name": "Larne",
+          "source": "https://media.api-sports.io/football/teams/5354.png"
+        },
+        {
+          "id": 7808,
+          "name": "ML Vitebsk",
+          "source": "https://media.api-sports.io/football/teams/7808.png"
+        },
+        {
+          "id": 10124,
+          "name": "Riga",
+          "source": "https://media.api-sports.io/football/teams/10124.png"
+        },
+        {
+          "id": 13976,
+          "name": "Sabah FA",
+          "source": "https://media.api-sports.io/football/teams/13976.png"
+        },
+        {
+          "id": 14281,
+          "name": "Drita",
+          "source": "https://media.api-sports.io/football/teams/14281.png"
+        },
+        {
+          "id": 15847,
+          "name": "Atert Bissen",
+          "source": "https://media.api-sports.io/football/teams/15847.png"
+        }
+      ]
+    },
+    {
+      "slug": "premier_2025",
+      "id": 39,
+      "season": 2026,
+      "teams": [
+        {
+          "id": 33,
+          "name": "Manchester United",
+          "source": "https://media.api-sports.io/football/teams/33.png"
+        },
+        {
+          "id": 34,
+          "name": "Newcastle",
+          "source": "https://media.api-sports.io/football/teams/34.png"
+        },
+        {
+          "id": 35,
+          "name": "Bournemouth",
+          "source": "https://media.api-sports.io/football/teams/35.png"
+        },
+        {
+          "id": 36,
+          "name": "Fulham",
+          "source": "https://media.api-sports.io/football/teams/36.png"
+        },
+        {
+          "id": 40,
+          "name": "Liverpool",
+          "source": "https://media.api-sports.io/football/teams/40.png"
+        },
+        {
+          "id": 42,
+          "name": "Arsenal",
+          "source": "https://media.api-sports.io/football/teams/42.png"
+        },
+        {
+          "id": 45,
+          "name": "Everton",
+          "source": "https://media.api-sports.io/football/teams/45.png"
+        },
+        {
+          "id": 47,
+          "name": "Tottenham",
+          "source": "https://media.api-sports.io/football/teams/47.png"
+        },
+        {
+          "id": 49,
+          "name": "Chelsea",
+          "source": "https://media.api-sports.io/football/teams/49.png"
+        },
+        {
+          "id": 50,
+          "name": "Manchester City",
+          "source": "https://media.api-sports.io/football/teams/50.png"
+        },
+        {
+          "id": 51,
+          "name": "Brighton",
+          "source": "https://media.api-sports.io/football/teams/51.png"
+        },
+        {
+          "id": 52,
+          "name": "Crystal Palace",
+          "source": "https://media.api-sports.io/football/teams/52.png"
+        },
+        {
+          "id": 55,
+          "name": "Brentford",
+          "source": "https://media.api-sports.io/football/teams/55.png"
+        },
+        {
+          "id": 57,
+          "name": "Ipswich",
+          "source": "https://media.api-sports.io/football/teams/57.png"
+        },
+        {
+          "id": 63,
+          "name": "Leeds",
+          "source": "https://media.api-sports.io/football/teams/63.png"
+        },
+        {
+          "id": 64,
+          "name": "Hull City",
+          "source": "https://media.api-sports.io/football/teams/64.png"
+        },
+        {
+          "id": 65,
+          "name": "Nottingham Forest",
+          "source": "https://media.api-sports.io/football/teams/65.png"
+        },
+        {
+          "id": 66,
+          "name": "Aston Villa",
+          "source": "https://media.api-sports.io/football/teams/66.png"
+        },
+        {
+          "id": 746,
+          "name": "Sunderland",
+          "source": "https://media.api-sports.io/football/teams/746.png"
+        },
+        {
+          "id": 1346,
+          "name": "Coventry",
+          "source": "https://media.api-sports.io/football/teams/1346.png"
+        }
+      ]
+    },
+    {
+      "slug": "ligue1_2025",
+      "id": 61,
+      "season": 2026,
+      "teams": [
+        {
+          "id": 77,
+          "name": "Angers",
+          "source": "https://media.api-sports.io/football/teams/77.png"
+        },
+        {
+          "id": 79,
+          "name": "Lille",
+          "source": "https://media.api-sports.io/football/teams/79.png"
+        },
+        {
+          "id": 80,
+          "name": "Lyon",
+          "source": "https://media.api-sports.io/football/teams/80.png"
+        },
+        {
+          "id": 81,
+          "name": "Marseille",
+          "source": "https://media.api-sports.io/football/teams/81.png"
+        },
+        {
+          "id": 84,
+          "name": "Nice",
+          "source": "https://media.api-sports.io/football/teams/84.png"
+        },
+        {
+          "id": 85,
+          "name": "Paris Saint Germain",
+          "source": "https://media.api-sports.io/football/teams/85.png"
+        },
+        {
+          "id": 91,
+          "name": "Monaco",
+          "source": "https://media.api-sports.io/football/teams/91.png"
+        },
+        {
+          "id": 94,
+          "name": "Rennes",
+          "source": "https://media.api-sports.io/football/teams/94.png"
+        },
+        {
+          "id": 95,
+          "name": "Strasbourg",
+          "source": "https://media.api-sports.io/football/teams/95.png"
+        },
+        {
+          "id": 96,
+          "name": "Toulouse",
+          "source": "https://media.api-sports.io/football/teams/96.png"
+        },
+        {
+          "id": 97,
+          "name": "Lorient",
+          "source": "https://media.api-sports.io/football/teams/97.png"
+        },
+        {
+          "id": 106,
+          "name": "Stade Brestois 29",
+          "source": "https://media.api-sports.io/football/teams/106.png"
+        },
+        {
+          "id": 108,
+          "name": "Auxerre",
+          "source": "https://media.api-sports.io/football/teams/108.png"
+        },
+        {
+          "id": 110,
+          "name": "Estac Troyes",
+          "source": "https://media.api-sports.io/football/teams/110.png"
+        },
+        {
+          "id": 111,
+          "name": "Le Havre",
+          "source": "https://media.api-sports.io/football/teams/111.png"
+        },
+        {
+          "id": 114,
+          "name": "Paris FC",
+          "source": "https://media.api-sports.io/football/teams/114.png"
+        },
+        {
+          "id": 116,
+          "name": "Lens",
+          "source": "https://media.api-sports.io/football/teams/116.png"
+        },
+        {
+          "id": 1298,
+          "name": "Le Mans",
+          "source": "https://media.api-sports.io/football/teams/1298.png"
+        }
+      ]
+    },
+    {
+      "slug": "bundesliga_2025",
+      "id": 78,
+      "season": 2026,
+      "teams": [
+        {
+          "id": 157,
+          "name": "Bayern München",
+          "source": "https://media.api-sports.io/football/teams/157.png"
+        },
+        {
+          "id": 160,
+          "name": "SC Freiburg",
+          "source": "https://media.api-sports.io/football/teams/160.png"
+        },
+        {
+          "id": 162,
+          "name": "Werder Bremen",
+          "source": "https://media.api-sports.io/football/teams/162.png"
+        },
+        {
+          "id": 163,
+          "name": "Borussia Mönchengladbach",
+          "source": "https://media.api-sports.io/football/teams/163.png"
+        },
+        {
+          "id": 164,
+          "name": "FSV Mainz 05",
+          "source": "https://media.api-sports.io/football/teams/164.png"
+        },
+        {
+          "id": 165,
+          "name": "Borussia Dortmund",
+          "source": "https://media.api-sports.io/football/teams/165.png"
+        },
+        {
+          "id": 167,
+          "name": "1899 Hoffenheim",
+          "source": "https://media.api-sports.io/football/teams/167.png"
+        },
+        {
+          "id": 168,
+          "name": "Bayer Leverkusen",
+          "source": "https://media.api-sports.io/football/teams/168.png"
+        },
+        {
+          "id": 169,
+          "name": "Eintracht Frankfurt",
+          "source": "https://media.api-sports.io/football/teams/169.png"
+        },
+        {
+          "id": 170,
+          "name": "FC Augsburg",
+          "source": "https://media.api-sports.io/football/teams/170.png"
+        },
+        {
+          "id": 172,
+          "name": "VfB Stuttgart",
+          "source": "https://media.api-sports.io/football/teams/172.png"
+        },
+        {
+          "id": 173,
+          "name": "RB Leipzig",
+          "source": "https://media.api-sports.io/football/teams/173.png"
+        },
+        {
+          "id": 174,
+          "name": "FC Schalke 04",
+          "source": "https://media.api-sports.io/football/teams/174.png"
+        },
+        {
+          "id": 175,
+          "name": "Hamburger SV",
+          "source": "https://media.api-sports.io/football/teams/175.png"
+        },
+        {
+          "id": 182,
+          "name": "Union Berlin",
+          "source": "https://media.api-sports.io/football/teams/182.png"
+        },
+        {
+          "id": 185,
+          "name": "SC Paderborn 07",
+          "source": "https://media.api-sports.io/football/teams/185.png"
+        },
+        {
+          "id": 192,
+          "name": "1. FC Köln",
+          "source": "https://media.api-sports.io/football/teams/192.png"
+        },
+        {
+          "id": 1660,
+          "name": "SV Elversberg",
+          "source": "https://media.api-sports.io/football/teams/1660.png"
+        }
+      ]
+    },
+    {
+      "slug": "laliga_2025",
+      "id": 140,
+      "season": 2026,
+      "teams": [
+        {
+          "id": 529,
+          "name": "Barcelona",
+          "source": "https://media.api-sports.io/football/teams/529.png"
+        },
+        {
+          "id": 530,
+          "name": "Atletico Madrid",
+          "source": "https://media.api-sports.io/football/teams/530.png"
+        },
+        {
+          "id": 531,
+          "name": "Athletic Club",
+          "source": "https://media.api-sports.io/football/teams/531.png"
+        },
+        {
+          "id": 532,
+          "name": "Valencia",
+          "source": "https://media.api-sports.io/football/teams/532.png"
+        },
+        {
+          "id": 533,
+          "name": "Villarreal",
+          "source": "https://media.api-sports.io/football/teams/533.png"
+        },
+        {
+          "id": 535,
+          "name": "Malaga",
+          "source": "https://media.api-sports.io/football/teams/535.png"
+        },
+        {
+          "id": 536,
+          "name": "Sevilla",
+          "source": "https://media.api-sports.io/football/teams/536.png"
+        },
+        {
+          "id": 538,
+          "name": "Celta Vigo",
+          "source": "https://media.api-sports.io/football/teams/538.png"
+        },
+        {
+          "id": 539,
+          "name": "Levante",
+          "source": "https://media.api-sports.io/football/teams/539.png"
+        },
+        {
+          "id": 540,
+          "name": "Espanyol",
+          "source": "https://media.api-sports.io/football/teams/540.png"
+        },
+        {
+          "id": 541,
+          "name": "Real Madrid",
+          "source": "https://media.api-sports.io/football/teams/541.png"
+        },
+        {
+          "id": 542,
+          "name": "Alaves",
+          "source": "https://media.api-sports.io/football/teams/542.png"
+        },
+        {
+          "id": 543,
+          "name": "Real Betis",
+          "source": "https://media.api-sports.io/football/teams/543.png"
+        },
+        {
+          "id": 544,
+          "name": "Deportivo La Coruna",
+          "source": "https://media.api-sports.io/football/teams/544.png"
+        },
+        {
+          "id": 546,
+          "name": "Getafe",
+          "source": "https://media.api-sports.io/football/teams/546.png"
+        },
+        {
+          "id": 548,
+          "name": "Real Sociedad",
+          "source": "https://media.api-sports.io/football/teams/548.png"
+        },
+        {
+          "id": 727,
+          "name": "Osasuna",
+          "source": "https://media.api-sports.io/football/teams/727.png"
+        },
+        {
+          "id": 728,
+          "name": "Rayo Vallecano",
+          "source": "https://media.api-sports.io/football/teams/728.png"
+        },
+        {
+          "id": 797,
+          "name": "Elche",
+          "source": "https://media.api-sports.io/football/teams/797.png"
+        },
+        {
+          "id": 4665,
+          "name": "Racing Santander",
+          "source": "https://media.api-sports.io/football/teams/4665.png"
+        }
+      ]
+    },
+    {
+      "slug": "seriea_2025",
+      "id": 135,
+      "season": 2026,
+      "teams": [
+        {
+          "id": 487,
+          "name": "Lazio",
+          "source": "https://media.api-sports.io/football/teams/487.png"
+        },
+        {
+          "id": 488,
+          "name": "Sassuolo",
+          "source": "https://media.api-sports.io/football/teams/488.png"
+        },
+        {
+          "id": 489,
+          "name": "AC Milan",
+          "source": "https://media.api-sports.io/football/teams/489.png"
+        },
+        {
+          "id": 490,
+          "name": "Cagliari",
+          "source": "https://media.api-sports.io/football/teams/490.png"
+        },
+        {
+          "id": 492,
+          "name": "Napoli",
+          "source": "https://media.api-sports.io/football/teams/492.png"
+        },
+        {
+          "id": 494,
+          "name": "Udinese",
+          "source": "https://media.api-sports.io/football/teams/494.png"
+        },
+        {
+          "id": 495,
+          "name": "Genoa",
+          "source": "https://media.api-sports.io/football/teams/495.png"
+        },
+        {
+          "id": 496,
+          "name": "Juventus",
+          "source": "https://media.api-sports.io/football/teams/496.png"
+        },
+        {
+          "id": 497,
+          "name": "AS Roma",
+          "source": "https://media.api-sports.io/football/teams/497.png"
+        },
+        {
+          "id": 499,
+          "name": "Atalanta",
+          "source": "https://media.api-sports.io/football/teams/499.png"
+        },
+        {
+          "id": 500,
+          "name": "Bologna",
+          "source": "https://media.api-sports.io/football/teams/500.png"
+        },
+        {
+          "id": 502,
+          "name": "Fiorentina",
+          "source": "https://media.api-sports.io/football/teams/502.png"
+        },
+        {
+          "id": 503,
+          "name": "Torino",
+          "source": "https://media.api-sports.io/football/teams/503.png"
+        },
+        {
+          "id": 505,
+          "name": "Inter",
+          "source": "https://media.api-sports.io/football/teams/505.png"
+        },
+        {
+          "id": 512,
+          "name": "Frosinone",
+          "source": "https://media.api-sports.io/football/teams/512.png"
+        },
+        {
+          "id": 517,
+          "name": "Venezia",
+          "source": "https://media.api-sports.io/football/teams/517.png"
+        },
+        {
+          "id": 523,
+          "name": "Parma",
+          "source": "https://media.api-sports.io/football/teams/523.png"
+        },
+        {
+          "id": 867,
+          "name": "Lecce",
+          "source": "https://media.api-sports.io/football/teams/867.png"
+        },
+        {
+          "id": 895,
+          "name": "Como",
+          "source": "https://media.api-sports.io/football/teams/895.png"
+        },
+        {
+          "id": 1579,
+          "name": "Monza",
+          "source": "https://media.api-sports.io/football/teams/1579.png"
+        }
+      ]
+    }
+  ],
+  "observedTeams": [
+    {
+      "name": "Crystal Palace FC",
+      "source": "https://crests.football-data.org/354.png"
+    },
+    {
+      "name": "Leeds United FC",
+      "source": "https://crests.football-data.org/341.png"
+    },
+    {
+      "name": "Hull City AFC",
+      "source": "https://crests.football-data.org/322.png"
+    },
+    {
+      "name": "Newcastle United FC",
+      "source": "https://crests.football-data.org/67.png"
+    },
+    {
+      "name": "Arsenal FC",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/359.png"
+    },
+    {
+      "name": "Brighton & Hove Albion FC",
+      "source": "https://crests.football-data.org/397.png"
+    },
+    {
+      "name": "Aston Villa FC",
+      "source": "https://crests.football-data.org/58.png"
+    },
+    {
+      "name": "Tottenham Hotspur FC",
+      "source": "https://crests.football-data.org/73.png"
+    },
+    {
+      "name": "Manchester United FC",
+      "source": "https://crests.football-data.org/66.png"
+    },
+    {
+      "name": "Fulham FC",
+      "source": "https://crests.football-data.org/63.png"
+    },
+    {
+      "name": "Ipswich Town FC",
+      "source": "https://crests.football-data.org/349.png"
+    },
+    {
+      "name": "Everton FC",
+      "source": "https://crests.football-data.org/62.png"
+    },
+    {
+      "name": "Sunderland AFC",
+      "source": "https://crests.football-data.org/71.png"
+    },
+    {
+      "name": "Manchester City FC",
+      "source": "https://crests.football-data.org/65.png"
+    },
+    {
+      "name": "Liverpool FC",
+      "source": "https://crests.football-data.org/64.png"
+    },
+    {
+      "name": "AFC Bournemouth",
+      "source": "https://crests.football-data.org/bournemouth.png"
+    },
+    {
+      "name": "Coventry City FC",
+      "source": "https://crests.football-data.org/1076.png"
+    },
+    {
+      "name": "Nottingham Forest FC",
+      "source": "https://crests.football-data.org/351.png"
+    },
+    {
+      "name": "Chelsea FC",
+      "source": "https://crests.football-data.org/61.png"
+    },
+    {
+      "name": "Brentford FC",
+      "source": "https://crests.football-data.org/402.png"
+    },
+    {
+      "name": "Athletic Club",
+      "source": "https://crests.football-data.org/77.png"
+    },
+    {
+      "name": "Rayo Vallecano de Madrid",
+      "source": "https://crests.football-data.org/87.png"
+    },
+    {
+      "name": "SSC Napoli",
+      "source": "https://crests.football-data.org/113.png"
+    },
+    {
+      "name": "Atalanta BC",
+      "source": "https://crests.football-data.org/102.png"
+    },
+    {
+      "name": "Juventus FC",
+      "source": "https://crests.football-data.org/109.png"
+    },
+    {
+      "name": "Frosinone Calcio",
+      "source": "https://crests.football-data.org/470.png"
+    },
+    {
+      "name": "Real Madrid CF",
+      "source": "https://crests.football-data.org/86.png"
+    },
+    {
+      "name": "RC Deportivo La Coruña",
+      "source": "https://crests.football-data.org/560.png"
+    },
+    {
+      "name": "Málaga CF",
+      "source": "https://crests.football-data.org/84.png"
+    },
+    {
+      "name": "Sevilla FC",
+      "source": "https://crests.football-data.org/559.png"
+    },
+    {
+      "name": "Levante UD",
+      "source": "https://crests.football-data.org/88.png"
+    },
+    {
+      "name": "RC Celta de Vigo",
+      "source": "https://crests.football-data.org/558.png"
+    },
+    {
+      "name": "Getafe CF",
+      "source": "https://crests.football-data.org/82.png"
+    },
+    {
+      "name": "FC Barcelona",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2686.png"
+    },
+    {
+      "name": "Cagliari Calcio",
+      "source": "https://crests.football-data.org/104.png"
+    },
+    {
+      "name": "AS Roma",
+      "source": "https://crests.football-data.org/100.png"
+    },
+    {
+      "name": "Real Betis Balompié",
+      "source": "https://crests.football-data.org/90.png"
+    },
+    {
+      "name": "Club Atlético de Madrid",
+      "source": "https://crests.football-data.org/78.png"
+    },
+    {
+      "name": "US Lecce",
+      "source": "https://crests.football-data.org/5890.png"
+    },
+    {
+      "name": "Venezia FC",
+      "source": "https://crests.football-data.org/454.png"
+    },
+    {
+      "name": "Real Sociedad de Fútbol",
+      "source": "https://crests.football-data.org/92.png"
+    },
+    {
+      "name": "Villarreal CF",
+      "source": "https://crests.football-data.org/94.png"
+    },
+    {
+      "name": "CA Osasuna",
+      "source": "https://crests.football-data.org/79.png"
+    },
+    {
+      "name": "Valencia CF",
+      "source": "https://crests.football-data.org/95.png"
+    },
+    {
+      "name": "Elche CF",
+      "source": "https://crests.football-data.org/285.png"
+    },
+    {
+      "name": "Real Racing Club de Santander",
+      "source": "https://crests.football-data.org/5335.png"
+    },
+    {
+      "name": "US Sassuolo Calcio",
+      "source": "https://crests.football-data.org/471.png"
+    },
+    {
+      "name": "FC Internazionale Milano",
+      "source": "https://crests.football-data.org/108.png"
+    },
+    {
+      "name": "Como 1907",
+      "source": "https://crests.football-data.org/7397.png"
+    },
+    {
+      "name": "Genoa CFC",
+      "source": "https://crests.football-data.org/107.png"
+    },
+    {
+      "name": "AC Monza",
+      "source": "https://crests.football-data.org/5911.png"
+    },
+    {
+      "name": "Torino FC",
+      "source": "https://crests.football-data.org/586.png"
+    },
+    {
+      "name": "AC Milan",
+      "source": "https://crests.football-data.org/98.png"
+    },
+    {
+      "name": "Udinese Calcio",
+      "source": "https://crests.football-data.org/115.png"
+    },
+    {
+      "name": "RCD Espanyol de Barcelona",
+      "source": "https://crests.football-data.org/80.png"
+    },
+    {
+      "name": "Deportivo Alavés",
+      "source": "https://crests.football-data.org/263.png"
+    },
+    {
+      "name": "SS Lazio",
+      "source": "https://crests.football-data.org/110.png"
+    },
+    {
+      "name": "ACF Fiorentina",
+      "source": "https://crests.football-data.org/99.png"
+    },
+    {
+      "name": "Bologna FC 1909",
+      "source": "https://crests.football-data.org/103.png"
+    },
+    {
+      "name": "Parma Calcio 1913",
+      "source": "https://crests.football-data.org/112.png"
+    },
+    {
+      "name": "Paris Saint-Germain FC",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/160.png"
+    },
+    {
+      "name": "Toulouse FC",
+      "source": "https://crests.football-data.org/511.png"
+    },
+    {
+      "name": "Lille OSC",
+      "source": "https://crests.football-data.org/521.png"
+    },
+    {
+      "name": "Le Mans FC",
+      "source": "https://upload.wikimedia.org/wikipedia/en/5/57/Le_Mans_FC_logo.svg"
+    },
+    {
+      "name": "Olympique de Marseille",
+      "source": "https://crests.football-data.org/516.png"
+    },
+    {
+      "name": "FC Lorient",
+      "source": "https://crests.football-data.org/525.png"
+    },
+    {
+      "name": "RC Strasbourg Alsace",
+      "source": "https://crests.football-data.org/576.png"
+    },
+    {
+      "name": "OGC Nice",
+      "source": "https://crests.football-data.org/522.png"
+    },
+    {
+      "name": "Olympique Lyonnais",
+      "source": "https://crests.football-data.org/523.png"
+    },
+    {
+      "name": "Paris FC",
+      "source": "https://crests.football-data.org/1045.png"
+    },
+    {
+      "name": "AJ Auxerre",
+      "source": "https://crests.football-data.org/519.png"
+    },
+    {
+      "name": "Le Havre AC",
+      "source": "https://crests.football-data.org/533.png"
+    },
+    {
+      "name": "Stade Brestois 29",
+      "source": "https://crests.football-data.org/512.png"
+    },
+    {
+      "name": "Racing Club de Lens",
+      "source": "https://crests.football-data.org/546.png"
+    },
+    {
+      "name": "AS Monaco FC",
+      "source": "https://crests.football-data.org/548.png"
+    },
+    {
+      "name": "ES Troyes AC",
+      "source": "https://crests.football-data.org/531.png"
+    },
+    {
+      "name": "Stade Rennais FC 1901",
+      "source": "https://crests.football-data.org/529.png"
+    },
+    {
+      "name": "Angers SCO",
+      "source": "https://crests.football-data.org/532.png"
+    },
+    {
+      "name": "FC Schalke 04",
+      "source": "https://crests.football-data.org/6.png"
+    },
+    {
+      "name": "Bayer 04 Leverkusen",
+      "source": "https://crests.football-data.org/3.png"
+    },
+    {
+      "name": "1. FSV Mainz 05",
+      "source": "https://crests.football-data.org/15.png"
+    },
+    {
+      "name": "VfB Stuttgart",
+      "source": "https://crests.football-data.org/10.png"
+    },
+    {
+      "name": "FC Augsburg",
+      "source": "https://crests.football-data.org/16.png"
+    },
+    {
+      "name": "Hamburger SV",
+      "source": "https://crests.football-data.org/7.png"
+    },
+    {
+      "name": "SC Freiburg",
+      "source": "https://crests.football-data.org/17.png"
+    },
+    {
+      "name": "Borussia Dortmund",
+      "source": "https://crests.football-data.org/4.png"
+    },
+    {
+      "name": "FC Bayern München",
+      "source": "https://crests.football-data.org/5.png"
+    },
+    {
+      "name": "Eintracht Frankfurt",
+      "source": "https://crests.football-data.org/19.png"
+    },
+    {
+      "name": "SV 07 Elversberg",
+      "source": "https://crests.football-data.org/719.png"
+    },
+    {
+      "name": "SV Werder Bremen",
+      "source": "https://crests.football-data.org/12.png"
+    },
+    {
+      "name": "1. FC Union Berlin",
+      "source": "https://crests.football-data.org/28.png"
+    },
+    {
+      "name": "Borussia Mönchengladbach",
+      "source": "https://crests.football-data.org/18.png"
+    },
+    {
+      "name": "1. FC Köln",
+      "source": "https://crests.football-data.org/1.png"
+    },
+    {
+      "name": "SC Paderborn 07",
+      "source": "https://crests.football-data.org/29.png"
+    },
+    {
+      "name": "RB Leipzig",
+      "source": "https://crests.football-data.org/721.png"
+    },
+    {
+      "name": "TSG 1899 Hoffenheim",
+      "source": "https://crests.football-data.org/2.png"
+    },
+    {
+      "name": "Slavia Prague",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/494.png"
+    },
+    {
+      "name": "Arsenal",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/359.png"
+    },
+    {
+      "name": "FC Porto",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/437.png"
+    },
+    {
+      "name": "Napoli",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/114.png"
+    },
+    {
+      "name": "Manchester City",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/382.png"
+    },
+    {
+      "name": "Lens",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/175.png"
+    },
+    {
+      "name": "Como",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2572.png"
+    },
+    {
+      "name": "Viking FK",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/510.png"
+    },
+    {
+      "name": "Sabah FK",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/21922.png"
+    },
+    {
+      "name": "PSV Eindhoven",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/148.png"
+    },
+    {
+      "name": "Club Brugge",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/570.png"
+    },
+    {
+      "name": "Real Betis",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/244.png"
+    },
+    {
+      "name": "AEK Athens",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/887.png"
+    },
+    {
+      "name": "Real Madrid",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/86.png"
+    },
+    {
+      "name": "Fenerbahce",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/436.png"
+    },
+    {
+      "name": "Liverpool",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/364.png"
+    },
+    {
+      "name": "LASK Linz",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/4411.png"
+    },
+    {
+      "name": "Slovan Bratislava",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/521.png"
+    },
+    {
+      "name": "Manchester United",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/360.png"
+    },
+    {
+      "name": "Villarreal",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/102.png"
+    },
+    {
+      "name": "Paris Saint-Germain",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/160.png"
+    },
+    {
+      "name": "Bodo/Glimt",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2980.png"
+    },
+    {
+      "name": "Lille",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/166.png"
+    },
+    {
+      "name": "Feyenoord Rotterdam",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/142.png"
+    },
+    {
+      "name": "Internazionale",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/110.png"
+    },
+    {
+      "name": "Atlético Madrid",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/1068.png"
+    },
+    {
+      "name": "Bayern Munich",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/132.png"
+    },
+    {
+      "name": "Barcelona",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/83.png"
+    },
+    {
+      "name": "Aston Villa",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/362.png"
+    },
+    {
+      "name": "Galatasaray",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/432.png"
+    },
+    {
+      "name": "Shakhtar Donetsk",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/493.png"
+    },
+    {
+      "name": "Sporting CP",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2250.png"
+    },
+    {
+      "name": "Atlético Nacional",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5264.png"
+    },
+    {
+      "name": "Independiente Santa Fe",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5488.png"
+    },
+    {
+      "name": "América de Cali",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/8109.png"
+    },
+    {
+      "name": "Fortaleza CEIF",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/4928.png"
+    },
+    {
+      "name": "Internacional de Bogotá",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/7445.png"
+    },
+    {
+      "name": "Independiente Medellín",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2690.png"
+    },
+    {
+      "name": "Once Caldas",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2919.png"
+    },
+    {
+      "name": "Alianza FC",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/9761.png"
+    },
+    {
+      "name": "Boyacá Chicó FC",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5480.png"
+    },
+    {
+      "name": "Atlético Junior",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/4815.png"
+    },
+    {
+      "name": "Cúcuta Deportivo",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/6101.png"
+    },
+    {
+      "name": "Águilas Doradas",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/9762.png"
+    },
+    {
+      "name": "Atlético Bucaramanga",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/6137.png"
+    },
+    {
+      "name": "Jaguares de Córdoba",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/10309.png"
+    },
+    {
+      "name": "Llaneros FC",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/7915.png"
+    },
+    {
+      "name": "Deportes Tolima",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5489.png"
+    },
+    {
+      "name": "Deportivo Pasto",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5485.png"
+    },
+    {
+      "name": "Deportivo Cali",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2672.png"
+    },
+    {
+      "name": "Deportivo Pereira",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5486.png"
+    },
+    {
+      "name": "Millonarios",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5484.png"
+    },
+    {
+      "name": "Spain",
+      "source": "https://crests.football-data.org/760.svg"
+    },
+    {
+      "name": "Argentina",
+      "source": "https://crests.football-data.org/762.png"
+    },
+    {
+      "name": "France",
+      "source": "https://crests.football-data.org/773.svg"
+    },
+    {
+      "name": "England",
+      "source": "https://crests.football-data.org/770.svg"
+    },
+    {
+      "name": "Switzerland",
+      "source": "https://crests.football-data.org/788.svg"
+    },
+    {
+      "name": "Norway",
+      "source": "https://crests.football-data.org/813.svg"
+    },
+    {
+      "name": "Belgium",
+      "source": "https://crests.football-data.org/805.svg"
+    },
+    {
+      "name": "Morocco",
+      "source": "https://crests.football-data.org/morocco.svg"
+    },
+    {
+      "name": "Colombia",
+      "source": "https://crests.football-data.org/818.svg"
+    },
+    {
+      "name": "Egypt",
+      "source": "https://crests.football-data.org/825.svg"
+    },
+    {
+      "name": "United States",
+      "source": "https://crests.football-data.org/usa.svg"
+    },
+    {
+      "name": "Portugal",
+      "source": "https://crests.football-data.org/765.svg"
+    },
+    {
+      "name": "Mexico",
+      "source": "https://crests.football-data.org/769.svg"
+    },
+    {
+      "name": "Brazil",
+      "source": "https://crests.football-data.org/764.svg"
+    },
+    {
+      "name": "Paraguay",
+      "source": "https://crests.football-data.org/761.svg"
+    },
+    {
+      "name": "Canada",
+      "source": "https://crests.football-data.org/canada.svg"
+    },
+    {
+      "name": "Ghana",
+      "source": "https://crests.football-data.org/ghana.svg"
+    },
+    {
+      "name": "Cape Verde Islands",
+      "source": "https://crests.football-data.org/cape_verde.svg"
+    },
+    {
+      "name": "Australia",
+      "source": "https://crests.football-data.org/779.svg"
+    },
+    {
+      "name": "Algeria",
+      "source": "https://crests.football-data.org/algeria.svg"
+    },
+    {
+      "name": "Croatia",
+      "source": "https://crests.football-data.org/799.svg"
+    },
+    {
+      "name": "Austria",
+      "source": "https://crests.football-data.org/816.svg"
+    },
+    {
+      "name": "Bosnia-Herzegovina",
+      "source": "https://crests.football-data.org/bosnia.svg"
+    },
+    {
+      "name": "Senegal",
+      "source": "https://crests.football-data.org/senegal.svg"
+    },
+    {
+      "name": "Congo DR",
+      "source": "https://crests.football-data.org/congo_dr.svg"
+    },
+    {
+      "name": "Ecuador",
+      "source": "https://crests.football-data.org/791.svg"
+    },
+    {
+      "name": "Sweden",
+      "source": "https://crests.football-data.org/792.svg"
+    },
+    {
+      "name": "Ivory Coast",
+      "source": "https://crests.football-data.org/787.svg"
+    },
+    {
+      "name": "Netherlands",
+      "source": "https://crests.football-data.org/8601.svg"
+    },
+    {
+      "name": "Germany",
+      "source": "https://crests.football-data.org/759.svg"
+    },
+    {
+      "name": "Japan",
+      "source": "https://crests.football-data.org/766.svg"
+    },
+    {
+      "name": "South Africa",
+      "source": "https://crests.football-data.org/9396.svg"
+    },
+    {
+      "name": "Jordan",
+      "source": "https://crests.football-data.org/8049.png"
+    },
+    {
+      "name": "Uzbekistan",
+      "source": "https://crests.football-data.org/8070.png"
+    },
+    {
+      "name": "Panama",
+      "source": "https://crests.football-data.org/panama.svg"
+    },
+    {
+      "name": "New Zealand",
+      "source": "https://crests.football-data.org/783.svg"
+    },
+    {
+      "name": "Iran",
+      "source": "https://crests.football-data.org/iran.svg"
+    },
+    {
+      "name": "Saudi Arabia",
+      "source": "https://crests.football-data.org/saudi_arabia.svg"
+    },
+    {
+      "name": "Uruguay",
+      "source": "https://crests.football-data.org/758.svg"
+    },
+    {
+      "name": "Iraq",
+      "source": "https://crests.football-data.org/iraq.svg"
+    },
+    {
+      "name": "Turkey",
+      "source": "https://crests.football-data.org/803.svg"
+    },
+    {
+      "name": "Tunisia",
+      "source": "https://crests.football-data.org/tunisia.svg"
+    },
+    {
+      "name": "Curaçao",
+      "source": "https://crests.football-data.org/curacao.svg"
+    },
+    {
+      "name": "Czechia",
+      "source": "https://crests.football-data.org/798.svg"
+    },
+    {
+      "name": "South Korea",
+      "source": "https://crests.football-data.org/772.png"
+    },
+    {
+      "name": "Haiti",
+      "source": "https://crests.football-data.org/haiti.svg"
+    },
+    {
+      "name": "Scotland",
+      "source": "https://crests.football-data.org/814.svg"
+    },
+    {
+      "name": "Qatar",
+      "source": "https://crests.football-data.org/8030.svg"
+    },
+    {
+      "name": "Cruzeiro",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2022.png"
+    },
+    {
+      "name": "Barcelona SC",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2686.png"
+    },
+    {
+      "name": "Tigre",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/7767.png"
+    },
+    {
+      "name": "Alianza Atlético",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5267.png"
+    },
+    {
+      "name": "Boca Juniors",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5.png"
+    },
+    {
+      "name": "Universidad Católica",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/885.png"
+    },
+    {
+      "name": "Macará",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/18439.png"
+    },
+    {
+      "name": "Palmeiras",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2029.png"
+    },
+    {
+      "name": "Cerro Porteño",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2671.png"
+    },
+    {
+      "name": "Sporting Cristal",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2673.png"
+    },
+    {
+      "name": "Corinthians",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/874.png"
+    },
+    {
+      "name": "Platense",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/7764.png"
+    },
+    {
+      "name": "Red Bull Bragantino",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/6079.png"
+    },
+    {
+      "name": "Carabobo",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/6037.png"
+    },
+    {
+      "name": "Vasco da Gama",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/3454.png"
+    },
+    {
+      "name": "Barracas Central",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/10060.png"
+    },
+    {
+      "name": "Bolívar",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2681.png"
+    },
+    {
+      "name": "Independiente Rivadavia",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/9744.png"
+    },
+    {
+      "name": "Fluminense",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/3445.png"
+    },
+    {
+      "name": "Deportivo La Guaira",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/17090.png"
+    },
+    {
+      "name": "Club Olimpia",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2675.png"
+    },
+    {
+      "name": "Audax Italiano",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/4138.png"
+    },
+    {
+      "name": "River Plate",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/16.png"
+    },
+    {
+      "name": "Blooming",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/6047.png"
+    },
+    {
+      "name": "Peñarol",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2683.png"
+    },
+    {
+      "name": "Cienciano del Cusco",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/3372.png"
+    },
+    {
+      "name": "Juventud",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/8416.png"
+    },
+    {
+      "name": "Caracas FC",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/4811.png"
+    },
+    {
+      "name": "Botafogo",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/6086.png"
+    },
+    {
+      "name": "Independiente del Valle",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/17086.png"
+    },
+    {
+      "name": "Rosario Central",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/17.png"
+    },
+    {
+      "name": "Libertad",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2670.png"
+    },
+    {
+      "name": "Universidad Central",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/10094.png"
+    },
+    {
+      "name": "Atlético-MG",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/7632.png"
+    },
+    {
+      "name": "Academia Puerto Cabello",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/18995.png"
+    },
+    {
+      "name": "Racing Club",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/15.png"
+    },
+    {
+      "name": "Independiente Petrolero",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/20889.png"
+    },
+    {
+      "name": "Estudiantes de La Plata",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/8.png"
+    },
+    {
+      "name": "Nacional",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2684.png"
+    },
+    {
+      "name": "Coquimbo Unido",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/8186.png"
+    },
+    {
+      "name": "Universitario",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2685.png"
+    },
+    {
+      "name": "Santos",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2674.png"
+    },
+    {
+      "name": "Deportivo Cuenca",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/4812.png"
+    },
+    {
+      "name": "San Lorenzo",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/18.png"
+    },
+    {
+      "name": "Deportivo Recoleta",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/22517.png"
+    },
+    {
+      "name": "Flamengo",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/819.png"
+    },
+    {
+      "name": "Cusco FC",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/11995.png"
+    },
+    {
+      "name": "Palestino",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/4422.png"
+    },
+    {
+      "name": "Deportivo Riestra",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/17702.png"
+    },
+    {
+      "name": "Lanús",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/12.png"
+    },
+    {
+      "name": "Mirassol",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/9169.png"
+    },
+    {
+      "name": "O'Higgins",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/6072.png"
+    },
+    {
+      "name": "Liga de Quito",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/4816.png"
+    },
+    {
+      "name": "Always Ready",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/19425.png"
+    },
+    {
+      "name": "Grêmio",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/6273.png"
+    },
+    {
+      "name": "Montevideo City Torque",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/19002.png"
+    },
+    {
+      "name": "São Paulo",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/2026.png"
+    },
+    {
+      "name": "Boston River",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/9999.png"
+    },
+    {
+      "name": "Hellas Verona FC",
+      "source": "https://crests.football-data.org/450.png"
+    },
+    {
+      "name": "US Cremonese",
+      "source": "https://crests.football-data.org/457.png"
+    },
+    {
+      "name": "West Ham United FC",
+      "source": "https://crests.football-data.org/563.png"
+    },
+    {
+      "name": "Burnley FC",
+      "source": "https://crests.football-data.org/328.png"
+    },
+    {
+      "name": "Wolverhampton Wanderers FC",
+      "source": "https://crests.football-data.org/76.png"
+    },
+    {
+      "name": "RCD Mallorca",
+      "source": "https://crests.football-data.org/89.png"
+    },
+    {
+      "name": "Real Oviedo",
+      "source": "https://crests.football-data.org/1048.png"
+    },
+    {
+      "name": "Girona FC",
+      "source": "https://crests.football-data.org/298.png"
+    },
+    {
+      "name": "AC Pisa 1909",
+      "source": "https://crests.football-data.org/487.png"
+    },
+    {
+      "name": "Bucaramanga",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/6137.png"
+    },
+    {
+      "name": "Boyacá Chicó",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/5480.png"
+    },
+    {
+      "name": "Llaneros",
+      "source": "https://a.espncdn.com/i/teamlogos/soccer/500/7915.png"
+    },
+    {
+      "name": "Sporting Clube de Portugal",
+      "source": "https://crests.football-data.org/498.png"
+    },
+    {
+      "name": "Galatasaray SK",
+      "source": "https://crests.football-data.org/610.png"
+    },
+    {
+      "name": "FK Bodø/Glimt",
+      "source": "https://crests.football-data.org/5721.png"
+    },
+    {
+      "name": "Sport Lisboa e Benfica",
+      "source": "https://crests.football-data.org/1903.png"
+    },
+    {
+      "name": "PAE Olympiakos SFP",
+      "source": "https://crests.football-data.org/654.png"
+    },
+    {
+      "name": "Qarabağ Ağdam FK",
+      "source": "https://crests.football-data.org/611.png"
+    },
+    {
+      "name": "Club Brugge KV",
+      "source": "https://crests.football-data.org/851.png"
+    },
+    {
+      "name": "Paphos FC",
+      "source": "https://crests.football-data.org/11034.png"
+    },
+    {
+      "name": "SK Slavia Praha",
+      "source": "https://crests.football-data.org/930.png"
+    },
+    {
+      "name": "AFC Ajax",
+      "source": "https://crests.football-data.org/678.png"
+    },
+    {
+      "name": "FC København",
+      "source": "https://crests.football-data.org/1876.png"
+    },
+    {
+      "name": "FK Kairat",
+      "source": "https://crests.football-data.org/10601.png"
+    },
+    {
+      "name": "Royale Union Saint-Gilloise",
+      "source": "https://crests.football-data.org/3929.png"
+    },
+    {
+      "name": "PSV",
+      "source": "https://crests.football-data.org/674.png"
+    }
+  ]
+}

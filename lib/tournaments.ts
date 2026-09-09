@@ -1,5 +1,6 @@
 // lib/tournaments.ts — Single source of truth for tournament metadata
 // Logo paths must match exact filenames in /public/tournaments/
+import leagueLogos from './teams/league-logos.json' with { type: 'json' };
 
 // Cache-bust version para los logos de torneos. Incrementar (por ejemplo
 // "2" -> "3") cada vez que se reemplace el archivo fuente de un logo
@@ -189,7 +190,7 @@ export function getTournamentName(slug: string, locale: string = "es"): string {
 export function getTournamentLogo(slug: string, size: "original" | "small" = "original"): string {
   const tournament = getTournamentBySlug(slug) ?? TOURNAMENTS[0];
   // Static 96 px assets cover a 32 px logo at 3x without Image Optimization.
-  return size === "small" ? tournament.smallLogoPath : tournament.logoPath;
+  return size === "small" ? ((leagueLogos as Record<string,string>)[slug] ?? tournament.smallLogoPath) : tournament.logoPath;
 }
 
 // Flat slug → icon-path map. Relocated from components/shared/PollaCard.tsx

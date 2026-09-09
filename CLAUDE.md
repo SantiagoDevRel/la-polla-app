@@ -32,6 +32,22 @@ Contrato tipográfico: Outfit 15/13 px (cuerpo/ayuda), Bebas 32/24/20 px
 (pantalla/partido/sección), marcador 40 px; etiquetas completas y wrap al 200 %.
 Configuración, cachés y límites: ver README, sección «Fútbol».
 
+**Escudos completos (mismo día):** `scripts/bake-team-crests.mjs` ahora incluye
+los nueve torneos, también Sudamericana y todas las fases de Champions.
+`lib/teams/crest-coverage.json` registra 258 clubes actuales y los 280 nombres
+observados en fixtures. El resolver único `localCrestSource` aplica excepciones
+verificadas ANTES de la URL del proveedor (el histórico de Club Brugge apuntaba
+a Espanyol). No usar iniciales como sustituto de un escudo faltante ni inventar
+un logo: completar el catálogo, comprobar identidad y ejecutar
+`npm test -- tests/football-media.test.ts`. Logos de liga: `league-logos.json`.
+Los WebP del catálogo se cargan bajo demanda; `globPublicPatterns` los excluye
+del precache para no competir con fuentes y datos al instalar el SW.
+
+**Creación solo administrativa:** `/pollas/crear` redirige a `/casa` desde
+Next.js, sin pantalla explicativa del cambio de modelo. No mostrar mensajes
+"ahora las creamos nosotros" ni opciones de crear a jugadores. El acceso
+vigente es `/admin/pollas/crear`, con su autorización administrativa existente.
+
 ### Resultados y escudos (2026-09-09, migración 093)
 
 Los tres proveedores y la resolución administrativa cierran mediante
