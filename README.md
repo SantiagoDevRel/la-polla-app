@@ -54,6 +54,13 @@ Pruebas del modelo: `npm test -- tests/api-football-detail.test.ts`.
 
 ### Cobertura de escudos y logos
 
+El detalle del partido abre **Estadísticas** por defecto. La barra horizontal
+ofrece Estadísticas, Alineaciones y Resumen, con navegación por teclado y
+etiquetas completas. Resumen contiene todos los eventos en una lista con scroll
+interno cuando supera 55 % de la pantalla (máximo 28 rem); los goles llevan un
+balón y las tarjetas, cambios y estadísticas tienen íconos acompañados de texto.
+Los enlaces de última alineación conservan su apertura directa en Alineaciones.
+
 La creación es exclusivamente administrativa (`/admin/pollas/crear`). Los
 enlaces antiguos a `/pollas/crear` redirigen directamente a `/casa`, sin aviso
 de transición ni formulario para jugadores. El POST P2P continúa bloqueado.

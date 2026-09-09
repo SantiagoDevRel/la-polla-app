@@ -2,18 +2,19 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { ChevronDown, MapPin } from 'lucide-react';
+import { BarChart3, ChevronDown, List, MapPin, Users } from 'lucide-react';
 import { TeamCrest } from '@/components/match/TeamCrest';
 import { getTournamentName } from '@/lib/tournaments';
 import { eventLabel, positionLabel, statLabel } from '@/lib/espn/labels-es';
 import { isLiveStatus, type FootballDetail, type PlayerPerformance } from '@/lib/api-football/detail-model';
 import { FootballBack, FootballEmpty, FootballLoading, FootballPhoto, FootballLeagueLogo, statusLabel, useFootballResource } from './shared';
+import { FootballEventIcon, FootballStatIcon } from './FootballIcons';
 
 export function FootballPlayerRow({player}:{player:PlayerPerformance}) {
  const locale=useLocale(),en=locale==='en';
- const metrics=[{label:en?'Minutes':'Minutos',value:player.minutes},{label:en?'Goals':'Goles',value:player.goals},
-  {label:en?'Assists':'Asistencias',value:player.assists},{label:en?'Rating':'Calificación',value:player.rating},
-  {label:en?'Yellow cards':'Amarillas',value:player.yellow},{label:en?'Red cards':'Rojas',value:player.red}];
+ const metrics=[{kind:'minutes',label:en?'Minutes':'Minutos',value:player.minutes},{kind:'goals',label:en?'Goals':'Goles',value:player.goals},
+  {kind:'assists',label:en?'Assists':'Asistencias',value:player.assists},{kind:'rating',label:en?'Rating':'Calificación',value:player.rating},
+  {kind:'yellow',label:en?'Yellow cards':'Amarillas',value:player.yellow},{kind:'red',label:en?'Red cards':'Rojas',value:player.red}];
  return <details className="group rounded-xl border border-border-subtle bg-bg-elevated/50 p-3">
   <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf [&::-webkit-details-marker]:hidden">
    <FootballPhoto src={player.headshot} name={player.name} number={player.jersey}/>
@@ -22,7 +23,7 @@ export function FootballPlayerRow({player}:{player:PlayerPerformance}) {
    </div><ChevronDown className="h-4 w-4 shrink-0 text-text-muted transition-transform group-open:rotate-180"/>
   </summary>
   <dl className="mt-3 flex flex-wrap gap-3 border-t border-border-subtle pt-3">
-   {metrics.map(m=><div key={m.label} className="min-w-fit flex-1 basis-[40%]"><dt className="text-[13px] text-text-secondary">{m.label}</dt><dd className="text-[15px] font-semibold tabular-nums text-text-primary">{m.value??'—'}</dd></div>)}
+   {metrics.map(m=><div key={m.label} className="min-w-fit flex-1 basis-[40%]"><dt className="flex items-center gap-1.5 text-[13px] text-text-secondary"><FootballStatIcon kind={m.kind}/>{m.label}</dt><dd className="text-[15px] font-semibold tabular-nums text-text-primary">{m.value??'—'}</dd></div>)}
   </dl>
  </details>;
 }
@@ -31,10 +32,10 @@ export default function FootballMatchDetail({id,initialLineup=false,initialSide=
  const locale=useLocale(),en=locale==='en';
  const endpoint=/^\d+$/.test(id)?`/api/football/matches/${id}`:`/api/matches/${id}/live`;
  const {data,error,loading,reload}=useFootballResource<FootballDetail>(endpoint,30_000);
- const [view,setView]=useState<'summary'|'stats'|'lineup'>(initialLineup?'lineup':'summary'),[side,setSide]=useState<'home'|'away'>(initialSide);
+ const [view,setView]=useState<'summary'|'stats'|'lineup'>(initialLineup?'lineup':'stats'),[side,setSide]=useState<'home'|'away'>(initialSide);
  if(loading)return <main className="space-y-4 px-4"><FootballBack/><FootballLoading/></main>;
  if(!data?.match)return <main className="space-y-4 px-4"><FootballBack/><FootballEmpty title={en?'Match information unavailable':'Información del partido no disponible'} message={en?'Try again shortly.':'Intenta de nuevo en unos momentos.'} onRetry={reload}/></main>;
- const m=data.match,goals=data.summary.timeline.filter(e=>e.isGoal),lineup=data.summary.lineups.find(l=>l.side===side);
+ const m=data.match,lineup=data.summary.lineups.find(l=>l.side===side);
  return <main className="space-y-4 px-4 pb-4 [overflow-wrap:anywhere]">
   <FootballBack/>
   <section className="lp-card space-y-4 p-4" aria-label={en?'Score':'Marcador'}>
@@ -59,25 +60,35 @@ export default function FootballMatchDetail({id,initialLineup=false,initialSide=
     {m.venue&&<p className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0"/>{m.venue}</p>}
    </div>
   </section>
-  {goals.length>0&&<section className="lp-card space-y-3 p-4" aria-label={en?'Goals':'Goles'}>
-   <h2 className="font-display text-[20px] tracking-wide text-text-primary">{en?'Goals':'Goles'}</h2>
-   {goals.map((g,i)=><div key={i} className="flex items-start gap-3"><span className="min-w-10 shrink-0 text-[15px] font-semibold tabular-nums text-turf">{g.minute}</span><div className="min-w-0"><p className="text-[15px] font-semibold text-text-primary [overflow-wrap:anywhere]">{g.scorer??eventLabel(g.type,locale)}</p><p className="text-[13px] text-text-secondary">{g.side==='home'?m.home.name:g.side==='away'?m.away.name:''}{g.type==='Own Goal'?` · ${en?'Own goal':'Autogol'}`:''}</p></div></div>)}
-  </section>}
-  <div className="grid grid-cols-1 gap-2" role="group" aria-label={en?'Match information':'Información del partido'}>
-   {(['summary','stats','lineup'] as const).map((tab,i)=><button key={tab} type="button" aria-pressed={view===tab} onClick={()=>setView(tab)} className={`min-h-11 rounded-full px-4 py-3 text-[15px] font-semibold transition-colors cursor-pointer ${view===tab?'bg-text-primary text-bg-base':'border border-border-subtle bg-bg-card/80 text-text-secondary hover:bg-bg-elevated'}`}>
-    {(en?['Goals and events','View statistics','View lineups']:['Goles y jugadas','Ver estadísticas','Ver alineaciones'])[i]}
-   </button>)}
+  <div className="flex overflow-x-auto rounded-xl border border-border-subtle bg-bg-card/90 p-1" role="tablist" aria-label={en?'Match information':'Información del partido'}>
+   {(['stats','lineup','summary'] as const).map((tab,i)=>{
+    const Icon=[BarChart3,Users,List][i];
+    return <button key={tab} id={`match-tab-${tab}`} type="button" role="tab" aria-selected={view===tab} aria-controls="match-panel" tabIndex={view===tab?0:-1}
+     onClick={()=>setView(tab)} onFocus={e=>e.currentTarget.scrollIntoView({block:'nearest',inline:'nearest'})}
+     onKeyDown={e=>{
+      const direction=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;
+      if(!direction&&e.key!=='Home'&&e.key!=='End')return;
+      e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?2:(i+direction+3)%3;
+      const button=e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next];button?.click();button?.focus();
+     }}
+     className={`flex min-h-16 min-w-max flex-1 flex-col items-center justify-center gap-1.5 rounded-lg px-1.5 py-2 text-[15px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf cursor-pointer ${view===tab?'bg-text-primary text-bg-base':'text-text-secondary hover:bg-bg-elevated'}`}>
+     <Icon className="h-5 w-5 shrink-0" aria-hidden="true"/>
+     {(en?['Statistics','Lineups','Summary']:['Estadísticas','Alineaciones','Resumen'])[i]}
+    </button>;
+   })}
   </div>
+  <div id="match-panel" role="tabpanel" aria-labelledby={`match-tab-${view}`} tabIndex={0} className="rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">
   {view==='summary'&&<section className="lp-card space-y-3 p-4">
-   <h2 className="font-display text-[20px] tracking-wide text-text-primary">{en?'Match events':'Minuto a minuto'}</h2>
+   <h2 className="font-display text-[20px] tracking-wide text-text-primary">{en?'Summary':'Resumen'}</h2>
    {data.summary.timeline.length===0?<p className="text-[15px] leading-relaxed text-text-secondary">{en?'Events will appear here as they become available.':'Aquí aparecerán los goles, las tarjetas y los cambios cuando estén disponibles.'}</p>:
+    <div role="region" aria-label={en?'Match events':'Jugadas del partido'} tabIndex={0} className="max-h-[min(55dvh,28rem)] overflow-y-auto rounded-lg pr-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf" data-match-timeline>
     <ol className="space-y-3">{[...data.summary.timeline].reverse().map((e,i)=><li key={i} className="flex items-start gap-3 border-b border-border-subtle pb-3 last:border-0">
-     <span className="min-w-10 shrink-0 text-[13px] font-semibold tabular-nums text-text-secondary">{e.minute}</span><div className="min-w-0 space-y-1">
+     <span className="flex min-w-10 shrink-0 flex-col items-center gap-2 text-[13px] font-semibold tabular-nums text-text-secondary"><FootballEventIcon type={e.type} isGoal={e.isGoal}/>{e.minute}</span><div className="min-w-0 space-y-1">
       <p className={`text-[15px] font-semibold [overflow-wrap:anywhere] ${e.isGoal?'text-turf':'text-text-primary'}`}>{e.scorer??e.player??eventLabel(e.type,locale)}</p>
       <p className="text-[13px] text-text-secondary">{eventLabel(e.type,locale)} · {e.side==='home'?m.home.name:e.side==='away'?m.away.name:''}</p>
       {e.assist&&<p className="text-[13px] text-text-secondary">{en?'Assist':'Asistencia'}: {e.assist}</p>}{e.text&&<p className="text-[13px] text-text-secondary">{e.text}</p>}
      </div>
-    </li>)}</ol>}
+    </li>)}</ol></div>}
   </section>}
   {view==='stats'&&<section className="lp-card space-y-5 p-4">
    <h2 className="font-display text-[20px] tracking-wide text-text-primary">{en?'Statistics':'Estadísticas'}</h2>
@@ -85,7 +96,7 @@ export default function FootballMatchDetail({id,initialLineup=false,initialSide=
     data.summary.stats.map(s=>{
      const h=Number.parseFloat(s.home),a=Number.parseFloat(s.away);
      return <div key={s.key} className="space-y-2"><div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 text-[15px]">
-      <span className="font-semibold tabular-nums text-text-primary">{s.home}</span><span className="text-center text-text-secondary">{statLabel(s.key,s.label,locale)}</span><span className="font-semibold tabular-nums text-text-primary">{s.away}</span>
+      <span className="font-semibold tabular-nums text-text-primary">{s.home}</span><span className="flex min-w-0 flex-col items-center gap-1 text-center text-text-secondary"><FootballStatIcon kind={s.key}/>{statLabel(s.key,s.label,locale)}</span><span className="font-semibold tabular-nums text-text-primary">{s.away}</span>
      </div>{Number.isFinite(h)&&Number.isFinite(a)&&<progress aria-label={statLabel(s.key,s.label,locale)} value={h} max={Math.max(h+a,1)} className="block h-1.5 w-full overflow-hidden rounded-full accent-turf [&::-webkit-progress-bar]:bg-bg-elevated [&::-webkit-progress-value]:bg-turf"/>}
      {s.key==='expectedGoals'&&<p className="text-[13px] text-text-muted">{en?'Estimates the quality of scoring chances.':'Estima la calidad de las oportunidades de gol.'}</p>}</div>;
     })}
@@ -99,6 +110,7 @@ export default function FootballMatchDetail({id,initialLineup=false,initialSide=
      {data.players[side].filter(p=>p.starter===starter).map(p=><FootballPlayerRow key={p.id} player={p}/>)}</div>)}
    </>}
   </section>}
+  </div>
   <p className={`text-center text-[13px] leading-relaxed ${error||data.stale?'text-amber':'text-text-muted'}`}>
    {error||data.stale?(en?'Waiting for an update. ':'Esperando una actualización. '):''}
    API-Football · {new Intl.DateTimeFormat(en?'en-US':'es-CO',{hour:'numeric',minute:'2-digit',timeZone:'America/Bogota'}).format(new Date(data.fetchedAt))}

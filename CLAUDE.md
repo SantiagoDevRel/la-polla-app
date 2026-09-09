@@ -32,6 +32,13 @@ Contrato tipográfico: Outfit 15/13 px (cuerpo/ayuda), Bebas 32/24/20 px
 (pantalla/partido/sección), marcador 40 px; etiquetas completas y wrap al 200 %.
 Configuración, cachés y límites: ver README, sección «Fútbol».
 
+Detalle de partido: pestañas horizontales **Estadísticas (default) ·
+Alineaciones · Resumen**. Outfit 15/600 para las tres etiquetas, íconos de 20 px;
+en texto ampliado la barra puede desplazarse horizontalmente sin truncarlas.
+Resumen conserva todos los eventos con scroll interno (`55dvh`, máximo `28rem`)
+y SVG de balón, tarjetas o cambios junto al texto. No repetir los goles en otra
+lista larga antes de las pestañas. El deep link a alineaciones sigue vigente.
+
 **Escudos completos (mismo día):** `scripts/bake-team-crests.mjs` ahora incluye
 los nueve torneos, también Sudamericana y todas las fases de Champions.
 `lib/teams/crest-coverage.json` registra 258 clubes actuales y los 280 nombres
