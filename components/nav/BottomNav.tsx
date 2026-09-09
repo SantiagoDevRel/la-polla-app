@@ -23,7 +23,7 @@ import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { Ticket, User } from "lucide-react";
 import type { ComponentType } from 'react';
-import { FootballBall } from '@/components/football/FootballIcons';
+import { FootballNavigationBall } from '@/components/football/FootballIcons';
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 
@@ -53,7 +53,7 @@ interface Tab {
 }
 
 const TAB_POLLAS: Tab = { key: "pollas", href: "/casa", Icon: Ticket, labelKey: "tabPollas" };
-const TAB_FUTBOL: Tab = { key: "futbol", href: "/futbol", Icon: FootballBall, labelKey: "tabFutbol" };
+const TAB_FUTBOL: Tab = { key: "futbol", href: "/futbol", Icon: FootballNavigationBall, labelKey: "tabFutbol" };
 const TAB_PERFIL: Tab = { key: "perfil", href: "/perfil", Icon: User, labelKey: "tabPerfil" };
 function deriveActive(pathname: string | null): NavKey | undefined {
   if (!pathname) return undefined;
@@ -86,9 +86,9 @@ export function BottomNav({ active, isAdmin = false, pollasPending = 0 }: Bottom
   return (
     <nav
       aria-label={t("ariaNav")}
-      className="fixed bottom-[calc(14px+env(safe-area-inset-bottom))] left-[14px] right-[14px] z-50 mx-auto h-[64px] max-w-[480px] rounded-full border border-white/[0.12] bg-bg-card/[0.42] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_40px_rgba(0,0,0,0.45)] backdrop-blur-3xl backdrop-saturate-[1.8]"
+      className="fixed bottom-[calc(14px+env(safe-area-inset-bottom))] left-[14px] right-[14px] z-50 mx-auto min-h-[64px] max-w-[480px] rounded-full border border-white/[0.12] bg-bg-card/[0.42] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_14px_40px_rgba(0,0,0,0.45)] backdrop-blur-3xl backdrop-saturate-[1.8]"
     >
-      <div className="flex h-full">
+      <div className="flex min-h-[62px]">
         {tabs.map((tab) => (
           <TabItem
             key={tab.key}
@@ -127,7 +127,8 @@ function TabItem({
       aria-label={t(labelKey)}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex min-h-[48px] min-w-0 flex-1 flex-col items-center justify-center gap-[2px] rounded-full",
+        "relative flex min-h-[48px] min-w-0 flex-col items-center justify-center gap-[2px] rounded-full px-1 py-2",
+        tab.key === "futbol" ? "flex-1" : "min-w-[26%] flex-none",
         "transition-all duration-200 active:scale-90",
         active ? "text-gold" : "text-text-muted hover:text-text-secondary",
       )}
@@ -141,12 +142,12 @@ function TabItem({
               ? { duration: 0 }
               : { type: "spring", stiffness: 600, damping: 38 }
           }
-          className="absolute h-[52px] w-[84px] rounded-full border border-white/[0.08] bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]"
+          className="absolute inset-x-1 inset-y-1 rounded-full border border-white/[0.08] bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]"
         />
       )}
 
       <span className="relative z-10 shrink-0">
-        <Icon className="h-[24px] w-[24px]" strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
+        <Icon className={tab.key === "futbol" ? "h-7 w-7" : "h-6 w-6"} strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
         {showBadge && (
           <span
             className="absolute -right-2 -top-1 min-w-[15px] border-2 border-bg-base bg-gold px-[3px] text-center text-[9px] font-bold leading-[13px] text-bg-base"
@@ -156,7 +157,7 @@ function TabItem({
           </span>
         )}
       </span>
-      <span className="relative z-10 text-[11px] font-semibold uppercase leading-none tracking-normal">
+      <span className={cn("relative z-10 max-w-full text-center text-[11px] font-semibold uppercase leading-tight tracking-normal", tab.key === "futbol" ? "hyphens-auto [overflow-wrap:anywhere]" : "whitespace-nowrap")}>
         {t(labelKey)}
       </span>
     </Link>

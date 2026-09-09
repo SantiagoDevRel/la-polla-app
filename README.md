@@ -61,7 +61,7 @@ interno cuando supera 55 % de la pantalla (máximo 28 rem); los goles llevan un
 balón y las tarjetas, cambios y estadísticas tienen íconos acompañados de texto.
 Los enlaces de última alineación conservan su apertura directa en Alineaciones.
 
-La navegación presenta **INFO** con un balón. El calendario usa un único
+La navegación presenta **ESTADÍSTICAS** con un balón clásico blanco y negro. El calendario usa un único
 selector de fecha con el mes completo («Septiembre 08»), dentro de la ventana
 vigente de seis días antes/después; no presenta atajos Ayer/Hoy/Mañana ni meses
 numéricos ambiguos. El valor enviado a la API sigue siendo ISO.
@@ -481,3 +481,20 @@ La plataforma no procesa pagos reales. El campo `payment_mode` solo registra el 
 ---
 
 Construido con ☕ en Medellín / Lisboa por [@SantiagoDevRel](https://github.com/SantiagoDevRel)
+
+### Mis pollas en Casa y Perfil (2026-09-09)
+
+`components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
+con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
+En `/casa`, Mis pollas aparece antes de Pollas abiertas para inscribirte; ambas
+secciones empiezan desplegadas. Las inscripciones pendientes o pagadas se
+muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
+Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.
+El historial finalizado se conserva después de las participaciones actuales.
+
+`lib/casa/my-pollas.ts` pagina las lecturas por usuario y deduplica entradas
+de rifas sin cambiar datos. `/api/casa/mis-pollas` valida la sesión antes de
+leer y devuelve solo nombres, destino, estado y torneos, con `private, no-store`.
+Casa usa el mismo helper en el servidor; Perfil usa el endpoint. No se crean
+inscripciones de demostración: cero es un resultado real; un fallo tiene su
+propio estado con reintento. No se tocan pronósticos ni el modelo P2P histórico.

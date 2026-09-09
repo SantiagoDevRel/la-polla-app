@@ -3,6 +3,7 @@
 "use client";
 
 import Link from "next/link";
+import { MyPollas } from "@/components/casa/MyPollas";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -278,6 +279,8 @@ export default function PerfilPage() {
             {formatPhone(profile.whatsapp_number)}
           </p>
         </div>
+
+        <MyPollas />
 
         {/* Cuenta de pago — debajo del pollito + nombre. Edit / clear /
             cambiar de banco. Pre-llena el WinnerPayoutModal cuando ganan

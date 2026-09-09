@@ -39,7 +39,9 @@ Resumen conserva todos los eventos con scroll interno (`55dvh`, máximo `28rem`)
 y SVG de balón, tarjetas o cambios junto al texto. No repetir los goles en otra
 lista larga antes de las pestañas. El deep link a alineaciones sigue vigente.
 
-La pestaña de navegación se llama **INFO**, con SVG de balón (no CircleDot).
+La pestaña de navegación se llama **ESTADÍSTICAS**, con un balón SVG clásico
+blanco y negro. Outfit 11 px/600, línea 1.25; la barra admite texto ampliado
+sin cortar el nombre y da más ancho al destino central.
 El calendario ofrece solo un selector de fecha con mes completo y día de dos
 dígitos («Septiembre 08»). No volver a agregar Ayer/Hoy/Mañana ni mostrar fecha
 numérica mes/día. Conserva la ventana ±6 días del calendario compartido.
@@ -1717,3 +1719,20 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+### Mis pollas en Casa y Perfil (2026-09-09)
+
+`components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
+con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
+En `/casa`, Mis pollas aparece antes de Pollas abiertas para inscribirte; ambas
+secciones empiezan desplegadas. Las inscripciones pendientes o pagadas se
+muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
+Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.
+El historial finalizado se conserva después de las participaciones actuales.
+
+`lib/casa/my-pollas.ts` pagina las lecturas por usuario y deduplica entradas
+de rifas sin cambiar datos. `/api/casa/mis-pollas` valida la sesión antes de
+leer y devuelve solo nombres, destino, estado y torneos, con `private, no-store`.
+Casa usa el mismo helper en el servidor; Perfil usa el endpoint. No se crean
+inscripciones de demostración: cero es un resultado real; un fallo tiene su
+propio estado con reintento. No se tocan pronósticos ni el modelo P2P histórico.

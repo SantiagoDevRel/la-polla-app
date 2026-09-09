@@ -24,7 +24,7 @@ export default function FootballCenter() {
  });
  return <main className="space-y-5 px-4 pb-4">
   <header className="space-y-1">
-   <h1 className="font-display text-[32px] leading-tight tracking-wide text-text-primary">{en?'Football info':'Información de fútbol'}</h1>
+   <h1 className="font-display text-[32px] leading-tight tracking-wide text-text-primary hyphens-auto [overflow-wrap:anywhere]">{en?'Football statistics':'Estadísticas de fútbol'}</h1>
    <p className="text-[15px] leading-relaxed text-text-secondary">{en?'Scores, goals and your teams.':'Resultados, goles y tus equipos.'}</p>
   </header>
   <div className="lp-card space-y-4 p-4">

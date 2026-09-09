@@ -80,6 +80,12 @@ export interface CasaPot {
   house_cop: number;
 }
 
+/** Minimal personal-list payload: no payment accounts, proofs or user IDs. */
+export interface MyCasaPolla extends Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "tournament" | "status" | "closes_at"> {
+  entry_status: "pendiente" | "pagada";
+  tournaments: string[];
+}
+
 export interface CasaEntry {
   id: string;
   polla_id: string;
