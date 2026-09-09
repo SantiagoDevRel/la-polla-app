@@ -50,6 +50,8 @@ export function scorePair(value: unknown): value is {home: number; away: number}
 export function readFinalResult(f: ApiFootballFixture) {
   if (!['FT', 'AET', 'PEN'].includes(f.fixture.status.short) || !scorePair(f.score?.fulltime)) return null;
   const {home, away} = f.score.fulltime;
+  if (scorePair(f.goals) && (f.goals.home < home || f.goals.away < away
+    || (f.fixture.status.short === 'FT' && (f.goals.home !== home || f.goals.away !== away)))) return null;
   return {home, away, outcome: home > away ? '1' : home < away ? '2' : 'X',
     wentToExtraTime: f.fixture.status.short !== 'FT',
     fulltime: scorePair(f.goals) ? f.goals : null,

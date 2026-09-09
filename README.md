@@ -13,7 +13,7 @@ Sudamericana, Champions, Premier, Ligue 1, Bundesliga, La Liga y Serie A.
 Guarda el marcador de **90 minutos + adición**; el 1X2 se deriva de ese marcador.
 Alargue y penales se conservan aparte para los modos de puntaje existentes.
 
-Configuración server-side, después de aplicar `092_api_football_free_cache.sql`:
+Configuración server-side, después de aplicar las migraciones 092 y 093:
 
 ```dotenv
 # Obtener la clave en https://dashboard.api-football.com/profile?access
@@ -32,9 +32,33 @@ uso continuo puede alcanzar el límite; ESPN/football-data siguen disponibles.
 El cron existente `/api/matches/sync-live` ejecuta la verificación. Se exigen ambos
 equipos, torneo y horario para identificar un partido. Una discrepancia bloquea
 el cierre; sin corroboración se requieren dos respuestas nuevas del proveedor
-(releer la caché no cuenta). El cierre atómico pasa por `finalize_match_result`,
+(releer la caché no cuenta). Los tres proveedores y la resolución administrativa
+pasan por `finalize_verified_match_result` → `finalize_match_result` (093),
 sin escribir pronósticos directamente ni importar partidos duplicados.
-Los calendarios y el marcador en vivo mantienen sus fuentes existentes.
+El resultado verificado es inmutable para los syncs: el candado de fila serializa
+actualizaciones en vivo y cierres. La importación se serializa por identidad
+normalizada para evitar duplicados entre proveedores concurrentes. La DB no cuenta
+como una segunda fuente de su propio proveedor.
+
+ESPN aporta el vivo; API-Football y football-data aportan confirmación y resultados.
+Un snapshot de 90 minutos solo se captura del estado explícito de fin reglamentario;
+un resultado viejo o de alargue de otro proveedor nunca se convierte en ese snapshot.
+football-data se interpreta según su [contrato de periodos](https://docs.football-data.org/general/v4/overtime.html):
+extraTime suma solo goles del alargue y fullTime puede incluir la tanda.
+
+**Calendario:** el creador muestra los próximos 10 días que ya están en la DB.
+Si una liga está vacía, **Traer el calendario** importa los próximos 60 días
+con ESPN y vuelve a consultar. Esto no consume la cuota de API-Football.
+
+**Escudos:** TeamCrest usa el catálogo estático WebP. Para un club nuevo cuyo
+escudo ESPN aún no esté horneado, usa el endpoint público de imágenes
+`GET /api/teams/crest?espn=<id>` (ID numérico, host fijo, PNG de hasta 512 KiB,
+caché compartida). No usa keys, DB ni Image Optimization de Vercel.
+Para actualizar el catálogo: `node --experimental-strip-types scripts/bake-team-crests.mjs`.
+
+Regresión de concurrencia: aplicar 093 en el PostgreSQL local de Supabase y ejecutar
+`node scripts/test-result-concurrency.mjs`. Crea y retira solo sus fixtures sintéticos;
+no ejecutarlo contra producción.
 
 Diagnóstico (solo lectura, acceso de servicio):
 

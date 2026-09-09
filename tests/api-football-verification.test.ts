@@ -32,7 +32,7 @@ beforeEach(()=>{
   fetchMock.mockImplementation(async(input)=>new Response(String(input).includes('/rpc/')?'true':'', {status:200}));
 });
 afterEach(()=>vi.useRealTimers());
-const finalCalls=()=>fetchMock.mock.calls.filter(c=>String(c[0]).includes('/rpc/finalize_api_football_result'));
+const finalCalls=()=>fetchMock.mock.calls.filter(c=>String(c[0]).includes('/rpc/finalize_verified_match_result'));
 
 describe('API-Football within the existing scoring chain',()=>{
   it('corroborates and finalizes via the atomic RPC, without writing predictions',async()=>{
@@ -74,8 +74,40 @@ describe('API-Football within the existing scoring chain',()=>{
   });
   it('preserves legacy verification when no API-Football result exists',async()=>{
     mocks.daily.mockResolvedValue(new Map());
+    mocks.matches.mockResolvedValue({filas:[{...candidate,final_verification_notes:' fdseen=2-1@2026-09-09T20:00:00Z'}],errores:[]});
     expect((await verifyPendingFinals())[0].status).toBe('verified');
+    expect(finalCalls()).toHaveLength(1);
+    expect(fetchMock.mock.calls.some(c=>String(c[0]).includes('/rpc/finalize_match_result'))).toBe(false);
+  });
+  it('does not corroborate football-data using its own stored database score',async()=>{
+    mocks.daily.mockResolvedValue(new Map());
+    expect((await verifyPendingFinals())[0].status).toBe('pending');
     expect(finalCalls()).toHaveLength(0);
-    expect(fetchMock.mock.calls.some(c=>String(c[0]).includes('/rpc/finalize_match_result'))).toBe(true);
+  });
+  it('does not match an unrelated football-data match solely by its kickoff',async()=>{
+    mocks.daily.mockResolvedValue(new Map());
+    mocks.fd.mockResolvedValue([{...fd,homeTeam:{name:'Manchester City'},awayTeam:{name:'Everton'}}]);
+    mocks.matches.mockResolvedValue({filas:[{...candidate,final_verification_notes:' fdseen=2-1@2026-09-09T20:00:00Z'}],errores:[]});
+    expect((await verifyPendingFinals())[0].status).toBe('pending'); expect(finalCalls()).toHaveLength(0);
+  });
+  it('carries live extra-time signals into fallback verification even without a stored snapshot',async()=>{
+    mocks.daily.mockResolvedValue(new Map()); mocks.fd.mockResolvedValue([]);
+    mocks.espn.mockResolvedValue([{id:'e1',date:candidate.scheduled_at,status:{type:{name:'STATUS_FINAL_AET'}},
+      competitions:[{competitors:[{homeAway:'home',score:'2',team:{displayName:'Arsenal'}},{homeAway:'away',score:'1',team:{displayName:'Chelsea'}}]}]}]);
+    mocks.matches.mockResolvedValue({filas:[{...candidate,final_verification_notes:' espnseen=2-1@2026-09-09T20:00:00Z'}],errores:[]});
+    expect((await verifyPendingFinals())[0].status).toBe('discrepancy'); expect(finalCalls()).toHaveLength(0);
+  });
+  it('does not persist knockout extras before the result is agreed',async()=>{
+    mocks.matches.mockResolvedValue({filas:[{...candidate,phase:'final'}],errores:[]});
+    mocks.fd.mockResolvedValue([{...fd,score:{duration:'REGULAR',fullTime:{home:1,away:1}}}]);
+    mocks.espn.mockResolvedValue([{id:'e1',date:candidate.scheduled_at,status:{type:{name:'STATUS_FINAL'}},
+      competitions:[{competitors:[{homeAway:'home',score:'2',winner:true,team:{displayName:'Arsenal'}},{homeAway:'away',score:'1',team:{displayName:'Chelsea'}}]}]}]);
+    expect((await verifyPendingFinals())[0].status).toBe('discrepancy');
+    for(const call of fetchMock.mock.calls)expect(String(call[1]?.body)).not.toContain('fulltime_home_score');
+    expect(finalCalls()).toHaveLength(0);
+  });
+  it('does not claim its score won when another tick already finalized the row',async()=>{
+    fetchMock.mockResolvedValue(new Response('false'));
+    expect((await verifyPendingFinals())[0].status).toBe('pending');
   });
 });

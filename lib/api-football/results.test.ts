@@ -13,6 +13,7 @@ describe('final scores and identity', () => {
   it('supports the nine requested competitions', () => expect(Object.values(RESULT_LEAGUES).sort((a,b)=>a-b)).toEqual([2,11,13,39,61,78,135,140,239]));
   it.each([[2,1,'1'],[0,0,'X'],[1,3,'2']])('derives 1X2 from %s-%s', (home,away,outcome) => {
     const f = fixture(); f.score.fulltime = {home: Number(home), away: Number(away)};
+    f.goals = {...f.score.fulltime};
     expect(readFinalResult(f)?.outcome).toBe(outcome);
   });
   it('preserves 90 minute draw when extra time or shootout has a winner', () => {

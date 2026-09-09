@@ -6,6 +6,26 @@
 
 ## READ THIS FIRST
 
+### Resultados y escudos (2026-09-09, migración 093)
+
+Los tres proveedores y la resolución administrativa cierran mediante
+`finalize_verified_match_result` → `finalize_match_result`. La fila se bloquea
+antes de leer/escribir resultados; una verificación existente no se sobrescribe.
+El upsert de fixtures también serializa por identidad semántica. Matching de ESPN
+(vivo, verificación y resolución manual) comparte `lib/matches/result-identity.ts`:
+ambos equipos y horario, candidato único; nunca solo horario ni tokens parciales.
+La DB no es una segunda fuente. ESPN/FD solos requieren dos observaciones separadas;
+API-Football requiere un fetch nuevo, no releer caché. Los 90 minutos nunca se
+infieren de un score almacenado al ver AET/PEN por primera vez: snapshot solo en
+STATUS_END_OF_REGULATION; si falta, esperar regularTime/fulltime reglamentario o
+resolución manual. `lib/football-data/scores.ts` separa 90, alargue y penales.
+Estas reglas actualizan los detalles históricos de verificación descritos abajo.
+
+Los escudos usan el catálogo local; clubes nuevos caen a `/api/teams/crest?espn=<id>`
+(público, solo PNG de ESPN con ID numérico y límites). Resto de /api/teams sigue autenticado.
+Detalles y comandos de regresión: README → Resultados API-Football Free.
+
+
 ### API-Football Free: cierre de resultados (2026-09-09)
 
 - `lib/api-football/daily-results.ts` consulta `/fixtures?date=...` (hoy/ayer UTC),

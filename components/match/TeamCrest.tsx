@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import { teamNameKey } from "@/lib/teams/team-name-key";
 import catalog from "@/lib/teams/crest-catalog.json";
+import { crestFallbackSource } from "@/lib/teams/crest-source";
 
 const bySource: Record<string, string> = catalog.bySource;
 const byName: Record<string, string> = catalog.byName;
@@ -26,7 +27,7 @@ export function TeamCrest({
     countryFlag,
     src ? bySource[src] : undefined,
     byName[teamNameKey(team)],
-    src,
+    crestFallbackSource(src),
   ].filter((value): value is string => Boolean(value));
   const current = candidates.find((candidate) => !failed.includes(candidate));
 
