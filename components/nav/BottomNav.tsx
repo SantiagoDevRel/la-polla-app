@@ -21,11 +21,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { Ticket, User } from "lucide-react";
+import { Ticket, User, CircleDot } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
 
-type NavKey = "pollas" | "perfil";
+type NavKey = "pollas" | "futbol" | "perfil";
 
 export interface BottomNavProps {
   active?: NavKey;
@@ -47,10 +47,11 @@ interface Tab {
   key: NavKey;
   href: string;
   Icon: typeof Ticket;
-  labelKey: "tabPollas" | "tabPerfil";
+  labelKey: "tabPollas" | "tabFutbol" | "tabPerfil";
 }
 
 const TAB_POLLAS: Tab = { key: "pollas", href: "/casa", Icon: Ticket, labelKey: "tabPollas" };
+const TAB_FUTBOL: Tab = { key: "futbol", href: "/futbol", Icon: CircleDot, labelKey: "tabFutbol" };
 const TAB_PERFIL: Tab = { key: "perfil", href: "/perfil", Icon: User, labelKey: "tabPerfil" };
 function deriveActive(pathname: string | null): NavKey | undefined {
   if (!pathname) return undefined;
@@ -58,6 +59,7 @@ function deriveActive(pathname: string | null): NavKey | undefined {
   // por si alguna ruta futura los comparte.
   if (pathname.startsWith("/admin")) return undefined;
   if (pathname.startsWith("/casa")) return "pollas";
+  if (pathname.startsWith("/futbol")) return "futbol";
   if (pathname.startsWith("/perfil")) return "perfil";
   // Las rutas del modelo viejo (/inicio, /pollas, /road-to-worldcup) ya no
   // tienen tab. Si alguien llega por una URL guardada, no se marca ninguna
@@ -77,7 +79,7 @@ export function BottomNav({ active, isAdmin = false, pollasPending = 0 }: Bottom
   // acceso que nadie mas tiene. Todo lo de administracion cuelga de /admin,
   // al que se entra desde el perfil.
   void isAdmin;
-  const tabs: Tab[] = [TAB_POLLAS, TAB_PERFIL];
+  const tabs: Tab[] = [TAB_POLLAS, TAB_FUTBOL, TAB_PERFIL];
 
   return (
     <nav
@@ -152,7 +154,7 @@ function TabItem({
           </span>
         )}
       </span>
-      <span className="relative z-10 text-[11px] font-semibold uppercase leading-none tracking-[0.08em]">
+      <span className="relative z-10 text-[11px] font-semibold uppercase leading-none tracking-normal">
         {t(labelKey)}
       </span>
     </Link>

@@ -6,6 +6,32 @@
 
 ## READ THIS FIRST
 
+### Centro de fútbol y API-Football Pro (2026-09-09, migraciones 094–095)
+
+El usuario aprobó y pagó un mes de Pro. `/status` decide plan y vencimiento;
+no asumir Pro permanente ni aplicar la restricción Free a esta suscripción.
+**API-Football es ahora la fuente principal del vivo Pro**, con ESPN como
+respaldo. `update_match_live_provider` es el único escritor de vivo: bloquea
+la fila, rechaza observaciones anteriores y protege tres minutos una lectura
+reciente de API-Football. El cierre sigue el contrato de 093 y los 90 minutos.
+
+`/futbol` ofrece calendario, `/futbol/partidos/[id]` goles/estadísticas/alineaciones
+y `/futbol/equipos/[id]` plantel/fotos/dorsales/club/estadio. Los escudos de Casa
+abren esas fichas. No crear otro proveedor, caché o tabla de partidos para estas
+pantallas: `lib/api-football/feed.ts` comparte calendario entre UI/vivo/cierre;
+`details.ts` y `teams.ts` reservan cuota en SQL antes de cualquier consulta.
+Las fichas son de lectura, privadas, con auth previa y NetworkOnly.
+
+Topes propios: Pro 7.000/día; detalle y equipos 6.000, dejando capacidad para
+resultados. Free vuelve a 80/día y su cadencia original al vencer el plan.
+Las imágenes públicas de `media.api-sports.io` no llevan key del proveedor.
+No inventar fotos ni titulares cuando no están publicados. El diseño se trabajó
+con Lovable y referencias del sistema existente; favorecer botones con texto,
+secciones bajo demanda y texto grande, para usuarios poco familiarizados con apps.
+Contrato tipográfico: Outfit 15/13 px (cuerpo/ayuda), Bebas 32/24/20 px
+(pantalla/partido/sección), marcador 40 px; etiquetas completas y wrap al 200 %.
+Configuración, cachés y límites: ver README, sección «Fútbol».
+
 ### Resultados y escudos (2026-09-09, migración 093)
 
 Los tres proveedores y la resolución administrativa cierran mediante

@@ -60,6 +60,7 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   // pagar, y un contador congelado lo deja creyendo que todavía alcanza a
   // entrar. Siempre a la red.
   /^\/casa(\/|$)/,
+  /^\/futbol(\/|$)/,
 ];
 
 const serwist = new Serwist({

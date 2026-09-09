@@ -26,6 +26,10 @@ interface Label {
 // en MAYÚSCULAS raras ("SHOTS", "ON GOAL").
 // ─────────────────────────────────────────────────────────────────────
 const STAT_LABELS: Record<string, Label> = {
+  shotsOffTarget: { es: "Tiros desviados", en: "Shots off target" },
+  shotsInsideBox: { es: "Tiros dentro del área", en: "Shots inside the box" },
+  shotsOutsideBox: { es: "Tiros fuera del área", en: "Shots outside the box" },
+  expectedGoals: { es: "Goles esperados", en: "Expected goals" },
   possessionPct: { es: "Posesión" },
   foulsCommitted: { es: "Faltas" },
   yellowCards: { es: "Tarjetas amarillas" },

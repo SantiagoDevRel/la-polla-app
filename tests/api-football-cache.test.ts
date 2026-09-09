@@ -1,6 +1,8 @@
 import {beforeEach, afterEach, it, expect, vi} from 'vitest';
 import {createClient} from '@supabase/supabase-js';
 const mocks = vi.hoisted(()=>({admin:vi.fn(), get:vi.fn()}));
+vi.mock('server-only',()=>({}));
+vi.mock('@/lib/api-football/account',()=>({apiFootballProActive:async()=>false}));
 vi.mock('@/lib/supabase/admin',()=>({createAdminClient:mocks.admin}));
 vi.mock('@/lib/api-football/client',()=>({apiFootballGet:mocks.get}));
 import {loadDailyResults} from '@/lib/api-football/daily-results';

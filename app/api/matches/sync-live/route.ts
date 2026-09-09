@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncEspnLive } from "@/lib/espn/sync";
 import { verifyPendingFinals } from "@/lib/matches/verify-final";
+import { syncApiFootballLive } from "@/lib/api-football/live";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -71,7 +72,8 @@ async function runSync() {
   // el gate ya está cerrado en el tick siguiente y el scoring quedaba
   // congelado hasta la próxima ventana (la FINAL del Mundial: para
   // siempre). El path sin candidatos cuesta 1 query con inner join — barato.
-  const espn = inWindow ? await syncEspnLive() : null;
+  const apiFootball = inWindow ? await syncApiFootballLive() : new Set<string>();
+  const espn = inWindow ? await syncEspnLive(apiFootball) : null;
   const verifications = await verifyPendingFinals();
 
   return {
@@ -79,6 +81,7 @@ async function runSync() {
     skipped: !inWindow,
     reason: inWindow ? undefined : "no_active_window",
     espn,
+    apiFootball: {covered: apiFootball.size},
     verifications,
     ms: Date.now() - started,
   };

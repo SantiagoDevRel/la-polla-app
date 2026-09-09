@@ -6,7 +6,53 @@ El modelo histórico de grupos privados permanece disponible.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
-## Resultados API-Football Free
+## Fútbol: calendario, partidos y equipos (API-Football Pro)
+
+La pestaña **Fútbol** (`/futbol`) presenta los nueve torneos con sus logos,
+escudos, marcadores y acceso al detalle. El partido muestra goles, jugadas,
+estadísticas, titulares y suplentes. Tocar un escudo abre la ficha del club:
+plantel por posición, fotos, dorsales, edades, resultados, próximos partidos
+e información e imagen del estadio. Desde el plantel se abre la última alineación.
+Las estadísticas individuales se consultan dentro de cada alineación.
+
+La propuesta visual se trabajó en [Lovable](https://lovable.dev/projects/4c4f70a0-dc3c-48d1-93af-6907944caabf)
+con referencias de Tribuna Caliente. Conserva Bebas Neue/Outfit, vidrio oscuro,
+controles con texto visible y secciones que se abren bajo demanda.
+
+Aplicar las migraciones **092–095** en orden. Con las variables de abajo,
+`/status` detecta automáticamente el plan: no hay un flag de Pro en el cliente.
+El mes aprobado el 9 de septiembre de 2026 vence el 9 de octubre de 2026;
+la autoridad es la fecha que devuelve el proveedor. Al vencer, las reservas
+vuelven a los límites gratuitos y el detalle conserva la última información.
+
+- Calendario de Fútbol: ±6 días, agrupados por **día de Colombia** (dos feeds UTC).
+  Los equipos agregan sus últimos cinco y próximos cinco partidos, filtrados
+  a los nueve torneos. No se fija un año de temporada para estas consultas.
+- Pro: límite propio de 7.000 llamadas/día UTC frente a las 7.500 contratadas.
+  El detalle y los equipos paran a las 6.000 para reservar capacidad a resultados.
+  Un calendario cercano se comparte durante 60 segundos; el detalle activo,
+  60 segundos; equipos y partidos finalizados, una hora. Cada ficha de equipo
+  reserva cuatro llamadas antes de consultar. No se multiplican por espectador.
+- El cliente actualiza el marcador cada 30 segundos y el calendario cada minuto;
+  pausa las consultas con la pestaña oculta. Esto es actualización periódica,
+  no streaming. La caché compartida decide si hace falta consultar al proveedor.
+- API-Football es la fuente principal del vivo Pro. ESPN cubre partidos sin una
+  observación reciente. `update_match_live_provider` serializa ambos: rechaza
+  lecturas viejas, protege tres minutos la fuente principal y permite correcciones
+  de VAR. Un resultado verificado no se modifica por un tick de vivo.
+- Las rutas `/api/football/**` validan sesión antes de leer datos. Las tablas
+  `api_football_details` y `api_football_teams` tienen RLS y acceso de servicio.
+  Los endpoints y `/futbol/**` usan NetworkOnly; las respuestas son privadas.
+- Los logos y fotos de API-Sports son imágenes públicas sin key en el cliente.
+  Se cargan bajo demanda, con respaldo local para logos y dorsal/icono cuando
+  falla una foto. Se evita Image Optimization. La cobertura de fotos, alineaciones
+  y estadísticas depende del partido; los datos ausentes no se inventan.
+
+Código: `lib/api-football/{account,feed,details,teams,live}.ts`,
+`components/football/`, `app/api/football/`, `app/(app)/futbol/`.
+Pruebas del modelo: `npm test -- tests/api-football-detail.test.ts`.
+
+## Resultados y alternativa gratuita
 
 El cierre automático incorpora API-Football para BetPlay, Libertadores,
 Sudamericana, Champions, Premier, Ligue 1, Bundesliga, La Liga y Serie A.
@@ -40,7 +86,9 @@ actualizaciones en vivo y cierres. La importación se serializa por identidad
 normalizada para evitar duplicados entre proveedores concurrentes. La DB no cuenta
 como una segunda fuente de su propio proveedor.
 
-ESPN aporta el vivo; API-Football y football-data aportan confirmación y resultados.
+Con Pro, API-Football aporta el vivo principal y ESPN actúa como respaldo;
+en Free se conserva el vivo de ESPN. API-Football y football-data aportan
+confirmación y resultados.
 Un snapshot de 90 minutos solo se captura del estado explícito de fin reglamentario;
 un resultado viejo o de alargue de otro proveedor nunca se convierte en ese snapshot.
 football-data se interpreta según su [contrato de periodos](https://docs.football-data.org/general/v4/overtime.html):

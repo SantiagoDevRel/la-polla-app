@@ -8,6 +8,7 @@ export const RESULT_LEAGUES: Record<string, number> = {
 };
 
 const ALIASES: Record<string, string> = {
+  'feyenoord rotterdam': 'feyenoord', 'viking fk': 'viking',
   'paris saint germain': 'psg', 'paris saintgermain': 'psg',
   'bayern munich': 'bayern munchen', 'internazionale milano': 'inter',
   'internazionale': 'inter', 'inter milan': 'inter', 'milano': 'milan',

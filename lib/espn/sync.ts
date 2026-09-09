@@ -69,7 +69,7 @@ export interface EspnSyncResult {
   unmatched_samples: string[];
 }
 
-export async function syncEspnLive(): Promise<EspnSyncResult[]> {
+export async function syncEspnLive(primaryCovered: ReadonlySet<string> = new Set()): Promise<EspnSyncResult[]> {
   const supabase = createAdminClient();
   const results: EspnSyncResult[] = [];
 
@@ -154,6 +154,7 @@ export async function syncEspnLive(): Promise<EspnSyncResult[]> {
         continue;
       }
       result.matched++;
+      if (primaryCovered.has(row.id)) continue;
 
       // 4. Mapear status + scores + minute.
       const newStatus = mapEspnStatus(event.status);
