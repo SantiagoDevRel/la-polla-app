@@ -8,7 +8,7 @@ import { useLocale } from 'next-intl';
 import { TeamCrest } from '@/components/match/TeamCrest';
 import { isLiveStatus, type FootballMatch } from '@/lib/api-football/detail-model';
 import { RESULT_LEAGUES } from '@/lib/api-football/results';
-import { TOURNAMENTS } from '@/lib/tournaments';
+import { TOURNAMENTS, getTournamentLogoClassName } from '@/lib/tournaments';
 import leagueLogos from '@/lib/teams/league-logos.json';
 
 /** Public provider image URLs need no API request or client-side key. */
@@ -16,11 +16,11 @@ export function FootballLeagueLogo({tournament}:{tournament:string}) {
  const [failed,setFailed]=useState(false),[fallbackFailed,setFallbackFailed]=useState(false);
  const id=RESULT_LEAGUES[tournament],local=(leagueLogos as Record<string,string>)[tournament]??TOURNAMENTS.find(t=>t.slug===tournament)?.smallLogoPath;
  const src=!failed?local:id?`https://media.api-sports.io/football/leagues/${id}.png`:undefined;
- return <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-text-primary p-1.5" aria-hidden="true">
+ return <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl p-1.5" aria-hidden="true">
   {src&&!fallbackFailed?
    // eslint-disable-next-line @next/next/no-img-element
-   <img src={src} alt="" width={32} height={32} loading="lazy" onError={()=>failed?setFallbackFailed(true):setFailed(true)} className="h-full w-full object-contain"/>:
-   <Trophy className="h-6 w-6 text-bg-base"/>}
+   <img src={src} alt="" width={32} height={32} loading="lazy" onError={()=>failed?setFallbackFailed(true):setFailed(true)} className={`h-full w-full object-contain ${getTournamentLogoClassName(tournament)}`}/>:
+   <Trophy className="h-6 w-6 text-text-secondary"/>}
  </span>;
 }
 

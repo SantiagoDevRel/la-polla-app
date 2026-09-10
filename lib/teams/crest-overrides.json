@@ -1,4 +1,10 @@
 {
+  "sportivo trinidense": {
+    "source": "https://a.espncdn.com/i/teamlogos/soccer/500/7466.png",
+    "local": "/team-crests/sportivo-trinidense-transparent.png",
+    "reference": "https://site.api.espn.com/apis/site/v2/sports/soccer/par.1/teams",
+    "reason": "Transparent official crest; the API-Football image contains an opaque white background."
+  },
   "club brugge": {
     "source": "https://media.api-sports.io/football/teams/569.png",
     "reference": "https://crests.football-data.org/851.png",

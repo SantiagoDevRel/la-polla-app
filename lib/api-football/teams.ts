@@ -6,6 +6,7 @@ import { isValidFixture } from './mappers';
 import { footballMatch, latestFootballFixtures } from './detail-model';
 import { RESULT_LEAGUES } from './results';
 import type { FootballSquadPlayer, FootballTeam } from './team-model';
+import { apiFootballPlayerPhoto } from './player-photo';
 
 export async function loadFootballTeam(id: number): Promise<FootballTeam | null> {
   if (!Number.isSafeInteger(id) || id<=0) return null;
@@ -51,6 +52,6 @@ export async function loadFootballTeam(id: number): Promise<FootballTeam | null>
   const merged=latestFootballFixtures([...observations,{fixtures:teamMatches,fetchedAt:data?.fetched_at??null}])
     .filter(f=>f.teams.home.id===id||f.teams.away.id===id);
   return {team:data?.profile?.team??{...seed,country:null,founded:null},venue:data?.profile?.venue??null,
-    players:Array.isArray(data?.squad)?data.squad:[],
+    players:Array.isArray(data?.squad)?data.squad.map((player:FootballSquadPlayer)=>({...player,photo:player.photo||apiFootballPlayerPhoto(player.id)})):[],
     matches:merged.map(footballMatch).sort((a,b)=>a.date.localeCompare(b.date)),fetchedAt:data?.fetched_at??null};
 }

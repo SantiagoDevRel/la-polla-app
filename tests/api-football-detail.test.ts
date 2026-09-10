@@ -29,7 +29,7 @@ describe('football detail semantics',()=>{
   const f=fixture();f.lineups=[{team:{id:1,name:'Home'},formation:'4-3-3',startXI:[{player:{id:7,name:'Starter',number:9,pos:'F'}}],substitutes:[{player:{id:8,name:'Bench',number:12}}]}];
   f.players=[{team:{id:1},players:[{player:{id:7,photo:'photo.png'},statistics:[{games:{minutes:80,rating:'7.1'},goals:{total:1,assists:0}}]}]}];
   const p=footballDetail(f,'').players.home;
-  expect(p[0]).toMatchObject({starter:true,headshot:'photo.png',jersey:'9',goals:1,minutes:80});expect(p[1]).toMatchObject({starter:false,headshot:null,minutes:null});
+  expect(p[0]).toMatchObject({starter:true,headshot:'photo.png',jersey:'9',goals:1,minutes:80});expect(p[1]).toMatchObject({starter:false,headshot:'https://media.api-sports.io/football/players/8.png',minutes:null});
  });
  it('handles an upcoming fixture with no lineup or stats without inventing players',()=>{
   const d=footballDetail(fixture(),'');expect(d.summary.lineups).toEqual([]);expect(d.players.home).toEqual([]);

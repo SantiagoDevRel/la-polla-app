@@ -164,7 +164,7 @@ export function PicksBoard({
   }
 
   return (
-    <div>
+    <div data-app-update-blocked={dirty || saving}>
       <ul className="space-y-px">
         {matches.map((m) => {
           const cerrado =

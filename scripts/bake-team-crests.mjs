@@ -12,6 +12,8 @@ import { RESULT_LEAGUES } from "../lib/api-football/leagues.ts";
 import { flagUrlForTeam } from "../lib/flags/country-iso.ts";
 import { isPlaceholderTeam } from "../lib/matches/is-placeholder.ts";
 import { teamNameKey } from "../lib/teams/team-name-key.ts";
+import reviewedLeagues from "../lib/teams/league-logo-overrides.json" with { type: "json" };
+import reviewedTeams from "../lib/teams/crest-overrides.json" with { type: "json" };
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
@@ -147,7 +149,12 @@ async function main() {
   const sorted = (record) => Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
   const missing=required.filter(t=>!bySource[t.source]&&!byName[teamNameKey(t.name)]);
   if(missing.length)throw new Error(`Missing club crests: ${JSON.stringify(missing)}`);
-  const leagues=Object.fromEntries(inventory.map(l=>[l.slug,bySource[l.logo]]));
+  // Preserve reviewed transparent artwork across future provider refreshes.
+  for (const team of apiTeams) {
+    const local = reviewedTeams[teamNameKey(team.name)]?.local;
+    if (local) { await readFile(path.join(repo, 'public', local)); bySource[team.logo] = local; byName[teamNameKey(team.name)] = local; }
+  }
+  const leagues=Object.fromEntries(inventory.map(l=>[l.slug,reviewedLeagues[l.slug]??bySource[l.logo]]));
   await writeFile(path.join(repo,'lib/teams/league-logos.json'),JSON.stringify(leagues,null,2)+'\n');
   await writeFile(path.join(repo,'lib/teams/crest-coverage.json'),JSON.stringify({
     generatedAt:new Date().toISOString(),fixtures:rows.length,

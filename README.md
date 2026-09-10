@@ -50,6 +50,9 @@ vuelven a los límites gratuitos y el detalle conserva la última información.
   `api_football_details` y `api_football_teams` tienen RLS y acceso de servicio.
   Los endpoints y `/futbol/**` usan NetworkOnly; las respuestas son privadas.
 - Los logos y fotos de API-Sports son imágenes públicas sin key en el cliente.
+  Las alineaciones y el plantel también resuelven la foto por el ID confirmado
+  de API-Football cuando falta en las estadísticas; esto no consume consultas
+  adicionales a la API. Nunca se mezclan IDs de ESPN/FIFA con los de API-Football.
   Se cargan bajo demanda, con respaldo local para logos y dorsal/icono cuando
   falla una foto. Se evita Image Optimization. La cobertura de fotos, alineaciones
   y estadísticas depende del partido; los datos ausentes no se inventan.
@@ -78,7 +81,7 @@ de transición ni formulario para jugadores. El POST P2P continúa bloqueado.
 
 El catálogo incluye **258 clubes de las temporadas actuales**, los **280 nombres
 de equipos observados en 3.515 partidos históricos** (incluidas selecciones) y
-los nueve logos de API-Football. Todos tienen imágenes locales; las selecciones
+los nueve logos de las competiciones. Todos tienen imágenes locales; las selecciones
 conservan sus banderas. `crest-coverage.json` registra el inventario completo
 para comprobar faltantes; nunca se importa en el cliente.
 
@@ -86,6 +89,15 @@ para comprobar faltantes; nunca se importa en el cliente.
 históricas. `crest-overrides.json` corrige identidades revisadas: Club Brugge
 tenía una URL histórica de Espanyol; Recoleta usa el escudo actual. La excepción
 de Brugge se aplica al nombre del club, para no cambiar el logo de Espanyol.
+
+Los escudos se muestran sin placas blancas. Sportivo Trinidense tiene una
+variante transparente de ESPN. Champions, Premier, Bundesliga y Libertadores
+usan las variantes `500-dark` de ESPN, descargadas a 192 px desde su CDN.
+Serie A usa [el vector de su marca](https://commons.wikimedia.org/wiki/File:Serie_A.svg),
+con el rectángulo de fondo eliminado y el texto claro; sus trazados y colores
+del símbolo se conservan. Ligue 1 y Sudamericana tienen tratamiento monocromo
+claro mediante `getTournamentLogoClassName`. `league-logo-overrides.json` y
+`crest-overrides.json` conservan estas decisiones cuando se regenera el catálogo.
 
 Actualizar al incorporar equipos/temporadas:
 
@@ -511,8 +523,28 @@ propio estado con reintento. No se tocan pronósticos ni el modelo P2P históric
 `/api/app-version` devuelve únicamente el identificador público del build con
 `Cache-Control: no-store`, sin consultar sesión ni base de datos. `SWAutoReload`
 compara ese ID al abrir, volver a la pestaña, recuperar conexión y cada dos minutos
-visibles. Una diferencia muestra «Actualizar app»; el usuario decide cuándo recargar.
-Perfil incluye el mismo botón manual. La recarga conserva cookies y almacenamiento,
+visibles. Al entrar a una ruta o regresar, una versión nueva se carga automáticamente
+si no hubo interacción ni hay ediciones pendientes. Se vuelve a comprobar esto
+después de instalar el worker para no perder cambios hechos durante la espera.
+`PicksBoard` y `QuestionsBoard` exponen `data-app-update-blocked` mientras tienen
+pronósticos sin guardar o están guardando; también se protege la edición de campos.
+Durante el uso activo se muestra un aviso inferior con «Actualizar app». Su X
+lo oculta hasta la próxima entrada; solo desaparece definitivamente al actualizar.
+No hay botón permanente en Perfil. Un guard por par de builds en `sessionStorage`
+evita bucles si el CDN devuelve temporalmente el HTML anterior.
+La recarga conserva cookies y almacenamiento,
 comprueba conexión y actualiza el worker sin desregistrarlo ni vaciar cachés.
 Vercel aporta `VERCEL_DEPLOYMENT_ID`/`VERCEL_URL`; para probar dos builds locales,
 usar `APP_BUILD_ID` distinto en cada `npm run build`. No requiere proveedor adicional.
+
+### Correo de contacto
+
+`info@lapollacolombiana.com` recibe mediante el plan gratuito de
+[Forward Email](https://forwardemail.net/en/faq) y reenvía al Gmail del administrador.
+Los DNS siguen en Vercel: MX `mx1.forwardemail.net` (10) y `mx2.forwardemail.net`
+(20), configuración de alias en TXT cifrado y SPF de Forward Email. Solo se
+configura `info`, sin catch-all. El destino personal no se publica en el repositorio
+ni en el TXT en texto plano. Las páginas de soporte, privacidad y eliminación
+de cuenta muestran esta dirección. La entrega a Gmail y la verificación de la
+cuenta se comprobaron el 9 de septiembre de 2026. El envío como `info` no forma
+parte de este reenvío; la configuración de Resend en `send.*` permanece separada.

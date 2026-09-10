@@ -25,7 +25,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
-import { getTournamentLogo, getTournamentName } from "@/lib/tournaments";
+import { getTournamentLogo, getTournamentLogoClassName, getTournamentName } from "@/lib/tournaments";
 import { RESULT_LEAGUES } from "@/lib/api-football/leagues";
 
 const SEEN_KEY = "lp_welcome_seen_v1";
@@ -348,7 +348,7 @@ export function WelcomeIntro() {
                       alt={getTournamentName(tournament, locale).replace("Copa ", "").replace(" League", "").replace("Liga BetPlay", "BetPlay")}
                       width={36}
                       height={36}
-                      className="h-11 w-11 rounded-sm bg-text-primary p-1 object-contain"
+                      className={`h-11 w-11 rounded-sm p-1 object-contain ${getTournamentLogoClassName(tournament)}`}
                     />
                   )}
                   <span className="text-center text-[13px] leading-tight text-text-secondary [overflow-wrap:anywhere]">

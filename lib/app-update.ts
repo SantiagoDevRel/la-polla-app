@@ -13,7 +13,7 @@ export async function fetchAppVersion(): Promise<string> {
   return data.version;
 }
 
-export async function refreshApp(): Promise<void> {
+export async function refreshApp(canReload: () => boolean = () => true): Promise<void> {
   // Verify connectivity first; never replace a usable screen with an offline error.
   await fetchAppVersion();
   if (navigator.serviceWorker) {
@@ -38,5 +38,17 @@ export async function refreshApp(): Promise<void> {
       }
     } catch { /* Authenticated HTML is NetworkOnly even if SW update fails. */ }
   }
-  window.location.reload();
+  // Installation can take seconds; recheck edits/navigation immediately before leaving.
+  if (canReload()) window.location.reload();
+}
+
+export function autoUpdateKey(current: string, next: string): string {
+  return `lp-auto-update:${current}:${next}`;
+}
+
+/** A tab gets one automatic attempt per build pair, preventing CDN reload loops. */
+export function canAutoUpdate(current: string, next: string, entry: boolean, editing: boolean, storage: Pick<Storage, 'getItem'>): boolean {
+  if (current === next || !entry || editing) return false;
+  try { return storage.getItem(autoUpdateKey(current, next)) === null; }
+  catch { return false; } // Storage blocked: keep the explicit update button.
 }

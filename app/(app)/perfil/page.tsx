@@ -4,7 +4,6 @@
 
 import Link from "next/link";
 import { MyPollas } from "@/components/casa/MyPollas";
-import { AppUpdateButton } from "@/components/layout/SWAutoReload";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -301,7 +300,6 @@ export default function PerfilPage() {
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />
-        <AppUpdateButton />
 
         {/* Actividad reciente */}
         {activity.length > 0 && (

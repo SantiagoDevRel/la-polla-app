@@ -36,7 +36,7 @@ export function MyPollas({ initialPollas, defaultOpen = true, pendingByPolla = {
   const currentPage = Math.min(page, Math.max(0, pageCount - 1));
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
-  return <PollaSection id="mis-pollas" kind="mine" title={en ? "My pools" : "Mis pollas"} description={en ? "Your entries and predictions." : "Tus inscripciones y pronósticos."} count={pollas ? pollas.length : "—"} defaultOpen={defaultOpen}>
+  return <PollaSection id="mis-pollas" kind="mine" title={en ? "My pools" : "Mis pollas"} description={en ? "Pools you have joined" : "Pollas a las que te has unido"} count={pollas ? pollas.length : "—"} defaultOpen={defaultOpen}>
       {error ? <div className="lp-card p-4 text-[15px] text-text-secondary" role="alert">
         <p>{en ? "Unable to load your pools." : "No pudimos cargar tus pollas."}</p>
         <button onClick={() => setAttempt(n => n + 1)} className="mt-2 min-h-11 cursor-pointer rounded-full border border-border-default px-4 text-text-primary transition-colors hover:bg-bg-elevated">{en ? "Try again" : "Intentar de nuevo"}</button>

@@ -1,6 +1,7 @@
 import type { MatchSummary, LineupPlayer, TimelineEvent } from '@/lib/espn/summary';
 import type { ApiFootballFixture } from './mappers';
 import { RESULT_LEAGUES } from './results';
+import { apiFootballPlayerPhoto } from './player-photo';
 
 export interface PlayerPerformance extends LineupPlayer {
   id: number; grid: string | null; minutes: number | null; goals: number | null;
@@ -81,7 +82,7 @@ export function footballDetail(f: DetailedFixture, fetchedAt: string): FootballD
     const list: PlayerPerformance[]=[...(l.startXI??[]).map(x=>({...x,starter:true})),...(l.substitutes??[]).map(x=>({...x,starter:false}))].map(({player:p,starter})=>{
       const performance=performances.find(x=>x.player.id===p.id),s=performance?.statistics?.[0];
       return {id:p.id,name:p.name,jersey:p.number==null?null:String(p.number),pos:p.pos??null,starter,
-        grid:p.grid??null,club:l.team.name,headshot:performance?.player.photo??null,
+        grid:p.grid??null,club:l.team.name,headshot:performance?.player.photo||apiFootballPlayerPhoto(p.id),
         minutes:s?.games?.minutes??null,goals:s?.goals?.total??null,assists:s?.goals?.assists??null,
         rating:s?.games?.rating && Number(s.games.rating)>0?s.games.rating:null,
         yellow:s?.cards?.yellow??null,red:s?.cards?.red??null};

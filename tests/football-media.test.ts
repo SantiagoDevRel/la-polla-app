@@ -29,7 +29,7 @@ describe('complete football media catalog',()=>{
   const byId=new Map<number,string>();
   for(const league of coverage.leagues){
    expect(league.teams.length).toBeGreaterThan(0);
-   for(const team of league.teams){expect(sources[team.source]).toMatch(/^\/team-crests\/[a-f0-9]+-96\.webp$/);byId.set(team.id,sources[team.source]);}
+   for(const team of league.teams){expect(sources[team.source]).toMatch(/^\/team-crests\/[a-z0-9-]+\.(webp|png|svg)$/);byId.set(team.id,sources[team.source]);}
   }
   // A generic placeholder reused for two different clubs is not coverage.
   expect(new Set(byId.values()).size).toBe(byId.size);

@@ -37,7 +37,6 @@ export function TeamCrest({
       data-team-crest={team}
       className={cn(
         "inline-flex h-6 w-6 max-w-none shrink-0 items-center justify-center rounded-sm",
-        !countryFlag && "bg-text-primary p-0.5",
         className,
       )}
     >
@@ -57,7 +56,7 @@ export function TeamCrest({
         />
       ) : (
         <span role="img" aria-label={`Escudo de ${team} no disponible`} title={`Escudo de ${team} no disponible`}>
-          <ImageOff className="h-4 w-4 text-bg-base" aria-hidden="true" />
+          <ImageOff className="h-4 w-4 text-text-secondary" aria-hidden="true" />
         </span>
       )}
     </span>

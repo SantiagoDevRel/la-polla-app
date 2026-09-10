@@ -1,10 +1,32 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchAppVersion, refreshApp } from '@/lib/app-update';
+import { autoUpdateKey, canAutoUpdate, fetchAppVersion, refreshApp } from '@/lib/app-update';
 import { GET } from '@/app/api/app-version/route';
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('deployment updates', () => {
+  it('only updates on entry and preserves edits, with a per-build loop guard', () => {
+    const storage = { getItem: vi.fn().mockReturnValue(null) };
+    expect(canAutoUpdate('a', 'b', true, false, storage)).toBe(true);
+    expect(canAutoUpdate('a', 'a', true, false, storage)).toBe(false);
+    expect(canAutoUpdate('a', 'b', false, false, storage)).toBe(false);
+    expect(canAutoUpdate('a', 'b', true, true, storage)).toBe(false);
+    storage.getItem.mockReturnValue('attempted');
+    expect(canAutoUpdate('a', 'b', true, false, storage)).toBe(false);
+    expect(storage.getItem).toHaveBeenLastCalledWith(autoUpdateKey('a', 'b'));
+    storage.getItem.mockImplementation(() => { throw Error('blocked'); });
+    expect(canAutoUpdate('a', 'b', true, false, storage)).toBe(false);
+  });
+
+  it('checks for edits again after asynchronous installation, before reloading', async () => {
+    const reload = vi.fn(), safe = vi.fn(() => false);
+    vi.stubGlobal('window', { location: { reload } });
+    vi.stubGlobal('navigator', {});
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ version: 'b' })));
+    await refreshApp(safe);
+    expect(safe).toHaveBeenCalledOnce();
+    expect(reload).not.toHaveBeenCalled();
+  });
   it('returns a public version without permitting HTTP caching', async () => {
     const response = GET();
     expect(response.headers.get('cache-control')).toContain('no-store');

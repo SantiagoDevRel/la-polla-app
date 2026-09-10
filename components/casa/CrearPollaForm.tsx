@@ -15,7 +15,7 @@ import { X } from "lucide-react";
 import { Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { formatCop, formatMatchTime } from "@/lib/casa/format";
 import { LOCK_MINUTES } from "@/lib/casa/types";
-import { CREATABLE_TOURNAMENTS, getTournamentLogo } from "@/lib/tournaments";
+import { CREATABLE_TOURNAMENTS, getTournamentLogo, getTournamentLogoClassName } from "@/lib/tournaments";
 import { TeamCrest } from "@/components/match/TeamCrest";
 
 type Kind = "partidos" | "manual" | "rifa";
@@ -672,7 +672,7 @@ export function CrearPollaForm() {
                         : "border-border-subtle bg-bg-elevated"
                     }`}
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-text-primary">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm">
                       {/* Pre-sized local assets avoid the image optimizer's query-string restriction. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -680,7 +680,7 @@ export function CrearPollaForm() {
                         alt=""
                         width={32}
                         height={32}
-                        className="h-8 w-8 max-w-none object-contain"
+                        className={`h-8 w-8 max-w-none object-contain ${getTournamentLogoClassName(t.slug)}`}
                       />
                     </span>
                     <span className="min-w-0 text-[12px] font-medium leading-snug text-text-primary [overflow-wrap:anywhere]">

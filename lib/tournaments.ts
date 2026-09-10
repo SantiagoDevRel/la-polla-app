@@ -190,7 +190,14 @@ export function getTournamentName(slug: string, locale: string = "es"): string {
 export function getTournamentLogo(slug: string, size: "original" | "small" = "original"): string {
   const tournament = getTournamentBySlug(slug) ?? TOURNAMENTS[0];
   // Static 96 px assets cover a 32 px logo at 3x without Image Optimization.
-  return size === "small" ? ((leagueLogos as Record<string,string>)[slug] ?? tournament.smallLogoPath) : tournament.logoPath;
+  return (leagueLogos as Record<string,string>)[slug] ?? (size === "small" ? tournament.smallLogoPath : tournament.logoPath);
+}
+
+/** Monochrome marks need their light treatment on our dark surfaces. */
+export function getTournamentLogoClassName(slug: string): string {
+  if (slug === 'ligue1_2025' || slug === 'sudamericana_2026') return 'brightness-0 invert';
+  if (slug === 'betplay_2026') return 'brightness-200';
+  return '';
 }
 
 // Flat slug → icon-path map. Relocated from components/shared/PollaCard.tsx
