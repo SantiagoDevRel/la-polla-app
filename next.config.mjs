@@ -15,9 +15,10 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === "development",
   // Reload de pestañas que estaban cargadas cuando vuelve la conexión.
   reloadOnOnline: false,
-  // Hundreds of club crests must not compete with fonts/data during SW install.
-  // They remain same-origin, with the existing image runtime cache on first use.
-  globPublicPatterns: ['*', '!(team-crests)/**/*'],
+  // Install the shell first. Preloading the whole public directory downloaded
+  // 507 assets (including videos) and delayed worker activation for minutes.
+  // Club crests, players, backgrounds and league logos use runtime caching.
+  globPublicPatterns: ['manifest.json', 'icons/*.png'],
 });
 
 /** @type {import('next').NextConfig} */
