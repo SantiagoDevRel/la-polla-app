@@ -1,9 +1,9 @@
 type Stat = { key: string; label: string; home: string; away: string };
 const CATEGORIES = [
   { id: 'general', es: 'General', en: 'Overview', keys: ['possessionPct','totalShots','shotsOnTarget','expectedGoals','wonCorners','saves'] },
-  { id: 'attack', es: 'Ataque', en: 'Attack', keys: ['totalShots','shotsOnTarget','shotsOffTarget','blockedShots','shotsInsideBox','shotsOutsideBox','expectedGoals','wonCorners','offsides','shotPct','penaltyKickGoals','penaltyKickShots'] },
+  { id: 'attack', es: 'Ataque', en: 'Attack', keys: ['totalShots','shotsOnTarget','shotsOffTarget','blockedShots','shotsInsideBox','shotsOutsideBox','expectedGoals','wonCorners','offsides','shotPct','penaltyKickGoals','penaltyKickShots','Free Kicks'] },
   { id: 'passing', es: 'Pases', en: 'Passing', keys: ['possessionPct','totalPasses','accuratePasses','passPct','accurateCrosses','totalCrosses','crossPct','totalLongBalls','accurateLongBalls','longballPct'] },
-  { id: 'defense', es: 'Defensa', en: 'Defence', keys: ['saves','foulsCommitted','yellowCards','redCards','effectiveTackles','totalTackles','tacklePct','interceptions','effectiveClearance','totalClearance'] },
+  { id: 'defense', es: 'Defensa', en: 'Defence', keys: ['saves','foulsCommitted','yellowCards','redCards','effectiveTackles','totalTackles','tacklePct','interceptions','effectiveClearance','totalClearance','goals_prevented'] },
 ];
 
 /** Keep every provider metric reachable, including keys added in future feeds. */
