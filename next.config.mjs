@@ -14,7 +14,7 @@ const withSerwist = withSerwistInit({
   // huérfanas y empezás a debuggear cosas que no son tuyas.
   disable: process.env.NODE_ENV === "development",
   // Reload de pestañas que estaban cargadas cuando vuelve la conexión.
-  reloadOnOnline: true,
+  reloadOnOnline: false,
   // Hundreds of club crests must not compete with fonts/data during SW install.
   // They remain same-origin, with the existing image runtime cache on first use.
   globPublicPatterns: ['*', '!(team-crests)/**/*'],
@@ -22,6 +22,9 @@ const withSerwist = withSerwistInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_BUILD_ID: process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_URL || process.env.APP_BUILD_ID || 'development',
+  },
   reactStrictMode: true,
   generateEtags: false,
   // Playwright serves the app on localhost but opens it through 127.0.0.1.

@@ -17,7 +17,6 @@ import { AppBackground } from "@/components/layout/AppBackground";
 import AnnouncementTicker from "@/components/layout/AnnouncementTicker";
 import BrandHeader from "@/components/layout/BrandHeader";
 import FontScaleApplier from "@/components/layout/FontScaleApplier";
-import SWAutoReload from "@/components/layout/SWAutoReload";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { needsName } from "@/lib/users/needs-name";
@@ -137,7 +136,6 @@ export default async function AppLayout({
 
   return (
     <ToastProvider>
-      <SWAutoReload />
       {/* Los dos popups de encuesta (ScoringSurveyModal y
           DoublePointsSurveyModal) SE DESMONTARON de acá (2026-08-25).
           Estaban globales en el shell, o sea que aparecían encima de /casa

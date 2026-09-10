@@ -1,89 +1,59 @@
-// components/layout/SWAutoReload.tsx — Recarga la página cuando un
-// nuevo Service Worker toma control. Sin esto, después de un deploy
-// el cliente sigue corriendo el JS viejo hasta que el user haga un
-// hard-reload manual — y como nuestros chunks /_next/static/* están
-// cacheados por el SW, los fixes no se ven en uso real hasta entonces.
-//
-// Flujo:
-//  1) Mount: pedirle al browser que CHEQUEE /sw.js ahora mismo
-//     (registration.update()). Sin esto, el browser solo chequea cada
-//     ~24h o en navegación, así que el deploy puede tardar mucho en
-//     verse.
-//  2) Si hay un SW nuevo install-eado y waiting, le mandamos
-//     SKIP_WAITING para que active de una.
-//  3) clientsClaim: true en sw.ts hace que el nuevo SW tome control
-//     inmediatamente del cliente actual → controllerchange dispara →
-//     recargamos una sola vez (flag previene loop).
-//  4) Cuando el tab vuelve a foco (visibilitychange visible),
-//     re-check — agarra deploys hechos mientras el user tenía la
-//     PWA en background.
-//  5) Poll cada 3 min mientras el tab está visible — para usuarios
-//     que se quedan sentados en una pantalla sin navegar (ej. mirando
-//     scoreboard live). Sin el poll, esos clientes podían quedarse
-//     trabados varios minutos en JS viejo después de un deploy.
-"use client";
+﻿"use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from 'react';
+import { useLocale } from 'next-intl';
+import { RefreshCw } from 'lucide-react';
+import { APP_BUILD_ID, fetchAppVersion, refreshApp } from '@/lib/app-update';
+
+export function AppUpdateButton() {
+  const en = useLocale() === 'en';
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  return <div className="space-y-2">
+    <button type="button" disabled={busy} onClick={async () => {
+      setBusy(true); setError(false);
+      try { await refreshApp(); } catch { setError(true); setBusy(false); }
+    }} className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-border-subtle bg-bg-elevated px-4 py-3 text-[15px] font-semibold text-text-primary transition-colors hover:bg-bg-card disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">
+      <RefreshCw className={`h-4 w-4 shrink-0 ${busy ? 'animate-spin' : ''}`} aria-hidden="true"/>
+      {busy ? (en ? 'Updating…' : 'Actualizando…') : (en ? 'Update app' : 'Actualizar app')}
+    </button>
+    {error && <p role="alert" className="text-[13px] leading-relaxed text-amber">{en ? 'Could not connect. Check your connection and try again.' : 'No pudimos conectar. Revisa tu conexión e intenta de nuevo.'}</p>}
+  </div>;
+}
 
 export default function SWAutoReload() {
+  const en = useLocale() === 'en';
+  const [available, setAvailable] = useState(false);
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator)) return;
-
-    let didReload = false;
-
-    const onControllerChange = () => {
-      if (didReload) return;
-      didReload = true;
-      // Una sola recarga por session — si el SW se reemplaza más de
-      // una vez (raro) el flag previene el loop.
-      window.location.reload();
-    };
-
-    const checkForUpdate = async () => {
+    let mounted = true, checking = false;
+    const check = async () => {
+      if (checking || document.visibilityState !== 'visible') return;
+      checking = true;
       try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (!reg) return;
-        await reg.update();
-        if (reg.waiting) {
-          // Hay un SW nuevo install-eado y waiting. Decile que active
-          // ya — no esperar al próximo reload natural.
-          reg.waiting.postMessage({ type: "SKIP_WAITING" });
-        }
-      } catch {
-        // Browser viejo o registration cancelado. No-op.
-      }
+        const version = await fetchAppVersion();
+        if (mounted) setAvailable(version !== APP_BUILD_ID);
+        // Install assets in the background, but let the user choose when to reload.
+        const registration = await navigator.serviceWorker?.getRegistration();
+        await registration?.update();
+      } catch { /* Keep the current screen usable while offline. */ }
+      finally { checking = false; }
     };
-
-    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
-
-    // Chequeo inicial al montar.
-    void checkForUpdate();
-
-    // Re-chequeo cuando el tab vuelve a foco (típico en PWAs móviles
-    // donde el user vuelve a la app después de varias horas).
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        void checkForUpdate();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-
-    // Poll cada 3 min — atrapa deploys mientras el user está sentado
-    // en una pantalla viva (live scoreboard, lobby de polla, etc).
-    const POLL_MS = 3 * 60 * 1000;
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void checkForUpdate();
-      }
-    }, POLL_MS);
-
+    void check();
+    const visible = () => { void check(); };
+    document.addEventListener('visibilitychange', visible);
+    window.addEventListener('online', visible);
+    navigator.serviceWorker?.addEventListener('controllerchange', visible);
+    const timer = window.setInterval(visible, 120_000);
     return () => {
-      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.clearInterval(intervalId);
+      mounted = false; clearInterval(timer);
+      document.removeEventListener('visibilitychange', visible);
+      window.removeEventListener('online', visible);
+      navigator.serviceWorker?.removeEventListener('controllerchange', visible);
     };
   }, []);
-
-  return null;
+  if (!available) return null;
+  return <aside role="status" aria-label={en ? 'App update' : 'Actualización de la app'} data-app-update className="fixed inset-x-3 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-[10001] mx-auto max-h-[60dvh] max-w-[456px] space-y-3 overflow-y-auto rounded-2xl border border-border-subtle bg-bg-elevated p-4 shadow-xl">
+    <p className="text-[15px] font-semibold text-text-primary">{en ? 'A new version is available' : 'Hay una nueva versión disponible'}</p>
+    <AppUpdateButton/>
+  </aside>;
 }

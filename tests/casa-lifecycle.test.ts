@@ -40,11 +40,14 @@ describe("CASA archive and lifecycle API", () => {
     expect(mocks.db).not.toHaveBeenCalled();
   });
 
-  it("requires the exact pool name before archival", async () => {
-    fetchDb.mockResolvedValueOnce(response({ id, name: "Polla de prueba", archived_at: null }));
-    expect((await PATCH(request({ action: "eliminar", confirmName: "Otra polla" }), params)).status).toBe(400);
-    expect(fetchDb).toHaveBeenCalledTimes(1);
-    expect(fetchDb.mock.calls[0][1]?.method).toBe("GET");
+  it("allows the other administrator to confirm without typing a pool name", async () => {
+    const otherAdminId = "00000000-0000-4000-8000-000000000004";
+    mocks.user.mockResolvedValue({ id: otherAdminId, is_admin: true });
+    fetchDb.mockResolvedValueOnce(response({ id, name: "Polla de prueba", archived_at: null }))
+      .mockResolvedValueOnce(response({ id, slug: "prueba", archived_at: "2026-09-09T00:00:00Z" }));
+    expect((await PATCH(request({ action: "eliminar" }), params)).status).toBe(200);
+    expect(JSON.parse(String(fetchDb.mock.calls[1][1]?.body)).archived_by).toBe(otherAdminId);
+    expect(fetchDb).toHaveBeenCalledTimes(2);
   });
 
   it("archives without deleting or rewriting status, entries or payouts", async () => {

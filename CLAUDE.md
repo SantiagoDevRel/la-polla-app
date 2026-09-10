@@ -6,6 +6,21 @@
 
 ## READ THIS FIRST
 
+### Navegación y actualización de la app (2026-09-09)
+
+Casa: Pollas abiertas → Mis pollas → Pollas cerradas, todas cerradas inicialmente,
+con contenedores `PollaSection` y subtítulos consistentes. Perfil conserva Mis pollas
+abierta. Eliminar polla requiere rol admin y un clic de confirmación; no pedir nombre.
+Equipo: Próximos (default) / Pasados / Plantel / Club. Partido: equipos clickeables
+con nombre/escudo centrados y «Ver equipo», marcador central, categorías de estadísticas
+y selector Titulares/Suplentes. Referencia inspeccionada: 365Scores web móvil y app.
+
+`SWAutoReload` ahora avisa y ofrece Actualizar app; nunca recarga por controllerchange
+ni al recuperar conexión. `/api/app-version` es público, sin DB y no-store; compara
+el ID público del build con el cliente cada dos minutos visibles y al volver a la app.
+Perfil ofrece el mismo botón manual. No borrar cookies, storage ni registros del SW.
+La bienvenida presenta nueve logos locales y no lleva crédito personal.
+
 ### Centro de fútbol y API-Football Pro (2026-09-09, migraciones 094–095)
 
 El usuario aprobó y pagó un mes de Pro. `/status` decide plan y vencimiento;
@@ -1724,8 +1739,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 `components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
-En `/casa`, Mis pollas aparece antes de Pollas abiertas para inscribirte; ambas
-secciones empiezan desplegadas. Las inscripciones pendientes o pagadas se
+En `/casa`, el orden es Pollas abiertas, Mis pollas y Pollas cerradas. Las tres
+empiezan cerradas, comparten título/subtítulo y contienen sus tarjetas dentro de
+`PollaSection`. En Perfil, Mis pollas permanece abierta. Las inscripciones pendientes o pagadas se
 muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
 Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.
 El historial finalizado se conserva después de las participaciones actuales.

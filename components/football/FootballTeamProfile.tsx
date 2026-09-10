@@ -12,7 +12,7 @@ const POSITIONS=[['Goalkeeper','Arqueros','Goalkeepers'],['Defender','Defensas',
 export default function FootballTeamProfile({id}:{id:string}) {
  const locale=useLocale(),en=locale==='en';
  const {data,error,loading,reload}=useFootballResource<FootballTeam>(`/api/football/teams/${id}`,300_000);
- const [view,setView]=useState<'matches'|'squad'|'info'>('matches'),[venueFailed,setVenueFailed]=useState(false);
+ const [view,setView]=useState<'upcoming'|'results'|'squad'|'info'>('upcoming'),[venueFailed,setVenueFailed]=useState(false);
  if(loading)return <main className="space-y-4 px-4"><FootballBack/><FootballLoading/></main>;
  if(!data)return <main className="space-y-4 px-4"><FootballBack/><FootballEmpty title={en?'Team unavailable':'Equipo no disponible'} message={en?'Try opening the team from a recent match.':'Intenta abrir el equipo desde un partido reciente.'} onRetry={reload}/></main>;
  const positions=[...POSITIONS.map(([key,es,label])=>({key,label:en?label:es})),{key:'Other',label:en?'Other players':'Otros jugadores'}];
@@ -28,16 +28,24 @@ export default function FootballTeamProfile({id}:{id:string}) {
    <h1 className="font-display text-[32px] leading-tight tracking-wide text-text-primary [overflow-wrap:anywhere]">{data.team.name}</h1>
    {country&&<p className="text-[15px] text-text-secondary">{country}</p>}
   </header>
-  <div className="grid grid-cols-1 gap-2" role="group" aria-label={en?'Team information':'Información del equipo'}>
-   {(['matches','squad','info'] as const).map((tab,i)=><button key={tab} type="button" aria-pressed={view===tab} onClick={()=>setView(tab)} className={`min-h-11 rounded-full px-4 py-3 text-[15px] font-semibold transition-colors cursor-pointer ${view===tab?'bg-text-primary text-bg-base':'border border-border-subtle bg-bg-card/80 text-text-secondary hover:bg-bg-elevated'}`}>
-    {(en?['View matches','View squad','About the club']:['Ver partidos','Ver plantel','Conocer el club'])[i]}
+  <div className="flex overflow-x-auto rounded-xl border border-border-subtle bg-bg-card/90 p-1" role="tablist" aria-label={en?'Team information':'Información del equipo'}>
+   {(['upcoming','results','squad','info'] as const).map((tab,i)=><button key={tab} id={`team-tab-${tab}`} type="button" role="tab" aria-selected={view===tab} aria-controls="team-panel" tabIndex={view===tab?0:-1} onClick={()=>setView(tab)}
+    onFocus={e=>e.currentTarget.scrollIntoView({block:'nearest',inline:'nearest'})}
+    onKeyDown={e=>{
+     const direction=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;
+     if(!direction&&e.key!=='Home'&&e.key!=='End')return;
+     e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?3:(i+direction+4)%4;
+     const button=e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next];button?.click();button?.focus();
+    }} className={`min-h-11 min-w-max flex-1 rounded-lg px-2 py-2 text-[15px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf cursor-pointer ${view===tab?'bg-text-primary text-bg-base':'text-text-secondary hover:bg-bg-elevated'}`}>
+    {(en?['Upcoming','Results','Squad','Club']:['Próximos','Pasados','Plantel','Club'])[i]}
    </button>)}
   </div>
-  {view==='matches'&&<div className="space-y-5">
-   {upcoming.length>0&&<section className="space-y-3"><h2 className="font-display text-[20px] tracking-wide text-text-primary">{en?'Upcoming and live':'Próximos y en juego'}</h2>{upcoming.map(m=><FootballMatchCard key={m.id} match={m} showDate/>)}</section>}
-   {results.length>0&&<section className="space-y-3"><h2 className="font-display text-[20px] tracking-wide text-text-primary">{en?'Recent results':'Resultados recientes'}</h2>{[...results].reverse().map(m=><FootballMatchCard key={m.id} match={m} showDate/>)}</section>}
-   <p className="text-[13px] leading-relaxed text-text-secondary">{en?'Recent and upcoming matches in the competitions we cover.':'Partidos recientes y próximos en los torneos que seguimos.'}</p>
-  </div>}
+  <div id="team-panel" role="tabpanel" aria-labelledby={`team-tab-${view}`} tabIndex={0} className="rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">
+  {(view==='upcoming'||view==='results')&&<section className="space-y-3">
+   <h2 className="font-display text-[20px] tracking-wide text-text-primary">{view==='upcoming'?(en?'Upcoming and live':'Próximos partidos'):(en?'Recent results':'Partidos pasados')}</h2>
+   {(view==='upcoming'?upcoming:[...results].reverse()).map(m=><FootballMatchCard key={m.id} match={m} showDate/>)}
+   {(view==='upcoming'?upcoming:results).length===0&&<FootballEmpty title={view==='upcoming'?(en?'No upcoming matches yet':'Aún no hay próximos partidos'):(en?'No recent results':'Aún no hay resultados')} message={en?'Matches in the competitions we cover will appear here.':'Aquí aparecerán los partidos de los torneos que seguimos.'} onRetry={reload}/>}
+  </section>}
   {view==='squad'&&<section className="space-y-4">
    <p className="text-[13px] leading-relaxed text-text-secondary">{en?'Club squad. Open a match to see its starting lineup.':'Plantel del club. Para ver quiénes son titulares, abre la alineación de un partido.'}</p>
    {lastMatch&&<Link href={`/futbol/partidos/${lastMatch.id}?vista=alineaciones&equipo=${lastMatch.home.id===data.team.id?'home':'away'}`} className="flex min-h-11 items-center justify-center rounded-full border border-border-subtle px-4 py-3 text-center text-[15px] font-semibold text-text-primary transition-colors hover:bg-bg-elevated">{en?'View the last match lineup':'Ver alineación del último partido'}</Link>}
@@ -66,6 +74,7 @@ export default function FootballTeamProfile({id}:{id:string}) {
     // eslint-disable-next-line @next/next/no-img-element
     <img src={data.venue.image} alt={data.venue.name??(en?'Stadium':'Estadio')} width={480} height={270} onError={()=>setVenueFailed(true)} loading="lazy" className="aspect-video w-full rounded-xl object-cover"/>}
   </section>}
+  </div>
   {error&&<p className="text-[13px] text-amber">{en?'Unable to refresh. Showing the last available information.':'No pudimos actualizar. Mostramos la última información disponible.'}</p>}
  </main>;
 }

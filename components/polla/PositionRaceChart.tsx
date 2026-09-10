@@ -62,7 +62,7 @@ const DEMO_FECHAS = ["11/6", "13/6", "15/6", "17/6", "19/6", "21/6", "24/6", "27
 // y se diluye, vos (Santiago) hacés el arco clásico de remontada.
 const DEMO_INCS: { id: string; name: string; isMe?: boolean; type: string; incs: number[] }[] = [
   { id: "u_pipe", name: "Pipe", type: "pibe", incs: [7, 5, 1, 6, 2, 5, 4, 3] },
-  { id: "u_santi", name: "Santiago", isMe: true, type: "goleador", incs: [5, 6, 7, 2, 8, 6, 7, 5] },
+  { id: "u_santi", name: "Jugador", isMe: true, type: "goleador", incs: [5, 6, 7, 2, 8, 6, 7, 5] },
   { id: "u_andres", name: "Andrés", type: "arquero", incs: [6, 3, 5, 7, 4, 5, 2, 6] },
   { id: "u_lady", name: "Lady", type: "capitan", incs: [8, 5, 4, 3, 2, 4, 3, 2] },
   { id: "u_fede", name: "Fede", type: "tigre", incs: [3, 5, 6, 5, 6, 3, 5, 4] },

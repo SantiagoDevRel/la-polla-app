@@ -14,6 +14,12 @@ estadísticas, titulares y suplentes. Tocar un escudo abre la ficha del club:
 plantel por posición, fotos, dorsales, edades, resultados, próximos partidos
 e información e imagen del estadio. Desde el plantel se abre la última alineación.
 Las estadísticas individuales se consultan dentro de cada alineación.
+La ficha del club usa Próximos (inicial), Pasados, Plantel y Club en una barra
+horizontal. El partido presenta ambos equipos con nombre y escudo centrados,
+enlaces «Ver equipo» y marcador central, tomando como referencia la navegación
+de [365Scores](https://www.365scores.com/es). Estadísticas agrupa General,
+Ataque, Pases y Defensa; Más conserva métricas desconocidas del proveedor.
+Las alineaciones permiten alternar Titulares/Suplentes además del equipo.
 
 La propuesta visual se trabajó en [Lovable](https://lovable.dev/projects/4c4f70a0-dc3c-48d1-93af-6907944caabf)
 con referencias de Tribuna Caliente. Conserva Bebas Neue/Outfit, vidrio oscuro,
@@ -196,7 +202,7 @@ incluir teléfonos en URLs. El panel
   `&cursor=<nextCursor>`; así revisar pagos desde otra sesión no salta filas.
 - Compartir incluye el nombre, el valor de entrada y el enlace público directo.
 - **Eliminar polla** aparece al final del detalle y en cada card administrativa.
-  Exige rol de administrador y confirmar el nombre. Archiva con `archived_at`
+  Exige rol de administrador y un clic de confirmación, sin escribir el nombre. Archiva con `archived_at`
   y `archived_by`: conserva pagos, pronósticos, estado y premios; no hace
   devoluciones ni transferencias. El enlace archivado responde 404.
 
@@ -486,8 +492,9 @@ Construido con ☕ en Medellín / Lisboa por [@SantiagoDevRel](https://github.co
 
 `components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
-En `/casa`, Mis pollas aparece antes de Pollas abiertas para inscribirte; ambas
-secciones empiezan desplegadas. Las inscripciones pendientes o pagadas se
+En `/casa`, el orden es Pollas abiertas, Mis pollas y Pollas cerradas. Las tres
+empiezan cerradas, comparten título/subtítulo y contienen sus tarjetas dentro de
+`PollaSection`. En Perfil, Mis pollas permanece abierta. Las inscripciones pendientes o pagadas se
 muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
 Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.
 El historial finalizado se conserva después de las participaciones actuales.
@@ -498,3 +505,14 @@ leer y devuelve solo nombres, destino, estado y torneos, con `private, no-store`
 Casa usa el mismo helper en el servidor; Perfil usa el endpoint. No se crean
 inscripciones de demostración: cero es un resultado real; un fallo tiene su
 propio estado con reintento. No se tocan pronósticos ni el modelo P2P histórico.
+
+### Actualizaciones publicadas
+
+`/api/app-version` devuelve únicamente el identificador público del build con
+`Cache-Control: no-store`, sin consultar sesión ni base de datos. `SWAutoReload`
+compara ese ID al abrir, volver a la pestaña, recuperar conexión y cada dos minutos
+visibles. Una diferencia muestra «Actualizar app»; el usuario decide cuándo recargar.
+Perfil incluye el mismo botón manual. La recarga conserva cookies y almacenamiento,
+comprueba conexión y actualiza el worker sin desregistrarlo ni vaciar cachés.
+Vercel aporta `VERCEL_DEPLOYMENT_ID`/`VERCEL_URL`; para probar dos builds locales,
+usar `APP_BUILD_ID` distinto en cada `npm run build`. No requiere proveedor adicional.

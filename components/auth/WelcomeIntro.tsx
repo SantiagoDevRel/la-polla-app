@@ -11,7 +11,7 @@
 // estadio a pantalla completa. Las dos cosas se fueron: la app ahora cobra
 // entrada, y el video se descargaba en datos moviles antes de que la persona
 // supiera siquiera de que se trata.
-//   5. CTA + credit line settle.
+//   5. CTA line settle.
 //
 // Persisted via localStorage so returning users land straight on the
 // login form. Reduced-motion users skip the cadence and see the full
@@ -23,9 +23,10 @@
 
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
-import { TOURNAMENT_ICONS } from "@/lib/tournaments";
+import { getTournamentLogo, getTournamentName } from "@/lib/tournaments";
+import { RESULT_LEAGUES } from "@/lib/api-football/leagues";
 
 const SEEN_KEY = "lp_welcome_seen_v1";
 const TYPE_MS = 26; // ms between chars — fast, energetic typewriter
@@ -34,30 +35,8 @@ const CHAR_FADE_MS = 160; // each char's fade-in; multiple chars overlap mid-fad
 // "physics". Acts close to easeOutExpo — soft landing, no overshoot.
 const SMOOTH: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-// Cuatro de los ocho torneos de la casa. Se muestran cuatro y no ocho porque
-// la animación los hace caer en cascada en una sola fila: con ocho no entran
-// en 390px sin encogerlos hasta volverlos irreconocibles.
-//
-// La selección no es aleatoria: dos de peso europeo (Champions, La Liga) y
-// dos que el público de esta app siente propias (Libertadores, BetPlay). El
-// Mundial salió — terminó en julio y ya no se puede jugar.
-//
-// Premier sigue afuera: su logo blanco renderiza inconsistente dentro del
-// WebView de Capacitor en Android y rompe la alineación contra los otros
-// tres, que son oscuros.
-const TOURNAMENT_ORDER: Array<{
-  slug: keyof typeof TOURNAMENT_ICONS;
-  nameKey:
-    | "tournamentChampions"
-    | "tournamentLaLiga"
-    | "tournamentLibertadores"
-    | "tournamentBetplay";
-}> = [
-  { slug: "champions_2025", nameKey: "tournamentChampions" },
-  { slug: "laliga_2025", nameKey: "tournamentLaLiga" },
-  { slug: "libertadores_2026", nameKey: "tournamentLibertadores" },
-  { slug: "betplay_2026", nameKey: "tournamentBetplay" },
-];
+// Nine supported competitions, arranged as a balanced 3 × 3 grid.
+const TOURNAMENT_ORDER = Object.keys(RESULT_LEAGUES);
 
 // Stage gates — ms between the previous beat finishing and the next
 // one starting. Tight enough to keep momentum, loose enough that
@@ -72,6 +51,7 @@ const STAGE_DELAYS: Record<Exclude<Stage, "intro">, number> = {
 
 export function WelcomeIntro() {
   const t = useTranslations("Welcome");
+  const locale = useLocale();
   const tBrand = useTranslations("Brand");
   const isIOSApp = useIsIOSApp();
   const prefersReducedMotion = useReducedMotion();
@@ -260,7 +240,7 @@ export function WelcomeIntro() {
               fallback for short viewports where the full stack still
               wouldn't fit (older iPhones in landscape, etc.). */}
           <div
-            className="relative z-10 w-full h-full overflow-y-auto flex flex-col items-center justify-start px-6 pt-10 pb-12 max-w-lg mx-auto"
+            className="relative z-10 w-full h-full overflow-y-auto flex flex-col items-center justify-start px-4 pt-10 pb-12 max-w-lg mx-auto"
             onClick={fastForward}
           >
             {/* Wordmark */}
@@ -340,10 +320,10 @@ export function WelcomeIntro() {
 
             {/* Tournament logos — slot reserved (min-h) from the start so
                 the rest of the column doesn't move when the row reveals. */}
-            <div className="mt-6 w-full flex flex-wrap items-center justify-center gap-x-5 gap-y-3 min-h-[68px]">
-              {(isIOSApp ? TOURNAMENT_ORDER.filter((tn) => tn.slug === "worldcup_2026") : TOURNAMENT_ORDER).map((tournament, i) => (
+            <div className="mt-6 grid w-full grid-cols-3 items-start gap-x-2 gap-y-4">
+              {(isIOSApp ? [] : TOURNAMENT_ORDER).map((tournament, i) => (
                 <motion.div
-                  key={tournament.slug}
+                  key={tournament}
                   initial={{
                     opacity: 0,
                     scale: 0.92,
@@ -364,15 +344,15 @@ export function WelcomeIntro() {
                 >
                   {isIOSApp ? null : (
                     <img
-                      src={TOURNAMENT_ICONS[tournament.slug]}
-                      alt={t(tournament.nameKey)}
+                      src={getTournamentLogo(tournament, "small")}
+                      alt={getTournamentName(tournament, locale).replace("Copa ", "").replace(" League", "").replace("Liga BetPlay", "BetPlay")}
                       width={36}
                       height={36}
-                      className="object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]"
+                      className="h-11 w-11 rounded-sm bg-text-primary p-1 object-contain"
                     />
                   )}
-                  <span className="text-[10px] uppercase tracking-wider text-text-secondary">
-                    {t(tournament.nameKey)}
+                  <span className="text-center text-[13px] leading-tight text-text-secondary [overflow-wrap:anywhere]">
+                    {getTournamentName(tournament, locale).replace("Copa ", "").replace(" League", "").replace("Liga BetPlay", "BetPlay")}
                   </span>
                 </motion.div>
               ))}
@@ -444,7 +424,7 @@ export function WelcomeIntro() {
               .
             </motion.p>
 
-            {/* CTA + credit — always rendered, pointer-events disabled
+            {/* CTA — always rendered, pointer-events disabled
                 until showReady so users can't tap an invisible button. */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -464,17 +444,7 @@ export function WelcomeIntro() {
               >
                 {t("start")}
               </button>
-              <a
-                href="https://instagram.com/santiagotrujilloz"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-text-muted hover:text-gold transition-colors inline-flex items-center gap-1.5"
-              >
-                <span>{t("madeBy")}</span>
-                <span className="text-gold/80 underline underline-offset-2">
-                  @santiagotrujilloz
-                </span>
-              </a>
+
             </motion.div>
           </div>
         </motion.div>

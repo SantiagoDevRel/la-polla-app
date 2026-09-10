@@ -1,5 +1,6 @@
 // app/layout.tsx — Layout raíz de la aplicación La Polla App con configuración PWA
 import type { Metadata, Viewport } from "next";
+import SWAutoReload from "@/components/layout/SWAutoReload";
 import { Bebas_Neue, Outfit } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
@@ -172,6 +173,7 @@ export default async function RootLayout({
               <CapacitorDeepLinks />
               <CapacitorAppUpdate />
               <OfflineBanner />
+              <SWAutoReload />
               <SplashScreen />
               {children}
             </PlatformProvider>

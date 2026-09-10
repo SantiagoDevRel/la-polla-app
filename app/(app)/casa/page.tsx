@@ -8,7 +8,7 @@ import Link from "next/link";
 import { MyPollas } from "@/components/casa/MyPollas";
 import { listMyPollas } from "@/lib/casa/my-pollas";
 import Image from "next/image";
-import { ChevronDown } from "lucide-react";
+import { PollaSection } from "@/components/casa/PollaSection";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -72,54 +72,8 @@ export default async function CasaPage() {
         </p>
       </HeroFrame>
 
-      <div className="px-4 pt-6">
-        <div className="mb-6"><MyPollas initialPollas={myPollas} /></div>
-        {/* ── Te falta pronosticar ─────────────────────────────────────────
-              (2026-09-02) El único aviso que existía era el numerito del
-              BottomNav, y un badge no dice ni en cuál polla ni cuánto falta.
-              Tampoco hay recordatorio por SMS o WhatsApp: el cron de
-              recordatorios lee el modelo P2P viejo y no sabe que existe
-              `casa_*`. Dentro de la app el aviso es gratis y llega igual,
-              porque para pronosticar hay que abrirla de todas formas.
-              Ámbar y no dorado: es urgencia, no premio. */}
-        {pendientes.length > 0 && (
-          <ul className="mb-6 space-y-2">
-            {pendientes.map(({ polla, faltan }) => (
-              <li key={polla.id}>
-                <Link href={`/casa/${polla.slug}`} className="block">
-                  <div className="flex items-center gap-3 border border-amber/40 bg-amber/10 p-3">
-                    <span className="min-w-0 flex-1">
-                      <span className="lp-label block text-amber">
-                        Te falta pronosticar
-                      </span>
-                      <span className="mt-0.5 block truncate text-[14px] text-text-primary">
-                        {polla.name}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className="lp-money block text-[18px] leading-none text-amber">
-                        {faltan}
-                      </span>
-                      <span className="lp-label mt-0.5 block">
-                        {faltan === 1 ? "partido" : "partidos"}
-                      </span>
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* ── Pollas abiertas ─────────────────────────────────────────── */}
-        <details open id="pollas-abiertas" className="group/open-pollas scroll-mt-20">
-          <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-md border border-border-subtle bg-bg-card/80 px-3 py-3 transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold [&::-webkit-details-marker]:hidden">
-            <span className="min-w-0 flex-1"><h2 className="lp-display-sm text-text-primary">POLLAS</h2><span className="mt-1 block text-[13px] text-text-secondary">Pollas abiertas para inscribirte</span></span>
-            <span className="lp-label shrink-0">{disponibles.length}</span>
-            <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-text-secondary transition-transform group-open/open-pollas:rotate-180" />
-          </summary>
-          <div className="mt-3">
-
+      <div className="space-y-4 px-4 pt-6">
+        <PollaSection id="pollas-abiertas" kind="open" title="Pollas abiertas" description="Elige una polla e inscríbete." count={disponibles.length}>
         {disponibles.length === 0 ? (
           // `bg-bg-card` pisa a proposito el 80% de opacidad de .lp-card: es la
           // unica card de la app que lleva ilustracion adentro, y sobre el video
@@ -150,19 +104,11 @@ export default async function CasaPage() {
             ))}
           </ul>
         )}
-          </div>
-        </details>
+        </PollaSection>
 
-        <details className="group mt-9">
-          <summary
-            aria-controls="pollas-cerradas-list"
-            className="flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-md border border-border-subtle bg-bg-card/80 px-3 py-3 transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:bg-bg-elevated [&::-webkit-details-marker]:hidden"
-          >
-            <h2 className="lp-display-sm min-w-0 flex-1 text-text-primary">POLLAS CERRADAS</h2>
-            <span className="lp-label shrink-0">{cerradas.length}</span>
-            <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-text-secondary transition-transform duration-200 group-open:rotate-180" />
-          </summary>
-          <div id="pollas-cerradas-list" className="mt-3">
+        <MyPollas initialPollas={myPollas} defaultOpen={false} pendingByPolla={Object.fromEntries(pendientes.map(p => [p.polla.id, p.faltan]))} />
+
+        <PollaSection id="pollas-cerradas" kind="closed" title="Pollas cerradas" description="Consulta los resultados de pollas anteriores." count={cerradas.length}>
             {cerradas.length > 0 ? (
               <ul className="grid auto-rows-fr gap-3">
                 {cerradas.map((polla) => (
@@ -175,8 +121,7 @@ export default async function CasaPage() {
                 <p className="mt-2 text-[13px] text-text-muted">Cuando una polla cierre, podrás consultarla aquí.</p>
               </StreetCard>
             )}
-          </div>
-        </details>
+        </PollaSection>
       </div>
     </div>
   );
@@ -197,7 +142,7 @@ function PollaRow({
   return (
     <li>
       <Link href={`/casa/${polla.slug}`} className="block h-full">
-        <StreetCard className="flex h-full flex-col p-4 transition-colors hover:border-border-strong">
+        <StreetCard className="flex h-full flex-col bg-bg-elevated p-4 transition-colors hover:border-border-strong">
           {/* Equal-height list rows let names wrap without shifting the
               logos and amounts in neighboring cards. */}
           <div className="flex items-start justify-between gap-3">

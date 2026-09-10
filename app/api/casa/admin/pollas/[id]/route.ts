@@ -39,7 +39,6 @@ export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
   action: z.enum(["publicar", "cerrar", "repartir", "anular", "eliminar"]),
-  confirmName: z.string().trim().max(80).optional(),
 });
 
 export async function PATCH(
@@ -75,9 +74,6 @@ export async function PATCH(
     if (readError) return NextResponse.json({ error: "No se pudo consultar la polla." }, { status: 500 });
     if (!polla) return NextResponse.json({ error: "No existe esa polla." }, { status: 404 });
     if (polla.archived_at) return NextResponse.json({ error: "Esta polla ya se eliminó." }, { status: 409 });
-    if (parsed.data.confirmName !== polla.name) {
-      return NextResponse.json({ error: "Escribe el nombre completo de la polla para confirmar." }, { status: 400 });
-    }
     // Archive every lifecycle state, including settled pools, without changing
     // the original status or deleting financial and prediction history.
     const { data, error } = await db.from("casa_pollas")
