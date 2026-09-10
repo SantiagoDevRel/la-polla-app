@@ -35,9 +35,12 @@ export default function SWAutoReload() {
     const interact = () => { interacted = true; };
     const editing = () => edited || Boolean(document.querySelector('[data-app-update-blocked="true"]')) || Boolean(document.activeElement?.matches('input, textarea, select, [contenteditable="true"]'));
     const check = async (entry = false) => {
-      if (checking || document.visibilityState !== 'visible') return;
+      if (document.visibilityState !== 'visible') return;
+      // Returning restores the reminder even while a previous worker check runs.
+      if (entry) setDismissed(false);
+      if (checking) return;
       checking = true;
-      if (entry) { interacted = false; setDismissed(false); }
+      if (entry) interacted = false;
       try {
         const version = await fetchAppVersion();
         if (!mounted) return;
