@@ -176,7 +176,15 @@ export default async function PollaPage({
               </div>
             </div>
             <div>
-              <Label>Se lleva el ganador</Label>
+              {/* Con la polla ya repartida y un empate, decir "se lleva el
+                  ganador $21.000" al lado de un premio de $10.500 se lee como
+                  si le hubieran pagado de menos a alguien. El pozo es el mismo;
+                  lo que cambia es entre cuántos se dividió. */}
+              <Label>
+                {payouts.length > 1
+                  ? `Repartido entre ${payouts.length}`
+                  : "Se lleva el ganador"}
+              </Label>
               <div className="lp-money mt-1 text-[17px] text-gold">
                 {formatCop(pot.prize_cop)}
               </div>
