@@ -8,11 +8,12 @@ import { HeroFrame, Label, Tape } from "@/components/street";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { AccionesPolla } from "@/components/casa/AccionesPolla";
 import { ColaDePagos } from "@/components/casa/ColaDePagos";
+import { ResolverPolla } from "@/components/casa/ResolverPolla";
 import { fadeUp, staggerContainer } from "@/lib/animations";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import type { pollaStatusLabel, CasaPolla, CasaPot } from "@/lib/casa/types";
 
-export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "status" | "closes_at"> & {
+export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at"> & {
   label: ReturnType<typeof pollaStatusLabel>;
 };
 
@@ -139,6 +140,13 @@ export function CasaAdminPanel({ pollas, pots, totalCasa }: {
                             {polla.status !== "borrador" && <Link href={`/casa/${polla.slug}`} className="lp-btn lp-btn-ghost !px-3 !text-[13px]">Ver polla</Link>}
                           </div>
                           <div className="[&_button]:!min-h-11">
+                            {/* Resolver preguntas / registrar el número de la
+                                rifa. Sin esto, esas dos clases de polla solo
+                                se podían cerrar desde el bot de Telegram. */}
+                            {(polla.kind === "manual" || polla.kind === "rifa") &&
+                              polla.status !== "borrador" && polla.status !== "anulada" && (
+                                <ResolverPolla id={polla.id} kind={polla.kind} />
+                              )}
                             <AccionesPolla id={polla.id} status={polla.status} nombre={polla.name} />
                           </div>
                         </div>

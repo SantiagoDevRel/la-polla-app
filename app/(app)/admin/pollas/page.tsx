@@ -24,6 +24,9 @@ export default async function CasaAdminPage() {
         id: polla.id,
         slug: polla.slug,
         name: polla.name,
+        // `kind` decide si el panel muestra los controles para resolver
+        // preguntas (manual) o registrar el número sorteado (rifa).
+        kind: polla.kind,
         status: polla.status,
         closes_at: polla.closes_at,
         label: pollaStatusLabel(polla),

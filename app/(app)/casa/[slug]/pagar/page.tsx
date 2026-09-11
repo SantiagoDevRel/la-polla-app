@@ -33,8 +33,16 @@ export default async function PagarPage({
     getPot(polla.id),
   ]);
 
-  // Ya entró y no fue rechazado: no tiene nada que hacer acá.
-  if (entry && entry.status !== "rechazada" && polla.kind !== "rifa") {
+  // Ya entró y no fue rechazado: no tiene nada que hacer acá. `anulada` (se
+  // cayó la subida del comprobante) SÍ puede volver a intentar — el endpoint de
+  // join reusa esa fila a propósito; si esta pantalla la rebota, la persona
+  // queda sin ninguna puerta para entrar a la polla.
+  if (
+    entry &&
+    entry.status !== "rechazada" &&
+    entry.status !== "anulada" &&
+    polla.kind !== "rifa"
+  ) {
     redirect(`/casa/${polla.slug}`);
   }
   if (!isPollaOpen(polla)) redirect(`/casa/${polla.slug}`);

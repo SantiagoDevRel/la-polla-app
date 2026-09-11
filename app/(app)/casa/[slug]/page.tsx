@@ -30,6 +30,7 @@ import {
   type Pick1x2,
 } from "@/lib/casa/types";
 import { formatCop, prizeImageUrl, timeLeft } from "@/lib/casa/format";
+import { getPollitoBase } from "@/lib/pollitos";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
 import { HeroFrame, Label, SectionHead, StreetCard, Tape } from "@/components/street";
@@ -91,7 +92,13 @@ export default async function PollaPage({
 
   const abierta = isPollaOpen(polla);
   const estado = pollaStatusLabel(polla);
-  const inscrito = entry != null && entry.status !== "rechazada";
+  // `anulada` cuenta igual que `rechazada`: NO estás inscrito. Es el estado que
+  // deja el endpoint de join cuando se cae la subida del comprobante, y existe
+  // justamente para que la persona pueda volver a intentar. Tratarla como
+  // inscripción viva escondía el botón de entrar y /pagar la devolvía acá: un
+  // pantallazo que no subió dejaba a esa persona sin forma de entrar a la polla.
+  const inscrito =
+    entry != null && entry.status !== "rechazada" && entry.status !== "anulada";
   const pagoPendiente = entry?.status === "pendiente";
   const tournaments = resolveTournamentSlugs(polla, matches as { tournament: string | null }[]);
 
@@ -261,6 +268,19 @@ export default async function PollaPage({
             <p className="lp-label text-red-alert">Pago rechazado</p>
             <p className="mt-1 text-[13px] text-text-secondary">
               {entry.reject_reason ?? "Comunícate con el administrador."}
+            </p>
+          </div>
+        )}
+
+        {/* El comprobante no llegó a guardarse (se cayó la subida). Sin este
+            aviso la persona solo veía el botón de entrar otra vez, sin saber
+            por qué su intento anterior no quedó. */}
+        {entry?.status === "anulada" && abierta && (
+          <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
+            <p className="lp-label text-amber">Tu comprobante no se guardó</p>
+            <p className="mt-1 text-[13px] text-text-secondary">
+              No alcanzamos a recibir la imagen, así que tu inscripción no
+              quedó. Vuelve a subirla y sigues en carrera.
             </p>
           </div>
         )}
@@ -489,16 +509,19 @@ function ResultadoPolla({
           <ul className="mt-3 space-y-2">
             {payouts.map((p) => (
               <li key={p.user_id} className="flex items-center gap-3">
-                {p.avatar_url && (
-                  <Image
-                    src={p.avatar_url}
-                    alt=""
-                    aria-hidden="true"
-                    width={28}
-                    height={28}
-                    className="h-7 w-7 max-w-none shrink-0 rounded-full object-contain"
-                  />
-                )}
+                {/* `users.avatar_url` NO es una URL: guarda la clave del
+                    pollito ("millos", "junior"). Pasársela a next/image tiraba
+                    `Failed to parse src` y con eso se caía la pantalla ENTERA
+                    de la polla — para todos menos el ganador, y solo después
+                    de repartir. getPollitoBase es el traductor de siempre. */}
+                <Image
+                  src={getPollitoBase(p.avatar_url)}
+                  alt=""
+                  aria-hidden="true"
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 max-w-none shrink-0 rounded-full object-contain"
+                />
                 <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">
                   {p.display_name ?? "Sin nombre"}
                 </span>

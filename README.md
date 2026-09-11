@@ -223,6 +223,42 @@ de desplegar. El bloqueo de la fila de la polla serializa revisiones de pagos,
 archivo y reparto, también para Telegram. No permite repartir con comprobantes
 pendientes ni cambiar inscripciones después del reparto o del archivo.
 
+### Resolver y repartir sin el bot (2026-09-12)
+
+- **Polla manual:** al abrir su card en `/admin/pollas` aparecen sus preguntas.
+  Cada una se resuelve eligiendo la opción correcta o escribiendo la respuesta
+  libre; al guardar se repuntúa la polla completa y se indica cuántas faltan.
+- **Rifa:** la misma card pide el número que salió y dice en el momento si esa
+  boleta se vendió o no, antes de repartir.
+- Los comandos `/resolver`, `/respuesta` y `/numero` del bot siguen vigentes y
+  escriben exactamente lo mismo, con los mismos guardas: una pregunta ya
+  resuelta no se sobrescribe (`resolved_at IS NULL`) y el número respeta el
+  rango de boletas. Ninguna de las dos vías toca una polla repartida,
+  anulada o eliminada.
+
+### Reparto del pozo: solo el ganador (migración 096)
+
+`supabase/migrations/096_casa_pozo_solo_ganador.sql` deja el reparto en una
+sola regla, y hay que aplicarla antes de publicar pollas nuevas:
+
+- El pozo (`casa_polla_pot.prize_cop`) va COMPLETO al puntaje más alto. Nunca
+  hay segundo ni tercer puesto: `casa_payouts.place` siempre es 1.
+- Si varios empatan arriba, se divide en partes iguales entre ellos. Los pesos
+  sueltos del redondeo también van a los ganadores, en orden estable por
+  `user_id`, así que la suma de `casa_payouts` es exactamente el pozo.
+- Sin ganador no se reparte y no se escribe ningún pago: si nadie sumó puntos,
+  o si la boleta sorteada no la compró nadie, el reparto falla con un mensaje
+  que explica qué pasó. Qué hacer con esa plata lo decide la casa, no el código.
+
+Regresión: `scripts/casa-settle-check.sql` arma pollas de prueba en un Supabase
+LOCAL y verifica los cinco casos con `ASSERT` — ganador único (quien no pagó no
+entra), empate con sobrante de redondeo, nadie con puntos, rifa cuya boleta no
+se vendió y doble reparto. Se corre así, y no toca datos reales:
+
+```bash
+docker exec -i supabase_db_la-polla psql -U postgres -d postgres < scripts/casa-settle-check.sql
+```
+
 ## Partidos, tabla e imágenes
 
 `/casa` muestra **Pollas disponibles** y **Pollas cerradas**, estas últimas

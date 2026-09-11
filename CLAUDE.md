@@ -157,6 +157,41 @@ sigue existiendo pero está inactivo.
   (la inscripción y su comprobante) · `casa_picks` · `casa_payouts`.
 - `telegram_admins` / `telegram_outbox` / `telegram_auth_attempts`.
 
+### 🏆 El pozo es del ganador y de nadie más (2026-09-12, migración 096)
+
+Regla del dueño, y es la única: **el pozo completo va al puntaje más alto**.
+No hay segundo ni tercer puesto — `casa_payouts.place` siempre es 1 — y la casa
+no tiene tabla de distribución configurable; no se le agrega una. Si varios
+empatan arriba, se divide en partes iguales entre ellos y **los pesos sueltos
+del redondeo también son de los ganadores** (antes quedaban en la casa con una
+nota en `settle_notes`).
+
+Sin ganador NO se reparte: si nadie sumó puntos, o si la boleta sorteada no la
+compró nadie, `casa_settle_polla` falla con un mensaje que lo explica y no
+escribe un solo payout. Antes, "nadie sumó puntos" repartía el pozo entre TODOS
+los que pagaron — incluido quien nunca pronosticó — y una rifa sin boleta
+vendida se marcaba `resuelta` con la plata callada en la casa.
+
+Regresión: `scripts/casa-settle-check.sql` (Supabase local, 5 casos con ASSERT).
+
+**Resolver sin bot:** desde `/admin/pollas`, la card de una polla manual
+resuelve sus preguntas y la de una rifa registra el número sorteado (acción
+`responder` / `numero` en `app/api/casa/admin/pollas/[id]/route.ts`, UI en
+`components/casa/ResolverPolla.tsx`). Antes eso vivía SOLO en el bot de
+Telegram, así que una polla manual o una rifa se podían crear, cobrar y jugar
+desde la web pero no cerrar. Los comandos del bot siguen funcionando: las dos
+vías escriben lo mismo con los mismos guardas.
+
+⚠️ `users.avatar_url` **no es una URL**: guarda la clave del pollito
+("millos", "junior"). Pasarla a `next/image` tira `Failed to parse src` y tumba
+la pantalla entera. Siempre `getPollitoBase()` / `UserAvatar`.
+
+⚠️ Una inscripción `anulada` (se cayó la subida del comprobante) **no es una
+inscripción**: cuenta como "no inscrito" igual que `rechazada`, para que la
+persona pueda volver a intentar. Tratarla como viva dejaba a esa persona sin
+botón de entrar y con `/pagar` devolviéndola: bloqueada para siempre en esa
+polla.
+
 ### 🚨 La plata se calcula en SQL, nunca en TypeScript
 Toda cifra de dinero sale de estas funciones. Si necesitás un total, llamá
 al RPC — **no lo recalcules en JS**, porque ahí empiezan las dos verdades:
