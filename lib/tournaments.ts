@@ -203,15 +203,6 @@ export function getTournamentLogoClassName(slug: string): string {
 // Flat slug → icon-path map. Relocated from components/shared/PollaCard.tsx
 // during Phase 3a so multiple UI surfaces can import without depending on a
 // component file.
-export const TOURNAMENT_ICONS: Record<string, string> = {
-  champions_2025: `/tournaments/champions_league.svg?v=${LOGO_V}`,
-  worldcup_2026: `/tournaments/mundial-2026.webp?v=${LOGO_V}`,
-  laliga_2025: `/tournaments/la_liga.png?v=${LOGO_V}`,
-  premier_2025: `/tournaments/premier_league.webp?v=${LOGO_V}`,
-  seriea_2025: `/tournaments/seria_a.png?v=${LOGO_V}`,
-  libertadores_2026: `/tournaments/copa_libertadores.svg?v=${LOGO_V}`,
-  sudamericana_2026: `/tournaments/copa_sudamericana.svg?v=${LOGO_V}`,
-  betplay_2026: `/tournaments/liga_betplay.svg?v=${LOGO_V}`,
-  bundesliga_2025: `/tournaments/bundesliga.svg?v=${LOGO_V}`,
-  ligue1_2025: `/tournaments/ligue_1.svg?v=${LOGO_V}`,
-};
+export const TOURNAMENT_ICONS: Record<string, string> = Object.fromEntries(
+  TOURNAMENTS.map((tournament) => [tournament.slug, tournament.smallLogoPath]),
+);

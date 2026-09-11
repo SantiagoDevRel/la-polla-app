@@ -79,8 +79,8 @@ export default function LoserPayoutModal({
         playsInline
         poster="/videos/la-polla-triste-poster.webp"
       >
-        <source src="/videos/la-polla-triste.webm" type="video/webm" />
         <source src="/videos/la-polla-triste-lite.mp4" type="video/mp4" />
+        <source src="/videos/la-polla-triste.webm" type="video/webm" />
       </video>
       <div
         className="absolute inset-0"

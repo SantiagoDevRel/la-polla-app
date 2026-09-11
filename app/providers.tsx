@@ -1,50 +1,91 @@
 // app/providers.tsx — PostHog (product analytics) en el navegador / WebView Capacitor.
-// Patrón oficial PostHog para Next.js App Router: init a nivel de módulo
-// (corre una vez en el cliente) + captura manual de $pageview en cada
-// navegación client-side (App Router no dispara pageview nativo confiable).
+// PostHog carga después de `load` + idle para no competir con la pantalla.
+// La captura manual de $pageview sigue cada navegación del App Router.
 "use client";
 
-import posthog from "posthog-js";
-import { PostHogProvider as PHProvider, usePostHog } from "posthog-js/react";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import type { PostHog } from "posthog-js";
 
-// Init solo si hay key (en build sin key, PostHog queda inerte — no rompe nada).
-// Se captura en dev y prod; en los dashboards de PostHog filtrás el tráfico
-// local por `$host = localhost` para mantener limpia la "product truth".
-if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-    api_host:
-      process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
-    // Solo crea perfil de persona para usuarios identificados → ahorra cuota
-    // free (eventos anónimos no inflan MAU).
-    person_profiles: "identified_only",
-    // Pageview lo mandamos manual abajo (App Router). Pageleave sí automático.
-    capture_pageview: false,
-    capture_pageleave: true,
-    // ANALYTICS-ONLY (decisión Santiago 2026-06-13): sin Session Replay ni
-    // Surveys. La Polla tiene login por teléfono + reglas duras de Habeas Data,
-    // y replay quema la cuota free.
-    // Si más adelante querés grabar sesiones puntuales, se prende acá con
-    // masking. Autocapture (clicks) NO graba valores de inputs por default.
-    disable_session_recording: true,
-    disable_surveys: true,
-    debug: process.env.NODE_ENV === "development",
+let postHogPromise: Promise<PostHog | null> | undefined;
+
+function afterLoadAndIdle(): Promise<void> {
+  return new Promise((resolve) => {
+    const queueIdle = () => {
+      const idleWindow = window as Window & {
+        requestIdleCallback?: (
+          callback: () => void,
+          options?: { timeout: number },
+        ) => number;
+      };
+      if (idleWindow.requestIdleCallback) {
+        idleWindow.requestIdleCallback(resolve, { timeout: 3_000 });
+      } else {
+        window.setTimeout(resolve, 1_200);
+      }
+    };
+
+    if (document.readyState === "complete") queueIdle();
+    else window.addEventListener("load", queueIdle, { once: true });
   });
+}
+
+function getPostHog(): Promise<PostHog | null> {
+  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  if (!key || typeof window === "undefined") return Promise.resolve(null);
+  if (postHogPromise) return postHogPromise;
+
+  postHogPromise = afterLoadAndIdle()
+    .then(async () => {
+      const { default: posthog } = await import("posthog-js");
+      posthog.init(key, {
+        api_host:
+          process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
+        person_profiles: "identified_only",
+        capture_pageview: false,
+        capture_pageleave: true,
+        // Analytics-only: clicks + pageviews, without remote add-ons.
+        autocapture: true,
+        advanced_disable_flags: true,
+        capture_dead_clicks: false,
+        capture_heatmaps: false,
+        capture_performance: false,
+        disable_external_dependency_loading: true,
+        disable_session_recording: true,
+        disable_surveys: true,
+        debug: process.env.NODE_ENV === "development",
+      });
+      return posthog;
+    })
+    .catch(() => {
+      // A chunk/network failure should not disable analytics for the whole
+      // document. The next real route transition can retry after the page is
+      // already interactive.
+      postHogPromise = undefined;
+      return null;
+    });
+
+  return postHogPromise;
 }
 
 function PostHogPageView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const ph = usePostHog();
+  const scheduledUrl = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!pathname || !ph) return;
+    if (!pathname) return;
     let url = window.origin + pathname;
     const qs = searchParams?.toString();
     if (qs) url += `?${qs}`;
-    ph.capture("$pageview", { $current_url: url });
-  }, [pathname, searchParams, ph]);
+    // Keep every real route transition that occurs while the deferred import
+    // is pending. The ref only removes React's repeated effect for the same URL.
+    if (scheduledUrl.current === url) return;
+    scheduledUrl.current = url;
+    void getPostHog().then((posthog) => {
+      posthog?.capture("$pageview", { $current_url: url });
+    });
+  }, [pathname, searchParams]);
 
   return null;
 }
@@ -60,9 +101,9 @@ function SuspendedPostHogPageView() {
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   return (
-    <PHProvider client={posthog}>
+    <>
       <SuspendedPostHogPageView />
       {children}
-    </PHProvider>
+    </>
   );
 }

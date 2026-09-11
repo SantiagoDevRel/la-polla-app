@@ -18,7 +18,26 @@ const withSerwist = withSerwistInit({
   // Install the shell first. Preloading the whole public directory downloaded
   // 507 assets (including videos) and delayed worker activation for minutes.
   // Club crests, players, backgrounds and league logos use runtime caching.
-  globPublicPatterns: ['manifest.json', 'icons/*.png'],
+  globPublicPatterns: [
+    'manifest.json',
+    'icons/icon-192x192.png',
+    'icons/icon-512x512.png',
+  ],
+  // Los chunks grandes se guardan cuando realmente se usan mediante el cache
+  // runtime. Evita que la instalación del worker adelante PostHog y el pack
+  // de banderas; los iconos explícitos de arriba se conservan en el shell.
+  maximumFileSizeToCacheInBytes: 256 * 1024,
+  // Next emite un stub estático por cada Route Handler. El browser nunca
+  // solicita esos `app/api/**/route` chunks, pero precachearlos agregaba 98
+  // requests a cada instalación del worker.
+  manifestTransforms: [
+    (entries) => ({
+      manifest: entries.filter(
+        ({ url }) => !url.includes("/chunks/app/api/"),
+      ),
+      warnings: [],
+    }),
+  ],
 });
 
 /** @type {import('next').NextConfig} */
@@ -47,9 +66,6 @@ const nextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "crests.football-data.org" },
       { protocol: "https", hostname: "a.espncdn.com" },
-      { protocol: "https", hostname: "api.dicebear.com" },
-      { protocol: "https", hostname: "avatars.dicebear.com" },
-      { protocol: "https", hostname: "cdn.jsdelivr.net" },
       { protocol: "https", hostname: "**.supabase.co" },
     ],
     // Permitir SVGs optimizados para los logos de torneos bajo /public/tournaments.
@@ -72,17 +88,53 @@ const nextConfig = {
           { key: "Content-Type", value: "application/json" },
         ],
       },
-      // Existing cache headers
+      // Los escudos WebP llevan hash de contenido en el nombre. Pueden vivir
+      // un año en el navegador sin revalidaciones ni riesgo de quedar viejos.
+      {
+        source: "/team-crests/:file([0-9a-f]{16}-96\\.webp)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      // Estos nombres son estables y pueden reemplazarse en un deploy. Un TTL
+      // corto con SWR evita viajes repetidos sin congelar una versión vieja.
+      {
+        source: "/videos/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+      {
+        source: "/flags/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
       {
         source: "/tournaments/:path*",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=300, stale-while-revalidate=86400",
+          },
         ],
       },
       {
         source: "/pollitos/:path*",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=300, stale-while-revalidate=86400",
+          },
         ],
       },
       // Security headers — all routes
@@ -115,23 +167,19 @@ const nextConfig = {
               // (React Refresh) lo necesita — sin eso, la JS se rompe en
               // hidratación, los handlers de React no se atachan, y los
               // forms hacen native-submit (page reload) al primer click.
-              // us-assets.i.posthog.com: PostHog sirve su config + scripts de
-              // features (web-vitals, dead-clicks) desde este CDN. Sin esto en
-              // script-src el browser los bloquea (console CSP errors). Session
-              // replay y surveys quedan apagados desde el init (analytics-only).
+              // PostHog corre analytics-only desde el bundle: flags, replay,
+              // surveys y dependencias externas quedan apagados en providers.
               process.env.NODE_ENV === "development"
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://us-assets.i.posthog.com"
-                : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://us-assets.i.posthog.com",
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com"
+                : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               // i.ytimg.com: thumbnails de los highlights del Mundial (FIFA
               // YouTube) en /inicio. a.espncdn.com: fotos de jugadores/escudos
               // para futuras fichas de equipo. Todo hotlink, sin self-host.
-              "img-src 'self' data: blob: https://api.dicebear.com https://avatars.dicebear.com https://crests.football-data.org https://a.espncdn.com https://media.api-sports.io https://upload.wikimedia.org https://i.ytimg.com https://*.supabase.co https://cdn.jsdelivr.net",
-              // us.i.posthog.com + us-assets.i.posthog.com: ingest + assets de
-              // PostHog (product analytics). Sin estos en connect-src el browser
-              // bloquea el POST de eventos.
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://us.i.posthog.com https://us-assets.i.posthog.com",
+              "img-src 'self' data: blob: https://crests.football-data.org https://a.espncdn.com https://media.api-sports.io https://upload.wikimedia.org https://i.ytimg.com https://*.supabase.co",
+              // us.i.posthog.com recibe eventos; no se cargan scripts remotos.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://us.i.posthog.com",
               // www.youtube.com + youtube-nocookie: embed inline de highlights
               // del Mundial (canales de broadcasters que permiten embed).
               "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",

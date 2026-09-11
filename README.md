@@ -523,7 +523,7 @@ propio estado con reintento. No se tocan pronósticos ni el modelo P2P históric
 `/api/app-version` devuelve únicamente el identificador público del build con
 `Cache-Control: no-store`, sin consultar sesión ni base de datos. `SWAutoReload`
 compara ese ID al abrir, volver a la pestaña, recuperar conexión y cada dos minutos
-visibles. Al entrar a una ruta o regresar, una versión nueva se carga automáticamente
+visibles. Al abrir la app o regresar, una versión nueva se carga automáticamente
 si no hubo interacción ni hay ediciones pendientes. Se vuelve a comprobar esto
 después de instalar el worker para no perder cambios hechos durante la espera.
 `PicksBoard` y `QuestionsBoard` exponen `data-app-update-blocked` mientras tienen
@@ -536,6 +536,35 @@ La recarga conserva cookies y almacenamiento,
 comprueba conexión y actualiza el worker sin desregistrarlo ni vaciar cachés.
 Vercel aporta `VERCEL_DEPLOYMENT_ID`/`VERCEL_URL`; para probar dos builds locales,
 usar `APP_BUILD_ID` distinto en cada `npm run build`. No requiere proveedor adicional.
+
+### Rendimiento de medios y shell (2026-09-10)
+
+`AppBackground` pinta primero `.lp-humo`, tres gradientes CSS animados que no
+descargan archivos. Login conserva ese humo y no solicita video; onboarding
+mantiene el video que ya tenía. En el shell autenticado,
+`lib/background-connection.ts` mantiene la conducta existente: ahorro de
+datos/2G/3G queda en humo y las demás conexiones rotan los cinco MP4 lite.
+La política escucha `connection.change`; el humo pausa sus animaciones cuando
+el clip ya cubre la pantalla. Los modales prefieren también el MP4 lite y
+conservan WebM como fallback.
+
+El proxy deja pasar MP4/WebM como archivos públicos y sus headers permiten
+reutilizarlos sin revalidar durante un día. El worker manda esas solicitudes
+a la red para no leer posibles respuestas HTML de un cache anterior; el cache
+HTTP del navegador conserva el soporte de rangos. Serwist guarda los escudos
+con hash en `lp-team-crests` y el arte mutable en `lp-art` mediante SWR. Del directorio
+público, el precache solo incluye manifest e iconos de 192/512; los chunks de
+más de 256 KiB se guardan al usarse y los stubs estáticos de `app/api/**` no
+entran porque ningún browser los solicita. Los masters MP4 de edición permanecen
+en el repo pero `.vercelignore` evita subirlos. `TOURNAMENT_ICONS` entrega las
+variantes de 96 px para sus usos pequeños.
+
+PostHog se importa después de `load` + idle. Encola las transiciones que ocurran
+mientras carga y conserva pageviews y autocapture de clics una vez inicializado;
+una visita que termine antes de esa carga diferida no alcanza a reportarse. Replay,
+encuestas, flags, mapas de calor, dead clicks, métricas de performance y
+dependencias remotas quedan apagados. `/` y el retorno autenticado desde login entran directo a
+`/casa`, sin el salto intermedio por `/inicio`.
 
 ### Correo de contacto
 

@@ -221,12 +221,13 @@ cambiá `app/globals.css` y `tailwind.config.ts`, NUNCA los componentes.
   Bebas NECESITA tracking positivo: sin él las mayúsculas se pegan.
 - Superficies de **vidrio oscuro**: `rgb(bg-card / 0.80)` + `blur(8px)` +
   bordes translúcidos. Toda card tiene hover; ninguna es estática.
-- **VOLVIÓ el video de estadio de fondo.** `AppBackground` es el server
-  picker de `background-variants.ts` (5 clips en `/public/videos`).
-  ⚠️ La objeción de agosto (costo en datos móviles) era real y NO se
-  ignoró: `AppBackgroundClient` tiene un guard de `navigator.connection`
-  — con `saveData` o en 2G/3G no pide el video y se queda con el poster
-  (~80 kB). El que tiene wifi ve el estadio; el que anda con datos, la foto.
+- **VOLVIÓ el video de estadio de fondo.** `AppBackgroundClient` administra
+  cinco clips de `background-variants.ts`, siempre después de `load` + idle.
+  `saveData`/2G/3G y login reciben solo el humo CSS de cero bytes; onboarding
+  conserva su video. Las demás conexiones conservan la rotación de los cinco
+  clips; el listener `connection.change` pasa a humo si la señal reportada
+  empeora. El fondo usa un solo MP4 lite por vez y pausa
+  las animaciones del humo cuando el video ya está visible.
 - `WelcomeIntro` ya no monta su propio `<video>`: se dejó transparente y
   deja ver el `AppBackground` que su layout ya tenía montado. Cero bytes
   nuevos en la primera visita.
@@ -251,12 +252,18 @@ Las cuatro reglas que salieron de ahí, y por qué:
    93 KB para tapar un hueco de medio segundo.
 2. **El video entra DESPUÉS de `load` + idle, nunca antes.** Si lo montás
    durante la carga, compite por ancho de banda con el JS y los datos.
-3. **UNA sola `<source>`.** Con dos, el browser tantea webm *y* mp4 — eran
-   4 requests de video para una sola pantalla.
-4. **La rotación es del CLIENTE y el primer video es siempre el mismo.**
-   Elegir al azar en el server hacía inútil el cache (otro archivo de 2 MB
-   por navegación) y, peor, el `headers()` que lo hacía obligaba a render
-   dinámico de TODO el layout.
+3. **UNA sola fuente MP4 lite.** La comparación de los cinco clips contra sus
+   masters dio mayor fidelidad que WebM y 1,71 MB menos por ciclo completo.
+4. **La rotación es del CLIENTE y el primer video siempre es el mismo.** Una
+   red lenta conserva el humo y las demás mantienen los cinco clips. Elegir al
+   azar en el server inutilizaba el cache y el
+   `headers()` forzaba render dinámico del layout.
+5. **Cache por naturaleza del archivo.** Escudos WebP con hash son immutable;
+   pollitos/logos/banderas usan SWR. Video usa cache HTTP con soporte Range;
+   el worker evita su cache viejo para no recuperar HTML de redirects previos.
+   Del directorio público, el precache incluye solo manifest + iconos 192/512;
+   nunca banners ni videos. Los chunks mayores de 256 KiB y los stubs estáticos
+   de `app/api/**` quedan fuera; entran bajo demanda solo assets navegables.
 
 ⚠️ **Las imágenes se sirven en su tamaño real, no con `next/image`.** Los
 originales son de 1024×1024 y se dibujan a 40-80 px; hay variantes

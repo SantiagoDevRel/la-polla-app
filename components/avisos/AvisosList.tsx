@@ -298,8 +298,8 @@ function Aviso({
               poster={visual.posterSrc}
               className="absolute inset-0 w-full h-full object-cover"
             >
-              <source src={visual.videoWebm} type="video/webm" />
               <source src={visual.videoMp4} type="video/mp4" />
+              <source src={visual.videoWebm} type="video/webm" />
             </video>
           ) : (
             <Image

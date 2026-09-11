@@ -178,7 +178,7 @@ export async function updateSession(request: NextRequest) {
   if (user && (path.startsWith("/login") || path.startsWith("/verify"))) {
     const url = request.nextUrl.clone();
     const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));
-    const [pathname, search = ""] = (returnTo ?? "/inicio").split("?");
+    const [pathname, search = ""] = (returnTo ?? "/casa").split("?");
     url.pathname = pathname;
     url.search = search ? `?${search}` : "";
     return redirectWithCookies(url, supabaseResponse);
