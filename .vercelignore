@@ -16,6 +16,13 @@
 !/tsconfig.json
 !/css.d.ts
 !/proxy.ts
+# Los clips -lite son los usados en producción. Los masters quedan en el repo
+# como fuente de edición, pero no necesitan viajar en cada upload de Vercel.
+/public/videos/nuevo-background.mp4
+/public/videos/la-polla-celebration.mp4
+/public/videos/la-polla-rankup-moment.mp4
+/public/videos/la-polla-rivales.mp4
+/public/videos/la-polla-triste.mp4
 # Defense in depth inside allowed directories.
 **/.env*
 **/*.key

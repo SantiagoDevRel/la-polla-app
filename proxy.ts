@@ -102,7 +102,7 @@ export const config = {
      * - apple-touch-icon*, android-chrome*, mstile* (PWA icon variants)
      * - reset.html (página utilitaria sin auth)
      * - Archivos estáticos por extensión: imágenes, fonts, audio,
-     *   css/js/maps, ico, html
+     *   css/js/maps, ico, html y video
      *
      * IMPORTANTE: sitemap.xml, robots.txt, llms.txt NO se excluyen acá
      * porque el proxy raíz setea x-locale en headers, que esos
@@ -114,6 +114,6 @@ export const config = {
      * route.ts viven en directorios, no en archivos con extensión.
      * Por eso excluimos .json sin riesgo (cubre manifest.json y assets).
      */
-    "/((?!_next/static|_next/image|favicon\\.ico|icons/|sounds/|fonts/|manifest\\.json|sw\\.js|workbox-.*\\.js|reset\\.html|\\.well-known/|apple-touch-icon.*|android-chrome.*|mstile.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|html|woff|woff2|ttf|otf|mp3|wav|ogg|css|js|map|json)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|icons/|sounds/|fonts/|manifest\\.json|sw\\.js|workbox-.*\\.js|reset\\.html|\\.well-known/|apple-touch-icon.*|android-chrome.*|mstile.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|html|woff|woff2|ttf|otf|mp3|wav|ogg|mp4|webm|css|js|map|json)$).*)",
   ],
 };

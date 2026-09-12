@@ -169,7 +169,7 @@ export default function DesignPage() {
         <div className="space-y-4 bg-bg-card p-6 rounded-lg border border-white/10">
           <div>
             <span className="text-xs text-text-muted uppercase tracking-wider">Bebas 56</span>
-            <p className="font-display text-[56px] leading-none">Santiago</p>
+            <p className="font-display text-[56px] leading-none">Jugador</p>
           </div>
           <div>
             <span className="text-xs text-text-muted uppercase tracking-wider">Bebas 40 gold</span>
@@ -406,7 +406,7 @@ export default function DesignPage() {
             pollaName="Champions Pana"
             currentUserId="u1"
             top3={[
-              { userId: "u1", name: "Santiago", points: 28 },
+              { userId: "u1", name: "Jugador", points: 28 },
               { userId: "u2", name: "Andrés", points: 24 },
               { userId: "u3", name: "Laura", points: 21 },
             ]}

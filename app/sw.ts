@@ -13,7 +13,10 @@ import {
   type PrecacheEntry,
   type SerwistGlobalConfig,
   Serwist,
+  CacheFirst,
+  ExpirationPlugin,
   NetworkOnly,
+  StaleWhileRevalidate,
 } from "serwist";
 
 declare global {
@@ -60,6 +63,7 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   // pagar, y un contador congelado lo deja creyendo que todavía alcanza a
   // entrar. Siempre a la red.
   /^\/casa(\/|$)/,
+  /^\/futbol(\/|$)/,
 ];
 
 const serwist = new Serwist({
@@ -73,6 +77,50 @@ const serwist = new Serwist({
         url.origin === self.location.origin &&
         NEVER_CACHE_PATHS.some((re) => re.test(url.pathname)),
       handler: new NetworkOnly(),
+    },
+    // Un worker anterior pudo guardar HTML bajo una URL de video después de
+    // seguir un redirect a login. Esta regla evita leer ese cache heredado;
+    // el cache HTTP del navegador sigue reutilizando los rangos según headers.
+    {
+      matcher: ({ url }: { url: URL }) =>
+        url.origin === self.location.origin &&
+        url.pathname.startsWith("/videos/") &&
+        /\.(?:mp4|webm)$/i.test(url.pathname),
+      handler: new NetworkOnly(),
+    },
+    // Los escudos WebP tienen hash de contenido. Mantener el catálogo entero
+    // evita que el límite genérico de 64 imágenes lo expulse constantemente.
+    {
+      matcher: ({ url }: { url: URL }) =>
+        url.origin === self.location.origin &&
+        /^\/team-crests\/[0-9a-f]{16}-96\.webp$/i.test(url.pathname),
+      handler: new CacheFirst({
+        cacheName: "lp-team-crests",
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 800,
+            maxAgeSeconds: 365 * 24 * 60 * 60,
+            maxAgeFrom: "last-used",
+          }),
+        ],
+      }),
+    },
+    // Pollitos, banderas y logos pueden reemplazarse conservando el nombre.
+    // SWR entrega el cache al instante y actualiza la copia en segundo plano.
+    {
+      matcher: ({ url }: { url: URL }) =>
+        url.origin === self.location.origin &&
+        /^\/(?:pollitos|tournaments|flags)\//.test(url.pathname),
+      handler: new StaleWhileRevalidate({
+        cacheName: "lp-art",
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 320,
+            maxAgeSeconds: 30 * 24 * 60 * 60,
+            maxAgeFrom: "last-used",
+          }),
+        ],
+      }),
     },
     // defaultCache provides sensible runtime caching for static assets,
     // images, fonts, and JS chunks. Anything not matched by the

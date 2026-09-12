@@ -22,12 +22,17 @@ import {
   type CasaQuestion,
 } from "./types";
 
-const EMPTY_POT: CasaPot = {
-  paid_entries: 0,
-  gross_cop: 0,
-  prize_cop: 0,
-  house_cop: 0,
-};
+async function withDrawState(pollas: CasaPolla[]): Promise<CasaPolla[]> {
+  const pending = new Set<string>();
+  const ids = pollas.filter((p) => p.status === "cerrada" && p.prize_kind === "objeto").map((p) => p.id);
+  for (let offset = 0; offset < ids.length; offset += 200) {
+    const { data, error } = await createAdminClient().from("casa_object_draws").select("polla_id")
+      .in("polla_id", ids.slice(offset, offset + 200)).eq("state", "pending");
+    if (error) throw error;
+    for (const draw of data ?? []) pending.add(draw.polla_id);
+  }
+  return pollas.map((polla) => ({ ...polla, draw_pending: pending.has(polla.id) }));
+}
 
 /** Las pollas que la gente puede ver. Nunca devuelve borradores. */
 export async function listPublicPollas(): Promise<CasaPolla[]> {
@@ -41,7 +46,7 @@ export async function listPublicPollas(): Promise<CasaPolla[]> {
     .order("closes_at", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as CasaPolla[];
+  return withDrawState((data ?? []) as CasaPolla[]);
 }
 
 /** Todas, incluidos borradores. Solo para el panel de admin / el bot. */
@@ -54,7 +59,7 @@ export async function listAllPollas(): Promise<CasaPolla[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []) as CasaPolla[];
+  return withDrawState((data ?? []) as CasaPolla[]);
 }
 
 export async function getPollaBySlug(slug: string): Promise<CasaPolla | null> {
@@ -67,92 +72,41 @@ export async function getPollaBySlug(slug: string): Promise<CasaPolla | null> {
     .maybeSingle();
 
   if (error) throw error;
-  return (data as CasaPolla) ?? null;
+  return data ? (await withDrawState([data as CasaPolla]))[0] : null;
 }
 
 /**
  * Pozo de una polla. El calculo real vive en SQL (`casa_polla_pot`) para que
  * no haya dos verdades sobre la plata.
  */
-export async function getPot(pollaId: string): Promise<CasaPot> {
-  const db = createAdminClient();
-  const { data, error } = await db.rpc("casa_polla_pot", { p_polla_id: pollaId });
+export async function getPot(pollaId: string, projectionEntry?: string): Promise<CasaPot> {
+  const { data, error } = await createAdminClient().rpc("casa_payment_details_v2", {
+    p_polla_id: pollaId, p_projection_entry: projectionEntry ?? null,
+  });
   if (error) throw error;
-  const row = Array.isArray(data) ? data[0] : data;
-  return (row as CasaPot) ?? EMPTY_POT;
+  if (!data) throw new Error("No se pudo leer el pozo.");
+  return data as CasaPot;
 }
 
-/** Pozos de varias pollas de una. Evita el N+1 en el listado del inicio. */
-export async function getPots(
-  pollaIds: string[],
-): Promise<Record<string, CasaPot>> {
-  if (pollaIds.length === 0) return {};
-  const db = createAdminClient();
-
-  // Una sola pasada por casa_entries y agregamos en JS sobre un set acotado
-  // (solo las pagadas de estas pollas). El corte de 1000 filas de PostgREST no
-  // aplica: pedimos count exacto por polla con un group-by del lado del server.
-  const { data, error } = await db
-    .from("casa_entries")
-    .select("polla_id, amount_cop")
-    .in("polla_id", pollaIds)
-    .eq("status", "pagada")
-    .limit(10000);
-
-  if (error) throw error;
-
-  const { data: pollas, error: pErr } = await db
-    .from("casa_pollas")
-    .select("id, house_cut_pct")
-    .in("id", pollaIds);
-  if (pErr) throw pErr;
-
-  const cutById = new Map<string, number>(
-    (pollas ?? []).map((p: { id: string; house_cut_pct: number }) => [
-      p.id,
-      p.house_cut_pct,
-    ]),
-  );
-
-  const acc: Record<string, { n: number; gross: number }> = {};
-  for (const row of (data ?? []) as { polla_id: string; amount_cop: number }[]) {
-    const bucket = (acc[row.polla_id] ??= { n: 0, gross: 0 });
-    bucket.n += 1;
-    bucket.gross += row.amount_cop;
-  }
-
+/** One SQL aggregate per pool; entry volume cannot truncate the monetary total. */
+export async function getPots(pollaIds: string[]): Promise<Record<string, CasaPot>> {
   const out: Record<string, CasaPot> = {};
-  for (const id of pollaIds) {
-    const bucket = acc[id] ?? { n: 0, gross: 0 };
-    const cut = cutById.get(id) ?? 30;
-    const prize = Math.floor((bucket.gross * (100 - cut)) / 100);
-    out[id] = {
-      paid_entries: bucket.n,
-      gross_cop: bucket.gross,
-      prize_cop: prize,
-      house_cop: bucket.gross - prize,
-    };
+  const ids = [...new Set(pollaIds)];
+  for (let start = 0; start < ids.length; start += 200) {
+    const batch = ids.slice(start, start + 200);
+    const { data, error } = await createAdminClient().rpc("casa_pot_summaries_v2", { p_ids: batch });
+    if (error) throw error;
+    if (data?.length !== batch.length) throw new Error("No se pudieron leer todos los pozos.");
+    for (const row of data as Array<CasaPot & { polla_id: string }>) out[row.polla_id] = row;
   }
   return out;
 }
 
-/** La inscripcion de ESTE usuario en esta polla (o null si no entro). */
-export async function getMyEntry(
-  pollaId: string,
-  userId: string,
-): Promise<CasaEntry | null> {
-  const db = createAdminClient();
-  const { data, error } = await db
-    .from("casa_entries")
-    .select(CASA_ENTRY_COLUMNS)
-    .eq("polla_id", pollaId)
-    .eq("user_id", userId) // ← filtro explicito obligatorio (ver cabecera)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
+/** Paid > pending > rejected > cancelled, chosen in SQL before LIMIT. */
+export async function getMyEntry(pollaId: string, userId: string): Promise<CasaEntry | null> {
+  const { data, error } = await createAdminClient().rpc("casa_my_entry_v2", { p_polla_id: pollaId, p_user_id: userId });
   if (error) throw error;
-  return (data as CasaEntry) ?? null;
+  return data as CasaEntry | null;
 }
 
 export async function getMyPicks(
@@ -326,7 +280,7 @@ export async function getPayouts(pollaId: string): Promise<CasaPayout[]> {
   const db = createAdminClient();
   const { data, error } = await db
     .from("casa_payouts")
-    .select("user_id, place, points, amount_cop, paid_at")
+    .select("id, user_id, place, points, amount_cop, paid_at, prize_kind, prize_object, delivered_at")
     .eq("polla_id", pollaId)
     .order("place", { ascending: true });
   if (error) throw error;
@@ -334,13 +288,14 @@ export async function getPayouts(pollaId: string): Promise<CasaPayout[]> {
   const filas = (data ?? []) as Array<Omit<CasaPayout, "display_name" | "avatar_url">>;
   if (filas.length === 0) return [];
 
-  const { data: users } = await db
+  const { data: users, error: usersError } = await db
     .from("users")
     .select("id, display_name, avatar_url")
     .in(
       "id",
       filas.map((f) => f.user_id),
     );
+  if (usersError) throw usersError;
   const porId = new Map(
     (users ?? []).map((u: { id: string; display_name: string | null; avatar_url: string | null }) => [
       u.id,
@@ -377,12 +332,38 @@ export async function listPendingProofs(limit = 20) {
   const db = createAdminClient();
   const { data, error } = await db
     .from("casa_entries")
-    .select(CASA_ENTRY_COLUMNS)
+    .select(`${CASA_ENTRY_COLUMNS}, casa_pollas!inner(archived_at,status)`)
     .eq("status", "pendiente")
+    .is("casa_pollas.archived_at", null)
+    .in("casa_pollas.status", ["abierta", "cerrada"])
     .not("proof_path", "is", null)
     .order("proof_uploaded_at", { ascending: true })
     .limit(limit);
 
   if (error) throw error;
   return (data ?? []) as CasaEntry[];
+}
+
+export async function getHouseTotal(pollaIds: string[]): Promise<number> {
+  const { data, error } = await createAdminClient().rpc("casa_house_total_v2", { p_ids: pollaIds });
+  if (error) throw error;
+  if (typeof data !== "number") throw new Error("No se pudo leer la recaudación de la casa.");
+  return data;
+}
+
+/** Owned, unexpired uploads; the database clock decides whether recovery is open. */
+export async function getActiveProofs(pollaId: string, userId: string): Promise<Array<{ entry_id: string; ticket_number: number | null }>> {
+  const { data, error } = await createAdminClient().rpc("casa_active_proofs_v2", { p_polla_id: pollaId, p_user_id: userId });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** One outstanding ticket blocks a new reservation, across all pages. */
+export async function getOutstandingTicket(pollaId: string, userId: string, ticket?: number) {
+  let query = createAdminClient().from("casa_entries").select("id, ticket_number, status, proof_path, reject_reason")
+    .eq("polla_id", pollaId).eq("user_id", userId).neq("status", "pagada").not("ticket_number", "is", null);
+  if (ticket !== undefined) query = query.eq("ticket_number", ticket);
+  const { data, error } = await query.order("created_at").order("id").limit(1).maybeSingle();
+  if (error) throw error;
+  return data;
 }

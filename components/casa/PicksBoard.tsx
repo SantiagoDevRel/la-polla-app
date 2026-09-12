@@ -10,6 +10,7 @@
 // asi que se muestra SIEMPRE que haya al menos un pronostico cargado.
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { TeamCrest } from "@/components/match/TeamCrest";
 import { Label, PctBar } from "@/components/street";
 import { formatMatchTime } from "@/lib/casa/format";
@@ -163,7 +164,7 @@ export function PicksBoard({
   }
 
   return (
-    <div>
+    <div data-app-update-blocked={dirty || saving}>
       <ul className="space-y-px">
         {matches.map((m) => {
           const cerrado =
@@ -191,15 +192,17 @@ export function PicksBoard({
                   text-zoom de accesibilidad no los aplaste (regla del repo). */}
               <div className="mb-3">
                 <div className="flex items-center justify-between gap-2">
-                  <TeamCrest team={m.home_team} src={m.home_team_flag} />
+                  <Link href={`/futbol/equipos/home.${m.id}`} aria-label={`Ver equipo: ${m.home_team}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-bg-elevated"><TeamCrest team={m.home_team} src={m.home_team_flag} /></Link>
                   <span className="lp-label">vs</span>
-                  <TeamCrest team={m.away_team} src={m.away_team_flag} />
+                  <Link href={`/futbol/equipos/away.${m.id}`} aria-label={`Ver equipo: ${m.away_team}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-bg-elevated"><TeamCrest team={m.away_team} src={m.away_team_flag} /></Link>
                 </div>
                 <div className="mt-1.5 grid grid-cols-2 gap-3 text-[14px] font-semibold text-text-primary">
                   <span className="min-w-0 [overflow-wrap:anywhere]">{m.home_team}</span>
                   <span className="min-w-0 text-right [overflow-wrap:anywhere]">{m.away_team}</span>
                 </div>
               </div>
+
+              <Link href={`/futbol/partidos/${m.id}`} className="mb-3 flex min-h-11 items-center justify-center rounded-full border border-border-subtle px-3 text-[13px] font-medium text-text-secondary transition-colors hover:bg-bg-elevated">Ver partido y alineaciones</Link>
 
               {scoringMode === "1x2" ? (
                 <div className="grid grid-cols-3 gap-px">

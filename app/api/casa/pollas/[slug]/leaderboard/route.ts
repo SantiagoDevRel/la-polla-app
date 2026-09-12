@@ -36,6 +36,7 @@ export async function GET(
     return privateJson({
       rows,
       entryStatus: entry?.status ?? null,
+      drawPending: polla.draw_pending ?? false,
       pollaStatus: polla.status,
     });
   } catch {

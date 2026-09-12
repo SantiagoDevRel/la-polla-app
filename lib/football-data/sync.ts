@@ -1,3 +1,4 @@
+import { fdRegulationScore } from './scores';
 // lib/football-data/sync.ts — Sync de partidos desde football-data.org a Supabase
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSyncableTournament } from "@/lib/tournaments";
@@ -53,6 +54,7 @@ function mapPhase(stage: string): string {
 }
 
 function mapMatchToRow(match: FDMatch, tournament: string) {
+  const regulation = fdRegulationScore(match.score);
   // football-data usa `tla` (3-letter country/team code). Si falta,
   // dejamos null y el cliente cae al displayName.
   const homeAbbr =
@@ -81,8 +83,8 @@ function mapMatchToRow(match: FDMatch, tournament: string) {
     // ET; en ese caso `fullTime` ya incluye los goles del alargue. Para
     // pollas usamos siempre el resultado de los 90 — el alargue mete
     // suerte que castiga injustamente al que clavó el regulation score.
-    home_score: match.score?.regularTime?.home ?? match.score?.fullTime?.home ?? null,
-    away_score: match.score?.regularTime?.away ?? match.score?.fullTime?.away ?? null,
+    home_score: regulation?.home ?? null,
+    away_score: regulation?.away ?? null,
     status: mapStatus(match.status),
     // Current minute while the match is live. football-data serves
     // this at the top level on IN_PLAY / PAUSED states; null otherwise.

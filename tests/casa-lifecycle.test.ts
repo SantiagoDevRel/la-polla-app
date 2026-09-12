@@ -1,121 +1,75 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-const mocks = vi.hoisted(() => ({ user: vi.fn(), db: vi.fn(), pot: vi.fn() }));
+const mocks = vi.hoisted(() => ({ user: vi.fn(), db: vi.fn(), notifyReview: vi.fn() }));
+vi.mock("@/lib/casa/review-notify", () => ({ notifyCasaReview: mocks.notifyReview }));
 vi.mock("@/lib/auth/admin", () => ({ getAuthenticatedUser: mocks.user }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.db }));
-vi.mock("@/lib/casa/queries", () => ({ getPot: mocks.pot }));
 vi.mock("@/lib/telegram/notify", () => ({ signedProofUrl: vi.fn() }));
 import { PATCH } from "@/app/api/casa/admin/pollas/[id]/route";
 import { POST } from "@/app/api/casa/admin/entries/route";
-
 const id = "00000000-0000-4000-8000-000000000001";
 const adminId = "00000000-0000-4000-8000-000000000002";
-const entryId = "00000000-0000-4000-8000-000000000003";
+const attemptId = "00000000-0000-4000-8000-000000000003";
 const fetchDb = vi.fn<typeof fetch>();
 const params = { params: Promise.resolve({ id }) };
-const request = (body: unknown) => new NextRequest("http://localhost/api/casa/admin/test", {
-  method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+const request = (body: unknown, contract = true) => new NextRequest("http://localhost/api/casa/admin/test", {
+  method: "POST", headers: { "Content-Type": "application/json", ...(contract ? { "X-Casa-Contract": "2" } : {}) }, body: JSON.stringify(body),
 });
-const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
-  status, headers: { "Content-Type": "application/json" },
-});
-const pendingCount = (count: number) => new Response(null, { headers: { "Content-Range": `0-0/${count}` } });
-
+const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 beforeEach(() => {
-  vi.resetAllMocks();
-  mocks.user.mockResolvedValue({ id: adminId, is_admin: true });
+  vi.resetAllMocks(); mocks.user.mockResolvedValue({ id: adminId, is_admin: true });
   mocks.db.mockImplementation(() => createClient("http://localhost:54321", "test-only-key", {
     auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: fetchDb },
   }));
-  mocks.pot.mockResolvedValue({ prize_cop: 7000 });
 });
-
-describe("CASA archive and lifecycle API", () => {
-  it.each([null, { id: adminId, is_admin: false }])("requires admin before database access: %j", async (user) => {
+describe("Casa v2 API boundary (lifecycle invariants execute in the local SQL suite)", () => {
+  it.each([null, { id: adminId, is_admin: false }])("requires admin before any operation: %j", async (user) => {
     mocks.user.mockResolvedValue(user);
-    expect((await PATCH(request({ action: "eliminar", confirmName: "Prueba" }), params)).status).toBe(user ? 403 : 401);
-    expect((await POST(request({ entryId, decision: "aprobar" }))).status).toBe(403);
+    expect((await PATCH(request({ action: "eliminar" }), params)).status).toBe(user ? 403 : 401);
+    expect((await POST(request({ attemptId, decision: "aprobar" }))).status).toBe(user ? 403 : 401);
     expect(mocks.db).not.toHaveBeenCalled();
   });
-
-  it("requires the exact pool name before archival", async () => {
-    fetchDb.mockResolvedValueOnce(response({ id, name: "Polla de prueba", archived_at: null }));
-    expect((await PATCH(request({ action: "eliminar", confirmName: "Otra polla" }), params)).status).toBe(400);
-    expect(fetchDb).toHaveBeenCalledTimes(1);
-    expect(fetchDb.mock.calls[0][1]?.method).toBe("GET");
+  it("rejects old clients before database writes", async () => {
+    expect((await PATCH(request({ action: "repartir" }, false), params)).status).toBe(409);
+    expect((await POST(request({ attemptId, decision: "aprobar" }, false))).status).toBe(409);
+    expect(fetchDb).not.toHaveBeenCalled();
   });
-
-  it("archives without deleting or rewriting status, entries or payouts", async () => {
-    fetchDb.mockResolvedValueOnce(response({ id, name: "Prueba", archived_at: null }))
-      .mockResolvedValueOnce(response({ id, slug: "prueba", archived_at: "2026-09-08T00:00:00Z" }));
-    const result = await PATCH(request({ action: "eliminar", confirmName: "Prueba" }), params);
-    expect(result.status).toBe(200);
-    expect(await result.json()).toEqual({ ok: true, slug: "prueba", archived: true });
-    const [url, init] = fetchDb.mock.calls[1];
-    expect(init?.method).toBe("PATCH");
-    expect(new URL(String(url)).pathname).toBe("/rest/v1/casa_pollas");
-    expect(new URL(String(url)).searchParams.get("archived_at")).toBe("is.null");
-    expect(JSON.parse(String(init?.body))).toEqual({ archived_at: expect.any(String), archived_by: adminId });
-    expect(fetchDb).toHaveBeenCalledTimes(2);
-  });
-
-  it("rejects a repeated archive without mutations", async () => {
-    fetchDb.mockResolvedValueOnce(response({ id, name: "Prueba", archived_at: "2026-09-08T00:00:00Z" }));
-    expect((await PATCH(request({ action: "eliminar", confirmName: "Prueba" }), params)).status).toBe(409);
-    expect(fetchDb).toHaveBeenCalledTimes(1);
-  });
-
-  it("cannot settle while a payment proof is pending", async () => {
-    fetchDb.mockResolvedValueOnce(response({ id, slug: "prueba", status: "cerrada", kind: "rifa", drawn_number: 1 }))
-      .mockResolvedValueOnce(pendingCount(1));
+  it.each(["DRAW_PENDING", "POLLA_FINAL", "PENDING_PROOFS", "UNVERIFIED_MATCHES", "UNRESOLVED_QUESTIONS", "NO_PAID_ENTRIES", "UNSOLD_TICKET", "OPERATIONS_PAUSED"])("surfaces SQL conflict %s without a second writer", async (message) => {
+    fetchDb.mockResolvedValueOnce(response({ code: "55000", message }, 409));
     const result = await PATCH(request({ action: "repartir" }), params);
-    expect(result.status).toBe(409);
-    expect((await result.json()).error).toContain("comprobantes pendientes");
-    expect(fetchDb).toHaveBeenCalledTimes(2);
-    const query = new URL(String(fetchDb.mock.calls[1][0])).searchParams;
-    expect(query.get("polla_id")).toBe(`eq.${id}`);
-    expect(query.get("proof_path")).toBe("not.is.null");
-    expect(query.get("status")).toBe("eq.pendiente");
+    expect(result.status).toBe(409); expect((await result.json()).code).toBe(message);
+    expect(result.headers.get("Cache-Control")).toBe("private, no-store"); expect(fetchDb).toHaveBeenCalledTimes(1);
   });
-
-  it("surfaces atomic settlement conflicts as 409", async () => {
-    fetchDb.mockResolvedValueOnce(response({ id, slug: "prueba", status: "cerrada", kind: "rifa", drawn_number: 1 }))
-      .mockResolvedValueOnce(pendingCount(0))
-      .mockResolvedValueOnce(response({ code: "55000", message: "Revisa todos los comprobantes pendientes antes de repartir el pozo." }, 409));
-    expect((await PATCH(request({ action: "repartir" }), params)).status).toBe(409);
-    expect(new URL(String(fetchDb.mock.calls[2][0])).pathname).toBe("/rest/v1/rpc/casa_settle_polla");
+  it.each(["money_awarded", "object_awarded", "object_draw_pending", "house_retained_zero_points"])("preserves the discriminated result %s", async (outcome) => {
+    const reparto = { contract: 2, outcome, prize_cop: 0, winners: 0, each_cop: 0, top_points: 0 };
+    fetchDb.mockResolvedValueOnce(response(reparto));
+    expect(await (await PATCH(request({ action: "repartir", actorId: "forged" }), params)).json()).toEqual({ ok: true, reparto });
+    expect(JSON.parse(String(fetchDb.mock.calls[0][1]?.body))).toEqual({ p_polla_id: id, p_actor_id: adminId, p_contract: 2 });
   });
-
-  it.each([
-    { status: "resuelta", archived_at: null },
-    { status: "anulada", archived_at: null },
-    { status: "cerrada", archived_at: "2026-09-08T00:00:00Z" },
-  ])("does not approve payments after terminal state: %j", async (polla) => {
-    fetchDb.mockResolvedValueOnce(response({ id: entryId, polla_id: id, status: "pendiente" }))
-      .mockResolvedValueOnce(response({ id, ...polla }));
-    expect((await POST(request({ entryId, decision: "aprobar" }))).status).toBe(409);
-    expect(fetchDb).toHaveBeenCalledTimes(2);
-    expect(fetchDb.mock.calls.every(([, init]) => init?.method === "GET")).toBe(true);
+  it("archives through the SQL lock and preserves the RPC idempotent result", async () => {
+    fetchDb.mockResolvedValueOnce(response({ slug: "polla", archived: true }));
+    expect(await (await PATCH(request({ action: "eliminar" }), params)).json()).toEqual({ ok: true, slug: "polla", archived: true });
+    expect(new URL(String(fetchDb.mock.calls[0][0])).pathname).toBe("/rest/v1/rpc/casa_archive_polla_v2");
   });
-
-  it("handles an archive between payment preflight and update", async () => {
-    fetchDb.mockResolvedValueOnce(response({ id: entryId, polla_id: id, status: "pendiente" }))
-      .mockResolvedValueOnce(response({ id, status: "cerrada", archived_at: null }))
-      .mockResolvedValueOnce(response({ code: "55000", message: "Esta polla ya se eliminó." }, 409));
-    expect((await POST(request({ entryId, decision: "aprobar" }))).status).toBe(409);
-    expect(mocks.pot).not.toHaveBeenCalled();
+  it("reviews the displayed attempt, taking the administrator from the session", async () => {
+    fetchDb.mockResolvedValueOnce(response({ changed: true, status: "pagada", entry_id: attemptId, polla_id: id }));
+    expect((await POST(request({ attemptId, decision: "aprobar", actorId: "forged" }))).status).toBe(200);
+    expect(JSON.parse(String(fetchDb.mock.calls[0][1]?.body))).toEqual({ p_attempt_id: attemptId, p_decision: "pagada", p_reason: null, p_contract: 2, p_actor_id: adminId });
+    expect(mocks.notifyReview).toHaveBeenCalledExactlyOnceWith(attemptId, id, true);
   });
-
-  it("still approves pending payments in closed pools before settlement", async () => {
-    fetchDb.mockResolvedValueOnce(response({ id: entryId, polla_id: id, status: "pendiente" }))
-      .mockResolvedValueOnce(response({ id, status: "cerrada", archived_at: null }))
-      .mockResolvedValueOnce(response({ id: entryId, polla_id: id }));
-    const result = await POST(request({ entryId, decision: "aprobar" }));
-    expect(result.status).toBe(200);
-    expect(await result.json()).toEqual({ ok: true, pozoCop: 7000 });
-    const update = JSON.parse(String(fetchDb.mock.calls[2][1]?.body));
-    expect(update).toMatchObject({ status: "pagada", reviewed_by: adminId });
+  it("does not resend a player notice on an idempotent review retry", async () => {
+    fetchDb.mockResolvedValueOnce(response({ changed: false, status: "pagada", entry_id: attemptId, polla_id: id }));
+    expect((await POST(request({ attemptId, decision: "aprobar" }))).status).toBe(200);
+    expect(mocks.notifyReview).not.toHaveBeenCalled();
+  });
+  it("rejects entry-only legacy review payloads", async () => {
+    expect((await POST(request({ entryId: attemptId, decision: "aprobar" }))).status).toBe(400);
+    expect(fetchDb).not.toHaveBeenCalled();
+  });
+  it("does not report success when scoring fails inside the question transaction", async () => {
+    fetchDb.mockResolvedValueOnce(response({ code: "XX000", message: "private scoring failure" }, 500));
+    const result = await PATCH(request({ action: "responder", questionId: id, optionId: attemptId }), params);
+    expect(result.status).toBe(500); expect(JSON.stringify(await result.json())).not.toContain("private scoring failure");
   });
 });

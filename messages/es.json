@@ -46,6 +46,7 @@
     "ariaNav": "Navegación inferior",
     "tabInicio": "Inicio",
     "tabPollas": "Pollas",
+    "tabFutbol": "Estadísticas",
     "tabAvisos": "Avisos",
     "tabWorldcup": "Llaves",
     "tabPerfil": "Perfil",
@@ -101,7 +102,6 @@
     "taglineAccent": "SE LLEVA EL POZO",
     "skip": "Saltar",
     "start": "Empezar",
-    "madeBy": "Desarrollado por Santiago",
     "tournamentLibertadores": "Libertadores",
     "tournamentBetplay": "BetPlay"
   },

@@ -83,7 +83,7 @@ export async function PUT(
   }
 
   const entry = await getMyEntry(polla.id, user.id);
-  if (!entry || entry.status === "rechazada" || entry.status === "anulada") {
+  if (!entry || (entry.status !== "pagada" && !(entry.status === "pendiente" && entry.proof_path))) {
     return NextResponse.json(
       { error: "Primero tienes que inscribirte a la polla." },
       { status: 403 },

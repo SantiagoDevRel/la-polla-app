@@ -40,6 +40,8 @@ const PUBLIC_NO_AUTH_PREFIXES = [
   "/soporte",
 ];
 const PUBLIC_NO_AUTH_EXACT = new Set([
+  "/api/app-version", // Public build identity only; no auth or database access.
+  "/api/teams/crest", // Fixed-host public PNGs; never opens the other team APIs.
   "/sitemap.xml",
   "/robots.txt",
   "/llms.txt",
@@ -156,10 +158,13 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/api/matches/discover") ||
     path.startsWith("/api/admin/");
 
-  // The table endpoint validates its session and returns JSON 401 itself.
+  // These read endpoints validate their session and return JSON 401 themselves.
   // Redirecting this fetch to HTML /login hides an expired session as a 200.
-  const isCasaLeaderboardApi = /^\/api\/casa\/pollas\/[^/]+\/leaderboard\/?$/.test(path);
-  if (!user && !isPublicRoute && !isApiWebhook && !isCasaPollaPublica && !isCasaLeaderboardApi) {
+  // These handlers validate their own session and return JSON 401/403.
+  // Redirecting a fetch to login turns an expired session into an HTML parse error.
+  const isCasaJsonApi = /^\/api\/casa\/pollas\/[^/]+\/(leaderboard|tickets|award|join|picks)\/?$/.test(path)
+    || path === "/api/casa/mis-pollas" || path.startsWith("/api/casa/admin/");
+  if (!user && !isPublicRoute && !isApiWebhook && !isCasaPollaPublica && !isCasaJsonApi) {
     const url = request.nextUrl.clone();
     const original = path + request.nextUrl.search;
     url.pathname = "/login";
@@ -176,7 +181,7 @@ export async function updateSession(request: NextRequest) {
   if (user && (path.startsWith("/login") || path.startsWith("/verify"))) {
     const url = request.nextUrl.clone();
     const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));
-    const [pathname, search = ""] = (returnTo ?? "/inicio").split("?");
+    const [pathname, search = ""] = (returnTo ?? "/casa").split("?");
     url.pathname = pathname;
     url.search = search ? `?${search}` : "";
     return redirectWithCookies(url, supabaseResponse);

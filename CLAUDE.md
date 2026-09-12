@@ -6,6 +6,115 @@
 
 ## READ THIS FIRST
 
+### Navegación y actualización de la app (2026-09-09)
+
+Casa: Pollas abiertas → Mis pollas → Pollas cerradas, todas cerradas inicialmente,
+con contenedores `PollaSection` y subtítulos consistentes. Perfil conserva Mis pollas
+abierta. Eliminar polla requiere rol admin y un clic de confirmación; no pedir nombre.
+Equipo: Próximos (default) / Pasados / Plantel / Club. Partido: equipos clickeables
+con nombre/escudo centrados y «Ver equipo», marcador central, categorías de estadísticas
+y selector Titulares/Suplentes. Referencia inspeccionada: 365Scores web móvil y app.
+
+`SWAutoReload` ahora avisa y ofrece Actualizar app; nunca recarga por controllerchange
+ni al recuperar conexión. `/api/app-version` es público, sin DB y no-store; compara
+el ID público del build con el cliente cada dos minutos visibles y al volver a la app.
+Perfil ofrece el mismo botón manual. No borrar cookies, storage ni registros del SW.
+La bienvenida presenta nueve logos locales y no lleva crédito personal.
+
+### Centro de fútbol y API-Football Pro (2026-09-09, migraciones 094–095)
+
+El usuario aprobó y pagó un mes de Pro. `/status` decide plan y vencimiento;
+no asumir Pro permanente ni aplicar la restricción Free a esta suscripción.
+**API-Football es ahora la fuente principal del vivo Pro**, con ESPN como
+respaldo. `update_match_live_provider` es el único escritor de vivo: bloquea
+la fila, rechaza observaciones anteriores y protege tres minutos una lectura
+reciente de API-Football. El cierre sigue el contrato de 093 y los 90 minutos.
+
+`/futbol` ofrece calendario, `/futbol/partidos/[id]` goles/estadísticas/alineaciones
+y `/futbol/equipos/[id]` plantel/fotos/dorsales/club/estadio. Los escudos de Casa
+abren esas fichas. No crear otro proveedor, caché o tabla de partidos para estas
+pantallas: `lib/api-football/feed.ts` comparte calendario entre UI/vivo/cierre;
+`details.ts` y `teams.ts` reservan cuota en SQL antes de cualquier consulta.
+Las fichas son de lectura, privadas, con auth previa y NetworkOnly.
+
+Topes propios: Pro 7.000/día; detalle y equipos 6.000, dejando capacidad para
+resultados. Free vuelve a 80/día y su cadencia original al vencer el plan.
+Las imágenes públicas de `media.api-sports.io` no llevan key del proveedor.
+No inventar fotos ni titulares cuando no están publicados. El diseño se trabajó
+con Lovable y referencias del sistema existente; favorecer botones con texto,
+secciones bajo demanda y texto grande, para usuarios poco familiarizados con apps.
+Contrato tipográfico: Outfit 15/13 px (cuerpo/ayuda), Bebas 32/24/20 px
+(pantalla/partido/sección), marcador 40 px; etiquetas completas y wrap al 200 %.
+Configuración, cachés y límites: ver README, sección «Fútbol».
+
+Detalle de partido: pestañas horizontales **Estadísticas (default) ·
+Alineaciones · Resumen**. Outfit 15/600 para las tres etiquetas, íconos de 20 px;
+en texto ampliado la barra puede desplazarse horizontalmente sin truncarlas.
+Resumen conserva todos los eventos con scroll interno (`55dvh`, máximo `28rem`)
+y SVG de balón, tarjetas o cambios junto al texto. No repetir los goles en otra
+lista larga antes de las pestañas. El deep link a alineaciones sigue vigente.
+
+La pestaña de navegación se llama **ESTADÍSTICAS**, con un balón SVG clásico
+blanco y negro. Outfit 11 px/600, línea 1.25; la barra admite texto ampliado
+sin cortar el nombre y da más ancho al destino central.
+El calendario ofrece solo un selector de fecha con mes completo y día de dos
+dígitos («Septiembre 08»). No volver a agregar Ayer/Hoy/Mañana ni mostrar fecha
+numérica mes/día. Conserva la ventana ±6 días del calendario compartido.
+
+**Escudos completos (mismo día):** `scripts/bake-team-crests.mjs` ahora incluye
+los nueve torneos, también Sudamericana y todas las fases de Champions.
+`lib/teams/crest-coverage.json` registra 258 clubes actuales y los 280 nombres
+observados en fixtures. El resolver único `localCrestSource` aplica excepciones
+verificadas ANTES de la URL del proveedor (el histórico de Club Brugge apuntaba
+a Espanyol). No usar iniciales como sustituto de un escudo faltante ni inventar
+un logo: completar el catálogo, comprobar identidad y ejecutar
+`npm test -- tests/football-media.test.ts`. Logos de liga: `league-logos.json`.
+Los WebP del catálogo se cargan bajo demanda; `globPublicPatterns` los excluye
+del precache para no competir con fuentes y datos al instalar el SW.
+
+**Creación solo administrativa:** `/pollas/crear` redirige a `/casa` desde
+Next.js, sin pantalla explicativa del cambio de modelo. No mostrar mensajes
+"ahora las creamos nosotros" ni opciones de crear a jugadores. El acceso
+vigente es `/admin/pollas/crear`, con su autorización administrativa existente.
+
+### Resultados y escudos (2026-09-09, migración 093)
+
+Los tres proveedores y la resolución administrativa cierran mediante
+`finalize_verified_match_result` → `finalize_match_result`. La fila se bloquea
+antes de leer/escribir resultados; una verificación existente no se sobrescribe.
+El upsert de fixtures también serializa por identidad semántica. Matching de ESPN
+(vivo, verificación y resolución manual) comparte `lib/matches/result-identity.ts`:
+ambos equipos y horario, candidato único; nunca solo horario ni tokens parciales.
+La DB no es una segunda fuente. ESPN/FD solos requieren dos observaciones separadas;
+API-Football requiere un fetch nuevo, no releer caché. Los 90 minutos nunca se
+infieren de un score almacenado al ver AET/PEN por primera vez: snapshot solo en
+STATUS_END_OF_REGULATION; si falta, esperar regularTime/fulltime reglamentario o
+resolución manual. `lib/football-data/scores.ts` separa 90, alargue y penales.
+Estas reglas actualizan los detalles históricos de verificación descritos abajo.
+
+Los escudos usan el catálogo local; clubes nuevos caen a `/api/teams/crest?espn=<id>`
+(público, solo PNG de ESPN con ID numérico y límites). Resto de /api/teams sigue autenticado.
+Detalles y comandos de regresión: README → Resultados API-Football Free.
+
+
+### API-Football Free: cierre de resultados (2026-09-09)
+
+- `lib/api-football/daily-results.ts` consulta `/fixtures?date=...` (hoy/ayer UTC),
+  nunca la temporada completa: Free puede rechazar `season` aunque sí entregue
+  resultados actuales por fecha. Nueve torneos mapeados en `results.ts`.
+- Clave privada `API_FOOTBALL_KEY` + `API_FOOTBALL_FINALS_ENABLED=true`, solo servidor.
+  Migración 092 antes de habilitar: caché compartida 20 min, reserva atómica,
+  techo 80 solicitudes/día UTC, sin retries que gasten cuota por fuera del contador.
+- `verify-final.ts` incorpora esta fuente al cron existente. Marcador de 90' para
+  1X2/puntos; extras separados. Dos nombres + torneo + horario y candidato único.
+  Discrepancia veta; dos lecturas de la misma caché NO corroboran entre sí.
+- `finalize_api_football_result` bloquea el match, guarda extras y llama al RPC
+  autoritativo `finalize_match_result` en la misma transacción. Nada de updates
+  directos de pronósticos, de partidos nuevos ni de recalcular resultados históricos.
+- ESPN/football-data siguen siendo calendario/live y fallback si falta cobertura,
+  hay error o se agota la cuota. No activar el poller legacy de API-Football.
+- Detalle de operación y pruebas en README, sección «Resultados API-Football Free».
+
 ### Coordinación entre chats: datos y avatares (2026-09-08)
 
 Santiago acepta Supabase o Neon gratuitos y pide evitar bases duplicadas.
@@ -47,6 +156,41 @@ sigue existiendo pero está inactivo.
 - `casa_polla_matches` · `casa_questions` + `casa_options` · `casa_entries`
   (la inscripción y su comprobante) · `casa_picks` · `casa_payouts`.
 - `telegram_admins` / `telegram_outbox` / `telegram_auth_attempts`.
+
+### 🏆 El pozo es del ganador y de nadie más (2026-09-12, migración 096)
+
+Regla del dueño, y es la única: **el pozo completo va al puntaje más alto**.
+No hay segundo ni tercer puesto — `casa_payouts.place` siempre es 1 — y la casa
+no tiene tabla de distribución configurable; no se le agrega una. Si varios
+empatan arriba, se divide en partes iguales entre ellos y **los pesos sueltos
+del redondeo también son de los ganadores** (antes quedaban en la casa con una
+nota en `settle_notes`).
+
+Sin ganador NO se reparte: si nadie sumó puntos, o si la boleta sorteada no la
+compró nadie, `casa_settle_polla` falla con un mensaje que lo explica y no
+escribe un solo payout. Antes, "nadie sumó puntos" repartía el pozo entre TODOS
+los que pagaron — incluido quien nunca pronosticó — y una rifa sin boleta
+vendida se marcaba `resuelta` con la plata callada en la casa.
+
+Regresión: `scripts/casa-settle-check.sql` (Supabase local, 5 casos con ASSERT).
+
+**Resolver sin bot:** desde `/admin/pollas`, la card de una polla manual
+resuelve sus preguntas y la de una rifa registra el número sorteado (acción
+`responder` / `numero` en `app/api/casa/admin/pollas/[id]/route.ts`, UI en
+`components/casa/ResolverPolla.tsx`). Antes eso vivía SOLO en el bot de
+Telegram, así que una polla manual o una rifa se podían crear, cobrar y jugar
+desde la web pero no cerrar. Los comandos del bot siguen funcionando: las dos
+vías escriben lo mismo con los mismos guardas.
+
+⚠️ `users.avatar_url` **no es una URL**: guarda la clave del pollito
+("millos", "junior"). Pasarla a `next/image` tira `Failed to parse src` y tumba
+la pantalla entera. Siempre `getPollitoBase()` / `UserAvatar`.
+
+⚠️ Una inscripción `anulada` (se cayó la subida del comprobante) **no es una
+inscripción**: cuenta como "no inscrito" igual que `rechazada`, para que la
+persona pueda volver a intentar. Tratarla como viva dejaba a esa persona sin
+botón de entrar y con `/pagar` devolviéndola: bloqueada para siempre en esa
+polla.
 
 ### 🚨 La plata se calcula en SQL, nunca en TypeScript
 Toda cifra de dinero sale de estas funciones. Si necesitás un total, llamá
@@ -112,12 +256,13 @@ cambiá `app/globals.css` y `tailwind.config.ts`, NUNCA los componentes.
   Bebas NECESITA tracking positivo: sin él las mayúsculas se pegan.
 - Superficies de **vidrio oscuro**: `rgb(bg-card / 0.80)` + `blur(8px)` +
   bordes translúcidos. Toda card tiene hover; ninguna es estática.
-- **VOLVIÓ el video de estadio de fondo.** `AppBackground` es el server
-  picker de `background-variants.ts` (5 clips en `/public/videos`).
-  ⚠️ La objeción de agosto (costo en datos móviles) era real y NO se
-  ignoró: `AppBackgroundClient` tiene un guard de `navigator.connection`
-  — con `saveData` o en 2G/3G no pide el video y se queda con el poster
-  (~80 kB). El que tiene wifi ve el estadio; el que anda con datos, la foto.
+- **VOLVIÓ el video de estadio de fondo.** `AppBackgroundClient` administra
+  cinco clips de `background-variants.ts`, siempre después de `load` + idle.
+  `saveData`/2G/3G y login reciben solo el humo CSS de cero bytes; onboarding
+  conserva su video. Las demás conexiones conservan la rotación de los cinco
+  clips; el listener `connection.change` pasa a humo si la señal reportada
+  empeora. El fondo usa un solo MP4 lite por vez y pausa
+  las animaciones del humo cuando el video ya está visible.
 - `WelcomeIntro` ya no monta su propio `<video>`: se dejó transparente y
   deja ver el `AppBackground` que su layout ya tenía montado. Cero bytes
   nuevos en la primera visita.
@@ -142,12 +287,18 @@ Las cuatro reglas que salieron de ahí, y por qué:
    93 KB para tapar un hueco de medio segundo.
 2. **El video entra DESPUÉS de `load` + idle, nunca antes.** Si lo montás
    durante la carga, compite por ancho de banda con el JS y los datos.
-3. **UNA sola `<source>`.** Con dos, el browser tantea webm *y* mp4 — eran
-   4 requests de video para una sola pantalla.
-4. **La rotación es del CLIENTE y el primer video es siempre el mismo.**
-   Elegir al azar en el server hacía inútil el cache (otro archivo de 2 MB
-   por navegación) y, peor, el `headers()` que lo hacía obligaba a render
-   dinámico de TODO el layout.
+3. **UNA sola fuente MP4 lite.** La comparación de los cinco clips contra sus
+   masters dio mayor fidelidad que WebM y 1,71 MB menos por ciclo completo.
+4. **La rotación es del CLIENTE y el primer video siempre es el mismo.** Una
+   red lenta conserva el humo y las demás mantienen los cinco clips. Elegir al
+   azar en el server inutilizaba el cache y el
+   `headers()` forzaba render dinámico del layout.
+5. **Cache por naturaleza del archivo.** Escudos WebP con hash son immutable;
+   pollitos/logos/banderas usan SWR. Video usa cache HTTP con soporte Range;
+   el worker evita su cache viejo para no recuperar HTML de redirects previos.
+   Del directorio público, el precache incluye solo manifest + iconos 192/512;
+   nunca banners ni videos. Los chunks mayores de 256 KiB y los stubs estáticos
+   de `app/api/**` quedan fuera; entran bajo demanda solo assets navegables.
 
 ⚠️ **Las imágenes se sirven en su tamaño real, no con `next/image`.** Los
 originales son de 1024×1024 y se dibujan a 40-80 px; hay variantes
@@ -233,33 +384,6 @@ cuando el user diga sí/no explícito o se haya completado.
   rankeados (Codespaces zero-code, GitHub Actions worker, Vercel
   Sandbox v2). **Pendiente:** que el user elija un camino. Re-asks
   pendientes hasta que decida.
-- **AI-assist screenshot end-to-end (Fase 2 después de validar el
-  test bench):** una vez que el user valide que Haiku pesca bien
-  contra screenshots reales, hay que cablear:
-  - **SCOPE: solo modo `admin_collects` (pago al principio).** Para
-    `pay_winner` (pago al final), NO usamos Haiku — el ganador ve el
-    screenshot directamente y decide si dejar o revocar. Decisión
-    del user 2026-04-29: el AI sirve para evitar que el organizador
-    olvide marcar pagados (loser bloqueado de pronosticar) — eso solo
-    aplica a admin_collects.
-  - Migración de `pollas.admin_payout_method/account` (estructurado
-    para que Haiku compare).
-  - Tabla `payment_proofs` con storage 7 días + auto-delete pg_cron.
-  - Tabla `claude_api_usage` (✓ ya creada en migración 037).
-  - Admin dashboard con MTD spend (✓ ya creado en /admin).
-  - Throttle 10 screenshots/día/user con flag al admin (✓ tracking
-    listo, falta enforce).
-  - Cap por flujo: 1 screenshot per joining user (admin_collects).
-  - **Disclaimers obligatorios al subir:**
-    - "El screenshot estará guardado por 7 días."
-    - "El organizador validará este screenshot — si detecta algo raro
-      puede revertir tu pago a no-aprobado."
-    - "AI puede cometer errores. El organizador siempre tiene la
-      última palabra."
-- **Deep links / QR Bre-B para una-tap-pay** (alternativa a
-  screenshot manual). Discutido 2026-04-29 — el user dijo
-  "no" explícito a pasarela P2P real, pero el QR Bre-B sigue como
-  posibilidad UX. Mantener visible.
 <!-- Pollas combinadas multi-torneo: COMPLETADO 2026-04-30. Migración
      038 + UI de creación con multi-select + display con stack de logos
      en PollaCard y header de detail. Removido de pendings. -->
@@ -1625,3 +1749,31 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+### Mis pollas en Casa y Perfil (2026-09-09)
+
+`components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
+con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
+En `/casa`, el orden es Pollas abiertas, Mis pollas y Pollas cerradas. Las tres
+empiezan cerradas, comparten título/subtítulo y contienen sus tarjetas dentro de
+`PollaSection`. En Perfil, Mis pollas permanece abierta. Las inscripciones pendientes o pagadas se
+muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
+Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.
+El historial finalizado se conserva después de las participaciones actuales.
+
+`lib/casa/my-pollas.ts` pagina las lecturas por usuario y deduplica entradas
+de rifas sin cambiar datos. `/api/casa/mis-pollas` valida la sesión antes de
+leer y devuelve solo nombres, destino, estado y torneos, con `private, no-store`.
+Casa usa el mismo helper en el servidor; Perfil usa el endpoint. No se crean
+inscripciones de demostración: cero es un resultado real; un fallo tiene su
+propio estado con reintento. No se tocan pronósticos ni el modelo P2P histórico.
+
+
+### Casa v2: premios y comprobantes (implementación 2026-09-12)
+
+El contrato v2 separa pozo y objeto, conserva las boletas fallidas para su dueño,
+identifica cada comprobante en las aprobaciones y registra desempate/evidencia/entrega.
+Migraciones 097–102; activación explícita `legacy → paused → v2`. No activar ni
+revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
+[docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
+de 096 arriba no es el contrato de liquidación una vez activado v2.

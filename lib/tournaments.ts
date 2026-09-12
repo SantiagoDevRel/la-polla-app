@@ -1,5 +1,6 @@
 // lib/tournaments.ts — Single source of truth for tournament metadata
 // Logo paths must match exact filenames in /public/tournaments/
+import leagueLogos from './teams/league-logos.json' with { type: 'json' };
 
 // Cache-bust version para los logos de torneos. Incrementar (por ejemplo
 // "2" -> "3") cada vez que se reemplace el archivo fuente de un logo
@@ -189,21 +190,19 @@ export function getTournamentName(slug: string, locale: string = "es"): string {
 export function getTournamentLogo(slug: string, size: "original" | "small" = "original"): string {
   const tournament = getTournamentBySlug(slug) ?? TOURNAMENTS[0];
   // Static 96 px assets cover a 32 px logo at 3x without Image Optimization.
-  return size === "small" ? tournament.smallLogoPath : tournament.logoPath;
+  return (leagueLogos as Record<string,string>)[slug] ?? (size === "small" ? tournament.smallLogoPath : tournament.logoPath);
+}
+
+/** Monochrome marks need their light treatment on our dark surfaces. */
+export function getTournamentLogoClassName(slug: string): string {
+  if (slug === 'ligue1_2025' || slug === 'sudamericana_2026') return 'brightness-0 invert';
+  if (slug === 'betplay_2026') return 'brightness-200';
+  return '';
 }
 
 // Flat slug → icon-path map. Relocated from components/shared/PollaCard.tsx
 // during Phase 3a so multiple UI surfaces can import without depending on a
 // component file.
-export const TOURNAMENT_ICONS: Record<string, string> = {
-  champions_2025: `/tournaments/champions_league.svg?v=${LOGO_V}`,
-  worldcup_2026: `/tournaments/mundial-2026.webp?v=${LOGO_V}`,
-  laliga_2025: `/tournaments/la_liga.png?v=${LOGO_V}`,
-  premier_2025: `/tournaments/premier_league.webp?v=${LOGO_V}`,
-  seriea_2025: `/tournaments/seria_a.png?v=${LOGO_V}`,
-  libertadores_2026: `/tournaments/copa_libertadores.svg?v=${LOGO_V}`,
-  sudamericana_2026: `/tournaments/copa_sudamericana.svg?v=${LOGO_V}`,
-  betplay_2026: `/tournaments/liga_betplay.svg?v=${LOGO_V}`,
-  bundesliga_2025: `/tournaments/bundesliga.svg?v=${LOGO_V}`,
-  ligue1_2025: `/tournaments/ligue_1.svg?v=${LOGO_V}`,
-};
+export const TOURNAMENT_ICONS: Record<string, string> = Object.fromEntries(
+  TOURNAMENTS.map((tournament) => [tournament.slug, tournament.smallLogoPath]),
+);

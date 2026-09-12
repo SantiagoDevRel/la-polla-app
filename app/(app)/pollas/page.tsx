@@ -251,8 +251,8 @@ export default function MisPollasPage() {
                       onClick: () => setJoinOpen(true),
                     }
                   : {
-                      label: t("createFirst"),
-                      onClick: () => router.push("/pollas/crear"),
+                      label: tClosure("createCta"),
+                      onClick: () => router.push("/casa"),
                     }
               }
             />
@@ -303,11 +303,11 @@ export default function MisPollasPage() {
             viejo, el join le responde "esta polla ya finalizó". */}
         {!isIOSApp && !SEASON_CLOSED && (
           <button
-            onClick={() => router.push("/pollas/crear")}
+            onClick={() => router.push("/casa")}
             className="w-full bg-gold text-bg-base font-bold rounded-lg py-3 text-sm inline-flex items-center justify-center gap-1.5 hover:brightness-110 transition-all cursor-pointer"
           >
             <Plus size={14} strokeWidth={2.5} />
-            {t("createNew")}
+            {tClosure("createCta")}
           </button>
         )}
 

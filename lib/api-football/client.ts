@@ -51,7 +51,7 @@ export interface Match {
  *
  * Detecta automáticamente cuál usar según las variables de entorno disponibles.
  */
-function createClient(): AxiosInstance {
+function createClient(direct = false): AxiosInstance {
   const rapidApiKey = process.env.RAPIDAPI_KEY;
   const apiSportsKey = process.env.API_FOOTBALL_KEY;
 
@@ -61,10 +61,11 @@ function createClient(): AxiosInstance {
     );
   }
 
-  const host = process.env.RAPIDAPI_HOST || 'v3.football.api-sports.io';
+  if (direct && !apiSportsKey) throw new Error('Falta API_FOOTBALL_KEY');
+  const host = direct ? 'v3.football.api-sports.io' : process.env.RAPIDAPI_HOST || 'v3.football.api-sports.io';
 
   // Headers según el modo de autenticación
-  const headers: Record<string, string> = rapidApiKey
+  const headers: Record<string, string> = rapidApiKey && !direct
     ? { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': host }
     : { 'x-apisports-key': apiSportsKey! };
 
@@ -104,11 +105,13 @@ function sleep(ms: number): Promise<void> {
  */
 export async function apiFootballGet<T = unknown>(
   endpoint: string,
-  params: Record<string, string | number>
+  params: Record<string, string | number>,
+  options: { attempts?: number; direct?: boolean } = {},
 ): Promise<T[]> {
-  const client = createClient();
+  const client = createClient(options.direct);
+  const attempts = options.attempts ?? MAX_RETRIES;
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       const { data } = await client.get(endpoint, { params });
 
@@ -119,6 +122,7 @@ export async function apiFootballGet<T = unknown>(
         throw new Error(`API-Football error: ${errorMsg}`);
       }
 
+      if (!Array.isArray(data.response)) throw new Error('API-Football response is not an array');
       return data.response as T[];
     } catch (error) {
       const axiosErr = error as AxiosError;
@@ -127,7 +131,7 @@ export async function apiFootballGet<T = unknown>(
       // Reintentar solo en 429 (rate limit) o errores de servidor (5xx)
       const isRetryable = status === 429 || (status !== undefined && status >= 500);
 
-      if (isRetryable && attempt < MAX_RETRIES) {
+      if (isRetryable && attempt < attempts) {
         const waitMs = BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
         console.warn(
           `[api-football] HTTP ${status} - reintentando en ${waitMs}ms (intento ${attempt}/${MAX_RETRIES})`
@@ -141,7 +145,7 @@ export async function apiFootballGet<T = unknown>(
         `[api-football] Error fatal en ${endpoint}:`,
         axiosErr.message
       );
-      throw error;
+      throw new Error(`API-Football request failed${status ? ` (HTTP ${status})` : ''}`);
     }
   }
 

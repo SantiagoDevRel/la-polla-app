@@ -5,7 +5,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
-import { flagUrlForTeam } from "@/lib/flags/country-iso";
+import { TeamCrest } from './TeamCrest';
 
 // El popup carga sólo cuando se abre (es pesado: framer-motion + portal).
 const LiveMatchPopup = dynamic(() => import("@/components/match/LiveMatchPopup"), {
@@ -75,47 +75,9 @@ function formatUpcoming(
   return `${weekday} · ${time}`;
 }
 
-/**
- * Renderiza el logo del equipo. Si la URL falla en runtime (404, host
- * caído como crests.football-data.org, CSP block), cae al code de
- * letras (ATM/ARS/etc.) en vez de quedar en blanco. El bug previo
- * usaba e.currentTarget.style.display = "none" pero no había sibling
- * para mostrar — simplemente desaparecía el escudo y nada lo reemplazaba.
- */
-function TeamLogoOrCode({
-  logo,
-  code,
-  teamName,
-}: {
-  logo: string | null | undefined;
-  code: string;
-  teamName?: string;
-}) {
-  const [errored, setErrored] = useState(false);
-  // Si el teamName matchea una seleccion nacional conocida, preferir
-  // la bandera del pais sobre el logo del provider — eso resuelve el
-  // caso del Mundial donde ESPN no siempre devuelve crest util.
-  const countryFlag = teamName ? flagUrlForTeam(teamName) : null;
-  const src = countryFlag ?? logo;
-  if (src && !errored) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt={code}
-        width={24}
-        height={24}
-        className="object-contain"
-        style={{ width: 24, height: 24, borderRadius: countryFlag ? 4 : 0 }}
-        onError={() => setErrored(true)}
-      />
-    );
-  }
-  return (
-    <span className="font-display text-[16px] tracking-[0.04em] text-text-primary">
-      {code}
-    </span>
-  );
+/** Shared local artwork for every club and national team. */
+function TeamLogoOrCode({logo,code,teamName}:{logo:string|null|undefined;code:string;teamName?:string}) {
+ return <TeamCrest team={teamName??code} src={logo} />;
 }
 
 export function LiveChip(props: LiveChipProps) {

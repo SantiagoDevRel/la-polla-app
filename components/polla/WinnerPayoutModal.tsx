@@ -96,8 +96,8 @@ export default function WinnerPayoutModal({
         playsInline
         poster="/videos/la-polla-celebration-poster.webp"
       >
-        <source src="/videos/la-polla-celebration.webm" type="video/webm" />
         <source src="/videos/la-polla-celebration-lite.mp4" type="video/mp4" />
+        <source src="/videos/la-polla-celebration.webm" type="video/webm" />
       </video>
       {/* Dim suave para que el video se vea claramente detrás del card.
           Antes los gradientes oscurecían demasiado y el video no se

@@ -21,6 +21,7 @@ import {
   getPollaQuestions,
   getPot,
   getPayouts,
+  getActiveProofs,
 } from "@/lib/casa/queries";
 import {
   isPollaOpen,
@@ -30,6 +31,7 @@ import {
   type Pick1x2,
 } from "@/lib/casa/types";
 import { formatCop, prizeImageUrl, timeLeft } from "@/lib/casa/format";
+import { getPollitoBase } from "@/lib/pollitos";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
 import { HeroFrame, Label, SectionHead, StreetCard, Tape } from "@/components/street";
@@ -37,6 +39,8 @@ import { PicksBoard } from "@/components/casa/PicksBoard";
 import { QuestionsBoard } from "@/components/casa/QuestionsBoard";
 import { PollaTabs } from "@/components/casa/PollaTabs";
 import { EliminarPolla } from "@/components/casa/EliminarPolla";
+import { MisBoletas } from "@/components/casa/Boletas";
+import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
 
 export const dynamic = "force-dynamic";
@@ -90,9 +94,17 @@ export default async function PollaPage({
     ]);
 
   const abierta = isPollaOpen(polla);
+  const canResumeProof = !abierta && polla.kind !== "rifa" && entry?.status === "pendiente" && !entry.proof_path
+    ? (await getActiveProofs(polla.id, user.id)).some((proof) => proof.entry_id === entry.id) : false;
   const estado = pollaStatusLabel(polla);
-  const inscrito = entry != null && entry.status !== "rechazada";
-  const pagoPendiente = entry?.status === "pendiente";
+  // `anulada` cuenta igual que `rechazada`: NO estás inscrito. Es el estado que
+  // deja el endpoint de join cuando se cae la subida del comprobante, y existe
+  // justamente para que la persona pueda volver a intentar. Tratarla como
+  // inscripción viva escondía el botón de entrar y /pagar la devolvía acá: un
+  // pantallazo que no subió dejaba a esa persona sin forma de entrar a la polla.
+  const inscrito =
+    entry != null && (entry.status === "pagada" || (entry.status === "pendiente" && Boolean(entry.proof_path)));
+  const pagoPendiente = entry?.status === "pendiente" && Boolean(entry.proof_path);
   const tournaments = resolveTournamentSlugs(polla, matches as { tournament: string | null }[]);
 
   const picksPorPartido: Record<
@@ -129,11 +141,11 @@ export default async function PollaPage({
         </div>
         <TournamentIdentity tournaments={tournaments} kind={polla.kind} />
         <h1 className="lp-display mt-2 text-[34px]">{polla.name}</h1>
-        <div className="mt-3 flex items-end justify-between gap-4">
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <Label>Pozo</Label>
+            <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label>
             <div className="lp-money text-[32px] leading-none text-gold">
-              {formatCop(pot.prize_cop)}
+              {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
             </div>
           </div>
           <span className="text-[12px] text-text-secondary">
@@ -151,8 +163,14 @@ export default async function PollaPage({
               Va primero a propósito — cuando una polla ya terminó, el
               resultado es lo único que importa de esa pantalla. */}
         {payouts.length > 0 && (
-          <ResultadoPolla payouts={payouts} miUserId={user.id} />
+          <ResultadoPolla payouts={payouts} miUserId={user.id} totalCop={pot.prize_cop} />
         )}
+
+        {polla.settlement_outcome === "house_retained_zero_points" && <StreetCard className="mb-4 p-4">
+          <h2 className="lp-display-sm">Polla finalizada</h2>
+          <p className="mt-2 text-[15px] text-text-secondary">Todos los participantes terminaron con cero puntos. No se adjudicaron premios.</p>
+        </StreetCard>}
+        {polla.prize_kind === "objeto" && (polla.draw_pending || payouts.length > 0) && (isAdmin || entry?.status === "pagada") && <PremioObjeto slug={polla.slug} />}
 
         {/* (2026-09-03) Antes esto desglosaba "A los ganadores 70% / A la
               casa 30%". El dueño pidió sacar el porcentaje, así que queda lo
@@ -169,9 +187,17 @@ export default async function PollaPage({
               </div>
             </div>
             <div>
-              <Label>Se lleva el ganador</Label>
+              {/* Con la polla ya repartida y un empate, decir "se lleva el
+                  ganador $21.000" al lado de un premio de $10.500 se lee como
+                  si le hubieran pagado de menos a alguien. El pozo es el mismo;
+                  lo que cambia es entre cuántos se dividió. */}
+              <Label>
+                {payouts.length > 1
+                  ? `Repartido entre ${payouts.length}`
+                  : polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Se lleva el ganador"}
+              </Label>
               <div className="lp-money mt-1 text-[17px] text-gold">
-                {formatCop(pot.prize_cop)}
+                {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
               </div>
             </div>
           </div>
@@ -190,9 +216,8 @@ export default async function PollaPage({
                   className="h-16 w-16 max-w-none shrink-0 rounded-md object-cover"
                 />
               )}
-              <p className="min-w-0 text-[13px] text-text-secondary">
-                <span className="lp-label mb-0.5 block">El premio</span>
-                {polla.prize_object}
+              <p className="min-w-0 text-[15px] leading-relaxed text-text-secondary">
+                {polla.kind === "rifa" ? `El premio es ${polla.prize_object}. Se entrega al ganador del sorteo anunciado. No hay reparto de dinero.` : `El premio es ${polla.prize_object}. Gana quien obtenga el mayor puntaje. Si dos o más participantes empatan en el primer puesto, realizaremos un sorteo entre ellos para definir quién recibe el premio. El premio no se divide ni se convierte en dinero.`}
               </p>
             </div>
           )}
@@ -224,11 +249,13 @@ export default async function PollaPage({
           </div>
         )}
 
+        {polla.kind === "rifa" && <div className="mt-4"><MisBoletas slug={polla.slug} open={abierta} /></div>}
+
         {/* ── Estado de tu inscripción ─────────────────────────────────── */}
-        {!inscrito && abierta && (
+        {!inscrito && (abierta || canResumeProof) && polla.kind !== "rifa" && (
           <Link href={`/casa/${polla.slug}/pagar`} className="mt-4 block">
             <span className="lp-btn lp-btn-primary w-full">
-              Entrar por {formatCop(polla.entry_price_cop)}
+              {entry ? "Retomar comprobante" : `Entrar por ${formatCop(polla.entry_price_cop)}`}
             </span>
           </Link>
         )}
@@ -236,31 +263,44 @@ export default async function PollaPage({
         {/* Estás dentro. Antes, cuando Tama aprobaba, simplemente DESAPARECÍA
             el aviso ámbar y no aparecía nada — la única señal de que el pago
             se confirmó era una ausencia, que nadie nota. */}
-        {entry?.status === "pagada" && (
+        {entry?.status === "pagada" && polla.kind !== "rifa" && (
           <div className="mt-4 border border-turf/40 bg-turf/10 p-3">
             <p className="lp-label text-turf">Estás dentro</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              Confirmamos tu pago y ya cuentas para el pozo.
+              Confirmamos tu pago y ya participas por el premio.
               {abierta ? " Haz tus pronósticos antes del cierre." : ""}
             </p>
           </div>
         )}
 
-        {pagoPendiente && (
+        {pagoPendiente && polla.kind !== "rifa" && (
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">Pago en revisión</p>
             <p className="mt-1 text-[13px] text-text-secondary">
               Recibimos tu comprobante. Puedes pronosticar mientras tanto, pero
-              no cuentas para el pozo ni la tabla hasta que lo confirmemos.
+              tu participación se activa cuando confirmemos el pago.
             </p>
           </div>
         )}
 
-        {entry?.status === "rechazada" && (
+        {entry?.status === "rechazada" && polla.kind !== "rifa" && (
           <div className="mt-4 border border-red-alert/40 bg-red-alert/10 p-3">
             <p className="lp-label text-red-alert">Pago rechazado</p>
             <p className="mt-1 text-[13px] text-text-secondary">
               {entry.reject_reason ?? "Comunícate con el administrador."}
+            </p>
+          </div>
+        )}
+
+        {/* El comprobante no llegó a guardarse (se cayó la subida). Sin este
+            aviso la persona solo veía el botón de entrar otra vez, sin saber
+            por qué su intento anterior no quedó. */}
+        {(entry?.status === "anulada" || (entry?.status === "pendiente" && !entry.proof_path)) && abierta && polla.kind !== "rifa" && (
+          <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
+            <p className="lp-label text-amber">Tu comprobante no se guardó</p>
+            <p className="mt-1 text-[13px] text-text-secondary">
+              No alcanzamos a recibir la imagen, así que tu inscripción no
+              quedó. Vuelve a subirla y sigues en carrera.
             </p>
           </div>
         )}
@@ -271,6 +311,7 @@ export default async function PollaPage({
           initialRows={tabla}
           entryStatus={entry?.status ?? null}
           pollaStatus={polla.status}
+          drawPending={polla.draw_pending}
           userId={user.id}
         >
         {/* ── Los partidos ─────────────────────────────────────────────── */}
@@ -290,7 +331,7 @@ export default async function PollaPage({
                 distribution={distribution}
                 canEdit={inscrito && abierta}
                 lockedReason={
-                  !inscrito
+                  !abierta ? "Esta polla ya cerró." : !inscrito
                     ? "Inscríbete para pronosticar."
                     : "Esta polla ya cerró."
                 }
@@ -315,7 +356,7 @@ export default async function PollaPage({
                 distribution={distribution}
                 canEdit={inscrito && abierta}
                 lockedReason={
-                  !inscrito
+                  !abierta ? "Esta polla ya cerró." : !inscrito
                     ? "Inscríbete para responder."
                     : "Esta polla ya cerró."
                 }
@@ -334,11 +375,11 @@ export default async function PollaPage({
             <StreetCard className="mt-4 p-5">
               <h2 className="lp-display-sm">Sorteo</h2>
               <p className="mt-2 text-sm text-text-secondary">{polla.draw_method ?? "El administrador publicará el resultado del sorteo aquí."}</p>
-              {entry?.ticket_number != null && <p className="lp-money mt-3">Tu número: {entry.ticket_number}</p>}
+              {polla.drawn_number != null && <p className="lp-money mt-3">Número sorteado: {polla.drawn_number}</p>}
             </StreetCard>
           )}
         </PollaTabs>
-        {isAdmin && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/casa" />}
+        {isAdmin && !polla.draw_pending && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/casa" />}
       </div>
     </div>
   );
@@ -374,9 +415,9 @@ function PollaPublica({
           {polla.name}
         </h1>
         <div className="mt-3">
-          <Label>Pozo</Label>
+          <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label>
           <div className="lp-money mt-0.5 text-[40px] leading-none text-gold">
-            {formatCop(pot.prize_cop)}
+            {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
           </div>
         </div>
       </HeroFrame>
@@ -399,8 +440,7 @@ function PollaPublica({
           </div>
 
           <p className="mt-4 border-t border-border-subtle pt-4 text-[13px] leading-relaxed text-text-secondary">
-            Entras, pronosticas y el pozo se reparte entre quienes más
-            acierten.
+            {polla.prize_kind === "objeto" ? `Participas por ${polla.prize_object}. El premio no se divide ni se convierte en dinero.` : polla.kind === "rifa" ? "Participas con tu boleta en el sorteo anunciado." : "El pozo se reparte entre quienes obtienen el mayor puntaje."}
           </p>
 
           <Link href={entrar} className="lp-btn lp-btn-primary mt-5 w-full">
@@ -430,13 +470,14 @@ function PollaPublica({
    ──────────────────────────────────────────────────────────────────────── */
 function ResultadoPolla({
   payouts,
-  miUserId,
+  miUserId, totalCop,
 }: {
   payouts: CasaPayout[];
   miUserId: string;
+  totalCop: number;
 }) {
   const miPremio = payouts.find((p) => p.user_id === miUserId);
-  const total = payouts.reduce((s, p) => s + p.amount_cop, 0);
+  const objeto = payouts[0]?.prize_kind === "objeto";
 
   return (
     <div className="mb-5">
@@ -456,8 +497,8 @@ function ResultadoPolla({
           <Label>
             {miPremio.place === 1 ? "Ganaste" : `Puesto ${miPremio.place}`}
           </Label>
-          <div className="lp-money mt-1 text-[46px] leading-none text-gold">
-            {formatCop(miPremio.amount_cop)}
+          <div className={`lp-money mt-1 leading-tight text-gold [overflow-wrap:anywhere] ${objeto ? "text-[24px]" : "text-[46px]"}`}>
+            {objeto ? miPremio.prize_object : formatCop(miPremio.amount_cop)}
           </div>
           {miPremio.points != null && (
             <p className="mt-2 text-[13px] text-text-secondary">
@@ -466,11 +507,11 @@ function ResultadoPolla({
             </p>
           )}
           <p className="mt-4 border-t border-border-subtle pt-4 text-[12px] leading-relaxed text-text-muted">
-            {miPremio.paid_at
+            {objeto ? (miPremio.delivered_at ? "La entrega de tu premio ya está registrada." : "La casa coordinará contigo la entrega de tu premio.") : miPremio.paid_at
               ? "Ya te transferimos. Si no te llegó, escríbenos."
               : "La casa te transfiere a la cuenta que tengas registrada en tu perfil. Revísala para que el pago no se demore."}
           </p>
-          {!miPremio.paid_at && (
+          {!objeto && !miPremio.paid_at && (
             <Link href="/perfil" className="lp-btn lp-btn-ghost mt-3 w-full">
               Revisar mi cuenta de pago
             </Link>
@@ -483,27 +524,30 @@ function ResultadoPolla({
               {payouts.length === 1 ? "Ganador" : "Ganadores"}
             </h2>
             <span className="lp-money text-[16px] text-gold">
-              {formatCop(total)}
+              {objeto ? payouts[0]?.prize_object : formatCop(totalCop)}
             </span>
           </div>
           <ul className="mt-3 space-y-2">
             {payouts.map((p) => (
               <li key={p.user_id} className="flex items-center gap-3">
-                {p.avatar_url && (
-                  <Image
-                    src={p.avatar_url}
-                    alt=""
-                    aria-hidden="true"
-                    width={28}
-                    height={28}
-                    className="h-7 w-7 max-w-none shrink-0 rounded-full object-contain"
-                  />
-                )}
-                <span className="min-w-0 flex-1 truncate text-[14px] text-text-primary">
+                {/* `users.avatar_url` NO es una URL: guarda la clave del
+                    pollito ("millos", "junior"). Pasársela a next/image tiraba
+                    `Failed to parse src` y con eso se caía la pantalla ENTERA
+                    de la polla — para todos menos el ganador, y solo después
+                    de repartir. getPollitoBase es el traductor de siempre. */}
+                <Image
+                  src={getPollitoBase(p.avatar_url)}
+                  alt=""
+                  aria-hidden="true"
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 max-w-none shrink-0 rounded-full object-contain"
+                />
+                <span className="min-w-0 flex-1 text-[15px] text-text-primary [overflow-wrap:anywhere]">
                   {p.display_name ?? "Sin nombre"}
                 </span>
                 <span className="lp-money shrink-0 text-[15px] text-text-secondary">
-                  {formatCop(p.amount_cop)}
+                  {p.prize_kind === "objeto" ? "Premio adjudicado" : formatCop(p.amount_cop)}
                 </span>
               </li>
             ))}

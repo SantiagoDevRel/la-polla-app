@@ -46,6 +46,7 @@
     "ariaNav": "Bottom navigation",
     "tabInicio": "Home",
     "tabPollas": "Pools",
+    "tabFutbol": "Statistics",
     "tabAvisos": "Alerts",
     "tabWorldcup": "Bracket",
     "tabPerfil": "Profile",
@@ -101,7 +102,6 @@
     "taglineAccent": "70% IS YOURS",
     "skip": "Skip",
     "start": "Get started",
-    "madeBy": "made by santiago",
     "tournamentLibertadores": "Libertadores",
     "tournamentBetplay": "BetPlay"
   },

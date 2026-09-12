@@ -13,10 +13,11 @@ interface Props {
   initialRows: CasaLeaderboardRow[];
   entryStatus: CasaEntryStatus | null;
   pollaStatus: CasaPollaStatus;
+  drawPending?: boolean;
   userId: string;
 }
 
-export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus, pollaStatus, userId }: Props) {
+export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus, pollaStatus, userId, drawPending = false }: Props) {
   const [tab, setTab] = useState<0 | 1>(0);
   const [rows, setRows] = useState(initialRows);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +50,7 @@ export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus
         if (!active) return;
         setRows(data.rows);
         setError(null);
-        if (data.entryStatus !== entryStatus || data.pollaStatus !== pollaStatus) router.refresh();
+        if (data.entryStatus !== entryStatus || data.pollaStatus !== pollaStatus || Boolean(data.drawPending) !== drawPending) router.refresh();
       } catch (cause) {
         if (active && !controller?.signal.aborted) {
           setError(cause instanceof Error ? cause.message : "No se pudo actualizar la tabla.");
@@ -69,7 +70,7 @@ export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [tab, slug, revision, entryStatus, pollaStatus, router]);
+  }, [tab, slug, revision, entryStatus, pollaStatus, drawPending, router]);
 
   return (
     <section className="mt-7">

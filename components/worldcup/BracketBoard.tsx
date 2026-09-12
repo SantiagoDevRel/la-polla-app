@@ -1743,8 +1743,8 @@ export default function BracketBoard({ teams, matches, locked, lockedWinners }: 
           autoPlay
           className="absolute inset-0 h-full w-full object-cover opacity-30 motion-reduce:hidden"
         >
-          <source src={BRACKET_BACKGROUND.webm} type="video/webm" />
           <source src={BRACKET_BACKGROUND.mp4} type="video/mp4" />
+          <source src={BRACKET_BACKGROUND.webm} type="video/webm" />
         </video>
         <div className="absolute inset-0 bg-black/[0.92]" />
       </div>

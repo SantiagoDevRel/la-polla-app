@@ -598,6 +598,9 @@ a:focus-visible {
   will-change: transform;
   opacity: 0.48;
 }
+.lp-humo-paused > span {
+  animation-play-state: paused;
+}
 .lp-humo-a {
   width: 62vw;
   height: 62vw;

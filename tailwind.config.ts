@@ -19,6 +19,7 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./lib/tournaments.ts", // Shared light treatments for league logos.
   ],
   theme: {
     extend: {
