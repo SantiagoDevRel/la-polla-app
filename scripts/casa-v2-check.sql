@@ -61,6 +61,11 @@ BEGIN
       'entryPriceCop',1000,'houseCutPct',30,'closesAt',clock_timestamp()+interval '1 hour','closeMode','manual','publish',true),
     'v2-denied-'||gen_random_uuid(),admin_id),'DRAW_PROTOCOL_PENDING');
   ASSERT NOT EXISTS(SELECT 1 FROM public.casa_pollas WHERE name='Objeto sin protocolo');
+  r:=public.casa_create_polla_v2(jsonb_build_object('name','Objeto fijo','kind','rifa','prizeKind','objeto','prizeObject','Camiseta',
+    'entryPriceCop',1000,'houseCutPct',30,'closesAt',clock_timestamp()+interval '1 hour','closeMode','manual','publish',true,
+    'payoutMethod','otro','payoutAccount','fixture','ticketCount',100,'drawMethod','Sorteo local'),
+    'v2-fixed-object-'||gen_random_uuid(),admin_id,2);
+  ASSERT (SELECT house_cut_pct FROM public.casa_pollas WHERE id=(r->>'id')::uuid)=100;
   RAISE NOTICE 'PASS atomic manual creation and protocol publication gate';
   p:=pg_temp.manual_pool(admin_id,players,false,false,false);
   PERFORM pg_temp.must_fail(format('SELECT public.casa_settle_polla_v2(%L,1,%L,NULL)',p,admin_id),'UPDATE_REQUIRED');
@@ -143,6 +148,15 @@ BEGIN
   ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=p)=2;
   ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=p AND ticket_number IS NULL);
   PERFORM pg_temp.must_fail(format('SELECT public.casa_begin_entry_proof_v2(%L,%L,%L,7,%L,''image/png'',100,2)',p,players[2],gen_random_uuid(),repeat('b',64)),'TICKET_UNAVAILABLE');
+  -- A rejected proof is not a successful replay of its original request.
+  INSERT INTO storage.objects(bucket_id,name) VALUES('payment-proofs',a->>'proof_path');
+  PERFORM public.casa_confirm_entry_proof_v2((a->>'attempt_id')::uuid,players[1],2);
+  PERFORM public.casa_review_attempt_v2((a->>'attempt_id')::uuid,'rechazada','Revisar comprobante',2,admin_id,NULL);
+  SELECT request_id INTO rid FROM public.casa_entry_proof_attempts WHERE id=(a->>'attempt_id')::uuid;
+  PERFORM pg_temp.must_fail(format('SELECT public.casa_begin_entry_proof_v2(%L,%L,%L,7,%L,''image/png'',100,2)',p,players[1],rid,repeat('b',64)),'ATTEMPT_REPLACED');
+  b:=public.casa_begin_entry_proof_v2(p,players[1],gen_random_uuid(),7,repeat('b',64),'image/png',100,2);
+  ASSERT b->>'attempt_id'<>a->>'attempt_id' AND b->>'entry_id'=a->>'entry_id';
+  a:=b;
   -- Closing must preserve the existing 15-minute attempt and same-file recovery.
   PERFORM public.casa_change_status_v2(p,'cerrar',2,admin_id,NULL);
   b:=public.casa_begin_entry_proof_v2(p,players[1],gen_random_uuid(),7,repeat('b',64),'image/png',100,2);

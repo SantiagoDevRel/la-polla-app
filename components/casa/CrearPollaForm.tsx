@@ -306,7 +306,7 @@ export function CrearPollaForm() {
         name: name.trim(),
         description: description.trim() || undefined,
         entryPriceCop: precio,
-        houseCutPct: houseCut,
+        houseCutPct: prizeKind === "objeto" ? 100 : houseCut,
         // En modo auto el server ignora este valor y lo recalcula desde el
         // primer partido; se manda igual porque el schema lo exige.
         closesAt: new Date(closesAt).toISOString(),

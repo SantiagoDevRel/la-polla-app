@@ -357,3 +357,13 @@ export async function getActiveProofs(pollaId: string, userId: string): Promise<
   if (error) throw error;
   return data ?? [];
 }
+
+/** One outstanding ticket blocks a new reservation, across all pages. */
+export async function getOutstandingTicket(pollaId: string, userId: string, ticket?: number) {
+  let query = createAdminClient().from("casa_entries").select("id, ticket_number, status, proof_path, reject_reason")
+    .eq("polla_id", pollaId).eq("user_id", userId).neq("status", "pagada").not("ticket_number", "is", null);
+  if (ticket !== undefined) query = query.eq("ticket_number", ticket);
+  const { data, error } = await query.order("created_at").order("id").limit(1).maybeSingle();
+  if (error) throw error;
+  return data;
+}

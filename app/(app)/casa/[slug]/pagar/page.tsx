@@ -4,9 +4,10 @@
 // solo se registra el comprobante y se le avisa a Tama, que aprueba a mano
 // desde el bot de Telegram. Ninguna pasarela, ningún cobro automático.
 
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyEntry, getPollaBySlug, getPot, getActiveProofs } from "@/lib/casa/queries";
+import { getMyEntry, getPollaBySlug, getPot, getActiveProofs, getOutstandingTicket } from "@/lib/casa/queries";
 import { isPollaOpen } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
 import { HeroFrame, Label, StreetCard } from "@/components/street";
@@ -48,6 +49,26 @@ export default async function PagarPage({
     redirect(`/casa/${polla.slug}`);
   }
   const boleta = (await searchParams).boleta;
+  let recovering = Boolean(entry);
+  let rejected = entry?.status === "rechazada";
+  let rejectReason = entry?.reject_reason;
+  if (polla.kind === "rifa") {
+    const outstanding = await getOutstandingTicket(polla.id, user.id);
+    const number = boleta && /^\d+$/.test(boleta) && Number.isSafeInteger(Number(boleta)) ? Number(boleta) : undefined;
+    const selected = number !== undefined ? await getOutstandingTicket(polla.id, user.id, number) : null;
+    recovering = Boolean(selected);
+    rejected = selected?.status === "rechazada";
+    rejectReason = selected?.reject_reason;
+    if (outstanding && (!selected || (selected.status === "pendiente" && selected.proof_path))) {
+      const waiting = selected ?? outstanding;
+      const inReview = waiting.status === "pendiente" && Boolean(waiting.proof_path);
+      return <div className="px-4 py-6"><StreetCard className="space-y-4 p-4">
+        <h1 className="lp-display text-[30px] [overflow-wrap:anywhere]">{inReview ? "Comprobante en revisión" : "Ya tienes una boleta reservada"}</h1>
+        <p className="text-[15px] text-text-secondary">Boleta {waiting.ticket_number} de {polla.name}. {inReview ? "Espera la confirmación de tu pago antes de comprar otra boleta." : "Completa el comprobante de esta boleta antes de reservar otra."} Si ya transferiste, no repitas el pago.</p>
+        <Link className="lp-btn lp-btn-primary w-full" href={inReview ? `/casa/${polla.slug}` : `/casa/${polla.slug}/pagar?boleta=${waiting.ticket_number}`}>{inReview ? "Ver mi rifa" : "Retomar comprobante"}</Link>
+      </StreetCard></div>;
+    }
+  }
   const resumeOnly = !isPollaOpen(polla);
   if (resumeOnly) {
     const active = await getActiveProofs(polla.id, user.id);
@@ -67,11 +88,13 @@ export default async function PagarPage({
       </HeroFrame>
 
       <div className="space-y-4 px-4 pt-5">
+        {rejected ? <p className="text-[15px] text-text-secondary">Tu comprobante fue rechazado. {rejectReason} Revisa el motivo y consulta con el administrador antes de hacer otra transferencia.</p>
+          : recovering && <p className="text-[15px] text-text-secondary">Si ya transferiste, solo completa el comprobante. No repitas el pago.</p>}
         {/* Qué pasa con tu plata. Explícito, sin letra chica. */}
         <StreetCard className="p-4">
           <div className="flex items-end justify-between">
             <div>
-              <Label>Tienes que transferir</Label>
+              <Label>{recovering ? "Valor de la inscripción" : "Tienes que transferir"}</Label>
               <div className="lp-money mt-1 text-[34px] leading-none text-gold">
                 {formatCop(entrada)}
               </div>
@@ -106,7 +129,7 @@ export default async function PagarPage({
             que la persona no sabía a quién hacer. */}
         {polla.payout_account ? (
           <StreetCard hero className="p-4">
-            <Label>Transfiere a</Label>
+            <Label>{recovering ? "Cuenta de la inscripción" : "Transfiere a"}</Label>
             <div className="lp-display-sm mt-1 text-gold">
               {(polla.payout_method ?? "").toUpperCase()}
             </div>
@@ -120,8 +143,7 @@ export default async function PagarPage({
               </p>
             )}
             <p className="mt-3 border-t border-border-subtle pt-3 text-[12px] text-text-muted">
-              Transfiere exactamente {formatCop(entrada)}. Luego subes el
-              comprobante aquí abajo y lo confirmamos.
+              {recovering ? "Verifica que el comprobante corresponda a esta cuenta y súbelo para revisión." : <>Transfiere exactamente {formatCop(entrada)}. Luego subes el comprobante aquí abajo y lo confirmamos.</>}
             </p>
           </StreetCard>
         ) : (

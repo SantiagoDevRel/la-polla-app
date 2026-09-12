@@ -17,6 +17,9 @@ El procedimiento de evidencia sigue pendiente de aceptación operativa del dueñ
 `object_draws_enabled=false` impide confirmarlo y publicar nuevas pollas por puntos
 con premio en objeto hasta entonces. Se pueden guardar borradores; las rifas de
 objeto usan el sorteo anunciado y no dependen de este desempate por puntos.
+No apagar este flag mientras exista una polla por puntos con objeto publicada o
+un desempate pendiente; finalizar esas operaciones primero. El preflight vuelve
+a comprobar este conjunto antes de cada corte.
 La grabación debe mostrar lista, método con posibilidades iguales y ganador;
 la aplicación comprueba pertenencia, integridad del archivo y trazabilidad,
 pero no certifica que el sorteo externo sea imparcial.

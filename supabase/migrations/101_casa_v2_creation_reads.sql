@@ -51,7 +51,7 @@ BEGIN
   VALUES(p_slug,p_config->>'name',p_config->>'description',(p_config->>'kind')::public.casa_polla_kind,
     CASE WHEN p_config->>'kind'='partidos' THEN p_config->>'tournament' END,
     CASE WHEN p_config->>'kind'='partidos' THEN (p_config->>'scoringMode')::public.casa_scoring_mode END,
-    (p_config->>'entryPriceCop')::integer,(p_config->>'houseCutPct')::integer,p_config->>'prizeKind',
+    (p_config->>'entryPriceCop')::integer,CASE WHEN p_config->>'prizeKind'='objeto' THEN 100 ELSE (p_config->>'houseCutPct')::integer END,p_config->>'prizeKind',
     CASE WHEN p_config->>'prizeKind'='objeto' THEN p_config->>'prizeObject' END,
     CASE WHEN p_config->>'prizeKind'='objeto' THEN p_config->>'prizeImagePath' END,
     3,3,1,'borrador',closing,p_config->>'closeMode',

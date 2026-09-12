@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getPollaBySlug, getActiveProofs } from "@/lib/casa/queries";
+import { getPollaBySlug, getActiveProofs, getOutstandingTicket } from "@/lib/casa/queries";
 import { casaJson, casaError } from "@/lib/casa/operations";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +20,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       .select("id, ticket_number, status, proof_path, reject_reason")
       .eq("polla_id", polla.id).eq("user_id", user.id).order("ticket_number").range(offset, offset + 20);
     if (error) return casaError(error);
-    const active = await getActiveProofs(polla.id, user.id);
-    return casaJson({ entries: (data ?? []).slice(0, 20).map(({ proof_path, ...entry }) => ({ ...entry, hasProof: Boolean(proof_path), canResume: active.some((proof) => proof.entry_id === entry.id) })),
+    const [active, outstanding] = await Promise.all([getActiveProofs(polla.id, user.id), getOutstandingTicket(polla.id, user.id)]);
+    return casaJson({ canReserve: !outstanding, entries: (data ?? []).slice(0, 20).map(({ proof_path, ...entry }) => ({ ...entry, hasProof: Boolean(proof_path), canResume: active.some((proof) => proof.entry_id === entry.id) })),
       next: (data?.length ?? 0) > 20 ? offset + 20 : null });
   }
   const from = Number(search.get("from") ?? 1);

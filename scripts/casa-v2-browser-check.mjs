@@ -44,6 +44,7 @@ async function screen(actor, name, path) {
   assert.ok(!actor.page.url().includes('/login'), 'Authenticated session must reach the page');
   for (const width of [320, 768, 1440]) {
     await actor.page.setViewportSize({ width, height: 1000 });
+    await actor.page.waitForTimeout(650); // Let the existing entrance animation finish before capturing.
     await actor.page.screenshot({ path: `${output}/${name}-${width}.png`, fullPage: true });
     const metrics = await actor.page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth, bodyFont: getComputedStyle(document.body).fontFamily,
       overflow: [...document.querySelectorAll('main *')].filter((el) => el.getBoundingClientRect().right > innerWidth + 1 && getComputedStyle(el).position !== 'fixed').slice(0, 5).map((el) => el.tagName + ':' + el.textContent?.slice(0, 60)) }));
@@ -53,8 +54,8 @@ async function screen(actor, name, path) {
   await actor.page.setViewportSize({width:320,height:1000});
   await actor.page.evaluate(() => { const nodes=[...document.querySelectorAll('body *')].map(el=>[el,parseFloat(getComputedStyle(el).fontSize)]);for(const [el,size] of nodes) el.style.fontSize=`${size*2}px`; });
   await actor.page.screenshot({path:`${output}/${name}-320-zoom200.png`,fullPage:true});
-  if(name==='pagar-rifa') { await actor.page.getByText('Transfiere a',{exact:true}).scrollIntoViewIfNeeded(); await actor.page.screenshot({path:`${output}/${name}-account-zoom200-viewport.png`}); }
-  if(name==='empate-administrador') { await actor.page.getByRole('button',{name:'Adjudicar el objeto',exact:true}).scrollIntoViewIfNeeded(); await actor.page.screenshot({path:`${output}/${name}-confirm-zoom200-viewport.png`}); }
+  if(name==='pagar-rifa') { await actor.page.getByText('Transfiere a',{exact:true}).scrollIntoViewIfNeeded(); await actor.page.waitForTimeout(650); await actor.page.screenshot({path:`${output}/${name}-account-zoom200-viewport.png`}); }
+  if(name==='empate-administrador') { await actor.page.getByRole('button',{name:'Adjudicar el objeto',exact:true}).scrollIntoViewIfNeeded(); await actor.page.waitForTimeout(650); await actor.page.screenshot({path:`${output}/${name}-confirm-zoom200-viewport.png`}); }
   assert.ok(await actor.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),name+' overflow at 200% text zoom');
   await actor.page.reload({waitUntil:'networkidle'});
 }
@@ -70,11 +71,13 @@ try {
   const admin = await actor('Administrador local', true), player = await actor('Participante local'), other = await actor('Otro participante');
   await admin.page.goto(`${origin}/admin/pollas/crear`,{waitUntil:'networkidle'});
   await admin.page.getByRole('button',{name:'Un objeto',exact:true}).click();
+  await admin.page.waitForFunction(()=>Array.from(document.querySelectorAll('p')).some(p=>p.textContent.includes('La inscripción es para')&&p.textContent.includes('10.000')));
   const houseInput=admin.page.locator('input[type=number][max="100"]');
   assert.equal(await houseInput.inputValue(),'100');assert.equal(await houseInput.isDisabled(),true);
   for(const width of [320,768,1440]) {
     await admin.page.setViewportSize({width,height:1000});
     await admin.page.getByText('La inscripción es para participar por el objeto anunciado.',{exact:false}).scrollIntoViewIfNeeded();
+    await admin.page.waitForTimeout(650);
     await admin.page.screenshot({path:`${output}/crear-objeto-${width}.png`});
     assert.ok(await admin.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   }
@@ -94,7 +97,20 @@ try {
   if(entry.error) throw entry.error;
   assert.equal(entry.data.status,'pendiente');assert.ok(entry.data.proof_path);
   await api(other, `/api/casa/pollas/${slug}/join`, { action:'confirm',attemptId:entry.data.current_proof_attempt_id },'POST',404);
-  await api(admin,'/api/casa/admin/entries',{ attemptId:entry.data.current_proof_attempt_id, decision:'aprobar' });
+  await screen(player,'rifa-en-revision',`/casa/${slug}/pagar`);
+  assert.equal(await player.page.getByText('Transfiere a',{exact:true}).count(),0);
+  assert.equal(await player.page.locator('input[type=file]').count(),0);
+  await player.page.getByRole('heading',{name:'Comprobante en revisión',exact:true}).waitFor();
+  await api(admin,'/api/casa/admin/entries',{attemptId:entry.data.current_proof_attempt_id,decision:'rechazar',motivo:'Verificar el comprobante original'});
+  await player.page.goto(`${origin}/casa/${slug}/pagar?boleta=7`,{waitUntil:'networkidle'});
+  await player.page.getByText('Tu comprobante fue rechazado.',{exact:false}).waitFor();
+  await player.page.locator('input[type=file]').setInputFiles({name:'comprobante-local.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+  await player.page.getByRole('button',{name:'Enviar el comprobante',exact:true}).click();
+  await player.page.getByText('Pago registrado',{exact:true}).waitFor({timeout:60000});
+  const reuploaded=await db.from('casa_entries').select('current_proof_attempt_id').eq('id',entry.data.id).single();
+  assert.ifError(reuploaded.error);assert.notEqual(reuploaded.data.current_proof_attempt_id,entry.data.current_proof_attempt_id);
+  await api(admin,'/api/casa/admin/entries',{attemptId:reuploaded.data.current_proof_attempt_id,decision:'aprobar'});
+  console.log('PASS rejected same-file proof creates a new attempt, retaining the same ticket and audit history');
   await screen(player,'rifa-pagada',`/casa/${slug}`);
   const leaderboard = await api(player,`/api/casa/pollas/${slug}/leaderboard`,null,'GET');
   assert.equal(leaderboard.entryStatus,'pagada');

@@ -169,3 +169,33 @@ assert.ok(Date.now()-drainStarted>=1000);
 assert.equal((await sql(`SELECT drawn_number FROM casa_pollas WHERE id=${literal(written.pool)}`)).trim(),'8');
 await sql("SELECT casa_transition_mode('paused','v2');");
 console.log('PASS legacy writer after first write drains before pause, then v2 resumes');
+
+// Actual match finalizers, two shared pools, then settlement waiting for scoring.
+// Fixtures are created through the authoritative upsert; no historical prediction
+// rows exist for these fresh IDs and none are inserted/edited by this test.
+const matchAdmin=randomUUID(), sharedPools=[randomUUID(),randomUUID()].sort(), matchKeys=[randomUUID(),randomUUID()];
+await sql(`INSERT INTO users(id,whatsapp_number,display_name,is_admin) VALUES(${literal(matchAdmin)},'+1222${matchAdmin.slice(0,8)}','Admin partido local',true);`);
+const matchIds=[];
+for(const key of matchKeys) {
+  const value=await sql(`SELECT upsert_match_safe('local-casa-${key}','local_casa_test',1,'league','Home ${key}','Away ${key}',NULL,NULL,clock_timestamp()+interval '2 hours',NULL,NULL,NULL,'scheduled',NULL,NULL,NULL);`);
+  const id=value.trim();assert.match(id,/^[a-f0-9-]{36}$/);matchIds.push(id);
+}
+for(const pool of sharedPools) await sql(`BEGIN; SELECT casa_v2_context(2);
+ INSERT INTO casa_pollas(id,slug,name,kind,tournament,scoring_mode,status,closes_at,created_by,entry_price_cop,payout_method,payout_account)
+ VALUES(${literal(pool)},'shared-${pool}','Partidos compartidos local','partidos','local_casa_test','1x2','abierta',clock_timestamp()+interval '1 hour',${literal(matchAdmin)},10000,'otro','fixture');
+ INSERT INTO casa_polla_matches(polla_id,match_id) VALUES(${literal(pool)},${literal(matchIds[0])}),(${literal(pool)},${literal(matchIds[1])});
+ INSERT INTO casa_entries(polla_id,user_id,status,amount_cop) VALUES(${literal(pool)},${literal(matchAdmin)},'pagada',10000);
+ INSERT INTO casa_picks(entry_id,polla_id,user_id,match_id,pick_1x2) SELECT e.id,e.polla_id,e.user_id,pm.match_id,'L' FROM casa_entries e JOIN casa_polla_matches pm ON pm.polla_id=e.polla_id WHERE e.polla_id=${literal(pool)};
+ SELECT casa_change_status_v2(${literal(pool)},'cerrar',2,${literal(matchAdmin)},NULL); COMMIT;`);
+assert.equal((await sql(`SELECT count(*) FROM predictions WHERE match_id IN (${matchIds.map(literal).join(',')})`)).trim(),'0');
+const finalA=session(`BEGIN; SET LOCAL statement_timeout='10s'; SELECT finalize_match_result(${literal(matchIds[0])},1,0,'local race'); SELECT 'MATCH_A_HELD'; SELECT pg_sleep(0.75); COMMIT;`,'MATCH_A_HELD');
+assert.equal(await finalA.ready,true);
+const finalB=session(`BEGIN; SET LOCAL statement_timeout='10s'; SELECT finalize_match_result(${literal(matchIds[1])},2,0,'local race'); SELECT 'MATCH_B_HELD'; SELECT pg_sleep(0.75); COMMIT;`,'MATCH_B_HELD');
+const aResult=await finalA.done;assert.equal(aResult.code,0,aResult.err);
+assert.equal(await finalB.ready,true);
+const settlementStart=Date.now();
+const finalSettlement=await session(`SET statement_timeout='10s'; SELECT casa_settle_polla_v2(${literal(sharedPools[0])},2,${literal(matchAdmin)},NULL);`).done;
+const bResult=await finalB.done;assert.equal(bResult.code,0,bResult.err);assert.equal(finalSettlement.code,0,finalSettlement.err);
+assert.ok(Date.now()-settlementStart<10000);assert.match(finalSettlement.out,/money_awarded/);
+assert.equal((await sql(`SELECT sum(points_earned) FROM casa_picks WHERE polla_id=${literal(sharedPools[0])}`)).trim(),'6');
+console.log('PASS two real match finalizers share pools in stable order; concurrent settlement completes without deadlock');

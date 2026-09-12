@@ -54,7 +54,7 @@ export function SelectorBoleta({ slug, value, onChange, disabled, revision = 0 }
 type MyTicket = { id: string; ticket_number: number; status: string; hasProof: boolean; canResume: boolean; reject_reason: string | null };
 export function MisBoletas({ slug, open }: { slug: string; open: boolean }) {
   const [offset, setOffset] = useState(0);
-  const [data, setData] = useState<{ entries: MyTicket[]; next: number | null } | null>(null);
+  const [data, setData] = useState<{ entries: MyTicket[]; next: number | null; canReserve: boolean } | null>(null);
   const [error, setError] = useState(false);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
@@ -80,6 +80,6 @@ export function MisBoletas({ slug, open }: { slug: string; open: boolean }) {
       <button className="lp-btn lp-btn-ghost flex-1" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>Anteriores</button>
       <button className="lp-btn lp-btn-ghost flex-1" disabled={data.next === null} onClick={() => setOffset(data.next!)}>Siguientes</button>
     </div>}
-    {open && <Link className="lp-btn lp-btn-ghost w-full" href={`/casa/${slug}/pagar`}>Comprar otra boleta</Link>}
+    {open && data?.canReserve && <Link className="lp-btn lp-btn-ghost w-full" href={`/casa/${slug}/pagar`}>Comprar otra boleta</Link>}
   </section>;
 }

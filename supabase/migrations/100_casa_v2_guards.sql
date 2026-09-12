@@ -62,6 +62,26 @@ BEGIN
   RETURN NEW;
 END $$;
 
+-- Match finalizers already hold their own match row. Shared pools must always
+-- be visited in UUID order, otherwise concurrent finalizers can invert locks.
+CREATE OR REPLACE FUNCTION public.casa_score_on_match_verified()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_polla_id uuid;
+BEGIN
+  IF NEW.final_verified_at IS NULL THEN RETURN NEW; END IF;
+  IF OLD.final_verified_at IS NOT NULL AND OLD.home_score IS NOT DISTINCT FROM NEW.home_score
+    AND OLD.away_score IS NOT DISTINCT FROM NEW.away_score THEN RETURN NEW; END IF;
+  FOR v_polla_id IN
+    SELECT DISTINCT pm.polla_id FROM public.casa_polla_matches pm
+    JOIN public.casa_pollas p ON p.id=pm.polla_id
+    WHERE pm.match_id=NEW.id AND p.status NOT IN ('resuelta','anulada')
+    ORDER BY pm.polla_id
+  LOOP
+    PERFORM public.casa_score_polla(v_polla_id);
+  END LOOP;
+  RETURN NEW;
+END $$;
+
 CREATE TRIGGER casa_00_contract BEFORE UPDATE ON public.casa_pollas
   FOR EACH ROW EXECUTE FUNCTION public.casa_v2_write_guard();
 CREATE TRIGGER casa_00_contract BEFORE INSERT OR UPDATE ON public.casa_entries

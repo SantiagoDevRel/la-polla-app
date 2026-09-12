@@ -35,6 +35,9 @@ BEGIN
       RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ATTEMPT_REPLACED';
     END IF;
     IF a.state='confirmed' THEN
+      IF e.status NOT IN ('pendiente','pagada') THEN
+        RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ATTEMPT_REPLACED';
+      END IF;
       RETURN jsonb_build_object('entry_id',e.id,'attempt_id',a.id,'state','confirmed','entry_status',e.status,'proof_path',a.proof_path);
     END IF;
     IF a.state<>'uploading' OR a.expires_at<=clock_timestamp() THEN
