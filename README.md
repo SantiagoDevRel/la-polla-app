@@ -239,7 +239,10 @@ pendientes ni cambiar inscripciones después del reparto o del archivo.
 ### Reparto del pozo: solo el ganador (migración 096)
 
 `supabase/migrations/096_casa_pozo_solo_ganador.sql` deja el reparto en una
-sola regla, y hay que aplicarla antes de publicar pollas nuevas:
+sola regla. **Aplicada en producción el 2026-09-12** (verificada comparando
+`md5(prosrc)` de la función en prod contra la del entorno local creada desde
+este mismo archivo: idénticas). Es `CREATE OR REPLACE`, así que re-aplicarla no
+rompe nada. La regla:
 
 - El pozo (`casa_polla_pot.prize_cop`) va COMPLETO al puntaje más alto. Nunca
   hay segundo ni tercer puesto: `casa_payouts.place` siempre es 1.
