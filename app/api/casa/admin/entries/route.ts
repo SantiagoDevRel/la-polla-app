@@ -1,3 +1,4 @@
+import { notifyCasaReview } from "@/lib/casa/review-notify";
 // app/api/casa/admin/entries/route.ts — aprobar o rechazar un pago desde la web.
 //
 // Existe como RESPALDO del bot de Telegram, no como reemplazo. El bot es
@@ -13,14 +14,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
-import { getPot } from "@/lib/casa/queries";
+import { casaJson, casaError, requireCasaContract } from "@/lib/casa/operations";
 import { signedProofUrl } from "@/lib/telegram/notify";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const schema = z.object({
-  entryId: z.string().uuid(),
+  attemptId: z.string().uuid(),
   decision: z.enum(["aprobar", "rechazar"]),
   motivo: z.string().trim().max(200).optional(),
 });
@@ -55,9 +56,10 @@ export async function GET(req: NextRequest) {
       // ni hace saltar la siguiente fila. No se firman imagenes para contar.
       for (;;) {
         let query = db.from("casa_entries")
-          .select("id, polla_id, casa_pollas!inner(archived_at)")
+          .select("id, polla_id, casa_pollas!inner(archived_at,status)")
           .eq("status", "pendiente")
           .is("casa_pollas.archived_at", null)
+          .in("casa_pollas.status", ["abierta", "cerrada"])
           .not("proof_path", "is", null)
           .order("id", { ascending: true })
           .limit(1000);
@@ -96,9 +98,10 @@ export async function GET(req: NextRequest) {
 
     let query = db
       .from("casa_entries")
-      .select("id, polla_id, user_id, amount_cop, ticket_number, proof_path, proof_uploaded_at, casa_pollas!inner(archived_at)")
+      .select("id, polla_id, user_id, amount_cop, ticket_number, proof_path, current_proof_attempt_id, proof_uploaded_at, casa_pollas!inner(archived_at,status)")
       .eq("status", "pendiente")
       .is("casa_pollas.archived_at", null)
+          .in("casa_pollas.status", ["abierta", "cerrada"])
       .not("proof_path", "is", null)
       .order("proof_uploaded_at", { ascending: true, nullsFirst: false })
       .order("id", { ascending: true });
@@ -148,8 +151,25 @@ export async function GET(req: NextRequest) {
     const polla = new Map((pollas ?? []).map((p) => [p.id, p]));
 
     const pendientes = await Promise.all(
-      entries.map(async (e) => ({
+      entries.map(async (e) => {
+        // Capture legacy metadata once, then bind the displayed proof to its attempt.
+        let attemptId = e.current_proof_attempt_id;
+        if (!attemptId) {
+          const captured = await db.rpc("casa_legacy_proof_attempt_v2", { p_entry_id: e.id, p_contract: 2, p_actor_id: user.id });
+          if (captured.error) {
+            if (["OPERATIONS_PAUSED", "CASA_V2_NOT_ACTIVE"].includes(captured.error.message)) throw captured.error;
+            // The pool/entry may have closed or been reviewed after the list read.
+            if (["POLLA_FINAL", "DRAW_PENDING", "PROOF_NOT_UPLOADED", "ALREADY_REVIEWED"].includes(captured.error.message)) return null;
+            throw captured.error;
+          }
+          attemptId = captured.data;
+          const proof = await db.from("casa_entry_proof_attempts").select("proof_path")
+            .eq("id", attemptId).eq("entry_id", e.id).single();
+          if (proof.error || proof.data.proof_path !== e.proof_path) return null;
+        }
+        return ({
         id: e.id,
+        attemptId,
         pollaId: e.polla_id,
         jugador: nombre.get(e.user_id) ?? "Sin nombre",
         polla: polla.get(e.polla_id)?.name ?? "?",
@@ -159,11 +179,12 @@ export async function GET(req: NextRequest) {
         subidoEn: e.proof_uploaded_at,
         // URL firmada de 1h: el bucket es privado y así se ve sin exponerlo.
         comprobanteUrl: e.proof_path ? await signedProofUrl(e.proof_path) : null,
-      })),
+      }); }),
     );
 
-    return privateJson({ pendientes, hasMore, nextCursor });
-  } catch {
+    return privateJson({ pendientes: pendientes.filter((entry) => entry !== null), hasMore, nextCursor });
+  } catch (error) {
+    if (["OPERATIONS_PAUSED", "CASA_V2_NOT_ACTIVE"].includes((error as { message?: string }).message ?? "")) return casaError(error as { message: string });
     return privateJson({ error: "No se pudieron cargar los pagos pendientes." }, 500);
   }
 }
@@ -171,59 +192,18 @@ export async function GET(req: NextRequest) {
 /** POST — la decisión. */
 export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
-  if (!user?.is_admin) {
-    return NextResponse.json({ error: "Solo el admin." }, { status: 403 });
-  }
-
+  if (!user) return casaJson({ error: "No autenticado." }, 401);
+  if (!user.is_admin) return casaJson({ error: "Solo el administrador." }, 403);
+  const contractError = requireCasaContract(req);
+  if (contractError) return contractError;
   const parsed = schema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
-  }
-  const { entryId, decision, motivo } = parsed.data;
-  const aprobar = decision === "aprobar";
-
-  const db = createAdminClient();
-
-  const { data: entry, error: entryError } = await db.from("casa_entries")
-    .select("id, polla_id, status").eq("id", entryId).maybeSingle();
-  if (entryError) return privateJson({ error: "No se pudo consultar el pago." }, 500);
-  if (!entry) return privateJson({ error: "No existe esa inscripción." }, 404);
-  if (entry.status !== "pendiente") return privateJson({ error: "Esa inscripción ya la habían resuelto." }, 409);
-  const { data: polla, error: pollaError } = await db.from("casa_pollas")
-    .select("id, status, archived_at").eq("id", entry.polla_id).maybeSingle();
-  if (pollaError) return privateJson({ error: "No se pudo consultar la polla." }, 500);
-  if (!polla || polla.archived_at || !["abierta", "cerrada"].includes(polla.status)) {
-    return privateJson({ error: "Solo se pueden revisar pagos de una polla abierta o cerrada que no se haya eliminado." }, 409);
-  }
-
-  // El `.eq("status","pendiente")` es el guard anti doble-decisión: si el bot
-  // ya la resolvió hace un segundo, este update no toca nada.
-  // El trigger 091 bloquea la polla y repite el guard dentro del UPDATE:
-  // repartir/eliminar entre la lectura anterior y esta escritura no lo evita.
-  const { data: actualizada, error: updateError } = await db
-    .from("casa_entries")
-    .update({
-      status: aprobar ? "pagada" : "rechazada",
-      reviewed_by: user.id,
-      reviewed_at: new Date().toISOString(),
-      reject_reason: aprobar ? null : (motivo ?? "Rechazado por el admin"),
-    })
-    .eq("id", entryId)
-    .eq("status", "pendiente")
-    .select("id, polla_id")
-    .maybeSingle();
-
-  if (updateError) {
-    if (updateError.code === "55000") return privateJson({ error: updateError.message }, 409);
-    return privateJson({ error: "No se pudo guardar la revisión del pago." }, 500);
-  }
-  if (!actualizada) {
-    return NextResponse.json(
-      { error: "Esa inscripción ya la habían resuelto." },
-      { status: 409 },
-    );
-  }
-
-  const pot = await getPot(actualizada.polla_id);
-  return NextResponse.json({ ok: true, pozoCop: pot.prize_cop });
+  if (!parsed.success) return casaJson({ error: "Datos inválidos." }, 400);
+  const { attemptId, decision, motivo } = parsed.data;
+  const { data, error } = await createAdminClient().rpc("casa_review_attempt_v2", {
+    p_attempt_id: attemptId, p_decision: decision === "aprobar" ? "pagada" : "rechazada",
+    p_reason: motivo ?? null, p_contract: 2, p_actor_id: user.id,
+  });
+  if (error) return casaError(error);
+  if (data.changed) await notifyCasaReview(data.entry_id, data.polla_id, decision === "aprobar");
+  return casaJson({ ok: true, ...data });
 }

@@ -8,12 +8,13 @@ import { HeroFrame, Label, Tape } from "@/components/street";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { AccionesPolla } from "@/components/casa/AccionesPolla";
 import { ColaDePagos } from "@/components/casa/ColaDePagos";
+import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { ResolverPolla } from "@/components/casa/ResolverPolla";
 import { fadeUp, staggerContainer } from "@/lib/animations";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import type { pollaStatusLabel, CasaPolla, CasaPot } from "@/lib/casa/types";
 
-export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at"> & {
+export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "prize_kind" | "prize_object" | "draw_pending"> & {
   label: ReturnType<typeof pollaStatusLabel>;
 };
 
@@ -136,7 +137,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa }: {
                         <ColaDePagos key={polla.id} pollaId={polla.id} refreshKey={revision} onReviewed={() => setRevision((value) => value + 1)} />
                         <div className="mt-6 border-t border-border-default pt-4">
                           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                            <div><Label>Pozo</Label><p className="lp-money mt-1 text-[24px] text-text-primary">{formatCop(pot?.prize_cop ?? 0)}</p></div>
+                            <div className="min-w-0"><Label>{polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label><p className="lp-money mt-1 text-[24px] text-text-primary [overflow-wrap:anywhere]">{polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot?.prize_cop ?? 0)}</p></div>
                             {polla.status !== "borrador" && <Link href={`/casa/${polla.slug}`} className="lp-btn lp-btn-ghost !px-3 !text-[13px]">Ver polla</Link>}
                           </div>
                           <div className="[&_button]:!min-h-11">
@@ -144,10 +145,11 @@ export function CasaAdminPanel({ pollas, pots, totalCasa }: {
                                 rifa. Sin esto, esas dos clases de polla solo
                                 se podían cerrar desde el bot de Telegram. */}
                             {(polla.kind === "manual" || polla.kind === "rifa") &&
-                              polla.status !== "borrador" && polla.status !== "anulada" && (
+                              ["abierta", "cerrada"].includes(polla.status) && !polla.draw_pending && (
                                 <ResolverPolla id={polla.id} kind={polla.kind} />
                               )}
-                            <AccionesPolla id={polla.id} status={polla.status} nombre={polla.name} />
+                            {polla.prize_kind === "objeto" && (polla.draw_pending || polla.status === "resuelta") && <PremioObjeto slug={polla.slug} />}
+                            <AccionesPolla id={polla.id} status={polla.status} nombre={polla.name} prizeKind={polla.prize_kind} drawPending={polla.draw_pending} />
                           </div>
                         </div>
                       </div>

@@ -160,8 +160,11 @@ export async function updateSession(request: NextRequest) {
 
   // These read endpoints validate their session and return JSON 401 themselves.
   // Redirecting this fetch to HTML /login hides an expired session as a 200.
-  const isCasaReadApi = /^\/api\/casa\/pollas\/[^/]+\/leaderboard\/?$/.test(path) || path === "/api/casa/mis-pollas";
-  if (!user && !isPublicRoute && !isApiWebhook && !isCasaPollaPublica && !isCasaReadApi) {
+  // These handlers validate their own session and return JSON 401/403.
+  // Redirecting a fetch to login turns an expired session into an HTML parse error.
+  const isCasaJsonApi = /^\/api\/casa\/pollas\/[^/]+\/(leaderboard|tickets|award|join|picks)\/?$/.test(path)
+    || path === "/api/casa/mis-pollas" || path.startsWith("/api/casa/admin/");
+  if (!user && !isPublicRoute && !isApiWebhook && !isCasaPollaPublica && !isCasaJsonApi) {
     const url = request.nextUrl.clone();
     const original = path + request.nextUrl.search;
     url.pathname = "/login";

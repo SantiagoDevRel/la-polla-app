@@ -616,3 +616,13 @@ ni en el TXT en texto plano. Las páginas de soporte, privacidad y eliminación
 de cuenta muestran esta dirección. La entrega a Gmail y la verificación de la
 cuenta se comprobaron el 9 de septiembre de 2026. El envío como `info` no forma
 parte de este reenvío; la configuración de Resend en `send.*` permanece separada.
+
+
+### Casa v2: premios y comprobantes (implementación 2026-09-12)
+
+El contrato v2 separa pozo y objeto, conserva las boletas fallidas para su dueño,
+identifica cada comprobante en las aprobaciones y registra desempate/evidencia/entrega.
+Migraciones 097–102; activación explícita `legacy → paused → v2`. No activar ni
+revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
+[docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
+de 096 arriba no es el contrato de liquidación una vez activado v2.

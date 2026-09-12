@@ -6,7 +6,7 @@
 
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyEntry, getPollaBySlug, getPot } from "@/lib/casa/queries";
+import { getMyEntry, getPollaBySlug, getPot, getActiveProofs } from "@/lib/casa/queries";
 import { isPollaOpen } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
 import { HeroFrame, Label, StreetCard } from "@/components/street";
@@ -15,9 +15,10 @@ import { PagarForm } from "@/components/casa/PagarForm";
 export const dynamic = "force-dynamic";
 
 export default async function PagarPage({
-  params,
+  params, searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ boleta?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -41,18 +42,26 @@ export default async function PagarPage({
     entry &&
     entry.status !== "rechazada" &&
     entry.status !== "anulada" &&
+    (entry.status === "pagada" || entry.proof_path !== null) &&
     polla.kind !== "rifa"
   ) {
     redirect(`/casa/${polla.slug}`);
   }
-  if (!isPollaOpen(polla)) redirect(`/casa/${polla.slug}`);
+  const boleta = (await searchParams).boleta;
+  const resumeOnly = !isPollaOpen(polla);
+  if (resumeOnly) {
+    const active = await getActiveProofs(polla.id, user.id);
+    if (!active.some((proof) => polla.kind !== "rifa" || String(proof.ticket_number) === boleta)) redirect(`/casa/${polla.slug}`);
+  }
 
   const entrada = polla.entry_price_cop;
-  const alPozo = Math.floor((entrada * (100 - polla.house_cut_pct)) / 100);
+  if (pot.entry_prize_cop === undefined || pot.entry_house_cop === undefined || pot.projected_prize_cop === undefined) throw new Error("No se pudo leer el desglose de la entrada.");
+  const alPozo = pot.entry_prize_cop;
+
 
   return (
     <div className="pb-28">
-      <HeroFrame height="h-[168px]">
+      <HeroFrame height="min-h-[168px]">
         <Label>Entrar a</Label>
         <h1 className="lp-display mt-1 text-[30px]">{polla.name}</h1>
       </HeroFrame>
@@ -68,7 +77,7 @@ export default async function PagarPage({
               </div>
             </div>
           </div>
-          <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
+          {polla.prize_kind === "objeto" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary">El premio es <strong className="text-text-primary">{polla.prize_object}</strong>. La inscripción te permite participar por ese objeto. No hay reparto del pozo ni premio adicional en dinero.</p> : <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
             <div className="flex justify-between">
               <span className="text-text-secondary">
                 Va al pozo
@@ -80,16 +89,16 @@ export default async function PagarPage({
                 Costo del servicio
               </span>
               <span className="lp-money text-text-muted">
-                {formatCop(entrada - alPozo)}
+                {formatCop(pot.entry_house_cop)}
               </span>
             </div>
             <div className="flex justify-between border-t border-border-subtle pt-1.5">
               <span className="text-text-secondary">Pozo si entras</span>
               <span className="lp-money text-text-primary">
-                {formatCop(pot.prize_cop + alPozo)}
+                {formatCop(pot.projected_prize_cop)}
               </span>
             </div>
-          </div>
+          </div>}
         </StreetCard>
 
         {/* A DÓNDE se transfiere. Sin esto el flujo era imposible de
@@ -125,10 +134,11 @@ export default async function PagarPage({
           </div>
         )}
 
-        <PagarForm
+        <PagarForm resumeOnly={resumeOnly}
           slug={polla.slug}
           esRifa={polla.kind === "rifa"}
           ticketCount={polla.ticket_count}
+          initialTicket={boleta && /^\d+$/.test(boleta) && Number(boleta) <= (polla.ticket_count ?? 0) ? boleta : ""}
         />
 
         <p className="text-center text-[11px] leading-relaxed text-text-muted">

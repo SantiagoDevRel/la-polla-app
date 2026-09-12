@@ -42,7 +42,7 @@ const payload = {
 function request(body: unknown) {
   return new NextRequest("http://localhost/api/casa/admin/pollas", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Casa-Contract": "2" },
     body: JSON.stringify(body),
   });
 }
@@ -76,77 +76,29 @@ afterEach(() => {
 });
 
 describe("CASA creation across tournaments", () => {
-  it.each(["laliga_2025", "premier_2025"])("keeps every selected match and closes before the earliest, regardless of legacy tournament %s", async (tournament) => {
-    dbFetch.mockResolvedValueOnce(response([fixtures[2], fixtures[0], fixtures[1]]))
-      .mockResolvedValueOnce(response(null))
-      .mockResolvedValueOnce(response(savedPolla))
-      .mockResolvedValueOnce(response(null))
-      .mockResolvedValueOnce(response(null));
-
+  it.each(["laliga_2025", "premier_2025"])("passes all mixed-tournament fixtures unchanged to the atomic creator: %s", async (tournament) => {
+    dbFetch.mockResolvedValueOnce(response({ ok: true, ...savedPolla, publicada: true }));
     const result = await POST(request({ ...payload, tournament }));
-
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ ok: true, ...savedPolla, publicada: true });
-    expect(query(0).get("id")).toBe(`in.(${matchIds.join(",")})`);
-    expect(query(0).has("tournament")).toBe(false);
-    expect(written(2)).toMatchObject({
-      tournament,
-      closes_at: "2026-09-12T10:55:00.000Z",
-      close_mode: "auto",
-      status: "borrador",
-      created_by: userId,
-    });
-    expect(written(3)).toEqual(links);
-    expect(new URL(String(dbFetch.mock.calls[3][0])).pathname).toBe("/rest/v1/casa_polla_matches");
-    expect(dbFetch.mock.calls[3][1]?.method).toBe("POST");
-    expect(written(4)).toEqual({ status: "abierta" });
-    expect(query(4).get("id")).toBe(`eq.${pollaId}`);
-    expect(dbFetch.mock.calls[4][1]?.method).toBe("PATCH");
-    expect(dbFetch).toHaveBeenCalledTimes(5);
-  });
-
-  it("keeps mixed-league IDs while respecting an explicit manual close", async () => {
-    dbFetch.mockResolvedValueOnce(response(null))
-      .mockResolvedValueOnce(response(savedPolla))
-      .mockResolvedValueOnce(response(null));
-
-    const result = await POST(request({ ...payload, closeMode: "manual", publish: false }));
-
-    expect(result.status).toBe(200);
-    expect(written(1)).toMatchObject({ closes_at: payload.closesAt, close_mode: "manual", status: "borrador" });
-    expect(written(2)).toEqual(links);
-    expect(dbFetch.mock.calls.every(([url]) => new URL(String(url)).pathname !== "/rest/v1/matches")).toBe(true);
-    expect(dbFetch).toHaveBeenCalledTimes(3);
-  });
-
-  it("rejects automatic creation when an earlier match in the other league is already locked", async () => {
-    dbFetch.mockResolvedValueOnce(response([
-      fixtures[0],
-      { ...fixtures[1], scheduled_at: "2026-09-08T10:04:00.000Z" },
-      fixtures[2],
-    ]));
-
-    const result = await POST(request(payload));
-
-    expect(result.status).toBe(400);
-    expect((await result.json()).error).toContain("primer partido");
+    expect(written(0)).toMatchObject({ p_config: { matchIds, tournament, closeMode: "auto", closesAt: payload.closesAt }, p_actor_id: userId, p_contract: 2 });
+    expect(new URL(String(dbFetch.mock.calls[0][0])).pathname).toBe("/rest/v1/rpc/casa_create_polla_v2");
     expect(dbFetch).toHaveBeenCalledTimes(1);
-    expect(dbFetch.mock.calls[0][1]?.method).toBe("GET");
   });
-
-  it("does not publish a partial pool if associating the selected matches fails", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    dbFetch.mockResolvedValueOnce(response(fixtures))
-      .mockResolvedValueOnce(response(null))
-      .mockResolvedValueOnce(response(savedPolla))
-      .mockResolvedValueOnce(response({ code: "23503", message: "Missing fixture" }, 409));
-
-    const result = await POST(request(payload));
-
-    expect(result.status).toBe(500);
-    expect((await result.json()).error).toContain("borrador");
-    expect(written(2).status).toBe("borrador");
-    expect(written(3)).toEqual(links);
+  it("preserves manual closing and draft intent in the SQL transaction", async () => {
+    dbFetch.mockResolvedValueOnce(response({ ok: true, ...savedPolla, publicada: false }));
+    expect((await POST(request({ ...payload, closeMode: "manual", publish: false }))).status).toBe(200);
+    expect(written(0)).toMatchObject({ p_config: { closeMode: "manual", closesAt: payload.closesAt, publish: false, matchIds } });
+  });
+  it("propagates an elapsed closing time rejected by SQL", async () => {
+    dbFetch.mockResolvedValueOnce(response({ code: "22023", message: "INSCRIPTIONS_CLOSED" }, 400));
+    expect((await POST(request(payload))).status).toBe(409);
+    expect(dbFetch).toHaveBeenCalledTimes(1);
+  });
+  it("does not make separate writes after creation fails", async () => {
+    dbFetch.mockResolvedValueOnce(response({ code: "23503", message: "Missing fixture" }, 409));
+    expect((await POST(request(payload))).status).toBe(500);
+    expect(dbFetch).toHaveBeenCalledTimes(1);
     expect(dbFetch.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
   });
 

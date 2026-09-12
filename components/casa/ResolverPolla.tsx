@@ -15,6 +15,7 @@
 // guards (`resolved_at IS NULL` contra la doble resolución, rango de boletas
 // contra un número que no existe).
 
+import { CASA_HEADERS } from "@/lib/casa/contract";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
@@ -66,7 +67,7 @@ export function ResolverPolla({ id, kind }: { id: string; kind: string }) {
     try {
       const res = await fetch(`/api/casa/admin/pollas/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: CASA_HEADERS,
         body: JSON.stringify(body),
       });
       const json = await res.json();
@@ -77,12 +78,12 @@ export function ResolverPolla({ id, kind }: { id: string; kind: string }) {
       if (typeof json.faltan === "number") {
         setAviso(json.faltan > 0
           ? `Guardado. Faltan ${json.faltan} pregunta(s) por resolver.`
-          : "Guardado. Ya puedes repartir el pozo.");
+          : "Respuesta y puntajes guardados. Todas las preguntas están resueltas.");
       }
       if (typeof json.numero === "number") {
         setAviso(json.vendida
-          ? `Número ${json.numero} guardado. Esa boleta sí se vendió: ya puedes repartir.`
-          : `Número ${json.numero} guardado, pero NADIE compró esa boleta. Registra otro número o anuncia qué pasa con el pozo.`);
+          ? `Número ${json.numero} guardado. Esa boleta tiene el pago confirmado.`
+          : `Número ${json.numero} guardado. Esa boleta no está pagada; aplica el procedimiento anunciado para este caso.`);
       }
       await cargar();
       router.refresh();
@@ -101,7 +102,7 @@ export function ResolverPolla({ id, kind }: { id: string; kind: string }) {
       </div>
     );
   }
-  if (!datos) return null;
+  if (!datos || !["abierta", "cerrada"].includes(datos.polla.status)) return null;
 
   const pendientes = datos.preguntas.filter((q) => !q.resolved_at).length;
 

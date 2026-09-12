@@ -1767,3 +1767,13 @@ leer y devuelve solo nombres, destino, estado y torneos, con `private, no-store`
 Casa usa el mismo helper en el servidor; Perfil usa el endpoint. No se crean
 inscripciones de demostración: cero es un resultado real; un fallo tiene su
 propio estado con reintento. No se tocan pronósticos ni el modelo P2P histórico.
+
+
+### Casa v2: premios y comprobantes (implementación 2026-09-12)
+
+El contrato v2 separa pozo y objeto, conserva las boletas fallidas para su dueño,
+identifica cada comprobante en las aprobaciones y registra desempate/evidencia/entrega.
+Migraciones 097–102; activación explícita `legacy → paused → v2`. No activar ni
+revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
+[docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
+de 096 arriba no es el contrato de liquidación una vez activado v2.

@@ -49,6 +49,7 @@ export interface CasaPolla {
   points_result: number;
 
   status: CasaPollaStatus;
+  draw_pending?: boolean;
   opens_at: string;
   closes_at: string;
   /**
@@ -64,6 +65,7 @@ export interface CasaPolla {
 
   settled_at: string | null;
   settle_notes: string | null;
+  settlement_outcome?: "money_awarded" | "object_awarded" | "house_retained_zero_points" | null;
 
   /** A dónde transfiere la gente. Sin esto la polla no se puede pagar. */
   payout_method: string | null;
@@ -78,6 +80,9 @@ export interface CasaPot {
   gross_cop: number;
   prize_cop: number;
   house_cop: number;
+  entry_prize_cop?: number;
+  entry_house_cop?: number;
+  projected_prize_cop?: number;
 }
 
 /** Minimal personal-list payload: no payment accounts, proofs or user IDs. */
@@ -93,6 +98,7 @@ export interface CasaEntry {
   status: CasaEntryStatus;
   amount_cop: number;
   proof_path: string | null;
+  current_proof_attempt_id?: string | null;
   proof_uploaded_at: string | null;
   reviewed_at: string | null;
   reject_reason: string | null;
@@ -154,6 +160,10 @@ export interface CasaLeaderboardRow {
  * enteraba de que habia ganado.
  */
 export interface CasaPayout {
+  id?: string;
+  prize_kind?: CasaPrizeKind;
+  prize_object?: string | null;
+  delivered_at?: string | null;
   user_id: string;
   place: number;
   points: number | null;
@@ -174,20 +184,15 @@ export interface CasaDistribution {
    Regla dura del repo: nunca `select("*")` en tablas con datos de usuario.
    Enumerar evita que una columna sensible futura se filtre sola. */
 export const CASA_POLLA_COLUMNS =
-  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_kind, prize_object, prize_image_path, points_exact, points_one_team, points_result, status, opens_at, closes_at, close_mode, ticket_count, draw_method, drawn_number, settled_at, settle_notes, payout_method, payout_account, payout_account_name, created_by, created_at" as const;
+  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_kind, prize_object, prize_image_path, points_exact, points_one_team, points_result, status, opens_at, closes_at, close_mode, ticket_count, draw_method, drawn_number, settled_at, settle_notes, settlement_outcome, payout_method, payout_account, payout_account_name, created_by, created_at" as const;
 
 export const CASA_ENTRY_COLUMNS =
-  "id, polla_id, user_id, status, amount_cop, proof_path, proof_uploaded_at, reviewed_at, reject_reason, ticket_number, created_at" as const;
+  "id, polla_id, user_id, status, amount_cop, proof_path, current_proof_attempt_id, proof_uploaded_at, reviewed_at, reject_reason, ticket_number, created_at" as const;
 
 export const CASA_PICK_COLUMNS =
   "id, entry_id, polla_id, user_id, match_id, question_id, pick_1x2, home_score, away_score, option_id, free_text, points_earned" as const;
 
 /* ── Helpers de dominio ─────────────────────────────────────────────── */
-
-/** El pozo de una polla = lo recaudado menos lo que se queda la casa. */
-export function prizeFromGross(grossCop: number, houseCutPct: number): number {
-  return Math.floor((grossCop * (100 - houseCutPct)) / 100);
-}
 
 /** Se puede seguir entrando / cambiando pronosticos? */
 export function isPollaOpen(polla: Pick<CasaPolla, "status" | "closes_at">): boolean {
@@ -202,6 +207,7 @@ export function pollaStatusLabel(polla: CasaPolla): {
   if (polla.status === "resuelta") return { text: "Resuelta", tone: "mute" };
   if (polla.status === "anulada") return { text: "Anulada", tone: "red" };
   if (polla.status === "borrador") return { text: "Borrador", tone: "mute" };
+  if (polla.draw_pending) return { text: "Desempate pendiente", tone: "red" };
   if (polla.status === "cerrada") return { text: "Cerrada", tone: "red" };
   if (new Date(polla.closes_at) <= new Date())
     return { text: "Cerrando", tone: "red" };

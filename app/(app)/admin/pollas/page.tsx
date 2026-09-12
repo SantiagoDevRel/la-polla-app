@@ -3,7 +3,7 @@
 
 import { redirect } from "next/navigation";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
-import { getPots, listAllPollas } from "@/lib/casa/queries";
+import { getPots, getHouseTotal, listAllPollas } from "@/lib/casa/queries";
 import { pollaStatusLabel } from "@/lib/casa/types";
 import { CasaAdminPanel } from "@/components/casa/CasaAdminPanel";
 
@@ -16,7 +16,7 @@ export default async function CasaAdminPage() {
 
   const pollas = await listAllPollas();
   const pots = await getPots(pollas.map((polla) => polla.id));
-  const totalCasa = pollas.reduce((total, polla) => total + (pots[polla.id]?.house_cop ?? 0), 0);
+  const totalCasa = await getHouseTotal(pollas.map((polla) => polla.id));
 
   return (
     <CasaAdminPanel
@@ -27,6 +27,9 @@ export default async function CasaAdminPage() {
         // `kind` decide si el panel muestra los controles para resolver
         // preguntas (manual) o registrar el número sorteado (rifa).
         kind: polla.kind,
+        prize_kind: polla.prize_kind,
+        prize_object: polla.prize_object,
+        draw_pending: polla.draw_pending,
         status: polla.status,
         closes_at: polla.closes_at,
         label: pollaStatusLabel(polla),

@@ -9,6 +9,7 @@
 //   manual   → escribís vos las preguntas y sus opciones ("primer goleador").
 //   rifa     → cuántas boletas, cuánto vale, y cómo se sortea.
 
+import { CASA_HEADERS } from "@/lib/casa/contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
@@ -220,7 +221,7 @@ export function CrearPollaForm() {
     try {
       const res = await fetch("/api/admin/sync-ligas", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: CASA_HEADERS,
         body: JSON.stringify({ tournament }),
         signal: controller.signal,
       });
@@ -339,7 +340,7 @@ export function CrearPollaForm() {
 
       const res = await fetch("/api/casa/admin/pollas", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: CASA_HEADERS,
         body: JSON.stringify(body),
       });
       const json = await res.json();
@@ -361,7 +362,20 @@ export function CrearPollaForm() {
     }
   }
 
-  const alPozo = Math.floor((precio * (100 - houseCut)) / 100);
+  const [previewMoney, setPreviewMoney] = useState<{ entry_prize: number; entry_house: number; ten_prize: number; all_prize: number } | null>(null);
+  const [previewError, setPreviewError] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    setPreviewMoney(null); setPreviewError(false);
+    const timer = setTimeout(() => {
+      const query = new URLSearchParams({ price: String(precio), cut: String(houseCut), tickets: String(boletas), kind: prizeKind });
+      fetch(`/api/casa/admin/prize-preview?${query}`, { signal: controller.signal, cache: "no-store" })
+        .then(async (response) => { if (!response.ok) throw new Error(); return response.json(); }).then(setPreviewMoney)
+        .catch(() => { if (!controller.signal.aborted) setPreviewError(true); });
+    }, 300);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [precio, houseCut, boletas, prizeKind]);
+  const previewCop = (field: "entry_prize" | "entry_house" | "ten_prize" | "all_prize") => previewMoney ? formatCop(previewMoney[field]) : "—";
 
   return (
     <div className="space-y-5">
@@ -431,7 +445,8 @@ export function CrearPollaForm() {
                 type="number"
                 min={0}
                 max={100}
-                value={houseCut}
+                value={prizeKind === "objeto" ? 100 : houseCut}
+                disabled={prizeKind === "objeto"}
                 onChange={(e) => setHouseCut(Number(e.target.value))}
                 className="lp-input lp-money text-[18px]"
               />
@@ -442,8 +457,9 @@ export function CrearPollaForm() {
 
         {/* La cuenta, en vivo. Que Tama vea el reparto antes de publicar. */}
         <p className="border-t border-border-subtle pt-3 text-[12px] text-text-muted">
-          Por cada persona que entre: <b className="text-text-primary">{formatCop(alPozo)}</b> al
-          pozo y <b className="text-text-primary">{formatCop(precio - alPozo)}</b> a la casa.
+          {previewError && <span className="block text-red-alert">No se pudo consultar el cálculo. Revisa los valores antes de publicar.</span>}
+          {prizeKind === "objeto" ? <>La inscripción es para participar por el objeto anunciado. La casa recibe <b className="text-text-primary">{previewCop("entry_house")}</b> por persona y entrega el objeto; no se reparte dinero.</>
+            : <>Por cada persona que entre: <b className="text-text-primary">{previewCop("entry_prize")}</b> al pozo y <b className="text-text-primary">{previewCop("entry_house")}</b> a la casa.</>}
         </p>
 
         {/* Cuenta de cobro — sin esto la polla no se puede pagar. */}
@@ -598,14 +614,14 @@ export function CrearPollaForm() {
             <div className="mt-3 border border-border-subtle bg-bg-elevated p-3">
               <span className="lp-label block">Se lleva el ganador</span>
               <div className="lp-money mt-1 text-[26px] leading-none text-gold">
-                {formatCop(alPozo)}
+                {previewCop("entry_prize")}
                 <span className="lp-label ml-2 inline text-text-muted">
                   por cada inscrito
                 </span>
               </div>
               <p className="mt-2 text-[11px] leading-relaxed text-text-muted">
                 El {100 - houseCut}% de todo lo que entre. Con {precio > 0 ? "10" : "N"}{" "}
-                inscritos serían {formatCop(alPozo * 10)}.
+                inscritos serían {previewCop("ten_prize")}.
               </p>
             </div>
           ) : (
@@ -991,7 +1007,7 @@ export function CrearPollaForm() {
               className="lp-input lp-money mt-2 text-[18px]"
             />
             <p className="mt-2 text-[11px] text-text-muted">
-              Si se venden todas: <b className="text-text-primary">{formatCop(boletas * alPozo)}</b> de
+              Si se venden todas: <b className="text-text-primary">{previewCop("all_prize")}</b> de
               premio.
             </p>
           </div>

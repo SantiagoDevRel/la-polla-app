@@ -7,6 +7,7 @@
 // nunca se vinculó, o si Tama perdió el mensaje, esta lista es la que evita
 // que la gente quede esperando para siempre.
 
+import { CASA_HEADERS } from "@/lib/casa/contract";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, FileImage, RefreshCw } from "lucide-react";
@@ -14,6 +15,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { formatCop } from "@/lib/casa/format";
 
 interface Pendiente {
+  attemptId: string;
   id: string;
   jugador: string;
   polla: string;
@@ -109,14 +111,16 @@ export function ColaDePagos({ pollaId, onReviewed, refreshKey = 0 }: { pollaId?:
 
   async function decidir(id: string, decision: "aprobar" | "rechazar") {
     if (decisionRef.current) return;
+    const attemptId = pendientes?.find((p) => p.id === id)?.attemptId;
+    if (!attemptId) { setDecisionError("Actualiza la cola antes de revisar el comprobante."); return; }
     decisionRef.current = true;
     setResolviendo(id);
     setDecisionError(null);
     try {
       const r = await fetch("/api/casa/admin/entries", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entryId: id, decision }),
+        headers: CASA_HEADERS,
+        body: JSON.stringify({ attemptId, decision }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {

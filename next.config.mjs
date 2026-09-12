@@ -7,6 +7,12 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
+// Isolated integration tests use the local Supabase stack. This is never
+// enabled by NODE_ENV alone and cannot add arbitrary origins to production.
+const localStorageCsp = process.env.CASA_LOCAL_TEST === "1"
+  && process.env.NEXT_PUBLIC_SUPABASE_URL === "http://127.0.0.1:54321"
+  ? " http://127.0.0.1:54321" : "";
+
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
@@ -177,9 +183,9 @@ const nextConfig = {
               // i.ytimg.com: thumbnails de los highlights del Mundial (FIFA
               // YouTube) en /inicio. a.espncdn.com: fotos de jugadores/escudos
               // para futuras fichas de equipo. Todo hotlink, sin self-host.
-              "img-src 'self' data: blob: https://crests.football-data.org https://a.espncdn.com https://media.api-sports.io https://upload.wikimedia.org https://i.ytimg.com https://*.supabase.co",
+              "img-src 'self' data: blob: https://crests.football-data.org https://a.espncdn.com https://media.api-sports.io https://upload.wikimedia.org https://i.ytimg.com https://*.supabase.co" + localStorageCsp,
               // us.i.posthog.com recibe eventos; no se cargan scripts remotos.
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://us.i.posthog.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://us.i.posthog.com" + localStorageCsp,
               // www.youtube.com + youtube-nocookie: embed inline de highlights
               // del Mundial (canales de broadcasters que permiten embed).
               "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",

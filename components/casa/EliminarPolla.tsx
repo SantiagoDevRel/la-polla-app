@@ -1,5 +1,6 @@
 "use client";
 
+import { CASA_HEADERS } from "@/lib/casa/contract";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
@@ -22,7 +23,7 @@ export function EliminarPolla({ id, nombre, redirectTo }: {
     try {
       const response = await fetch(`/api/casa/admin/pollas/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: CASA_HEADERS,
         body: JSON.stringify({ action: "eliminar" }),
       });
       const data = await response.json().catch(() => ({}));

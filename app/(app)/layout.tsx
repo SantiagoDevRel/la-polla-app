@@ -67,13 +67,15 @@ async function contarPendientes(
 
   if (!entries || entries.length === 0) return 0;
 
-  const pollaIds = entries.map((e: { polla_id: string }) => e.polla_id);
+  const pollaIds = entries.map((e: { polla_id: string }) => e.polla_id).filter((id, index, all) => all.indexOf(id) === index);
 
   const { data: abiertas } = await admin
     .from("casa_pollas")
     .select("id")
     .in("id", pollaIds)
     .eq("status", "abierta")
+    .eq("kind", "partidos")
+    .is("archived_at", null)
     .gt("closes_at", new Date().toISOString());
 
   if (!abiertas || abiertas.length === 0) return 0;

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth/admin", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }));
 vi.mock("@/lib/telegram/notify", () => ({ signedProofUrl: mocks.signedProofUrl }));
+vi.mock("@/lib/casa/review-notify", () => ({ notifyCasaReview: vi.fn() }));
 vi.mock("@/lib/casa/queries", () => ({ getPot: vi.fn() }));
 
 import { GET } from "@/app/api/casa/admin/entries/route";
@@ -65,12 +66,35 @@ describe("GET /api/casa/admin/entries", () => {
     expect(await result.json()).toEqual({ counts: { [pollaId]: 502, [otraPolla]: 500 } });
     expect(result.headers.get("Cache-Control")).toBe("private, no-store");
     expect(dbFetch).toHaveBeenCalledTimes(2);
-    expect(calledUrl().searchParams.get("select")).toBe("id,polla_id,casa_pollas!inner(archived_at)");
+    expect(calledUrl().searchParams.get("select")).toBe("id,polla_id,casa_pollas!inner(archived_at,status)");
     expect(calledUrl().searchParams.get("casa_pollas.archived_at")).toBe("is.null");
     expect(calledUrl().searchParams.get("status")).toBe("eq.pendiente");
+    expect(calledUrl().searchParams.get("casa_pollas.status")).toBe("in.(abierta,cerrada)");
     expect(calledUrl().searchParams.get("proof_path")).toBe("not.is.null");
     expect(calledUrl().searchParams.get("order")).toBe("id.asc");
     expect(calledUrl(1).searchParams.get("id")).toBe(`gt.${rows[999].id}`);
+    expect(mocks.signedProofUrl).not.toHaveBeenCalled();
+  });
+
+  it.each(["POLLA_FINAL", "PROOF_NOT_UPLOADED"])("una fila legacy que cambia no tumba toda la cola: %s", async (message) => {
+    dbFetch.mockResolvedValueOnce(response([{ id: userId, polla_id: pollaId, user_id: userId, current_proof_attempt_id: null, proof_path: "old.webp" }]))
+      .mockResolvedValueOnce(response([{ id: userId, display_name: "Persona" }]))
+      .mockResolvedValueOnce(response([{ id: pollaId, name: "Polla", slug: "polla" }]))
+      .mockResolvedValueOnce(response({ code: "55000", message }, 409));
+    const result = await GET(request({ pollaId }));
+    expect(result.status).toBe(200);
+    expect((await result.json()).pendientes).toEqual([]);
+    expect(mocks.signedProofUrl).not.toHaveBeenCalled();
+  });
+
+  it("la adaptación legacy durante una pausa devuelve un conflicto explícito", async () => {
+    dbFetch.mockResolvedValueOnce(response([{ id: userId, polla_id: pollaId, user_id: userId, current_proof_attempt_id: null, proof_path: "old.webp" }]))
+      .mockResolvedValueOnce(response([{ id: userId, display_name: "Persona" }]))
+      .mockResolvedValueOnce(response([{ id: pollaId, name: "Polla", slug: "polla" }]))
+      .mockResolvedValueOnce(response({ code: "55000", message: "OPERATIONS_PAUSED" }, 409));
+    const result = await GET(request({ pollaId }));
+    expect(result.status).toBe(409);
+    expect((await result.json()).code).toBe("OPERATIONS_PAUSED");
     expect(mocks.signedProofUrl).not.toHaveBeenCalled();
   });
 
@@ -87,6 +111,7 @@ describe("GET /api/casa/admin/entries", () => {
       id: `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
       polla_id: pollaId,
       user_id: userId,
+      current_proof_attempt_id: userId,
       amount_cop: 1000,
       ticket_number: null,
       proof_path: `fixtures/${index}.webp`,
@@ -114,14 +139,14 @@ describe("GET /api/casa/admin/entries", () => {
 
   it.each(["summary", "queue"])("excluye los pagos de pollas archivadas de %s", async (mode) => {
     const entries = [
-      { id: userId, polla_id: pollaId, user_id: userId, proof_path: "visible.webp", casa_pollas: { archived_at: null } },
-      { id: otraPolla, polla_id: otraPolla, user_id: userId, proof_path: "archived.webp", casa_pollas: { archived_at: "2026-09-08T00:00:00Z" } },
+      { id: userId, polla_id: pollaId, user_id: userId, current_proof_attempt_id: userId, proof_path: "visible.webp", casa_pollas: { archived_at: null } },
+      { id: otraPolla, polla_id: otraPolla, user_id: userId, current_proof_attempt_id: userId, proof_path: "archived.webp", casa_pollas: { archived_at: "2026-09-08T00:00:00Z" } },
     ];
     dbFetch.mockImplementation(async (input) => {
       const url = new URL(String(input));
       if (url.pathname.endsWith("/users")) return response([{ id: userId, display_name: "Persona" }]);
       if (url.pathname.endsWith("/casa_pollas")) return response([{ id: pollaId, name: "Visible", slug: "visible" }]);
-      const excludesArchived = url.searchParams.get("select")?.includes("casa_pollas!inner(archived_at)")
+      const excludesArchived = url.searchParams.get("select")?.includes("casa_pollas!inner(archived_at,status)")
         && url.searchParams.get("casa_pollas.archived_at") === "is.null";
       return response(excludesArchived ? entries.filter((entry) => entry.casa_pollas.archived_at === null) : entries);
     });
@@ -139,7 +164,7 @@ describe("GET /api/casa/admin/entries", () => {
   it.each([0, 24])("no omite el pago 26 si otro administrador resuelve la fila %i entre paginas", async (reviewedIndex) => {
     const allEntries = Array.from({ length: 26 }, (_, index) => ({
       id: `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
-      polla_id: pollaId, user_id: userId, amount_cop: 1000, ticket_number: null,
+      polla_id: pollaId, user_id: userId, current_proof_attempt_id: userId, amount_cop: 1000, ticket_number: null,
       proof_path: `fixtures/${index}.webp`, proof_uploaded_at: "2026-09-08T00:00:00.000Z",
     }));
     let pendingEntries = allEntries;
