@@ -9,7 +9,10 @@ import { NextRequest } from "next/server";
 import type { BackupRunRow } from "@/lib/backup/freshness";
 
 type Filters = Record<string, string>;
-type Resolver = (filters: Filters) => { data: BackupRunRow | null; error: { code?: string } | null };
+type Resolver = (
+  filters: Filters,
+  order?: string,
+) => { data: BackupRunRow | null; error: { code?: string } | null };
 
 const mocks = vi.hoisted(() => ({
   send: vi.fn(),
@@ -54,7 +57,7 @@ function fakeAdmin() {
         limit() {
           return builder;
         },
-        maybeSingle: async () => mocks.resolver.current(call.filters),
+        maybeSingle: async () => mocks.resolver.current(call.filters, call.order),
       };
       return builder;
     },
@@ -91,12 +94,15 @@ function run(overrides: Partial<BackupRunRow> & Pick<BackupRunRow, "kind" | "sta
 
 const hoursAgo = (h: number) => new Date(NOW.getTime() - h * 3_600_000).toISOString();
 
-/** Tabla en memoria: la última fila por (kind, status) y la última por kind. */
+/** Tabla en memoria: primera fila por (kind, status) o por kind, según el orden pedido. */
 function table(rows: BackupRunRow[]): Resolver {
-  return (filters) => {
+  return (filters, order) => {
+    const ascending = order === "finished_at:asc";
     const match = rows
       .filter((r) => r.kind === filters.kind && (!filters.status || r.status === filters.status))
-      .sort((a, b) => b.finished_at.localeCompare(a.finished_at));
+      .sort((a, b) =>
+        ascending ? a.finished_at.localeCompare(b.finished_at) : b.finished_at.localeCompare(a.finished_at),
+      );
     return { data: match[0] ?? null, error: null };
   };
 }
@@ -238,6 +244,77 @@ describe("POST /api/cron/backup-freshness", () => {
     expect(email.text).toContain("el runner no está escribiendo en backup_runs");
   });
 
+  // Activación: el primer backup ya existe, pero el timer de verificación
+  // (03:40) todavía no ha corrido. No debe salir un correo por hora hasta la
+  // madrugada siguiente.
+  it("recién activado: primer backup bueno y ninguna verificación aún → no manda correo", async () => {
+    mocks.resolver.current = table([run({ kind: "backup", status: "ok", finished_at: hoursAgo(1) })]);
+
+    const response = await POST(cronRequest(`Bearer ${SECRET}`));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      stale: false,
+      age_hours: 1,
+      verify_stale: false,
+      verify_age_hours: null,
+      sent: false,
+    });
+    expect(mocks.send).not.toHaveBeenCalled();
+    // El margen se mide desde el PRIMER backup bueno, no desde el último.
+    expect(mocks.calls.map((c) => ({ filters: c.filters, order: c.order }))).toContainEqual({
+      filters: { kind: "backup", status: "ok" },
+      order: "finished_at:asc",
+    });
+  });
+
+  it("el margen es desde el primer backup: si nunca corre la verificación, a las 30 h avisa", async () => {
+    mocks.resolver.current = table([
+      run({ kind: "backup", status: "ok", finished_at: hoursAgo(31) }),
+      run({ kind: "backup", status: "ok", finished_at: hoursAgo(1) }),
+    ]);
+
+    const response = await POST(cronRequest(`Bearer ${SECRET}`));
+
+    expect(await response.json()).toMatchObject({
+      stale: false,
+      verify_stale: true,
+      verify_age_hours: null,
+      sent: true,
+    });
+    expect(mocks.send.mock.calls[0][0].text).toContain("Verificación de snapshots (una vez al día): ATRASADO");
+  });
+
+  it("una verificación fallida no tiene margen: avisa aunque el primer backup sea reciente", async () => {
+    mocks.resolver.current = table([
+      run({ kind: "backup", status: "ok", finished_at: hoursAgo(2) }),
+      run({
+        kind: "verify",
+        status: "failed",
+        finished_at: hoursAgo(1),
+        error: "sha256 no coincide en 2026-09-13-17-10.tar.zst.gpg",
+      }),
+    ]);
+
+    const response = await POST(cronRequest(`Bearer ${SECRET}`));
+
+    expect(await response.json()).toMatchObject({ stale: false, verify_stale: true, sent: true });
+    expect(mocks.send.mock.calls[0][0].text).toContain("sha256 no coincide");
+  });
+
+  it("backup atrasado con la primera verificación pendiente: el correo no culpa al registro", async () => {
+    mocks.resolver.current = table([run({ kind: "backup", status: "ok", finished_at: hoursAgo(9) })]);
+
+    const response = await POST(cronRequest(`Bearer ${SECRET}`));
+
+    expect(await response.json()).toMatchObject({ stale: true, verify_stale: false, sent: true });
+    const { text } = mocks.send.mock.calls[0][0];
+    expect(text).toContain("Verificación de snapshots (una vez al día): pendiente");
+    expect(text).toContain("Todavía no corre la primera verificación");
+    expect(text.match(/el runner no está escribiendo en backup_runs/g)).toBeNull();
+  });
+
   it("respeta BACKUP_MAX_AGE_HOURS", async () => {
     process.env.BACKUP_MAX_AGE_HOURS = "12";
     mocks.resolver.current = table([
@@ -326,6 +403,25 @@ describe("lib/backup/freshness", () => {
     expect(evaluateFreshness(row, row, 7, NOW).stale).toBe(false);
     const older = run({ kind: "backup", status: "ok", finished_at: hoursAgo(7.2) });
     expect(evaluateFreshness(older, older, 7, NOW).stale).toBe(true);
+  });
+
+  it("margen de la primera verificación: solo sin filas del tipo y hasta el límite inclusive", () => {
+    const first = hoursAgo(30);
+    const fresh = evaluateFreshness(null, null, 30, NOW, { graceSince: first });
+    expect(fresh).toMatchObject({ pending: true, stale: false, ageHours: null });
+    expect(evaluateFreshness(null, null, 30, NOW, { graceSince: hoursAgo(30.2) })).toMatchObject({
+      pending: false,
+      stale: true,
+    });
+    // Sin fecha de referencia no hay margen.
+    expect(evaluateFreshness(null, null, 30, NOW)).toMatchObject({ pending: false, stale: true });
+    expect(evaluateFreshness(null, null, 30, NOW, { graceSince: null })).toMatchObject({ pending: false, stale: true });
+    // Un intento fallido ya es una verificación: se reporta, sin margen.
+    const failed = run({ kind: "verify", status: "failed", finished_at: hoursAgo(1) });
+    expect(evaluateFreshness(null, failed, 30, NOW, { graceSince: hoursAgo(2) })).toMatchObject({
+      pending: false,
+      stale: true,
+    });
   });
 
   it("el correo no trae emojis ni voseo", () => {

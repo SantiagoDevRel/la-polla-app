@@ -429,8 +429,14 @@ falta de filas ES la alerta. Se repite cada hora mientras siga atrasado.
   `bash ops/backup/test-record-run.sh` (con `RECORD_RUN_TEST_*` también
   inserta contra un Supabase local; rechaza URLs que no sean 127.0.0.1).
 - Orden al activar: migración 117 en prod → runner del DGX actualizado al
-  commit con `record-run.mjs` → recién ahí el workflow (si no, correo cada hora
-  por "sin filas"). Un 500 `backup_runs query failed` = migración sin aplicar.
+  commit con `record-run.mjs` → corrida manual de `la-polla-backup.service` Y
+  de `la-polla-backup-verify.service` → confirmar filas `backup|ok` y
+  `verify|ok` → recién ahí el workflow (si no, correo cada hora por "sin
+  filas"). Un 500 `backup_runs query failed` = migración sin aplicar.
+- Primera verificación: sin ninguna fila `kind=verify` y con el PRIMER backup
+  bueno de 30 h o menos, la verificación queda «pendiente» y no alerta. El
+  margen se mide desde el primer backup (no el último), así una verificación
+  que nunca arranca termina avisando; una fallida no tiene margen.
 
 ---
 

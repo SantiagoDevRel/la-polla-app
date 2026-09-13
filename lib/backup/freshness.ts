@@ -58,6 +58,23 @@ export interface FreshnessCheck {
   maxAgeHours: number;
   ageHours: number | null;
   stale: boolean;
+  /**
+   * Todavía no hay ninguna corrida de ese tipo, pero el margen desde
+   * `graceSince` no se ha vencido: no es atraso, es la primera que falta.
+   */
+  pending: boolean;
+}
+
+export interface FreshnessOptions {
+  /**
+   * Para la verificación: `finished_at` del PRIMER backup bueno. Mientras no
+   * exista ninguna fila de ese tipo (ni buena ni fallida) y no hayan pasado
+   * `maxAgeHours` desde esa fecha, no se considera atrasado. Sin esto, el día
+   * de la activación salía un correo por hora hasta que corría el timer de
+   * las 03:40. Se mide desde el primer backup y no desde el último, para que
+   * una verificación que nunca arranca termine avisando.
+   */
+  graceSince?: string | null;
 }
 
 export function evaluateFreshness(
@@ -65,14 +82,18 @@ export function evaluateFreshness(
   lastAttempt: BackupRunRow | null,
   maxAgeHours: number,
   now: Date,
+  options: FreshnessOptions = {},
 ): FreshnessCheck {
   const age = ageHours(lastOk?.finished_at, now);
+  const graceAge = ageHours(options.graceSince, now);
+  const pending = !lastAttempt && graceAge !== null && graceAge <= maxAgeHours;
   return {
     lastOk,
     lastAttempt,
     maxAgeHours,
     ageHours: age,
-    stale: age === null || age > maxAgeHours,
+    stale: !pending && (age === null || age > maxAgeHours),
+    pending,
   };
 }
 
@@ -85,6 +106,12 @@ function hours(n: number): string {
 }
 
 function section(title: string, check: FreshnessCheck): string[] {
+  if (check.pending) {
+    return [
+      `${title}: pendiente`,
+      `  Todavía no corre la primera verificación; se espera dentro de las ${hours(check.maxAgeHours)} siguientes al primer backup bueno.`,
+    ];
+  }
   const lines = [`${title}: ${check.stale ? "ATRASADO" : "al día"}`];
   if (check.lastOk && check.ageHours !== null) {
     const snapshot = check.lastOk.snapshot_name ? ` · ${check.lastOk.snapshot_name}` : "";

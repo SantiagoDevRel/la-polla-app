@@ -12,7 +12,9 @@
 // Reglas:
 //   · backup  (kind=backup, status=ok): más de BACKUP_MAX_AGE_HOURS (7) → atrasado
 //   · verify  (kind=verify, status=ok): más de BACKUP_VERIFY_MAX_AGE_HOURS (30) → atrasado
-//   · sin filas buenas → atrasado
+//   · sin filas buenas → atrasado, salvo la primera verificación: si todavía no
+//     hay ninguna fila kind=verify y el PRIMER backup bueno tiene 30 h o menos,
+//     queda "pendiente" (el timer corre a las 03:40, no al activar el runner).
 // Si alguna está atrasada, un correo a ADMIN_ALERT_EMAIL (o FEEDBACK_NOTIFY_EMAIL)
 // con asunto "Backup de La Polla atrasado". Resend rechaza → 502, así el
 // workflow falla en vez de confirmar un aviso que no salió.
@@ -41,11 +43,11 @@ const NO_STORE = { "Cache-Control": "no-store" };
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
-async function latestRun(admin: AdminClient, kind: BackupRunKind, onlyOk: boolean) {
+async function latestRun(admin: AdminClient, kind: BackupRunKind, onlyOk: boolean, oldest = false) {
   let query = admin.from("backup_runs").select(BACKUP_RUN_COLUMNS).eq("kind", kind);
   if (onlyOk) query = query.eq("status", "ok");
   const { data, error } = await query
-    .order("finished_at", { ascending: false })
+    .order("finished_at", { ascending: oldest })
     .limit(1)
     .maybeSingle();
   return { row: (data as BackupRunRow | null) ?? null, error };
@@ -75,7 +77,13 @@ export async function POST(request: NextRequest) {
     latestRun(admin, "verify", true),
     latestRun(admin, "verify", false),
   ]);
-  const queryError = [backupOk, backupLast, verifyOk, verifyLast].find((r) => r.error)?.error;
+  // Solo si nunca ha corrido una verificación: el primer backup bueno fija el
+  // margen de la primera (el timer de verify es a las 03:40, no al activar).
+  const firstBackupOk =
+    verifyLast.row === null && !verifyLast.error && backupOk.row
+      ? await latestRun(admin, "backup", true, true)
+      : { row: null, error: null };
+  const queryError = [backupOk, backupLast, verifyOk, verifyLast, firstBackupOk].find((r) => r.error)?.error;
   if (queryError) {
     // Sin detalle en el body (log público). Típico: la migración 117 no está aplicada.
     console.error("[cron/backup-freshness] no pude leer backup_runs:", queryError.code ?? "sin código");
@@ -84,7 +92,9 @@ export async function POST(request: NextRequest) {
 
   const now = new Date();
   const backup = evaluateFreshness(backupOk.row, backupLast.row, backupMax, now);
-  const verify = evaluateFreshness(verifyOk.row, verifyLast.row, verifyMax, now);
+  const verify = evaluateFreshness(verifyOk.row, verifyLast.row, verifyMax, now, {
+    graceSince: firstBackupOk.row?.finished_at ?? null,
+  });
   const summary = {
     ok: true as const,
     stale: backup.stale,

@@ -163,6 +163,13 @@ Umbrales: el backup corre cada 6 h, así que 7 h deja una hora de margen; un
 backup **degradado** (código 4) o con poco disco (código 3) se registra como
 `failed` y, si persiste, también dispara la alerta.
 
+Primera verificación: mientras no exista **ninguna** fila `kind=verify` (ni
+buena ni fallida) y el **primer** backup bueno tenga 30 h o menos, la
+verificación queda «pendiente» y no dispara el correo (el timer corre a las
+03:40, no cuando se activa el runner). El margen se cuenta desde el primer
+backup y no desde el último: si la verificación nunca arranca, a las 30 h
+avisa. Una verificación fallida no tiene margen.
+
 Probar sin tocar producción:
 
 ```bash
@@ -173,10 +180,25 @@ RECORD_RUN_TEST_SERVICE_KEY=<service key local> RECORD_RUN_TEST_ANON_KEY=<anon k
 RECORD_RUN_DRY=1 node ops/backup/record-run.mjs --kind=backup --exit-code=0   # imprime el JSON, no envía
 ```
 
-Orden para activarla: migración 117 en producción → runner del DGX en el commit
-que trae `record-run.mjs` (y una corrida manual para que exista la primera
-fila) → merge del workflow. Al revés, el correo llega cada hora por "no hay
-filas".
+Orden para activarla:
+
+1. Migración 117 en producción.
+2. Runner del DGX en el commit que trae `record-run.mjs`.
+3. Corridas manuales de los dos tipos, en este orden:
+   ```bash
+   systemctl --user start la-polla-backup.service
+   systemctl --user start la-polla-backup-verify.service
+   ```
+4. Confirmar que hay una fila buena de cada tipo antes de mergear:
+   ```sql
+   SELECT kind, status, max(finished_at) FROM public.backup_runs GROUP BY 1, 2;
+   ```
+   Deben aparecer `backup | ok` y `verify | ok`.
+5. Merge del workflow.
+
+Al revés, el correo llega cada hora por "no hay filas". Si solo existe el
+backup, la ruta espera la primera verificación hasta 30 h (ver arriba), pero
+correr las dos a mano deja la alerta probada de punta a punta desde el inicio.
 
 ### Actualizar el runner
 

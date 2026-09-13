@@ -556,7 +556,9 @@ Después de un deploy nuevo:
   backup del DGX) y le escribe a `ADMIN_ALERT_EMAIL` (o `FEEDBACK_NOTIFY_EMAIL`)
   «Backup de La Polla atrasado» si el último backup bueno pasa de
   `BACKUP_MAX_AGE_HOURS` (7) o la última verificación de
-  `BACKUP_VERIFY_MAX_AGE_HOURS` (30). Responde `{ok, stale, age_hours,
+  `BACKUP_VERIFY_MAX_AGE_HOURS` (30). La primera verificación tiene margen:
+  sin filas `kind=verify` y con el primer backup bueno de 30 h o menos, no
+  alerta. Responde `{ok, stale, age_hours,
   verify_stale, verify_age_hours, sent}`; 502 si Resend falla, 500 si la tabla
   no existe. Detalle: `ops/backup/README.md`.
 
