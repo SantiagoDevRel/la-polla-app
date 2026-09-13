@@ -543,6 +543,34 @@ Después de un deploy nuevo:
 3. Confirmá que el webhook de Meta apunta a `https://lapollacolombiana.com/api/whatsapp/webhook`
 4. Confirmá Site URL de Supabase → Auth en `lapollacolombiana.com`
 
+### Crons de GitHub Actions (`/api/cron/*`)
+
+| Workflow | Ruta | Horario |
+|---|---|---|
+| `match-reminders.yml` | `/api/cron/match-reminders` | diario 13:00 UTC |
+| `admin-discrepancies-email.yml` | `/api/cron/admin-discrepancies-email` | diario 13:00 UTC |
+| `cleanup-payout-proofs.yml` | `/api/cron/cleanup-payout-proofs` | **solo manual** (pendiente de aprobación del dueño) |
+
+- El middleware exime `/api/cron/` (con barra final) del gate de sesión; cada
+  handler se protege solo con `requireCronSecret(request)`
+  (`lib/auth/cron-secret.ts`): `Authorization: Bearer $CRON_SECRET`, comparación
+  en tiempo constante, 403 si no coincide y 500 si falta la variable. Ruta nueva
+  bajo `app/api/cron/` sin esa llamada = test rojo (`tests/cron-auth.test.ts`).
+- El `CRON_SECRET` del repo en GitHub debe ser igual al de Vercel. Un 403 en el
+  workflow significa que no coinciden.
+- Los workflows fallan ante cualquier status que no sea 2xx o sin `"ok": true`,
+  con `--max-time 90` y sin reintentos, e imprimen solo contadores.
+- `admin-discrepancies-email` responde **502** `{error:"email send failed"}` si
+  Resend rechaza el envío (key revocada, sin cuota, dominio sin verificar):
+  el SDK no lanza excepción, así que el handler revisa el `error` devuelto.
+  El detalle del proveedor queda solo en el log de Vercel
+  (`tests/cron-admin-discrepancies-email.test.ts`).
+- Verificación después de un deploy: `curl -X POST https://lapollacolombiana.com/api/cron/match-reminders`
+  sin header debe dar **403** (nunca 307), y `gh workflow run match-reminders.yml`
+  debe terminar en verde.
+- Limpiar comprobantes a mano: `gh workflow run cleanup-payout-proofs.yml -f confirm=BORRAR`.
+  Borra de forma irreversible; confirma antes que el backup los tenga.
+
 ---
 
 ## Tags de seguridad / rollback
