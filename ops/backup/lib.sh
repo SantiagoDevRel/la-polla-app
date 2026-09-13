@@ -40,10 +40,33 @@ json_str() {
   printf '"%s"' "$s"
 }
 
-# write_status <archivo> <exit_code> <started_at> <phase> <snapshot> <reason>
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# record_run --kind=… --exit-code=… [--started-at=… --snapshot=… --bytes=… --tables=…
+#            --rows=… --auth-users=… --storage-objects=… --runner-commit=… --error=…]
+# Inserta la corrida en public.backup_runs (record-run.mjs, migración 117) para
+# que /api/cron/backup-freshness pueda avisar si el backup se atrasa.
+# Usar SIEMPRE la forma --opción=valor. Imprime una palabra (ok, dry_run,
+# skipped_*, failed_*) y devuelve 0 siempre: registrar nunca cambia el código
+# de salida del backup. Tope de 40 s aunque la red se cuelgue.
+record_run() {
+  local out=""
+  if ! command -v node >/dev/null 2>&1; then printf 'skipped_no_node'; return 0; fi
+  if command -v timeout >/dev/null 2>&1; then
+    out="$(timeout 40 node "$LIB_DIR/record-run.mjs" "$@" </dev/null)" || true
+  else
+    out="$(node "$LIB_DIR/record-run.mjs" "$@" </dev/null)" || true
+  fi
+  out="${out//[^a-zA-Z0-9_]/}"
+  printf '%s' "${out:-failed_timeout}"
+  return 0
+}
+
+# write_status <archivo> <exit_code> <started_at> <phase> <snapshot> <reason> [run_recorded]
 # Estado sin datos personales, para que otra máquina (el PC) pueda alertar.
+# run_recorded = resultado de record_run (si el insert en backup_runs falló, queda aquí).
 write_status() {
-  local file="$1" code="$2" started="$3" phase="$4" snap="$5" reason="$6" tmp free
+  local file="$1" code="$2" started="$3" phase="$4" snap="$5" reason="$6" recorded="${7:-}" tmp free
   mkdir -p "$(dirname "$file")" || return 1
   tmp="$file.tmp.$$"
   free="$(df -PBG "$(dirname "$file")" 2>/dev/null | awk 'NR==2{gsub(/G/,"",$4); print $4}')"
@@ -57,6 +80,7 @@ write_status() {
     printf '"snapshot":%s,' "$(json_str "$snap")"
     printf '"reason":%s,' "$(json_str "$reason")"
     printf '"host":%s,' "$(json_str "$(hostname)")"
+    printf '"run_recorded":%s,' "$(json_str "$recorded")"
     printf '"free_gb":%s' "${free:-null}"
     printf '}\n'
   } >"$tmp" && mv -f -- "$tmp" "$file"

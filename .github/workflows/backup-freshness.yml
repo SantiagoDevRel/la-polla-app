@@ -1,0 +1,62 @@
+# Alerta de backup atrasado (dead man's switch del backup del DGX).
+#
+# POST a /api/cron/backup-freshness cada hora, al minuto 17. La ruta lee
+# public.backup_runs (lo llena ops/backup en el DGX) y le escribe al admin si
+# no hay un backup bueno en 7 h o una verificación buena en 30 h. Como corre en
+# GitHub y no en el DGX, avisa aunque el DGX y el PC estén apagados.
+#
+# El paso falla si: la respuesta no es 2xx (un 307 a /login también es fallo),
+# el body no trae "ok": true, o curl pasa de 90 s. En el log (público) solo se
+# imprimen stale/age_hours, nunca el body. Sin --retry: el correo no es
+# idempotente y la próxima hora vuelve a revisar.
+
+name: Backup Freshness Hourly
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: cron-backup-freshness
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST a la API de frescura del backup
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${APP_URL:=https://lapollacolombiana.com}"
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET no está configurado en los secrets del repo"
+            exit 1
+          fi
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+          status="$(curl -sS --max-time 90 -o "$body_file" -w '%{http_code}' -X POST \
+            "$APP_URL/api/cron/backup-freshness" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")"
+          echo "HTTP status: $status"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            error_code="$(jq -r '.error // empty | tostring | .[0:80]' "$body_file" 2>/dev/null || true)"
+            echo "::error::El cron respondió HTTP $status (se esperaba 2xx) ${error_code:+error=$error_code}"
+            exit 1
+          fi
+          if ! jq -e '.ok == true' "$body_file" > /dev/null 2>&1; then
+            echo "::error::La respuesta no trae \"ok\": true"
+            exit 1
+          fi
+          jq -c '{stale, age_hours, verify_stale, verify_age_hours, sent}' "$body_file"
+          if jq -e '.stale == true or .verify_stale == true' "$body_file" > /dev/null 2>&1; then
+            echo "::warning::Backup atrasado: se envió el correo al admin"
+          fi

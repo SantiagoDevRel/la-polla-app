@@ -6,9 +6,12 @@
 #   tar | zstd -19 | gpg --encrypt      → snapshots/<stamp>.tar.zst.gpg
 #   sha256 + conteos                    → snapshots/index.tsv
 #   poda GFS                            → solo snapshots que este job creó
+#   bitácora (record-run.mjs)           → public.backup_runs, en el trap, bien o mal
 #
 # Sale con código ≠ 0 ante cualquier fallo, así el timer queda "failed" y se
-# ve en `systemctl --user --failed` y en status/backup-last.json.
+# ve en `systemctl --user --failed` y en status/backup-last.json. La fila de
+# backup_runs alimenta /api/cron/backup-freshness, que avisa por correo si no
+# hay un backup bueno en 7 h (aunque el DGX esté apagado).
 #
 # Configuración (nada de esto vive en el repo, que es público):
 #   ~/.config/la-polla-backup/env   chmod 600, dueño = este usuario
@@ -55,7 +58,21 @@ on_exit() {
     rm -f -- "$TMP_OUT"
   fi
   if [[ $code -ne 0 && -z "$EXIT_REASON" ]]; then EXIT_REASON="falló en la fase: $PHASE"; fi
-  write_status "$STATUS_DIR/backup-last.json" "$code" "$STARTED_AT" "$PHASE" "$SNAPSHOT_NAME" "$EXIT_REASON" || true
+  # Bitácora en Supabase (public.backup_runs) para la alerta de backup atrasado.
+  # Solo conteos y el motivo que arma este script; si falla, queda en el JSON
+  # de estado y el código de salida no cambia.
+  local recorded err_text=""
+  if [[ $code -ne 0 ]]; then err_text="fase $PHASE: $EXIT_REASON"; fi
+  recorded="$(record_run --kind=backup --exit-code="$code" --started-at="$STARTED_AT" \
+    --snapshot="$SNAPSHOT_NAME" --bytes="${SNAP_BYTES:-}" --tables="${N_TABLES:-}" --rows="${N_ROWS:-}" \
+    --auth-users="${N_USERS:-}" --storage-objects="${N_FILES:-}" --runner-commit="${RUNNER_COMMIT:-unknown}" \
+    --error="$err_text")" || recorded="failed_runner"
+  if [[ "$recorded" == "ok" || "$recorded" == "dry_run" ]]; then
+    log "backup_runs: $recorded"
+  else
+    log_warn "no se registró la corrida en backup_runs: $recorded"
+  fi
+  write_status "$STATUS_DIR/backup-last.json" "$code" "$STARTED_AT" "$PHASE" "$SNAPSHOT_NAME" "$EXIT_REASON" "$recorded" || true
   if [[ $code -ne 0 ]]; then
     log_err "BACKUP FALLÓ (código $code): $EXIT_REASON"
   else

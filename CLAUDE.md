@@ -405,6 +405,33 @@ verificada byte a byte en el DGX (`~/apps/la-polla-backup/`).
 Guía completa (incluye cómo reabrir en un proyecto nuevo):
 `docs/backup-restore.md`.
 
+### Backup automático en el DGX + alerta de backup atrasado (2026-09-13)
+
+`ops/backup/` corre export + verify cada 6 h en el DGX (systemd de usuario),
+cifra con gpg (la llave privada NO vive en el DGX) y poda con GFS. Detalle y
+operación: `ops/backup/README.md`.
+
+**La alerta no depende del DGX.** Al terminar, bien o mal, `run-backup.sh` y
+`verify-snapshots.sh` insertan una fila en `public.backup_runs` (migración 117,
+`ops/backup/record-run.mjs`, solo conteos y el motivo del fallo, sin PII). El
+workflow `backup-freshness.yml` llama cada hora a `/api/cron/backup-freshness`,
+que le escribe al admin (`ADMIN_ALERT_EMAIL`, o `FEEDBACK_NOTIFY_EMAIL`) con asunto
+«Backup de La Polla atrasado» si el último backup bueno pasa de 7 h
+(`BACKUP_MAX_AGE_HOURS`) o la última verificación buena de 30 h
+(`BACKUP_VERIFY_MAX_AGE_HOURS`), o si no hay filas. Si el DGX se apaga, la
+falta de filas ES la alerta. Se repite cada hora mientras siga atrasado.
+
+- `backup_runs`: RLS + deny-all para anon/authenticated; `service_role` solo
+  `SELECT, INSERT` (nadie edita ni borra la bitácora). Regresión:
+  `scripts/backup-runs-check.sql` (Supabase local).
+- Registrar nunca cambia el código de salida del backup; si el insert falla
+  queda en `status/*.json` como `run_recorded`. Prueba:
+  `bash ops/backup/test-record-run.sh` (con `RECORD_RUN_TEST_*` también
+  inserta contra un Supabase local; rechaza URLs que no sean 127.0.0.1).
+- Orden al activar: migración 117 en prod → runner del DGX actualizado al
+  commit con `record-run.mjs` → recién ahí el workflow (si no, correo cada hora
+  por "sin filas"). Un 500 `backup_runs query failed` = migración sin aplicar.
+
 ---
 
 ## NUNCA dejes ideas a medio camino

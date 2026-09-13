@@ -13,6 +13,12 @@ DGX (systemd --user, cada 6 h)
   sha256 + conteos ──► snapshots/index.tsv
   poda GFS         ──► solo snapshots listados en index.tsv con nombre del job
   estado           ──► ~/apps/la-polla-backup/status/backup-last.json (sin datos personales)
+  bitácora         ──► Supabase public.backup_runs (bien o mal, en el trap)
+
+GitHub Actions (cada hora, no depende del DGX)
+  /api/cron/backup-freshness ──► lee backup_runs; si el último backup bueno
+                                 tiene > 7 h o la última verificación > 30 h,
+                                 correo "Backup de La Polla atrasado"
 
 PC (Programador de tareas, diario)
   scp de los .gpg nuevos ──► %USERPROFILE%\Backups\la-polla\snapshots
@@ -28,8 +34,10 @@ puede leer los snapshots. Tampoco los puede leer este runner.
 | --- | --- |
 | `run-backup.sh` | Una corrida completa. Sale ≠ 0 ante cualquier fallo. |
 | `verify-snapshots.sh` | `sha256sum -c` del índice, destinatario gpg, huérfanos y frescura (≤ 8 h). |
-| `lib.sh` | Log para journald, carga segura del env, estado JSON, poda GFS. |
+| `lib.sh` | Log para journald, carga segura del env, estado JSON, poda GFS, `record_run`. |
+| `record-run.mjs` | Inserta la corrida en `public.backup_runs` (migración 117). Siempre sale con 0. |
 | `test-prune.sh` | Prueba de la poda con 1.600 archivos falsos en un directorio temporal. |
+| `test-record-run.sh` | Prueba del registro: payload, validaciones, red caída, código de salida intacto y, opcional, insert real contra un Supabase local. |
 | `systemd/*.service`, `systemd/*.timer` | Units de usuario. |
 | `tools/package.json` + `package-lock.json` | `tsx` fijado con lockfile. La app no lo trae. |
 | `pc/pull-snapshots.ps1`, `pc/register-task.ps1` | Segunda copia en Windows. |
@@ -123,6 +131,52 @@ en `status/*.json` y la tarea del PC muestra un `msg.exe` si la última corrida
 falló, si el DGX tiene menos de 50 GB libres o si el snapshot más nuevo tiene
 más de 8 h. **No** se usa el bot de Telegram de admins: si ese token se
 filtrara, permitiría secuestrar las aprobaciones de pagos.
+
+### Alerta por correo de backup atrasado
+
+Las alertas de arriba necesitan que el DGX o el PC estén prendidos. Esta no.
+
+1. Al terminar, bien o mal, `run-backup.sh` (`kind=backup`) y
+   `verify-snapshots.sh` (`kind=verify`) llaman a `record_run`, que ejecuta
+   `record-run.mjs`: un `POST /rest/v1/backup_runs` con la secret key del env
+   (`Prefer: return=minimal`, 10 s de timeout, un reintento solo ante red caída
+   o 5xx, tope total de 40 s). La llave va por entorno, nunca por argv; la URL
+   debe ser `https` (o `http` a 127.0.0.1 para pruebas).
+2. La fila lleva solo `status` (`ok`/`failed`), fechas, nombre del snapshot,
+   bytes, tablas, filas, cuentas, objetos de Storage, commit del runner y el
+   motivo del fallo que arma el script (máx. 400 caracteres). Nada de filas ni
+   teléfonos; los CHECK de la migración 117 rechazan formatos raros.
+3. **Registrar nunca cambia el código de salida.** El resultado queda en
+   `status/*.json` como `run_recorded`: `ok`, `skipped_no_credentials` (falló
+   antes de leer el env), `failed_http_<status>[_<código>]`, `failed_network`,
+   `failed_timeout`…
+4. `.github/workflows/backup-freshness.yml` llama cada hora (minuto 17) a
+   `/api/cron/backup-freshness`. Si el último backup bueno tiene más de
+   `BACKUP_MAX_AGE_HOURS` (7) o la última verificación buena más de
+   `BACKUP_VERIFY_MAX_AGE_HOURS` (30), o no hay filas, manda un correo a
+   `ADMIN_ALERT_EMAIL` (o `FEEDBACK_NOTIFY_EMAIL`) con asunto «Backup de La
+   Polla atrasado», el último fallo y qué revisar. Se repite cada hora mientras
+   siga atrasado. Si Resend rechaza el envío, la ruta responde 502 y el
+   workflow falla (GitHub también avisa).
+
+Umbrales: el backup corre cada 6 h, así que 7 h deja una hora de margen; un
+backup **degradado** (código 4) o con poco disco (código 3) se registra como
+`failed` y, si persiste, también dispara la alerta.
+
+Probar sin tocar producción:
+
+```bash
+bash ops/backup/test-record-run.sh            # sin red
+RECORD_RUN_TEST_URL=http://127.0.0.1:54321 \
+RECORD_RUN_TEST_SERVICE_KEY=<service key local> RECORD_RUN_TEST_ANON_KEY=<anon key local> \
+  bash ops/backup/test-record-run.sh          # + inserts reales contra Supabase local (migración 117 aplicada)
+RECORD_RUN_DRY=1 node ops/backup/record-run.mjs --kind=backup --exit-code=0   # imprime el JSON, no envía
+```
+
+Orden para activarla: migración 117 en producción → runner del DGX en el commit
+que trae `record-run.mjs` (y una corrida manual para que exista la primera
+fila) → merge del workflow. Al revés, el correo llega cada hora por "no hay
+filas".
 
 ### Actualizar el runner
 

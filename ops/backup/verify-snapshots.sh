@@ -5,6 +5,7 @@
 #   · cada snapshot sigue cifrado a la subllave de GPG_RECIPIENT
 #   · ningún snapshot huérfano (en disco pero fuera del índice)
 #   · el más nuevo no tiene más de MAX_AGE_HOURS (8 por defecto)
+#   · al terminar (bien o mal) registra la corrida en public.backup_runs
 #
 # No necesita la llave privada ni internet. Sale ≠ 0 ante cualquier problema.
 set -Eeuo pipefail
@@ -23,13 +24,25 @@ SNAP_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}\.tar\.zst\.gpg$'
 source "$SCRIPT_DIR/lib.sh"
 
 STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+RUNNER_COMMIT="$(git -C "$SCRIPT_DIR/../.." rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
 PHASE="init"
 REASON=""
 NEWEST=""
 on_exit() {
   local code=$?
   if [[ $code -ne 0 && -z "$REASON" ]]; then REASON="falló en la fase: $PHASE"; fi
-  write_status "$STATUS_DIR/verify-last.json" "$code" "$STARTED_AT" "$PHASE" "$NEWEST" "$REASON" || true
+  # Bitácora en public.backup_runs (kind=verify): /api/cron/backup-freshness
+  # avisa si no hay una verificación buena en 30 h. No cambia el código de salida.
+  local recorded err_text=""
+  if [[ $code -ne 0 ]]; then err_text="fase $PHASE: $REASON"; fi
+  recorded="$(record_run --kind=verify --exit-code="$code" --started-at="$STARTED_AT" \
+    --snapshot="$NEWEST" --runner-commit="$RUNNER_COMMIT" --error="$err_text")" || recorded="failed_runner"
+  if [[ "$recorded" == "ok" || "$recorded" == "dry_run" ]]; then
+    log "backup_runs: $recorded"
+  else
+    log_warn "no se registró la verificación en backup_runs: $recorded"
+  fi
+  write_status "$STATUS_DIR/verify-last.json" "$code" "$STARTED_AT" "$PHASE" "$NEWEST" "$REASON" "$recorded" || true
   if [[ $code -ne 0 ]]; then log_err "VERIFICACIÓN FALLÓ (código $code): $REASON"; else log "Snapshots íntegros"; fi
   exit "$code"
 }
