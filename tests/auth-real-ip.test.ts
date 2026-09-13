@@ -454,8 +454,8 @@ describe("rutas de sesión: solo Auth con IP real, nunca el cliente de datos", (
     "app/api/auth/start-otp/route.ts",
     "app/api/auth/verify-otp/route.ts",
     "app/api/auth/wa-magic/route.ts",
-    "app/api/auth/telegram-link/route.ts",
-    "app/api/auth/telegram-verify/route.ts",
+    // Telegram v2: las rutas de solicitud y enlace abren sesión por aquí.
+    "lib/auth/telegram-login/session.ts",
     "lib/auth/phone-session.ts",
   ];
 
@@ -471,11 +471,28 @@ describe("rutas de sesión: solo Auth con IP real, nunca el cliente de datos", (
   // le pasa la IP del request para que Supabase no vea la IP de Vercel.
   it.each([
     "app/api/auth/wa-magic/route.ts",
-    "app/api/auth/telegram-link/route.ts",
-    "app/api/auth/telegram-verify/route.ts",
+    "lib/auth/telegram-login/session.ts",
   ])("%s pasa la IP real a startSessionForVerifiedPhone", (file) => {
     const source = readFileSync(join(process.cwd(), file), "utf8");
     expect(source).toMatch(/getClientIp\(request\.headers\)/);
     expect(source).toMatch(/clientIp/);
   });
+
+  it.each([
+    "app/api/auth/telegram/request/complete/route.ts",
+    "app/api/auth/telegram/link/route.ts",
+  ])("%s abre sesión solo con startTelegramSession", (file) => {
+    const source = readFileSync(join(process.cwd(), file), "utf8");
+    expect(source).toMatch(/startTelegramSession\(request,/);
+    expect(source).not.toMatch(/from "@\/lib\/supabase\/server"/);
+    expect(source).not.toMatch(/\.auth\.(verifyOtp|signInWithOtp|signOut)\(/);
+  });
+
+  it.each(["app/api/auth/telegram-link/route.ts", "app/api/auth/telegram-verify/route.ts"])(
+    "%s (v1 retirado) no abre sesión ni toca la base",
+    (file) => {
+      const source = readFileSync(join(process.cwd(), file), "utf8");
+      expect(source).not.toMatch(/startSessionForVerifiedPhone|startTelegramSession|createAdminClient/);
+    },
+  );
 });

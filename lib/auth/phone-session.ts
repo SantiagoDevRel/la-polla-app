@@ -39,6 +39,64 @@ export interface PhoneSessionOptions {
   clientIp?: string | null;
 }
 
+export type ResolveAccountResult =
+  | { ok: true; authUserId: string; created: boolean }
+  | { ok: false; stage: "lookup" | "create" };
+
+/**
+ * Busca o crea la cuenta de un teléfono YA probado, sin tocar cookies ni
+ * sesiones. El bot de Telegram (v2) la usa al recibir el contacto para
+ * vincular la cuenta antes de que el navegador entre.
+ */
+export async function resolveAccountForVerifiedPhone(
+  phone: string,
+  logTag: string,
+  admin: ReturnType<typeof createAdminClient> = createAdminClient(),
+): Promise<ResolveAccountResult> {
+  const phoneNormalized = normalizePhone(phone);
+  const phoneE164 = `+${phoneNormalized}`;
+  const syntheticEmail = emailForPhone(phoneNormalized);
+
+  // Resolver auth.users.id por teléfono (migración 026): mismo id venga la
+  // cuenta de SMS (auth.users.phone) o de un canal con email sintético. Es lo
+  // que evita cuentas duplicadas entre canales.
+  const { data: rpcId, error: rpcErr } = await admin.rpc(
+    "find_auth_user_id_by_phone",
+    { p_phone: phoneE164 },
+  );
+  if (rpcErr) {
+    console.error(`[${logTag}] find_auth_user_id_by_phone failed:`, rpcErr.message);
+    return { ok: false, stage: "lookup" };
+  }
+  if (typeof rpcId === "string" && rpcId.length > 0) {
+    return { ok: true, authUserId: rpcId, created: false };
+  }
+
+  // Sin cuenta: se crea. phone_confirm=true porque el canal ya probó la
+  // propiedad del número. El email sintético ancla generateLink.
+  const { data: createdUser, error: createErr } =
+    await admin.auth.admin.createUser({
+      phone: phoneE164,
+      phone_confirm: true,
+      email: syntheticEmail,
+      email_confirm: true,
+    });
+
+  if (createErr || !createdUser.user) {
+    // Carrera de unicidad (el mismo teléfono entró por otro canal en el mismo
+    // instante): si ahora existe, se usa esa fila.
+    const { data: retryId } = await admin.rpc("find_auth_user_id_by_phone", {
+      p_phone: phoneE164,
+    });
+    if (typeof retryId === "string" && retryId.length > 0) {
+      return { ok: true, authUserId: retryId, created: false };
+    }
+    console.error(`[${logTag}] createUser failed and recheck miss:`, createErr?.message);
+    return { ok: false, stage: "create" };
+  }
+  return { ok: true, authUserId: createdUser.user.id, created: true };
+}
+
 /**
  * Busca o crea la cuenta del teléfono y deja la sesión en las cookies del
  * request actual. Solo llamar DESPUÉS de haber probado la propiedad del número.
@@ -50,54 +108,11 @@ export async function startSessionForVerifiedPhone(
 ): Promise<PhoneSessionResult> {
   const admin = createAdminClient();
   const phoneNormalized = normalizePhone(phone);
-  const phoneE164 = `+${phoneNormalized}`;
   const syntheticEmail = emailForPhone(phoneNormalized);
 
-  // Resolver auth.users.id por teléfono (migración 026): mismo id venga la
-  // cuenta de SMS (auth.users.phone) o de un canal con email sintético. Es lo
-  // que evita cuentas duplicadas entre canales.
-  let authUserId: string | null = null;
-  let created = false;
-  {
-    const { data: rpcId, error: rpcErr } = await admin.rpc(
-      "find_auth_user_id_by_phone",
-      { p_phone: phoneE164 },
-    );
-    if (rpcErr) {
-      console.error(`[${logTag}] find_auth_user_id_by_phone failed:`, rpcErr.message);
-      return { ok: false, stage: "lookup" };
-    }
-    if (typeof rpcId === "string" && rpcId.length > 0) authUserId = rpcId;
-  }
-
-  if (!authUserId) {
-    // Sin cuenta: se crea. phone_confirm=true porque el canal ya probó la
-    // propiedad del número. El email sintético ancla generateLink.
-    const { data: createdUser, error: createErr } =
-      await admin.auth.admin.createUser({
-        phone: phoneE164,
-        phone_confirm: true,
-        email: syntheticEmail,
-        email_confirm: true,
-      });
-
-    if (createErr || !createdUser.user) {
-      // Carrera de unicidad (el mismo teléfono entró por otro canal en el mismo
-      // instante): si ahora existe, se usa esa fila.
-      const { data: retryId } = await admin.rpc("find_auth_user_id_by_phone", {
-        p_phone: phoneE164,
-      });
-      if (typeof retryId === "string" && retryId.length > 0) {
-        authUserId = retryId;
-      } else {
-        console.error(`[${logTag}] createUser failed and recheck miss:`, createErr?.message);
-        return { ok: false, stage: "create" };
-      }
-    } else {
-      authUserId = createdUser.user.id;
-      created = true;
-    }
-  }
+  const account = await resolveAccountForVerifiedPhone(phone, logTag, admin);
+  if (!account.ok) return { ok: false, stage: account.stage };
+  const { authUserId, created } = account;
 
   if (options.authorize && !(await options.authorize({ authUserId, created }))) {
     return { ok: false, stage: "denied" };

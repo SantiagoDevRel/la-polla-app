@@ -98,6 +98,41 @@ export interface AuthConfirmPageInput {
   cancel: string;
 }
 
+export interface AuthAutoSubmitPageInput {
+  locale: Locale;
+  title: string;
+  heading: string;
+  lead: string;
+  action: string;
+  fields: Record<string, string>;
+  submit: string;
+}
+
+/**
+ * Página que envía sola un POST del mismo origen. Solo para el caso en que el
+ * servidor ya comprobó que este navegador es el que pidió el ingreso (cookie
+ * propia): no hay nada que confirmar. Sin JS, el botón hace lo mismo.
+ */
+export function authAutoSubmitPage(input: AuthAutoSubmitPageInput): NextResponse {
+  const hidden = Object.entries(input.fields)
+    .map(
+      ([name, value]) =>
+        `      <input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" />`,
+    )
+    .join("\n");
+  const inner = `    <h1>${escapeHtml(input.heading)}</h1>
+    <p role="status">${escapeHtml(input.lead)}</p>
+    <form id="lp-auto" method="post" action="${escapeHtml(input.action)}">
+${hidden}
+      <noscript><button type="submit">${escapeHtml(input.submit)}</button></noscript>
+    </form>
+    <script>document.getElementById("lp-auto").submit();</script>`;
+  return new NextResponse(page(input.locale, input.title, inner), {
+    status: 200,
+    headers: NO_STORE_HTML,
+  });
+}
+
 /**
  * Confirmación antes de abrir una sesión desde un enlace: muestra a qué número
  * se va a entrar y solo un POST del mismo origen la abre.

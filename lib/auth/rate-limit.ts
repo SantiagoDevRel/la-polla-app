@@ -14,10 +14,8 @@ const LIMITS = {
   // WhatsApp NO cuesta Twilio, así que NO debe contar en el tope diario de
   // SMS ni inflar las métricas de costo (que cuentan solo 'generate').
   wa_magic: { maxAttempts: 5, windowMinutes: 60 },
-  // Códigos del bot de login de Telegram (/api/auth/telegram-verify). Misma
-  // cadencia que 'verify', tipo propio: no es SMS y no cuenta en el tope diario.
-  // Requiere el CHECK de la migración 115.
-  telegram_verify: { maxAttempts: 5, windowMinutes: 15 },
+  // (El login por Telegram v2 no usa esta tabla: sus topes viven en las RPC de
+  // la migración 119, en la misma transacción que cada escritura.)
 } as const;
 
 // Tope DIARIO de SMS por teléfono. Más allá, el login empuja al usuario a

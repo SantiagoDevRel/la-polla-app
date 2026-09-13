@@ -5,9 +5,14 @@
 // y en → chickenpicks.app (sin www: el middleware redirige www → apex y el
 // token no debe viajar por un redirect extra). En local o preview,
 // NEXT_PUBLIC_APP_URL manda para no sacar a nadie de su entorno.
+//
+// v2: el enlace vive bajo /api/auth/telegram/ para recibir la cookie lp_tg_req
+// (request-cookie.ts). /api/auth/telegram-link queda solo como respuesta 410.
 
 import { SITES } from "@/lib/seo/sites";
 import type { LoginLocale } from "./update";
+
+export const LOGIN_LINK_PATH = "/api/auth/telegram/link";
 
 const PRODUCTION_HOSTS = new Set([
   SITES.ES.host,
@@ -37,10 +42,10 @@ export function loginLinkUrl(
   token: string,
   env: Record<string, string | undefined> = process.env,
 ): string {
-  return `${loginLinkOrigin(locale, env)}/api/auth/telegram-link?t=${encodeURIComponent(token)}`;
+  return `${loginLinkOrigin(locale, env)}${LOGIN_LINK_PATH}?t=${encodeURIComponent(token)}`;
 }
 
-/** Idioma de la página de error del enlace según el host que lo recibió. */
+/** Idioma de la página según el host que recibió el request. */
 export function localeForHost(host: string | null | undefined): LoginLocale {
   const h = (host ?? "").toLowerCase().split(":")[0];
   return h === SITES.EN.host || h === `www.${SITES.EN.host}` ? "en" : "es";

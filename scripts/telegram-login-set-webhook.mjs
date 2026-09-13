@@ -7,6 +7,11 @@
 //   node --env-file=.env.local scripts/telegram-login-set-webhook.mjs --dry-run
 //   node --env-file=.env.local scripts/telegram-login-set-webhook.mjs
 //   node --env-file=.env.local scripts/telegram-login-set-webhook.mjs --url https://lapollacolombiana.com/api/telegram/login
+//   node --env-file=.env.local scripts/telegram-login-set-webhook.mjs --texts-only
+//
+// --texts-only (v2, 2026-09-13): actualiza SOLO comandos y descripciones del
+// bot (ya no hablan de códigos). No llama setWebhook ni necesita el secreto:
+// el webhook, su secreto y allowed_updates=["message"] quedan como están.
 //
 // Variables: TELEGRAM_LOGIN_BOT_TOKEN y TELEGRAM_LOGIN_WEBHOOK_SECRET (los
 // mismos valores que en Vercel). Nunca imprime sus valores.
@@ -19,13 +24,14 @@ function arg(name) {
 }
 
 const dryRun = process.argv.includes("--dry-run");
+const textsOnly = process.argv.includes("--texts-only");
 const url = arg("--url") ?? DEFAULT_URL;
 const token = process.env.TELEGRAM_LOGIN_BOT_TOKEN?.trim() ?? "";
 const secret = process.env.TELEGRAM_LOGIN_WEBHOOK_SECRET?.trim() ?? "";
 
 const problems = [];
 if (!/^\d{5,}:[A-Za-z0-9_-]{30,}$/.test(token)) problems.push("TELEGRAM_LOGIN_BOT_TOKEN ausente o mal formado");
-if (!/^[A-Za-z0-9_-]{32,256}$/.test(secret)) problems.push("TELEGRAM_LOGIN_WEBHOOK_SECRET ausente o mal formado (32-256 caracteres A-Z a-z 0-9 _ -)");
+if (!textsOnly && !/^[A-Za-z0-9_-]{32,256}$/.test(secret)) problems.push("TELEGRAM_LOGIN_WEBHOOK_SECRET ausente o mal formado (32-256 caracteres A-Z a-z 0-9 _ -)");
 let parsed;
 try {
   parsed = new URL(url);
@@ -39,37 +45,43 @@ if (problems.length) {
   process.exit(1);
 }
 
-const steps = [
-  ["setWebhook", {
-    url,
-    secret_token: secret,
-    allowed_updates: ["message"],
-    drop_pending_updates: true,
-    max_connections: 20,
-  }],
+const textSteps = [
   ["setMyCommands", {
     commands: [
-      { command: "start", description: "Recibir un código para entrar" },
-      { command: "login", description: "Recibir un código para entrar" },
+      { command: "start", description: "Entrar a La Polla" },
+      { command: "login", description: "Entrar a La Polla" },
     ],
   }],
   ["setMyCommands", {
     language_code: "en",
     commands: [
-      { command: "start", description: "Get a sign-in code" },
-      { command: "login", description: "Get a sign-in code" },
+      { command: "start", description: "Sign in to Chicken Picks" },
+      { command: "login", description: "Sign in to Chicken Picks" },
     ],
   }],
   ["setMyShortDescription", {
-    short_description: "Código para entrar a La Polla Colombiana cuando el SMS no llega.",
+    short_description: "Entra a La Polla Colombiana con tu cuenta de Telegram, sin códigos.",
   }],
   ["setMyDescription", {
-    description: "Comparte tu número de Telegram y recibe un código para entrar a La Polla Colombiana. No aceptamos números escritos a mano ni contactos de otras personas.",
+    description: "Entra a La Polla Colombiana con tu cuenta de Telegram. La primera vez confirmas tu número con el botón Compartir mi número; después basta con tocar Iniciar. No aceptamos números escritos a mano ni contactos de otras personas.",
   }],
 ];
 
+const steps = textsOnly
+  ? textSteps
+  : [
+      ["setWebhook", {
+        url,
+        secret_token: secret,
+        allowed_updates: ["message"],
+        drop_pending_updates: true,
+        max_connections: 20,
+      }],
+      ...textSteps,
+    ];
+
 if (dryRun) {
-  console.log(`[dry-run] Webhook: ${parsed.origin}${parsed.pathname}`);
+  if (!textsOnly) console.log(`[dry-run] Webhook: ${parsed.origin}${parsed.pathname}`);
   for (const [method, body] of steps) {
     const shown = { ...body };
     if ("secret_token" in shown) shown.secret_token = "(oculto)";
