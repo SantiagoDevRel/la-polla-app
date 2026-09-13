@@ -555,6 +555,11 @@ Después de un deploy nuevo:
   workflow significa que no coinciden.
 - Los workflows fallan ante cualquier status que no sea 2xx o sin `"ok": true`,
   con `--max-time 90` y sin reintentos, e imprimen solo contadores.
+- `admin-discrepancies-email` responde **502** `{error:"email send failed"}` si
+  Resend rechaza el envío (key revocada, sin cuota, dominio sin verificar):
+  el SDK no lanza excepción, así que el handler revisa el `error` devuelto.
+  El detalle del proveedor queda solo en el log de Vercel
+  (`tests/cron-admin-discrepancies-email.test.ts`).
 - Verificación después de un deploy: `curl -X POST https://lapollacolombiana.com/api/cron/match-reminders`
   sin header debe dar **403** (nunca 307), y `gh workflow run match-reminders.yml`
   debe terminar en verde.

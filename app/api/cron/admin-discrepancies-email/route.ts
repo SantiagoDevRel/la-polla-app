@@ -7,6 +7,8 @@
 // Trigger: GitHub Actions cada día (horario configurado en el workflow).
 //
 // Destinatario: ADMIN_ALERT_EMAIL (env var).
+// Si Resend rechaza el envío responde 502 {error:"email send failed"}, así
+// el workflow falla en vez de confirmar un correo que no salió.
 
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
@@ -89,7 +91,19 @@ export async function POST(request: NextRequest) {
 
   const resend = new Resend(apiKey);
   const from = process.env.RESEND_FROM_EMAIL || "La Polla <onboarding@resend.dev>";
-  await resend.emails.send({ from, to, subject, text });
+  // resend 6.x no lanza: devuelve { data: null, error }. Sin este chequeo la
+  // ruta respondía ok:true con el correo rechazado y el workflow quedaba verde.
+  // El body no lleva el detalle del proveedor porque el log de Actions es
+  // público; el nombre y el status quedan en el log privado de Vercel.
+  const { error } = await resend.emails.send({ from, to, subject, text });
+  if (error) {
+    console.error(
+      "[cron/admin-discrepancies-email] Resend rechazó el envío:",
+      error.name,
+      error.statusCode ?? "sin status",
+    );
+    return NextResponse.json({ error: "email send failed" }, { status: 502 });
+  }
 
   return NextResponse.json({
     ok: true,
