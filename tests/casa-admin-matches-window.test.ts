@@ -18,7 +18,6 @@ const adminId = "00000000-0000-4000-8000-000000000001";
 const pollaId = "00000000-0000-4000-8000-000000000002";
 const matchIds = ["10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002"];
 const dbFetch = vi.fn<typeof fetch>();
-const PROVISIONAL = "Hay partidos con hora por confirmar. Elige cierre manual o quítalos.";
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { "Content-Type": "application/json" },
@@ -113,114 +112,49 @@ describe("admin calendar window", () => {
   });
 });
 
-describe("provisional kickoff guard on creation", () => {
-  it("rejects automatic closing when a selected match has no confirmed time, before the RPC", async () => {
-    dbFetch.mockResolvedValueOnce(response([
-      { id: matchIds[0], scheduled_at_confirmed: true }, { id: matchIds[1], scheduled_at_confirmed: false },
-    ]));
-    const res = await POST(createRequest(partidos));
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: PROVISIONAL, code: "PROVISIONAL_KICKOFF" });
-    expect(call(0).pathname).toBe("/rest/v1/matches");
-    expect(call(0).searchParams.get("select")).toBe("id,scheduled_at_confirmed");
-    expect(call(0).searchParams.get("id")).toBe(`in.(${matchIds.join(",")})`);
-    expect(dbFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it("rejects a hidden draft with automatic closing too", async () => {
-    dbFetch.mockResolvedValueOnce(response([{ id: matchIds[0], scheduled_at_confirmed: false }]));
-    expect((await POST(createRequest({ ...partidos, publish: false }))).status).toBe(400);
-    expect(dbFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it("creates with automatic closing when every time is confirmed", async () => {
-    dbFetch.mockResolvedValueOnce(response(matchIds.map((id) => ({ id, scheduled_at_confirmed: true }))))
-      .mockResolvedValueOnce(response({ ok: true, id: pollaId, slug: "fecha-5", publicada: true }));
+// (2026-09-13, migración 118) Los partidos con hora por confirmar ya no bloquean
+// el cierre automático: el cierre sigue al calendario en SQL. Crear y publicar
+// van directo al RPC, sin leer horarios desde la ruta.
+describe("automatic closing with provisional kickoffs on creation", () => {
+  it("creates with automatic closing even when a selected match has no confirmed time, straight to the RPC", async () => {
+    dbFetch.mockResolvedValueOnce(response({ ok: true, id: pollaId, slug: "fecha-5", publicada: true }));
     const res = await POST(createRequest(partidos));
     expect(res.status).toBe(200);
-    expect(call(1).pathname).toBe("/rest/v1/rpc/casa_create_polla_v2");
-    expect(dbFetch).toHaveBeenCalledTimes(2);
+    expect(call(0).pathname).toBe("/rest/v1/rpc/casa_create_polla_v2");
+    expect(dbFetch).toHaveBeenCalledTimes(1);
+    expect(dbFetch.mock.calls.some(([url]) => String(url).includes("/rest/v1/matches"))).toBe(false);
   });
 
-  it("allows provisional matches with manual closing without an extra read", async () => {
+  it("keeps manual closing on the same single RPC call", async () => {
     dbFetch.mockResolvedValueOnce(response({ ok: true, id: pollaId, slug: "fecha-5", publicada: true }));
     expect((await POST(createRequest({ ...partidos, closeMode: "manual" }))).status).toBe(200);
     expect(call(0).pathname).toBe("/rest/v1/rpc/casa_create_polla_v2");
     expect(dbFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("does not create when the kickoff check cannot be read", async () => {
-    dbFetch.mockResolvedValueOnce(response({ message: "boom" }, 500));
+  it("does not echo database errors", async () => {
+    dbFetch.mockResolvedValueOnce(response({ message: "boom", code: "XX000" }, 500));
     const res = await POST(createRequest(partidos));
-    expect(res.status).toBe(500);
+    expect(res.status).toBeGreaterThanOrEqual(400);
     expect(JSON.stringify(await res.json())).not.toContain("boom");
-    expect(dbFetch).toHaveBeenCalledTimes(1);
   });
 
-  it("requires admin before the kickoff check", async () => {
+  it("requires admin before touching the database", async () => {
     mocks.user.mockResolvedValue({ id: adminId, is_admin: false });
     expect((await POST(createRequest(partidos))).status).toBe(403);
     expect(mocks.db).not.toHaveBeenCalled();
   });
 });
 
-describe("provisional kickoff guard on publication", () => {
-  const draft = { kind: "partidos", close_mode: "auto", status: "borrador", opens_at: null };
-
-  it.each([{ action: "publicar" }, { action: "publicacion", mode: "ahora" }])("blocks publishing an automatic-close draft with a provisional match: %j", async (body) => {
-    dbFetch.mockResolvedValueOnce(response(draft))
-      .mockResolvedValueOnce(response(matchIds.map((match_id) => ({ match_id }))))
-      .mockResolvedValueOnce(response([{ id: matchIds[0], scheduled_at_confirmed: true }, { id: matchIds[1], scheduled_at_confirmed: false }]));
-    const res = await PATCH(patchRequest(body), params);
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe(PROVISIONAL);
-    expect(call(2).searchParams.get("id")).toBe(`in.(${matchIds.join(",")})`);
-    expect(dbFetch.mock.calls.some(([url]) => String(url).includes("/rpc/"))).toBe(false);
-  });
-
-  it.each([{ action: "publicar" }, { action: "publicacion", mode: "ahora" }])("blocks publishing a scheduled (not yet visible) automatic-close pool with a provisional match: %j", async (body) => {
-    const scheduled = { ...draft, status: "abierta", opens_at: new Date(now.getTime() + day).toISOString() };
-    dbFetch.mockResolvedValueOnce(response(scheduled))
-      .mockResolvedValueOnce(response(matchIds.map((match_id) => ({ match_id }))))
-      .mockResolvedValueOnce(response([{ id: matchIds[0], scheduled_at_confirmed: false }]));
-    const res = await PATCH(patchRequest(body), params);
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: PROVISIONAL, code: "PROVISIONAL_KICKOFF" });
-    expect(call(1).pathname).toBe("/rest/v1/casa_polla_matches");
-    expect(dbFetch).toHaveBeenCalledTimes(3);
-    expect(dbFetch.mock.calls.some(([url]) => String(url).includes("/rpc/"))).toBe(false);
-  });
-
-  it("leaves an already visible pool to the RPC without reading its matches", async () => {
-    const visible = { ...draft, status: "abierta", opens_at: new Date(now.getTime() - day).toISOString() };
-    dbFetch.mockResolvedValueOnce(response(visible))
-      .mockResolvedValueOnce(response({ ok: true, slug: "fecha-5", publication_mode: "ahora" }));
-    expect((await PATCH(patchRequest({ action: "publicacion", mode: "ahora" }), params)).status).toBe(200);
-    expect(call(1).pathname).toBe("/rest/v1/rpc/casa_set_publication_v2");
-    expect(dbFetch).toHaveBeenCalledTimes(2);
-  });
-
-  it("publishes an automatic-close draft whose times are confirmed", async () => {
-    dbFetch.mockResolvedValueOnce(response(draft))
-      .mockResolvedValueOnce(response(matchIds.map((match_id) => ({ match_id }))))
-      .mockResolvedValueOnce(response(matchIds.map((id) => ({ id, scheduled_at_confirmed: true }))))
-      .mockResolvedValueOnce(response({ slug: "fecha-5", status: "abierta" }));
-    expect((await PATCH(patchRequest({ action: "publicar" }), params)).status).toBe(200);
-    expect(call(3).pathname).toBe("/rest/v1/rpc/casa_change_status_v2");
-  });
-
-  it("publishes a manual-close draft without reading its matches", async () => {
-    dbFetch.mockResolvedValueOnce(response({ ...draft, close_mode: "manual" }))
-      .mockResolvedValueOnce(response({ slug: "fecha-5", status: "abierta" }));
-    expect((await PATCH(patchRequest({ action: "publicar" }), params)).status).toBe(200);
-    expect(call(1).pathname).toBe("/rest/v1/rpc/casa_change_status_v2");
-    expect(dbFetch).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not check when hiding a pool", async () => {
-    dbFetch.mockResolvedValueOnce(response({ ok: true, slug: "fecha-5", publication_mode: "oculta" }));
-    expect((await PATCH(patchRequest({ action: "publicacion", mode: "oculta" }), params)).status).toBe(200);
-    expect(call(0).pathname).toBe("/rest/v1/rpc/casa_set_publication_v2");
+describe("publication no longer reads kickoffs", () => {
+  it.each([
+    [{ action: "publicar" }, "casa_change_status_v2"],
+    [{ action: "publicacion", mode: "ahora" }, "casa_set_publication_v2"],
+    [{ action: "publicacion", mode: "oculta" }, "casa_set_publication_v2"],
+  ])("goes straight to the RPC: %j", async (body, rpc) => {
+    dbFetch.mockResolvedValueOnce(response({ ok: true, slug: "fecha-5" }));
+    expect((await PATCH(patchRequest(body), params)).status).toBe(200);
+    expect(call(0).pathname).toBe(`/rest/v1/rpc/${rpc}`);
     expect(dbFetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -106,13 +106,15 @@ describe('refreshAfTournament mapping', () => {
     expect(argsOf(calls, 1570423)).toMatchObject({ p_phase: 'regular_season', p_match_day: 10 });
   });
 
-  it('marks BetPlay TBD and postponed fixtures provisional, with no score, and skips old postponements', async () => {
+  it('marks BetPlay TBD provisional, keeps the kickoff of an upcoming postponed fixture, and skips old postponements', async () => {
     const now = Date.parse(BETPLAY.observedAt);
     const { db, calls } = fakeDb();
     const r = await refreshAfTournament('betplay_2026', {}, deps(envelope(BETPLAY.response), db, now));
     expect(r.aborted).toBeNull();
     expect(argsOf(calls, 1549712)).toMatchObject({ p_status: 'scheduled', p_scheduled_at_confirmed: false, p_home_score: null, p_match_day: 3 });
-    expect(argsOf(calls, 1549750)).toMatchObject({ p_status: 'scheduled', p_scheduled_at_confirmed: false, p_home_score: null });
+    // (2026-09-13) PST con saque futuro: se muestra con hora para poder elegirlo en Casa.
+    expect(argsOf(calls, 1549750)).toMatchObject({ p_status: 'scheduled', p_scheduled_at_confirmed: true, p_home_score: null,
+      p_scheduled_at: '2026-09-16T23:15:00.000Z' });
     expect(argsOf(calls, 1549705)?.p_scheduled_at_confirmed).toBe(true);
     expect(argsOf(calls, 1549863)?.p_scheduled_at_confirmed).toBe(false); // Clausura 19 de relleno
     expect(argsOf(calls, 1549770)).toBeUndefined(); // PST del 8-sep: fuera de la ventana D3

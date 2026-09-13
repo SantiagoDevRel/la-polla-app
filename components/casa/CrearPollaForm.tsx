@@ -774,14 +774,13 @@ export function CrearPollaForm() {
           </div>
 
           {closeMode === "auto" ? (
-            // Con partidos de hora por confirmar no hay pitazo del cual restar
-            // 5 minutos: no se muestra una hora inventada. El aviso accionable
-            // vive una sola vez, junto a la lista donde se eligen los partidos.
+            // Con partidos de hora por confirmar no se muestra una hora exacta:
+            // el cierre usa la hora provisional y se ajusta solo (migración 118).
             <p className="mt-2 text-[12px] leading-relaxed text-text-secondary">
               Cierra 5 minutos antes de que arranque el primer partido que
               elijas
               {provisionalesElegidos > 0 ? (
-                "."
+                ". Se ajusta solo cuando se confirmen las horas."
               ) : primerKickoff !== null ? (
                 <>
                   {" "}
@@ -1004,15 +1003,15 @@ export function CrearPollaForm() {
                 {resultadosBusqueda === null ? "" : teamQueryStatus(resultadosBusqueda, consulta)}
               </p>
             </div>
-            {/* Único aviso de hora por confirmar: el cierre está arriba y el
-                admin elige partidos acá abajo. Con cierre manual no hay
-                conflicto. Mismo criterio que rechaza el server. */}
+            {/* (2026-09-13, migración 118) Ya no bloquea: el cierre automático
+                usa la hora provisional y el calendario lo ajusta cuando la
+                confirma. Queda como aviso informativo junto a la lista. */}
             {closeMode === "auto" && provisionalesElegidos > 0 && (
-              <p role="status" className="mb-3 text-[13px] leading-relaxed text-amber">
+              <p role="status" className="mb-3 text-[13px] leading-relaxed text-text-secondary">
                 {provisionalesElegidos === 1
                   ? "Elegiste 1 partido con hora por confirmar."
                   : `Elegiste ${provisionalesElegidos} partidos con hora por confirmar.`}{" "}
-                El cierre automático necesita horas confirmadas: elige cierre manual o quítalos.
+                El cierre usa la hora provisional y se ajusta solo cuando el calendario la confirme.
               </p>
             )}
             {seleccion.length > 0 && (

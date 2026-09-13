@@ -218,7 +218,16 @@ en caché, sin gastar cuota) o `{source:"manual",home,away}`; `espn` y `fd` resp
 Colombia. La temporada completa de cada liga se importa desde API-Football
 (`lib/api-football/calendar.ts`, 1 solicitud por liga) y el cron la refresca por
 diferencias. **Actualizar calendario** fuerza ese refresco. Los partidos sin hora
-fija muestran «hora por confirmar» y no admiten cierre automático de la polla.
+fija muestran «hora por confirmar». Un partido aplazado (PST) cuyo saque sigue en
+el futuro se muestra con la hora que trae API-Football y se puede elegir; uno con
+fecha vieja no entra hasta que el proveedor publique la nueva.
+
+Desde la migración **118** los partidos provisionales se pueden meter en pollas con
+cierre automático: el cierre usa su hora provisional (la misma del candado de
+pronósticos) y se recalcula solo cada vez que el calendario confirma o reprograma
+un partido de la polla, o cuando se vincula un partido. Nunca reabre una polla cuyo
+cierre ya pasó. Regresión: `scripts/casa-auto-close-check.sql` (encadenada con la
+migración en una transacción que termina en ROLLBACK; ver el encabezado del script).
 Corte: `docs/af-cutover-today.md`. La fila `app_config.data_provider_mode` quedó en la
 DB pero ningún código la lee: no hay vuelta a ESPN/football-data.
 

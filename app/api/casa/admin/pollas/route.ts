@@ -17,8 +17,6 @@ import { casaJson, casaError, requireCasaContract } from "@/lib/casa/operations"
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const PROVISIONAL_KICKOFF_ERROR = "Hay partidos con hora por confirmar. Elige cierre manual o quítalos.";
-
 const baseSchema = z.object({
   name: z.string().trim().min(3).max(80),
   description: z.string().trim().max(400).optional(),
@@ -129,23 +127,10 @@ export async function POST(req: NextRequest) {
   const db = createAdminClient();
 
   // Cierre automático = primer pitazo menos 5 minutos, calculado en SQL desde
-  // `matches.scheduled_at`. Un partido con hora por confirmar guarda solo la
-  // fecha (medianoche UTC, migración 103): derivar el cierre de ahí cerraría
-  // la polla a una hora inventada. Se revisa antes del RPC; si faltan filas,
-  // el propio RPC responde INVALID_MATCHES.
-  if (body.kind === "partidos" && body.closeMode === "auto") {
-    const { data: kickoffs, error: kickoffError } = await db
-      .from("matches")
-      .select("id, scheduled_at_confirmed")
-      .in("id", body.matchIds);
-    if (kickoffError || !Array.isArray(kickoffs)) {
-      console.error("[casa/admin/pollas] kickoff check", kickoffError?.message);
-      return casaJson({ error: "No se pudieron revisar los horarios de los partidos. Intenta de nuevo." }, 500);
-    }
-    if (kickoffs.some((match: { scheduled_at_confirmed: boolean | null }) => match.scheduled_at_confirmed === false)) {
-      return casaJson({ error: PROVISIONAL_KICKOFF_ERROR, code: "PROVISIONAL_KICKOFF" }, 400);
-    }
-  }
+  // `matches.scheduled_at`. (2026-09-13, migración 118) Un partido con hora por
+  // confirmar ya no bloquea: cuenta con su hora provisional, la misma del
+  // candado de pronósticos, y el cierre se recalcula solo cuando el calendario
+  // confirma o reprograma un partido (sin reabrir una polla ya cerrada).
 
   const baseSlug = slugify(body.name);
   // Unique slug conflicts are retried; the failed RPC transaction creates no partial pool.

@@ -25,8 +25,8 @@ const matchIds = fixtures.map((match) => match.id);
 const links = matchIds.map((match_id, order_index) => ({ polla_id: pollaId, match_id, order_index }));
 const savedPolla = { id: pollaId, slug: "dos-ligas" };
 const dbFetch = vi.fn<typeof fetch>();
-// Automatic closing first checks that every kickoff time is confirmed.
-const confirmedKickoffs = () => response(matchIds.map((id) => ({ id, scheduled_at_confirmed: true })));
+// (2026-09-13, migración 118) Automatic closing no longer reads kickoff precision
+// before the RPC: SQL derives the close and recomputes it when the calendar changes.
 
 const payload = {
   name: "Dos ligas",
@@ -79,13 +79,13 @@ afterEach(() => {
 
 describe("CASA creation across tournaments", () => {
   it.each(["laliga_2025", "premier_2025"])("passes all mixed-tournament fixtures unchanged to the atomic creator: %s", async (tournament) => {
-    dbFetch.mockResolvedValueOnce(confirmedKickoffs()).mockResolvedValueOnce(response({ ok: true, ...savedPolla, publicada: true }));
+    dbFetch.mockResolvedValueOnce(response({ ok: true, ...savedPolla, publicada: true }));
     const result = await POST(request({ ...payload, tournament }));
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ ok: true, ...savedPolla, publicada: true });
-    expect(written(1)).toMatchObject({ p_config: { matchIds, tournament, closeMode: "auto", closesAt: payload.closesAt }, p_actor_id: userId, p_contract: 2 });
-    expect(new URL(String(dbFetch.mock.calls[1][0])).pathname).toBe("/rest/v1/rpc/casa_create_polla_v2");
-    expect(dbFetch).toHaveBeenCalledTimes(2);
+    expect(written(0)).toMatchObject({ p_config: { matchIds, tournament, closeMode: "auto", closesAt: payload.closesAt }, p_actor_id: userId, p_contract: 2 });
+    expect(new URL(String(dbFetch.mock.calls[0][0])).pathname).toBe("/rest/v1/rpc/casa_create_polla_v2");
+    expect(dbFetch).toHaveBeenCalledTimes(1);
   });
   it("preserves manual closing and draft intent in the SQL transaction", async () => {
     dbFetch.mockResolvedValueOnce(response({ ok: true, ...savedPolla, publicada: false }));
@@ -93,14 +93,14 @@ describe("CASA creation across tournaments", () => {
     expect(written(0)).toMatchObject({ p_config: { closeMode: "manual", closesAt: payload.closesAt, publish: false, matchIds } });
   });
   it("propagates an elapsed closing time rejected by SQL", async () => {
-    dbFetch.mockResolvedValueOnce(confirmedKickoffs()).mockResolvedValueOnce(response({ code: "22023", message: "INSCRIPTIONS_CLOSED" }, 400));
+    dbFetch.mockResolvedValueOnce(response({ code: "22023", message: "INSCRIPTIONS_CLOSED" }, 400));
     expect((await POST(request(payload))).status).toBe(409);
-    expect(dbFetch).toHaveBeenCalledTimes(2);
+    expect(dbFetch).toHaveBeenCalledTimes(1);
   });
   it("does not make separate writes after creation fails", async () => {
-    dbFetch.mockResolvedValueOnce(confirmedKickoffs()).mockResolvedValueOnce(response({ code: "23503", message: "Missing fixture" }, 409));
+    dbFetch.mockResolvedValueOnce(response({ code: "23503", message: "Missing fixture" }, 409));
     expect((await POST(request(payload))).status).toBe(500);
-    expect(dbFetch).toHaveBeenCalledTimes(2);
+    expect(dbFetch).toHaveBeenCalledTimes(1);
     expect(dbFetch.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
   });
 
