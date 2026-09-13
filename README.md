@@ -626,6 +626,17 @@ Unitarias: `npm test -- tests/auth-real-ip.test.ts`.
 | `match-reminders.yml` | `/api/cron/match-reminders` | diario 13:00 UTC |
 | `admin-discrepancies-email.yml` | `/api/cron/admin-discrepancies-email` | diario 13:00 UTC |
 | `cleanup-payout-proofs.yml` | `/api/cron/cleanup-payout-proofs` | **solo manual** (pendiente de aprobación del dueño) |
+| `backup-freshness.yml` | `/api/cron/backup-freshness` | cada hora, minuto 17 |
+
+- `backup-freshness` lee `public.backup_runs` (migración 117, la llena el
+  backup del DGX) y le escribe a `ADMIN_ALERT_EMAIL` (o `FEEDBACK_NOTIFY_EMAIL`)
+  «Backup de La Polla atrasado» si el último backup bueno pasa de
+  `BACKUP_MAX_AGE_HOURS` (7) o la última verificación de
+  `BACKUP_VERIFY_MAX_AGE_HOURS` (30). La primera verificación tiene margen:
+  sin filas `kind=verify` y con el primer backup bueno de 30 h o menos, no
+  alerta. Responde `{ok, stale, age_hours,
+  verify_stale, verify_age_hours, sent}`; 502 si Resend falla, 500 si la tabla
+  no existe. Detalle: `ops/backup/README.md`.
 
 - El middleware exime `/api/cron/` (con barra final) del gate de sesión; cada
   handler se protege solo con `requireCronSecret(request)`
