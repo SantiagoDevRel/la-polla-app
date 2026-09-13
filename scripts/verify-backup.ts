@@ -13,6 +13,10 @@
 //   npx tsx scripts/verify-backup.ts --json               # una línea JSON, para máquinas
 //   MAX_AGE_HOURS=7 npx tsx scripts/verify-backup.ts      # además falla si el backup es viejo
 //   ONLINE=1 npx tsx scripts/verify-backup.ts             # + compara contra la DB viva
+//   ALLOW_REDUCED_BACKUP=1 npx tsx scripts/verify-backup.ts  # acepta auth por admin API / Storage sin cruce
+//
+// Un backup reducido (auth por la admin API, sin restore de cuentas, o Storage
+// sin cruce contra storage.objects) es un PROBLEMA salvo ALLOW_REDUCED_BACKUP=1.
 //
 // Las carpetas `<stamp>.partial` (un export que no terminó) se ignoran al
 // buscar el más nuevo y se rechazan si se pasan a mano.
@@ -24,6 +28,7 @@ import { createClient } from "@supabase/supabase-js";
 import { promises as fs } from "fs";
 import path from "path";
 import {
+  assessBackupCompleteness,
   backupAgeHours,
   FileManifest,
   isPartialBackupDir,
@@ -38,7 +43,8 @@ type Manifest = {
   generatedAt: string;
   projectRef: string;
   totals: { tables: number; rows: number; storageFiles: number; storageBytes: number };
-  auth: { mode: string; users: number; identities: number };
+  auth: { mode: string; users: number; identities: number; note?: string };
+  storage?: { crossCheck?: string };
   tables: Record<string, { rows: number; bytes: number; sha256: string }>;
   files?: FileManifest;
   schemaLive?: { mode: string; errors: string[]; warnings: string[] };
@@ -94,6 +100,7 @@ type Report = {
   tables: number;
   rows: number;
   authMode: string | null;
+  storageCrossCheck: string | null;
   authUsers: number;
   authIdentities: number;
   storageFiles: number;
@@ -130,6 +137,7 @@ async function verify(report: Report): Promise<void> {
   report.projectRef = manifest.projectRef;
   report.generatedAt = manifest.generatedAt;
   report.authMode = manifest.auth?.mode ?? null;
+  report.storageCrossCheck = manifest.storage?.crossCheck ?? null;
   say(`Tomado el ${manifest.generatedAt} · proyecto ${manifest.projectRef} · formato ${version}\n`);
 
   // 0) Frescura.
@@ -233,9 +241,13 @@ async function verify(report: Report): Promise<void> {
       problems.push(`schema: ${migs.length} migraciones en disco, el manifiesto dice ${manifest.migrations.length}`);
     }
   }
-  if (manifest.auth.mode === "skipped") {
-    warnings.push("este backup NO tiene auth (SKIP_PII=1): no alcanza para reabrir con las mismas cuentas");
-  }
+  // Completo vs reducido: auth por la admin API o Storage sin cruce no
+  // alcanzan para reabrir la app aunque cada archivo esté íntegro.
+  const completeness = assessBackupCompleteness(manifest, {
+    allowReduced: process.env.ALLOW_REDUCED_BACKUP === "1",
+  });
+  problems.push(...completeness.problems);
+  warnings.push(...completeness.warnings);
   report.authUsers = manifest.auth.users;
   report.authIdentities = manifest.auth.identities ?? 0;
 
@@ -279,6 +291,7 @@ async function main() {
     tables: 0,
     rows: 0,
     authMode: null,
+    storageCrossCheck: null,
     authUsers: 0,
     authIdentities: 0,
     storageFiles: 0,

@@ -16,7 +16,12 @@
 //
 // El destino es un Supabase LOCAL con el esquema ya aplicado (supabase db
 // reset). El SQL generado:
-//   · aborta si alguna tabla destino ya tiene filas (salvo ALLOW_NONEMPTY=1),
+//   · reemplaza las tablas que las migraciones siembran (app_config,
+//     casa_operation_control): quedan con el contenido del backup, no con
+//     el de las migraciones (mode='legacy' en vez del modo real de Casa),
+//   · aborta si cualquier otra tabla destino ya tiene filas,
+//   · aborta si alguna fila del backup no queda escrita tal cual (choque de
+//     clave o contenido distinto al buscarla por PK),
 //   · convierte cada lote con jsonb_populate_recordset según los tipos reales,
 //   · omite columnas generadas e inserta identity con OVERRIDING SYSTEM VALUE,
 //   · aborta si el backup trae columnas que el destino no tiene
@@ -33,12 +38,26 @@
 //   OUT=<archivo>            destino (default: <carpeta del backup>.restore.sql)
 //   OVERWRITE=1              reemplazar OUT si ya existe
 //   TABLES=a,b               solo esas tablas de public
-//   SKIP_AUTH=1              no incluir auth.users / auth.identities
-//   ALLOW_NONEMPTY=1         no abortar si el destino ya tiene filas
+//   SKIP_AUTH=1              no incluir auth.users / auth.identities. Úsalo si
+//                            las cuentas ya se restauraron con
+//                            auth/restore-auth.sql; si no, este SQL las trae
+//                            en la misma transacción (lo recomendado).
+//   REPLACE_TABLES=a,b       tablas cuyo contenido actual se reemplaza por el
+//                            del backup (default: app_config,casa_operation_control;
+//                            vacío = ninguna)
+//   ALLOW_NONEMPTY=1         solo para ensayos: no aborta si el destino ya tiene
+//                            filas; las filas que chocan se saltan con NOTICE
 //   ALLOW_MISSING_COLUMNS=1  ignorar columnas del backup que el destino no tiene
 import { promises as fs } from "fs";
 import path from "path";
-import { buildRestoreSql, isPartialBackupDir, pickNewestBackup, RestoreSection, sha256Hex } from "./backup/core";
+import {
+  buildRestoreSql,
+  isPartialBackupDir,
+  parseReplaceTables,
+  pickNewestBackup,
+  RestoreSection,
+  sha256Hex,
+} from "./backup/core";
 
 type Manifest = {
   formatVersion?: number;
@@ -131,10 +150,18 @@ async function main() {
     console.log(`→ public.${table.padEnd(35)} ${String(rows.length).padStart(6)} filas`);
   }
 
+  const replaceTables = parseReplaceTables(process.env.REPLACE_TABLES);
+  const replaced = replaceTables.filter((t) => sections.some((s) => s.schemaTable === t));
+  if (replaced.length) console.log(`\nSe reemplazan con el contenido del backup: ${replaced.join(", ")}`);
+  if (process.env.ALLOW_NONEMPTY === "1") {
+    console.log(`! ALLOW_NONEMPTY=1: las filas que choquen se saltan (NOTICE). No es un restore fiel.`);
+  }
+
   const sql = buildRestoreSql({
     title: `Restore de La Polla — backup ${path.basename(dir)} (proyecto ${manifest.projectRef})`,
     generator: "scripts/restore-backup-sql.ts",
     sections,
+    replaceTables,
     allowNonEmpty: process.env.ALLOW_NONEMPTY === "1",
     allowMissingColumns: process.env.ALLOW_MISSING_COLUMNS === "1",
   });
