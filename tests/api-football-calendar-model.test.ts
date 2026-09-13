@@ -167,22 +167,33 @@ describe('inferPrecision', () => {
     for (const f of inRound(FEEDS.betplay, 'Clausura - 19')) expect(betplay.get(f.fixture.id)?.movable).toBe(false);
   });
 
-  it('makes every TBD and PST provisional, and never provisional for anything else', () => {
-    let provisional = 0;
+  it('makes every TBD and past PST provisional; a PST still ahead keeps its kickoff like NS (2026-09-13)', () => {
+    let provisional = 0, upcomingPostponed = 0;
     for (const { feed, fixture } of ALL) {
       const p = precisionOf(feed).get(fixture.fixture.id)!;
       const short = fixture.fixture.status.short;
-      if (short === 'TBD' || short === 'PST') {
+      const ahead = fixture.fixture.timestamp * 1000 > Date.parse(feed.observedAt);
+      if (short === 'TBD' || (short === 'PST' && !ahead)) {
         provisional++;
         expect(p).toMatchObject({ confirmed: false, movable: false });
+      } else if (short === 'PST') {
+        upcomingPostponed++;
+        expect(p.reason === 'confirmed' || p.reason === 'uniform_round').toBe(true);
+        expect(p.confirmed).toBe(true);
       } else {
         expect(p.confirmed).toBe(true);
       }
-      if (short !== 'NS') expect(p.movable).toBe(false);
+      if (short !== 'NS' && !(short === 'PST' && ahead)) expect(p.movable).toBe(false);
     }
-    expect(provisional).toBeGreaterThanOrEqual(3);
+    expect(provisional).toBeGreaterThanOrEqual(2);
+    expect(upcomingPostponed).toBeGreaterThanOrEqual(1);
     expect(precisionOf(FEEDS.betplay).get(1549712)).toEqual({ confirmed: false, movable: false, reason: 'time_to_be_defined' });
     expect(precisionOf(FEEDS.betplay).get(1549770)).toEqual({ confirmed: false, movable: false, reason: 'postponed' });
+    // Once Caldas–Tolima: aplazado en API-Football pero con la hora nueva (16-sep 23:15 UTC).
+    expect(precisionOf(FEEDS.betplay).get(1549750)).toEqual({ confirmed: true, movable: true, reason: 'confirmed' });
+    // Observado después del saque vuelve a ser provisional: no hay fecha nueva que mostrar.
+    const [caldas] = fixturesOf(FEEDS.betplay).filter((f) => f.fixture.id === 1549750);
+    expect(precisionOf(FEEDS.betplay, caldas.fixture.timestamp * 1000 + 60_000).get(1549750)).toEqual({ confirmed: false, movable: false, reason: 'postponed' });
   });
 
   it('ignores rounds with fewer than five unstarted fixtures and rejects a missing observation time', () => {

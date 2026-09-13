@@ -272,7 +272,12 @@ export function roundTimings(fixtures: CalendarFixture[]): Map<string, RoundTimi
 }
 
 /**
- * - TBD o PST → provisional (`confirmed=false`) y nunca mueve.
+ * - TBD → provisional (`confirmed=false`) y nunca mueve.
+ * - PST (aplazado) con saque todavía en el futuro → se trata como NS: API-Football
+ *   deja el estado aplazado aunque ya publicó la hora nueva (Once Caldas–Tolima,
+ *   16-sep 18:15). Pedido del dueño (2026-09-13): mostrarlo con su hora para
+ *   poder elegirlo. Si al final no se juega, el caso llega a /admin/issues.
+ * - PST con saque ya pasado → provisional y nunca mueve (no hay fecha nueva).
  * - Cualquier estado distinto de NS (en juego, terminado, cancelado) → la
  *   hora es la que fue; no mueve nada desde el calendario.
  * - Ronda de relleno (≥5 NS, ≥75 % a la misma hora, saque a más de 10 días
@@ -293,12 +298,13 @@ export function inferPrecision(
 ): SchedulePrecision {
   const short = fixture.fixture.status.short;
   if (short === 'TBD') return { confirmed: false, movable: false, reason: 'time_to_be_defined' };
-  if (short === 'PST') return { confirmed: false, movable: false, reason: 'postponed' };
-  if (short !== 'NS') return { confirmed: true, movable: false, reason: 'not_scheduled' };
-
   const observed = typeof observedAt === 'number' ? observedAt : Date.parse(observedAt);
   // Sin la hora de la observación no se mide la antelación: es un bug del llamador.
   if (!Number.isFinite(observed)) throw new RangeError('observedAt inválido');
+  if (short === 'PST' && fixture.fixture.timestamp * 1000 <= observed) {
+    return { confirmed: false, movable: false, reason: 'postponed' };
+  }
+  if (short !== 'NS' && short !== 'PST') return { confirmed: true, movable: false, reason: 'not_scheduled' };
   const timing = timings.get(roundKey(fixture));
   const uniform = timing !== undefined
     && timing.fixtures >= UNIFORM_ROUND_MIN_FIXTURES

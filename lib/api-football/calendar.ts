@@ -211,9 +211,11 @@ export function mapFixtureToRow(
 
   const short = f.fixture.status.short;
   // D2: la ronda de relleno se inserta como provisional, no como hora exacta.
-  const confirmed = short === 'TBD' || short === 'PST' ? false
-    : precision?.reason === 'uniform_round' ? false
-      : precision?.confirmed ?? true;
+  // (2026-09-13) Un aplazado con saque futuro trae hora (inferPrecision lo trata
+  // como NS); sin precisión calculada se mantiene el criterio conservador.
+  const confirmed = short === 'TBD' ? false
+    : precision ? precision.reason !== 'uniform_round' && precision.confirmed
+      : short !== 'PST';
 
   let score: { home: number | null; away: number | null } = { home: null, away: null };
   let elapsed: number | null = null;

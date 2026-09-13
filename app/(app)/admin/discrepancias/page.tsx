@@ -34,7 +34,6 @@ interface Discrepancy {
   af_penalty_home: number | null;
   af_penalty_away: number | null;
   scheduled_at: string;
-  schedule_override_at: string | null;
   final_verification_notes: string | null;
   alerted_at: string | null;
 }
@@ -296,14 +295,6 @@ export default function AdminDiscrepanciasPage() {
                       {fmtDate(m.scheduled_at)}
                     </span>
                   </header>
-                  {/* Migración 118: la hora la fijó el admin y el proveedor no
-                      tiene el partido en esa fecha, así que no llega su final. */}
-                  {m.schedule_override_at && (
-                    <p className="text-[13px] leading-relaxed text-text-secondary">
-                      Hora fijada a mano: API-Football no tiene este partido en esa fecha.
-                      Ingresa abajo el marcador de los 90 minutos.
-                    </p>
-                  )}
 
                   {/* Score side-by-side */}
                   <div className="grid grid-cols-2 gap-2">

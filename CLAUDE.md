@@ -24,16 +24,16 @@ cron `/api/matches/discover` y panel `/api/admin/sync-ligas`), vivo
   `lib/api-football/calendar.ts` vía `upsert_match_safe` (Regla #1). Filas viejas
   con pronósticos o Casa conservan su uuid y llevan `apifootball:<id>` en
   `source_external_ids`. Vivo y cierre emparejan por ese id + liga, nunca por nombre.
-- TBD, aplazados y rondas de relleno (≥75 % a la misma hora) quedan
-  `scheduled_at_confirmed=false` aunque falten menos de 10 días. Desde la migración
-  118 Casa admite cierre automático con partidos provisionales: `closes_at` = primer
-  `scheduled_at` no anulado − 5 min, recalculado por trigger cuando cambia la hora de
-  un partido vinculado o se vincula uno (`casa_recompute_auto_close`, SKIP LOCKED,
-  nunca reabre una polla cerrada ni bloquea el calendario).
-- Hora fijada por el admin: `matches.schedule_override_at` (migración 118). El trigger
-  `matches_00_schedule_override` impide que cualquier escritor mueva esa hora y la
-  libera cuando el proveedor confirma a ±15 min. Sin el partido en el feed de esa
-  fecha no hay vivo ni verificación automática: cierre manual en `/admin/discrepancias`.
+- TBD, aplazados con saque ya pasado y rondas de relleno (≥75 % a la misma hora) quedan
+  `scheduled_at_confirmed=false` aunque falten menos de 10 días. (2026-09-13) Un
+  aplazado (PST) con saque futuro se trata como NS: API-Football deja el estado
+  aunque ya publicó la hora nueva, y el dueño lo quiere visible y elegible. Si no se
+  juega, llega a `/admin/issues`. Un aplazado con fecha vieja no entra: no hay fecha.
+- Desde la migración 118 Casa admite cierre automático con partidos provisionales:
+  `closes_at` = primer `scheduled_at` no anulado − 5 min, recalculado por trigger cuando
+  cambia la hora de un partido vinculado o se vincula uno (`casa_recompute_auto_close`,
+  SKIP LOCKED, nunca reabre una polla cerrada ni bloquea el calendario). El dueño
+  rechazó fijar horas a mano: si API-Football va atrasado, no se corrige en la fila.
 - Temporada completa por liga (1 solicitud por liga); el cron `discover` refresca por
   diff con presupuesto de 35 s; importación manual: `npx tsx scripts/af-import.ts`.
 - Corte (histórico): `docs/af-cutover-today.md`. El código ESPN/football-data y el

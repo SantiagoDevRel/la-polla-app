@@ -51,23 +51,6 @@ describe('admin and automatic closure share a transaction',()=>{
   expect((await request({source:'api-football'})).status).toBe(200);
   expect(rpcBody()).toMatchObject({p_home_score:1,p_away_score:1,p_fulltime_home:1,p_fulltime_away:1,p_penalty_home:3,p_penalty_away:4,p_advancer:'away'});
  });
- it('admin-fixed kickoff (118): a match that never reached finished takes only a manual score after playing time',async()=>{
-  const fixed={...match,status:'scheduled',home_score:null,away_score:null,scheduled_at:'2026-09-09T18:00:00Z',schedule_override_at:'2026-09-09T18:00:00Z'};
-  const serve=(row:object)=>fetchMock.mockImplementation(async input=>new Response(JSON.stringify(String(input).includes('/rpc/')?true:row),{headers:{'content-type':'application/json'}}));
-  vi.useFakeTimers({toFake:['Date']});
-  try{
-   vi.setSystemTime(new Date('2026-09-09T20:10:00Z'));serve(fixed);
-   expect((await request()).status).toBe(200);
-   expect(rpcBody()).toMatchObject({p_home_score:2,p_away_score:1});
-   fetchMock.mockClear();serve(fixed);
-   expect((await request({source:'api-football'})).status).toBe(409);
-   vi.setSystemTime(new Date('2026-09-09T19:30:00Z'));fetchMock.mockClear();serve(fixed);
-   expect((await request()).status).toBe(409);
-   fetchMock.mockClear();serve({...fixed,schedule_override_at:null});vi.setSystemTime(new Date('2026-09-10T00:00:00Z'));
-   expect((await request()).status).toBe(409);
-   expect(fetchMock.mock.calls.some(c=>String(c[0]).includes('/rpc/'))).toBe(false);
-  }finally{vi.useRealTimers();}
- });
  it('api-football without a usable cached final asks for the manual score',async()=>{
   mocks.cached.mockResolvedValue({fixture:fixture('2H'),fetchedAt:'2026-09-09T19:00:00Z'});
   expect((await request({source:'api-football'})).status).toBe(409);
