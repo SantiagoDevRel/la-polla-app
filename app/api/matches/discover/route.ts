@@ -2,8 +2,7 @@
 // nuevos de un torneo via ESPN.
 //
 // Llamado por:
-//   1. pg_cron auto-discover (cada 6h) para tournaments con pollas
-//      activas scope != custom.
+//   1. pg_cron auto-discover (cada 6h) para todos los torneos habilitados.
 //   2. Manualmente con CRON_SECRET para seedear fixtures de un torneo
 //      nuevo (ej. la primera vez que se agrega Liga BetPlay).
 //
@@ -11,8 +10,8 @@
 //   curl -X POST -H "x-cron-secret: $CRON_SECRET" \
 //     "https://lapollacolombiana.com/api/matches/discover?tournament=betplay_2026"
 //
-// Sin tournament param: itera sobre todos los tournaments con polla
-// activa scope != custom (mismo gate que el cron).
+// Sin tournament param: actualiza los 30 días próximos de todos los torneos,
+// aunque todavía no exista una polla de Casa o P2P.
 //
 // Auth: CRON_SECRET solo. Aceptado via header `x-cron-secret` o
 // `Authorization: Bearer …`. La opción ?secret=… fue removida porque
@@ -22,7 +21,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { discoverTournament } from "@/lib/espn/discover";
 import { ESPN_LEAGUE_BY_TOURNAMENT } from "@/lib/espn/client";
-import { isSyncableTournament } from "@/lib/tournaments";
+import { SYNCABLE_TOURNAMENT_SLUGS } from "@/lib/tournaments";
+import { refreshTournamentSchedule } from "@/lib/matches/refresh-schedule";
 import { hasPlaceholderTeam } from "@/lib/matches/is-placeholder";
 import { syncWorldCup2026 } from "@/lib/api-football/sync-worldcup";
 import { syncCompetition } from "@/lib/football-data/sync";
@@ -46,41 +46,9 @@ async function tournamentsToDiscover(explicit: string | null): Promise<string[]>
     }
     return [explicit];
   }
-  // Default: tournaments que cumplan AL MENOS UNA condición:
-  //   - Hay al menos una polla activa con scope != custom (ej. el
-  //     organizador quiere que matches futuros entren solos).
-  //   - Hay placeholder TBD rows sin promover. Esto cubre el caso
-  //     común: pollas custom con cuartos/semis/final placeholders
-  //     que esperan ser promovidos cuando ESPN publique los matchups.
-  // Si ambas condiciones son false, retornamos [] y el cron skipea.
-  const admin = createAdminClient();
-  const tournaments = new Set<string>();
-
-  const { data: dyn } = await admin
-    .from("pollas")
-    .select("tournament")
-    .eq("status", "active")
-    .neq("scope", "custom");
-  for (const p of (dyn || []) as Array<{ tournament: string }>) {
-    tournaments.add(p.tournament);
-  }
-
-  const { data: tbd } = await admin
-    .from("matches")
-    .select("tournament")
-    .eq("home_team", "TBD")
-    .like("external_id", "placeholder:%");
-  for (const m of (tbd || []) as Array<{ tournament: string }>) {
-    tournaments.add(m.tournament);
-  }
-
-  // Solo torneos "syncables" (post-Mundial: solo worldcup_2026). El auto-
-  // discover por cron no toca ligas sin pollas activas. El path EXPLÍCITO
-  // (?tournament=…) sí puede seedear cualquier liga mapeada — es override
-  // deliberado con CRON_SECRET.
-  return Array.from(tournaments).filter(
-    (s) => ESPN_LEAGUE_BY_TOURNAMENT[s] && isSyncableTournament(s),
-  );
+  // Casa calendars must stay current before the first pool is created.
+  // Legacy P2P activity is not a prerequisite for schedule maintenance.
+  return SYNCABLE_TOURNAMENT_SLUGS.filter(s => ESPN_LEAGUE_BY_TOURNAMENT[s]);
 }
 
 // Resolución de brackets del Mundial (migración 062): si quedan slots de
@@ -161,11 +129,12 @@ async function runDiscover(request: NextRequest) {
       brackets,
     };
   }
-  const results = [];
-  for (const t of tournaments) {
-    const r = await discoverTournament(t);
-    results.push(r);
-  }
+  // Independent calendars run together so one provider timeout cannot starve
+  // tournaments at the end of the list. Each uses the same atomic reservation.
+  const results = await Promise.all(tournaments.map(async tournament =>
+    explicit
+      ? await discoverTournament(tournament, { daysAhead: 30, daysBack: 1 })
+      : { tournament, refreshed: await refreshTournamentSchedule(tournament) }));
   return { ok: true, skipped: false, results, brackets };
 }
 

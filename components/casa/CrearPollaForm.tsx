@@ -28,6 +28,7 @@ interface MatchOption {
   home_team_flag: string | null;
   away_team_flag: string | null;
   scheduled_at: string;
+  scheduled_at_confirmed?: boolean;
 }
 
 interface SelectedMatch extends MatchOption {
@@ -191,6 +192,7 @@ export function CrearPollaForm() {
         if (controller.signal.aborted) return;
         const loaded: MatchOption[] = j.matches ?? [];
         setMatches(loaded);
+        if (j.scheduleRefreshed === false) setSyncMsg("No pudimos actualizar los horarios. Se muestran los últimos datos guardados.");
         // Refresca horarios de los elegidos sin perder los de otras ligas.
         setSeleccion((prev) => prev.map((match) => {
           const fresh = loaded.find((item) => item.id === match.id);
@@ -749,6 +751,7 @@ export function CrearPollaForm() {
             <SectionHead
               title="Partidos"
               meta={`${seleccion.length}/30 elegidos`}
+              className="[&>div]:flex-wrap"
             />
             {seleccion.length > 0 && (
               <details className="mb-3 rounded-lg border border-border-subtle bg-bg-card/80 transition-colors hover:border-border-strong">
@@ -761,7 +764,7 @@ export function CrearPollaForm() {
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] text-text-primary [overflow-wrap:anywhere]">{m.home_team} vs {m.away_team}</p>
                         <p className="mt-1 text-[11px] text-text-secondary">
-                          {CREATABLE_TOURNAMENTS.find((t) => t.slug === m.tournament)?.name} · {formatMatchTime(m.scheduled_at)}
+                          {CREATABLE_TOURNAMENTS.find((t) => t.slug === m.tournament)?.name} · {formatMatchTime(m.scheduled_at, m.scheduled_at_confirmed)}
                         </p>
                       </div>
                       <button
@@ -844,7 +847,7 @@ export function CrearPollaForm() {
                             </span>
                           </span>
                           <span className="lp-label mt-0.5 block">
-                            {formatMatchTime(m.scheduled_at)}
+                            {formatMatchTime(m.scheduled_at, m.scheduled_at_confirmed)}
                           </span>
                         </span>
                       </button>

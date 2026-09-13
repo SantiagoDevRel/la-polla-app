@@ -18,6 +18,7 @@ const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
 // este map, ESPN no se consulta para él (la sync skipea silenciosa).
 export const ESPN_LEAGUE_BY_TOURNAMENT: Record<string, string> = {
   champions_2025: "uefa.champions",
+  europa_2026: "uefa.europa",
   worldcup_2026: "fifa.world",
   laliga_2025: "esp.1",
   premier_2025: "eng.1",
@@ -30,12 +31,12 @@ export const ESPN_LEAGUE_BY_TOURNAMENT: Record<string, string> = {
 };
 
 /**
- * Tournaments donde ESPN es la ÚNICA fuente disponible (football-data
- * plan free no las cubre). El verify-final puede operar con
- * single-source para estos. Cuando se agregue un segundo proveedor
- * (API-Football, etc.) movemos estos slugs fuera de la lista.
+ * Tournaments without coverage in the football-data free plan. The name
+ * is historical: API-Football also verifies these results now. Keep this
+ * gate so verify-final skips football-data and uses the available sources.
  */
 export const ESPN_ONLY_TOURNAMENTS: ReadonlySet<string> = new Set([
+  "europa_2026",
   "libertadores_2026",
   "sudamericana_2026",
   "betplay_2026",
@@ -87,6 +88,8 @@ export interface ESPNCompetitor {
 
 export interface ESPNCompetition {
   id: string;
+  /** false means the provider has not confirmed the kickoff time yet. */
+  timeValid?: boolean;
   competitors: ESPNCompetitor[];
 }
 

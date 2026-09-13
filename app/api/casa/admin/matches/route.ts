@@ -8,9 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { isCreatableTournament } from "@/lib/tournaments";
+import { refreshTournamentSchedule } from "@/lib/matches/refresh-schedule";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   if (!(await isCurrentUserAdmin())) {
@@ -30,11 +32,12 @@ export async function GET(req: NextRequest) {
   );
   const hasta = new Date(Date.now() + dias * 86_400_000).toISOString();
 
+  const scheduleRefreshed = await refreshTournamentSchedule(tournament);
   const db = createAdminClient();
   const { data, error } = await db
     .from("matches")
     .select(
-      "id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, match_day",
+      "id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, scheduled_at_confirmed, match_day",
     )
     .eq("tournament", tournament)
     .gt("scheduled_at", new Date().toISOString())
@@ -47,5 +50,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No pude leer los partidos." }, { status: 500 });
   }
 
-  return NextResponse.json({ matches: data ?? [] });
+  return NextResponse.json({ matches: data ?? [], scheduleRefreshed }, {
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }

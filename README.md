@@ -6,9 +6,45 @@ El modelo histórico de grupos privados permanece disponible.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
+### Horarios y torneos (2026-09-13)
+
+Sudamericana y Europa League (`europa_2026`, API-Football 3, ESPN `uefa.europa`)
+están habilitadas para estadísticas, creación de pollas y sincronización.
+Sus logos y escudos son archivos locales; Europa incluye 76 clubes de la temporada.
+
+El calendario de Casa se actualiza **antes** de responder al administrador, aunque
+ya tenga partidos guardados. `refreshTournamentSchedule` comparte una reserva SQL
+de 15 minutos con `/api/matches` y el cron de descubrimiento existente (cada seis
+horas). Consulta 30 días próximos: football-data donde tiene cobertura y ESPN como
+respaldo. Las ligas se actualizan independientemente de las pollas P2P antiguas.
+Una actualización fallida o en curso no se presenta como exitosa; el cliente recibe
+un aviso y usa `private, no-store`.
+
+Migración **103**: `scheduled_at_confirmed` distingue una fecha provisional de un
+pitazo confirmado. `SCHEDULED` de football-data y `timeValid=false` de ESPN conservan
+la fecha sin convertirla al día anterior y se muestran como «hora por confirmar».
+`TIMED` sí se convierte a Colombia. El RPC central conserva identidades de proveedor,
+promueve fechas provisionales sin crear otro UUID y rechaza identidades ambiguas;
+una observación provisional no reemplaza un horario confirmado. Mantiene compatible
+la firma anterior del RPC y no recalcula pronósticos, puntos ni resultados.
+
+El incidente Barcelona–Racing / Atlético–Osasuna se debía a fechas antiguas
+`2026-09-16T00:00Z` de football-data guardadas como horas reales, que en Colombia se
+veían como martes 15. Los horarios verificados son miércoles 16, 14:30 y 12:00 en
+Colombia, respectivamente. La migración corrige esos registros con el mismo RPC.
+Los proveedores todavía pueden reprogramar o equivocarse: la reserva no equivale
+a una garantía en tiempo real ni a que todos los horarios futuros sean definitivos.
+
+Verificación local:
+
+```powershell
+Get-Content -Raw scripts/match-schedule-check.sql | docker exec -i supabase_db_la-polla psql -U postgres -d postgres -X -v ON_ERROR_STOP=1
+npm test -- tests/match-schedule.test.ts tests/tournament-availability.test.ts tests/football-media.test.ts
+```
+
 ## Fútbol: calendario, partidos y equipos (API-Football Pro)
 
-La pestaña **Fútbol** (`/futbol`) presenta los nueve torneos con sus logos,
+La pestaña **Fútbol** (`/futbol`) presenta los diez torneos con sus logos,
 escudos, marcadores y acceso al detalle. El partido muestra goles, jugadas,
 estadísticas, titulares y suplentes. Tocar un escudo abre la ficha del club:
 plantel por posición, fotos, dorsales, edades, resultados, próximos partidos

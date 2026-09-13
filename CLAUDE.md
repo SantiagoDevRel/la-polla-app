@@ -6,6 +6,22 @@
 
 ## READ THIS FIRST
 
+### Precisión de horarios y torneos (2026-09-13, migración 103)
+
+`matches.scheduled_at_confirmed=false` significa fecha provisional, no medianoche
+real: mostrar la fecha UTC sin corrimiento y «hora por confirmar». football-data
+`SCHEDULED` y ESPN `timeValid=false` deben enviar esa precisión al overload de 17
+argumentos de `upsert_match_safe`; la firma anterior sigue compatible. El escritor
+central protege horarios confirmados, conserva `source_external_ids` y no duplica
+al confirmar/reprogramar un partido. No corregir esto sumando horas al timestamp.
+
+El calendario administrativo espera `refreshTournamentSchedule` antes de responder,
+incluso con filas existentes. Reserva atómica compartida 15 min; ventana 30 días;
+cron existente cada seis horas sin depender de pollas P2P. Errores/en curso no se
+anuncian como datos frescos. Sudamericana y `europa_2026` están activas; Europa usa
+API-Football 3 / ESPN `uefa.europa` y no consulta football-data sin cobertura.
+Pruebas y detalle del incidente: README → Horarios y torneos.
+
 ### Navegación y actualización de la app (2026-09-09)
 
 Casa: Pollas abiertas → Mis pollas → Pollas cerradas, todas cerradas inicialmente,
