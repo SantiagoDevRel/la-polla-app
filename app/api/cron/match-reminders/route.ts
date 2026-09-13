@@ -18,6 +18,7 @@ import {
   estimateTemplateCost,
   type TemplateComponent,
 } from "@/lib/whatsapp/template";
+import { whatsappOutboundEnabled } from "@/lib/whatsapp/outbound";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,6 +55,11 @@ export async function POST(request: NextRequest) {
   }
   if (auth !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  // Sin número propio no se envía nada ni se registran envíos fallidos.
+  if (!whatsappOutboundEnabled()) {
+    return NextResponse.json({ ok: true, disabled: true, sent: 0 });
   }
 
   const admin = createAdminClient();
