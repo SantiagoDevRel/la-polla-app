@@ -1163,7 +1163,14 @@ Where it matters most we use reply buttons:
 - `META_WA_ACCESS_TOKEN`, `META_WA_PHONE_NUMBER_ID` — outbound sends.
 - `META_WA_APP_SECRET` — inbound HMAC signature verification.
 - `META_WA_WEBHOOK_VERIFY_TOKEN` — Meta subscription handshake.
-- `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` — bot's E.164 number (no plus).
+- `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` — bot's E.164 number (no plus). Sin
+  valor por defecto: sin la variable no existe enlace al bot.
+
+⛔ **WhatsApp apagado (2026-09-13).** El número del bot ahora pertenece a
+otra app. La Polla no lo muestra ni envía desde él: login solo por SMS, sin
+enlaces `wa.me` al bot, y `lib/whatsapp/outbound.ts` convierte todo envío
+(texto, interactivo, template y el cron de recordatorios) en no-op salvo
+`WHATSAPP_OUTBOUND_ENABLED=true`. No reactivar sin un número propio.
 
 ### Tone Rules (non-negotiable) — REESCRITAS 2026-09-02
 

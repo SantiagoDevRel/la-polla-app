@@ -370,7 +370,11 @@ CRON_SECRET=
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=573117312391
+# WhatsApp: apagado. El número anterior del bot ahora es de otra app.
+# Solo con un número propio: WHATSAPP_OUTBOUND_ENABLED=true y
+# NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=<E.164 sin +>.
+WHATSAPP_OUTBOUND_ENABLED=
+NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=
 ```
 
 ### 3. Supabase migrations
