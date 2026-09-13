@@ -51,6 +51,8 @@ interface RateLimitResult {
   blocked: boolean;
   remaining: number;
   retryAfter?: Date;
+  /** Fila grabada por checkAndRecordAttempt (para liberarla si Supabase rechaza). */
+  attemptId?: string;
 }
 
 /**
@@ -98,13 +100,51 @@ export async function checkAndRecordAttempt(
   }
 
   // Record this attempt
-  await admin.from("otp_rate_limits").insert({
-    phone_number: phone,
-    attempt_type: type,
-    ip_address: ip ?? null,
-  });
+  const { data: recorded } = await admin
+    .from("otp_rate_limits")
+    .insert({
+      phone_number: phone,
+      attempt_type: type,
+      ip_address: ip ?? null,
+    })
+    .select("id")
+    .maybeSingle();
 
-  return { blocked: false, remaining: maxAttempts - currentCount - 1 };
+  return {
+    blocked: false,
+    remaining: maxAttempts - currentCount - 1,
+    attemptId: typeof recorded?.id === "string" ? recorded.id : undefined,
+  };
+}
+
+/**
+ * ¿Supabase Auth rechazó el envío ANTES de mandar el SMS? Solo las respuestas
+ * 4xx (429 de límite, 400/422 de validación o proveedor apagado) lo
+ * garantizan. Un 5xx o un error de red puede llegar después de que el
+ * proveedor aceptó el mensaje, así que esos intentos siguen contando.
+ */
+export function otpRejectedBeforeSending(error: unknown): boolean {
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status === "number" && status >= 400 && status < 500;
+}
+
+/**
+ * Devuelve el cupo de un 'generate' que Supabase rechazó sin enviar SMS: sin
+ * esto un 429 de Supabase gastaba uno de los 2 SMS diarios de la persona sin
+ * que le llegara nada. Borra SOLO la fila que grabó este mismo request (por
+ * id y tipo). No abre abuso: lo que se libera no costó un SMS, y los envíos
+ * aceptados siguen contando para el tope diario, el de la hora y el de IP.
+ */
+export async function releaseGenerateAttempt(attemptId: string): Promise<void> {
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("otp_rate_limits")
+    .delete()
+    .eq("id", attemptId)
+    .eq("attempt_type", "generate");
+  if (error) {
+    console.error("[rate-limit] no se pudo liberar el intento:", error.message);
+  }
 }
 
 /**

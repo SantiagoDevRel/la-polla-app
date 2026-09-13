@@ -23,6 +23,7 @@ import { ArrowLeft, MessageSquare, Loader2, Send } from "lucide-react";
 import axios from "axios";
 import { useLocale, useTranslations } from "next-intl";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
+import { DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
 import { telegramLoginDeepLink } from "@/lib/auth/telegram-login/deep-link";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
@@ -260,7 +261,11 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(json.error || t("errSendFailed"));
+        setError(
+          json.code === DAILY_SMS_CAP_CODE
+            ? t("errDailySmsCap")
+            : json.error || t("errSendFailed"),
+        );
         return;
       }
       // Arm the cooldown only after a successful send — failures don't
@@ -448,6 +453,15 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
             {error && (
               <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
                 {error}
+                {/* Tope diario de SMS: la salida es soporte (WhatsApp está apagado). */}
+                {error === t("errDailySmsCap") && (
+                  <a
+                    href={SUPPORT_PATH}
+                    className="block py-2.5 font-semibold text-text-primary underline underline-offset-2 hover:text-gold transition-colors"
+                  >
+                    {t("errDailySmsCapSupport")}
+                  </a>
+                )}
               </p>
             )}
 

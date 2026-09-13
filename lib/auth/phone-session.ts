@@ -15,7 +15,7 @@
 
 import type { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient as createServerSupabase } from "@/lib/supabase/server";
+import { createAuthRouteClient } from "@/lib/supabase/auth-ip";
 import { emailForPhone, normalizePhone } from "@/lib/auth/phone";
 
 export type PhoneSessionResult =
@@ -31,6 +31,12 @@ export interface PhoneSessionOptions {
    * anterior (lib/auth/telegram-login/identity.ts).
    */
   authorize?: (account: { authUserId: string; created: boolean }) => Promise<boolean>;
+  /**
+   * IP real de quien pide la sesión (getClientIp del request). Viaja a Supabase
+   * como Sb-Forwarded-For para que el límite por IP de /verify cuente a esa
+   * persona y no a la IP compartida de Vercel (lib/supabase/auth-ip.ts).
+   */
+  clientIp?: string | null;
 }
 
 /**
@@ -124,12 +130,13 @@ export async function startSessionForVerifiedPhone(
     return { ok: false, stage: "link" };
   }
 
-  const supabase = await createServerSupabase();
+  // Cliente SOLO de Auth, con las cookies del request y la IP real.
+  const auth = await createAuthRouteClient(options.clientIp ?? null);
   // scope:'local' — solo este navegador. 'global' revocaría las sesiones del
   // usuario anterior en sus otros dispositivos.
-  await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+  await auth.signOut({ scope: "local" }).catch(() => {});
 
-  const { error: verifyErr } = await supabase.auth.verifyOtp({
+  const { error: verifyErr } = await auth.verifyOtp({
     email: syntheticEmail,
     token: emailOtp,
     type: "email",

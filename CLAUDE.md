@@ -405,6 +405,39 @@ verificada byte a byte en el DGX (`~/apps/la-polla-backup/`).
 Guía completa (incluye cómo reabrir en un proyecto nuevo):
 `docs/backup-restore.md`.
 
+### Backup automático en el DGX + alerta de backup atrasado (2026-09-13)
+
+`ops/backup/` corre export + verify cada 6 h en el DGX (systemd de usuario),
+cifra con gpg (la llave privada NO vive en el DGX) y poda con GFS. Detalle y
+operación: `ops/backup/README.md`.
+
+**La alerta no depende del DGX.** Al terminar, bien o mal, `run-backup.sh` y
+`verify-snapshots.sh` insertan una fila en `public.backup_runs` (migración 117,
+`ops/backup/record-run.mjs`, solo conteos y el motivo del fallo, sin PII). El
+workflow `backup-freshness.yml` llama cada hora a `/api/cron/backup-freshness`,
+que le escribe al admin (`ADMIN_ALERT_EMAIL`, o `FEEDBACK_NOTIFY_EMAIL`) con asunto
+«Backup de La Polla atrasado» si el último backup bueno pasa de 7 h
+(`BACKUP_MAX_AGE_HOURS`) o la última verificación buena de 30 h
+(`BACKUP_VERIFY_MAX_AGE_HOURS`), o si no hay filas. Si el DGX se apaga, la
+falta de filas ES la alerta. Se repite cada hora mientras siga atrasado.
+
+- `backup_runs`: RLS + deny-all para anon/authenticated; `service_role` solo
+  `SELECT, INSERT` (nadie edita ni borra la bitácora). Regresión:
+  `scripts/backup-runs-check.sql` (Supabase local).
+- Registrar nunca cambia el código de salida del backup; si el insert falla
+  queda en `status/*.json` como `run_recorded`. Prueba:
+  `bash ops/backup/test-record-run.sh` (con `RECORD_RUN_TEST_*` también
+  inserta contra un Supabase local; rechaza URLs que no sean 127.0.0.1).
+- Orden al activar: migración 117 en prod → runner del DGX actualizado al
+  commit con `record-run.mjs` → corrida manual de `la-polla-backup.service` Y
+  de `la-polla-backup-verify.service` → confirmar filas `backup|ok` y
+  `verify|ok` → recién ahí el workflow (si no, correo cada hora por "sin
+  filas"). Un 500 `backup_runs query failed` = migración sin aplicar.
+- Primera verificación: sin ninguna fila `kind=verify` y con el PRIMER backup
+  bueno de 30 h o menos, la verificación queda «pendiente» y no alerta. El
+  margen se mide desde el primer backup (no el último), así una verificación
+  que nunca arranca termina avisando; una fallida no tiene margen.
+
 ---
 
 ## NUNCA dejes ideas a medio camino
@@ -436,8 +469,16 @@ se pierden ideas grandes que el usuario sí quería.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
-- (Sin ideas abiertas. El chat embebido de Claude en /admin quedó descartado
-  por ahora el 2026-09-13, por decisión del dueño.)
+- (El chat embebido de Claude en /admin quedó descartado por ahora el
+  2026-09-13, por decisión del dueño.)
+- **Captcha de Supabase Auth antes de producción (2026-09-13, hallazgo de
+  revisión del PR #71).** `/auth/v1/otp` acepta llamadas directas con la anon
+  key pública y la captcha está apagada: los topes de `start-otp` no frenan a
+  quien llama a Supabase directo, que puede gastar hasta 300 SMS/h y dejar sin
+  login a todos. Falta decidir y probar: activar la captcha de Auth después de
+  que `SUPABASE_SECRET_KEY` funcione en producción (GoTrue se la salta con
+  credenciales de admin), probándola primero en un proyecto de prueba, o un
+  Send SMS Hook. Plan y verificación: README → «IP real en Supabase Auth».
 <!-- Pollas combinadas multi-torneo: COMPLETADO 2026-04-30. Migración
      038 + UI de creación con multi-select + display con stack de logos
      en PollaCard y header de detail. Removido de pendings. -->
@@ -595,6 +636,27 @@ están documentadas en migration 056-057.
   page.tsx`) calls `signInWithOtp` client-side and then verifies the
   code server-side at `/api/auth/verify-otp` so cookies stick on iOS
   Safari.
+- **IP real en Supabase Auth (2026-09-13).** `/otp` y `/verify` de Supabase
+  limitan POR IP (30 cada 5 min); llamados desde Vercel, todos los usuarios
+  compartían las IPs de salida de Vercel. `start-otp`, `verify-otp` y
+  `lib/auth/phone-session.ts` (sesión de `wa-magic`, `telegram-link` y
+  `telegram-verify`, que le pasan `clientIp`) llaman a Auth SOLO con `lib/supabase/auth-ip.ts`:
+  `getClientIp` (`x-real-ip` → primer `x-forwarded-for`, IP validada) +
+  `SUPABASE_SECRET_KEY` (`sb_secret_`) + cabecera `Sb-Forwarded-For`. Supabase
+  la respeta solo con secret key y `security_sb_forwarded_for_enabled=true`.
+  Los helpers devuelven `client.auth`, nunca el cliente: con secret key y sin
+  sesión un `.from()` sería service_role. No usarlos para datos. Sin la env
+  cae a anon sin cabecera (warn). Si Supabase rechaza la key (401 `Invalid
+  API key`: revocada, rotada, de otro proyecto), `fetchWithAnonFallback`
+  repite esa llamada una vez con anon y sin cabecera y deja un console.error:
+  se pierde la IP real, no el login. No quitar ese respaldo; antes de poner la
+  env en Production, smoke test de login real en Preview. Cualquier ruta nueva que abra sesión desde
+  el servidor (p. ej. `lib/auth/phone-session.ts`) usa `createAuthRouteClient`.
+- Tope diario de SMS (2 por teléfono en 24 h): `start-otp` responde 429
+  `code: "daily_sms_cap"` y `/login` muestra `Login.errDailySmsCap` con
+  enlace a `/soporte` (WhatsApp está apagado). Un 4xx de Supabase (no salió
+  SMS) libera el `generate` que ese mismo request grabó; 5xx o error de red
+  siguen contando.
 - After OTP verify, new users land on `/onboarding`. Onboarding has
   two **mandatory** steps:
     1. Pick a real display name (not phone-shaped, ≥2 chars)

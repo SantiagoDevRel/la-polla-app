@@ -1,0 +1,9 @@
+{
+  "name": "la-polla-backup-tools",
+  "private": true,
+  "description": "Herramientas fijadas del runner de backup (ops/backup). Se instalan con npm ci --ignore-scripts; no forman parte de la app.",
+  "license": "MIT",
+  "dependencies": {
+    "tsx": "4.23.13"
+  }
+}

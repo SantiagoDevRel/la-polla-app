@@ -24,6 +24,7 @@ import {
   applyOnboardingCookie,
   startSessionForVerifiedPhone,
 } from "@/lib/auth/phone-session";
+import { getClientIp } from "@/lib/supabase/auth-ip";
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { consumeLoginCode } from "@/lib/auth/telegram-login/consume";
 import { telegramSessionAuthorizer } from "@/lib/auth/telegram-login/identity";
@@ -66,9 +67,9 @@ export async function POST(request: NextRequest) {
   }
   const phoneNormalized = normalizePhone(phoneE164);
 
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
-  const limit = await checkAndRecordAttempt(phoneNormalized, "telegram_verify", ip);
+  // Misma IP validada que viaja a Supabase (x-real-ip, luego x-forwarded-for).
+  const clientIp = getClientIp(request.headers);
+  const limit = await checkAndRecordAttempt(phoneNormalized, "telegram_verify", clientIp ?? undefined);
   if (limit.blocked) {
     return json(
       { error: "rate_limited", retryAfter: limit.retryAfter?.toISOString() },
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
 
   const session = await startSessionForVerifiedPhone(phoneNormalized, "telegram-verify", {
     authorize: telegramSessionAuthorizer(admin, config, consumed.telegramUserId),
+    clientIp,
   });
   if (!session.ok) {
     // Cuenta existente que no acepta esta cuenta de Telegram: solo SMS.

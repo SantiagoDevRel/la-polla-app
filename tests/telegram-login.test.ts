@@ -3,9 +3,13 @@ import { NextRequest } from "next/server";
 
 const adminFactory = vi.hoisted(() => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => adminFactory);
-// Cliente de Supabase con las cookies del request (el que abre la sesión).
-const serverFactory = vi.hoisted(() => ({ createClient: vi.fn() }));
-vi.mock("@/lib/supabase/server", () => serverFactory);
+// Cliente de Auth con las cookies del request y la IP real (el que abre la
+// sesión). getClientIp se conserva real: las rutas la usan para el límite.
+const authIpFactory = vi.hoisted(() => ({ createAuthRouteClient: vi.fn() }));
+vi.mock("@/lib/supabase/auth-ip", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/supabase/auth-ip")>()),
+  createAuthRouteClient: authIpFactory.createAuthRouteClient,
+}));
 vi.mock("@/lib/auth/login-event", () => ({ recordLoginEvent: vi.fn().mockResolvedValue(undefined) }));
 
 import { toE164 } from "@/lib/auth/phone";
@@ -76,7 +80,7 @@ function privateMessage(extra: Record<string, unknown>, userId = 5550001) {
 
 beforeEach(() => {
   adminFactory.createAdminClient.mockReset();
-  serverFactory.createClient.mockReset();
+  authIpFactory.createAuthRouteClient.mockReset();
   setLoginEnv(false);
 });
 afterEach(() => {
@@ -412,7 +416,12 @@ describe("consume helpers", () => {
 
 describe("rate limit — 5 code attempts / 15 min per phone", () => {
   it("blocks the sixth attempt and records attempts with their own type", async () => {
-    const insert = vi.fn().mockResolvedValue({ error: null });
+    // checkAndRecordAttempt graba y lee el id de la fila (insert → select → maybeSingle).
+    const insert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: "attempt-1" }, error: null }),
+      })),
+    }));
     let count = 4;
     const chain = {
       select: vi.fn(() => chain),
@@ -428,6 +437,7 @@ describe("rate limit — 5 code attempts / 15 min per phone", () => {
 
     const allowed = await checkAndRecordAttempt("573001234567", "telegram_verify", "1.2.3.4");
     expect(allowed.blocked).toBe(false);
+    expect(allowed.attemptId).toBe("attempt-1");
     expect(insert).toHaveBeenCalledWith({ phone_number: "573001234567", attempt_type: "telegram_verify", ip_address: "1.2.3.4" });
     expect(chain.eq).toHaveBeenCalledWith("attempt_type", "telegram_verify");
     const since = new Date((chain.gte.mock.calls[0] as unknown as [string, string])[1]).getTime();
@@ -600,7 +610,7 @@ function fakeCookieClient() {
       verifyOtp: vi.fn().mockResolvedValue({ data: {}, error: null }),
     },
   };
-  serverFactory.createClient.mockResolvedValue(client);
+  authIpFactory.createAuthRouteClient.mockResolvedValue(client.auth);
   return client;
 }
 
@@ -635,7 +645,7 @@ describe("telegram-link: the GET only shows the number, a same-origin POST signs
     expect(html).not.toContain("sesión abierta");
 
     expect(admin.rpc.mock.calls.map((c) => c[0])).toEqual(["telegram_login_peek_link"]);
-    expect(serverFactory.createClient).not.toHaveBeenCalled();
+    expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
     expect(cookies.auth.signOut).not.toHaveBeenCalled();
   });
 
@@ -671,7 +681,7 @@ describe("telegram-link: the GET only shows the number, a same-origin POST signs
       expect(res.headers.get("set-cookie")).toBeNull();
     }
     expect(adminFactory.createAdminClient).not.toHaveBeenCalled();
-    expect(serverFactory.createClient).not.toHaveBeenCalled();
+    expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
   });
 
   it("same-origin POST redeems once and opens the session of an account linked to that Telegram account", async () => {
@@ -685,8 +695,12 @@ describe("telegram-link: the GET only shows the number, a same-origin POST signs
     );
     const cookies = fakeCookieClient();
 
-    const res = await linkPOST(formPost({ "sec-fetch-site": "same-origin", origin: "http://localhost" }));
+    const res = await linkPOST(
+      formPost({ "sec-fetch-site": "same-origin", origin: "http://localhost", "x-real-ip": "203.0.113.5" }),
+    );
     expect(res.status).toBe(303);
+    // La sesión se abre con la IP real de la persona (Sb-Forwarded-For).
+    expect(authIpFactory.createAuthRouteClient).toHaveBeenCalledWith("203.0.113.5");
     expect(res.headers.get("location")).toBe("http://localhost/casa");
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(admin.rpc).toHaveBeenCalledWith("telegram_login_redeem_link", { p_link_token_hash: hashLinkToken(BOT_TOKEN, token) });
@@ -715,7 +729,7 @@ describe("recycled number: an existing account only accepts its linked Telegram 
     expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
     expect(admin.auth.admin.updateUserById).not.toHaveBeenCalled();
     expect(admin.auth.admin.generateLink).not.toHaveBeenCalled();
-    expect(serverFactory.createClient).not.toHaveBeenCalled();
+    expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
     expect(cookies.auth.signOut).not.toHaveBeenCalled();
     expect(cookies.auth.verifyOtp).not.toHaveBeenCalled();
   });

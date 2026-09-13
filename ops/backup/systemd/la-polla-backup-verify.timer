@@ -1,0 +1,13 @@
+[Unit]
+Description=La Polla: verificación diaria de snapshots a las 03:40 hora Bogotá
+Documentation=https://github.com/SantiagoDevRel/la-polla-app/blob/main/ops/backup/README.md
+
+[Timer]
+OnCalendar=*-*-* 03:40:00 America/Bogota
+Persistent=true
+RandomizedDelaySec=120
+AccuracySec=1min
+Unit=la-polla-backup-verify.service
+
+[Install]
+WantedBy=timers.target

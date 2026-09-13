@@ -29,6 +29,7 @@ import {
   applyOnboardingCookie,
   startSessionForVerifiedPhone,
 } from "@/lib/auth/phone-session";
+import { getClientIp } from "@/lib/supabase/auth-ip";
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { consumeLoginLink, peekLoginLink } from "@/lib/auth/telegram-login/consume";
 import { telegramSessionAuthorizer } from "@/lib/auth/telegram-login/identity";
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
 
   const session = await startSessionForVerifiedPhone(result.phoneE164, "telegram-link", {
     authorize: telegramSessionAuthorizer(admin, config, result.telegramUserId),
+    clientIp: getClientIp(request.headers),
   });
   if (!session.ok) {
     if (session.stage === "denied") return authErrorPage(copy.smsOnly, 409, locale);

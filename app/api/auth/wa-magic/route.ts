@@ -22,6 +22,7 @@ import {
   applyOnboardingCookie,
   startSessionForVerifiedPhone,
 } from "@/lib/auth/phone-session";
+import { getClientIp } from "@/lib/supabase/auth-ip";
 import { authErrorPage as errorPage } from "@/lib/auth/auth-error-page";
 
 export const runtime = "nodejs";
@@ -63,6 +64,8 @@ export async function GET(request: NextRequest) {
   const session = await startSessionForVerifiedPhone(
     normalizePhone(row.phone_number),
     "wa-magic",
+    // IP real hacia Supabase: /verify limita por IP (lib/supabase/auth-ip.ts).
+    { clientIp: getClientIp(request.headers) },
   );
   if (!session.ok) {
     return errorPage(
