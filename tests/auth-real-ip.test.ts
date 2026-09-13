@@ -164,7 +164,10 @@ describe("selección de key y cabecera para Auth", () => {
     expect(auth).toEqual({ kind: "plain" });
     expect(mocks.sbCreateClient).toHaveBeenCalledWith(URL_, SECRET, {
       auth: { autoRefreshToken: false, persistSession: false },
-      global: { headers: { "Sb-Forwarded-For": "2800:e2:9f00::1" } },
+      global: {
+        headers: { "Sb-Forwarded-For": "2800:e2:9f00::1" },
+        fetch: expect.any(Function),
+      },
     });
   });
 
@@ -184,10 +187,145 @@ describe("selección de key y cabecera para Auth", () => {
     const [url, key, options] = mocks.ssrCreateServerClient.mock.calls[0];
     expect(url).toBe(URL_);
     expect(key).toBe(SECRET);
-    expect(options.global).toEqual({ headers: { "Sb-Forwarded-For": "190.25.1.7" } });
+    expect(options.global).toEqual({
+      headers: { "Sb-Forwarded-For": "190.25.1.7" },
+      fetch: expect.any(Function),
+    });
     expect(options.cookies.getAll()).toEqual([{ name: "sb-test-auth-token", value: "old" }]);
     options.cookies.setAll([{ name: "sb-test-auth-token", value: "new", options: { path: "/" } }]);
     expect(mocks.cookieStore.set).toHaveBeenCalledWith("sb-test-auth-token", "new", { path: "/" });
+  });
+});
+
+// Una sb_secret_ revocada, rotada, de otro proyecto o mal copiada: el gateway
+// de Supabase responde 401 {"message":"Invalid API key"} (probado en prod el
+// 2026-09-13 contra /auth/v1/otp y /auth/v1/logout) antes de llegar a Auth.
+describe("secret key rechazada por Supabase: el login no se cae", () => {
+  const invalidKey = () =>
+    new Response(JSON.stringify({ message: "Invalid API key", hint: "Double check your API key." }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    });
+  const ok = (body: unknown = {}) =>
+    new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  async function secretFetchFor(create: () => unknown) {
+    process.env.SUPABASE_SECRET_KEY = SECRET;
+    await create();
+    const calls = [...mocks.sbCreateClient.mock.calls, ...mocks.ssrCreateServerClient.mock.calls];
+    const fetchImpl = calls[calls.length - 1][2].global.fetch as typeof fetch | undefined;
+    expect(typeof fetchImpl).toBe("function");
+    return fetchImpl!;
+  }
+
+  it("repite UNA vez con la anon key y sin Sb-Forwarded-For, y avisa por console.error", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const net = vi.fn().mockResolvedValueOnce(invalidKey()).mockResolvedValueOnce(ok({ sent: true }));
+    vi.stubGlobal("fetch", net);
+    const fetchImpl = await secretFetchFor(() => createAuthClient("190.25.1.7"));
+
+    const body = JSON.stringify({ phone: "+573001112233" });
+    const res = await fetchImpl(`${URL_}/auth/v1/otp`, {
+      method: "POST",
+      headers: {
+        apikey: SECRET,
+        Authorization: `Bearer ${SECRET}`,
+        "Sb-Forwarded-For": "190.25.1.7",
+      },
+      body,
+    });
+
+    expect(res.status).toBe(200);
+    expect(net).toHaveBeenCalledTimes(2);
+    const retry = new Headers(net.mock.calls[1][1].headers);
+    expect(retry.get("apikey")).toBe(ANON);
+    expect(retry.get("authorization")).toBe(`Bearer ${ANON}`);
+    expect(retry.get("sb-forwarded-for")).toBeNull();
+    expect(net.mock.calls[1][0]).toBe(`${URL_}/auth/v1/otp`);
+    expect(net.mock.calls[1][1].body).toBe(body);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(String(error.mock.calls[0][0])).toMatch(/SUPABASE_SECRET_KEY/);
+    expect(String(error.mock.calls[0][0])).not.toContain(SECRET);
+  });
+
+  it("signOut (verify-otp): conserva el token de la persona y cambia solo la apikey", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const net = vi.fn().mockResolvedValueOnce(invalidKey()).mockResolvedValueOnce(ok());
+    vi.stubGlobal("fetch", net);
+    const fetchImpl = await secretFetchFor(() => createAuthRouteClient("190.25.1.7"));
+
+    await fetchImpl(`${URL_}/auth/v1/logout?scope=local`, {
+      method: "POST",
+      headers: { apikey: SECRET, Authorization: "Bearer user-access-token", "Sb-Forwarded-For": "190.25.1.7" },
+    });
+
+    const retry = new Headers(net.mock.calls[1][1].headers);
+    expect(retry.get("apikey")).toBe(ANON);
+    expect(retry.get("authorization")).toBe("Bearer user-access-token");
+    expect(retry.get("sb-forwarded-for")).toBeNull();
+  });
+
+  it("otros 401 de Auth (JWT inválido) y respuestas normales no se repiten", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const net = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 401, error_code: "bad_jwt", msg: "invalid JWT" }), {
+          status: 401,
+        }),
+      )
+      .mockResolvedValueOnce(ok());
+    vi.stubGlobal("fetch", net);
+    const fetchImpl = await secretFetchFor(() => createAuthClient("190.25.1.7"));
+
+    const first = await fetchImpl(`${URL_}/auth/v1/logout`, { headers: { apikey: SECRET } });
+    expect(first.status).toBe(401);
+    expect(await first.json()).toEqual({ code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
+    const second = await fetchImpl(`${URL_}/auth/v1/otp`, { headers: { apikey: SECRET } });
+    expect(second.status).toBe(200);
+    expect(net).toHaveBeenCalledTimes(2);
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("start-otp de punta a punta (supabase-js real): la key rechazada igual envía el código", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const actual = await vi.importActual<typeof import("@supabase/supabase-js")>("@supabase/supabase-js");
+    mocks.sbCreateClient.mockImplementation(actual.createClient);
+    process.env.SUPABASE_SECRET_KEY = SECRET;
+    route.checkIpRateLimit.mockResolvedValue({ blocked: false, remaining: 0 });
+    route.checkDailySmsCap.mockResolvedValue({ blocked: false, remaining: 2 });
+    route.checkAndRecordAttempt.mockResolvedValue({ blocked: false, remaining: 4, attemptId: "attempt-1" });
+
+    const net = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+      new Headers(init?.headers).get("apikey") === SECRET ? invalidKey() : ok(),
+    );
+    vi.stubGlobal("fetch", net);
+
+    vi.resetModules();
+    vi.doUnmock("@/lib/supabase/auth-ip");
+    const { POST } = await import("@/app/api/auth/start-otp/route");
+    const res = await POST(
+      new NextRequest("https://lapollacolombiana.com/api/auth/start-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-real-ip": "190.25.1.7" },
+        body: JSON.stringify({ phone: "+57 300 111 2233" }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    const otpCalls = net.mock.calls.filter(([input]) => String(input).includes("/auth/v1/otp"));
+    expect(otpCalls).toHaveLength(2);
+    expect(new Headers(otpCalls[1][1]?.headers).get("apikey")).toBe(ANON);
+    expect(route.releaseGenerateAttempt).not.toHaveBeenCalled();
   });
 });
 

@@ -567,10 +567,50 @@ Supabase la respeta solo con las dos condiciones:
 
    o Dashboard → Authentication → Rate Limits → IP Address Forwarding.
 
-El orden no rompe nada: sin la env el código usa la anon key sin cabecera
-(como antes, con un `warn` en logs); sin el flag Supabase ignora la cabecera.
+Qué pasa con cada configuración incompleta:
+
+- **Sin la env:** anon key sin cabecera, como antes, con un `warn` en logs.
+- **Sin el flag:** Supabase ignora la cabecera.
+- **Con una key que Supabase rechaza** (revocada, rotada, de otro proyecto o
+  mal copiada): el gateway responde 401 `Invalid API key` antes de llegar a
+  Auth. `fetchWithAnonFallback` repite esa llamada una vez con la anon key sin
+  cabecera y deja un `console.error` con `[auth-ip] Supabase rechazó
+  SUPABASE_SECRET_KEY`. El login sigue funcionando, pero sin IP real, hasta
+  corregir la env y volver a desplegar. Cada llamada suma un viaje extra.
+  Rotar esa key: crear la nueva, actualizar Vercel, desplegar y solo después
+  revocar la vieja.
+
+**Smoke test en Preview antes de poner la env en Production:** con la env en
+Preview y el deploy listo, pide un código real desde `/login` del Preview,
+ingrésalo y confirma que entras a `/casa`. En los logs de ese deploy no debe
+aparecer `[auth-ip] Supabase rechazó`. Si aparece, la key está mal.
+
 Verificación: en los logs de Auth, `/otp` y `/verify` pasan de mostrar IPs de
 AWS (`3.236.x`, `54.82.x`) a las IPs de los usuarios.
+
+**Pendiente antes de producción: captcha de Auth.** `/auth/v1/otp` acepta
+llamadas directas con la anon key pública, así que el tope diario, el de IP y
+el de teléfono de `start-otp` no frenan a quien llame a Supabase directo. Solo
+lo frenan los límites de Supabase (`rate_limit_otp` 30 cada 5 min por IP,
+`rate_limit_sms_sent` 300 por hora para todo el proyecto). Un script con
+números rotados puede gastar 300 SMS por hora y dejar sin login a todos
+(2026-09-13: `security_captcha_enabled=false`, `disable_signup=false`).
+Plan, en este orden:
+
+1. La secret key funcionando en Production (arriba) y verificada en logs.
+2. En un proyecto de Supabase de prueba (Preview usa el mismo proyecto que
+   producción, así que ahí no sirve), activar la captcha de Auth
+   (`security_captcha_enabled`, proveedor y secret) y confirmar dos cosas:
+   `start-otp`, `verify-otp` y `wa-magic` siguen funcionando, porque GoTrue se
+   salta la captcha con credenciales de admin (`verifyCaptcha` en
+   `internal/api/middleware.go`), y un `POST /auth/v1/otp` directo con la anon
+   key responde `captcha_failed`. `/verify` no pide captcha; el refresh de
+   `/token` está exento.
+3. Recién ahí activarla en producción.
+
+Con captcha activa, la repetición con anon key de una secret key rechazada
+ya no salva `/otp`: ese caso también exige el smoke test de Preview. La
+alternativa es un Send SMS Hook que valide contra `otp_rate_limits`.
 
 Los helpers devuelven solo `client.auth`; para datos siguen
 `lib/supabase/server.ts` y `lib/supabase/admin.ts`. Prueba local: GoTrue con

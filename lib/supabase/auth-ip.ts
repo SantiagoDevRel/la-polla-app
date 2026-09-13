@@ -19,6 +19,10 @@
 //   token. Probado en integración local (README → «IP real en Supabase Auth»).
 // - Sin SUPABASE_SECRET_KEY (o con un valor que no es sb_secret_) se usa la
 //   anon key sin cabecera, igual que antes, con un warn por proceso.
+// - Si Supabase RECHAZA la secret key (revocada, rotada, de otro proyecto o mal
+//   copiada: 401 "Invalid API key"), cada llamada se repite una vez con la anon
+//   key sin cabecera y deja un console.error. Un error de configuración cuesta
+//   la IP real, no el login (fetchWithAnonFallback).
 import { isIP } from "node:net";
 import { createClient as createSbClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
@@ -109,12 +113,59 @@ export function authRequestConfig(ip: string | null | undefined): AuthRequestCon
     : { key: secret, headers: {}, forwardsIp: false };
 }
 
+async function isInvalidApiKeyResponse(response: Response): Promise<boolean> {
+  if (response.status !== 401) return false;
+  try {
+    const body = (await response.clone().json()) as { message?: unknown } | null;
+    return typeof body?.message === "string" && body.message.trim().toLowerCase() === "invalid api key";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * fetch de las llamadas hechas con la secret key. Si el gateway de Supabase la
+ * rechaza (401 {"message":"Invalid API key"}), repite ESA petición una sola vez
+ * con la anon key y sin Sb-Forwarded-For, que es el comportamiento anterior.
+ * Es seguro repetir: el rechazo ocurre en el gateway, antes de Auth, así que no
+ * salió SMS ni se consumió ningún código. Otros 401 de Auth (JWT inválido,
+ * código vencido) se devuelven tal cual. El token de la persona en
+ * `Authorization` (signOut) se conserva; solo se cambia si era la secret key.
+ */
+export function fetchWithAnonFallback(secret: string, anon: string): typeof fetch {
+  return async (input, init) => {
+    const response = await fetch(input, init);
+    const headers = new Headers(init?.headers);
+    if (headers.get("apikey") !== secret || !(await isInvalidApiKeyResponse(response))) {
+      return response;
+    }
+    console.error(
+      "[auth-ip] Supabase rechazó SUPABASE_SECRET_KEY (401 Invalid API key: revocada, rotada, de otro proyecto o mal copiada). Se repite la llamada con la anon key, sin IP real. Corrige la env en Vercel y vuelve a desplegar.",
+    );
+    headers.set("apikey", anon);
+    if (headers.get("Authorization") === `Bearer ${secret}`) {
+      headers.set("Authorization", `Bearer ${anon}`);
+    }
+    headers.delete(SB_FORWARDED_FOR_HEADER);
+    return fetch(input, { ...init, headers });
+  };
+}
+
+function authClientOptions(ip: string | null | undefined) {
+  const { key, headers } = authRequestConfig(ip);
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  return {
+    key,
+    global: key === anon ? { headers } : { headers, fetch: fetchWithAnonFallback(key, anon) },
+  };
+}
+
 /** Cliente de Auth sin cookies (start-otp: todavía no hay sesión). */
 export function createAuthClient(ip: string | null | undefined): AuthClient {
-  const { key, headers } = authRequestConfig(ip);
+  const { key, global } = authClientOptions(ip);
   return createSbClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
     auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers },
+    global,
   }).auth;
 }
 
@@ -127,9 +178,9 @@ export async function createAuthRouteClient(
   ip: string | null | undefined,
 ): Promise<AuthClient> {
   const cookieStore = await cookies();
-  const { key, headers } = authRequestConfig(ip);
+  const { key, global } = authClientOptions(ip);
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
-    global: { headers },
+    global,
     cookies: {
       getAll() {
         return cookieStore.getAll();

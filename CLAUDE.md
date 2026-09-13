@@ -436,8 +436,16 @@ se pierden ideas grandes que el usuario sí quería.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
-- (Sin ideas abiertas. El chat embebido de Claude en /admin quedó descartado
-  por ahora el 2026-09-13, por decisión del dueño.)
+- (El chat embebido de Claude en /admin quedó descartado por ahora el
+  2026-09-13, por decisión del dueño.)
+- **Captcha de Supabase Auth antes de producción (2026-09-13, hallazgo de
+  revisión del PR #71).** `/auth/v1/otp` acepta llamadas directas con la anon
+  key pública y la captcha está apagada: los topes de `start-otp` no frenan a
+  quien llama a Supabase directo, que puede gastar hasta 300 SMS/h y dejar sin
+  login a todos. Falta decidir y probar: activar la captcha de Auth después de
+  que `SUPABASE_SECRET_KEY` funcione en producción (GoTrue se la salta con
+  credenciales de admin), probándola primero en un proyecto de prueba, o un
+  Send SMS Hook. Plan y verificación: README → «IP real en Supabase Auth».
 <!-- Pollas combinadas multi-torneo: COMPLETADO 2026-04-30. Migración
      038 + UI de creación con multi-select + display con stack de logos
      en PollaCard y header de detail. Removido de pendings. -->
@@ -604,7 +612,11 @@ están documentadas en migration 056-057.
   la respeta solo con secret key y `security_sb_forwarded_for_enabled=true`.
   Los helpers devuelven `client.auth`, nunca el cliente: con secret key y sin
   sesión un `.from()` sería service_role. No usarlos para datos. Sin la env
-  cae a anon sin cabecera (warn). Cualquier ruta nueva que abra sesión desde
+  cae a anon sin cabecera (warn). Si Supabase rechaza la key (401 `Invalid
+  API key`: revocada, rotada, de otro proyecto), `fetchWithAnonFallback`
+  repite esa llamada una vez con anon y sin cabecera y deja un console.error:
+  se pierde la IP real, no el login. No quitar ese respaldo; antes de poner la
+  env en Production, smoke test de login real en Preview. Cualquier ruta nueva que abra sesión desde
   el servidor (p. ej. `lib/auth/phone-session.ts`) usa `createAuthRouteClient`.
 - Tope diario de SMS (2 por teléfono en 24 h): `start-otp` responde 429
   `code: "daily_sms_cap"` y `/login` muestra `Login.errDailySmsCap` con
