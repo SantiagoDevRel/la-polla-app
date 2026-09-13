@@ -423,6 +423,18 @@ cuando el user diga sí/no explícito o se haya completado.
 
 ## Free-tier only (NON-NEGOTIABLE)
 
+> **Actualización 2026-09-13 — planes pagos APROBADOS para producción.**
+> El dueño aprobó y paga: **Vercel Pro** (team `santiago-prod`),
+> **Supabase Pro con compute Small** (el proyecto "La Polla App" se movió a
+> la org Pro "SantiagoDevRel's Org", ~15 USD/mes extra) y **API-Football
+> Pro**. Estos planes son decisión tomada: **no propongas volver a Free ni
+> cuestiones esos planes**, y donde las reglas de abajo digan "sin Vercel
+> Pro" o "sin Supabase Pro", manda esta actualización. El resto de la regla
+> sigue vigente: **nada de servicios pagos nuevos, upgrades adicionales ni
+> add-ons (p. ej. PITR) sin aprobación explícita**, y se sigue optimizando
+> costo en cada feature (las cuotas de la org Pro se comparten con otros
+> proyectos).
+
 La Polla es **gratis para todos los usuarios** y debe correr en planes
 gratuitos punta a punta. Antes de proponer cualquier cambio que
 involucre infra, providers o features que cuesten plata, parate.
@@ -1238,6 +1250,23 @@ panel interno. La regla aplica a lo que LEE UN USUARIO.
 - NEVER use `NEXT_PUBLIC_` prefix for secrets (CRON_SECRET, META_WA_APP_SECRET, etc.)
 - `CRON_SECRET` — server-only, used by Vercel cron jobs and admin API dual-auth
 - `META_WA_APP_SECRET` — server-only, used for WhatsApp webhook signature verification
+
+### Crons de GitHub Actions: `/api/cron/*` (2026-09-13)
+- `lib/supabase/middleware.ts` exime el prefijo **`/api/cron/`** (con barra
+  final: `/api/cron` y `/api/cronologia` siguen con gate) del gate de sesión,
+  sin llamar `getUser()`. Antes respondía 307 a `/login` y los workflows
+  quedaban en verde sin que ningún cron corriera.
+- Por eso **todo `route.ts` bajo `app/api/cron/` debe empezar con
+  `const denied = requireCronSecret(request); if (denied) return denied;`**
+  (`lib/auth/cron-secret.ts`: `Authorization: Bearer`, SHA-256 +
+  `timingSafeEqual`, 500 sin `CRON_SECRET`, 403 si no coincide) ANTES de crear
+  el admin client. `tests/cron-auth.test.ts` lo exige para cada ruta.
+- Los workflows fallan ante status no 2xx (incluido un 3xx) o sin `"ok": true`,
+  y solo imprimen contadores (repo público). Sin `--retry`: correo y WhatsApp no
+  son idempotentes. `cleanup-payout-proofs` queda solo manual (con `BORRAR`)
+  hasta que el dueño apruebe borrar los comprobantes históricos.
+- Los endpoints que llama pg_cron (`/api/matches/sync-live`, `discover`, ...)
+  usan `x-cron-secret` y 401: tienen su propio chequeo, no son `/api/cron/`.
 
 ### WhatsApp Webhook Security
 - POST handler verifies `X-Hub-Signature-256` using HMAC-SHA256 with META_WA_APP_SECRET

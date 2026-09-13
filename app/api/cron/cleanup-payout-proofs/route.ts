@@ -12,27 +12,22 @@
 //      Borrar del bucket `payment-proofs` y borrar la fila de payment_proofs
 //      (esa tabla es 100% temporal, sin valor histórico una vez aprobado).
 //
-// Auth: header Authorization: Bearer ${CRON_SECRET}.
-// Trigger: GitHub Actions cada día a las 4am Bogota (9 UTC).
+// Auth: header Authorization: Bearer ${CRON_SECRET}, vía requireCronSecret
+// (el middleware exime /api/cron/ del gate de sesión).
+// Trigger: SOLO manual (workflow_dispatch). El schedule semanal está
+// comentado en .github/workflows/cleanup-payout-proofs.yml hasta que el
+// dueño apruebe borrar los comprobantes históricos.
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireCronSecret } from "@/lib/auth/cron-secret";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const auth = request.headers.get("authorization") ?? "";
-  const expected = process.env.CRON_SECRET;
-  if (!expected) {
-    return NextResponse.json(
-      { error: "CRON_SECRET not configured" },
-      { status: 500 },
-    );
-  }
-  if (auth !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
+  const denied = requireCronSecret(request);
+  if (denied) return denied;
 
   const admin = createAdminClient();
 

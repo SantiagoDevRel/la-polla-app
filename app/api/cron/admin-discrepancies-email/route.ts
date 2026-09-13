@@ -2,13 +2,15 @@
 // con resumen de discrepancias activas (matches sin verify + pollas con
 // problemas). Solo manda si hay items que reportar.
 //
-// Auth: header Authorization: Bearer ${CRON_SECRET}.
+// Auth: header Authorization: Bearer ${CRON_SECRET}, vía requireCronSecret
+// (el middleware exime /api/cron/ del gate de sesión).
 // Trigger: GitHub Actions cada día (horario configurado en el workflow).
 //
 // Destinatario: ADMIN_ALERT_EMAIL (env var).
 
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { requireCronSecret } from "@/lib/auth/cron-secret";
 import { matchesEnJuego } from "@/lib/matches/en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { collectPollaHealth } from "@/lib/admin/polla-health";
@@ -17,14 +19,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const auth = request.headers.get("authorization") ?? "";
-  const expected = process.env.CRON_SECRET;
-  if (!expected) {
-    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
-  }
-  if (auth !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
+  const denied = requireCronSecret(request);
+  if (denied) return denied;
 
   const to = process.env.ADMIN_ALERT_EMAIL;
   if (!to) {

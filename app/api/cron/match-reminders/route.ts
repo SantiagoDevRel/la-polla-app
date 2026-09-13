@@ -9,9 +9,11 @@
 // no duplica envios — chequea wa_template_sends por user + template +
 // rango "hoy Bogota".
 //
-// Auth: header Authorization: Bearer ${CRON_SECRET}.
+// Auth: header Authorization: Bearer ${CRON_SECRET}, vía requireCronSecret
+// (el middleware exime /api/cron/ del gate de sesión).
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireCronSecret } from "@/lib/auth/cron-secret";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   sendTemplateMessage,
@@ -45,17 +47,8 @@ interface UserToRemind {
 
 export async function POST(request: NextRequest) {
   // ─── Auth ───
-  const auth = request.headers.get("authorization") ?? "";
-  const expected = process.env.CRON_SECRET;
-  if (!expected) {
-    return NextResponse.json(
-      { error: "CRON_SECRET not configured" },
-      { status: 500 },
-    );
-  }
-  if (auth !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
+  const denied = requireCronSecret(request);
+  if (denied) return denied;
 
   // Sin número propio no se envía nada ni se registran envíos fallidos.
   if (!whatsappOutboundEnabled()) {

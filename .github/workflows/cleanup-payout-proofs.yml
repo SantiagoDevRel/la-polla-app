@@ -1,25 +1,39 @@
-# Cleanup semanal de TODOS los comprobantes (peer-to-peer + admin_collects)
-# que tienen >=7 dias.
+# Cleanup de TODOS los comprobantes (peer-to-peer + admin_collects) que
+# tienen >=7 dias.
 #
-# POST a /api/cron/cleanup-payout-proofs los DOMINGOS a las 09:00 UTC
-# (4:00 am Bogota). El endpoint borra todo lo que tiene uploaded_at /
-# created_at >7 dias, asi que un comprobante subido cualquier dia de la
-# semana queda esperando al domingo siguiente (vida 7-13 dias).
+# POST a /api/cron/cleanup-payout-proofs. El endpoint borra todo lo que
+# tiene uploaded_at / created_at >7 dias.
 #
-# Decision 2026-05-09: cron semanal en vez de diario porque (a) el costo
-# Vercel es despreciable de cualquier forma (4 vs 30 inv/mes, ambos <0.05%
-# free tier), (b) agrupar el cleanup en domingos hace el comportamiento
-# mas predecible para el user.
+# ATENCIÓN: SCHEDULE DESACTIVADO (2026-09-13) — PENDIENTE DE APROBACIÓN DEL DUEÑO.
+# Hasta esa fecha el cron nunca corrió de verdad (el middleware respondía
+# 307 a /login). Ahora que llega al handler, el primer disparo borraría de
+# una vez 73 filas de payment_proofs con sus 73 archivos (~7,5 MB) y 2
+# comprobantes de polla_payouts: evidencia histórica del modelo P2P. Por eso
+# solo queda el disparo manual, con confirmación escrita. Para reactivar el
+# domingo semanal: descomentar el bloque `schedule` de abajo, y antes
+# confirmar que el backup cifrado contiene esos 75 objetos.
 #
-# Free tier: GitHub Actions schedule en repos publicos.
+# El paso falla si la respuesta no es 2xx, si no trae "ok": true o si curl
+# pasa de 90 s. En el log solo se imprimen contadores, nunca el body.
 
-name: Cleanup All Proofs Weekly (Sundays)
+name: Cleanup All Proofs (manual)
 
 on:
-  schedule:
-    # 09:00 UTC domingo = 4:00 AM Bogota domingo
-    - cron: "0 9 * * 0"
-  workflow_dispatch: {}
+  # schedule:
+  #   # 09:00 UTC domingo = 4:00 AM Bogota domingo
+  #   - cron: "0 9 * * 0"
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Borra comprobantes de más de 7 días (no se recuperan). Escribe BORRAR para continuar.'
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: cron-cleanup-payout-proofs
+  cancel-in-progress: false
 
 jobs:
   cleanup:
@@ -30,21 +44,33 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           APP_URL: ${{ secrets.APP_URL }}
+          CONFIRM: ${{ inputs.confirm }}
+        shell: bash
         run: |
+          set -euo pipefail
           : "${APP_URL:=https://lapollacolombiana.com}"
-          if [ -z "$CRON_SECRET" ]; then
-            echo "CRON_SECRET secret no configurado en repo settings"
+          if [ "${GITHUB_EVENT_NAME:-}" = "workflow_dispatch" ] && [ "${CONFIRM:-}" != "BORRAR" ]; then
+            echo "::error::Cancelado: para borrar comprobantes hay que escribir BORRAR en el campo confirm"
             exit 1
           fi
-          response=$(curl -sS -w "\nHTTP_STATUS:%{http_code}" -X POST \
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET no está configurado en los secrets del repo"
+            exit 1
+          fi
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+          status="$(curl -sS --max-time 90 -o "$body_file" -w '%{http_code}' -X POST \
             "$APP_URL/api/cron/cleanup-payout-proofs" \
             -H "Authorization: Bearer $CRON_SECRET" \
-            -H "Content-Type: application/json")
-          body="${response%HTTP_STATUS:*}"
-          status="${response##*HTTP_STATUS:}"
-          echo "Status: $status"
-          echo "Body: $body"
-          if [ "$status" -ge 400 ]; then
-            echo "Cleanup failed with status $status"
+            -H "Content-Type: application/json")"
+          echo "HTTP status: $status"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            error_code="$(jq -r '.error // empty | tostring | .[0:80]' "$body_file" 2>/dev/null || true)"
+            echo "::error::El cron respondió HTTP $status (se esperaba 2xx) ${error_code:+error=$error_code}"
             exit 1
           fi
+          if ! jq -e '.ok == true' "$body_file" > /dev/null 2>&1; then
+            echo "::error::La respuesta no trae \"ok\": true"
+            exit 1
+          fi
+          jq -c '{ok, deleted_payout_proofs, deleted_payment_proofs}' "$body_file"
