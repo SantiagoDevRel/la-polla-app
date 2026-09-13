@@ -470,10 +470,11 @@ fue para otro lado:
    explícito, "déjalo", "ya lo descartamos", o cuando se haya
    completado e ido a prod.
 
-**Por qué:** se nos pasó el chat de Claude embedded en /admin
-durante 4 mensajes seguidos porque cada turno yo seguía la última
-cosa que pidió el usuario sin volver a las pendientes. Mala forma —
-se pierden ideas grandes que el usuario sí quería.
+**Por qué:** una idea grande se nos pasó durante 4 mensajes seguidos
+porque cada turno yo seguía la última cosa que pidió el usuario sin
+volver a las pendientes. Mala forma — se pierden ideas que el usuario
+sí quería. Y al revés: una idea que el dueño descartó se BORRA de la
+lista y no se vuelve a preguntar.
 
 ---
 
@@ -482,8 +483,6 @@ se pierden ideas grandes que el usuario sí quería.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
-- (El chat embebido de Claude en /admin quedó descartado por ahora el
-  2026-09-13, por decisión del dueño.)
 - **Captcha de Supabase Auth antes de producción (2026-09-13, hallazgo de
   revisión del PR #71).** `/auth/v1/otp` acepta llamadas directas con la anon
   key pública y la captcha está apagada: los topes de `start-otp` no frenan a
