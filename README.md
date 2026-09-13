@@ -411,6 +411,12 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 # NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=<E.164 sin +>.
 WHATSAPP_OUTBOUND_ENABLED=
 NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=
+
+# Login alternativo por Telegram (bot PÚBLICO, distinto del bot admin).
+# Las tres o ninguna: con alguna vacía el canal queda apagado.
+TELEGRAM_LOGIN_BOT_TOKEN=
+TELEGRAM_LOGIN_WEBHOOK_SECRET=            # 32-256 caracteres [A-Za-z0-9_-]
+NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME=  # sin @
 ```
 
 ### 3. Supabase migrations
@@ -438,11 +444,31 @@ npm test            # vitest unit tests (111 tests)
 
 ### Auth
 
-- **Primera vez (registro)**: número de teléfono → OTP por WhatsApp → crear contraseña (4+ caracteres, alfanumérica) → completar onboarding (nombre + pollito).
-- **Login normal**: número + contraseña, sin pasar por el bot ni Turnstile (el rate-limit cubre brute-force).
-- **Olvidé clave**: link en `/login/password` regresa al flujo OTP. Validar el código resetea la clave a un valor temporal y vuelve a forzar `/set-password`.
+- **Login por SMS (principal)**: número → `/api/auth/start-otp` (Supabase `signInWithOtp`, hoy Twilio Verify) → código → `/api/auth/verify-otp` deja la sesión en cookies HttpOnly. Sin contraseña. Usuarios nuevos pasan por `/onboarding` (nombre + pollito).
+- **Login por Telegram (alternativa, 2026-09-13)**: si el SMS no llega, `/login` ofrece «Recibe tu código por Telegram». Ver la sección siguiente.
 
-Detalle: el server NUNCA ve la contraseña HMAC-derivada del teléfono — usa una random temp pwd entre el OTP success y la creación de la real. La sesión se mantiene viva al cambiar la clave (usa `supabase.auth.updateUser`, no admin API).
+#### Login por Telegram
+
+Bot **público y separado** del panel de admin. El bot nunca acepta un número escrito:
+
+1. `/login` → «Abrir Telegram» (`t.me/<bot>?start=login`, o `login_en` en chickenpicks.app).
+2. El bot (`/start` o `/login`) muestra un teclado con **Compartir mi número** (`request_contact`). Solo acepta el contacto propio: chat privado, `contact.user_id === from.id`, sin reenvío. Número → E.164 con `toE164` (`lib/auth/phone.ts`).
+3. `telegram_login_issue` (migración 115) emite un **código de 6 dígitos** y un **enlace de un solo uso** (`/api/auth/telegram-link?t=…`). En la base solo hay HMAC-SHA256 con pepper del servidor (derivado del token del bot); el hash del código incluye el teléfono. Vence en 10 min; emitir uno nuevo invalida el anterior; canjear código o enlace invalida ambos; 5 fallos matan el token.
+4. La persona escribe el código en `/login` → `/api/auth/telegram-verify` (POST JSON same-origin, 5 intentos / 15 min por teléfono en `otp_rate_limits`). El enlace también funciona, pero si se abre dentro de Telegram la sesión queda en el navegador de Telegram: el código es la vía recomendada.
+5. La sesión se crea con `lib/auth/phone-session.ts`, el mismo mecanismo del magic-link (`generateLink` + `verifyOtp` con `signOut({scope:'local'})` previo). Misma cuenta si el teléfono ya entró por SMS. `login_event` con `method: 'telegram'`.
+
+Topes de emisión: 3 / 15 min y 10 / día, por teléfono y por cuenta de Telegram. Respuestas genéricas: el bot no revela si el número tiene cuenta.
+
+| Archivo | Rol |
+|---|---|
+| `app/api/telegram/login/route.ts` | Webhook. 503 sin configuración (sin leer body ni DB); header `X-Telegram-Bot-Api-Secret-Token` en tiempo constante antes del body |
+| `lib/auth/telegram-login/*` | Configuración, clasificación de updates, hashes, textos del bot, canje |
+| `app/api/auth/telegram-verify/route.ts` · `telegram-link/route.ts` | Canje de código / enlace (`no-store`; HEAD 405 no canjea) |
+| `app/(auth)/login/page.tsx` → `LoginClient.tsx` | El servidor decide si el canal está completo y solo pasa el usuario del bot |
+| `scripts/telegram-login-set-webhook.mjs` | `setWebhook` (`allowed_updates: ["message"]`) + comandos. `--dry-run` primero |
+| `scripts/telegram-login-check.sql` | Regresión SQL contra Supabase local (transacción revertida) |
+
+Activación (dueño): crear el bot en @BotFather → cargar las tres variables en Vercel (Production) → aplicar la migración 115 → redeploy → `node --env-file=.env.local scripts/telegram-login-set-webhook.mjs`. Pruebas: `npm test -- tests/telegram-login.test.ts`.
 
 ### Pollas
 
@@ -485,7 +511,7 @@ Botones interactivos vía Meta Cloud API (button + list messages, CTA URL).
 
 ### Login events en /avisos
 
-Cada login exitoso (password u OTP) genera una notificación tipo `login_event` con device + ciudad+país (de los headers de Vercel). Aparece en el feed de avisos del usuario.
+Cada login exitoso (SMS, magic-link o Telegram) genera una notificación tipo `login_event` con device + ciudad+país (de los headers de Vercel). Aparece en el feed de avisos del usuario.
 
 ---
 

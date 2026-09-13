@@ -578,7 +578,39 @@ están documentadas en migration 056-057.
   5 generate attempts / hour, enforced in `app/api/auth/verify-otp/
   route.ts` via `lib/auth/rate-limit.ts`.
 
+### Canal alternativo: Telegram (2026-09-13, migración 115)
+
+Si el SMS no llega, `/login` ofrece «Recibe tu código por Telegram». Bot
+**público y separado** del admin (`@LaPollaColombianaAdminBot` no es la cara
+pública). Variables: `TELEGRAM_LOGIN_BOT_TOKEN`, `TELEGRAM_LOGIN_WEBHOOK_SECRET`,
+`NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME` — las tres o el canal queda apagado
+(la opción no aparece, el webhook responde 503 sin tocar DB).
+
+- **Propiedad del teléfono:** el bot nunca acepta un número escrito. Solo
+  `message.contact` en chat privado con `contact.user_id === from.id` y sin
+  reenvío (`lib/auth/telegram-login/update.ts`). No relajar esto.
+- **Tokens:** `telegram_login_tokens` guarda solo HMAC (pepper derivado del
+  token del bot; el hash del código incluye el teléfono). 10 min, un solo uso,
+  emitir invalida los anteriores, canjear código o enlace invalida ambos, 5
+  fallos matan el token. Toda la lógica de estado vive en las RPC
+  `telegram_login_issue` / `_consume_code` / `_consume_link` (service_role).
+- **Sesión:** `lib/auth/phone-session.ts` es el ÚNICO mecanismo para iniciar
+  sesión de un teléfono probado por un canal propio (lo usan wa-magic y
+  Telegram). No duplicarlo en rutas nuevas.
+- Webhook `app/api/telegram/login/route.ts` (exento en el middleware; secreto en
+  tiempo constante ANTES del body). Canje: `/api/auth/telegram-verify` (POST
+  JSON same-origin, 5/15 min por teléfono con `otp_rate_limits`
+  `telegram_verify`) y `/api/auth/telegram-link` (GET; HEAD 405 no canjea).
+- `app/(auth)/login/page.tsx` es server wrapper: decide si el canal está
+  completo y solo pasa el usuario del bot a `LoginClient.tsx`. Cambiar las
+  variables exige redeploy (Next incrusta `NEXT_PUBLIC_*` en el build).
+- Pruebas: `tests/telegram-login.test.ts` y `scripts/telegram-login-check.sql`
+  (Supabase local). Activación y detalle: README → «Login por Telegram».
+
 Files: `app/(auth)/{login,onboarding}/page.tsx`,
+`app/(auth)/login/LoginClient.tsx`, `lib/auth/phone-session.ts`,
+`lib/auth/telegram-login/*`, `app/api/auth/telegram-{verify,link}/route.ts`,
+`app/api/telegram/login/route.ts`,
 `app/api/auth/verify-otp/route.ts`, `app/api/users/me/route.ts`,
 `lib/auth/{phone,login-event,user-agent,rate-limit}.ts`,
 `lib/users/needs-name.ts`, `lib/supabase/middleware.ts` (gating logic),

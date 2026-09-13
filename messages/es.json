@@ -87,7 +87,21 @@
     "otpVerify": "Verificar código",
     "otpResend": "Reenviar código o cambiar número",
     "otpDidntArrive": "¿No te llegó?",
-    "otpTryWhatsapp": "Prueba con WhatsApp"
+    "otpTryWhatsapp": "Prueba con WhatsApp",
+    "tgOr": "o también",
+    "tgUseTelegram": "Recibe tu código por Telegram",
+    "tgDidntArrive": "¿No te llegó el SMS?",
+    "tgTitle": "CÓDIGO POR TELEGRAM",
+    "tgFor": "Para el número",
+    "tgStep1": "Abre nuestro bot de Telegram.",
+    "tgOpenBot": "Abrir Telegram",
+    "tgStep2": "Toca «Compartir mi número». Tiene que ser el mismo número que escribiste aquí.",
+    "tgStep3": "Escribe aquí el código de 6 dígitos que te envía el bot.",
+    "tgBackToSms": "Volver al código por SMS",
+    "tgUseSms": "Prefiero recibir un SMS",
+    "tgErrRateLimited": "Demasiados intentos. Espera 15 minutos e inténtalo de nuevo.",
+    "tgErrUnavailable": "El acceso por Telegram no está disponible en este momento. Usa el SMS.",
+    "tgErrGeneric": "No pudimos verificar el código. Inténtalo de nuevo."
   },
   "Welcome": {
     "introLine": "Cada fin de semana subimos las pollas.\nEntras, pronosticas y compites por el pozo.",
