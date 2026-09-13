@@ -7,7 +7,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyEntry, getPollaBySlug, getPot, getActiveProofs, getOutstandingTicket } from "@/lib/casa/queries";
+import { getMyEntry, getPollaBySlug, getPot, getActiveProofs, getOutstandingTicket, getFixedPrizeThreshold } from "@/lib/casa/queries";
+import { FixedPrizeGrowth } from "@/components/casa/FixedPrizeGrowth";
 import { isPollaOpen } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
 import { HeroFrame, Label, StreetCard } from "@/components/street";
@@ -30,9 +31,10 @@ export default async function PagarPage({
   const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador") notFound();
 
-  const [entry, pot] = await Promise.all([
+  const [entry, pot, threshold] = await Promise.all([
     getMyEntry(polla.id, user.id),
     getPot(polla.id),
+    getFixedPrizeThreshold(polla),
   ]);
 
   // Ya entró y no fue rechazado: no tiene nada que hacer acá. `anulada` (se
@@ -102,7 +104,7 @@ export default async function PagarPage({
           </div>
           {polla.prize_kind === "objeto" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary">El premio es <strong className="text-text-primary">{polla.prize_object}</strong>. La inscripción te permite participar por ese objeto. No hay reparto del pozo ni premio adicional en dinero.</p> : polla.pot_mode === "fijo" ? <div className="mt-4 space-y-2 text-[15px] leading-relaxed text-text-secondary">
             {/* Mínimo garantizado (migración 109). Las cifras salen de casa_payment_details_v2. */}
-            <p>Participas por un pozo de <strong className="text-text-primary">{formatCop(pot.prize_cop)}</strong>{typeof polla.fixed_prize_cop === "number" && <>, con un premio mínimo garantizado de <strong className="text-text-primary">{formatCop(polla.fixed_prize_cop)}</strong></>}.{100 - polla.house_cut_pct > 0 && ` Cuando las entradas superan ese mínimo, el ${100 - polla.house_cut_pct}% de cada nueva entrada se suma al pozo.`} Si varios ganadores empatan, se divide entre ellos.</p>
+            <p>Participas por un pozo de <strong className="text-text-primary">{formatCop(pot.prize_cop)}</strong>{typeof polla.fixed_prize_cop === "number" && <>, con un premio mínimo garantizado de <strong className="text-text-primary">{formatCop(polla.fixed_prize_cop)}</strong></>}. <FixedPrizeGrowth threshold={threshold} /> Si varios ganadores empatan, se divide entre ellos.</p>
             {pot.projected_prize_cop > pot.prize_cop && <p>Con tu entrada, el pozo queda en <strong className="text-text-primary">{formatCop(pot.projected_prize_cop)}</strong>.</p>}
           </div> : <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
             <div className="flex justify-between">

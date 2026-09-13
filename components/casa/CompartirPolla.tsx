@@ -18,10 +18,13 @@ export function CompartirPolla({
   slug,
   nombre,
   entradaCop,
+  className = "w-full",
 }: {
   slug: string;
   nombre: string;
   entradaCop: number;
+  /** Ancho/flex según dónde va: sola ocupa toda la fila; junto al CTA se reparte. */
+  className?: string;
 }) {
   const [copiado, setCopiado] = useState(false);
 
@@ -68,7 +71,7 @@ export function CompartirPolla({
     <button
       type="button"
       onClick={compartir}
-      className="lp-btn lp-btn-ghost h-11 min-h-0 w-full text-[14px]"
+      className={`lp-btn lp-btn-ghost !px-4 ${className}`}
       aria-label={`Compartir ${nombre}`}
     >
       {copiado ? (

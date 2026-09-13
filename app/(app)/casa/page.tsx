@@ -20,6 +20,7 @@ import { isPollaOpen, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types"
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
+import { ScoringModeBadge } from "@/components/casa/ScoringModeBadge";
 import {
   HeroFrame,
   Label,
@@ -152,8 +153,16 @@ function PollaRow({
             <Tape tone={estado.tone} className="shrink-0">{estado.text}</Tape>
           </div>
 
+          {/* (2026-09-13) Qué hay que acertar, antes de entrar: "no me queda
+              claro cuándo una polla es de 1X2 o de marcadores" (dueño). */}
+          {polla.kind === "partidos" && (
+            <div className="mt-2">
+              <ScoringModeBadge mode={polla.scoring_mode} />
+            </div>
+          )}
+
           <div className="mt-auto min-h-8 pt-3">
-            <TournamentIdentity tournaments={tournaments} kind={polla.kind} showNames={false} />
+            <TournamentIdentity tournaments={tournaments} kind={polla.kind} />
           </div>
 
           {/* Equal columns, label baselines and number sizes for both amounts. */}
