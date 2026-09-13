@@ -50,7 +50,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No pude leer los partidos." }, { status: 500 });
   }
 
-  return NextResponse.json({ matches: data ?? [], scheduleRefreshed }, {
+  // Lista vacía no significa que falten datos: Champions, por ejemplo, no
+  // juega entre jornadas (13-sep-2026: la siguiente era el 13-oct). Se
+  // devuelve el próximo partido guardado para que el form lo diga en vez de
+  // sugerir que el torneo está fuera de temporada.
+  let nextMatch: { scheduled_at: string; scheduled_at_confirmed: boolean } | null = null;
+  if ((data ?? []).length === 0) {
+    const { data: next } = await db
+      .from("matches")
+      .select("scheduled_at, scheduled_at_confirmed")
+      .eq("tournament", tournament)
+      .eq("status", "scheduled")
+      .gte("scheduled_at", hasta)
+      .order("scheduled_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    nextMatch = next ?? null;
+  }
+
+  return NextResponse.json({ matches: data ?? [], scheduleRefreshed, dias, nextMatch }, {
     headers: { "Cache-Control": "private, no-store" },
   });
 }
