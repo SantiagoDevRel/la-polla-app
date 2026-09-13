@@ -8,11 +8,18 @@
 //   TELEGRAM_LOGIN_BOT_TOKEN              servidor — token de @BotFather
 //   TELEGRAM_LOGIN_WEBHOOK_SECRET         servidor — secret_token del setWebhook
 //   NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME  público — usuario del bot, sin @
+//
+// Opcional, decisión del dueño (lib/auth/telegram-login/identity.ts):
+//   TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true  deja entrar por Telegram a
+//   cuentas que ya existían sin Telegram. Apagado por defecto: un número
+//   reciclado que el dueño anterior conserva en Telegram no entra a la cuenta
+//   que el dueño nuevo creó por SMS.
 
 export interface TelegramLoginConfig {
   botToken: string;
   webhookSecret: string;
   botUsername: string;
+  allowExistingAccounts: boolean;
 }
 
 type Env = Record<string, string | undefined>;
@@ -56,5 +63,8 @@ export function getTelegramLoginConfig(
     return null;
   }
 
-  return { botToken, webhookSecret, botUsername };
+  const allowExistingAccounts =
+    env.TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS?.trim().toLowerCase() === "true";
+
+  return { botToken, webhookSecret, botUsername, allowExistingAccounts };
 }

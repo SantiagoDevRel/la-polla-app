@@ -593,14 +593,26 @@ pública). Variables: `TELEGRAM_LOGIN_BOT_TOKEN`, `TELEGRAM_LOGIN_WEBHOOK_SECRET
   token del bot; el hash del código incluye el teléfono). 10 min, un solo uso,
   emitir invalida los anteriores, canjear código o enlace invalida ambos, 5
   fallos matan el token. Toda la lógica de estado vive en las RPC
-  `telegram_login_issue` / `_consume_code` / `_consume_link` (service_role).
+  `telegram_login_issue` / `_redeem_code` / `_redeem_link` / `_peek_link`
+  (service_role).
+- **El GET del enlace NUNCA abre sesión:** muestra el número enmascarado y un
+  botón que hace POST de formulario same-origin (prueba positiva:
+  `Sec-Fetch-Site` u `Origin`). Canjear en el GET era login CSRF: un enlace
+  ajeno reenviado por chat metía a la víctima en la cuenta del atacante.
+- **Telegram no es un espejo del SMS (número reciclado):** una cuenta que YA
+  existe solo acepta la cuenta de Telegram vinculada en
+  `telegram_login_identities` (`lib/auth/telegram-login/identity.ts`). Cuentas
+  creadas por SMS: solo SMS, salvo `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`
+  (decisión del dueño; vincula la primera cuenta de Telegram). No quitar el
+  `authorize` de `startSessionForVerifiedPhone` en las rutas de Telegram.
 - **Sesión:** `lib/auth/phone-session.ts` es el ÚNICO mecanismo para iniciar
   sesión de un teléfono probado por un canal propio (lo usan wa-magic y
   Telegram). No duplicarlo en rutas nuevas.
 - Webhook `app/api/telegram/login/route.ts` (exento en el middleware; secreto en
   tiempo constante ANTES del body). Canje: `/api/auth/telegram-verify` (POST
   JSON same-origin, 5/15 min por teléfono con `otp_rate_limits`
-  `telegram_verify`) y `/api/auth/telegram-link` (GET; HEAD 405 no canjea).
+  `telegram_verify`) y `/api/auth/telegram-link` (GET confirma, POST canjea;
+  HEAD 405). Rechazo por identidad → 409 `sms_only`.
 - `app/(auth)/login/page.tsx` es server wrapper: decide si el canal está
   completo y solo pasa el usuario del bot a `LoginClient.tsx`. Cambiar las
   variables exige redeploy (Next incrusta `NEXT_PUBLIC_*` en el build).

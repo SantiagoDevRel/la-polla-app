@@ -101,7 +101,8 @@
     "tgUseSms": "Prefiero recibir un SMS",
     "tgErrRateLimited": "Demasiados intentos. Espera 15 minutos e inténtalo de nuevo.",
     "tgErrUnavailable": "El acceso por Telegram no está disponible en este momento. Usa el SMS.",
-    "tgErrGeneric": "No pudimos verificar el código. Inténtalo de nuevo."
+    "tgErrGeneric": "No pudimos verificar el código. Inténtalo de nuevo.",
+    "tgErrSmsOnly": "Por seguridad, con este número solo puedes entrar con el código por SMS."
   },
   "Welcome": {
     "introLine": "Cada fin de semana subimos las pollas.\nEntras, pronosticas y compites por el pozo.",

@@ -33,6 +33,8 @@ const COPY = {
     ].join("\n"),
     invalidPhone:
       "No pudimos leer ese número. Toca el botón <b>Compartir mi número</b> para intentarlo de nuevo.",
+    smsOnly:
+      "Por seguridad, con este número solo puedes entrar con el código por SMS. Vuelve a la pantalla de inicio de sesión y pide el SMS.",
     rateLimited:
       "Ya pediste varios códigos. Espera 15 minutos antes de pedir otro.",
     failure:
@@ -67,6 +69,8 @@ const COPY = {
     ].join("\n"),
     invalidPhone:
       "We could not read that number. Tap <b>Share my number</b> to try again.",
+    smsOnly:
+      "For your security, this number can only sign in with the text message code. Go back to the sign-in screen and request the text message.",
     rateLimited:
       "You already requested several codes. Wait 15 minutes before asking for another one.",
     failure:

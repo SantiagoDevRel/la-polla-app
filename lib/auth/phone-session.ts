@@ -20,7 +20,18 @@ import { emailForPhone, normalizePhone } from "@/lib/auth/phone";
 
 export type PhoneSessionResult =
   | { ok: true; userId: string; needsOnboarding: boolean }
-  | { ok: false; stage: "lookup" | "create" | "link" | "verify" };
+  | { ok: false; stage: "lookup" | "create" | "denied" | "link" | "verify" };
+
+export interface PhoneSessionOptions {
+  /**
+   * Última palabra del canal, con la cuenta ya resuelta (created = la creó esta
+   * llamada). false → no se toca la cuenta ni las cookies del navegador: ni
+   * email sintético, ni signOut, ni sesión. Telegram la usa para no abrir una
+   * cuenta existente con un número que Telegram pudo conservar de un dueño
+   * anterior (lib/auth/telegram-login/identity.ts).
+   */
+  authorize?: (account: { authUserId: string; created: boolean }) => Promise<boolean>;
+}
 
 /**
  * Busca o crea la cuenta del teléfono y deja la sesión en las cookies del
@@ -29,6 +40,7 @@ export type PhoneSessionResult =
 export async function startSessionForVerifiedPhone(
   phone: string,
   logTag: string,
+  options: PhoneSessionOptions = {},
 ): Promise<PhoneSessionResult> {
   const admin = createAdminClient();
   const phoneNormalized = normalizePhone(phone);
@@ -39,6 +51,7 @@ export async function startSessionForVerifiedPhone(
   // cuenta de SMS (auth.users.phone) o de un canal con email sintético. Es lo
   // que evita cuentas duplicadas entre canales.
   let authUserId: string | null = null;
+  let created = false;
   {
     const { data: rpcId, error: rpcErr } = await admin.rpc(
       "find_auth_user_id_by_phone",
@@ -54,7 +67,7 @@ export async function startSessionForVerifiedPhone(
   if (!authUserId) {
     // Sin cuenta: se crea. phone_confirm=true porque el canal ya probó la
     // propiedad del número. El email sintético ancla generateLink.
-    const { data: created, error: createErr } =
+    const { data: createdUser, error: createErr } =
       await admin.auth.admin.createUser({
         phone: phoneE164,
         phone_confirm: true,
@@ -62,7 +75,7 @@ export async function startSessionForVerifiedPhone(
         email_confirm: true,
       });
 
-    if (createErr || !created.user) {
+    if (createErr || !createdUser.user) {
       // Carrera de unicidad (el mismo teléfono entró por otro canal en el mismo
       // instante): si ahora existe, se usa esa fila.
       const { data: retryId } = await admin.rpc("find_auth_user_id_by_phone", {
@@ -75,8 +88,13 @@ export async function startSessionForVerifiedPhone(
         return { ok: false, stage: "create" };
       }
     } else {
-      authUserId = created.user.id;
+      authUserId = createdUser.user.id;
+      created = true;
     }
+  }
+
+  if (options.authorize && !(await options.authorize({ authUserId, created }))) {
+    return { ok: false, stage: "denied" };
   }
 
   // El email sintético tiene que estar en la fila (las cuentas de solo SMS no

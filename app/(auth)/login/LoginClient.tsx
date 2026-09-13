@@ -309,6 +309,7 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
     if (status === 401) return t("errOtpInvalid");
     if (status === 429) return t("tgErrRateLimited");
     if (status === 404) return t("tgErrUnavailable");
+    if (status === 409) return t("tgErrSmsOnly");
     return t("tgErrGeneric");
   }
 

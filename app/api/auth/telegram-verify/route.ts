@@ -9,6 +9,8 @@
 //   - 5 intentos / 15 min por teléfono (otp_rate_limits, 'telegram_verify') y
 //     5 intentos por token en la base.
 //   - Error genérico: nunca dice si el número tiene cuenta o token.
+//   - Código correcto de una cuenta de Telegram no autorizada para la cuenta
+//     existente → 409 sms_only, sin sesión (lib/auth/telegram-login/identity.ts).
 // La sesión se crea con el mismo mecanismo que el magic-link
 // (lib/auth/phone-session.ts).
 
@@ -24,6 +26,7 @@ import {
 } from "@/lib/auth/phone-session";
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { consumeLoginCode } from "@/lib/auth/telegram-login/consume";
+import { telegramSessionAuthorizer } from "@/lib/auth/telegram-login/identity";
 import { isSameOriginRequest } from "@/lib/auth/telegram-login/same-origin";
 import { redactPhone } from "@/lib/log";
 
@@ -75,14 +78,20 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const consumed = await consumeLoginCode(admin, config, phoneE164, parsed.data.code);
-  if (consumed === "error") {
+  if (consumed.status === "error") {
     console.error("[telegram-verify] canje falló:", redactPhone(phoneNormalized));
     return json({ error: "server_error" }, 500);
   }
-  if (consumed !== "ok") return json({ error: "invalid_code" }, 401);
+  if (consumed.status !== "ok") return json({ error: "invalid_code" }, 401);
 
-  const session = await startSessionForVerifiedPhone(phoneNormalized, "telegram-verify");
-  if (!session.ok) return json({ error: "session_failed" }, 500);
+  const session = await startSessionForVerifiedPhone(phoneNormalized, "telegram-verify", {
+    authorize: telegramSessionAuthorizer(admin, config, consumed.telegramUserId),
+  });
+  if (!session.ok) {
+    // Cuenta existente que no acepta esta cuenta de Telegram: solo SMS.
+    if (session.stage === "denied") return json({ error: "sms_only" }, 409);
+    return json({ error: "session_failed" }, 500);
+  }
 
   void recordLoginEvent({ userId: session.userId, method: "telegram", request });
 

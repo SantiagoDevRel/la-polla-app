@@ -3,6 +3,10 @@ import { NextRequest } from "next/server";
 
 const adminFactory = vi.hoisted(() => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => adminFactory);
+// Cliente de Supabase con las cookies del request (el que abre la sesión).
+const serverFactory = vi.hoisted(() => ({ createClient: vi.fn() }));
+vi.mock("@/lib/supabase/server", () => serverFactory);
+vi.mock("@/lib/auth/login-event", () => ({ recordLoginEvent: vi.fn().mockResolvedValue(undefined) }));
 
 import { toE164 } from "@/lib/auth/phone";
 import { classifyLoginUpdate } from "@/lib/auth/telegram-login/update";
@@ -19,20 +23,32 @@ import { telegramLoginDeepLink } from "@/lib/auth/telegram-login/deep-link";
 import { loginLinkOrigin, localeForHost } from "@/lib/auth/telegram-login/links";
 import { maskPhone } from "@/lib/auth/telegram-login/messages";
 import { handleLoginUpdate } from "@/lib/auth/telegram-login/handler";
-import { consumeLoginCode, consumeLoginLink } from "@/lib/auth/telegram-login/consume";
+import { consumeLoginCode, consumeLoginLink, peekLoginLink } from "@/lib/auth/telegram-login/consume";
 import { isSameOriginRequest } from "@/lib/auth/telegram-login/same-origin";
 import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
 import { POST as webhookPOST } from "@/app/api/telegram/login/route";
 import { POST as verifyPOST } from "@/app/api/auth/telegram-verify/route";
-import { GET as linkGET, HEAD as linkHEAD } from "@/app/api/auth/telegram-link/route";
+import {
+  GET as linkGET,
+  HEAD as linkHEAD,
+  POST as linkPOST,
+} from "@/app/api/auth/telegram-link/route";
+import { canIssueFor, telegramSessionAuthorizer } from "@/lib/auth/telegram-login/identity";
+import { startSessionForVerifiedPhone } from "@/lib/auth/phone-session";
 
 const BOT_TOKEN = "123456789:AAFakeTokenForUnitTestsOnly_abcdefghijk";
 const SECRET = "unit-test-webhook-secret-0123456789abcdef";
-const CONFIG = { botToken: BOT_TOKEN, webhookSecret: SECRET, botUsername: "LaPollaLoginBot" };
+const CONFIG = {
+  botToken: BOT_TOKEN,
+  webhookSecret: SECRET,
+  botUsername: "LaPollaLoginBot",
+  allowExistingAccounts: false,
+};
 const ENV_KEYS = [
   "TELEGRAM_LOGIN_BOT_TOKEN",
   "TELEGRAM_LOGIN_WEBHOOK_SECRET",
   "NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME",
+  "TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS",
 ] as const;
 
 function setLoginEnv(on: boolean) {
@@ -60,6 +76,7 @@ function privateMessage(extra: Record<string, unknown>, userId = 5550001) {
 
 beforeEach(() => {
   adminFactory.createAdminClient.mockReset();
+  serverFactory.createClient.mockReset();
   setLoginEnv(false);
 });
 afterEach(() => {
@@ -202,6 +219,16 @@ describe("configuration", () => {
       }),
     ).toEqual(CONFIG);
   });
+  it("keeps existing accounts SMS-only unless the owner opts in explicitly", () => {
+    const base = {
+      TELEGRAM_LOGIN_BOT_TOKEN: BOT_TOKEN,
+      TELEGRAM_LOGIN_WEBHOOK_SECRET: SECRET,
+      NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME: "LaPollaLoginBot",
+    };
+    expect(getTelegramLoginConfig(base)?.allowExistingAccounts).toBe(false);
+    expect(getTelegramLoginConfig({ ...base, TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS: "1" })?.allowExistingAccounts).toBe(false);
+    expect(getTelegramLoginConfig({ ...base, TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS: "true" })?.allowExistingAccounts).toBe(true);
+  });
   it("builds the deep link with the locale payload", () => {
     expect(telegramLoginDeepLink("LaPollaLoginBot", "es")).toBe("https://t.me/LaPollaLoginBot?start=login");
     expect(telegramLoginDeepLink("LaPollaLoginBot", "en")).toBe("https://t.me/LaPollaLoginBot?start=login_en");
@@ -227,10 +254,16 @@ describe("link host", () => {
 });
 
 // ── handler with fake db + fake Telegram API ─────────────────────────────
-function fakeDb(issueStatus: string | null, opts: { error?: boolean; locale?: "es" | "en" } = {}) {
-  const rpc = vi.fn().mockResolvedValue(
-    opts.error ? { data: null, error: { code: "XX000", message: "boom" } } : { data: issueStatus, error: null },
-  );
+function fakeDb(
+  issueStatus: string | null,
+  opts: { error?: boolean; locale?: "es" | "en"; identity?: string } = {},
+) {
+  const rpc = vi.fn(async (fn: string) => {
+    if (fn === "telegram_login_identity_status") return { data: opts.identity ?? "new", error: null };
+    return opts.error
+      ? { data: null, error: { code: "XX000", message: "boom" } }
+      : { data: issueStatus, error: null };
+  });
   const upsert = vi.fn().mockResolvedValue({ error: null });
   const maybeSingle = vi.fn().mockResolvedValue({ data: opts.locale ? { locale: opts.locale } : null, error: null });
   const from = vi.fn(() => ({ upsert, select: () => ({ eq: () => ({ maybeSingle }) }) }));
@@ -246,8 +279,8 @@ describe("handleLoginUpdate", () => {
     const send = vi.fn().mockResolvedValue(true);
     expect(await handleLoginUpdate(ownContact, { config: CONFIG, db, send, env })).toBe("issued");
 
-    expect(rpc).toHaveBeenCalledTimes(1);
-    const [fn, args] = rpc.mock.calls[0];
+    expect(rpc.mock.calls.map((c) => c[0])).toEqual(["telegram_login_identity_status", "telegram_login_issue"]);
+    const [fn, args] = rpc.mock.calls[1] as unknown as [string, Record<string, unknown>];
     expect(fn).toBe("telegram_login_issue");
     expect(args.p_phone_e164).toBe("+573001234567");
     expect(args.p_telegram_user_id).toBe(5550001);
@@ -292,6 +325,35 @@ describe("handleLoginUpdate", () => {
     }
   });
 
+  // Número reciclado: el dueño anterior conserva el número en Telegram y el
+  // dueño nuevo ya creó su cuenta por SMS. Telegram no prueba quién tiene la SIM.
+  it("does not issue a code for an existing account that is not linked to this Telegram account", async () => {
+    for (const identity of ["unlinked", "linked_other"]) {
+      const { db, rpc } = fakeDb("ok", { identity });
+      const send = vi.fn().mockResolvedValue(true);
+      expect(await handleLoginUpdate(ownContact, { config: CONFIG, db, send, env })).toBe("sms_only");
+      expect(rpc.mock.calls.map((c) => c[0])).toEqual(["telegram_login_identity_status"]);
+      const body = send.mock.calls[0][1];
+      expect(body.text).toContain("SMS");
+      expect(body.text).not.toMatch(/<code>\d{6}<\/code>/);
+      expect(body.reply_markup.inline_keyboard).toBeUndefined();
+    }
+  });
+
+  it("issues for new phones and linked accounts; unlinked accounts only when the owner opts in", async () => {
+    expect(canIssueFor("new", CONFIG)).toBe(true);
+    expect(canIssueFor("linked", CONFIG)).toBe(true);
+    expect(canIssueFor("unlinked", CONFIG)).toBe(false);
+    expect(canIssueFor("linked_other", CONFIG)).toBe(false);
+    const allow = { ...CONFIG, allowExistingAccounts: true };
+    expect(canIssueFor("unlinked", allow)).toBe(true);
+    expect(canIssueFor("linked_other", allow)).toBe(false);
+
+    const { db } = fakeDb("ok", { identity: "unlinked" });
+    const send = vi.fn().mockResolvedValue(true);
+    expect(await handleLoginUpdate(ownContact, { config: allow, db, send, env })).toBe("issued");
+  });
+
   it("answers foreign contacts without touching the token table", async () => {
     const { db, rpc } = fakeDb("ok");
     const send = vi.fn().mockResolvedValue(true);
@@ -321,22 +383,30 @@ describe("consume helpers", () => {
   it("rejects malformed input without calling the database", async () => {
     const rpc = vi.fn();
     const db = { rpc } as never;
-    expect(await consumeLoginCode(db, CONFIG, "+573001234567", "12a456")).toBe("invalid");
+    expect(await consumeLoginCode(db, CONFIG, "+573001234567", "12a456")).toEqual({ status: "invalid" });
     expect(await consumeLoginLink(db, CONFIG, "short")).toEqual({ status: "invalid" });
+    expect(await peekLoginLink(db, CONFIG, "short")).toEqual({ status: "invalid" });
     expect(rpc).not.toHaveBeenCalled();
   });
-  it("maps database answers", async () => {
+  it("maps database answers and returns the Telegram account that requested the token", async () => {
     const token = generateLinkToken();
-    const ok = { rpc: vi.fn().mockResolvedValue({ data: [{ status: "ok", phone_e164: "+573001234567" }], error: null }) } as never;
-    expect(await consumeLoginLink(ok, CONFIG, token)).toEqual({ status: "ok", phoneE164: "+573001234567" });
-    const used = { rpc: vi.fn().mockResolvedValue({ data: [{ status: "used", phone_e164: null }], error: null }) } as never;
+    const ok = { rpc: vi.fn().mockResolvedValue({ data: [{ status: "ok", phone_e164: "+573001234567", telegram_user_id: 5550001 }], error: null }) };
+    expect(await consumeLoginLink(ok as never, CONFIG, token)).toEqual({ status: "ok", phoneE164: "+573001234567", telegramUserId: 5550001 });
+    expect(ok.rpc).toHaveBeenCalledWith("telegram_login_redeem_link", { p_link_token_hash: hashLinkToken(BOT_TOKEN, token) });
+    const used = { rpc: vi.fn().mockResolvedValue({ data: [{ status: "used", phone_e164: null, telegram_user_id: null }], error: null }) } as never;
     expect(await consumeLoginLink(used, CONFIG, token)).toEqual({ status: "used" });
-    const code = { rpc: vi.fn().mockResolvedValue({ data: "ok", error: null }) };
-    expect(await consumeLoginCode(code as never, CONFIG, "+573001234567", "123456")).toBe("ok");
-    expect(code.rpc).toHaveBeenCalledWith("telegram_login_consume_code", {
+    const code = { rpc: vi.fn().mockResolvedValue({ data: [{ status: "ok", telegram_user_id: 5550001 }], error: null }) };
+    expect(await consumeLoginCode(code as never, CONFIG, "+573001234567", "123456")).toEqual({ status: "ok", telegramUserId: 5550001 });
+    expect(code.rpc).toHaveBeenCalledWith("telegram_login_redeem_code", {
       p_phone_e164: "+573001234567",
       p_code_hash: hashLoginCode(BOT_TOKEN, "+573001234567", "123456"),
     });
+    // Un 'ok' sin cuenta de Telegram no abre nada.
+    const noTg = { rpc: vi.fn().mockResolvedValue({ data: [{ status: "ok", telegram_user_id: null }], error: null }) } as never;
+    expect(await consumeLoginCode(noTg, CONFIG, "+573001234567", "123456")).toEqual({ status: "invalid" });
+    const peek = { rpc: vi.fn().mockResolvedValue({ data: [{ status: "ok", phone_e164: "+573001234567" }], error: null }) };
+    expect(await peekLoginLink(peek as never, CONFIG, token)).toEqual({ status: "ok", phoneE164: "+573001234567" });
+    expect(peek.rpc).toHaveBeenCalledWith("telegram_login_peek_link", { p_link_token_hash: hashLinkToken(BOT_TOKEN, token) });
   });
 });
 
@@ -380,6 +450,13 @@ describe("same-origin guard", () => {
     expect(isSameOriginRequest(req({ host: "lapollacolombiana.com", "sec-fetch-site": "cross-site" }))).toBe(false);
     expect(isSameOriginRequest(req({ host: "lapollacolombiana.com", origin: "https://evil.example" }))).toBe(false);
     expect(isSameOriginRequest(req({ host: "lapollacolombiana.com", origin: "null" }))).toBe(false);
+  });
+  it("requires positive same-origin proof for form posts", () => {
+    const strict = { requireProof: true };
+    expect(isSameOriginRequest(req({ host: "lapollacolombiana.com" }), strict)).toBe(false);
+    expect(isSameOriginRequest(req({ host: "lapollacolombiana.com", "sec-fetch-site": "same-origin" }), strict)).toBe(true);
+    expect(isSameOriginRequest(req({ host: "lapollacolombiana.com", origin: "https://lapollacolombiana.com" }), strict)).toBe(true);
+    expect(isSameOriginRequest(req({ host: "lapollacolombiana.com", "sec-fetch-site": "none" }), strict)).toBe(false);
   });
 });
 
@@ -472,5 +549,222 @@ describe("verify and link routes", () => {
     expect(res.status).toBe(404);
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(adminFactory.createAdminClient).not.toHaveBeenCalled();
+  });
+});
+
+// ── sesión: fakes del cliente admin y del cliente con cookies ─────────────
+type RpcAnswers = Record<string, { data: unknown; error?: unknown }>;
+
+/** Consulta encadenable de PostgREST: cualquier método devuelve la misma cadena. */
+function chainable(result: unknown) {
+  const chain: unknown = new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (prop === "then") return (resolve: (v: unknown) => void) => resolve(result);
+        if (prop === "maybeSingle" || prop === "single") return () => Promise.resolve(result);
+        return () => chain;
+      },
+    },
+  );
+  return chain;
+}
+
+function fakeAdmin(rpcAnswers: RpcAnswers, opts: { existingUserId?: string | null } = {}) {
+  const rpc = vi.fn(async (fn: string) => {
+    if (fn === "find_auth_user_id_by_phone") return { data: opts.existingUserId ?? null, error: null };
+    const answer = rpcAnswers[fn];
+    if (!answer) throw new Error(`rpc inesperada: ${fn}`);
+    return { data: answer.data, error: answer.error ?? null };
+  });
+  const auth = {
+    admin: {
+      createUser: vi.fn().mockResolvedValue({ data: { user: { id: "new-user-id" } }, error: null }),
+      getUserById: vi.fn().mockResolvedValue({ data: { user: { email: "573001234567@wa.lapolla.app" } }, error: null }),
+      updateUserById: vi.fn().mockResolvedValue({ error: null }),
+      generateLink: vi.fn().mockResolvedValue({ data: { properties: { email_otp: "999999" } }, error: null }),
+    },
+  };
+  const from = vi.fn(() =>
+    chainable({ data: { display_name: "Ana", avatar_url: "millos" }, count: 0, error: null }),
+  );
+  const client = { rpc, auth, from };
+  adminFactory.createAdminClient.mockReturnValue(client);
+  return client;
+}
+
+function fakeCookieClient() {
+  const client = {
+    auth: {
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+      verifyOtp: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    },
+  };
+  serverFactory.createClient.mockResolvedValue(client);
+  return client;
+}
+
+describe("telegram-link: the GET only shows the number, a same-origin POST signs in", () => {
+  const token = "Q".repeat(43);
+  const url = `http://localhost/api/auth/telegram-link?t=${token}`;
+
+  function formPost(headers: Record<string, string>, body = `t=${token}`) {
+    return new NextRequest("http://localhost/api/auth/telegram-link", {
+      method: "POST",
+      headers: { host: "localhost", "content-type": "application/x-www-form-urlencoded", ...headers },
+      body,
+    });
+  }
+
+  it("GET with a valid token does not redeem it nor touch the browser session", async () => {
+    setLoginEnv(true);
+    const admin = fakeAdmin({
+      telegram_login_peek_link: { data: [{ status: "ok", phone_e164: "+573001234567" }] },
+    });
+    const cookies = fakeCookieClient();
+
+    const res = await linkGET(new NextRequest(url, { headers: { host: "localhost" } }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("set-cookie")).toBeNull();
+    const html = await res.text();
+    expect(html).toContain("+57 ••• ••• 4567");
+    expect(html).not.toContain("3001234567");
+    expect(html).toMatch(/<form method="post" action="\/api\/auth\/telegram-link">/);
+    expect(html).toContain(`name="t" value="${token}"`);
+    expect(html).not.toContain("sesión abierta");
+
+    expect(admin.rpc.mock.calls.map((c) => c[0])).toEqual(["telegram_login_peek_link"]);
+    expect(serverFactory.createClient).not.toHaveBeenCalled();
+    expect(cookies.auth.signOut).not.toHaveBeenCalled();
+  });
+
+  it("GET warns when this browser already has a session that would be replaced", async () => {
+    setLoginEnv(true);
+    fakeAdmin({ telegram_login_peek_link: { data: [{ status: "ok", phone_e164: "+573001234567" }] } });
+    const res = await linkGET(
+      new NextRequest(url, { headers: { host: "localhost", cookie: "sb-127-auth-token.0=abc" } }),
+    );
+    expect(await res.text()).toContain("Este navegador ya tiene una sesión abierta");
+  });
+
+  it("GET reports used or expired links without redeeming", async () => {
+    setLoginEnv(true);
+    const admin = fakeAdmin({ telegram_login_peek_link: { data: [{ status: "used", phone_e164: null }] } });
+    const res = await linkGET(new NextRequest(url, { headers: { host: "localhost" } }));
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("ya se usó");
+    expect(admin.rpc.mock.calls.map((c) => c[0])).toEqual(["telegram_login_peek_link"]);
+  });
+
+  it("POST from another site, without origin proof or not as a form, never touches the database", async () => {
+    setLoginEnv(true);
+    const variants = [
+      formPost({ "sec-fetch-site": "cross-site", origin: "https://evil.example" }),
+      formPost({ origin: "https://evil.example" }),
+      formPost({}),
+      formPost({ "sec-fetch-site": "same-origin", "content-type": "application/json" }, JSON.stringify({ t: token })),
+    ];
+    for (const request of variants) {
+      const res = await linkPOST(request);
+      expect(res.status).toBe(403);
+      expect(res.headers.get("set-cookie")).toBeNull();
+    }
+    expect(adminFactory.createAdminClient).not.toHaveBeenCalled();
+    expect(serverFactory.createClient).not.toHaveBeenCalled();
+  });
+
+  it("same-origin POST redeems once and opens the session of an account linked to that Telegram account", async () => {
+    setLoginEnv(true);
+    const admin = fakeAdmin(
+      {
+        telegram_login_redeem_link: { data: [{ status: "ok", phone_e164: "+573001234567", telegram_user_id: 5550001 }] },
+        telegram_login_authorize: { data: true },
+      },
+      { existingUserId: "account-1" },
+    );
+    const cookies = fakeCookieClient();
+
+    const res = await linkPOST(formPost({ "sec-fetch-site": "same-origin", origin: "http://localhost" }));
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("http://localhost/casa");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(admin.rpc).toHaveBeenCalledWith("telegram_login_redeem_link", { p_link_token_hash: hashLinkToken(BOT_TOKEN, token) });
+    expect(admin.rpc).toHaveBeenCalledWith("telegram_login_authorize", {
+      p_user_id: "account-1",
+      p_telegram_user_id: 5550001,
+      p_allow_first_link: false,
+    });
+    expect(cookies.auth.verifyOtp).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("recycled number: an existing account only accepts its linked Telegram account", () => {
+  it("does not touch the account nor the browser session when the Telegram account is not authorized", async () => {
+    const admin = fakeAdmin({ telegram_login_authorize: { data: false } }, { existingUserId: "sms-account" });
+    const cookies = fakeCookieClient();
+    const authorize = telegramSessionAuthorizer(admin as never, CONFIG, 7770001);
+
+    const result = await startSessionForVerifiedPhone("+573001234567", "test", { authorize });
+    expect(result).toEqual({ ok: false, stage: "denied" });
+    expect(admin.rpc).toHaveBeenCalledWith("telegram_login_authorize", {
+      p_user_id: "sms-account",
+      p_telegram_user_id: 7770001,
+      p_allow_first_link: false,
+    });
+    expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
+    expect(admin.auth.admin.updateUserById).not.toHaveBeenCalled();
+    expect(admin.auth.admin.generateLink).not.toHaveBeenCalled();
+    expect(serverFactory.createClient).not.toHaveBeenCalled();
+    expect(cookies.auth.signOut).not.toHaveBeenCalled();
+    expect(cookies.auth.verifyOtp).not.toHaveBeenCalled();
+  });
+
+  it("links the Telegram account when Telegram creates the account, or when the owner allows existing accounts", async () => {
+    const admin = fakeAdmin({ telegram_login_authorize: { data: true } }, { existingUserId: null });
+    fakeCookieClient();
+    const created = await startSessionForVerifiedPhone("+573001234567", "test", {
+      authorize: telegramSessionAuthorizer(admin as never, CONFIG, 5550001),
+    });
+    expect(created).toMatchObject({ ok: true, userId: "new-user-id" });
+    expect(admin.rpc).toHaveBeenCalledWith("telegram_login_authorize", {
+      p_user_id: "new-user-id",
+      p_telegram_user_id: 5550001,
+      p_allow_first_link: true,
+    });
+
+    const existing = fakeAdmin({ telegram_login_authorize: { data: true } }, { existingUserId: "sms-account" });
+    const authorize = telegramSessionAuthorizer(existing as never, { ...CONFIG, allowExistingAccounts: true }, 5550001);
+    await authorize({ authUserId: "sms-account", created: false });
+    expect(existing.rpc).toHaveBeenCalledWith("telegram_login_authorize", {
+      p_user_id: "sms-account",
+      p_telegram_user_id: 5550001,
+      p_allow_first_link: true,
+    });
+  });
+
+  it("telegram-verify answers 409 sms_only without cookies when a correct code comes from an unauthorized Telegram account", async () => {
+    setLoginEnv(true);
+    const admin = fakeAdmin(
+      {
+        telegram_login_redeem_code: { data: [{ status: "ok", telegram_user_id: 7770001 }] },
+        telegram_login_authorize: { data: false },
+      },
+      { existingUserId: "sms-account" },
+    );
+    const cookies = fakeCookieClient();
+
+    const res = await verifyPOST(
+      new NextRequest("http://localhost/api/auth/telegram-verify", {
+        method: "POST",
+        headers: { host: "localhost", "content-type": "application/json", "sec-fetch-site": "same-origin" },
+        body: JSON.stringify({ phone: "+573001234567", code: "123456" }),
+      }),
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "sms_only" });
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(admin.auth.admin.generateLink).not.toHaveBeenCalled();
+    expect(cookies.auth.verifyOtp).not.toHaveBeenCalled();
   });
 });

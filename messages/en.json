@@ -101,7 +101,8 @@
     "tgUseSms": "I'd rather get a text message",
     "tgErrRateLimited": "Too many attempts. Wait 15 minutes and try again.",
     "tgErrUnavailable": "Telegram sign-in is not available right now. Use the text message.",
-    "tgErrGeneric": "We couldn't verify the code. Please try again."
+    "tgErrGeneric": "We couldn't verify the code. Please try again.",
+    "tgErrSmsOnly": "For your security, this number can only sign in with the text message code."
   },
   "Welcome": {
     "introLine": "Every weekend we post the pools.\nYou join, you pick, you play for the pot.",

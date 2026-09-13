@@ -417,6 +417,9 @@ NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=
 TELEGRAM_LOGIN_BOT_TOKEN=
 TELEGRAM_LOGIN_WEBHOOK_SECRET=            # 32-256 caracteres [A-Za-z0-9_-]
 NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME=  # sin @
+# Opcional. Vacío = cuentas que ya existían (SMS) solo entran por SMS.
+# true = el dueño acepta el riesgo del número reciclado (ver «Login por Telegram»).
+TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=
 ```
 
 ### 3. Supabase migrations
@@ -455,15 +458,28 @@ Bot **público y separado** del panel de admin. El bot nunca acepta un número e
 2. El bot (`/start` o `/login`) muestra un teclado con **Compartir mi número** (`request_contact`). Solo acepta el contacto propio: chat privado, `contact.user_id === from.id`, sin reenvío. Número → E.164 con `toE164` (`lib/auth/phone.ts`).
 3. `telegram_login_issue` (migración 115) emite un **código de 6 dígitos** y un **enlace de un solo uso** (`/api/auth/telegram-link?t=…`). En la base solo hay HMAC-SHA256 con pepper del servidor (derivado del token del bot); el hash del código incluye el teléfono. Vence en 10 min; emitir uno nuevo invalida el anterior; canjear código o enlace invalida ambos; 5 fallos matan el token.
 4. La persona escribe el código en `/login` → `/api/auth/telegram-verify` (POST JSON same-origin, 5 intentos / 15 min por teléfono en `otp_rate_limits`). El enlace también funciona, pero si se abre dentro de Telegram la sesión queda en el navegador de Telegram: el código es la vía recomendada.
-5. La sesión se crea con `lib/auth/phone-session.ts`, el mismo mecanismo del magic-link (`generateLink` + `verifyOtp` con `signOut({scope:'local'})` previo). Misma cuenta si el teléfono ya entró por SMS. `login_event` con `method: 'telegram'`.
+   - **El GET del enlace no abre sesión.** Muestra «Vas a entrar con +57 ••• ••• 4567» (y avisa si ese navegador ya tiene una sesión que se cerraría) con un botón que hace un POST de formulario al mismo endpoint. El POST exige prueba positiva de mismo origen (`Sec-Fetch-Site: same-origin` u `Origin` del mismo host). Así, un enlace ajeno reenviado por chat no deja a nadie dentro de la cuenta de otro sin ver el número, y un escáner o una vista previa no queman el token (`telegram_login_peek_link` solo lee).
+5. La sesión se crea con `lib/auth/phone-session.ts`, el mismo mecanismo del magic-link (`generateLink` + `verifyOtp` con `signOut({scope:'local'})` previo), **solo si la cuenta de Telegram está autorizada** para esa cuenta (`lib/auth/telegram-login/identity.ts`, tabla `telegram_login_identities`). `login_event` con `method: 'telegram'`.
 
-Topes de emisión: 3 / 15 min y 10 / día, por teléfono y por cuenta de Telegram. Respuestas genéricas: el bot no revela si el número tiene cuenta.
+**Número reciclado.** Telegram prueba que el número está asociado HOY a esa cuenta de Telegram, no quién tiene hoy la SIM: no es un espejo del SMS. Si la operadora reasigna un número y el dueño anterior lo conserva en Telegram, podría entrar a la cuenta que el dueño nuevo creó por SMS. Por eso:
+
+| Estado del teléfono | Telegram |
+|---|---|
+| Sin cuenta | Crea la cuenta y queda vinculada a esa cuenta de Telegram |
+| Cuenta vinculada a esta cuenta de Telegram | Entra |
+| Cuenta vinculada a otra cuenta de Telegram | Nunca: el bot no emite código y pide usar el SMS |
+| Cuenta existente sin vínculo (creada por SMS) | Solo SMS, salvo `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`: entonces la primera cuenta de Telegram que entra queda vinculada y las demás no. Esa primera vez sigue expuesta al número reciclado; el login queda en `/avisos` de la cuenta |
+
+El bot revisa el estado antes de emitir (`telegram_login_identity_status`) y el canje lo vuelve a decidir con la cuenta ya resuelta (`telegram_login_authorize`, que vincula de forma atómica). Rechazo → `409 sms_only`, sin tocar la cuenta ni las cookies del navegador.
+
+Topes de emisión: 3 / 15 min y 10 / día, por teléfono y por cuenta de Telegram. El bot solo le dice a quien comparte SU contacto si ese número debe usar el SMS; nunca responde sobre números ajenos.
 
 | Archivo | Rol |
 |---|---|
 | `app/api/telegram/login/route.ts` | Webhook. 503 sin configuración (sin leer body ni DB); header `X-Telegram-Bot-Api-Secret-Token` en tiempo constante antes del body |
 | `lib/auth/telegram-login/*` | Configuración, clasificación de updates, hashes, textos del bot, canje |
-| `app/api/auth/telegram-verify/route.ts` · `telegram-link/route.ts` | Canje de código / enlace (`no-store`; HEAD 405 no canjea) |
+| `app/api/auth/telegram-verify/route.ts` · `telegram-link/route.ts` | Canje de código / enlace (`no-store`; el GET del enlace solo confirma, el POST same-origin canjea; HEAD 405) |
+| `lib/auth/telegram-login/identity.ts` | Qué cuenta de Telegram puede entrar a qué cuenta (número reciclado) |
 | `app/(auth)/login/page.tsx` → `LoginClient.tsx` | El servidor decide si el canal está completo y solo pasa el usuario del bot |
 | `scripts/telegram-login-set-webhook.mjs` | `setWebhook` (`allowed_updates: ["message"]`) + comandos. `--dry-run` primero |
 | `scripts/telegram-login-check.sql` | Regresión SQL contra Supabase local (transacción revertida) |

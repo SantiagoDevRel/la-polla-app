@@ -2,9 +2,11 @@
 // Vive fuera de app/api/telegram/login/route.ts porque un route.ts solo puede
 // exportar handlers HTTP, y así se prueba con dependencias falsas.
 //
-// Respuestas deliberadamente genéricas: el bot nunca dice si el número tiene
-// cuenta. Un número sin cuenta recibe su código igual y, como en el login por
-// SMS, la cuenta se crea al verificar.
+// Un número sin cuenta recibe su código y, como en el login por SMS, la cuenta
+// se crea al verificar. Una cuenta que ya existe solo acepta la cuenta de
+// Telegram vinculada (identity.ts): a cualquier otra, el bot le pide usar el
+// SMS sin emitir nada. Eso le confirma a quien tiene el número en Telegram que
+// ese número tiene cuenta; se acepta porque solo puede consultar su propio número.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { redactId, redactPhone } from "@/lib/log";
@@ -17,6 +19,7 @@ import {
   hashLoginCode,
   LOGIN_TOKEN_TTL_SECONDS,
 } from "./crypto";
+import { canIssueFor, telegramIdentityStatus } from "./identity";
 import { loginLinkUrl } from "./links";
 import { loginBotCopy, maskPhone } from "./messages";
 import { classifyLoginUpdate, type LoginLocale } from "./update";
@@ -34,6 +37,7 @@ export type LoginHandlerOutcome =
   | "foreign_contact"
   | "invalid_phone"
   | "issued"
+  | "sms_only"
   | "rate_limited"
   | "failed";
 
@@ -108,7 +112,26 @@ export async function handleLoginUpdate(
     return action.kind;
   }
 
-  // own_contact: emitir código + enlace.
+  // own_contact. Antes de emitir: ¿esta cuenta de Telegram puede entrar a la
+  // cuenta de ese teléfono? (identity.ts). Si no, ni código ni enlace.
+  const identity = await telegramIdentityStatus(db, action.phoneE164, action.telegramUserId);
+  if (identity === "error" || !canIssueFor(identity, config)) {
+    if (identity === "error") {
+      console.error(
+        "[telegram-login] estado de identidad falló:",
+        redactPhone(action.phoneE164),
+        redactId(String(action.telegramUserId)),
+      );
+    }
+    await send("sendMessage", {
+      chat_id: action.chatId,
+      text: identity === "error" ? copy.failure : copy.smsOnly,
+      parse_mode: "HTML",
+      reply_markup: { remove_keyboard: true },
+    });
+    return identity === "error" ? "failed" : "sms_only";
+  }
+
   const code = generateLoginCode();
   const linkToken = generateLinkToken();
   const { data: status, error } = await db.rpc("telegram_login_issue", {
