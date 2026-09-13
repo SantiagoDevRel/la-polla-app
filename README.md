@@ -603,7 +603,8 @@ Después de un deploy nuevo:
 ### Estado en producción (2026-09-13)
 
 Foto de lo que quedó activo antes del lanzamiento. Producción:
-`dpl_4kJdLw97EdCV9Y3ftz1ADtgsMTYX` (`main` 7d9ca5a). Toda la configuración de
+`dpl_4kJdLw97EdCV9Y3ftz1ADtgsMTYX` (`main` 7d9ca5a); los merges posteriores del
+mismo día (#73, #74 y la corrección de monitoreo) solo tocan documentación. Toda la configuración de
 Auth se lee y cambia con la Management API
 (`GET`/`PATCH /v1/projects/<ref>/config/auth`) usando un token con permisos
 del proyecto. Nunca pegues secretos en el PATCH desde la terminal; léelos de
@@ -615,9 +616,9 @@ un archivo.
 | SMS por LabsMobile (Send SMS Hook) | **Configurado y apagado.** URI `https://lapollacolombiana.com/api/auth/sms-hook` y secreto guardados en Auth; `sms_provider` sigue siendo `twilio_verify`; `sms_otp_exp=600` | Prender: PATCH `{"hook_send_sms_enabled": true}`. Rollback: PATCH `{"hook_send_sms_enabled": false}`, que vuelve a Twilio al instante sin deploy |
 | Login por Telegram | **Activo.** Bot `@LaPollaColombianaAccesoBot`, webhook en `/api/telegram/login` (`allowed_updates: ["message"]`), migración 115 aplicada, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true` | Apagar: quitar una de las tres variables `TELEGRAM_LOGIN_*` en Vercel y redeploy (la opción desaparece de `/login` y el webhook responde 503) |
 | Captcha de Auth | **Apagada** (`security_captcha_enabled=false`). Pendiente, ver «IP real en Supabase Auth» | — |
-| Backup | **Activo.** Runner del DGX fijado a `main` 7d9ca5a (checkout detached): backup a las 00:10, 06:10, 12:10 y 18:10 y verify a las 03:40 (hora de Bogotá). Cada corrida escribe en `backup_runs` (migración 117). `backup-freshness.yml` revisa cada hora y manda correo si hay atraso. El PC baja los snapshots con la tarea programada `La Polla backup pull` | Detalle en `ops/backup/README.md`. Si cambian `ops/backup` o `scripts/export-backup.ts`, en el DGX hay que repetir `git fetch`, `checkout` y `npm ci` |
+| Backup | **Activo.** Runner del DGX fijado a `main` 7d9ca5a (checkout detached): backup a las 00:10, 06:10, 12:10 y 18:10 y verify a las 03:40 (hora de Bogotá). Cada corrida escribe en `backup_runs` (migración 117). `backup-freshness.yml` está programado cada hora y manda correo si hay atraso (ojo: GitHub corre los `schedule` de este repo con horas de retraso, ver «Crons de GitHub Actions»). El PC baja los snapshots con la tarea programada `La Polla backup pull` | Detalle en `ops/backup/README.md`. Si cambian `ops/backup` o `scripts/export-backup.ts`, en el DGX hay que repetir `git fetch`, `checkout` y `npm ci` |
 | Planes | Vercel Pro, Supabase Pro compute Small, API-Football Pro (vence 2026-10-09) | — |
-| Monitoreo de errores | **No hay Sentry** ni otra integración de monitoreo. Los errores se revisan en los logs de Vercel y en los correos de alerta (discrepancias, backup atrasado, SMS fallido o tardío) | — |
+| Monitoreo | **Uptime en Sentry, sin aviso conectado.** Monitor «Uptime Monitoring for https://lapollacolombiana.com» (proyecto `santi-apps`, entorno `production`): `HEAD /api/app-version` cada 5 min, timeout 10 s, abre incidente tras 3 fallos y lo cierra con 1 éxito. **No tiene ninguna alerta (workflow) conectada**, así que un incidente no le avisa a nadie: hay que abrir Sentry para verlo. No hay SDK de Sentry en el código ni integración en Vercel. Los errores de la app se revisan en los logs de Vercel y en los correos de alerta (discrepancias, backup atrasado, SMS fallido o tardío) | Conectar el aviso: en Sentry → Monitors → Alerts, crear una alerta conectada a este monitor que mande email. Apagar: botón Disable en la edición del monitor |
 
 **Prueba de LabsMobile del 2026-09-13.** Con el hook prendido se mandó un solo
 SMS real: Supabase llamó al hook (200) y LabsMobile lo aceptó a las 16:10:41Z.
@@ -721,6 +722,17 @@ Unitarias: `npm test -- tests/auth-real-ip.test.ts`.
 | `admin-discrepancies-email.yml` | `/api/cron/admin-discrepancies-email` | diario 13:00 UTC |
 | `cleanup-payout-proofs.yml` | `/api/cron/cleanup-payout-proofs` | **solo manual** (pendiente de aprobación del dueño) |
 | `backup-freshness.yml` | `/api/cron/backup-freshness` | cada hora, minuto 17 |
+
+- **Los `schedule` de GitHub llegan tarde en este repo.** `match-reminders` y
+  `admin-discrepancies-email` (13:00 UTC) arrancaron entre las 15:54 y las
+  16:48 UTC del 2026-09-10 al 2026-09-13: casi 3 a 4 h de retraso. GitHub
+  no garantiza la hora y puede saltarse corridas con carga alta.
+  `backup-freshness.yml` llegó a `main` a las 15:45 UTC del 2026-09-13 y, a
+  las 18:37 UTC, sus horarios de las 16:17, 17:17 y 18:17 seguían sin correr
+  (solo había corridas manuales). En la práctica, un backup atrasado puede
+  avisar varias horas después del umbral de 7 h. Si eso no alcanza, dispara la
+  misma ruta desde un segundo lugar (pg_cron + pg_net o un cron de Vercel,
+  que Pro permite) con `CRON_SECRET`.
 
 - `backup-freshness` lee `public.backup_runs` (migración 117, la llena el
   backup del DGX) y le escribe a `ADMIN_ALERT_EMAIL` (o `FEEDBACK_NOTIFY_EMAIL`)
