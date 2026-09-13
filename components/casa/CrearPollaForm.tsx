@@ -816,7 +816,7 @@ export function CrearPollaForm() {
                 {proximoPartido ? (
                   <p className="mt-2 text-[13px] text-text-primary">
                     El próximo partido es el{" "}
-                    {formatMatchTime(proximoPartido.scheduled_at, proximoPartido.scheduled_at_confirmed)}.
+                    {formatMatchTime(proximoPartido.scheduled_at, proximoPartido.scheduled_at_confirmed)}
                   </p>
                 ) : (
                   <button
