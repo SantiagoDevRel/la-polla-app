@@ -400,6 +400,7 @@ verificada byte a byte en el DGX (`~/apps/la-polla-backup/`).
   **aborta** — un backup truncado en silencio es peor que ninguno.
 - `backups/` está en `.gitignore`. Lleva teléfonos y comprobantes de pago y
   **este repo es público**: nunca se commitea.
+- (2026-09-13) SQL read-only, Storage cruzado con `storage.objects`, sha256 por archivo, `schema/live` real y `.partial` hasta terminar; tablas se restauran con `restore-backup-sql.ts` (psql + replica role, PostgREST choca con los triggers) y `restore-backup.ts` no escribe en remoto sin `ALLOW_REMOTE_TARGET=<ref>`. El restore SQL reemplaza las tablas que siembran las migraciones (`app_config`, `casa_operation_control`: si no, Casa vuelve a `legacy`) y aborta si una fila no queda idéntica; `ALLOW_NONEMPTY` es solo para ensayos. `verify-backup` rechaza un backup reducido (auth por admin API o Storage sin cruce) salvo `ALLOW_REDUCED_BACKUP=1`. Detalle en `docs/backup-restore.md`.
 
 Guía completa (incluye cómo reabrir en un proyecto nuevo):
 `docs/backup-restore.md`.
