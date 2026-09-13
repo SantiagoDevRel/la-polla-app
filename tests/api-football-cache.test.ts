@@ -10,7 +10,7 @@ const dbFetch=vi.fn<typeof fetch>();
 const matches=[{tournament:'premier_2025',home_team:'Arsenal',away_team:'Chelsea',scheduled_at:'2026-09-09T18:00:00Z'}];
 beforeEach(()=>{
   vi.resetAllMocks(); vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-09T20:30:00Z'));
-  vi.stubEnv('API_FOOTBALL_KEY','test-only'); vi.stubEnv('API_FOOTBALL_FINALS_ENABLED','true');
+  vi.stubEnv('API_FOOTBALL_KEY','test-only');
   mocks.admin.mockImplementation(()=>createClient('http://localhost:54321','test-key',{auth:{persistSession:false},global:{fetch:dbFetch}}));
 });
 afterEach(()=>{vi.useRealTimers();vi.unstubAllEnvs();});
@@ -38,7 +38,7 @@ it('falls back on API errors and rejects stale caches',async()=>{
   dbFetch.mockResolvedValueOnce(new Response('false')).mockResolvedValueOnce(new Response(JSON.stringify({fixtures:[],fetched_at:'2026-09-09T18:00:00Z'})));
   expect((await loadDailyResults(matches)).size).toBe(0);
 });
-it('does nothing when disabled',async()=>{
-  vi.stubEnv('API_FOOTBALL_FINALS_ENABLED','false');
+it('does nothing without the provider key',async()=>{
+  vi.stubEnv('API_FOOTBALL_KEY','');
   expect((await loadDailyResults(matches)).size).toBe(0); expect(dbFetch).not.toHaveBeenCalled();
 });

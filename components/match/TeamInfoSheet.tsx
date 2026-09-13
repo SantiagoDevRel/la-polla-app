@@ -3,6 +3,9 @@
 // mundialista — lib/teams/worldcup-facts.ts) + data viva de nuestra DB
 // vía /api/teams/info (forma, números, mini-tabla del grupo, próximos).
 // Se abre al tocar la bandera/nombre de un equipo en la card del partido.
+// Pestañas: Resumen y Plantel (/api/teams/roster: horneado para el Mundial,
+// API-Football para clubes). Sin noticias: API-Football no las ofrece y
+// ESPN dejó de ser proveedor (2026-09-13).
 //
 // Responsive: bottom sheet full-width en mobile, centrado max-w-md en
 // pantallas ≥sm. Cierra con backdrop, X o Escape. Los nombres usan
@@ -18,14 +21,14 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, useDragControls, type PanInfo } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
-import { X, CalendarDays, Shield, Check, ExternalLink, Users, Newspaper, LayoutGrid } from "lucide-react";
+import { X, CalendarDays, Shield, Check, Users, LayoutGrid } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import { TeamCrest } from './TeamCrest';
 import { getTeamFacts } from "@/lib/teams/worldcup-facts";
-import { positionLabel } from "@/lib/espn/labels-es";
+import { positionLabel } from "@/lib/football/labels";
 import { DURATION } from "@/lib/animations";
-import type { SquadPlayer, PlayerLine, NewsItem } from "@/lib/espn/teams";
+import type { SquadPlayer, PlayerLine } from "@/lib/football/squad";
 
 // ─── Tipos (espejo del payload de /api/teams/info) ───
 
@@ -151,26 +154,6 @@ function fmtShortDate(iso: string, locale: string): string {
   }).format(new Date(iso));
 }
 
-/** Fecha relativa simple ("hace 3h", "ayer", o fecha corta si es viejo). */
-function fmtRelativeDate(iso: string | null, locale: string): string {
-  if (!iso) return "";
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const diffMs = Date.now() - then;
-  const rtf = new Intl.RelativeTimeFormat(locale === "en" ? "en-US" : "es-CO", { numeric: "auto" });
-  const mins = Math.round(diffMs / 60000);
-  if (Math.abs(mins) < 60) return rtf.format(-mins, "minute");
-  const hrs = Math.round(mins / 60);
-  if (Math.abs(hrs) < 24) return rtf.format(-hrs, "hour");
-  const days = Math.round(hrs / 24);
-  if (Math.abs(days) < 7) return rtf.format(-days, "day");
-  return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "es-CO", {
-    timeZone: COLOMBIA_TIME_ZONE,
-    day: "2-digit",
-    month: "short",
-  }).format(new Date(iso));
-}
-
 /** Orden de líneas para renderizar las secciones del plantel. */
 const LINE_ORDER: PlayerLine[] = ["GK", "DEF", "MID", "FWD", "OTH"];
 const LINE_KEY: Record<PlayerLine, string> = {
@@ -182,8 +165,8 @@ const LINE_KEY: Record<PlayerLine, string> = {
 };
 
 // ─── Foto del jugador con fallback al pollito gambeteador ───
-// ESPN solo tiene foto de ~10% de los jugadores del Mundial (sobre todo de
-// MLS). Para el resto mostramos el pollito gambeteador (marca > avatar
+// El plantel horneado del Mundial solo trae foto de ~10% de los jugadores y
+// API-Football puede no tenerla. Para el resto mostramos el pollito gambeteador (marca > avatar
 // genérico). El dorsal sigue visible a la derecha de la fila, así que no se
 // pierde info. Mismo pollito para todos a propósito (decisión user
 // 2026-06-13): uniforme = se lee como placeholder, no como lista de usuarios.
@@ -192,7 +175,8 @@ function PlayerHeadshot({ headshot }: { headshot: string | null }) {
   const [errored, setErrored] = useState(false);
   if (headshot && !errored) {
     return (
-      // Plain <img> (ESPN headshots, a.espncdn.com ya en CSP img-src).
+      // Plain <img>: fotos de media.api-sports.io y las del plantel horneado
+      // del Mundial (a.espncdn.com), ambos hosts en CSP img-src.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={headshot}
@@ -225,7 +209,7 @@ function ClubCrest({ crest }: { crest: string | null }) {
   const [errored, setErrored] = useState(false);
   if (!crest || errored) return null;
   return (
-    // Plain <img> (a.espncdn.com ya en CSP img-src).
+    // Plain <img>: WebP local del catálogo de escudos (/team-crests) o bandera.
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={crest}
@@ -240,8 +224,8 @@ function ClubCrest({ crest }: { crest: string | null }) {
 }
 
 // ─── Tabs del sheet ───
-type SheetTab = "resumen" | "plantel" | "noticias";
-const TAB_ORDER: SheetTab[] = ["resumen", "plantel", "noticias"];
+type SheetTab = "resumen" | "plantel";
+const TAB_ORDER: SheetTab[] = ["resumen", "plantel"];
 const SHEET_CLOSE_DRAG_OFFSET = 92;
 const SHEET_CLOSE_DRAG_VELOCITY = 720;
 
@@ -278,20 +262,17 @@ export default function TeamInfoSheet({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // ── Tabs (Resumen / Plantel / Noticias) ──
+  // ── Tabs (Resumen / Plantel) ──
   // Navegación por tap + swipe horizontal con CSS scroll-snap. El tab
   // activo se sincroniza con el scroll para que el indicador siga el swipe.
   const [activeTab, setActiveTab] = useState<SheetTab>("resumen");
   const panelsRef = useRef<HTMLDivElement | null>(null);
   const sheetDragControls = useDragControls();
-  // Lazy: cada tab fetchea su data solo la primera vez que se abre, para
-  // ahorrar requests a ESPN (el user puede no abrir Plantel/Noticias nunca).
+  // Lazy: el plantel se pide solo la primera vez que se abre la pestaña,
+  // para no gastar cuota de API-Football si el user nunca la abre.
   const [roster, setRoster] = useState<SquadPlayer[] | null>(null);
   const [rosterError, setRosterError] = useState(false);
-  const [news, setNews] = useState<NewsItem[] | null>(null);
-  const [newsError, setNewsError] = useState(false);
   const rosterRequested = useRef(false);
-  const newsRequested = useRef(false);
 
   const startSheetDrag = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
@@ -336,25 +317,12 @@ export default function TeamInfoSheet({
     let cancelled = false;
     setRosterError(false);
     axios
-      // timeout: sin esto, si el request no resuelve (ESPN fallback colgado,
+      // timeout: sin esto, si el request no resuelve (proveedor lento,
       // red lenta, cold start) roster queda en null para siempre → skeleton
       // infinito. Con timeout el catch dispara y mostramos el error state.
       .get<{ players: SquadPlayer[] }>("/api/teams/roster", { params: { tournament, team }, timeout: 12000 })
       .then((res) => { if (!cancelled) setRoster(res.data.players ?? []); })
       .catch(() => { if (!cancelled) setRosterError(true); });
-    return () => { cancelled = true; };
-  }, [activeTab, tournament, team]);
-
-  // Fetch Noticias la primera vez que el tab se abre.
-  useEffect(() => {
-    if (activeTab !== "noticias" || newsRequested.current) return;
-    newsRequested.current = true;
-    let cancelled = false;
-    setNewsError(false);
-    axios
-      .get<{ news: NewsItem[] }>("/api/teams/news", { params: { tournament, team }, timeout: 12000 })
-      .then((res) => { if (!cancelled) setNews(res.data.news ?? []); })
-      .catch(() => { if (!cancelled) setNewsError(true); });
     return () => { cancelled = true; };
   }, [activeTab, tournament, team]);
 
@@ -529,7 +497,6 @@ export default function TeamInfoSheet({
               [
                 { tab: "resumen", label: t("tabResumen"), Icon: LayoutGrid },
                 { tab: "plantel", label: t("tabPlantel"), Icon: Users },
-                { tab: "noticias", label: t("tabNoticias"), Icon: Newspaper },
               ] as { tab: SheetTab; label: string; Icon: typeof Users }[]
             ).map(({ tab, label, Icon }) => {
               const isActive = activeTab === tab;
@@ -562,7 +529,7 @@ export default function TeamInfoSheet({
             })}
           </div>
 
-          {/* ── Carrusel horizontal (3 paneles, scroll-snap) ── */}
+          {/* ── Carrusel horizontal (2 paneles, scroll-snap) ── */}
           <div
             ref={panelsRef}
             onScroll={onPanelsScroll}
@@ -922,80 +889,6 @@ export default function TeamInfoSheet({
                     </section>
                   );
                 })
-              )}
-            </div>
-          </div>
-          {/* ── Panel 3 · Noticias ── */}
-          <div className="snap-center w-full shrink-0 overflow-y-auto overscroll-contain">
-            <div className="px-4 pt-4 space-y-3" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
-              {newsError ? (
-                <div className="text-center py-10">
-                  <p className="text-sm text-text-secondary">{t("newsError")}</p>
-                </div>
-              ) : news === null ? (
-                /* Skeleton de noticias mientras carga */
-                <div className="space-y-3 animate-pulse" aria-hidden="true">
-                  {[0, 1, 2].map((r) => (
-                    <div key={r} className="bg-bg-elevated border border-border-subtle rounded-xl overflow-hidden">
-                      <div className="h-32 w-full bg-bg-card" />
-                      <div className="p-3 space-y-2">
-                        <div className="h-3 w-3/4 rounded bg-bg-card" />
-                        <div className="h-2.5 w-1/3 rounded bg-bg-card" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : news.length === 0 ? (
-                <div className="text-center py-10">
-                  <Newspaper className="w-8 h-8 mx-auto mb-3 text-text-muted" aria-hidden="true" />
-                  <p className="text-sm text-text-secondary">{t("newsEmpty")}</p>
-                </div>
-              ) : (
-                <ul className="space-y-3">
-                  {news.map((n, i) => (
-                    <li key={`${n.headline}-${i}`}>
-                      <a
-                        href={n.url ?? "#"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`block bg-bg-elevated border border-border-subtle rounded-xl overflow-hidden transition-all hover:border-gold/30 ${
-                          n.url ? "cursor-pointer" : "pointer-events-none"
-                        }`}
-                      >
-                        {n.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={n.image}
-                            alt=""
-                            loading="lazy"
-                            className="w-full max-w-none h-36 object-cover bg-bg-card"
-                          />
-                        ) : null}
-                        <div className="p-3 space-y-1.5">
-                          <p className="text-sm font-semibold text-text-primary [overflow-wrap:anywhere] leading-snug">
-                            {n.headline}
-                          </p>
-                          {n.description ? (
-                            <p className="text-xs text-text-secondary [overflow-wrap:anywhere] leading-snug line-clamp-2">
-                              {n.description}
-                            </p>
-                          ) : null}
-                          <div className="flex items-center justify-between gap-2 pt-0.5">
-                            <span className="text-[11px] text-text-muted">
-                              {fmtRelativeDate(n.publishedAt, locale)}
-                            </span>
-                            {n.url ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gold">
-                                {t("newsReadMore")}
-                                <ExternalLink className="w-3 h-3" aria-hidden="true" />
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
               )}
             </div>
           </div>

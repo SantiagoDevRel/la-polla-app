@@ -939,7 +939,6 @@
     "predSavedMini": "Prediction saved",
     "tabResumen": "Overview",
     "tabPlantel": "Squad",
-    "tabNoticias": "News",
     "lineGK": "Goalkeepers",
     "lineDEF": "Defenders",
     "lineMID": "Midfielders",
@@ -947,9 +946,6 @@
     "lineOTH": "Others",
     "rosterEmpty": "No squad available for this team",
     "rosterError": "Could not load the squad",
-    "newsEmpty": "No news right now",
-    "newsError": "Could not load the news",
-    "newsReadMore": "Read on ESPN",
     "ageShort": "{age} yrs"
   },
   "Profile": {

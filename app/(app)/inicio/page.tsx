@@ -1,8 +1,8 @@
 // app/(app)/inicio/page.tsx
 //
 // Inicio - Tribuna Caliente v0.1 redesign of the home screen. Built as a
-// Server Component so all Supabase queries and the football-data.org
-// fetches run before the client bundle ships. This route coexists with
+// Server Component so all Supabase queries run before the client bundle
+// ships. This route coexists with
 // /dashboard during the transition. A separate PR will flip BottomNav
 // and redirect /dashboard here.
 //
@@ -37,9 +37,8 @@ import {
 } from "@/lib/tournaments";
 import { TERMINAL_MATCH_STATUSES } from "@/lib/matches/constants";
 import { POLLA_COLUMNS_LITE } from "@/lib/db/columns";
-import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { computeLiveMinute, formatLiveMinute, specialStatusLabel } from "@/lib/matches/live-minute";
-import { deriveTla } from "@/lib/football-api";
+import { deriveTla } from "@/lib/matches/derive-tla";
 
 // El strip "En vivo" depende de scores/elapsed que cambian cada minuto.
 // Sin esto, Next.js puede cachear el render del Server Component y
@@ -603,7 +602,6 @@ function heroPropsFromDb(
 // ─── Page ──────────────────────────────────────────────────────────────
 
 export default async function InicioPage() {
-  void ensureMatchesFresh();
   // iOS app: oculta toda la UI de plata/cobros/payouts por compliance
   // Apple 5.3.4. Web y Android no se afectan.
   const isIOSApp = await isIOSAppRequest();
@@ -770,9 +768,8 @@ export default async function InicioPage() {
     (e) => !upcomingPredByPollaMatch.has(`${e.polla.id}|${e.match.id}`),
   );
 
-  // Live strip ahora lee de NUESTRA DB (que tiene ESPN fresh via cron
-  // sync-live cada 1 min) en vez de llamar a football-data directo.
-  // football-data tiene 5-15 min de lag para in-play, ESPN sub-minuto.
+  // Live strip lee de NUESTRA DB, que el cron sync-live actualiza cada
+  // minuto desde API-Football (única fuente desde 2026-09-13).
   // Solo matches que pertenecen a alguna polla activa del user
   // (allUserMatchIds), filtrados por status='live', orden por kickoff,
   // tope 10.
@@ -949,20 +946,20 @@ export default async function InicioPage() {
                 <div className="flex gap-3 px-4 pb-1 snap-x snap-mandatory">
                   {stripMatches.map((m) => {
                     // Ahora m es un row de nuestra DB (UUID, elapsed
-                    // de ESPN, etc). Predictions se cargan keyed por
+                    // del proveedor, etc). Predictions se cargan keyed por
                     // UUID, todos los matches del strip ya pertenecen
                     // a una polla del user.
                     const myPred = stripPredByMatchUuid.get(m.id);
                     const predictionStatus =
                       !myPred ? ("pending" as const) : undefined;
-                    // Preferimos abbreviation oficial del proveedor
-                    // (ESPN: ATM, ARS · football-data: ATL, ARS) sobre
+                    // Preferimos abbreviation oficial guardada en la fila
+                    // (filas históricas la traen del proveedor anterior) sobre
                     // el deriveTla del nombre, que en español falla
                     // ('Club Atlético de Madrid' → 'CAD' en vez de
                     // 'ATM'). deriveTla queda como último fallback.
                     const homeCode = m.home_team_abbr || deriveTla(m.home_team);
                     const awayCode = m.away_team_abbr || deriveTla(m.away_team);
-                    // Si ESPN reporta halftime / overtime / etc, la
+                    // Si el proveedor reporta halftime / overtime / etc, la
                     // etiqueta especial (Descanso, Penales, etc.) tiene
                     // prioridad sobre el minuto numérico — sino veríamos
                     // "47'" durante el descanso.

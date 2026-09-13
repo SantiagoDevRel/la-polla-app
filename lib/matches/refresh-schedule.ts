@@ -1,10 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { COMPETITIONS, syncCompetition } from '@/lib/football-data/sync';
-import { discoverTournament } from '@/lib/espn/discover';
-import { ESPN_LEAGUE_BY_TOURNAMENT } from '@/lib/espn/client';
 import { isSyncableTournament, SYNCABLE_TOURNAMENT_SLUGS } from '@/lib/tournaments';
-import { getDataProviderMode, type DataProviderMode } from '@/lib/matches/provider-mode';
 import { createCalendarDeps, refreshAfTournament, type AfRefreshResult, type CalendarDeps } from '@/lib/api-football/calendar';
 import { afLeagueIdForTournament } from '@/lib/api-football/season';
 
@@ -21,19 +17,18 @@ export interface ScheduleRefresh {
   tournament: string;
   refreshed: boolean;
   state: ScheduleState;
-  /** Solo modo 'af' cuando la reserva se tomó: conteos del refresco. */
+  /** Conteos del refresco cuando la reserva se tomó. */
   af?: Pick<AfRefreshResult, 'fetched' | 'inserted' | 'updated' | 'linked' | 'unchanged' | 'skipped' | 'errors' | 'aborted' | 'truncated'>;
 }
 
 interface RefreshOptions {
   deadlineMs?: number;
-  /** Deps AF compartidas entre ligas: una sola resolución de temporadas por corrida. */
+  /** Deps compartidas entre ligas: una sola resolución de temporadas por corrida. */
   deps?: CalendarDeps;
-  mode?: DataProviderMode;
 }
 
 /** Upcoming fixtures need refresh even when the stored list is nonempty.
- * Shared reservation limits all admin/legacy/cron callers to one refresh per
+ * Shared reservation limits all admin/cron callers to one refresh per
  * league per 15 minutes. It is awaited before returning the calendar.
  */
 export async function refreshTournamentSchedule(tournament: string, options: RefreshOptions = {}): Promise<boolean> {
@@ -41,19 +36,17 @@ export async function refreshTournamentSchedule(tournament: string, options: Ref
 }
 
 /**
- * Misma reserva y mismo estado `schedule_<t>` en los dos modos. En 'legacy'
- * es exactamente el comportamiento previo (football-data y ESPN). En 'af' la
- * única fuente es API-Football: 'fresh' solo si la temporada llegó completa,
- * sin errores de fila y sin que el plazo cortara escrituras.
+ * API-Football es la única fuente de calendario (2026-09-13). 'fresh' solo si
+ * la temporada llegó completa, sin errores de fila y sin que el plazo cortara
+ * escrituras. Estado compartido en `app_config.schedule_<t>`.
  */
 export async function refreshTournamentScheduleDetailed(
   tournament: string,
   options: RefreshOptions = {},
 ): Promise<ScheduleRefresh> {
-  const unsupported: ScheduleRefresh = { tournament, refreshed: false, state: 'unsupported' };
-  if (!isSyncableTournament(tournament)) return unsupported;
-  const mode = options.mode ?? await getDataProviderMode();
-  if (mode === 'af' ? !afLeagueIdForTournament(tournament) : !ESPN_LEAGUE_BY_TOURNAMENT[tournament]) return unsupported;
+  if (!isSyncableTournament(tournament) || !afLeagueIdForTournament(tournament)) {
+    return { tournament, refreshed: false, state: 'unsupported' };
+  }
 
   const admin = createAdminClient();
   const { data: reserved, error } = await admin.rpc('reserve_tournament_schedule_sync', {
@@ -66,49 +59,27 @@ export async function refreshTournamentScheduleDetailed(
       ? { tournament, refreshed: true, state: 'fresh' }
       : { tournament, refreshed: false, state: 'pending' };
   }
-  let refreshed = false;
-  let af: ScheduleRefresh['af'];
-  if (mode === 'af') {
-    const result = await refreshAfTournament(tournament, {
-      mode: 'apply',
-      deadlineMs: options.deadlineMs ?? Date.now() + DEFAULT_REFRESH_BUDGET_MS,
-    }, options.deps ?? await createCalendarDeps(admin));
-    const { fetched, inserted, updated, linked, unchanged, skipped, errors, aborted, truncated } = result;
-    af = { fetched, inserted, updated, linked, unchanged, skipped, errors, aborted, truncated };
-    refreshed = aborted === null && errors === 0 && !truncated;
-    if (!refreshed) {
-      console.warn('[schedule] API-Football calendar incomplete:', tournament, aborted ?? (truncated ? 'truncated' : `errors=${errors}`));
-    }
-  } else {
-    try {
-      const competition = COMPETITIONS.find(c => c.tournament === tournament);
-      if (competition) {
-        const now = Date.now();
-        // dateTo is exclusive in football-data v4. Include 30 full upcoming days.
-        const from = new Date(now - 86400000).toISOString().slice(0, 10);
-        const to = new Date(now + 31 * 86400000).toISOString().slice(0, 10);
-        const result = await syncCompetition(competition.id, tournament, undefined, from, to);
-        refreshed = result.errors === 0 && result.total > 0;
-      }
-      if (!refreshed) {
-        const result = await discoverTournament(tournament, { daysAhead: 30, daysBack: 1 });
-        refreshed = result.errors === 0;
-      }
-    } catch {
-      console.warn('[schedule] Upcoming calendar could not be refreshed:', tournament);
-    }
+  const result = await refreshAfTournament(tournament, {
+    mode: 'apply',
+    deadlineMs: options.deadlineMs ?? Date.now() + DEFAULT_REFRESH_BUDGET_MS,
+  }, options.deps ?? await createCalendarDeps(admin));
+  const { fetched, inserted, updated, linked, unchanged, skipped, errors, aborted, truncated } = result;
+  const af = { fetched, inserted, updated, linked, unchanged, skipped, errors, aborted, truncated };
+  const refreshed = aborted === null && errors === 0 && !truncated;
+  if (!refreshed) {
+    console.warn('[schedule] API-Football calendar incomplete:', tournament, aborted ?? (truncated ? 'truncated' : `errors=${errors}`));
   }
   const { error: writeError } = await admin.from('app_config')
     .update({ value: refreshed ? 'fresh' : 'failed' }).eq('key', `schedule_${tournament}`);
   const ok = refreshed && !writeError;
-  return { tournament, refreshed: ok, state: ok ? 'fresh' : 'failed', ...(af ? { af } : {}) };
+  return { tournament, refreshed: ok, state: ok ? 'fresh' : 'failed', af };
 }
 
 /**
- * Cron en modo 'af': recorre las ligas de la última intentada a la más
- * reciente (`schedule_<t>.updated_at` lo fija la reserva), en serie, y no
- * arranca una liga nueva pasados 40 s. Las que no alcanzan quedan
- * 'not_started' y la próxima corrida las toma primero.
+ * Cron: recorre las ligas de la última intentada a la más reciente
+ * (`schedule_<t>.updated_at` lo fija la reserva), en serie, y no arranca una
+ * liga nueva pasado el presupuesto. Las que no alcanzan quedan 'not_started'
+ * y la próxima corrida las toma primero.
  */
 export async function refreshAfSchedules(
   options: { startBudgetMs?: number; writeBudgetMs?: number; now?: () => number } = {},
@@ -133,7 +104,7 @@ export async function refreshAfSchedules(
       results.push({ tournament, refreshed: false, state: 'not_started' });
       continue;
     }
-    results.push(await refreshTournamentScheduleDetailed(tournament, { mode: 'af', deps, deadlineMs: writeDeadline }));
+    results.push(await refreshTournamentScheduleDetailed(tournament, { deps, deadlineMs: writeDeadline }));
   }
   return results;
 }

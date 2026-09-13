@@ -1,11 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   refreshAfTournament, validateFixturesEnvelope, writerWouldChange, memoizedSeasonResolver, estimateLegacyLinks,
-  type AfMatchRow, type CalendarDeps, type ExistingMatch,
+  reserveCalendarRequest, createCalendarDeps,
+  type AfMatchRow, type CalendarDeps, type CalendarReservation, type ExistingMatch,
 } from '@/lib/api-football/calendar';
 import type { CalendarFixture } from '@/lib/api-football/calendar-model';
+
+// El plan pagado lo refresca account.ts contra /status; acá se controla sin red.
+const mocks = vi.hoisted(() => ({ pro: vi.fn(async () => true) }));
+vi.mock('@/lib/api-football/account', () => ({ apiFootballProActive: mocks.pro }));
 
 // Respuestas reales de API-Football del 2026-09-13, recortadas. Cero red.
 type FeedFile = { observedAt: string; response: CalendarFixture[] };
@@ -185,6 +190,17 @@ describe('refreshAfTournament safety', () => {
     expect(calls).toHaveLength(0);
   });
 
+  it('reserves exactly one fixtures request for the league before fetching', async () => {
+    const { db } = fakeDb();
+    const order: string[] = [];
+    const d = deps(envelope(LALIGA.response), db, NOW, {
+      reserveRequest: vi.fn(async (request: CalendarReservation) => { order.push(`reserve:${JSON.stringify(request)}`); return true; }),
+      fetchEnvelope: vi.fn(async () => { order.push('fetch'); return envelope(LALIGA.response); }),
+    });
+    expect((await refreshAfTournament('laliga_2025', {}, d)).aborted).toBeNull();
+    expect(order).toEqual(['reserve:{"kind":"fixtures","leagueId":140}', 'fetch']);
+  });
+
   it('dry-run plans the same rows and writes nothing', async () => {
     const { db, calls } = fakeDb();
     const r = await refreshAfTournament('laliga_2025', { mode: 'dry-run' }, deps(envelope(LALIGA.response), db, NOW));
@@ -301,5 +317,118 @@ describe('envelope and season helpers', () => {
     const season = memoizedSeasonResolver(resolve);
     expect(await Promise.all([season(140), season(239), season(999)])).toEqual([2026, 2026, null]);
     expect(resolve).toHaveBeenCalledOnce();
+  });
+});
+
+type RpcReply = { data: unknown; error: { message: string; code?: string } | null };
+
+describe('calendar quota reservation (migration 116)', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('maps fixtures and leagues to the RPC, and only a literal true grants a request', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const rpc = vi.fn(async (): Promise<RpcReply> => ({ data: true, error: null }));
+    const db = { rpc } as unknown as SupabaseClient;
+    expect(await reserveCalendarRequest(db, { kind: 'fixtures', leagueId: 239 })).toBe(true);
+    expect(rpc).toHaveBeenLastCalledWith('reserve_api_football_calendar', { p_league_id: 239, p_kind: 'fixtures' });
+    expect(await reserveCalendarRequest(db, { kind: 'leagues' })).toBe(true);
+    expect(rpc).toHaveBeenLastCalledWith('reserve_api_football_calendar', { p_league_id: 0, p_kind: 'leagues' });
+
+    const denials: RpcReply[] = [
+      { data: false, error: null },
+      { data: null, error: { message: 'Invalid calendar reservation' } },
+      { data: true, error: { message: 'permission denied' } },
+      { data: 'true', error: null },
+      { data: null, error: null },
+    ];
+    for (const reply of denials) {
+      rpc.mockResolvedValueOnce(reply);
+      expect(await reserveCalendarRequest(db, { kind: 'fixtures', leagueId: 140 })).toBe(false);
+    }
+    rpc.mockRejectedValueOnce(new Error('fetch failed'));
+    expect(await reserveCalendarRequest(db, { kind: 'fixtures', leagueId: 140 })).toBe(false);
+    // Solo los errores quedan en el log; una negativa de cuota es operación normal.
+    expect(warn).toHaveBeenCalledTimes(3);
+  });
+
+  it('logs the RPC error code so a missing migration is not read as an exhausted quota', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const db = { rpc: vi.fn(async (): Promise<RpcReply> => ({ data: null,
+      error: { code: 'PGRST202', message: 'Could not find the function public.reserve_api_football_calendar' } })) } as unknown as SupabaseClient;
+    expect(await reserveCalendarRequest(db, { kind: 'leagues' })).toBe(false);
+    expect(warn).toHaveBeenCalledWith('[af-calendar] la reserva de cuota falló:', 'PGRST202');
+  });
+});
+
+describe('server calendar deps', () => {
+  const NOW = Date.parse(LALIGA.observedAt);
+  const freshSeasons = { fetchedAt: new Date().toISOString(), byLeague: { '140': 2026 } };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    mocks.pro.mockReset();
+    mocks.pro.mockResolvedValue(true);
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  /** Cliente mínimo: caché de temporadas en app_config y el RPC de reserva. */
+  function serverDb(cache: unknown, reply: (args: Record<string, unknown>) => RpcReply) {
+    const rpc = vi.fn(async (_fn: string, args: Record<string, unknown>) => reply(args));
+    const upsert = vi.fn(async () => ({ error: null }));
+    type Query = { select: () => Query; eq: () => Query; maybeSingle: () => Promise<{ data: unknown; error: null }>; upsert: typeof upsert };
+    const query: Query = {
+      select: () => query, eq: () => query, upsert,
+      maybeSingle: async () => ({ data: cache === null ? null : { value: JSON.stringify(cache) }, error: null }),
+    };
+    return { db: { rpc, from: vi.fn(() => query) } as unknown as SupabaseClient, rpc, upsert };
+  }
+
+  it('never reaches the RPC or the provider without a verified paid plan', async () => {
+    mocks.pro.mockResolvedValue(false);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const { db, rpc } = serverDb(freshSeasons, () => ({ data: true, error: null }));
+    const d = await createCalendarDeps(db);
+    expect(await d.reserveRequest({ kind: 'fixtures', leagueId: 140 })).toBe(false);
+    const r = await refreshAfTournament('laliga_2025', {}, { ...d, now: () => NOW, log: () => {} });
+    expect(r.aborted).toBe('budget');
+    expect(rpc).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('aborts as budget when the SQL reservation declines or errors, without calling the provider', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    for (const reply of [{ data: false, error: null }, { data: null, error: { message: 'boom' } }] satisfies RpcReply[]) {
+      const { db, rpc } = serverDb(freshSeasons, () => reply);
+      const d = await createCalendarDeps(db);
+      const r = await refreshAfTournament('laliga_2025', {}, { ...d, now: () => NOW, log: () => {} });
+      expect(r).toMatchObject({ aborted: 'budget', season: 2026 });
+      expect(rpc.mock.calls).toEqual([['reserve_api_football_calendar', { p_league_id: 140, p_kind: 'fixtures' }]]);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('reserves the single /leagues call before resolving seasons, and skips it when declined', async () => {
+    vi.stubEnv('API_FOOTBALL_KEY', 'test-key');
+    const leagues = { errors: [], paging: { current: 1, total: 1 },
+      response: [{ league: { id: 140 }, seasons: [{ year: 2026, current: true }] }] };
+    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => leagues }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const declined = serverDb(null, () => ({ data: false, error: null }));
+    expect(await (await createCalendarDeps(declined.db)).resolveSeason(140)).toBeNull();
+    expect(declined.rpc.mock.calls).toEqual([['reserve_api_football_calendar', { p_league_id: 0, p_kind: 'leagues' }]]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    const granted = serverDb(null, () => ({ data: true, error: null }));
+    const d = await createCalendarDeps(granted.db);
+    expect(await Promise.all([d.resolveSeason(140), d.resolveSeason(140)])).toEqual([2026, 2026]);
+    expect(granted.rpc).toHaveBeenCalledOnce();
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(String((fetchSpy.mock.calls[0] as unknown[])[0])).toContain('/leagues?current=true');
+    expect(granted.upsert).toHaveBeenCalledOnce();
   });
 });

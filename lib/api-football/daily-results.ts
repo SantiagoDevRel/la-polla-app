@@ -5,27 +5,15 @@ import { RESULT_LEAGUES, type ResultMatch } from './results';
 import { loadFootballDate } from './feed';
 
 export interface DailyResults { fixtures: ApiFootballFixture[]; fetchedAt: string }
-export const apiFootballFinalsEnabled = () => process.env.API_FOOTBALL_FINALS_ENABLED === 'true'
-  && Boolean(process.env.API_FOOTBALL_KEY);
-
-/** One shared daily feed for all nine leagues, only when a played match needs a result. */
-export async function loadDailyResults(matches: ResultMatch[]): Promise<Map<string, DailyResults>> {
-  if (!apiFootballFinalsEnabled()) return new Map();
-  return loadResultDates(matches);
-}
 
 /**
- * 'af' mode (2026-09-13): API-Football is the only result source, so the
- * data_provider_mode switch replaces API_FOOTBALL_FINALS_ENABLED as the gate.
- * Same d-1..d window, same shared reservation and 45-minute freshness.
+ * Shared daily feed for every result league, only when a played match needs a
+ * result (API-Football is the only result source since 2026-09-13). d-1..d
+ * window, one shared reservation per date and 45-minute freshness.
  */
-export async function loadAfDailyResults(matches: ResultMatch[]): Promise<Map<string, DailyResults>> {
-  if (!process.env.API_FOOTBALL_KEY) return new Map();
-  return loadResultDates(matches);
-}
-
-async function loadResultDates(matches: ResultMatch[]): Promise<Map<string, DailyResults>> {
+export async function loadDailyResults(matches: ResultMatch[]): Promise<Map<string, DailyResults>> {
   const result = new Map<string, DailyResults>();
+  if (!process.env.API_FOOTBALL_KEY) return result;
   const now = Date.now();
   const today = new Date(now).toISOString().slice(0, 10);
   const yesterday = new Date(now - 86400000).toISOString().slice(0, 10);
@@ -38,7 +26,7 @@ async function loadResultDates(matches: ResultMatch[]): Promise<Map<string, Dail
       if (feed && now-Date.parse(feed.fetchedAt)<=45*60000) result.set(date,feed);
     } catch {
       // Never log Axios objects: they carry the secret in request headers.
-      console.warn('[api-football] Daily results unavailable; existing verification remains active.');
+      console.warn('[api-football] Daily results unavailable; verification waits for the next tick.');
     }
   }
   return result;

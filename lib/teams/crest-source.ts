@@ -10,9 +10,13 @@ export function localCrestSource(team:string,source:string|null|undefined):strin
   return flagUrlForTeam(team)??reviewed?.local??(reviewed?bySource[reviewed.source]:undefined)??(source?bySource[source]:undefined)??byName[name];
 }
 
-/** Fixed CDN path -> same-origin image. Never accepts arbitrary proxy targets. */
+// Historical ESPN crest URLs are identities, never images to load: every one
+// referenced by `matches` is baked into the local catalog (2026-09-13), and the
+// same-origin ESPN proxy was removed along with ESPN as a provider.
+const ESPN_CREST = /^https:\/\/a\.espncdn\.com\//i;
+
+/** Last-resort remote crest (API-Football or another reviewed CDN). Never ESPN. */
 export function crestFallbackSource(source: string | null | undefined): string | undefined {
-  if (!source) return undefined;
-  const espn = source.match(/^https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/(?:500|100)\/([1-9]\d{0,7})\.png$/);
-  return espn ? `/api/teams/crest?espn=${espn[1]}` : source;
+  if (!source || ESPN_CREST.test(source)) return undefined;
+  return source;
 }

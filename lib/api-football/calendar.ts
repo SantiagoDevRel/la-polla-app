@@ -40,7 +40,10 @@ import {
 const AF_BASE_URL = 'https://v3.football.api-sports.io';
 /** Sin reintentos: un reintento gastaría cuota por fuera del conteo. */
 const FETCH_TIMEOUT_MS = 12_000;
-/** Mismo techo que detalle y equipos: deja capacidad para vivo y resultados. */
+/**
+ * Prechequeo del script manual `scripts/af-import.ts`. El servidor ya no lo usa:
+ * la reserva atómica (tope 7.000, sub-tope 300) la decide la migración 116.
+ */
 export const CALENDAR_REQUEST_CEILING = 6_000;
 /** D3: partidos desde hace dos días hasta el final de la temporada. */
 export const IMPORT_WINDOW_BACK_MS = 2 * 86_400_000;
@@ -139,12 +142,15 @@ export interface AfRefreshResult {
   legacy?: { wouldLink: number; ambiguous: number; unmatchedLegacyRows: number };
 }
 
+/** Qué solicitud se reserva: /fixtures de una liga o el único /leagues?current=true. */
+export type CalendarReservation = { kind: 'fixtures'; leagueId: number } | { kind: 'leagues' };
+
 export interface CalendarDeps {
   db: SupabaseClient;
   /** Sobre completo de API-Football ({errors, paging, response}). Lanza si falla. */
   fetchEnvelope: (path: '/fixtures' | '/leagues', params: Record<string, string>) => Promise<unknown>;
-  /** Guardia de cuota. true = se puede gastar UNA solicitud. */
-  reserveRequest: () => Promise<boolean>;
+  /** Guardia de cuota. true = se puede gastar UNA solicitud de ese tipo. */
+  reserveRequest: (request: CalendarReservation) => Promise<boolean>;
   /** Temporada vigente por liga; memoizada por corrida (una llamada a /leagues). */
   resolveSeason: (leagueId: number) => Promise<number | null>;
   now?: () => number;
@@ -358,7 +364,7 @@ export async function refreshAfTournament(
     if (!season) return { ...result, aborted: 'no_season' };
     result.season = season;
     if (expired()) return { ...result, aborted: 'deadline' };
-    if (!(await deps.reserveRequest())) return { ...result, aborted: 'budget' };
+    if (!(await deps.reserveRequest({ kind: 'fixtures', leagueId }))) return { ...result, aborted: 'budget' };
 
     let body: unknown;
     try {
@@ -393,6 +399,22 @@ export async function refreshAfTournament(
     }
     if (unknownRounds.size) {
       log(`[af-calendar] ${tournament}: rondas no escritas: ${Array.from(unknownRounds).sort().join(' | ')}`);
+    }
+    // Sin ESPN ni football-data nadie más crea esos partidos: una ronda con
+    // nombre nuevo no puede desaparecer en silencio. Alerta en /admin, una por
+    // combinación de torneo y rondas (dedupe_key UNIQUE).
+    const unknownOnly = fixtures
+      .filter((f) => classifyRound(f.league.round).kind === 'unknown' && f.fixture.timestamp * 1000 >= observedAt - IMPORT_WINDOW_BACK_MS)
+      .map((f) => f.league.round);
+    if (mode === 'apply' && unknownOnly.length) {
+      const rounds = Array.from(new Set(unknownOnly)).sort();
+      const { error: alertError } = await deps.db.from('admin_alerts').upsert({
+        kind: 'af_round_unknown',
+        title: `Rondas de API-Football sin mapear: ${tournament}`,
+        body: `${unknownOnly.length} partidos no se escribieron porque su ronda no tiene fase conocida: ${rounds.join(' | ')}. Agregarla en lib/api-football/calendar-model.ts (classifyRound) y volver a refrescar.`,
+        dedupe_key: `af_round_unknown:${tournament}:${rounds.join('|')}`,
+      }, { onConflict: 'dedupe_key', ignoreDuplicates: true });
+      if (alertError) log(`[af-calendar] ${tournament}: no se pudo registrar la alerta de rondas (${alertError.code ?? alertError.message})`);
     }
 
     const existing = await readExisting(deps.db, tournament, observedAt);
@@ -546,22 +568,46 @@ export function memoizedSeasonResolver(
 }
 
 /**
- * Deps del servidor. No hay RPC de reserva para una temporada completa: el
- * plan pagado lo confirma `apiFootballProActive` (que además concilia el
- * contador con el `/status` del proveedor) y se respeta el mismo techo de
- * 6.000 que detalle y equipos. Ver riesgos en el reporte del Paso 3.
+ * Reserva atómica de UNA solicitud de calendario (`reserve_api_football_calendar`,
+ * migración 116): plan pagado verificado, tope global, sub-tope diario de
+ * calendario e intervalo por liga, bajo el mismo candado que vivo, detalle y
+ * equipos. El contador sube ANTES de volver true. Un error del RPC, una
+ * respuesta distinta de `true` o una falla de red cuentan como «sin solicitud».
+ * El error sí se registra: sin la 116 aplicada, todo refresco abortaría como
+ * `budget` y en los logs se vería igual que una cuota agotada.
+ */
+export async function reserveCalendarRequest(db: SupabaseClient, request: CalendarReservation): Promise<boolean> {
+  try {
+    const { data, error } = await db.rpc('reserve_api_football_calendar', {
+      p_league_id: request.kind === 'fixtures' ? request.leagueId : 0,
+      p_kind: request.kind,
+    });
+    if (error) {
+      console.warn('[af-calendar] la reserva de cuota falló:', error.code ?? error.message);
+      return false;
+    }
+    return data === true;
+  } catch {
+    console.warn('[af-calendar] la reserva de cuota no respondió');
+    return false;
+  }
+}
+
+/**
+ * Deps del servidor. `apiFootballProActive` refresca antes el plan contra el
+ * `/status` del proveedor (no se cobra), porque el RPC exige una verificación de
+ * la última hora; después, la reserva la decide SQL.
  */
 export async function createCalendarDeps(db?: SupabaseClient): Promise<CalendarDeps> {
   const client = db ?? (await import('@/lib/supabase/admin')).createAdminClient();
-  const reserveRequest = async () => {
-    const { apiFootballProActive } = await import('./account');
-    if (!(await apiFootballProActive())) return false;
-    const { data, error } = await client.from('api_football_budget')
-      .select('request_day,requests_used').eq('singleton', true).maybeSingle();
-    if (error || !data) return false;
-    const today = new Date().toISOString().slice(0, 10);
-    const used = data.request_day === today ? Number(data.requests_used) : 0;
-    return Number.isFinite(used) && used < CALENDAR_REQUEST_CEILING;
+  const reserveRequest = async (request: CalendarReservation) => {
+    try {
+      const { apiFootballProActive } = await import('./account');
+      if (!(await apiFootballProActive())) return false;
+    } catch {
+      return false;
+    }
+    return reserveCalendarRequest(client, request);
   };
   const cache = appConfigSeasonCache(client);
   return {
@@ -571,7 +617,7 @@ export async function createCalendarDeps(db?: SupabaseClient): Promise<CalendarD
     resolveSeason: memoizedSeasonResolver(async () => (await resolveCurrentSeasons({
       cache,
       fetchLeagues: async () => {
-        if (!(await reserveRequest())) throw new Error('Cuota de API-Football no disponible');
+        if (!(await reserveRequest({ kind: 'leagues' }))) throw new Error('Cuota de API-Football no disponible');
         return fetchApiFootballEnvelope('/leagues', { current: 'true' });
       },
     }))?.seasons ?? null),

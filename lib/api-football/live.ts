@@ -1,10 +1,8 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { matchesEnJuego } from '@/lib/matches/en-juego';
-import { getDataProviderMode, type DataProviderMode } from '@/lib/matches/provider-mode';
 import { apiFootballProActive } from './account';
 import { loadFootballDate } from './feed';
-import { findResultFixture, resolveResultFixture, scorePair, type LinkedResultMatch, type ResultMatch } from './results';
+import { resolveResultFixture, scorePair, type LinkedResultMatch } from './results';
 import { RESULT_LEAGUES } from './leagues';
 import { mapApiStatus } from './mappers';
 
@@ -19,33 +17,29 @@ const DETAILS: Record<string,string> = {
  INT:'STATUS_INTERRUPTED',PST:'STATUS_POSTPONED',CANC:'STATUS_CANCELED',ABD:'STATUS_ABANDONED',
 };
 
-// 'legacy': identidad por nombres + saque, como antes. 'af' (2026-09-13): las
-// filas que escribió o vinculó el calendario de API-Football
-// ('apifootball:<id>' en external_id o source_external_ids) se emparejan por
-// id de fixture + competición; las filas viejas sin vínculo siguen por nombres.
-export async function syncApiFootballLive(mode?: DataProviderMode): Promise<Set<string>> {
+// API-Football es la única fuente de vivo (2026-09-13). Las filas que escribió
+// o vinculó el calendario ('apifootball:<id>' en external_id o
+// source_external_ids) se emparejan por id de fixture + competición; las filas
+// viejas sin vínculo siguen por nombres, competición y saque.
+export async function syncApiFootballLive(): Promise<Set<string>> {
  const covered=new Set<string>();
  if (!await apiFootballProActive()) return covered;
- const af=(mode ?? await getDataProviderMode())==='af';
  const admin=createAdminClient();
  const desde=new Date(Date.now()-8*3600000).toISOString(), hasta=new Date(Date.now()+30*60000).toISOString();
- // 'af': TODOS los partidos de los torneos activos en la ventana, estén o no en
- // una polla. Con API-Football como única fuente nadie más los actualiza: el
- // corte del 2026-09-13 dejó a Celta–Málaga en «vivo, minuto 48» dos horas
- // después. No cuesta cuota extra: el feed por fecha ya trae los diez torneos.
- const filas:(LinkedResultMatch&{id:string})[]=af
-  ? ((await admin.from('matches')
-     .select('id,tournament,home_team,away_team,scheduled_at,external_id,source_external_ids')
-     .in('tournament',Object.keys(RESULT_LEAGUES)).is('final_verified_at',null)
-     .gte('scheduled_at',desde).lte('scheduled_at',hasta).limit(500)).data ?? []) as (LinkedResultMatch&{id:string})[]
-  : (await matchesEnJuego<LinkedResultMatch&{id:string}>(admin,'id,tournament,home_team,away_team,scheduled_at',
-     q=>q.is('final_verified_at',null).gte('scheduled_at',desde).lte('scheduled_at',hasta))).filas;
+ // TODOS los partidos de los torneos activos en la ventana, estén o no en una
+ // polla: nadie más los actualiza. El corte del 2026-09-13 dejó a Celta–Málaga
+ // en «vivo, minuto 48» dos horas después. No cuesta cuota extra: el feed por
+ // fecha ya trae los diez torneos.
+ const filas=((await admin.from('matches')
+  .select('id,tournament,home_team,away_team,scheduled_at,external_id,source_external_ids')
+  .in('tournament',Object.keys(RESULT_LEAGUES)).is('final_verified_at',null)
+  .gte('scheduled_at',desde).lte('scheduled_at',hasta).limit(500)).data ?? []) as (LinkedResultMatch&{id:string})[];
  const dates=Array.from(new Set(filas.map(m=>m.scheduled_at.slice(0,10))));
  for (const date of dates) {
   const feed=await loadFootballDate(date);
   if (!feed || feed.stale) continue;
   for (const match of filas.filter(m=>m.scheduled_at.slice(0,10)===date)) {
-   const f=af?resolveResultFixture(match,feed.fixtures):findResultFixture(match as ResultMatch,feed.fixtures);
+   const f=resolveResultFixture(match,feed.fixtures);
    if (!f || !DETAILS[f.fixture.status.short]) continue;
    const short=f.fixture.status.short, regulation=scorePair(f.score.fulltime)?f.score.fulltime:null;
    const {data:updated,error}=await admin.rpc('update_match_live_provider',{

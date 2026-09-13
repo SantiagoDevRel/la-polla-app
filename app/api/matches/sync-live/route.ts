@@ -5,23 +5,19 @@
 // se puede pegar manualmente con CRON_SECRET para debugging.
 //
 // Estrategia:
-//   1. Gate temprano: si no hay matches en ventana live, return ok
-//      sin hacer fetch externos. Cuesta 1 query barata, ahorra
-//      requests innecesarias a ESPN.
-//   2. Llamar a syncEspnLive() — primary source para in-play.
-//   3. ESPN nunca crea fixtures. Si encontramos un match en la DB
-//      sin update reciente, football-data sigue siendo el backup
-//      (corre lazy via ensureMatchesFresh en otros endpoints).
+//   1. Gate temprano: si no hay matches en ventana live, no se lee el vivo.
+//      Cuesta 1 query barata y ahorra cuota de API-Football.
+//   2. syncApiFootballLive() — API-Football es la única fuente de vivo
+//      (2026-09-13). El vivo nunca crea fixtures: eso es del calendario.
+//   3. verifyPendingFinals() — cierre de resultados, también solo API-Football.
 //
 // Auth: CRON_SECRET solo (header x-cron-secret o Authorization Bearer).
 // No se expone admin session. La opción ?secret=… fue removida —
 // querystrings quedan persistidas en logs/CDN/Referer.
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { syncEspnLive } from "@/lib/espn/sync";
 import { verifyPendingFinals } from "@/lib/matches/verify-final";
 import { syncApiFootballLive } from "@/lib/api-football/live";
-import { getDataProviderMode } from "@/lib/matches/provider-mode";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -41,7 +37,7 @@ async function hasActiveMatchWindow(): Promise<boolean> {
   //   - status='scheduled' con kickoff entre [now - 30min, now + 30min]
   //     (cubre la transición scheduled → live).
   // En reposo (sin matches en ventana) la función devuelve false y la
-  // sync no llama a ESPN ni a nada.
+  // sync no consulta el vivo del proveedor.
   const nowIso = new Date().toISOString();
   const back = new Date(Date.now() - 30 * 60 * 1000).toISOString();
   const forward = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -67,28 +63,23 @@ async function runSync() {
   const inWindow = await hasActiveMatchWindow();
 
   // ⚠️ verifyPendingFinals corre SIEMPRE, gate abierto o no. El gate solo
-  // ahorra el fetch a ESPN del live sync. Razón (review 2026-06-10): la
-  // verificación dual espera a que football-data marque FINISHED (lag de
-  // minutos post-FT) — si el partido que terminó era el último del día,
-  // el gate ya está cerrado en el tick siguiente y el scoring quedaba
-  // congelado hasta la próxima ventana (la FINAL del Mundial: para
-  // siempre). El path sin candidatos cuesta 1 query con inner join — barato.
+  // ahorra la lectura del vivo. Razón (review 2026-06-10): la verificación
+  // exige una segunda lectura del proveedor minutos después del pitazo — si el
+  // partido que terminó era el último del día, el gate ya está cerrado en el
+  // tick siguiente y el scoring quedaría congelado hasta la próxima ventana.
+  // El path sin candidatos cuesta 1 query con inner join — barato.
   //
-  // 'af' (2026-09-13): API-Football es la única fuente de vivo y resultados.
-  // No hay respaldo de ESPN ni de football-data: si API-Football no responde,
-  // la fila espera al siguiente tick en vez de recibir otro proveedor.
-  const mode = await getDataProviderMode();
-  const apiFootball = inWindow ? await syncApiFootballLive(mode) : new Set<string>();
-  const espn = inWindow && mode === "legacy" ? await syncEspnLive(apiFootball) : null;
-  const verifications = await verifyPendingFinals(mode);
+  // API-Football es la única fuente de vivo y resultados (2026-09-13). No hay
+  // respaldo de otro proveedor: si API-Football no responde, la fila espera al
+  // siguiente tick.
+  const apiFootball = inWindow ? await syncApiFootballLive() : new Set<string>();
+  const verifications = await verifyPendingFinals();
 
   return {
     ok: true,
-    mode,
     skipped: !inWindow,
     reason: inWindow ? undefined : "no_active_window",
-    espn,
-    apiFootball: {covered: apiFootball.size},
+    apiFootball: { covered: apiFootball.size },
     verifications,
     ms: Date.now() - started,
   };

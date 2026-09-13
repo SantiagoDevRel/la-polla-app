@@ -10,7 +10,8 @@
 //
 // SE DEJARON DE IMPORTAR (ningún archivo se borró; revivir uno es volver a
 // escribir su <Card /> acá):
-//   · components/admin/KnockoutStatusCard      — brackets del Mundial
+//   · components/admin/KnockoutStatusCard      — brackets del Mundial (borrado
+//     2026-09-13: llamaba /api/admin/sync-worldcup, que salió con ESPN)
 //   · components/admin/ScoringSurveyCard       — encuesta goles_v2 (mig. 072)
 //   · components/admin/DoublePointsSurveyCard  — encuesta doble octavos (074)
 //   · components/admin/KnockoutModeCard        — modo de 120 minutos (mig. 077)

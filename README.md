@@ -8,22 +8,24 @@ Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
 ### Horarios y torneos (2026-09-13)
 
-Sudamericana y Europa League (`europa_2026`, API-Football 3, ESPN `uefa.europa`)
+Sudamericana y Europa League (`europa_2026`, liga 3 de API-Football)
 están habilitadas para estadísticas, creación de pollas y sincronización.
 Sus logos y escudos son archivos locales; Europa incluye 76 clubes de la temporada.
 
 El calendario de Casa se actualiza **antes** de responder al administrador, aunque
 ya tenga partidos guardados. `refreshTournamentSchedule` comparte una reserva SQL
 de 15 minutos con `/api/matches` y el cron de descubrimiento existente (cada seis
-horas). Consulta 30 días próximos: football-data donde tiene cobertura y ESPN como
-respaldo. Las ligas se actualizan independientemente de las pollas P2P antiguas.
+horas). Desde el 2026-09-13 trae la temporada completa de API-Football, la única
+fuente (ver «Calendario» abajo). Las ligas se actualizan independientemente de las
+pollas P2P antiguas.
 Una actualización fallida o en curso no se presenta como exitosa; el cliente recibe
 un aviso y usa `private, no-store`.
 
 Migración **103**: `scheduled_at_confirmed` distingue una fecha provisional de un
-pitazo confirmado. `SCHEDULED` de football-data y `timeValid=false` de ESPN conservan
-la fecha sin convertirla al día anterior y se muestran como «hora por confirmar».
-`TIMED` sí se convierte a Colombia. El RPC central conserva identidades de proveedor,
+pitazo confirmado. Los partidos sin hora fija de API-Football (antes `SCHEDULED` de
+football-data y `timeValid=false` de ESPN) conservan la fecha sin convertirla al día
+anterior y se muestran como «hora por confirmar».
+Una hora confirmada sí se convierte a Colombia. El RPC central conserva identidades de proveedor,
 promueve fechas provisionales sin crear otro UUID y rechaza identidades ambiguas;
 una observación provisional no reemplaza un horario confirmado. Mantiene compatible
 la firma anterior del RPC y no recalcula pronósticos, puntos ni resultados.
@@ -82,10 +84,9 @@ vuelven a los límites gratuitos y el detalle conserva la última información.
 - El cliente actualiza el marcador cada 30 segundos y el calendario cada minuto;
   pausa las consultas con la pestaña oculta. Esto es actualización periódica,
   no streaming. La caché compartida decide si hace falta consultar al proveedor.
-- API-Football es la fuente principal del vivo Pro. ESPN cubre partidos sin una
-  observación reciente. `update_match_live_provider` serializa ambos: rechaza
-  lecturas viejas, protege tres minutos la fuente principal y permite correcciones
-  de VAR. Un resultado verificado no se modifica por un tick de vivo.
+- API-Football es la única fuente del vivo (el respaldo ESPN se eliminó el
+  2026-09-13). `update_match_live_provider` rechaza lecturas viejas y permite
+  correcciones de VAR. Un resultado verificado no se modifica por un tick de vivo.
 - Las rutas `/api/football/**` validan sesión antes de leer datos. Las tablas
   `api_football_details` y `api_football_teams` tienen RLS y acceso de servicio.
   Los endpoints y `/futbol/**` usan NetworkOnly; las respuestas son privadas.
@@ -160,10 +161,12 @@ no se descargan cientos de imágenes durante la instalación del service worker.
 Los proveedores se conservan como respaldo. Las restricciones preexistentes
 de la app nativa iOS en las pantallas históricas permanecen separadas de la web.
 
-## Resultados y alternativa gratuita
+## Resultados API-Football
 
-El cierre automático incorpora API-Football para BetPlay, Libertadores,
-Sudamericana, Champions, Premier, Ligue 1, Bundesliga, La Liga y Serie A.
+API-Football es la **única** fuente de calendario, vivo y resultados desde el
+2026-09-13; ESPN y football-data se eliminaron del código. El cierre automático
+cubre BetPlay, Libertadores, Sudamericana, Champions, Europa League, Premier,
+Ligue 1, Bundesliga, La Liga y Serie A.
 Guarda el marcador de **90 minutos + adición**; el 1X2 se deriva de ese marcador.
 Alargue y penales se conservan aparte para los modos de puntaje existentes.
 
@@ -172,8 +175,9 @@ Configuración server-side, después de aplicar las migraciones 092 y 093:
 ```dotenv
 # Obtener la clave en https://dashboard.api-football.com/profile?access
 API_FOOTBALL_KEY=<clave privada>
-API_FOOTBALL_FINALS_ENABLED=true
 ```
+
+`API_FOOTBALL_FINALS_ENABLED` ya no se lee: sin `API_FOOTBALL_KEY` no hay verificación.
 
 El plan gratuito acepta `/fixtures?date=YYYY-MM-DD` para fechas actuales aunque
 rechace pedir la temporada completa. La integración consulta hoy/ayer en UTC,
@@ -181,12 +185,14 @@ filtra los nueve torneos y comparte una caché de 20 minutos. Solo consulta cuan
 un partido vinculado a una polla necesita resultado. Una reserva atómica en la
 DB limita esta integración a **80 solicitudes/día UTC**, sin reintentos HTTP;
 quedan 20 de las 100 gratuitas para otras consultas. Con dos fechas activas y
-uso continuo puede alcanzar el límite; ESPN/football-data siguen disponibles.
+uso continuo puede alcanzar el límite (histórico del plan Free; con Pro rigen los
+topes de la sección Fútbol). No hay otra fuente: al agotarse la cuota la verificación
+espera al siguiente tick o a la resolución manual.
 
 El cron existente `/api/matches/sync-live` ejecuta la verificación. Se exigen ambos
 equipos, torneo y horario para identificar un partido. Una discrepancia bloquea
 el cierre; sin corroboración se requieren dos respuestas nuevas del proveedor
-(releer la caché no cuenta). Los tres proveedores y la resolución administrativa
+(releer la caché no cuenta). La verificación y la resolución administrativa
 pasan por `finalize_verified_match_result` → `finalize_match_result` (093),
 sin escribir pronósticos directamente ni importar partidos duplicados.
 El resultado verificado es inmutable para los syncs: el candado de fila serializa
@@ -194,13 +200,13 @@ actualizaciones en vivo y cierres. La importación se serializa por identidad
 normalizada para evitar duplicados entre proveedores concurrentes. La DB no cuenta
 como una segunda fuente de su propio proveedor.
 
-Con Pro, API-Football aporta el vivo principal y ESPN actúa como respaldo;
-en Free se conserva el vivo de ESPN. API-Football y football-data aportan
-confirmación y resultados.
-Un snapshot de 90 minutos solo se captura del estado explícito de fin reglamentario;
-un resultado viejo o de alargue de otro proveedor nunca se convierte en ese snapshot.
-football-data se interpreta según su [contrato de periodos](https://docs.football-data.org/general/v4/overtime.html):
-extraTime suma solo goles del alargue y fullTime puede incluir la tanda.
+Filas vinculadas (`apifootball:<id>` en `external_id` o `source_external_ids`) se
+emparejan por id de fixture + competición + saque ±2 h; las demás, por nombres. Los
+puntos usan `score.fulltime` (90'); `goals` es el marcador de 120' y `score.penalty`
+la tanda. Un snapshot `regulation_*` distinto veta el cierre.
+
+`/admin/discrepancias` acepta `{source:"api-football"}` (confirma la última lectura
+en caché, sin gastar cuota) o `{source:"manual",home,away}`; `espn` y `fd` responden 400.
 
 **Calendario (desde 2026-09-13, solo API-Football):** el creador ofrece
 «Próximos 10 días», «30 días» y «Toda la temporada», agrupados por fecha en hora de
@@ -208,13 +214,12 @@ Colombia. La temporada completa de cada liga se importa desde API-Football
 (`lib/api-football/calendar.ts`, 1 solicitud por liga) y el cron la refresca por
 diferencias. **Actualizar calendario** fuerza ese refresco. Los partidos sin hora
 fija muestran «hora por confirmar» y no admiten cierre automático de la polla.
-Interruptor, corte y rollback: `app_config.data_provider_mode` y
-`docs/af-cutover-today.md`.
+Corte: `docs/af-cutover-today.md`. La fila `app_config.data_provider_mode` quedó en la
+DB pero ningún código la lee: no hay vuelta a ESPN/football-data.
 
-**Escudos:** TeamCrest usa el catálogo estático WebP. Para un club nuevo cuyo
-escudo ESPN aún no esté horneado, usa el endpoint público de imágenes
-`GET /api/teams/crest?espn=<id>` (ID numérico, host fijo, PNG de hasta 512 KiB,
-caché compartida). No usa keys, DB ni Image Optimization de Vercel.
+**Escudos:** TeamCrest usa el catálogo estático WebP. Una URL histórica de ESPN
+es identidad, nunca imagen; el proxy `/api/teams/crest` se eliminó el 2026-09-13.
+No usa keys, DB ni Image Optimization de Vercel.
 Para actualizar el catálogo: `node --experimental-strip-types scripts/bake-team-crests.mjs`.
 
 Regresión de concurrencia: aplicar 093 en el PostgreSQL local de Supabase y ejecutar
@@ -340,12 +345,12 @@ La Polla es **gratis para todos** y se mantiene sobre planes gratuitos
 de cada proveedor. Esto es una restricción dura, no una preferencia:
 
 - **Vercel** plan Hobby — sin crons pagos, sin Edge Config, sin
-  `maxDuration` > 60s. Sync de partidos es lazy (disparado por
-  requests reales) en vez de cron — ver `lib/matches/ensure-fresh.ts`.
+  `maxDuration` > 60s. Los partidos se sincronizan con pg_cron de
+  Supabase (`/api/matches/discover` cada 6 h, `/api/matches/sync-live` cada minuto).
 - **Supabase** plan free — 500 MB DB / 50k MAU. Schema y queries
   diseñadas dentro de esos límites.
-- **football-data.org** plan free — 10 req/min. La sync usa filtro
-  `dateFrom/dateTo` chico + throttle adaptativo.
+- **API-Football** plan Pro aprobado por el dueño — cuota reservada en SQL
+  antes de cada consulta (ver sección Fútbol).
 - **Twilio Verify** — pay-as-you-go con presupuesto controlado por
   `TWILIO_MONTHLY_BUDGET_USD`.
 - **Meta WhatsApp Cloud API**, **Resend** — free tiers.
@@ -360,7 +365,7 @@ usuario decida — no asumas que pagar está OK. Mismo principio en
 - **Next.js 16** App Router + TypeScript
 - **Supabase** (PostgreSQL + Auth + RLS) — phone+password con OTP de WhatsApp solo en el primer login
 - **Meta WhatsApp Cloud API** — bot conversacional para predecir/ver tabla, OTP de signup, recovery de clave
-- **football-data.org** — fuente de fixtures y resultados (UCL + Mundial 2026)
+- **API-Football** — única fuente de calendario, vivo y resultados (desde 2026-09-13)
 - **Cloudflare Turnstile** — anti-bot en el flujo OTP (validado server-side)
 - **Tailwind CSS** + **Framer Motion** + **lucide-react**
 - **@serwist/next** — PWA instalable + service worker
@@ -405,8 +410,8 @@ META_WA_APP_SECRET=
 NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY=
 CLOUDFLARE_TURNSTILE_SECRET_KEY=
 
-# football-data.org
-FOOTBALL_DATA_KEY=
+# API-Football (server-only)
+API_FOOTBALL_KEY=
 
 # Cron / admin (server-only)
 CRON_SECRET=
@@ -558,7 +563,7 @@ app/
   api/
     auth/check-phone, login-password, set-password, otp, login-poll, login-wait
     pollas/, pollas/[slug]/{join,predictions,payments,...}
-    whatsapp/webhook, matches/sync, admin/...
+    whatsapp/webhook, matches/{discover,sync-live}, admin/...
   sw.ts               # Service worker source (Serwist genera /public/sw.js)
 components/
   polla/              # PollaCard, PaymentsList, OrganizerPanel, etc.

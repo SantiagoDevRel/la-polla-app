@@ -10,7 +10,13 @@ import { findResultFixture } from './results';
 export async function loadFootballDetail(id: number) {
   if (!Number.isSafeInteger(id) || id<=0) return null;
   const observation = await knownFootballObservation(id);
-  if (!observation) return null;
+  if (!observation) {
+    // Partido fuera de los feeds recientes (más de 7 días): el detalle que ya
+    // se guardó para ese fixture sigue siendo válido. Sin esto, «Ver partido»
+    // de una polla cerrada hace más de una semana quedaba vacío.
+    const {data}=await createAdminClient().from('api_football_details').select('fixture,fetched_at').eq('fixture_id',id).maybeSingle();
+    return data?.fetched_at && isValidFixture(data.fixture) ? footballDetail(data.fixture,data.fetched_at) : null;
+  }
   const seed=observation.fixture;
   const admin=createAdminClient();
   if (await apiFootballProActive()) {

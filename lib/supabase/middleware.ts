@@ -41,7 +41,6 @@ const PUBLIC_NO_AUTH_PREFIXES = [
 ];
 const PUBLIC_NO_AUTH_EXACT = new Set([
   "/api/app-version", // Public build identity only; no auth or database access.
-  "/api/teams/crest", // Fixed-host public PNGs; never opens the other team APIs.
   "/sitemap.xml",
   "/robots.txt",
   "/llms.txt",

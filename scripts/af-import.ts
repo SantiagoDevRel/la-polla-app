@@ -23,8 +23,8 @@ import { parse } from 'dotenv';
 import { existsSync, readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import {
-  CALENDAR_REQUEST_CEILING, fetchApiFootballEnvelope, memoizedSeasonResolver, refreshAfTournament,
-  type AfRefreshResult, type CalendarDeps,
+  fetchApiFootballEnvelope, memoizedSeasonResolver, refreshAfTournament, reserveCalendarRequest,
+  type AfRefreshResult, type CalendarDeps, type CalendarReservation,
 } from '@/lib/api-football/calendar';
 import { afLeagueIdForTournament, resolveCurrentSeasons } from '@/lib/api-football/season';
 import { SYNCABLE_TOURNAMENT_SLUGS } from '@/lib/tournaments';
@@ -91,15 +91,11 @@ async function main() {
 
   const maxRequests = tournaments.length + 1;
   let spent = 0;
-  const reserveRequest = async () => {
+  const reserveRequest = async (request: CalendarReservation) => {
     if (spent >= maxRequests) return false;
-    const { data, error } = await db.from('api_football_budget')
-      .select('plan,plan_expires_at,request_day,requests_used').eq('singleton', true).maybeSingle();
-    if (error || !data) return false;
-    const today = new Date().toISOString().slice(0, 10);
-    const used = data.request_day === today ? Number(data.requests_used) : 0;
-    const paid = data.plan !== 'Free' && Date.parse(data.plan_expires_at ?? '') > Date.now();
-    if (!paid || used >= CALENDAR_REQUEST_CEILING) return false;
+    // Misma reserva atómica que el cron (migración 116): cuenta la solicitud y
+    // respeta el plan pagado, los topes y el intervalo por liga.
+    if (!(await reserveCalendarRequest(db, request))) return false;
     spent++;
     return true;
   };
@@ -110,7 +106,7 @@ async function main() {
     resolveSeason: memoizedSeasonResolver(async () => (await resolveCurrentSeasons({
       cache: { read: async () => null, write: async () => {} },
       fetchLeagues: async () => {
-        if (!(await reserveRequest())) throw new Error('Cuota no disponible');
+        if (!(await reserveRequest({ kind: 'leagues' }))) throw new Error('Cuota no disponible');
         return fetchApiFootballEnvelope('/leagues', { current: 'true' });
       },
     }))?.seasons ?? null),

@@ -2,7 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { resolvePollaMatches } from "@/lib/matches/resolve-scope";
 import {
   POLLA_COLUMNS,
@@ -16,9 +15,6 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    // Lazy sync de partidos recientes (fire-and-forget, no bloquea).
-    void ensureMatchesFresh();
-
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 

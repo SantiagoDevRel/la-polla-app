@@ -1,45 +1,27 @@
-// app/api/matches/discover/route.ts — Endpoint para descubrir fixtures
-// nuevos de un torneo via ESPN.
+// app/api/matches/discover/route.ts — Endpoint que refresca el calendario de
+// los torneos desde API-Football, la única fuente de partidos (2026-09-13).
 //
 // Llamado por:
-//   1. pg_cron auto-discover (cada 6h) para todos los torneos habilitados.
-//   2. Manualmente con CRON_SECRET para seedear fixtures de un torneo
-//      nuevo (ej. la primera vez que se agrega Liga BetPlay).
+//   1. pg_cron auto-discover (cada 6h, trigger_discover_tournaments).
+//   2. Manualmente con CRON_SECRET para refrescar un torneo puntual.
 //
 // Uso manual (terminal):
 //   curl -X POST -H "x-cron-secret: $CRON_SECRET" \
 //     "https://lapollacolombiana.com/api/matches/discover?tournament=betplay_2026"
 //
-// Sin tournament param: actualiza los 30 días próximos de todos los torneos,
-// aunque todavía no exista una polla de Casa o P2P.
-//
-// Modo 'af' (app_config.data_provider_mode, 2026-09-13): ESPN, football-data y
-// openfootball ya no escriben partidos. Sin tournament, recorre las ligas en
-// serie de la última intentada a la más reciente con un presupuesto de ~40 s
-// (temporada completa de API-Football); con ?tournament pasa por la misma
-// reserva de refreshTournamentSchedule. La resolución de brackets del Mundial
-// no corre: sus tres fuentes son legacy.
+// Sin tournament: recorre las ligas en serie, de la última intentada a la más
+// reciente, con un presupuesto de ~35 s (temporada completa por liga). Con
+// ?tournament pasa por la misma reserva de 15 minutos de
+// refreshTournamentScheduleDetailed. Toda escritura va por upsert_match_safe
+// dentro de lib/api-football/calendar.ts (Regla #1).
 //
 // Auth: CRON_SECRET solo. Aceptado via header `x-cron-secret` o
 // `Authorization: Bearer …`. La opción ?secret=… fue removida porque
 // querystrings quedan persistidas en logs/CDN/Referer.
 
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { discoverTournament } from "@/lib/espn/discover";
-import { ESPN_LEAGUE_BY_TOURNAMENT } from "@/lib/espn/client";
-import { SYNCABLE_TOURNAMENT_SLUGS } from "@/lib/tournaments";
-import {
-  refreshAfSchedules,
-  refreshTournamentSchedule,
-  refreshTournamentScheduleDetailed,
-} from "@/lib/matches/refresh-schedule";
-import { getDataProviderMode } from "@/lib/matches/provider-mode";
+import { refreshAfSchedules, refreshTournamentScheduleDetailed } from "@/lib/matches/refresh-schedule";
 import { afLeagueIdForTournament } from "@/lib/api-football/season";
-import { hasPlaceholderTeam } from "@/lib/matches/is-placeholder";
-import { syncWorldCup2026 } from "@/lib/api-football/sync-worldcup";
-import { syncCompetition } from "@/lib/football-data/sync";
-import { resolveWorldCupBracketsFromEspn } from "@/lib/espn/resolve-brackets";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -52,126 +34,15 @@ function checkSecret(request: NextRequest): boolean {
   return bearer === `Bearer ${secret}` || header === secret;
 }
 
-async function tournamentsToDiscover(explicit: string | null): Promise<string[]> {
-  if (explicit) {
-    if (!ESPN_LEAGUE_BY_TOURNAMENT[explicit]) {
-      throw new Error(`Sin mapeo ESPN para tournament=${explicit}`);
-    }
-    return [explicit];
-  }
-  // Casa calendars must stay current before the first pool is created.
-  // Legacy P2P activity is not a prerequisite for schedule maintenance.
-  return SYNCABLE_TOURNAMENT_SLUGS.filter(s => ESPN_LEAGUE_BY_TOURNAMENT[s]);
-}
-
-// Resolución de brackets del Mundial (migración 062): si quedan slots de
-// knockout con equipos codificados ("W93", "1A") y kickoff dentro de 7 días,
-// corre openfootball + football-data para que el RPC promueva los slots
-// in-place (mismo UUID → predicciones y pollas.match_ids intactos). El gate
-// del pg_cron (trigger_discover_tournaments v2) dispara este endpoint bajo
-// la misma condición, así que la resolución es automática cada 6h.
-async function resolveWorldCupBrackets(): Promise<{
-  pending: number;
-  ran: boolean;
-  openfootball?: { synced: number; errors: number };
-  footballData?: { synced: number; errors: number };
-  espn?: { promoted: number; errors: number };
-}> {
-  const admin = createAdminClient();
-  const horizon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data } = await admin
-    .from("matches")
-    .select("id, home_team, away_team")
-    .eq("tournament", "worldcup_2026")
-    .eq("status", "scheduled")
-    .lt("scheduled_at", horizon);
-  const pending = (data ?? []).filter((m) =>
-    hasPlaceholderTeam(m.home_team, m.away_team),
-  );
-  if (pending.length === 0) return { pending: 0, ran: false };
-
-  console.log(`[discover] ${pending.length} knockout slots sin resolver con kickoff <7d — corriendo resolución WC`);
-  const out: Awaited<ReturnType<typeof resolveWorldCupBrackets>> = {
-    pending: pending.length,
-    ran: true,
-  };
-  try {
-    const of = await syncWorldCup2026();
-    out.openfootball = { synced: of.synced, errors: of.errors };
-  } catch (err) {
-    console.error("[discover] syncWorldCup2026 failed:", err);
-    out.openfootball = { synced: 0, errors: 1 };
-  }
-  try {
-    // Full fixture list (sin date filter): football-data publica los
-    // matchups reales apenas se resuelven — 1 request, dentro del 10/min.
-    const fd = await syncCompetition(2000, "worldcup_2026");
-    out.footballData = { synced: fd.synced, errors: fd.errors };
-  } catch (err) {
-    console.error("[discover] football-data WC sync failed:", err);
-    out.footballData = { synced: 0, errors: 1 };
-  }
-  try {
-    // ESPN suele resolver los brackets antes que football-data. Promueve los
-    // slots codificados desde los cruces YA resueltos de ESPN — pens-safe
-    // (solo cruces con ambos equipos reales = partidos previos 100% jugados),
-    // in-place via el mismo RPC (confirm/auto según bracket_promotion_mode).
-    const espn = await resolveWorldCupBracketsFromEspn();
-    out.espn = { promoted: espn.promoted, errors: espn.errors };
-  } catch (err) {
-    console.error("[discover] ESPN bracket resolve failed:", err);
-    out.espn = { promoted: 0, errors: 1 };
-  }
-  return out;
-}
-
-async function runDiscoverAf(explicit: string | null) {
+async function runDiscover(request: NextRequest) {
+  const explicit = request.nextUrl.searchParams.get("tournament");
   if (explicit) {
     if (!afLeagueIdForTournament(explicit)) {
       throw new Error(`Sin liga de API-Football para tournament=${explicit}`);
     }
-    return {
-      ok: true,
-      skipped: false,
-      mode: "af" as const,
-      results: [await refreshTournamentScheduleDetailed(explicit, { mode: "af" })],
-      brackets: { pending: 0, ran: false },
-    };
+    return { ok: true, skipped: false, results: [await refreshTournamentScheduleDetailed(explicit)] };
   }
-  return {
-    ok: true,
-    skipped: false,
-    mode: "af" as const,
-    results: await refreshAfSchedules(),
-    brackets: { pending: 0, ran: false },
-  };
-}
-
-async function runDiscover(request: NextRequest) {
-  const explicit = request.nextUrl.searchParams.get("tournament");
-  if ((await getDataProviderMode()) === "af") return runDiscoverAf(explicit);
-  const tournaments = await tournamentsToDiscover(explicit);
-
-  // La resolución de brackets corre SIEMPRE que haya slots pendientes,
-  // independiente del gate de ESPN-discover (que requiere pollas dinámicas
-  // o TBD placeholders — condiciones que el Mundial knockout no cumple).
-  const brackets = await resolveWorldCupBrackets();
-
-  if (tournaments.length === 0) {
-    return {
-      ok: true,
-      skipped: !brackets.ran,
-      reason: brackets.ran ? undefined : "no_dynamic_pollas",
-      brackets,
-    };
-  }
-  // Independent calendars run together so one provider timeout cannot starve
-  // tournaments at the end of the list. Each uses the same atomic reservation.
-  const results = await Promise.all(tournaments.map(async tournament =>
-    explicit
-      ? await discoverTournament(tournament, { daysAhead: 30, daysBack: 1 })
-      : { tournament, refreshed: await refreshTournamentSchedule(tournament) }));
-  return { ok: true, skipped: false, results, brackets };
+  return { ok: true, skipped: false, results: await refreshAfSchedules() };
 }
 
 export async function GET(request: NextRequest) {

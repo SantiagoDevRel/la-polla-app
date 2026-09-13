@@ -1,24 +1,15 @@
-// app/api/admin/sync-ligas/route.ts — trae desde ESPN los partidos de una liga
-// que quedo sin calendario en la base, sin abrir una terminal.
+// app/api/admin/sync-ligas/route.ts — actualiza desde el panel el calendario de
+// una liga que quedó sin partidos en la base, sin abrir una terminal.
 //
-// Por que existe: de las 8 ligas que la casa puede usar, football-data (plan
-// free) no cubre Libertadores ni Liga BetPlay, y para Champions no siempre
-// publica el calendario con anticipacion. Esas quedan sin partidos futuros,
-// pero el formulario de crear polla las pinta igual que las demas: el
-// administrador elige una liga vacia y ve "no hay partidos", que se lee como un
-// error de la app. Este endpoint es el mismo trabajo que
-// `scripts/sync-espn-ligas.ts`, disponible desde el panel.
+// Por que existe: el formulario de crear polla pinta todas las ligas igual. Si
+// una liga no tiene partidos futuros guardados, el administrador ve "no hay
+// partidos", que se lee como un error de la app. Este endpoint trae la
+// temporada completa de API-Football, la única fuente de partidos desde el
+// 2026-09-13, con la misma reserva de 15 minutos del cron de calendario.
 //
 // ⚠️ REGLA #1 del repo: toda insercion en `matches` pasa por el RPC
 // `upsert_match_safe`. Aca no se escribe nada a mano — se delega en
-// `discoverTournament`, que ya lo respeta.
-//
-// ⚠️ REGLA #2: los cruces de bracket sin equipos definidos no generan filas;
-// el discover los descarta antes de llamar al RPC.
-//
-// Modo 'af' (app_config.data_provider_mode, 2026-09-13): ESPN ya no escribe
-// partidos. El POST pasa por refreshTournamentSchedule, que trae la temporada
-// completa de API-Football con la misma reserva de 15 minutos del calendario.
+// `refreshTournamentScheduleDetailed` → lib/api-football/calendar.ts.
 //
 // Autorizacion: la columna `users.is_admin`, nunca el telefono. Se deja como
 // unica puerta a proposito (mismo patron que /api/casa/admin/entries): el path
@@ -28,29 +19,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
-import { discoverTournament } from "@/lib/espn/discover";
-import { ESPN_LEAGUE_BY_TOURNAMENT } from "@/lib/espn/client";
 import { CREATABLE_TOURNAMENT_SLUGS, getTournamentName } from "@/lib/tournaments";
-import { getDataProviderMode } from "@/lib/matches/provider-mode";
 import { refreshTournamentScheduleDetailed } from "@/lib/matches/refresh-schedule";
 import { afLeagueIdForTournament } from "@/lib/api-football/season";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-// 60s es el techo del plan free de Vercel. Alcanza de sobra: la ventana por
-// defecto de abajo trae decenas de partidos, no cientos.
+// 60s es el techo del plan free de Vercel; el refresco se corta a los 45 s.
 export const maxDuration = 60;
 
 const schema = z.object({
   tournament: z.string().trim().min(1),
-  // Cuanto calendario traer. El default es mas corto que el del script (90)
-  // porque aca hay un limite de 60s: cada partido es una llamada al RPC.
-  diasAdelante: z.number().int().min(1).max(120).optional(),
-  // Dias hacia atras, para recuperar partidos reprogramados.
-  diasAtras: z.number().int().min(0).max(30).optional(),
 });
-
-const DIAS_ADELANTE_DEFAULT = 60;
 
 /**
  * GET — que tan vacia esta cada liga que la casa puede usar.
@@ -68,7 +48,6 @@ export async function GET() {
 
   const db = createAdminClient();
   const ahora = new Date().toISOString();
-  const modo = await getDataProviderMode();
 
   const ligas = await Promise.all(
     CREATABLE_TOURNAMENT_SLUGS.map(async (slug) => {
@@ -83,8 +62,8 @@ export async function GET() {
         slug,
         nombre: getTournamentName(slug),
         partidosFuturos,
-        // Sin mapeo de la fuente activa el boton de sincronizar no puede hacer nada.
-        sincronizable: modo === "af" ? !!afLeagueIdForTournament(slug) : !!ESPN_LEAGUE_BY_TOURNAMENT[slug],
+        // Sin liga de API-Football el boton de sincronizar no puede hacer nada.
+        sincronizable: !!afLeagueIdForTournament(slug),
         vacia: partidosFuturos === 0,
       };
     }),
@@ -93,7 +72,7 @@ export async function GET() {
   return NextResponse.json({ ligas });
 }
 
-/** POST — traer el calendario de una liga desde ESPN. */
+/** POST — traer el calendario de una liga desde API-Football. */
 export async function POST(req: NextRequest) {
   const user = await getAuthenticatedUser();
   if (!user?.is_admin) {
@@ -104,13 +83,13 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
-  const { tournament, diasAdelante, diasAtras } = parsed.data;
+  const { tournament } = parsed.data;
 
-  if ((await getDataProviderMode()) === "af") {
-    if (!afLeagueIdForTournament(tournament)) {
-      return NextResponse.json({ error: "API-Football no tiene esa liga." }, { status: 400 });
-    }
-    const r = await refreshTournamentScheduleDetailed(tournament, { mode: "af" });
+  if (!afLeagueIdForTournament(tournament)) {
+    return NextResponse.json({ error: "API-Football no tiene esa liga." }, { status: 400 });
+  }
+  try {
+    const r = await refreshTournamentScheduleDetailed(tournament);
     if (!r.refreshed) {
       const error = r.state === "pending"
         ? "Ya hay una actualización de este calendario en curso. Intenta de nuevo en unos minutos."
@@ -127,39 +106,9 @@ export async function POST(req: NextRequest) {
       errores: r.af?.errors ?? 0,
       avisos: [],
     });
-  }
-
-  // Se acepta cualquier liga mapeada en ESPN, no solo las creables: es una
-  // acción manual del administrador y puede necesitar resincronizar una liga
-  // que hoy no está en el formulario.
-  if (!ESPN_LEAGUE_BY_TOURNAMENT[tournament]) {
-    return NextResponse.json(
-      { error: `ESPN no tiene esa liga. Válidas: ${Object.keys(ESPN_LEAGUE_BY_TOURNAMENT).join(", ")}` },
-      { status: 400 },
-    );
-  }
-
-  try {
-    const r = await discoverTournament(tournament, {
-      daysAhead: diasAdelante ?? DIAS_ADELANTE_DEFAULT,
-      daysBack: diasAtras,
-    });
-
-    return NextResponse.json({
-      ok: true,
-      torneo: tournament,
-      nombre: getTournamentName(tournament),
-      liga: r.league,
-      traidos: r.fetched,
-      guardados: r.inserted_or_updated,
-      errores: r.errors,
-      // Los avisos suelen ser cruces de bracket todavía sin rivales. Se recorta
-      // para no devolver una respuesta enorme.
-      avisos: r.warnings.slice(0, 10),
-    });
   } catch (error) {
-    console.error("[sync-ligas] Error:", error);
-    const msg = error instanceof Error ? error.message : "Error sincronizando";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    // Nunca el objeto de error completo: un error de Axios lleva la clave del proveedor.
+    console.error("[sync-ligas] Error:", error instanceof Error ? error.message : "desconocido");
+    return NextResponse.json({ error: "No pude actualizar el calendario desde API-Football. Intenta de nuevo en unos minutos." }, { status: 500 });
   }
 }

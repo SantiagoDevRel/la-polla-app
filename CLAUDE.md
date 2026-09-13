@@ -9,10 +9,16 @@
 ### API-Football es la única fuente de partidos (2026-09-13, PR #67)
 
 Decisión del dueño: calendario, vivo y verificación de resultados salen solo de
-API-Football (Pro, se renueva; vence 2026-10-09). El interruptor es
-`app_config.data_provider_mode` (`lib/matches/provider-mode.ts`): **en prod vale
-`af` desde 2026-09-13 13:15 UTC**. Con `legacy` vuelve el camino ESPN/football-data,
-que sigue en el código solo como respaldo; no crear código nuevo sobre él.
+API-Football (Pro, se renueva; vence 2026-10-09). Corte en prod 2026-09-13
+13:15 UTC. **ESPN y football-data se eliminaron del código** (sin vuelta atrás):
+no existen `lib/espn`, `lib/football-data`, `provider-mode`, `ensure-fresh`,
+`/api/matches/sync`, `sync-recent` ni `sync-worldcup`. La fila
+`app_config.data_provider_mode` quedó en la DB pero ningún código la lee.
+Archivos: calendario `lib/api-football/calendar.ts` (vía `refresh-schedule.ts`,
+cron `/api/matches/discover` y panel `/api/admin/sync-ligas`), vivo
+`lib/api-football/live.ts`, cierre `lib/matches/verify-final.ts` (ambos desde
+`/api/matches/sync-live`). `/admin/discrepancias` acepta solo `api-football`
+(última lectura en caché, sin cuota) o `manual`; `espn`/`fd` responden 400.
 
 - Filas nuevas: `external_id = apifootball:<fixture.id>`, escritas por
   `lib/api-football/calendar.ts` vía `upsert_match_safe` (Regla #1). Filas viejas
@@ -23,17 +29,23 @@ que sigue en el código solo como respaldo; no crear código nuevo sobre él.
   automático con partidos provisionales: cierre manual.
 - Temporada completa por liga (1 solicitud por liga); el cron `discover` refresca por
   diff con presupuesto de 35 s; importación manual: `npx tsx scripts/af-import.ts`.
-- Corte y rollback: `docs/af-cutover-today.md`. Respaldo:
+- Corte (histórico): `docs/af-cutover-today.md`. El código ESPN/football-data y el
+  interruptor `legacy` ya no existen: no hay rollback por configuración. Respaldo:
   `matches_backup_20260913_af_cutover` y `backups/2026-09-13-13-07`.
-- Pendiente: quitar lecturas ESPN de plantel/noticias/proxy de escudos y el código
-  legacy; RPC atómica de cuota para el calendario.
+- Cuota del calendario: `reserve_api_football_calendar` (migración 116), atómica,
+  tope 300/día e intervalo por liga; la usan el cron, el botón del admin y
+  `scripts/af-import.ts`. Rondas nuevas sin fase generan alerta `af_round_unknown`.
+- Las funciones SQL de la era
+  ESPN (`update_match_live_espn`, `check_and_reserve_match_sync`, etc.) siguen en
+  la DB sin llamadas desde la app; no se borran sin orden del dueño.
 
 ### Precisión de horarios y torneos (2026-09-13, migración 103)
 
 `matches.scheduled_at_confirmed=false` significa fecha provisional, no medianoche
-real: mostrar la fecha UTC sin corrimiento y «hora por confirmar». football-data
-`SCHEDULED` y ESPN `timeValid=false` deben enviar esa precisión al overload de 17
-argumentos de `upsert_match_safe`; la firma anterior sigue compatible. El escritor
+real: mostrar la fecha UTC sin corrimiento y «hora por confirmar». El calendario
+de API-Football envía esa precisión al overload de 17 argumentos de
+`upsert_match_safe` (histórico: football-data `SCHEDULED` y ESPN
+`timeValid=false` hacían lo mismo); la firma anterior sigue compatible. El escritor
 central protege horarios confirmados, conserva `source_external_ids` y no duplica
 al confirmar/reprogramar un partido. No corregir esto sumando horas al timestamp.
 
@@ -41,7 +53,7 @@ El calendario administrativo espera `refreshTournamentSchedule` antes de respond
 incluso con filas existentes. Reserva atómica compartida 15 min; ventana 30 días;
 cron existente cada seis horas sin depender de pollas P2P. Errores/en curso no se
 anuncian como datos frescos. Sudamericana y `europa_2026` están activas; Europa usa
-API-Football 3 / ESPN `uefa.europa` y no consulta football-data sin cobertura.
+la liga 3 de API-Football.
 Pruebas y detalle del incidente: README → Horarios y torneos.
 
 ### Info, pagos y publicación (2026-09-13, migraciones 104–109)
@@ -83,8 +95,8 @@ La bienvenida presenta nueve logos locales y no lleva crédito personal.
 
 El usuario aprobó y pagó un mes de Pro. `/status` decide plan y vencimiento;
 no asumir Pro permanente ni aplicar la restricción Free a esta suscripción.
-**API-Football es ahora la fuente principal del vivo Pro**, con ESPN como
-respaldo. `update_match_live_provider` es el único escritor de vivo: bloquea
+**API-Football es la única fuente del vivo** (el respaldo ESPN se eliminó el
+2026-09-13). `update_match_live_provider` es el único escritor de vivo: bloquea
 la fila, rechaza observaciones anteriores y protege tres minutos una lectura
 reciente de API-Football. El cierre sigue el contrato de 093 y los 90 minutos.
 
@@ -137,22 +149,21 @@ vigente es `/admin/pollas/crear`, con su autorización administrativa existente.
 
 ### Resultados y escudos (2026-09-09, migración 093)
 
-Los tres proveedores y la resolución administrativa cierran mediante
+La verificación automática y la resolución administrativa cierran mediante
 `finalize_verified_match_result` → `finalize_match_result`. La fila se bloquea
 antes de leer/escribir resultados; una verificación existente no se sobrescribe.
-El upsert de fixtures también serializa por identidad semántica. Matching de ESPN
-(vivo, verificación y resolución manual) comparte `lib/matches/result-identity.ts`:
-ambos equipos y horario, candidato único; nunca solo horario ni tokens parciales.
-La DB no es una segunda fuente. ESPN/FD solos requieren dos observaciones separadas;
-API-Football requiere un fetch nuevo, no releer caché. Los 90 minutos nunca se
-infieren de un score almacenado al ver AET/PEN por primera vez: snapshot solo en
-STATUS_END_OF_REGULATION; si falta, esperar regularTime/fulltime reglamentario o
-resolución manual. `lib/football-data/scores.ts` separa 90, alargue y penales.
-Estas reglas actualizan los detalles históricos de verificación descritos abajo.
+El upsert de fixtures también serializa por identidad semántica. Identidad de
+resultado (`lib/api-football/results.ts`): id de fixture + competición + saque
+±2 h para filas vinculadas; ambos equipos, competición y horario con candidato
+único para las demás; nunca solo horario ni tokens parciales. La DB no es una
+segunda fuente: API-Football requiere un fetch nuevo, no releer caché. Los 90
+minutos salen de `score.fulltime`; un snapshot `regulation_*` distinto veta.
+Estas reglas reemplazan los detalles históricos de verificación descritos abajo
+(ESPN/football-data, eliminados el 2026-09-13).
 
-Los escudos usan el catálogo local; clubes nuevos caen a `/api/teams/crest?espn=<id>`
-(público, solo PNG de ESPN con ID numérico y límites). Resto de /api/teams sigue autenticado.
-Detalles y comandos de regresión: README → Resultados API-Football Free.
+Los escudos usan el catálogo local (`lib/teams/crest-source.ts`); una URL de ESPN
+histórica es identidad, nunca imagen. El proxy `/api/teams/crest` se eliminó.
+Detalles y comandos de regresión: README → Resultados API-Football.
 
 
 ### API-Football Free: cierre de resultados (2026-09-09)
@@ -160,7 +171,8 @@ Detalles y comandos de regresión: README → Resultados API-Football Free.
 - `lib/api-football/daily-results.ts` consulta `/fixtures?date=...` (hoy/ayer UTC),
   nunca la temporada completa: Free puede rechazar `season` aunque sí entregue
   resultados actuales por fecha. Nueve torneos mapeados en `results.ts`.
-- Clave privada `API_FOOTBALL_KEY` + `API_FOOTBALL_FINALS_ENABLED=true`, solo servidor.
+- Clave privada `API_FOOTBALL_KEY`, solo servidor. (`API_FOOTBALL_FINALS_ENABLED`
+  ya no se lee desde el 2026-09-13.)
   Migración 092 antes de habilitar: caché compartida 20 min, reserva atómica,
   techo 80 solicitudes/día UTC, sin retries que gasten cuota por fuera del contador.
 - `verify-final.ts` incorpora esta fuente al cron existente. Marcador de 90' para
@@ -169,9 +181,10 @@ Detalles y comandos de regresión: README → Resultados API-Football Free.
 - `finalize_api_football_result` bloquea el match, guarda extras y llama al RPC
   autoritativo `finalize_match_result` en la misma transacción. Nada de updates
   directos de pronósticos, de partidos nuevos ni de recalcular resultados históricos.
-- ESPN/football-data siguen siendo calendario/live y fallback si falta cobertura,
-  hay error o se agota la cuota. No activar el poller legacy de API-Football.
-- Detalle de operación y pruebas en README, sección «Resultados API-Football Free».
+- Histórico: hasta el 2026-09-13 ESPN/football-data eran calendario/vivo y
+  respaldo; hoy no existe otra fuente. Con cuota agotada o error, la fila espera
+  al siguiente tick o a la resolución manual.
+- Detalle de operación y pruebas en README, sección «Resultados API-Football».
 
 ### Coordinación entre chats: datos y avatares (2026-09-08)
 
@@ -509,7 +522,7 @@ Reglas duras:
    pago, `maxDuration` > 60s, Edge Config, etc. Si algo necesita
    ejecución programada, hay que conseguirlo via:
    - Lazy/on-demand sync disparado por requests de usuarios reales
-     (ver `lib/matches/ensure-fresh.ts`).
+     (histórico: `ensure-fresh.ts`, eliminado con football-data el 2026-09-13).
    - GitHub Actions schedule (gratis).
    - Supabase pg_cron (incluido en plan free).
    - Webhooks de terceros gratis.
@@ -519,7 +532,7 @@ Reglas duras:
 
 3. **Sin upgrades de proveedores externos** salvo que el usuario lo
    apruebe explícitamente. Twilio / Resend / Meta WhatsApp / Pixa /
-   football-data / API-Football: todo en free-tier hasta nuevo aviso.
+   API-Football: todo en free-tier salvo el Pro que el dueño aprobó.
    Si una limitación bloquea un feature, **proponé el tradeoff antes
    de asumir que hay que pagar**.
 
@@ -1211,21 +1224,14 @@ Before any API call that fetches fixtures or match data, always verify the curre
 
 ### Active Tournaments (Production)
 
-Cinco torneos activos. La UI Crear polla los muestra todos.
-
-| Slug | Nombre | football-data code | ESPN league code |
-|---|---|---|---|
-| `champions_2025` | Champions League | `CL` | `uefa.champions` |
-| `worldcup_2026` | Mundial 2026 | `WC` | `fifa.world` |
-| `laliga_2025` | La Liga | `PD` | `esp.1` |
-| `premier_2025` | Premier League | `PL` | `eng.1` |
-| `seriea_2025` | Serie A | `SA` | `ita.1` |
+Torneos con partidos: los de `RESULT_LEAGUES` en `lib/api-football/leagues.ts`
+(slug → id de liga de API-Football), filtrados por `SYNCABLE_TOURNAMENT_SLUGS`
+en `lib/tournaments.ts`.
 
 Para agregar un torneo nuevo:
 1. `lib/tournaments.ts` → entry en `TOURNAMENTS` + `TOURNAMENT_ICONS`.
-2. `lib/football-data/sync.ts` → entry en `COMPETITIONS`.
-3. `lib/espn/client.ts` → entry en `ESPN_LEAGUE_BY_TOURNAMENT`.
-4. `/public/tournaments/<slug>.png` o `.svg` para el logo.
+2. `lib/api-football/leagues.ts` → slug e id de liga en `RESULT_LEAGUES`.
+3. `/public/tournaments/<slug>.png` o `.svg` para el logo.
 
 ---
 
@@ -1372,7 +1378,7 @@ panel interno. La regla aplica a lo que LEE UN USUARIO.
   who somehow had the flag, and is idempotent so re-running is safe.
 - `lib/auth/admin.ts` — `isCurrentUserAdmin()` server-side check, used in API routes and admin layout
 - `app/(app)/admin/layout.tsx` — server-side layout guard, redirects non-admins to /dashboard
-- Admin API routes (`/api/admin/*`, `/api/matches/sync`) use dual auth: admin session OR CRON_SECRET header
+- Admin API routes (`/api/admin/*`) check `users.is_admin` (`/api/admin/matches/purge` also accepts CRON_SECRET); cron routes (`/api/matches/discover`, `/api/matches/sync-live`, `/api/cron/*`) require CRON_SECRET
 - Admin page uses Server Actions (`actions.ts`) — no secrets in client bundle
 
 ### Env Var Rules
@@ -1456,16 +1462,15 @@ sheet con su ficha. Cero APIs externas (free-tier intacto).
   fixtures** (los 4 de un grupo solo juegan entre sí en group_stage —
   componente conexo; la DB no guarda letra de grupo). Cache privada 60s.
 - **Plantel del Mundial HORNEADO** (re-horneado 2026-06-14, fuente FIFA):
-  el tab "Plantel" sale 100% de `lib/espn/baked-worldcup-squads.json`
+  el tab "Plantel" sale 100% de `lib/teams/baked-worldcup-squads.json`
   (48 equipos, **1248 jugadores** = 26 c/u, forma `SquadPlayer[]`),
   servido por `app/api/teams/roster/route.ts` para `worldcup_2026`
-  (`getBakedWorldCupRoster` en `lib/espn/baked-squads.ts`, server-only —
+  (`getBakedWorldCupRoster` en `lib/teams/baked-squads.ts`, server-only —
   solo lo importa el route, el JSON nunca entra al bundle del cliente,
   `Cache-Control: max-age=604800`). Carga INSTANTÁNEA, cero llamadas
   externas en runtime. `getBakedWorldCupRoster` es **insensible a
-  acentos/caja** (`teamNameKey`, ver bug Curaçao abajo); cae a ESPN en
-  vivo solo si el equipo no está horneado (slots de repechaje) u otros
-  torneos.
+  acentos/caja** (`teamNameKey`, ver bug Curaçao abajo). Otros torneos
+  usan API-Football (`lib/teams/roster.ts`); sin dato confiable, plantel vacío.
   - **CORE oficial FIFA:** nombre, dorsal, posición y edad (de
     `BirthDate`) salen de la FIFA squad API
     (`api.fifa.com/api/v3/teams/{id}/squad?idCompetition=17&idSeason=285023`).
@@ -1484,7 +1489,7 @@ sheet con su ficha. Cero APIs externas (free-tier intacto).
     clubes faltantes) → `wc-squads-merge.cjs` (aplica fills, escribe el
     JSON). Re-correr si cambia una convocatoria; **es data, commitear solo
     el JSON** (cero lógica). El viejo `scripts/bake-worldcup-squads.ts`
-    (ESPN-only) quedó obsoleto.
+    (ESPN-only) se eliminó el 2026-09-13.
   - ⚠️ **Fotos: solo ~119/1248** (la FIFA squad API devuelve `PictureUrl`
     null; las ~119 vienen del bake ESPN, sobre todo MLS). El resto cae al
     fallback dorsal/iniciales de `PlayerHeadshot` — limitación de fuente,
@@ -1596,14 +1601,15 @@ los 2 flags en false, `score_match`/`rescore_polla` dan **idéntico al 074**
 del x2. `eff_score` = 120' si score_120+cutoff+knockout, si no 90' (COALESCE).
 `advancer` efectivo = la captura o, si falta, derivado del marcador decisivo.
 
-### Captura (ESPN, automática)
-- ESPN trae `competitor.score` (=120'), `shootoutScore` (=penales) y `winner`
-  (=quién avanza). El cliente (`lib/espn/client.ts`) ahora los modela.
-- `verify-final.ts` escribe `matches.fulltime_home/away_score`,
-  `penalty_home/away`, `advancer` ANTES del RPC finalize (par atómico; solo si
-  ESPN=FINISHED). `/admin/discrepancias` hace lo mismo via
-  `lib/espn/knockout-extras.ts` (source=espn escribe, manual/fd LIMPIA extras
-  stale de ESPN).
+### Captura (API-Football, automática; ESPN hasta 2026-09-13)
+- `verify-final.ts` pasa `fulltime_home/away` (= `goals` de API-Football, 120'),
+  `penalty_home/away` y `advancer` al RPC `finalize_verified_match_result` en la
+  misma transacción que el 90'. `advancer` solo sale de una tanda de penales
+  decisiva (ganador del partido != clasificado por global); si falta,
+  score_match lo deriva del marcador decisivo.
+- `/admin/discrepancias`: `api-football` escribe esos extras desde la caché;
+  `manual` los deja en null. Histórico: antes los capturaba ESPN
+  (`winner`/`shootoutScore`).
 
 ### Columnas / archivos
 - `pollas`: `score_120`, `advance_bonus`, `kc_mode_changed_at`,
@@ -1641,8 +1647,8 @@ del x2. `eff_score` = 120' si score_120+cutoff+knockout, si no 90' (COALESCE).
 
 ### 🚨 REGLA HARD: TODA inserción a `matches` DEBE pasar por `upsert_match_safe` 🚨
 
-Cero excepciones. Si vas a agregar / modificar un sync de partidos (ESPN,
-football-data, api-football, openfootball, scraper manual, lo que sea),
+Cero excepciones. Si vas a agregar / modificar un sync de partidos (hoy solo
+`lib/api-football/calendar.ts`; antes ESPN, football-data, openfootball),
 la única forma permitida de meter rows en `matches` es:
 
 ```ts
@@ -1735,9 +1741,9 @@ Mecánica (migración 062):
   phase)`, el RPC jamás inserta un row nuevo de knockout — registra alerta en
   `admin_alerts` (visible en /admin) y devuelve NULL. `count(*)` del Mundial
   nunca puede pasar de 104.
-- Resolución automática: el cron de discover (6h) corre `syncWorldCup2026()` +
-  football-data full cuando hay slots codificados con kickoff <7 días. Manual:
-  botón "Sync Mundial" en /admin (matches o el card de alerta del dashboard).
+- Resolución automática (histórica, Mundial 2026 terminado): el cron de
+  discover corría `syncWorldCup2026()` + football-data + ESPN con slots
+  codificados; ese código y el botón "Sync Mundial" se eliminaron el 2026-09-13.
 - **Confirm-before-publish (migración 064):** con
   `app_config.bracket_promotion_mode='confirm'` (el default actual), la
   promoción NO se publica sola: queda en `bracket_proposals` (pending) y
@@ -1766,6 +1772,12 @@ Mecánica (migración 062):
 
 *(Formalizada 2026-06-10; ya era la intención del código — football-data sync
 siempre escribió `regularTime`.)*
+
+> Desde el 2026-09-13 la regla sigue igual pero la fuente es solo API-Football:
+> vivo por `update_match_live_provider`, 90' = `score.fulltime`, dos lecturas
+> separadas del proveedor para verificar. Los bullets de ESPN/football-data de
+> abajo son historia de por qué existen el snapshot `regulation_*` y el cierre
+> por RPC.
 
 - Las pollas se puntúan con el **score de los 90 + adición**. Goles de alargue
   y penales NO suman para los puntos.
@@ -1892,7 +1904,7 @@ duplicados y borrarlos.
 
 **Clave de unicidad correcta:** `(tournament, scheduled_at, home_team_normalizado, away_team_normalizado)`.
 
-**Cómo identificar dups REALES (cuando hay dos fuentes de datos):**
+**Cómo identificar dups REALES (histórico, con dos fuentes de datos antes del 2026-09-13):**
 - Las filas canónicas vienen de football-data.org (`external_id` numérico
   como `552094`) o api-football (`wc2026_xxxxxxxx`).
 - Las filas duplicadas insertadas erróneamente por `lib/espn/sync.ts` tienen

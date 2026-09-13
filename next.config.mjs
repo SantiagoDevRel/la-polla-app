@@ -185,8 +185,11 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               // i.ytimg.com: thumbnails de los highlights del Mundial (FIFA
-              // YouTube) en /inicio. a.espncdn.com: fotos de jugadores/escudos
-              // para futuras fichas de equipo. Todo hotlink, sin self-host.
+              // YouTube) en /inicio. a.espncdn.com: SOLO las ~119 fotos de
+              // jugadores del plantel horneado del Mundial 2026 (los escudos de
+              // club ya son WebP locales en /team-crests; ESPN no es proveedor
+              // desde 2026-09-13). media.api-sports.io: escudos y fotos de
+              // API-Football.
               "img-src 'self' data: blob: https://crests.football-data.org https://a.espncdn.com https://media.api-sports.io https://upload.wikimedia.org https://i.ytimg.com https://*.supabase.co" + localStorageCsp,
               // us.i.posthog.com recibe eventos; no se cargan scripts remotos.
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://us.i.posthog.com" + localStorageCsp,

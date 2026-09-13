@@ -1,15 +1,19 @@
-// app/api/teams/roster/route.ts — GET plantel de un equipo (ESPN).
-// Auth-gated. Resuelve el ESPN team id desde el nombre de DB y devuelve
-// el plantel agrupable por línea. Si el equipo no existe en ESPN (clubes
-// de torneos sin /teams, nombres que no matchean), devuelve players vacío
-// — el cliente muestra empty state, nunca rompe.
+// app/api/teams/roster/route.ts — GET plantel de un equipo para la ficha
+// (components/match/TeamInfoSheet.tsx, pestaña Plantel).
 //
-// Cero data en nuestra DB: todo sale de ESPN (público, sin API key).
-// Cacheado 1h en el browser (el plantel cambia poco).
+// Auth antes de tocar cualquier dato. Dos fuentes, ninguna de ESPN:
+// - Mundial 2026: plantel horneado (lib/teams/baked-squads.ts), instantáneo.
+// - Clubes de los torneos activos: API-Football (lib/teams/roster.ts), con la
+//   reserva de cuota y la caché compartida de lib/api-football/teams.ts.
+// Sin dato confiable responde players vacío: el cliente muestra el estado
+// vacío, nunca un plantel equivocado.
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { resolveEspnTeamId, fetchEspnTeamRoster } from "@/lib/espn/teams";
-import { getBakedWorldCupRoster } from "@/lib/espn/baked-squads";
+import { getBakedWorldCupRoster } from "@/lib/teams/baked-squads";
+import { loadApiFootballRoster } from "@/lib/teams/roster";
+
+const TOURNAMENT = /^[a-z0-9_]{1,40}$/;
+const MAX_TEAM_LENGTH = 120;
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,40 +25,30 @@ export async function GET(request: NextRequest) {
 
     const params = request.nextUrl.searchParams;
     const tournament = params.get("tournament");
-    const team = params.get("team");
-    if (!tournament || !team) {
+    const team = params.get("team")?.trim();
+    if (!tournament || !team || !TOURNAMENT.test(tournament) || team.length > MAX_TEAM_LENGTH) {
       return NextResponse.json({ error: "tournament y team requeridos" }, { status: 400 });
     }
 
-    // Mundial 2026: plantel horneado → respuesta INSTANTÁNEA, cero ESPN en
-    // runtime. Los planteles no cambian durante la Copa; si alguno cambia se
-    // re-hornea (scripts/bake-worldcup-squads.ts). Si el equipo no está en el
-    // bake (slot de repechaje sin resolver), caemos a ESPN en vivo abajo.
+    // Mundial 2026: los planteles no cambian después de la Copa; si alguno
+    // hubiera que corregirlo, se re-hornea el JSON. Un equipo sin hornear
+    // (slot de repechaje) no tiene otra fuente: plantel vacío.
     if (tournament === "worldcup_2026") {
       const baked = getBakedWorldCupRoster(team);
-      if (baked) {
-        return NextResponse.json(
-          { players: baked },
-          { headers: { "Cache-Control": "private, max-age=604800" } },
-        );
-      }
-    }
-
-    const espnId = await resolveEspnTeamId(tournament, team);
-    if (!espnId) {
       return NextResponse.json(
-        { players: [] },
-        { headers: { "Cache-Control": "private, max-age=3600" } },
+        { players: baked ?? [] },
+        { headers: { "Cache-Control": baked ? "private, max-age=604800" : "private, no-store" } },
       );
     }
 
-    const players = await fetchEspnTeamRoster(tournament, espnId);
+    const players = await loadApiFootballRoster(tournament, team);
     return NextResponse.json(
       { players },
-      { headers: { "Cache-Control": "private, max-age=3600" } },
+      // Un vacío puede ser momentáneo (sin reserva ni fixture reciente): no se cachea.
+      { headers: { "Cache-Control": players.length > 0 ? "private, max-age=3600" : "private, no-store" } },
     );
   } catch (err) {
-    console.error("[teams/roster] unexpected:", err);
+    console.error("[teams/roster] unexpected:", err instanceof Error ? err.message : "unknown");
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
