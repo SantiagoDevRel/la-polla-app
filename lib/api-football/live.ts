@@ -5,6 +5,7 @@ import { getDataProviderMode, type DataProviderMode } from '@/lib/matches/provid
 import { apiFootballProActive } from './account';
 import { loadFootballDate } from './feed';
 import { findResultFixture, resolveResultFixture, scorePair, type LinkedResultMatch, type ResultMatch } from './results';
+import { RESULT_LEAGUES } from './leagues';
 import { mapApiStatus } from './mappers';
 
 // PST (aplazado) llega como status 'scheduled' (mapApiStatus) + detalle
@@ -27,11 +28,18 @@ export async function syncApiFootballLive(mode?: DataProviderMode): Promise<Set<
  if (!await apiFootballProActive()) return covered;
  const af=(mode ?? await getDataProviderMode())==='af';
  const admin=createAdminClient();
- const {filas}=await matchesEnJuego<LinkedResultMatch&{id:string}>(admin,
-  af?'id,tournament,home_team,away_team,scheduled_at,external_id,source_external_ids'
-   :'id,tournament,home_team,away_team,scheduled_at',q=>q.is('final_verified_at',null)
-   .gte('scheduled_at',new Date(Date.now()-8*3600000).toISOString())
-   .lte('scheduled_at',new Date(Date.now()+30*60000).toISOString()));
+ const desde=new Date(Date.now()-8*3600000).toISOString(), hasta=new Date(Date.now()+30*60000).toISOString();
+ // 'af': TODOS los partidos de los torneos activos en la ventana, estén o no en
+ // una polla. Con API-Football como única fuente nadie más los actualiza: el
+ // corte del 2026-09-13 dejó a Celta–Málaga en «vivo, minuto 48» dos horas
+ // después. No cuesta cuota extra: el feed por fecha ya trae los diez torneos.
+ const filas:(LinkedResultMatch&{id:string})[]=af
+  ? ((await admin.from('matches')
+     .select('id,tournament,home_team,away_team,scheduled_at,external_id,source_external_ids')
+     .in('tournament',Object.keys(RESULT_LEAGUES)).is('final_verified_at',null)
+     .gte('scheduled_at',desde).lte('scheduled_at',hasta).limit(500)).data ?? []) as (LinkedResultMatch&{id:string})[]
+  : (await matchesEnJuego<LinkedResultMatch&{id:string}>(admin,'id,tournament,home_team,away_team,scheduled_at',
+     q=>q.is('final_verified_at',null).gte('scheduled_at',desde).lte('scheduled_at',hasta))).filas;
  const dates=Array.from(new Set(filas.map(m=>m.scheduled_at.slice(0,10))));
  for (const date of dates) {
   const feed=await loadFootballDate(date);
