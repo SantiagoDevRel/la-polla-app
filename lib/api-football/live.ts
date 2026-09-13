@@ -6,6 +6,10 @@ import { loadFootballDate } from './feed';
 import { findResultFixture, scorePair, type ResultMatch } from './results';
 import { mapApiStatus } from './mappers';
 
+// PST (aplazado) llega como status 'scheduled' (mapApiStatus) + detalle
+// STATUS_POSTPONED; solo CANC/ABD son 'cancelled'. update_match_live_provider
+// (095) rechaza un 'scheduled' sobre una fila live/finished con saque pasado,
+// y matches_prevent_status_regress no deja bajar un finished.
 const DETAILS: Record<string,string> = {
  NS:'STATUS_SCHEDULED','1H':'STATUS_FIRST_HALF',HT:'STATUS_HALFTIME','2H':'STATUS_SECOND_HALF',
  ET:'STATUS_OVERTIME',BT:'STATUS_OVERTIME',P:'STATUS_SHOOTOUT',FT:'STATUS_FULL_TIME',
