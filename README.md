@@ -344,11 +344,16 @@ Los datos históricos están respaldados; consulta
 La Polla es **gratis para todos** y se mantiene sobre planes gratuitos
 de cada proveedor. Esto es una restricción dura, no una preferencia:
 
-- **Vercel** plan Hobby — sin crons pagos, sin Edge Config, sin
-  `maxDuration` > 60s. Los partidos se sincronizan con pg_cron de
-  Supabase (`/api/matches/discover` cada 6 h, `/api/matches/sync-live` cada minuto).
-- **Supabase** plan free — 500 MB DB / 50k MAU. Schema y queries
-  diseñadas dentro de esos límites.
+> **Actualización 2026-09-13:** el dueño aprobó y paga **Vercel Pro** (team
+> `santiago-prod`), **Supabase Pro con compute Small** y **API-Football Pro**
+> para producción. Esos planes no se discuten; lo demás de esta sección sigue
+> vigente (nada de servicios, upgrades ni add-ons nuevos sin aprobación).
+
+- **Vercel** plan Pro — los partidos se siguen sincronizando con pg_cron de
+  Supabase (`/api/matches/discover` cada 6 h, `/api/matches/sync-live` cada
+  minuto) y los crons `/api/cron/*` corren desde GitHub Actions.
+- **Supabase** plan Pro, compute Small (org Pro compartida con otros
+  proyectos). Schema y queries siguen diseñadas para gastar poco.
 - **API-Football** plan Pro aprobado por el dueño — cuota reservada en SQL
   antes de cada consulta (ver sección Fútbol).
 - **Twilio Verify** — pay-as-you-go con presupuesto controlado por
@@ -459,7 +464,8 @@ npm test            # vitest unit tests (111 tests)
 
 ### Auth
 
-- **Login por SMS (principal)**: número → `/api/auth/start-otp` (Supabase `signInWithOtp`, hoy Twilio Verify) → código → `/api/auth/verify-otp` deja la sesión en cookies HttpOnly. Sin contraseña. Usuarios nuevos pasan por `/onboarding` (nombre + pollito).
+- **Login por SMS (principal)**: número → `/api/auth/start-otp` (Supabase `signInWithOtp`, hoy Twilio Verify) → código → `/api/auth/verify-otp` deja la sesión en cookies `sb-<ref>-auth-token` (hoy sin `HttpOnly` ni `Secure`, default de `@supabase/ssr`; ver «Estado en producción»). Sin contraseña. Usuarios nuevos pasan por `/onboarding` (nombre + pollito).
+- **SMS por LabsMobile (preparado, apagado)**: `app/api/auth/sms-hook` es el Send SMS Hook de Supabase Auth. Supabase genera y valida el código; el hook solo lo entrega con `lib/sms/labsmobile.ts` (SMS plano, nunca el endpoint 2FA del proveedor) y lo registra en `sms_entregas` (migración 088). LabsMobile avisa la entrega en `/api/sms/ack`, protegido con `SMS_ACK_SECRET`. Mientras `hook_send_sms_enabled=false`, Supabase sigue enviando por Twilio Verify.
 - **Login por Telegram (alternativa, 2026-09-13)**: si el SMS no llega, `/login` ofrece «Recibe tu código por Telegram». Ver la sección siguiente.
 
 #### Login por Telegram
@@ -593,6 +599,47 @@ Después de un deploy nuevo:
 4. Confirmá Site URL de Supabase → Auth en `lapollacolombiana.com`
 5. Confirmá `SUPABASE_SECRET_KEY` (sb_secret_) y la IP real en Supabase Auth
    (ver «IP real en Supabase Auth»)
+
+### Estado en producción (2026-09-13)
+
+Foto de lo que quedó activo antes del lanzamiento. Producción:
+`dpl_4kJdLw97EdCV9Y3ftz1ADtgsMTYX` (`main` 7d9ca5a). Toda la configuración de
+Auth se lee y cambia con la Management API
+(`GET`/`PATCH /v1/projects/<ref>/config/auth`) usando un token con permisos
+del proyecto. Nunca pegues secretos en el PATCH desde la terminal; léelos de
+un archivo.
+
+| Pieza | Estado | Cómo se apaga o se prende |
+|---|---|---|
+| IP real en Auth (`Sb-Forwarded-For`) | **Activa.** `security_sb_forwarded_for_enabled=true` y `SUPABASE_SECRET_KEY` en Production. Los logs de Auth muestran la IP del usuario en `remote_addr` | Apagar: PATCH `{"security_sb_forwarded_for_enabled": false}`. Sin la env, `auth-ip` cae a anon sin cabecera |
+| SMS por LabsMobile (Send SMS Hook) | **Configurado y apagado.** URI `https://lapollacolombiana.com/api/auth/sms-hook` y secreto guardados en Auth; `sms_provider` sigue siendo `twilio_verify`; `sms_otp_exp=600` | Prender: PATCH `{"hook_send_sms_enabled": true}`. Rollback: PATCH `{"hook_send_sms_enabled": false}`, que vuelve a Twilio al instante sin deploy |
+| Login por Telegram | **Activo.** Bot `@LaPollaColombianaAccesoBot`, webhook en `/api/telegram/login` (`allowed_updates: ["message"]`), migración 115 aplicada, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true` | Apagar: quitar una de las tres variables `TELEGRAM_LOGIN_*` en Vercel y redeploy (la opción desaparece de `/login` y el webhook responde 503) |
+| Captcha de Auth | **Apagada** (`security_captcha_enabled=false`). Pendiente, ver «IP real en Supabase Auth» | — |
+| Backup | **Activo.** Runner del DGX fijado a `main` 7d9ca5a (checkout detached): backup a las 00:10, 06:10, 12:10 y 18:10 y verify a las 03:40 (hora de Bogotá). Cada corrida escribe en `backup_runs` (migración 117). `backup-freshness.yml` revisa cada hora y manda correo si hay atraso. El PC baja los snapshots con la tarea programada `La Polla backup pull` | Detalle en `ops/backup/README.md`. Si cambian `ops/backup` o `scripts/export-backup.ts`, en el DGX hay que repetir `git fetch`, `checkout` y `npm ci` |
+| Planes | Vercel Pro, Supabase Pro compute Small, API-Football Pro (vence 2026-10-09) | — |
+| Monitoreo de errores | **No hay Sentry** ni otra integración de monitoreo. Los errores se revisan en los logs de Vercel y en los correos de alerta (discrepancias, backup atrasado, SMS fallido o tardío) | — |
+
+**Prueba de LabsMobile del 2026-09-13.** Con el hook prendido se mandó un solo
+SMS real: Supabase llamó al hook (200) y LabsMobile lo aceptó a las 16:10:41Z.
+Como a los 8 minutos no había acuse, el hook se apagó (16:18:48Z). El acuse
+llegó después: `handset` / `DELIVERED` a las 16:44:03Z, **2.002 s de demora**
+(`sms_entregas.demora_seg`). La ruta funciona de punta a punta, pero un código
+que vence a los 600 s no sirve con esa latencia. Antes de volver a prender el
+hook hay que confirmar con LabsMobile, en horario hábil, que la ruta a Colombia
+entrega en segundos (primer envío en revisión manual, domingo o cola) y repetir
+la prueba exigiendo acuse `handset` en menos de 60 s.
+
+Alertas de SMS que hay hoy: cuando llega el acuse, `aplicar_sms_ack` marca
+`alertado_at` y `/api/sms/ack` manda correo si el SMS falló (`ko`) o tardó
+más de 120 s (así salió el aviso de las 16:44:43Z). **El vigía de silencio
+(`revisarSilencios` en `lib/sms/entregas.ts`, 5 min sin acuse) no tiene cron
+conectado**: si LabsMobile nunca manda acuse, nadie se entera. Antes de
+prender el hook, conecta ese vigía a un cron.
+
+**Cookies de sesión.** En producción, las cookies `sb-<ref>-auth-token` salen
+sin `HttpOnly` ni `Secure`. Es el default de `@supabase/ssr` y pasa igual con
+SMS, magic-link y Telegram. Pendiente revisar `cookieOptions` antes del
+lanzamiento.
 
 ### IP real en Supabase Auth
 
