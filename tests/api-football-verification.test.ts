@@ -2,7 +2,10 @@ import {beforeEach, afterEach, describe, it, expect, vi} from 'vitest';
 import {createClient} from '@supabase/supabase-js';
 
 const mocks = vi.hoisted(() => ({admin:vi.fn(), matches:vi.fn(), daily:vi.fn(), fd:vi.fn(), espn:vi.fn(), alert:vi.fn()}));
+vi.mock('server-only',()=>({}));
 vi.mock('@/lib/supabase/admin',()=>({createAdminClient:mocks.admin}));
+// Legacy chain; the 'af' mode lives in tests/af-verify-mode.test.ts.
+vi.mock('@/lib/matches/provider-mode',()=>({getDataProviderMode:async()=>'legacy'}));
 vi.mock('@/lib/matches/en-juego',()=>({matchesEnJuego:mocks.matches}));
 vi.mock('@/lib/api-football/daily-results',()=>({loadDailyResults:mocks.daily,apiFootballFinalsEnabled:()=>true}));
 vi.mock('@/lib/football-data/client',()=>({fetchCompetitionMatches:mocks.fd}));

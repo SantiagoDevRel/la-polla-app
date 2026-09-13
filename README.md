@@ -202,9 +202,14 @@ un resultado viejo o de alargue de otro proveedor nunca se convierte en ese snap
 football-data se interpreta según su [contrato de periodos](https://docs.football-data.org/general/v4/overtime.html):
 extraTime suma solo goles del alargue y fullTime puede incluir la tanda.
 
-**Calendario:** el creador muestra los próximos 10 días que ya están en la DB.
-Si una liga está vacía, **Traer el calendario** importa los próximos 60 días
-con ESPN y vuelve a consultar. Esto no consume la cuota de API-Football.
+**Calendario (desde 2026-09-13, solo API-Football):** el creador ofrece
+«Próximos 10 días», «30 días» y «Toda la temporada», agrupados por fecha en hora de
+Colombia. La temporada completa de cada liga se importa desde API-Football
+(`lib/api-football/calendar.ts`, 1 solicitud por liga) y el cron la refresca por
+diferencias. **Actualizar calendario** fuerza ese refresco. Los partidos sin hora
+fija muestran «hora por confirmar» y no admiten cierre automático de la polla.
+Interruptor, corte y rollback: `app_config.data_provider_mode` y
+`docs/af-cutover-today.md`.
 
 **Escudos:** TeamCrest usa el catálogo estático WebP. Para un club nuevo cuyo
 escudo ESPN aún no esté horneado, usa el endpoint público de imágenes
