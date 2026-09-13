@@ -1,15 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks=vi.hoisted(()=>({rpc:vi.fn(),sync:vi.fn(),discover:vi.fn(),cached:vi.fn(),saved:vi.fn(),
- mode:vi.fn(),af:vi.fn(),deps:vi.fn(),attempts:vi.fn(),fetch:vi.fn()}));
+const mocks=vi.hoisted(()=>({rpc:vi.fn(),cached:vi.fn(),saved:vi.fn(),af:vi.fn(),deps:vi.fn(),attempts:vi.fn()}));
 vi.mock('server-only',()=>({}));
 vi.mock('@/lib/supabase/admin',()=>({createAdminClient:()=>({rpc:mocks.rpc,
  from:()=>({select:()=>({eq:()=>({maybeSingle:mocks.cached}),in:mocks.attempts}),update:()=>({eq:mocks.saved})})})}));
-vi.mock('@/lib/football-data/sync',()=>({COMPETITIONS:[{id:2014,tournament:'laliga_2025'}],syncCompetition:mocks.sync}));
-vi.mock('@/lib/espn/discover',()=>({discoverTournament:mocks.discover}));
-vi.mock('@/lib/matches/provider-mode',()=>({getDataProviderMode:mocks.mode}));
 vi.mock('@/lib/api-football/calendar',()=>({refreshAfTournament:mocks.af,createCalendarDeps:mocks.deps}));
 import { refreshAfSchedules, refreshTournamentSchedule, refreshTournamentScheduleDetailed } from '@/lib/matches/refresh-schedule';
-import { ensureMatchesFresh } from '@/lib/matches/ensure-fresh';
 import { SYNCABLE_TOURNAMENT_SLUGS } from '@/lib/tournaments';
 import { formatMatchTime } from '@/lib/casa/format';
 
@@ -17,67 +12,39 @@ const afResult=(extra:object={})=>({tournament:'laliga_2025',leagueId:140,season
  unchanged:300,skipped:{before_window:76},errors:0,aborted:null,truncated:false,sample:[],...extra});
 beforeEach(()=>{vi.resetAllMocks();mocks.rpc.mockResolvedValue({data:true,error:null});
  mocks.cached.mockResolvedValue({data:{value:'fresh'}});mocks.saved.mockResolvedValue({error:null});
- mocks.mode.mockResolvedValue('legacy');mocks.deps.mockResolvedValue({});mocks.af.mockResolvedValue(afResult());
+ mocks.deps.mockResolvedValue({});mocks.af.mockResolvedValue(afResult());
  mocks.attempts.mockResolvedValue({data:[]});});
-describe('upcoming schedules',()=>{
- it('refreshes future fixtures even when there are already stored matches',async()=>{
-   mocks.sync.mockResolvedValue({errors:0,total:10,synced:10});
-   expect(await refreshTournamentSchedule('laliga_2025')).toBe(true);
-   const [,slug,,from,to]=mocks.sync.mock.calls[0];
-   expect(slug).toBe('laliga_2025');
-   expect(Date.parse(to)-Date.parse(from)).toBe(32*86400000);
-   expect(mocks.discover).not.toHaveBeenCalled();
- });
- it('shares the reservation across requests',async()=>{
-   mocks.rpc.mockResolvedValue({data:false,error:null});
-   expect(await refreshTournamentSchedule('laliga_2025')).toBe(true);
-   expect(mocks.sync).not.toHaveBeenCalled();expect(mocks.discover).not.toHaveBeenCalled();
- });
- it('does not bypass a failed reservation',async()=>{
-   mocks.rpc.mockResolvedValue({data:null,error:{message:'Unavailable'}});
-   expect(await refreshTournamentSchedule('laliga_2025')).toBe(false);
-   expect(mocks.sync).not.toHaveBeenCalled();
- });
- it.each(['pending','failed'])('does not label a %s refresh as fresh',async value=>{
-   mocks.rpc.mockResolvedValue({data:false,error:null});mocks.cached.mockResolvedValue({data:{value}});
-   expect(await refreshTournamentSchedule('laliga_2025')).toBe(false);
-   expect(mocks.sync).not.toHaveBeenCalled();
- });
- it('uses ESPN if the primary calendar fails',async()=>{
-   mocks.sync.mockResolvedValue({errors:1,total:0,synced:0});
-   mocks.discover.mockResolvedValue({errors:0});
-   expect(await refreshTournamentSchedule('laliga_2025')).toBe(true);
-   expect(mocks.discover).toHaveBeenCalledWith('laliga_2025',{daysAhead:30,daysBack:1});
- });
- it('rejects unsupported tournaments before database access',async()=>{
-   expect(await refreshTournamentSchedule('unknown')).toBe(false);
-   expect(mocks.rpc).not.toHaveBeenCalled();expect(mocks.mode).not.toHaveBeenCalled();
- });
- it('never touches API-Football in legacy mode',async()=>{
-   mocks.sync.mockResolvedValue({errors:0,total:10,synced:10});
-   await refreshTournamentSchedule('laliga_2025');
-   expect(mocks.af).not.toHaveBeenCalled();expect(mocks.deps).not.toHaveBeenCalled();
- });
-});
-describe('API-Football mode',()=>{
- beforeEach(()=>{mocks.mode.mockResolvedValue('af');});
- it('refreshes the season from API-Football only, behind the same reservation',async()=>{
+describe('API-Football calendar refresh',()=>{
+ it('refreshes the season from API-Football, behind the shared reservation',async()=>{
    const r=await refreshTournamentScheduleDetailed('laliga_2025');
    expect(r).toMatchObject({refreshed:true,state:'fresh',af:{inserted:3,updated:1,unchanged:300}});
    expect(mocks.rpc).toHaveBeenCalledWith('reserve_tournament_schedule_sync',{p_tournament:'laliga_2025'});
    expect(mocks.af).toHaveBeenCalledWith('laliga_2025',expect.objectContaining({mode:'apply'}),{});
-   expect(mocks.sync).not.toHaveBeenCalled();expect(mocks.discover).not.toHaveBeenCalled();
    expect(mocks.saved).toHaveBeenCalledWith('key','schedule_laliga_2025');
+ });
+ it('shares the reservation across requests without spending a request',async()=>{
+   mocks.rpc.mockResolvedValue({data:false,error:null});
+   expect(await refreshTournamentSchedule('laliga_2025')).toBe(true);
+   expect(mocks.af).not.toHaveBeenCalled();
+ });
+ it('does not bypass a failed reservation',async()=>{
+   mocks.rpc.mockResolvedValue({data:null,error:{message:'Unavailable'}});
+   expect(await refreshTournamentScheduleDetailed('laliga_2025')).toEqual({tournament:'laliga_2025',refreshed:false,state:'reservation_error'});
+   expect(mocks.af).not.toHaveBeenCalled();
+ });
+ it.each(['pending','failed'])('does not label a %s refresh as fresh',async value=>{
+   mocks.rpc.mockResolvedValue({data:false,error:null});mocks.cached.mockResolvedValue({data:{value}});
+   expect(await refreshTournamentScheduleDetailed('laliga_2025')).toEqual({tournament:'laliga_2025',refreshed:false,state:'pending'});
+   expect(mocks.af).not.toHaveBeenCalled();
  });
  it.each([[{aborted:'paged'}],[{errors:2}],[{truncated:true}]])('does not label %o as fresh',async extra=>{
    mocks.af.mockResolvedValue(afResult(extra));
    expect(await refreshTournamentSchedule('laliga_2025')).toBe(false);
-   expect(mocks.sync).not.toHaveBeenCalled();expect(mocks.discover).not.toHaveBeenCalled();
+   expect(mocks.saved).toHaveBeenCalledWith('key','schedule_laliga_2025');
  });
- it('keeps the reservation semantics without spending a request',async()=>{
-   mocks.rpc.mockResolvedValue({data:false,error:null});mocks.cached.mockResolvedValue({data:{value:'pending'}});
-   expect(await refreshTournamentScheduleDetailed('laliga_2025')).toEqual({tournament:'laliga_2025',refreshed:false,state:'pending'});
-   expect(mocks.af).not.toHaveBeenCalled();
+ it('rejects unsupported tournaments before database access',async()=>{
+   expect(await refreshTournamentSchedule('unknown')).toBe(false);
+   expect(mocks.rpc).not.toHaveBeenCalled();expect(mocks.af).not.toHaveBeenCalled();
  });
  it('walks leagues oldest attempt first and starts none after the budget',async()=>{
    let clock=0;
@@ -97,10 +64,6 @@ describe('API-Football mode',()=>{
    expect(mocks.af).toHaveBeenCalledTimes(3);
    expect(mocks.deps).toHaveBeenCalledOnce();
    for(const call of mocks.af.mock.calls)expect(call[1].deadlineMs).toBe(50_000);
- });
- it('turns the football-data lazy sync into a no-op',async()=>{
-   await ensureMatchesFresh();
-   expect(mocks.rpc).not.toHaveBeenCalled();
  });
 });
 describe('Colombian kickoff display',()=>{

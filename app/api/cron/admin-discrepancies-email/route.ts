@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     lines.push("");
   }
   if ((matchDiscrepancies ?? 0) > 0) {
-    lines.push(`Discrepancias de scores ESPN/football-data: ${matchDiscrepancies}`);
+    lines.push(`Discrepancias de resultados (API-Football):${matchDiscrepancies}`);
     lines.push("");
   }
   lines.push(`Resolverlas en: https://lapollacolombiana.com/admin/discrepancias`);

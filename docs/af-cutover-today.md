@@ -1,5 +1,10 @@
 # Corte de partidos a API-Football — runbook del 2026-09-13
 
+> **Histórico.** El corte se ejecutó el 2026-09-13 a las 13:15 UTC. Después se borró
+> el código de ESPN y football-data y el interruptor `data_provider_mode`: las
+> secciones de rollback (R1/R2) ya no aplican. Este documento queda como registro
+> de lo que se hizo y de cómo se verificó.
+
 Decisión del dueño (13-sep-2026): el calendario, el vivo y la verificación de resultados
 salen **solo de API-Football** (plan Pro, 7.000 solicitudes/día, vence el 2026-10-09 y se
 renueva). ESPN y football-data dejan de escribir partidos. El interruptor es

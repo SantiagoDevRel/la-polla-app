@@ -1,34 +1,31 @@
 // app/api/admin/discrepancies/[matchId]/route.ts
 //
-// POST — resuelve la discrepancia escogiendo qué fuente es la
-// verdadera (o pasando un score manual).
+// POST — resuelve la discrepancia escogiendo la fuente del resultado.
 //
 // Body shape:
-//   { source: 'espn',     home: number, away: number }   // confirma ESPN
-//   { source: 'fd' }                                      // mantiene los scores actuales (de football-data)
-//   { source: 'manual',   home: number, away: number }   // override manual
+//   { source: 'api-football' }                            // confirma la última lectura de API-Football en caché
+//   { source: 'manual', home: number, away: number }      // marcador de 90' ingresado por el admin
 //
-// Importante: el trigger SQL de scoring dispara en UPDATE OF status,
-// final_verified_at — al setear final_verified_at=NOW() se ejecuta
-// trigger_score_predictions automáticamente, así que no hace falta
-// llamar nada adicional. Si los scores cambian, el trigger ya los lee
-// del row updated.
+// API-Football es la única fuente de partidos desde el 2026-09-13: 'espn' y
+// 'fd' ya no existen y responden 400. Con 'api-football' el servidor vuelve a
+// leer la observación guardada (nunca confía en cifras del cliente) y no gasta
+// cuota: si la caché no trae un final utilizable, responde 409 y queda el manual.
+//
+// El cierre va por finalize_verified_match_result (093), el mismo RPC con
+// bloqueo de fila que usa la verificación automática; el trigger de scoring
+// dispara con final_verified_at.
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin, getAuthenticatedUser } from "@/lib/auth/admin";
-import { fetchKnockoutExtras } from "@/lib/espn/knockout-extras";
+import { cachedApiFootballResult } from "@/lib/matches/af-cached-result";
+import { readFinalResult } from "@/lib/api-football/results";
 import { KNOCKOUT_PHASES } from "@/lib/utils/points";
 
 const BodySchema = z.discriminatedUnion("source", [
   z.object({
-    source: z.literal("espn"),
-    home: z.number().int().nonnegative(),
-    away: z.number().int().nonnegative(),
-  }),
-  z.object({
-    source: z.literal("fd"),
+    source: z.literal("api-football"),
   }),
   z.object({
     source: z.literal("manual"),
@@ -61,19 +58,20 @@ export async function POST(
   }
 
   const admin = createAdminClient();
+  const matchId = (await params).matchId;
 
   // Obtener el match para diagnóstico + status check.
   const { data: match, error: matchErr } = await admin
     .from("matches")
-    .select("id, status, home_score, away_score, final_verified_at, final_verification_notes, tournament, phase, home_team, away_team, scheduled_at, espn_id, regulation_home_score, regulation_away_score")
-    .eq("id", (await params).matchId)
+    .select("id, status, home_score, away_score, final_verified_at, tournament, phase, home_team, away_team, scheduled_at, external_id, source_external_ids")
+    .eq("id", matchId)
     .maybeSingle();
   if (matchErr || !match) {
     return NextResponse.json({ error: "Match no encontrado" }, { status: 404 });
   }
   if (match.status !== "finished") {
     return NextResponse.json(
-      { error: `El match no está finished (status=${match.status}). No se puede resolver una discrepancia que aún no terminó.` },
+      { error: `El partido no está finalizado (status=${match.status}). No se puede resolver una discrepancia que aún no terminó.` },
       { status: 409 },
     );
   }
@@ -87,90 +85,64 @@ export async function POST(
   const adminNote = me?.display_name
     ? `manual override por ${me.display_name} (${me.id})`
     : `manual override`;
+  const notes = `${adminNote} via /admin/discrepancias source=${parsed.data.source} at=${verifiedAt}`;
+  const isKnockout = !!match.phase && KNOCKOUT_PHASES.has(match.phase);
 
-  const updates: {
-    final_verification_notes: string;
-    home_score?: number;
-    away_score?: number;
-    fulltime_home_score?: number | null;
-    fulltime_away_score?: number | null;
-    penalty_home?: number | null;
-    penalty_away?: number | null;
-    advancer?: "home" | "away" | null;
-  } = {
-    final_verification_notes: `${adminNote} via /admin/discrepancias source=${parsed.data.source} at=${verifiedAt}`,
-  };
+  let home: number;
+  let away: number;
+  // Extras de knockout (migración 077). Con 'manual' quedan en null y
+  // score_match cae al 90' / avance derivado del marcador decisivo.
+  let fulltimeHome: number | null = null;
+  let fulltimeAway: number | null = null;
+  let penaltyHome: number | null = null;
+  let penaltyAway: number | null = null;
+  let advancer: "home" | "away" | null = null;
 
-  if (parsed.data.source === "espn" || parsed.data.source === "manual") {
-    updates.home_score = parsed.data.home;
-    updates.away_score = parsed.data.away;
-  }
-  // source === 'fd' → no tocamos scores, ya están escritos.
-
-  // Knockout: el 120'/penales/avance (para score_match, disparado por
-  // final_verified_at) se resuelve según la fuente que eligió el admin.
-  // Migración 077.
-  if (match.phase && KNOCKOUT_PHASES.has(match.phase)) {
-    if (parsed.data.source === "espn") {
-      // El admin CONFIRMÓ ESPN → capturamos sus extras (par atómico; si falla
-      // el scorer degrada al 90'/avance derivado).
-      const extras = await fetchKnockoutExtras(match.tournament, {
-        espn_id: match.espn_id,
-        scheduled_at: match.scheduled_at,
-        home_team: match.home_team,
-        away_team: match.away_team,
-      });
-      if (extras?.wentToExtraTime) {
-        if (match.regulation_home_score === null || match.regulation_away_score === null) {
-          return NextResponse.json({error:"ESPN incluye alargue o penales. Ingresa manualmente el marcador de los 90 minutos."},{status:409});
-        }
-        updates.home_score=match.regulation_home_score;
-        updates.away_score=match.regulation_away_score;
-      }
-      if (extras) {
-        if (
-          extras.fulltime_home_score !== null &&
-          extras.fulltime_away_score !== null
-        ) {
-          updates.fulltime_home_score = extras.fulltime_home_score;
-          updates.fulltime_away_score = extras.fulltime_away_score;
-        }
-        if (extras.penalty_home !== null && extras.penalty_away !== null) {
-          updates.penalty_home = extras.penalty_home;
-          updates.penalty_away = extras.penalty_away;
-        }
-        if (extras.advancer !== null) updates.advancer = extras.advancer;
-      }
-    } else {
-      // 'manual'/'fd': el admin RECHAZÓ ESPN. Limpiamos cualquier extra de ESPN
-      // que verify-final haya escrito ANTES de la discrepancia — si no, el
-      // scorer usaría un 120'/avance stale de ESPN en vez de la fuente elegida.
-      // Cae al 90'/avance derivado del marcador. (codex)
-      updates.fulltime_home_score = null;
-      updates.fulltime_away_score = null;
-      updates.penalty_home = null;
-      updates.penalty_away = null;
-      updates.advancer = null;
+  if (parsed.data.source === "api-football") {
+    const observation = await cachedApiFootballResult(match);
+    const final = observation ? readFinalResult(observation.fixture) : null;
+    if (!observation || !final) {
+      return NextResponse.json(
+        { error: "API-Football no tiene guardado un resultado final de este partido. Ingresa manualmente el marcador de los 90 minutos." },
+        { status: 409 },
+      );
     }
+    if (isKnockout && (!final.fulltime || (observation.fixture.fixture.status.short === "PEN" && !final.penalty))) {
+      return NextResponse.json(
+        { error: "API-Football no trae el marcador completo o los penales. Ingresa manualmente el marcador de los 90 minutos." },
+        { status: 409 },
+      );
+    }
+    // Los puntos usan el marcador de los 90 minutos (Regla #4).
+    home = final.home;
+    away = final.away;
+    if (isKnockout) {
+      fulltimeHome = final.fulltime?.home ?? null;
+      fulltimeAway = final.fulltime?.away ?? null;
+      penaltyHome = final.penalty?.home ?? null;
+      penaltyAway = final.penalty?.away ?? null;
+      // Ganador del partido != clasificado por global: solo una tanda decisiva lo define.
+      advancer = final.penalty && final.penalty.home !== final.penalty.away
+        ? final.penalty.home > final.penalty.away ? "home" : "away"
+        : null;
+    }
+  } else {
+    home = parsed.data.home;
+    away = parsed.data.away;
   }
 
-  const home = updates.home_score ?? match.home_score;
-  const away = updates.away_score ?? match.away_score;
-  if (home === null || away === null) {
-    return NextResponse.json({error:"Falta el marcador de los 90 minutos."},{status:409});
-  }
-  // The admin and automatic providers use the same row lock and scoring transaction.
+  // The admin and automatic verification use the same row lock and scoring transaction.
   const { data: finalized, error: updErr } = await admin.rpc("finalize_verified_match_result", {
     p_match_id: match.id, p_home_score: home, p_away_score: away,
-    p_notes: updates.final_verification_notes,
-    p_fulltime_home: updates.fulltime_home_score ?? null,
-    p_fulltime_away: updates.fulltime_away_score ?? null,
-    p_penalty_home: updates.penalty_home ?? null,
-    p_penalty_away: updates.penalty_away ?? null,
-    p_advancer: updates.advancer ?? null,
+    p_notes: notes,
+    p_fulltime_home: fulltimeHome,
+    p_fulltime_away: fulltimeAway,
+    p_penalty_home: penaltyHome,
+    p_penalty_away: penaltyAway,
+    p_advancer: advancer,
   });
   if (updErr) {
-    console.error("[admin/discrepancies/resolve] update failed:", updErr);
+    console.error("[admin/discrepancies/resolve] update failed:", updErr.message);
     return NextResponse.json({ error: "No se pudo resolver" }, { status: 500 });
   }
   if (finalized !== true) {
@@ -179,11 +151,8 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
-    matchId: (await params).matchId,
+    matchId,
     finalVerifiedAt: verifiedAt,
-    appliedScore: {
-      home: updates.home_score ?? match.home_score,
-      away: updates.away_score ?? match.away_score,
-    },
+    appliedScore: { home, away },
   });
 }

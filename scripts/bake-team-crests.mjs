@@ -1,5 +1,7 @@
 // Read-only fixture export + verified, same-origin club crests. Never writes to DB.
 // Run: node --experimental-strip-types scripts/bake-team-crests.mjs
+// World Cup squad club crests only (no DB, no API-Football calls):
+//      node --experimental-strip-types scripts/bake-team-crests.mjs --worldcup-squads
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -20,6 +22,8 @@ const require = createRequire(import.meta.url);
 // Sharp ships with the installed Next package; no additional dependency.
 const sharp = createRequire(require.resolve("next/package.json"))("sharp");
 const catalogPath = path.join(repo, "lib/teams/crest-catalog.json");
+const squadsPath = path.join(repo, "lib/teams/baked-worldcup-squads.json");
+const squadCrestsPath = path.join(repo, "lib/teams/worldcup-club-crests.json");
 const assetDir = path.join(repo, "public/team-crests");
 const hosts = new Set([
   "crests.football-data.org",
@@ -28,6 +32,53 @@ const hosts = new Set([
   "media.api-sports.io",
 ]);
 const arg = name => { const index=process.argv.indexOf(name); return index<0?null:process.argv[index+1]; };
+
+/**
+ * Downloads (or reuses an already baked asset), validates and converts each
+ * source to a 96 px WebP. `strict` aborts on the first bad source (fixtures and
+ * current clubs must all be covered); otherwise bad sources are reported and
+ * left out, so the UI shows no crest instead of a wrong or broken one.
+ */
+async function bakeSources(urls, previousBySource, {strict}) {
+  const downloaded = new Map();
+  const rejected = [];
+  let next = 0;
+  await Promise.all(Array.from({ length: 6 }, async () => {
+    while (next < urls.length) {
+      const source = urls[next++];
+      try {
+        const parsed = new URL(source);
+        if (parsed.protocol !== "https:" || !hosts.has(parsed.hostname)) {
+          throw new Error(`Unreviewed crest host: ${parsed.hostname}`);
+        }
+        // Do not follow a provider redirect to an unreviewed host.
+        let original;
+        const existing=previousBySource[source];
+        if(existing)original=await readFile(path.join(repo,'public',existing));
+        else {
+          const response = await fetch(source, { redirect: "error", signal: AbortSignal.timeout(15000) });
+          if (!response.ok) throw new Error(`Crest HTTP ${response.status}: ${source}`);
+          original = Buffer.from(await response.arrayBuffer());
+        }
+        if(original.length>2*1024*1024)throw new Error(`Oversized crest: ${source}`);
+        const metadata = await sharp(original).metadata();
+        if (!metadata.width || !metadata.height) throw new Error(`Invalid image: ${source}`);
+        const stats=await sharp(original).flatten({background:'#f5f7fa'}).stats();
+        if(stats.channels.every(c=>c.stdev<3))throw new Error(`Blank image: ${source}`);
+        const image = existing ? original : await sharp(original)
+          .resize(96, 96, { fit: "inside", withoutEnlargement: true })
+          .webp({ quality: 88 })
+          .toBuffer();
+        const hash = createHash("sha256").update(image).digest("hex").slice(0, 16);
+        downloaded.set(source, { filename: `${hash}-96.webp`, local: existing, image });
+      } catch (error) {
+        if (strict) throw error;
+        rejected.push({ source, reason: error.message });
+      }
+    }
+  }));
+  return { downloaded, rejected };
+}
 
 async function apiInventory() {
   const file=arg('--inventory');
@@ -56,7 +107,73 @@ async function apiInventory() {
   return inventory;
 }
 
+/**
+ * World Cup squads: every player's club crest was an ESPN hotlink. Bake them
+ * into the same local asset folder and write a server-only map (the roster
+ * route uses it; the client catalog does not grow). Identity rule: one ESPN
+ * club id per club name. An image shared by two different ids is a generic
+ * placeholder and is left out, never shown as a club crest.
+ */
+async function bakeWorldCupSquadCrests() {
+  const squads = JSON.parse(await readFile(squadsPath, "utf8"));
+  const clubsBySource = new Map();
+  for (const players of Object.values(squads)) {
+    for (const player of players) {
+      if (!player.clubCrest) continue;
+      const clubs = clubsBySource.get(player.clubCrest) ?? new Set();
+      if (player.club) clubs.add(player.club);
+      clubsBySource.set(player.clubCrest, clubs);
+    }
+  }
+  const urls = [...clubsBySource.keys()].sort();
+  let catalog = { bySource: {} };
+  try { catalog = JSON.parse(await readFile(catalogPath, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  let previous = { bySource: {} };
+  try { previous = JSON.parse(await readFile(squadCrestsPath, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  const known = { ...catalog.bySource, ...previous.bySource };
+  const { downloaded, rejected } = await bakeSources(urls, known, { strict: false });
+
+  const byHash = new Map();
+  for (const [source, asset] of downloaded) {
+    const hash = createHash("sha256").update(asset.image).digest("hex");
+    byHash.set(hash, [...(byHash.get(hash) ?? []), source]);
+  }
+  for (const sources of byHash.values()) {
+    if (sources.length < 2) continue;
+    for (const source of sources) {
+      downloaded.delete(source);
+      rejected.push({ source, reason: `Shared image across ${sources.length} club ids` });
+    }
+  }
+  // Spelling variants of one club (Fenerbahçe / Fenerbahce) are the same identity.
+  const conflicting = [...clubsBySource].filter(([, clubs]) => new Set([...clubs].map(teamNameKey)).size > 1);
+  for (const [source, clubs] of conflicting) {
+    downloaded.delete(source);
+    rejected.push({ source, reason: `One id for several clubs: ${[...clubs].join(" / ")}` });
+  }
+
+  await mkdir(assetDir, { recursive: true });
+  const bySource = {};
+  const clubs = {};
+  for (const source of urls) {
+    const asset = downloaded.get(source);
+    if (!asset) continue;
+    if (!asset.local) await writeFile(path.join(assetDir, asset.filename), asset.image);
+    bySource[source] = asset.local ?? `/team-crests/${asset.filename}`;
+    clubs[source] = [...clubsBySource.get(source)].join(" / ");
+  }
+  await writeFile(squadCrestsPath, `${JSON.stringify({
+    generatedAt: new Date().toISOString(),
+    source: "lib/teams/baked-worldcup-squads.json",
+    bySource,
+    clubs,
+  }, null, 2)}\n`);
+  for (const item of rejected) console.warn(`Left out ${item.source}: ${item.reason}`);
+  console.log(`World Cup squads: ${Object.keys(bySource).length}/${urls.length} club crests baked, ${rejected.length} left out. No database or API-Football calls.`);
+}
+
 async function main() {
+  if (process.argv.includes("--worldcup-squads")) return bakeWorldCupSquadCrests();
   dotenv.config({ path: path.join(repo, ".env.local"), quiet: true });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -88,37 +205,7 @@ async function main() {
   const required=rows.flatMap(row=>['home','away'].filter(side=>!isPlaceholderTeam(row[`${side}_team`])).map(side=>({name:row[`${side}_team`],source:row[`${side}_team_flag`]})));
 
   const urls = [...new Set([...required.filter(t=>!flagUrlForTeam(t.name)).map(t=>t.source),...apiTeams.map(t=>t.logo),...inventory.map(l=>l.logo)].filter(Boolean))].sort();
-  const downloaded = new Map();
-  let next = 0;
-  await Promise.all(Array.from({ length: 6 }, async () => {
-    while (next < urls.length) {
-      const source = urls[next++];
-      const parsed = new URL(source);
-      if (parsed.protocol !== "https:" || !hosts.has(parsed.hostname)) {
-        throw new Error(`Unreviewed crest host: ${parsed.hostname}`);
-      }
-      // Do not follow a provider redirect to an unreviewed host.
-      let original;
-      const existing=previous.bySource[source];
-      if(existing)original=await readFile(path.join(repo,'public',existing));
-      else {
-        const response = await fetch(source, { redirect: "error", signal: AbortSignal.timeout(15000) });
-        if (!response.ok) throw new Error(`Crest HTTP ${response.status}: ${source}`);
-        original = Buffer.from(await response.arrayBuffer());
-      }
-      if(original.length>2*1024*1024)throw new Error(`Oversized crest: ${source}`);
-      const metadata = await sharp(original).metadata();
-      if (!metadata.width || !metadata.height) throw new Error(`Invalid image: ${source}`);
-      const stats=await sharp(original).flatten({background:'#f5f7fa'}).stats();
-      if(stats.channels.every(c=>c.stdev<3))throw new Error(`Blank image: ${source}`);
-      const image = existing ? original : await sharp(original)
-        .resize(96, 96, { fit: "inside", withoutEnlargement: true })
-        .webp({ quality: 88 })
-        .toBuffer();
-      const hash = createHash("sha256").update(image).digest("hex").slice(0, 16);
-      downloaded.set(source, { filename: `${hash}-96.webp`, image });
-    }
-  }));
+  const { downloaded } = await bakeSources(urls, previous.bySource, { strict: true });
 
   // Only publish after every source has decoded. Keep older entries/assets.
   // A repeated image across distinct provider IDs is usually a generic placeholder.

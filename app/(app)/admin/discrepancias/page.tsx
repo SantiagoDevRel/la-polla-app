@@ -1,10 +1,11 @@
 // app/(app)/admin/discrepancias/page.tsx
-// Panel admin para resolver discrepancias entre ESPN y football-data
-// cuando el cron las detecta. Mientras un match esté finished SIN
-// final_verified_at, el scoring NO se ejecuta — para evitar puntuar
-// con datos mal. El admin elige qué cifra es la real y al confirmar:
-//   1. Se marca final_verified_at=NOW(), score correcto.
-//   2. El trigger SQL trigger_score_predictions corre solo y puntúa.
+// Panel admin para destrabar partidos terminados que la verificación
+// automática no cerró (API-Football sin segunda lectura, identidad dudosa o
+// marcador en conflicto). Mientras un match esté finished SIN
+// final_verified_at, el scoring NO se ejecuta — para evitar puntuar con
+// datos mal. El admin confirma la última lectura guardada de API-Football o
+// ingresa el marcador de 90' a mano; el servidor cierra con
+// finalize_verified_match_result y el trigger de scoring puntúa.
 "use client";
 
 import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
@@ -24,9 +25,14 @@ interface Discrepancy {
   away_team_flag: string | null;
   home_score: number | null;
   away_score: number | null;
-  espn_status: string | null;
-  espn_home: number | null;
-  espn_away: number | null;
+  af_status: string | null;
+  af_fetched_at: string | null;
+  af_home: number | null;
+  af_away: number | null;
+  af_fulltime_home: number | null;
+  af_fulltime_away: number | null;
+  af_penalty_home: number | null;
+  af_penalty_away: number | null;
   scheduled_at: string;
   final_verification_notes: string | null;
   alerted_at: string | null;
@@ -118,14 +124,14 @@ export default function AdminDiscrepanciasPage() {
 
   async function resolve(
     match: Discrepancy,
-    source: "espn" | "fd" | "manual",
+    source: "api-football" | "manual",
     home?: number,
     away?: number,
   ) {
     setBusyId(match.id);
     try {
       const body =
-        source === "fd"
+        source === "api-football"
           ? { source }
           : { source, home, away };
       await axios.post(`/api/admin/discrepancies/${match.id}`, body);
@@ -257,7 +263,7 @@ export default function AdminDiscrepanciasPage() {
               <section className="space-y-2 pt-2">
                 <h2 className="text-[12px] uppercase tracking-[0.1em] text-amber font-semibold flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5" />
-                  Scores ESPN ↔ DB ({items.length})
+                  Partidos sin verificar ({items.length})
                 </h2>
                 <p className="text-[11px] text-text-secondary">
                   {items.length} partido{items.length > 1 ? "s" : ""} esperan tu confirmación.
@@ -266,9 +272,10 @@ export default function AdminDiscrepanciasPage() {
               </section>
             )}
             {items.map((m) => {
-              const fd = { h: m.home_score, a: m.away_score };
-              const espn = { h: m.espn_home, a: m.espn_away };
-              const matches = fd.h === espn.h && fd.a === espn.a;
+              const db = { h: m.home_score, a: m.away_score };
+              const af = { h: m.af_home, a: m.af_away };
+              const afFinal = af.h !== null && af.a !== null;
+              const matches = afFinal && db.h === af.h && db.a === af.a;
               const draft = manualDraft[m.id] ?? { home: "", away: "" };
               return (
                 <article
@@ -292,34 +299,41 @@ export default function AdminDiscrepanciasPage() {
                   {/* Score side-by-side */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
-                      <p className="text-[10px] uppercase tracking-wide text-text-muted">DB (último sync)</p>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Guardado en la base</p>
                       <p className="font-display text-[28px] text-text-primary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                        {fd.h ?? "—"} - {fd.a ?? "—"}
+                        {db.h ?? "—"} - {db.a ?? "—"}
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => resolve(m, "fd")}
-                        disabled={busyId === m.id}
-                        className="mt-2 w-full text-[11px] font-semibold py-1.5 rounded-lg bg-turf/15 border border-turf/30 text-turf hover:bg-turf/20 transition-colors disabled:opacity-50"
-                      >
-                        {busyId === m.id ? "…" : "Confirmar este"}
-                      </button>
+                      <p className="mt-2 text-[11px] text-text-muted">
+                        Puede incluir alargue. Para usarlo, ingrésalo abajo.
+                      </p>
                     </div>
                     <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
-                      <p className="text-[10px] uppercase tracking-wide text-text-muted">ESPN</p>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">API-Football · 90&apos;</p>
                       <p className="font-display text-[28px] text-text-primary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
-                        {espn.h ?? "—"} - {espn.a ?? "—"}
+                        {af.h ?? "—"} - {af.a ?? "—"}
                       </p>
+                      {m.af_fetched_at ? (
+                        <p className="text-[10px] text-text-muted">
+                          {m.af_status ?? "?"}
+                          {m.af_fulltime_home !== null && m.af_fulltime_away !== null && (m.af_fulltime_home !== af.h || m.af_fulltime_away !== af.a)
+                            ? ` · final ${m.af_fulltime_home}-${m.af_fulltime_away}`
+                            : ""}
+                          {m.af_penalty_home !== null && m.af_penalty_away !== null
+                            ? ` · penales ${m.af_penalty_home}-${m.af_penalty_away}`
+                            : ""}
+                          {` · leído ${fmtDate(m.af_fetched_at)}`}
+                        </p>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => {
-                          if (espn.h === null || espn.a === null) {
-                            showToast("ESPN no tiene score disponible", "error");
+                          if (!afFinal) {
+                            showToast("API-Football no tiene un resultado final guardado", "error");
                             return;
                           }
-                          resolve(m, "espn", espn.h, espn.a);
+                          resolve(m, "api-football");
                         }}
-                        disabled={busyId === m.id || espn.h === null}
+                        disabled={busyId === m.id || !afFinal}
                         className="mt-2 w-full text-[11px] font-semibold py-1.5 rounded-lg bg-turf/15 border border-turf/30 text-turf hover:bg-turf/20 transition-colors disabled:opacity-50"
                       >
                         {busyId === m.id ? "…" : "Confirmar este"}
@@ -329,7 +343,7 @@ export default function AdminDiscrepanciasPage() {
 
                   {matches ? (
                     <p className="text-[11px] text-turf">
-                      Las dos fuentes coinciden ahora — confirmá cualquiera.
+                      La base y API-Football coinciden ahora.
                     </p>
                   ) : null}
 
@@ -349,7 +363,7 @@ export default function AdminDiscrepanciasPage() {
                             [m.id]: { ...draft, home: e.target.value.replace(/\D/g, "") },
                           }))
                         }
-                        placeholder={String(fd.h ?? 0)}
+                        placeholder={String(db.h ?? 0)}
                         className="w-14 text-center bg-bg-elevated border border-border-subtle rounded-lg px-2 py-1 text-sm text-text-primary placeholder:text-text-muted/40 focus:outline-none focus:border-gold/50"
                       />
                       <span className="text-text-muted">-</span>
@@ -363,7 +377,7 @@ export default function AdminDiscrepanciasPage() {
                             [m.id]: { ...draft, away: e.target.value.replace(/\D/g, "") },
                           }))
                         }
-                        placeholder={String(fd.a ?? 0)}
+                        placeholder={String(db.a ?? 0)}
                         className="w-14 text-center bg-bg-elevated border border-border-subtle rounded-lg px-2 py-1 text-sm text-text-primary placeholder:text-text-muted/40 focus:outline-none focus:border-gold/50"
                       />
                       <button

@@ -11,7 +11,6 @@ import {
 import { clearState, getState, setState } from "./state";
 import { formatTablaWA } from "./tabla";
 import { shortMatchTitle } from "./format";
-import { ensureMatchesFresh } from "@/lib/matches/ensure-fresh";
 import { joinByCode } from "@/lib/pollas/join";
 import { validateJoinCodeFormat } from "@/lib/pollas/join-code";
 import { KNOCKOUT_PHASES } from "@/lib/utils/points";
@@ -399,7 +398,6 @@ export async function handlePronosticar(
   page: number = 0,
   forceList: boolean = false
 ) {
-  void ensureMatchesFresh();
   const check = await verifyMemberAndPolla(phone, userId, pollaId);
   if (!check) return;
   const { polla } = check;
@@ -986,7 +984,6 @@ export async function handleLeaderboard(
   userId: string,
   pollaId: string
 ) {
-  void ensureMatchesFresh();
   const check = await verifyMemberAndPolla(phone, userId, pollaId);
   if (!check) return;
   const { polla } = check;
@@ -1031,7 +1028,6 @@ export async function handleResults(
   userId: string,
   pollaId: string
 ) {
-  void ensureMatchesFresh();
   const check = await verifyMemberAndPolla(phone, userId, pollaId);
   if (!check) return;
   const { polla } = check;

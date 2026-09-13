@@ -5,7 +5,7 @@ import { useLocale } from 'next-intl';
 import { BarChart3, ChevronDown, ChevronRight, List, MapPin, Users } from 'lucide-react';
 import { TeamCrest } from '@/components/match/TeamCrest';
 import { getTournamentName } from '@/lib/tournaments';
-import { eventLabel, positionLabel, statLabel } from '@/lib/espn/labels-es';
+import { eventLabel, positionLabel, statLabel } from '@/lib/football/labels';
 import { isLiveStatus, type FootballDetail, type PlayerPerformance } from '@/lib/api-football/detail-model';
 import { FootballBack, FootballEmpty, FootballLoading, FootballPhoto, FootballLeagueLogo, statusLabel, useFootballResource } from './shared';
 import { FootballEventIcon, FootballStatIcon } from './FootballIcons';

@@ -922,7 +922,6 @@
     "predSavedMini": "Pronóstico guardado",
     "tabResumen": "Resumen",
     "tabPlantel": "Plantel",
-    "tabNoticias": "Noticias",
     "lineGK": "Arqueros",
     "lineDEF": "Defensas",
     "lineMID": "Mediocampistas",
@@ -930,9 +929,6 @@
     "lineOTH": "Otros",
     "rosterEmpty": "No hay plantel disponible para este equipo",
     "rosterError": "No pudimos cargar el plantel",
-    "newsEmpty": "No hay noticias por ahora",
-    "newsError": "No pudimos cargar las noticias",
-    "newsReadMore": "Leer en ESPN",
     "ageShort": "{age} años"
   },
   "Profile": {

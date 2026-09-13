@@ -1,4 +1,4 @@
-import type { MatchSummary, LineupPlayer, TimelineEvent } from '@/lib/espn/summary';
+import type { MatchSummary, LineupPlayer, TimelineEvent } from '@/lib/football/summary';
 import type { ApiFootballFixture } from './mappers';
 import { RESULT_LEAGUES } from './results';
 import { apiFootballPlayerPhoto } from './player-photo';

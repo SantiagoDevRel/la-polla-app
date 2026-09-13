@@ -61,9 +61,10 @@ export function linkedFixtureId(match: Pick<LinkedResultMatch, 'external_id' | '
 }
 
 /**
- * 'af' mode identity. Linked rows are matched by fixture id plus competition
- * (names can differ between the old provider row and API-Football); rows with
- * no link keep the strict name/kickoff rule of findResultFixture.
+ * Live and final identity. Linked rows are matched by fixture id plus
+ * competition (names on rows created before 2026-09-13 can differ from
+ * API-Football); rows with no link keep the strict name/kickoff rule of
+ * findResultFixture.
  */
 export function resolveResultFixture(match: LinkedResultMatch, fixtures: ApiFootballFixture[]): ApiFootballFixture | null {
   const linked = linkedFixtureId(match);

@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiFootballFixture } from '@/lib/api-football/mappers';
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), enJuego: vi.fn(), pro: vi.fn(), feed: vi.fn() }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), rows: vi.fn(), pro: vi.fn(), feed: vi.fn() }));
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({ rpc: mocks.rpc }) }));
-vi.mock('@/lib/matches/en-juego', () => ({ matchesEnJuego: mocks.enJuego }));
+// Builder encadenable de supabase-js para la lectura de filas del vivo.
+const chain = () => {
+  const q: Record<string, unknown> = {};
+  for (const m of ['select', 'in', 'is', 'gte', 'lte', 'limit']) q[m] = () => q;
+  q.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: mocks.rows(), error: null }).then(resolve);
+  return q;
+};
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({ rpc: mocks.rpc, from: chain }) }));
 vi.mock('@/lib/api-football/account', () => ({ apiFootballProActive: mocks.pro }));
 vi.mock('@/lib/api-football/feed', () => ({ loadFootballDate: mocks.feed }));
 import { mapApiStatus, mapFixtureToMatch } from '@/lib/api-football/mappers';
@@ -45,11 +51,12 @@ describe('API-Football PST (aplazado) no es cancelado', () => {
 
 describe('live: observación enviada a update_match_live_provider', () => {
   const match = { id: '00000000-0000-4000-8000-000000001549', tournament: 'betplay_2026',
-    home_team: 'Llaneros FC', away_team: 'Deportivo Cali', scheduled_at: '2026-09-08T01:00:00Z' };
+    home_team: 'Llaneros FC', away_team: 'Deportivo Cali', scheduled_at: '2026-09-08T01:00:00Z',
+    external_id: 'apifootball:1549770', source_external_ids: [] as string[] };
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.pro.mockResolvedValue(true);
-    mocks.enJuego.mockResolvedValue({ filas: [match], errores: [] });
+    mocks.rows.mockReturnValue([match]);
     mocks.rpc.mockResolvedValue({ data: true, error: null });
   });
   const feedWith = (f: ApiFootballFixture) =>

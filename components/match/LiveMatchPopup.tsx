@@ -1,6 +1,6 @@
 // components/match/LiveMatchPopup.tsx — Bottom sheet con el detalle en
 // vivo de un partido: timeline (goles/tarjetas), stats del boxscore y
-// alineaciones. La data sale de /api/matches/[id]/live (ESPN summary).
+// alineaciones. La data sale de /api/matches/[id]/live (API-Football).
 //
 // Mismo patrón que TeamInfoSheet: portal a document.body (los transforms
 // de framer-motion en ancestros crean stacking contexts que lo dejarían
@@ -18,10 +18,10 @@ import { BarChart3, List, UsersRound, X } from "lucide-react";
 import { DURATION } from "@/lib/animations";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
 import { TeamCrest } from './TeamCrest';
-import { eventLabel, statLabel } from "@/lib/espn/labels-es";
-import type { MatchStat, MatchSummary, TimelineEvent, Lineup, LineupPlayer } from "@/lib/espn/summary";
+import { eventLabel, statLabel } from "@/lib/football/labels";
+import type { MatchStat, MatchSummary, TimelineEvent, Lineup, LineupPlayer } from "@/lib/football/summary";
 
-// Eventos de ESPN que son RUIDO para el resumen: saques, demoras, fin de
+// Eventos que son RUIDO para el resumen (tipos históricos del proveedor): saques, demoras, fin de
 // tiempos. Se ocultan para que el timeline muestre solo lo que importa
 // (goles, tarjetas, cambios, penales, VAR).
 const NOISE_EVENT_TYPES = new Set([
@@ -52,7 +52,7 @@ function isMeaningfulEvent(e: TimelineEvent): boolean {
   return e.type !== "" && !NOISE_EVENT_TYPES.has(e.type);
 }
 
-// Las etiquetas legibles de eventos y stats viven en lib/espn/labels-es.ts
+// Las etiquetas legibles de eventos y stats viven en lib/football/labels.ts
 // (eventLabel / statLabel) — set finito y compartido, free-tier sin API.
 
 interface LiveMatchPopupProps {
@@ -137,8 +137,8 @@ function TeamFlag({ flag, team, size }: { flag: string | null | undefined; team:
       );
     }
     return (
-      // Plain img: las banderas locales y los assets ESPN ya están cubiertos
-      // por CSP. max-w-none evita que flex las encoja en headers apretados.
+      // Plain img: banderas locales, cubiertas por CSP (self).
+      // max-w-none evita que flex las encoja en headers apretados.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
@@ -585,7 +585,7 @@ function StatsSection({ stats, title, emptyLabel, locale }: { stats: MatchStat[]
 
 /** Alineaciones lado a lado: equipo local a la IZQUIERDA, visitante a la
  *  DERECHA (pedido user 2026-06-12). Cada columna: solo número + nombre
- *  (+ club actual si ESPN lo trae). Sin posiciones (G/RB/…) ni fotos. */
+ *  (+ club si el proveedor lo trae). Sin posiciones (G/RB/…) ni fotos. */
 function LineupsSection({
   home,
   away,
