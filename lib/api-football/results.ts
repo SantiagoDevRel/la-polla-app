@@ -38,6 +38,42 @@ export function findResultFixture(match: ResultMatch, fixtures: ApiFootballFixtu
   return found.length === 1 ? found[0] : null;
 }
 
+/** Row identity as written by the API-Football calendar (external_id) or linked by the writer (source_external_ids). */
+export interface LinkedResultMatch extends ResultMatch {
+  external_id: string | null; source_external_ids?: string[] | null;
+}
+
+const LINK = /^apifootball:(\d{1,12})$/;
+
+/**
+ * Fixture id of a row owned by or linked to API-Football. Two different ids on
+ * one row mean a duplicated identity: 'ambiguous' never settles or updates anything.
+ */
+export function linkedFixtureId(match: Pick<LinkedResultMatch, 'external_id' | 'source_external_ids'>): number | 'ambiguous' | null {
+  const ids = new Set<number>();
+  for (const value of [match.external_id, ...(match.source_external_ids ?? [])]) {
+    const hit = typeof value === 'string' ? value.match(LINK) : null;
+    if (hit) ids.add(Number(hit[1]));
+  }
+  if (ids.size > 1) return 'ambiguous';
+  const [id] = Array.from(ids);
+  return id !== undefined && Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * 'af' mode identity. Linked rows are matched by fixture id plus competition
+ * (names can differ between the old provider row and API-Football); rows with
+ * no link keep the strict name/kickoff rule of findResultFixture.
+ */
+export function resolveResultFixture(match: LinkedResultMatch, fixtures: ApiFootballFixture[]): ApiFootballFixture | null {
+  const linked = linkedFixtureId(match);
+  if (linked === 'ambiguous') return null;
+  if (linked === null) return findResultFixture(match, fixtures);
+  const league = RESULT_LEAGUES[match.tournament];
+  if (!league) return null;
+  return fixtures.find(f => f.fixture.id === linked && f.league?.id === league) ?? null;
+}
+
 export function scorePair(value: unknown): value is {home: number; away: number} {
   if (!value || typeof value !== 'object') return false;
   const p = value as {home: unknown; away: unknown};

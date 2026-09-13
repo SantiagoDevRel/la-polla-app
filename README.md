@@ -202,9 +202,14 @@ un resultado viejo o de alargue de otro proveedor nunca se convierte en ese snap
 football-data se interpreta según su [contrato de periodos](https://docs.football-data.org/general/v4/overtime.html):
 extraTime suma solo goles del alargue y fullTime puede incluir la tanda.
 
-**Calendario:** el creador muestra los próximos 10 días que ya están en la DB.
-Si una liga está vacía, **Traer el calendario** importa los próximos 60 días
-con ESPN y vuelve a consultar. Esto no consume la cuota de API-Football.
+**Calendario (desde 2026-09-13, solo API-Football):** el creador ofrece
+«Próximos 10 días», «30 días» y «Toda la temporada», agrupados por fecha en hora de
+Colombia. La temporada completa de cada liga se importa desde API-Football
+(`lib/api-football/calendar.ts`, 1 solicitud por liga) y el cron la refresca por
+diferencias. **Actualizar calendario** fuerza ese refresco. Los partidos sin hora
+fija muestran «hora por confirmar» y no admiten cierre automático de la polla.
+Interruptor, corte y rollback: `app_config.data_provider_mode` y
+`docs/af-cutover-today.md`.
 
 **Escudos:** TeamCrest usa el catálogo estático WebP. Para un club nuevo cuyo
 escudo ESPN aún no esté horneado, usa el endpoint público de imágenes
@@ -580,6 +585,34 @@ Después de un deploy nuevo:
 3. Confirmá que el webhook de Meta apunta a `https://lapollacolombiana.com/api/whatsapp/webhook`
 4. Confirmá Site URL de Supabase → Auth en `lapollacolombiana.com`
 
+### Crons de GitHub Actions (`/api/cron/*`)
+
+| Workflow | Ruta | Horario |
+|---|---|---|
+| `match-reminders.yml` | `/api/cron/match-reminders` | diario 13:00 UTC |
+| `admin-discrepancies-email.yml` | `/api/cron/admin-discrepancies-email` | diario 13:00 UTC |
+| `cleanup-payout-proofs.yml` | `/api/cron/cleanup-payout-proofs` | **solo manual** (pendiente de aprobación del dueño) |
+
+- El middleware exime `/api/cron/` (con barra final) del gate de sesión; cada
+  handler se protege solo con `requireCronSecret(request)`
+  (`lib/auth/cron-secret.ts`): `Authorization: Bearer $CRON_SECRET`, comparación
+  en tiempo constante, 403 si no coincide y 500 si falta la variable. Ruta nueva
+  bajo `app/api/cron/` sin esa llamada = test rojo (`tests/cron-auth.test.ts`).
+- El `CRON_SECRET` del repo en GitHub debe ser igual al de Vercel. Un 403 en el
+  workflow significa que no coinciden.
+- Los workflows fallan ante cualquier status que no sea 2xx o sin `"ok": true`,
+  con `--max-time 90` y sin reintentos, e imprimen solo contadores.
+- `admin-discrepancies-email` responde **502** `{error:"email send failed"}` si
+  Resend rechaza el envío (key revocada, sin cuota, dominio sin verificar):
+  el SDK no lanza excepción, así que el handler revisa el `error` devuelto.
+  El detalle del proveedor queda solo en el log de Vercel
+  (`tests/cron-admin-discrepancies-email.test.ts`).
+- Verificación después de un deploy: `curl -X POST https://lapollacolombiana.com/api/cron/match-reminders`
+  sin header debe dar **403** (nunca 307), y `gh workflow run match-reminders.yml`
+  debe terminar en verde.
+- Limpiar comprobantes a mano: `gh workflow run cleanup-payout-proofs.yml -f confirm=BORRAR`.
+  Borra de forma irreversible; confirma antes que el backup los tenga.
+
 ---
 
 ## Tags de seguridad / rollback
@@ -596,14 +629,17 @@ El plan free de Supabase no incluye backups automáticos y pausa los
 proyectos inactivos, así que la copia de los datos vive afuera:
 
 ```bash
-npx tsx scripts/export-backup.ts    # dump completo (solo lectura)
-npx tsx scripts/verify-backup.ts    # sha256 + filas, 100% offline
-npx tsx scripts/restore-backup.ts   # dry run por default
+npx tsx scripts/export-backup.ts       # dump completo (solo lectura)
+npx tsx scripts/verify-backup.ts       # sha256 de tablas, auth, Storage y esquema, offline
+npx tsx scripts/restore-backup-sql.ts  # genera el .sql para psql contra Supabase local
+npx tsx scripts/restore-backup.ts      # dry run por default; escribe solo en local
 ```
 
 Deja `backups/<fecha>/` con todas las tablas de `public`, `auth` (+ SQL de
-restore con los mismos uuid), los archivos de Storage, las migraciones y un
-`RESUMEN.md` con la tabla final de cada polla en texto plano. `backups/`
+restore con los mismos uuid), los archivos de Storage (paginados y cruzados
+contra `storage.objects`), las migraciones del repo, el esquema vivo de prod
+(`schema/live`) y un `RESUMEN.md` con la tabla final de cada polla en texto
+plano. Se escribe en `<fecha>.partial/` y se renombra al terminar. `backups/`
 está en `.gitignore`: **lleva teléfonos y este repo es público.**
 
 Guía completa: [docs/backup-restore.md](docs/backup-restore.md).
@@ -712,3 +748,32 @@ Migraciones 097–102; activación explícita `legacy → paused → v2`. No act
 revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
 [docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
 de 096 arriba no es el contrato de liquidación una vez activado v2.
+
+### Comprobantes comprimidos en el navegador (2026-09-13)
+
+`components/casa/PagarForm.tsx` prepara la imagen UNA vez al elegirla
+(`lib/casa/prepare-proof.ts`) y calcula el SHA-256 sobre lo que sube. El
+servidor (`verifyCasaUpload`), el SQL 098 y el bucket no cambian.
+
+- Hasta 300 KB se sube el original sin decodificar. Por encima: JPEG 0,82
+  (0,72 si sigue pasando de 300 KB), lado largo 1600 px, lado corto mínimo
+  720 px y máximo 4 MP (`lib/casa/proof-image.ts`). Fondo blanco, orientación
+  EXIF aplicada y salida sin EXIF ni GPS. Si ahorra menos del 10 % o no hay
+  reducción legible, se sube el original. Entrada hasta 20 MB; subida hasta 8 MB.
+- Candidatos `[preparado, original válido]`. Ante `UPLOAD_IN_PROGRESS` o
+  `REQUEST_CONFLICT` (y `PROOF_IN_REVIEW`/`ALREADY_PAID`, que reconocen un
+  intento ya confirmado) `lib/casa/proof-submit.ts` prueba el siguiente: así se
+  retoman cargas del cliente anterior o de otro dispositivo, también con la
+  inscripción cerrada. sessionStorage guarda `sourceSha256` del original y
+  acepta registros viejos con solo `sha256`. Con la inscripción cerrada nunca
+  se marca como fallado un intento guardado.
+- Foto del premio (`CrearPollaForm`): se reduce a menos de 1 MB antes del
+  `FormData`; la función de Vercel corta el cuerpo en 4,5 MB.
+- Telegram: si `sendPhoto` falla, el admin recibe el texto con los mismos botones.
+- Pruebas: `npm test -- tests/casa-proof-image.test.ts tests/telegram-proof-notify.test.ts`.
+  E2E local (Supabase en Docker): `node scripts/casa-v2-local-env.mjs build <puerto>`,
+  `... start <puerto>` y `CASA_ORIGIN=http://localhost:<puerto> node scripts/casa-proof-compression-browser-check.mjs`
+  (captura 1179×2556, determinismo, recuperación tras cierre, registro anterior,
+  EXIF girado, foto del premio y HEIC ilegible).
+- Falta validar en dispositivos reales (iPhone Safari con HEIC y EXIF, Android
+  de gama media con fotos de 50 MP) y la legibilidad con comprobantes reales.

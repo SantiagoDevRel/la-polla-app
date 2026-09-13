@@ -6,6 +6,28 @@
 
 ## READ THIS FIRST
 
+### API-Football es la única fuente de partidos (2026-09-13, PR #67)
+
+Decisión del dueño: calendario, vivo y verificación de resultados salen solo de
+API-Football (Pro, se renueva; vence 2026-10-09). El interruptor es
+`app_config.data_provider_mode` (`lib/matches/provider-mode.ts`): **en prod vale
+`af` desde 2026-09-13 13:15 UTC**. Con `legacy` vuelve el camino ESPN/football-data,
+que sigue en el código solo como respaldo; no crear código nuevo sobre él.
+
+- Filas nuevas: `external_id = apifootball:<fixture.id>`, escritas por
+  `lib/api-football/calendar.ts` vía `upsert_match_safe` (Regla #1). Filas viejas
+  con pronósticos o Casa conservan su uuid y llevan `apifootball:<id>` en
+  `source_external_ids`. Vivo y cierre emparejan por ese id + liga, nunca por nombre.
+- TBD, aplazados y rondas de relleno (≥75 % a la misma hora) quedan
+  `scheduled_at_confirmed=false` aunque falten menos de 10 días. Casa rechaza cierre
+  automático con partidos provisionales: cierre manual.
+- Temporada completa por liga (1 solicitud por liga); el cron `discover` refresca por
+  diff con presupuesto de 35 s; importación manual: `npx tsx scripts/af-import.ts`.
+- Corte y rollback: `docs/af-cutover-today.md`. Respaldo:
+  `matches_backup_20260913_af_cutover` y `backups/2026-09-13-13-07`.
+- Pendiente: quitar lecturas ESPN de plantel/noticias/proxy de escudos y el código
+  legacy; RPC atómica de cuota para el calendario.
+
 ### Precisión de horarios y torneos (2026-09-13, migración 103)
 
 `matches.scheduled_at_confirmed=false` significa fecha provisional, no medianoche
@@ -378,6 +400,7 @@ verificada byte a byte en el DGX (`~/apps/la-polla-backup/`).
   **aborta** — un backup truncado en silencio es peor que ninguno.
 - `backups/` está en `.gitignore`. Lleva teléfonos y comprobantes de pago y
   **este repo es público**: nunca se commitea.
+- (2026-09-13) SQL read-only, Storage cruzado con `storage.objects`, sha256 por archivo, `schema/live` real y `.partial` hasta terminar; tablas se restauran con `restore-backup-sql.ts` (psql + replica role, PostgREST choca con los triggers) y `restore-backup.ts` no escribe en remoto sin `ALLOW_REMOTE_TARGET=<ref>`. El restore SQL reemplaza las tablas que siembran las migraciones (`app_config`, `casa_operation_control`: si no, Casa vuelve a `legacy`) y aborta si una fila no queda idéntica; `ALLOW_NONEMPTY` es solo para ensayos. `verify-backup` rechaza un backup reducido (auth por admin API o Storage sin cruce) salvo `ALLOW_REDUCED_BACKUP=1`. Detalle en `docs/backup-restore.md`.
 
 Guía completa (incluye cómo reabrir en un proyecto nuevo):
 `docs/backup-restore.md`.
@@ -422,6 +445,18 @@ cuando el user diga sí/no explícito o se haya completado.
 ---
 
 ## Free-tier only (NON-NEGOTIABLE)
+
+> **Actualización 2026-09-13 — planes pagos APROBADOS para producción.**
+> El dueño aprobó y paga: **Vercel Pro** (team `santiago-prod`),
+> **Supabase Pro con compute Small** (el proyecto "La Polla App" se movió a
+> la org Pro "SantiagoDevRel's Org", ~15 USD/mes extra) y **API-Football
+> Pro**. Estos planes son decisión tomada: **no propongas volver a Free ni
+> cuestiones esos planes**, y donde las reglas de abajo digan "sin Vercel
+> Pro" o "sin Supabase Pro", manda esta actualización. El resto de la regla
+> sigue vigente: **nada de servicios pagos nuevos, upgrades adicionales ni
+> add-ons (p. ej. PITR) sin aprobación explícita**, y se sigue optimizando
+> costo en cada feature (las cuotas de la org Pro se comparten con otros
+> proyectos).
 
 La Polla es **gratis para todos los usuarios** y debe correr en planes
 gratuitos punta a punta. Antes de proponer cualquier cambio que
@@ -1283,6 +1318,23 @@ panel interno. La regla aplica a lo que LEE UN USUARIO.
 - `CRON_SECRET` — server-only, used by Vercel cron jobs and admin API dual-auth
 - `META_WA_APP_SECRET` — server-only, used for WhatsApp webhook signature verification
 
+### Crons de GitHub Actions: `/api/cron/*` (2026-09-13)
+- `lib/supabase/middleware.ts` exime el prefijo **`/api/cron/`** (con barra
+  final: `/api/cron` y `/api/cronologia` siguen con gate) del gate de sesión,
+  sin llamar `getUser()`. Antes respondía 307 a `/login` y los workflows
+  quedaban en verde sin que ningún cron corriera.
+- Por eso **todo `route.ts` bajo `app/api/cron/` debe empezar con
+  `const denied = requireCronSecret(request); if (denied) return denied;`**
+  (`lib/auth/cron-secret.ts`: `Authorization: Bearer`, SHA-256 +
+  `timingSafeEqual`, 500 sin `CRON_SECRET`, 403 si no coincide) ANTES de crear
+  el admin client. `tests/cron-auth.test.ts` lo exige para cada ruta.
+- Los workflows fallan ante status no 2xx (incluido un 3xx) o sin `"ok": true`,
+  y solo imprimen contadores (repo público). Sin `--retry`: correo y WhatsApp no
+  son idempotentes. `cleanup-payout-proofs` queda solo manual (con `BORRAR`)
+  hasta que el dueño apruebe borrar los comprobantes históricos.
+- Los endpoints que llama pg_cron (`/api/matches/sync-live`, `discover`, ...)
+  usan `x-cron-secret` y 401: tienen su propio chequeo, no son `/api/cron/`.
+
 ### WhatsApp Webhook Security
 - POST handler verifies `X-Hub-Signature-256` using HMAC-SHA256 with META_WA_APP_SECRET
 - Raw body is read as text before parsing to preserve bytes for signature verification
@@ -1859,3 +1911,17 @@ Migraciones 097–102; activación explícita `legacy → paused → v2`. No act
 revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
 [docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
 de 096 arriba no es el contrato de liquidación una vez activado v2.
+
+### Comprobantes: compresión determinista en el navegador (2026-09-13)
+
+Preparar UNA vez al elegir (`prepareImageUpload`) y reutilizar ese mismo Blob en
+begin, reintento y reemplazo; el hash es el de lo que se sube. No cambiar la ruta
+de decodificación (`<img>` y luego `createImageBitmap`), el canvas en CPU
+(`willReadFrequently`) ni los parámetros (300 KB, 1600/720 px, 4 MP, JPEG
+0,82/0,72) sin repetir la prueba de determinismo de
+`scripts/casa-proof-compression-browser-check.mjs`: sessionStorage, la
+recuperación entre pestañas/dispositivos y la carga tras el cierre comparan hashes.
+El original válido siempre va como segundo candidato y `submitProof` prueba el
+siguiente ante UPLOAD_IN_PROGRESS/REQUEST_CONFLICT. Nunca marcar como fallado un
+intento guardado con la inscripción cerrada. Servidor, SQL y bucket sin cambios.
+Detalle en README → «Comprobantes comprimidos en el navegador».

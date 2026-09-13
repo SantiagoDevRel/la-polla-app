@@ -49,6 +49,16 @@ const PUBLIC_NO_AUTH_EXACT = new Set([
   "/twitter-image",
 ]);
 
+// Endpoints máquina-a-máquina que se autentican solos y NUNCA tienen sesión
+// de browser. Hasta 2026-09-13 /api/cron/* no estaba acá: quien llama es
+// GitHub Actions, el gate respondía 307 a /login y el workflow quedaba en
+// verde con el HTML de login como body — ningún cron corría de verdad.
+// Cada handler exige `requireCronSecret(request)` (lib/auth/cron-secret.ts)
+// antes de tocar la DB; tests/cron-auth.test.ts lo verifica por ruta.
+// La barra final es a propósito: `/api/cron` y `/api/cronologia` siguen
+// detrás del gate de sesión.
+const SELF_AUTH_MACHINE_PREFIXES = ["/api/cron/"];
+
 // Todo redirect emitido DESPUÉS de getUser() debe llevarse las cookies
 // que el client de Supabase haya encolado en supabaseResponse: getUser()
 // puede haber rotado el refresh token, y un redirect "pelado" descarta el
@@ -72,7 +82,8 @@ export async function updateSession(request: NextRequest) {
   if (
     PUBLIC_NO_AUTH_EXACT.has(path) ||
     path.startsWith("/.well-known/") ||
-    PUBLIC_NO_AUTH_PREFIXES.some((p) => path.startsWith(p))
+    PUBLIC_NO_AUTH_PREFIXES.some((p) => path.startsWith(p)) ||
+    SELF_AUTH_MACHINE_PREFIXES.some((p) => path.startsWith(p))
   ) {
     return NextResponse.next({ request });
   }

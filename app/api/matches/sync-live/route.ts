@@ -21,6 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { syncEspnLive } from "@/lib/espn/sync";
 import { verifyPendingFinals } from "@/lib/matches/verify-final";
 import { syncApiFootballLive } from "@/lib/api-football/live";
+import { getDataProviderMode } from "@/lib/matches/provider-mode";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -72,12 +73,18 @@ async function runSync() {
   // el gate ya está cerrado en el tick siguiente y el scoring quedaba
   // congelado hasta la próxima ventana (la FINAL del Mundial: para
   // siempre). El path sin candidatos cuesta 1 query con inner join — barato.
-  const apiFootball = inWindow ? await syncApiFootballLive() : new Set<string>();
-  const espn = inWindow ? await syncEspnLive(apiFootball) : null;
-  const verifications = await verifyPendingFinals();
+  //
+  // 'af' (2026-09-13): API-Football es la única fuente de vivo y resultados.
+  // No hay respaldo de ESPN ni de football-data: si API-Football no responde,
+  // la fila espera al siguiente tick en vez de recibir otro proveedor.
+  const mode = await getDataProviderMode();
+  const apiFootball = inWindow ? await syncApiFootballLive(mode) : new Set<string>();
+  const espn = inWindow && mode === "legacy" ? await syncEspnLive(apiFootball) : null;
+  const verifications = await verifyPendingFinals(mode);
 
   return {
     ok: true,
+    mode,
     skipped: !inWindow,
     reason: inWindow ? undefined : "no_active_window",
     espn,

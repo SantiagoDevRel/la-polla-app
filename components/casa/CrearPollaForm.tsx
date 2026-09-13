@@ -19,9 +19,57 @@ import { LOCK_MINUTES } from "@/lib/casa/types";
 import { CREATABLE_TOURNAMENTS, getTournamentLogo, getTournamentLogoClassName } from "@/lib/tournaments";
 import { TeamCrest } from "@/components/match/TeamCrest";
 import { ColombiaDateTimeField } from "@/components/casa/ColombiaDateTimeField";
-import { colombiaDateTimeToIso, nextColombiaSaturdayInput, toColombiaDateTimeInput } from "@/lib/time/colombia";
+import {
+  colombiaDateKey,
+  colombiaDateTimeToIso,
+  formatColombiaDateTime,
+  nextColombiaSaturdayInput,
+  toColombiaDateTimeInput,
+} from "@/lib/time/colombia";
+import { ImagePreparationError, PRIZE_IMAGE_PREPARE_OPTIONS, prepareImageUpload } from "@/lib/casa/prepare-proof";
 
 type Kind = "partidos" | "manual" | "rifa";
+
+/** Ventana del calendario de selección. "todo" = temporada restante. */
+type Ventana = "10" | "30" | "todo";
+
+const VENTANAS: { v: Ventana; t: string }[] = [
+  { v: "10", t: "Próximos 10 días" },
+  { v: "30", t: "30 días" },
+  { v: "todo", t: "Toda la temporada" },
+];
+
+function matchesUrl(tournament: string, ventana: Ventana): string {
+  const query = new URLSearchParams({ tournament });
+  if (ventana === "todo") query.set("todo", "1");
+  else query.set("dias", ventana);
+  return `/api/casa/admin/matches?${query}`;
+}
+
+/**
+ * Día del encabezado. Un partido con hora confirmada se agrupa por su día en
+ * Colombia; uno con hora por confirmar guarda solo la fecha (medianoche UTC,
+ * migración 103), así que se lee en UTC para no correrlo al día anterior.
+ */
+function matchDayKey(match: { scheduled_at: string; scheduled_at_confirmed?: boolean }): string {
+  return match.scheduled_at_confirmed === false
+    ? new Date(match.scheduled_at).toISOString().slice(0, 10)
+    : colombiaDateKey(match.scheduled_at);
+}
+
+function dayHeading(key: string): string {
+  // Mediodía de Colombia: el mismo día calendario sin importar la zona.
+  const label = formatColombiaDateTime(`${key}T12:00:00-05:00`, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function kickoffHour(iso: string): string {
+  return formatColombiaDateTime(iso, { hour: "numeric", minute: "2-digit", hour12: true });
+}
 
 interface MatchOption {
   id: string;
@@ -104,8 +152,31 @@ export function CrearPollaForm() {
   const [cargando, setCargando] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
-  const [ventanaDias, setVentanaDias] = useState(10);
+  const [ventana, setVentana] = useState<Ventana>("10");
+  const [ventanaDias, setVentanaDias] = useState<number | null>(10);
+  const [truncado, setTruncado] = useState(false);
   const [proximoPartido, setProximoPartido] = useState<{ scheduled_at: string; scheduled_at_confirmed: boolean } | null>(null);
+
+  // Encabezados por día. Dentro de cada día van primero los de hora
+  // confirmada, en orden, y al final los de hora por confirmar.
+  const matchesPorDia = useMemo(() => {
+    const groups = new Map<string, MatchOption[]>();
+    for (const match of matches) {
+      const key = matchDayKey(match);
+      const list = groups.get(key);
+      if (list) list.push(match);
+      else groups.set(key, [match]);
+    }
+    return [...groups.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, list]) => ({
+        key,
+        list: [...list].sort((a, b) =>
+          Number(a.scheduled_at_confirmed === false) - Number(b.scheduled_at_confirmed === false) ||
+          Date.parse(a.scheduled_at) - Date.parse(b.scheduled_at)),
+      }));
+  }, [matches]);
+  const provisionalesElegidos = seleccion.filter((m) => m.scheduled_at_confirmed === false).length;
 
   // ── Cierre vs primer pitazo ──────────────────────────────────────────
   // (2026-09-02) El default era "el proximo sabado a las 12:00", fijo. Para
@@ -185,7 +256,8 @@ export function CrearPollaForm() {
     setSyncMsg(null);
     setProximoPartido(null);
     setSincronizando(false);
-    fetch(`/api/casa/admin/matches?tournament=${tournament}`, { signal: controller.signal })
+    setTruncado(false);
+    fetch(matchesUrl(tournament, ventana), { signal: controller.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error("No se pudieron cargar los partidos.");
         return r.json();
@@ -194,7 +266,8 @@ export function CrearPollaForm() {
         if (controller.signal.aborted) return;
         const loaded: MatchOption[] = j.matches ?? [];
         setMatches(loaded);
-        setVentanaDias(j.dias ?? 10);
+        setVentanaDias(j.todo ? null : (j.dias ?? 10));
+        setTruncado(j.truncated === true);
         setProximoPartido(j.nextMatch ?? null);
         if (j.scheduleRefreshed === false) setSyncMsg("No pudimos actualizar los horarios. Se muestran los últimos datos guardados.");
         // Refresca horarios de los elegidos sin perder los de otras ligas.
@@ -211,14 +284,14 @@ export function CrearPollaForm() {
       controller.abort();
       syncController.current?.abort();
     };
-  }, [kind, tournament, matchesRevision]);
+  }, [kind, tournament, ventana, matchesRevision]);
 
   /**
-   * Trae el calendario de ESPN para el torneo elegido y vuelve a pedir los
-   * partidos. Es admin-only del lado del server; el boton solo existe cuando
-   * la lista vino vacia.
+   * Pide al server que actualice el calendario del torneo elegido y vuelve a
+   * pedir los partidos de la ventana visible. Es admin-only del lado del
+   * server; el boton solo existe cuando la lista vino vacia.
    */
-  async function traerDeEspn() {
+  async function actualizarCalendario() {
     const controller = new AbortController();
     syncController.current?.abort();
     syncController.current = controller;
@@ -237,13 +310,14 @@ export function CrearPollaForm() {
         setSyncMsg(json.error ?? "No se pudo traer el calendario.");
         return;
       }
-      const r = await fetch(`/api/casa/admin/matches?tournament=${tournament}`, { signal: controller.signal });
+      const r = await fetch(matchesUrl(tournament, ventana), { signal: controller.signal });
       if (!r.ok) throw new Error("No se pudieron cargar los partidos.");
       const j = await r.json().catch(() => ({}));
       if (controller.signal.aborted) return;
       const traidos = j.matches ?? [];
       setMatches(traidos);
-      setVentanaDias(j.dias ?? 10);
+      setVentanaDias(j.todo ? null : (j.dias ?? 10));
+      setTruncado(j.truncated === true);
       setProximoPartido(j.nextMatch ?? null);
       setSyncMsg(
         traidos.length > 0
@@ -264,8 +338,11 @@ export function CrearPollaForm() {
     setSubiendoFoto(true);
     setError(null);
     try {
+      // La función de Vercel corta el cuerpo en 4,5 MB: se reduce aquí a menos
+      // de 1 MB (el servidor sigue validando tipo y tamaño).
+      const preparada = (await prepareImageUpload(file, PRIZE_IMAGE_PREPARE_OPTIONS)).candidates[0];
       const fd = new FormData();
-      fd.append("image", file);
+      fd.append("image", preparada.blob, preparada.prepared ? "premio.jpg" : file.name);
       const res = await fetch("/api/casa/admin/prize-image", {
         method: "POST",
         body: fd,
@@ -277,8 +354,8 @@ export function CrearPollaForm() {
       }
       setPrizeImagePath(json.path);
       setPrizeImageUrl(json.url);
-    } catch {
-      setError("Se cayó la conexión al subir la imagen.");
+    } catch (cause) {
+      setError(cause instanceof ImagePreparationError ? cause.message : "Se cayó la conexión al subir la imagen.");
     } finally {
       setSubiendoFoto(false);
     }
@@ -664,10 +741,15 @@ export function CrearPollaForm() {
           </div>
 
           {closeMode === "auto" ? (
+            // Con partidos de hora por confirmar no hay pitazo del cual restar
+            // 5 minutos: no se muestra una hora inventada. El aviso accionable
+            // vive una sola vez, junto a la lista donde se eligen los partidos.
             <p className="mt-2 text-[12px] leading-relaxed text-text-secondary">
               Cierra 5 minutos antes de que arranque el primer partido que
               elijas
-              {primerKickoff !== null ? (
+              {provisionalesElegidos > 0 ? (
+                "."
+              ) : primerKickoff !== null ? (
                 <>
                   {" "}
                   &mdash;{" "}
@@ -818,6 +900,38 @@ export function CrearPollaForm() {
               meta={`${seleccion.length}/30 elegidos`}
               className="[&>div]:flex-wrap"
             />
+            {/* Ventana del calendario. Cambiarla no toca la selección: los
+                partidos elegidos viven aparte de la lista visible. En
+                teléfono van 2 + "Toda la temporada" a lo ancho (decisión,
+                no huérfano); desde sm, una fila de 3. */}
+            <div role="group" aria-label="Rango de fechas" className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {VENTANAS.map((option) => (
+                <button
+                  key={option.v}
+                  type="button"
+                  aria-pressed={ventana === option.v}
+                  onClick={() => setVentana(option.v)}
+                  className={`lp-btn min-w-0 px-3 text-center text-[15px] ${
+                    option.v === "todo" ? "col-span-2 sm:col-span-1" : ""
+                  } ${
+                    ventana === option.v ? "lp-btn-primary" : "lp-btn-ghost bg-bg-elevated"
+                  }`}
+                >
+                  {option.t}
+                </button>
+              ))}
+            </div>
+            {/* Único aviso de hora por confirmar: el cierre está arriba y el
+                admin elige partidos acá abajo. Con cierre manual no hay
+                conflicto. Mismo criterio que rechaza el server. */}
+            {closeMode === "auto" && provisionalesElegidos > 0 && (
+              <p role="status" className="mb-3 text-[13px] leading-relaxed text-amber">
+                {provisionalesElegidos === 1
+                  ? "Elegiste 1 partido con hora por confirmar."
+                  : `Elegiste ${provisionalesElegidos} partidos con hora por confirmar.`}{" "}
+                El cierre automático necesita horas confirmadas: elige cierre manual o quítalos.
+              </p>
+            )}
             {seleccion.length > 0 && (
               <details className="mb-3 rounded-lg border border-border-subtle bg-bg-card/80 transition-colors hover:border-border-strong">
                 <summary className="cursor-pointer rounded-lg p-3 text-[13px] text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
@@ -867,7 +981,9 @@ export function CrearPollaForm() {
               // próximo partido y el botón no aparece: no hay nada que traer.
               <StreetCard className="p-5 text-center">
                 <p className="text-[13px] text-text-secondary">
-                  No hay partidos de este torneo en los próximos {ventanaDias} días.
+                  {ventanaDias === null
+                    ? "No hay partidos próximos guardados de este torneo."
+                    : `No hay partidos de este torneo en los próximos ${ventanaDias} días.`}
                 </p>
                 {proximoPartido ? (
                   <p className="mt-2 text-[13px] text-text-primary">
@@ -877,11 +993,11 @@ export function CrearPollaForm() {
                 ) : (
                   <button
                     type="button"
-                    onClick={traerDeEspn}
+                    onClick={actualizarCalendario}
                     disabled={sincronizando}
-                    className="lp-btn lp-btn-ghost mt-3 h-10 min-h-0 w-full text-[14px]"
+                    className="lp-btn lp-btn-ghost mt-3 w-full text-[15px]"
                   >
-                    {sincronizando ? "Trayendo el calendario..." : "Traer el calendario"}
+                    {sincronizando ? "Actualizando el calendario..." : "Actualizar calendario"}
                   </button>
                 )}
                 {syncMsg && (
@@ -889,47 +1005,70 @@ export function CrearPollaForm() {
                 )}
               </StreetCard>
             ) : (
-              <ul className="max-h-[420px] space-y-px overflow-y-auto">
-                {matches.map((m) => {
-                  const on = selectedIds.has(m.id);
-                  return (
-                    <li key={m.id}>
-                      <button
-                        type="button"
-                        onClick={() => toggleMatch(m)}
-                        disabled={!on && seleccion.length >= 30}
-                        aria-label={`${m.home_team} vs ${m.away_team}`}
-                        aria-pressed={on}
-                        className={`flex w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-50 ${
-                          on ? "bg-gold/10" : "bg-bg-card"
-                        }`}
-                      >
-                        <span
-                          className={`h-4 w-4 shrink-0 border-2 ${
-                            on ? "border-gold bg-gold" : "border-border-strong"
-                          }`}
-                          aria-hidden
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="grid grid-cols-2 gap-3 text-[13px] text-text-primary">
-                            <span className="min-w-0">
-                              <TeamCrest team={m.home_team} src={m.home_team_flag} />
-                              <span className="mt-1 block [overflow-wrap:anywhere]">{m.home_team}</span>
-                            </span>
-                            <span className="min-w-0 text-right">
-                              <TeamCrest team={m.away_team} src={m.away_team_flag} />
-                              <span className="mt-1 block [overflow-wrap:anywhere]">{m.away_team}</span>
-                            </span>
-                          </span>
-                          <span className="lp-label mt-0.5 block">
-                            {formatMatchTime(m.scheduled_at, m.scheduled_at_confirmed)}
-                          </span>
+              <>
+                <ul className="max-h-[min(65dvh,560px)] overflow-y-auto overscroll-contain" aria-label="Partidos disponibles">
+                  {matchesPorDia.map((day) => (
+                    <li key={day.key}>
+                      {/* Encabezado fijo mientras se recorre el día: con la
+                          temporada completa son cientos de filas. */}
+                      <h3 className="sticky top-0 z-10 flex flex-wrap items-baseline justify-between gap-x-3 border-b border-border-subtle bg-bg-base/95 px-3 py-2 backdrop-blur">
+                        <span className="text-[13px] font-semibold text-text-primary">{dayHeading(day.key)}</span>
+                        <span className="text-[13px] text-text-muted">
+                          {day.list.length} {day.list.length === 1 ? "partido" : "partidos"}
                         </span>
-                      </button>
+                      </h3>
+                      <ul className="space-y-px">
+                        {day.list.map((m) => {
+                          const on = selectedIds.has(m.id);
+                          const provisional = m.scheduled_at_confirmed === false;
+                          const hora = provisional ? "hora por confirmar" : kickoffHour(m.scheduled_at);
+                          return (
+                            <li key={m.id}>
+                              <button
+                                type="button"
+                                onClick={() => toggleMatch(m)}
+                                disabled={!on && seleccion.length >= 30}
+                                aria-label={`${m.home_team} vs ${m.away_team}, ${hora}`}
+                                aria-pressed={on}
+                                className={`flex min-h-[44px] w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-50 ${
+                                  on ? "bg-gold/10" : "bg-bg-card"
+                                }`}
+                              >
+                                <span
+                                  className={`h-4 w-4 shrink-0 border-2 ${
+                                    on ? "border-gold bg-gold" : "border-border-strong"
+                                  }`}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0 flex-1">
+                                  <span className="grid grid-cols-2 gap-3 text-[13px] text-text-primary">
+                                    <span className="min-w-0">
+                                      <TeamCrest team={m.home_team} src={m.home_team_flag} />
+                                      <span className="mt-1 block [overflow-wrap:anywhere]">{m.home_team}</span>
+                                    </span>
+                                    <span className="min-w-0 text-right">
+                                      <TeamCrest team={m.away_team} src={m.away_team_flag} />
+                                      <span className="mt-1 block [overflow-wrap:anywhere]">{m.away_team}</span>
+                                    </span>
+                                  </span>
+                                  {provisional ? (
+                                    <span className="mt-1 block text-[13px] font-semibold text-amber">Hora por confirmar</span>
+                                  ) : (
+                                    <span className="mt-1 block text-[13px] tabular-nums text-text-secondary">{hora}</span>
+                                  )}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     </li>
-                  );
-                })}
-              </ul>
+                  ))}
+                </ul>
+                {truncado && (
+                  <p className="mt-2 text-[13px] text-text-muted">Se muestran los primeros 1.000 partidos por fecha.</p>
+                )}
+              </>
             )}
           </div>
         </>

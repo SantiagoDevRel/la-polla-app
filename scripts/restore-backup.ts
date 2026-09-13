@@ -10,12 +10,24 @@
 // 🚨 ANTES DE CORRERLO EN SERIO 🚨
 // 1. Apuntá NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY al proyecto
 //    DESTINO. Este script escribe donde apunte el .env — leelo dos veces.
-// 2. El destino tiene que tener el ESQUEMA ya aplicado (las migraciones de
+// 2. Solo escribe en un Supabase LOCAL (localhost / 127.0.0.1). Para un host
+//    remoto hay que nombrarlo exacto: ALLOW_REMOTE_TARGET=<ref>. Un .env que
+//    apunta a prod no alcanza para pisar datos reales.
+// 3. El destino tiene que tener el ESQUEMA ya aplicado (las migraciones de
 //    `schema/migrations/` del backup, en orden).
-// 3. Las cuentas van PRIMERO y por SQL: pegá `auth/restore-auth.sql` en el
-//    SQL editor. Todo lo demás cuelga de esos uuids.
-// 4. Por default NO escribe (DRY RUN) y se niega a tocar tablas que ya
+// 4. Las cuentas van PRIMERO y por SQL. Lo recomendado es
+//    `scripts/restore-backup-sql.ts`, que las trae junto con las tablas en
+//    una sola transacción. Si ya corriste `auth/restore-auth.sql`, genera
+//    ese SQL con SKIP_AUTH=1 (si no, su guarda aborta por auth.users).
+// 5. Por default NO escribe (DRY RUN) y se niega a tocar tablas que ya
 //    tengan filas. Eso es a propósito.
+//
+// ⚠️ Con el esquema actual, las TABLAS por esta vía fallan: el trigger de
+// lock de pronósticos (trigger_lock_predictions) y el guard de Casa v2
+// (casa_v2_write_guard) rechazan pronósticos históricos y filas de Casa
+// insertadas por PostgREST. Para las tablas usá `scripts/restore-backup-sql.ts`
+// (psql con session_replication_role = replica) y dejá este script para
+// Storage: STORAGE_ONLY=1.
 //
 // 🚨 REGLA DEL REPO — `predictions` 🚨
 // Los pronósticos son datos sagrados: nadie los modifica sin orden explícita
@@ -28,10 +40,13 @@
 //   TABLES=a,b,c        restaurar solo esas tablas
 //   ALLOW_NONEMPTY=1    seguir aunque el destino ya tenga filas
 //   SKIP_STORAGE=1      no re-subir los archivos de storage
+//   STORAGE_ONLY=1      solo Storage (las tablas van por restore-backup-sql.ts)
+//   ALLOW_REMOTE_TARGET=<ref exacto>  permitir escribir en un host no local
 import "dotenv/config";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { promises as fs } from "fs";
 import path from "path";
+import { checkRestoreTarget, isPartialBackupDir, pickNewestBackup } from "./backup/core";
 
 type Manifest = {
   generatedAt: string;
@@ -48,6 +63,7 @@ const DRY_RUN = process.env.CONFIRM !== "RESTAURAR";
 const ONLY = process.env.TABLES?.split(",").map((s) => s.trim()).filter(Boolean);
 const ALLOW_NONEMPTY = process.env.ALLOW_NONEMPTY === "1";
 const SKIP_STORAGE = process.env.SKIP_STORAGE === "1";
+const STORAGE_ONLY = process.env.STORAGE_ONLY === "1";
 const CHUNK = 500;
 
 async function newestBackup(): Promise<string> {
@@ -55,9 +71,9 @@ async function newestBackup(): Promise<string> {
     ? path.resolve(process.env.BACKUP_DIR)
     : path.join(REPO_ROOT, "backups");
   const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
-  const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
-  if (dirs.length === 0) throw new Error(`No hay backups en ${root}.`);
-  return path.join(root, dirs[dirs.length - 1]);
+  const newest = pickNewestBackup(entries.filter((e) => e.isDirectory()).map((e) => e.name));
+  if (!newest) throw new Error(`No hay backups terminados en ${root}.`);
+  return path.join(root, newest);
 }
 
 async function retry<T>(label: string, fn: () => Promise<T>, tries = 4): Promise<T> {
@@ -104,32 +120,49 @@ async function restoreStorage(sb: SupabaseClient, dir: string): Promise<number> 
 
 async function main() {
   const dir = process.argv[2] ? path.resolve(process.argv[2]) : await newestBackup();
+  if (isPartialBackupDir(path.basename(dir))) {
+    throw new Error(`${path.basename(dir)} es un export que no terminó (.partial): no se restaura.`);
+  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Faltan NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.");
 
   const manifest = JSON.parse(await fs.readFile(path.join(dir, "_manifest.json"), "utf8")) as Manifest;
-  const targetRef = new URL(url).hostname.split(".")[0];
+  const target = checkRestoreTarget(url, process.env.ALLOW_REMOTE_TARGET);
+  const targetRef = target.identity;
 
   console.log(`\n=== Restore de La Polla ===`);
   console.log(`Backup  : ${dir}`);
   console.log(`Tomado  : ${manifest.generatedAt} (proyecto ${manifest.projectRef})`);
-  console.log(`DESTINO : ${targetRef}  ← acá se escribe`);
-  console.log(`Modo    : ${DRY_RUN ? "DRY RUN (no escribe nada)" : "🔴 ESCRITURA REAL"}\n`);
+  console.log(`DESTINO : ${targetRef}${target.ok && target.local ? " (local)" : ""}  ← acá se escribe`);
+  console.log(`Modo    : ${DRY_RUN ? "DRY RUN (no escribe nada)" : "🔴 ESCRITURA REAL"}${STORAGE_ONLY ? " · solo Storage" : ""}\n`);
+
+  // Guard de host: se evalúa ANTES de crear el cliente. En dry-run solo
+  // avisa (no escribe nada); en escritura real aborta.
+  if (!target.ok) {
+    if (DRY_RUN) {
+      console.log(`! ${target.reason}\n  En escritura real esto abortaría.\n`);
+    } else {
+      console.error(`${target.reason}\nRESTORE ABORTADO: no se escribió nada.\n`);
+      process.exit(1);
+    }
+  }
 
   if (manifest.projectRef === targetRef && !DRY_RUN) {
     console.log(`! Ojo: estás restaurando SOBRE el mismo proyecto del que salió el backup.\n`);
   }
-  if (manifest.auth.mode !== "skipped") {
+  if (manifest.auth.mode !== "skipped" && !STORAGE_ONLY) {
     console.log(
-      `Recordatorio: las ${manifest.auth.users} cuentas van primero, a mano:\n` +
-        `  psql/SQL editor  ←  ${path.join(dir, "auth", "restore-auth.sql")}\n`,
+      `Recordatorio: las ${manifest.auth.users} cuentas van primero. Lo recomendado, cuentas + tablas juntas:\n` +
+        `  npx tsx scripts/restore-backup-sql.ts ${dir}\n` +
+        `o solo cuentas con auth/restore-auth.sql y después restore-backup-sql.ts con SKIP_AUTH=1.\n`,
     );
   }
 
   const sb = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 
-  const order = manifest.restoreOrder.filter((t) => (ONLY ? ONLY.includes(t) : true));
+  if (STORAGE_ONLY && SKIP_STORAGE) throw new Error("STORAGE_ONLY=1 y SKIP_STORAGE=1 juntos no restauran nada.");
+  const order = STORAGE_ONLY ? [] : manifest.restoreOrder.filter((t) => (ONLY ? ONLY.includes(t) : true));
   const pks = manifest.primaryKeys ?? {};
 
   // Guarda: un destino con datos casi siempre significa que apuntaste al

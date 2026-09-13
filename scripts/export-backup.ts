@@ -1,7 +1,7 @@
 // scripts/export-backup.ts — Backup COMPLETO y offline de La Polla.
 //
 // Nació del cierre de temporada post-Mundial 2026 (2026-07-26): si algún
-// día se reabre la app, o si Supabase pausa/pierde el proyecto free-tier,
+// día se reabre la app, o si Supabase pausa/pierde el proyecto,
 // esto es lo único que garantiza que los puntos, los pronósticos y la
 // gente sigan existiendo. Es SOLO-LECTURA: no escribe ni una fila en la DB.
 //
@@ -10,19 +10,29 @@
 // Env (de .env, igual que el resto de scripts/):
 //   NEXT_PUBLIC_SUPABASE_URL     · requerido
 //   SUPABASE_SERVICE_ROLE_KEY    · requerido (lee todo, bypass RLS)
-//   SUPABASE_30_DAYS             · opcional — PAT de la Management API.
-//                                  Con él el backup sube de nivel: dump
-//                                  COMPLETO de auth.users/auth.identities
-//                                  (todas las columnas, no solo las que
-//                                  expone la admin API) + SQL de restore
-//                                  listo + orden de restore derivado del
-//                                  grafo real de FKs. Sin él el backup
-//                                  sigue siendo válido, con auth reducido.
+//   Token de la Management API   · opcional pero muy recomendado. Se usa el
+//                                  primero que exista, en este orden:
+//                                    SUPABASE_BACKUP_PAT   (token propio del backup)
+//                                    SUPABASE_ACCESS_TOKEN (token del proyecto)
+//                                    SUPABASE_30_DAYS      (PAT histórico)
+//                                  Basta el permiso database_read: todas las
+//                                  consultas SQL van por el endpoint
+//                                  /database/query/read-only (rol
+//                                  supabase_read_only_user). Con token el
+//                                  backup trae: auth completo + SQL de restore
+//                                  de cuentas, cruce de Storage contra
+//                                  storage.objects, esquema vivo de prod
+//                                  (schema/live) y orden de restore del grafo
+//                                  real de FKs.
 // Flags:
 //   BACKUP_DIR=<path>  destino (default: ./backups)
-//   SKIP_STORAGE=1     no baja los comprobantes de pago (Storage)
+//   SKIP_STORAGE=1     no baja los archivos de Storage
 //   SKIP_PII=1         no exporta auth (teléfonos/emails). Ojo: sin auth
 //                      no se puede reabrir con las MISMAS cuentas.
+//   ALLOW_REDUCED_BACKUP=1  con token, si el dump completo de auth falla,
+//                      cae a la admin API en vez de abortar. Ese backup no
+//                      recrea cuentas y verify-backup lo rechaza salvo el
+//                      mismo flag.
 //
 // ─── Notas de diseño ───
 // · `select("*")`: la regla del repo prohíbe el `*` en código de APP (para
@@ -32,24 +42,46 @@
 //   (verificado 2026-07-26 contra prod). Todo se pagina y después se
 //   VERIFICA contra el count exacto: si no cuadra, el script falla. Un
 //   backup silenciosamente truncado es peor que no tener backup.
+// · Storage también pagina (offset de a 1000, recursivo) y se cruza contra
+//   storage.objects por bucket: conteo y nombres. Si no cuadra, aborta.
+// · Se escribe en `<stamp>.partial/` y se renombra a `<stamp>/` SOLO al final.
+//   Una carpeta sin `.partial` es un backup que terminó; verify-backup ignora
+//   las `.partial`.
+// · El manifiesto guarda sha256 + bytes de cada archivo de auth, Storage y
+//   esquema, además de filas + sha256 por tabla.
 // · Las tablas se auto-descubren del OpenAPI de PostgREST, así que una
 //   tabla nueva entra al backup sola, sin tocar este archivo.
 // · Todo salida va a `backups/` (gitignored). El repo es PÚBLICO: este
-//   dump lleva teléfonos, NUNCA se commitea.
+//   dump lleva teléfonos, NUNCA se commitea. Los logs no imprimen tokens,
+//   teléfonos ni rutas de objetos.
 import "dotenv/config";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
+import {
+  backupStamp,
+  buildRestoreSql,
+  compareStorageCounts,
+  compareStorageNames,
+  fileEntry,
+  FileManifest,
+  listAllStorageObjects,
+  partialDirName,
+  PolicyRow,
+  projectRefFromUrl,
+  renderPolicySql,
+  resolveManagementToken,
+} from "./backup/core";
 
 // ─── Config ───
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const MGMT_PAT = process.env.SUPABASE_30_DAYS;
+const MGMT = resolveManagementToken(process.env);
 const SKIP_STORAGE = process.env.SKIP_STORAGE === "1";
 const SKIP_PII = process.env.SKIP_PII === "1";
-const PAGE = 1000; // cap duro de PostgREST
+const ALLOW_REDUCED = process.env.ALLOW_REDUCED_BACKUP === "1";
+const PAGE = 1000; // cap duro de PostgREST y de storage.list
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 const BACKUP_ROOT = process.env.BACKUP_DIR
@@ -57,7 +89,7 @@ const BACKUP_ROOT = process.env.BACKUP_DIR
   : path.join(REPO_ROOT, "backups");
 
 /** Orden de restore por defecto, derivado del grafo de FKs de prod al
- *  2026-07-26. Solo se usa si NO hay PAT para recalcularlo en vivo.
+ *  2026-07-26. Solo se usa si NO hay token para recalcularlo en vivo.
  *  Las tablas que no figuren acá se agregan al final (no tenían FKs). */
 const FALLBACK_RESTORE_ORDER = [
   "users",
@@ -87,6 +119,9 @@ function log(msg: string) {
   console.log(msg);
 }
 
+/** Error que no vale la pena reintentar (401/403/400: no se arregla solo). */
+class PermanentError extends Error {}
+
 /** Reintento con backoff. La red hacia Supabase falla de a ratos
  *  (UND_ERR_CONNECT_TIMEOUT visto durante el desarrollo de este script);
  *  un backup no puede morirse por un timeout suelto. */
@@ -97,6 +132,7 @@ async function retry<T>(label: string, fn: () => Promise<T>, tries = 4): Promise
       return await fn();
     } catch (err) {
       lastErr = err;
+      if (err instanceof PermanentError) break;
       const wait = 1500 * (i + 1);
       if (i < tries - 1) {
         log(`   … ${label} falló (${(err as Error).message}). Reintento en ${wait}ms`);
@@ -104,40 +140,55 @@ async function retry<T>(label: string, fn: () => Promise<T>, tries = 4): Promise
       }
     }
   }
-  throw new Error(`${label}: agotados los reintentos — ${(lastErr as Error)?.message}`);
+  throw new Error(`${label}: ${(lastErr as Error)?.message}`);
 }
 
-/** Query SQL cruda por la Management API. Solo disponible con PAT.
- *  No tiene el cap de 1000 filas de PostgREST. */
-async function mgmtQuery<T = Record<string, unknown>>(sql: string): Promise<T[]> {
-  if (!MGMT_PAT) throw new Error("sin SUPABASE_30_DAYS");
-  const ref = new URL(SUPABASE_URL!).hostname.split(".")[0];
-  return retry(`mgmt query`, async () => {
-    const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+/** Query SQL de solo lectura por la Management API (rol
+ *  supabase_read_only_user). No tiene el cap de 1000 filas de PostgREST.
+ *  Toda referencia debe ir calificada con esquema. */
+async function mgmtQuery<T = Record<string, unknown>>(label: string, sql: string): Promise<T[]> {
+  if (!MGMT) throw new Error("sin token de la Management API");
+  const ref = projectRefFromUrl(SUPABASE_URL!);
+  return retry(`sql ${label}`, async () => {
+    const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query/read-only`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${MGMT_PAT}`,
+        Authorization: `Bearer ${MGMT.token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ query: sql }),
     });
     const text = await res.text();
-    if (!res.ok) throw new Error(`${res.status} ${text.slice(0, 300)}`);
-    return JSON.parse(text) as T[];
+    if (!res.ok) {
+      const msg = `${res.status} ${text.slice(0, 300)}`;
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) throw new PermanentError(msg);
+      throw new Error(msg);
+    }
+    const parsed = JSON.parse(text) as unknown;
+    if (!Array.isArray(parsed)) throw new Error(`respuesta inesperada (no es un arreglo de filas)`);
+    return parsed as T[];
   });
 }
 
-function sha256(buf: Buffer | string): string {
-  return createHash("sha256").update(buf).digest("hex");
+/** Escribe un archivo dentro del backup y lo registra en el manifiesto. */
+async function writeTracked(
+  root: string,
+  files: FileManifest,
+  relPath: string,
+  data: Buffer | string,
+): Promise<{ bytes: number; sha256: string }> {
+  const dest = path.join(root, ...relPath.split("/"));
+  await fs.mkdir(path.dirname(dest), { recursive: true });
+  await fs.writeFile(dest, data);
+  const entry = fileEntry(data);
+  files[relPath] = entry;
+  return entry;
 }
 
-async function writeJson(file: string, data: unknown): Promise<{ bytes: number; sha256: string }> {
+function jsonBody(data: unknown): string {
   // indent 1: legible con un editor/grep dentro de 5 años sin inflar el
   // archivo como indent 2 en tablas de 15k filas.
-  const body = JSON.stringify(data, null, 1);
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, body, "utf8");
-  return { bytes: Buffer.byteLength(body), sha256: sha256(body) };
+  return JSON.stringify(data, null, 1);
 }
 
 // ─── Descubrimiento de tablas (OpenAPI de PostgREST) ───
@@ -153,7 +204,7 @@ async function discoverTables(): Promise<TableMeta[]> {
         Accept: "application/openapi+json",
       },
     });
-    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
     return (await res.json()) as {
       definitions?: Record<string, { properties?: Record<string, unknown> }>;
     };
@@ -230,34 +281,11 @@ type AuthDump = {
   mode: "full" | "admin-api" | "skipped";
   users: number;
   identities: number;
+  /** Por qué no salió completo, si aplica (sin datos personales). */
+  note?: string;
 };
 
-/** Escapa un valor JS a literal SQL de Postgres. */
-function sqlLiteral(v: unknown): string {
-  if (v === null || v === undefined) return "NULL";
-  if (typeof v === "number") return Number.isFinite(v) ? String(v) : "NULL";
-  if (typeof v === "boolean") return v ? "true" : "false";
-  if (typeof v === "object") return `${sqlLiteral(JSON.stringify(v))}::jsonb`;
-  return `'${String(v).replace(/'/g, "''")}'`;
-}
-
-function buildInsertSql(schemaTable: string, rows: Record<string, unknown>[], conflictCols: string): string {
-  if (rows.length === 0) return `-- ${schemaTable}: sin filas\n`;
-  const cols = Object.keys(rows[0]);
-  const chunks: string[] = [];
-  for (let i = 0; i < rows.length; i += 50) {
-    const values = rows
-      .slice(i, i + 50)
-      .map((r) => `  (${cols.map((c) => sqlLiteral(r[c])).join(", ")})`)
-      .join(",\n");
-    chunks.push(
-      `INSERT INTO ${schemaTable} (${cols.map((c) => `"${c}"`).join(", ")}) VALUES\n${values}\nON CONFLICT (${conflictCols}) DO NOTHING;`,
-    );
-  }
-  return chunks.join("\n\n") + "\n";
-}
-
-async function dumpAuth(sb: SupabaseClient, dir: string): Promise<AuthDump> {
+async function dumpAuth(sb: SupabaseClient, dir: string, files: FileManifest): Promise<AuthDump> {
   if (SKIP_PII) {
     log("→ auth: SALTEADO (SKIP_PII=1). Sin esto NO se puede reabrir con las mismas cuentas.");
     return { mode: "skipped", users: 0, identities: 0 };
@@ -266,129 +294,326 @@ async function dumpAuth(sb: SupabaseClient, dir: string): Promise<AuthDump> {
   // Camino de máxima fidelidad: todas las columnas de auth.users +
   // auth.identities por SQL. Es lo único que permite recrear las cuentas
   // con su MISMO uuid (la admin API no deja elegir el id al crear).
-  if (MGMT_PAT) {
+  let note: string | undefined;
+  if (MGMT) {
     try {
       const users = await mgmtQuery<Record<string, unknown>>(
-        "select * from auth.users order by created_at asc;",
+        "auth.users",
+        "select * from auth.users order by created_at asc, id asc;",
       );
       const identities = await mgmtQuery<Record<string, unknown>>(
-        "select * from auth.identities order by created_at asc;",
+        "auth.identities",
+        "select * from auth.identities order by created_at asc, id asc;",
       );
-      await writeJson(path.join(dir, "auth", "users.full.json"), users);
-      await writeJson(path.join(dir, "auth", "identities.full.json"), identities);
+      await writeTracked(dir, files, "auth/users.full.json", jsonBody(users));
+      await writeTracked(dir, files, "auth/identities.full.json", jsonBody(identities));
 
-      const sql =
-        `-- Restore de cuentas de La Polla — generado por scripts/export-backup.ts\n` +
-        `-- Pegar en el SQL editor de Supabase (o correr con psql) ANTES de\n` +
-        `-- restaurar las tablas de public: todo cuelga de estos uuids.\n` +
-        `-- Idempotente: ON CONFLICT DO NOTHING.\n\n` +
-        buildInsertSql("auth.users", users, "id") +
-        "\n" +
-        buildInsertSql("auth.identities", identities, "id") +
-        "\n";
-      await fs.writeFile(path.join(dir, "auth", "restore-auth.sql"), sql, "utf8");
+      // SQL de restore de cuentas: una transacción con triggers apagados
+      // (on_auth_user_created insertaría public.users con valores por
+      // defecto y el restore de public.users después no los pisaría), las
+      // columnas generadas (confirmed_at, identities.email) se recalculan.
+      const sql = buildRestoreSql({
+        title: "Restore de cuentas de La Polla (auth.users + auth.identities)",
+        generator: "scripts/export-backup.ts",
+        sections: [
+          { schemaTable: "auth.users", rows: users },
+          { schemaTable: "auth.identities", rows: identities },
+        ],
+      });
+      await writeTracked(dir, files, "auth/restore-auth.sql", sql);
 
       log(`→ auth: dump COMPLETO — ${users.length} usuarios, ${identities.length} identities (+ SQL de restore)`);
       return { mode: "full", users: users.length, identities: identities.length };
     } catch (err) {
-      log(`   ! dump completo de auth falló (${(err as Error).message}); caigo a la admin API`);
+      // Con token presente, caer a la admin API deja un backup que no puede
+      // recrear las cuentas: igual que el cruce de Storage, se aborta salvo
+      // que se acepte explícitamente un backup reducido.
+      if (!ALLOW_REDUCED) {
+        throw new Error(
+          `el dump completo de auth falló (${(err as Error).message.slice(0, 300)}). Backup ABORTADO: ` +
+            `sin él no se pueden recrear las cuentas. Revisa que ${MGMT.source} siga vigente y tenga database_read; ` +
+            `para aceptar un backup reducido, ALLOW_REDUCED_BACKUP=1.`,
+        );
+      }
+      note = `dump completo falló: ${(err as Error).message.slice(0, 200)}`;
+      log(`   ! dump completo de auth falló (${(err as Error).message}); caigo a la admin API (ALLOW_REDUCED_BACKUP=1)`);
     }
+  } else {
+    note = "sin token de la Management API";
   }
 
   // Fallback: admin API. Trae lo esencial (id, phone, email, fechas) pero
   // no permite recrear la cuenta con el mismo uuid sin SQL manual.
   const all: unknown[] = [];
   for (let page = 1; ; page++) {
-    const { data, error } = await retry(`listUsers(${page})`, async () => {
+    const data = await retry(`listUsers(${page})`, async () => {
       const r = await sb.auth.admin.listUsers({ page, perPage: PAGE });
       if (r.error) throw new Error(r.error.message);
-      return r;
+      return r.data;
     });
-    if (error) throw error;
     all.push(...data.users);
     if (data.users.length < PAGE) break;
   }
-  await writeJson(path.join(dir, "auth", "users.json"), all);
-  log(`→ auth: ${all.length} usuarios (admin API — sin SQL de restore, falta el PAT)`);
-  return { mode: "admin-api", users: all.length, identities: 0 };
+  await writeTracked(dir, files, "auth/users.json", jsonBody(all));
+  log(`→ auth: ${all.length} usuarios (admin API — sin SQL de restore)`);
+  return { mode: "admin-api", users: all.length, identities: 0, note };
 }
 
-// ─── Storage (comprobantes de pago) ───
+// ─── Storage ───
 
-type StorageStats = { buckets: number; files: number; bytes: number };
+type BucketStats = { name: string; objects: number; bytes: number };
+type StorageStats = {
+  buckets: BucketStats[];
+  files: number;
+  bytes: number;
+  crossCheck: "storage.objects" | "sin token" | "salteado";
+};
 
-async function listAllObjects(sb: SupabaseClient, bucket: string, prefix = ""): Promise<string[]> {
-  const out: string[] = [];
-  const entries = await retry(`storage ls ${bucket}/${prefix}`, async () => {
-    const { data, error } = await sb.storage.from(bucket).list(prefix, { limit: PAGE });
+async function listBucket(sb: SupabaseClient, bucket: string): Promise<string[]> {
+  return listAllStorageObjects(async (prefix, { limit, offset }) =>
+    retry(`storage ls ${bucket} (offset ${offset})`, async () => {
+      const { data, error } = await sb.storage
+        .from(bucket)
+        .list(prefix, { limit, offset, sortBy: { column: "name", order: "asc" } });
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    }),
+  "",
+  PAGE);
+}
+
+/** Lista todos los buckets y, con token, los cruza contra storage.objects.
+ *  Dos intentos: si alguien sube un comprobante entre el listado y el
+ *  conteo, la segunda vuelta lo absorbe. Si sigue sin cuadrar, aborta. */
+async function listAndCrossCheck(
+  sb: SupabaseClient,
+  bucketNames: string[],
+): Promise<{ keys: Record<string, string[]>; crossCheck: StorageStats["crossCheck"] }> {
+  for (let attempt = 1; ; attempt++) {
+    const keys: Record<string, string[]> = {};
+    for (const b of bucketNames) keys[b] = await listBucket(sb, b);
+    if (!MGMT) {
+      log("   ! sin token: no puedo cruzar el listado de Storage con storage.objects");
+      return { keys, crossCheck: "sin token" };
+    }
+    const rows = await mgmtQuery<{ bucket_id: string; name: string }>(
+      "storage.objects",
+      "select o.bucket_id, o.name from storage.objects o order by o.bucket_id, o.name;",
+    ).catch((err: Error) => {
+      // Con token presente, no poder cruzar es un error de configuración:
+      // mejor fallar fuerte que dejar un backup sin la verificación prometida.
+      throw new Error(
+        `no pude leer storage.objects para cruzar el listado (${err.message}). ` +
+          `Revisa que ${MGMT.source} tenga database_read; para un backup sin cruce, córrelo sin token.`,
+      );
+    });
+    const dbNames: Record<string, string[]> = {};
+    for (const r of rows) (dbNames[r.bucket_id] ??= []).push(r.name);
+    const listedCounts: Record<string, number> = {};
+    const dbCounts: Record<string, number> = {};
+    for (const [b, k] of Object.entries(keys)) listedCounts[b] = k.length;
+    for (const [b, k] of Object.entries(dbNames)) dbCounts[b] = k.length;
+    const problems = [...compareStorageCounts(listedCounts, dbCounts), ...compareStorageNames(keys, dbNames)];
+    if (problems.length === 0) return { keys, crossCheck: "storage.objects" };
+    if (attempt >= 2) {
+      throw new Error(
+        `Storage no cuadra con storage.objects. Backup ABORTADO:\n  - ${problems.join("\n  - ")}`,
+      );
+    }
+    log(`   ! Storage no cuadró con storage.objects (${problems.length} diferencia(s)); reintento el listado`);
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+
+async function dumpStorage(sb: SupabaseClient, dir: string, files: FileManifest): Promise<StorageStats> {
+  if (SKIP_STORAGE) {
+    log("→ storage: SALTEADO (SKIP_STORAGE=1)");
+    return { buckets: [], files: 0, bytes: 0, crossCheck: "salteado" };
+  }
+  const buckets = await retry("listBuckets", async () => {
+    const { data, error } = await sb.storage.listBuckets();
     if (error) throw new Error(error.message);
     return data ?? [];
   });
-  for (const e of entries) {
-    const full = prefix ? `${prefix}/${e.name}` : e.name;
-    // Sin `id` = carpeta (así las modela la API de Storage).
-    if (e.id === null || e.id === undefined) out.push(...(await listAllObjects(sb, bucket, full)));
-    else out.push(full);
-  }
-  return out;
-}
+  const names = buckets.map((b) => b.name).sort();
+  const { keys, crossCheck } = await listAndCrossCheck(sb, names);
 
-async function dumpStorage(sb: SupabaseClient, dir: string): Promise<StorageStats> {
-  if (SKIP_STORAGE) {
-    log("→ storage: SALTEADO (SKIP_STORAGE=1)");
-    return { buckets: 0, files: 0, bytes: 0 };
-  }
-  const { data: buckets, error } = await sb.storage.listBuckets();
-  if (error) {
-    log(`   ! no pude listar buckets (${error.message}); sigo sin storage`);
-    return { buckets: 0, files: 0, bytes: 0 };
-  }
-  let files = 0;
-  let bytes = 0;
-  for (const b of buckets ?? []) {
-    const objects = await listAllObjects(sb, b.name);
-    log(`→ storage/${b.name}: ${objects.length} archivos`);
-    for (const key of objects) {
-      const blob = await retry(`download ${b.name}/${key}`, async () => {
-        const { data, error: dlErr } = await sb.storage.from(b.name).download(key);
-        if (dlErr) throw new Error(dlErr.message);
+  const stats: BucketStats[] = [];
+  let total = 0;
+  let totalBytes = 0;
+  for (const b of names) {
+    let bytes = 0;
+    for (const key of keys[b]) {
+      const blob = await retry(`download ${b}/(objeto ${stats.length + 1})`, async () => {
+        const { data, error } = await sb.storage.from(b).download(key);
+        if (error) throw new Error(error.message);
         return data;
       });
       const buf = Buffer.from(await blob.arrayBuffer());
-      const dest = path.join(dir, "storage", b.name, key);
-      await fs.mkdir(path.dirname(dest), { recursive: true });
-      await fs.writeFile(dest, buf);
-      files++;
+      await writeTracked(dir, files, `storage/${b}/${key}`, buf);
       bytes += buf.byteLength;
     }
+    stats.push({ name: b, objects: keys[b].length, bytes });
+    total += keys[b].length;
+    totalBytes += bytes;
+    log(`→ storage/${b}: ${keys[b].length} archivos (${(bytes / 1024 / 1024).toFixed(1)} MB)`);
   }
-  return { buckets: (buckets ?? []).length, files, bytes };
+  return { buckets: stats, files: total, bytes: totalBytes, crossCheck };
+}
+
+// ─── Esquema vivo (definiciones reales de prod) ───
+
+type SchemaLive = {
+  mode: "read-only" | "skipped";
+  counts: Record<string, number>;
+  errors: string[];
+  warnings: string[];
+};
+
+const LIVE_QUERIES: { name: string; sql: string }[] = [
+  {
+    name: "functions",
+    sql: `
+      select n.nspname as schema, p.proname as name,
+             pg_catalog.pg_get_function_identity_arguments(p.oid) as args,
+             pg_catalog.pg_get_functiondef(p.oid) as definition
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.prokind in ('f', 'p')
+        and not exists (
+          select 1 from pg_catalog.pg_depend d
+          where d.classid = 'pg_catalog.pg_proc'::pg_catalog.regclass and d.objid = p.oid and d.deptype = 'e'
+        )
+      order by 1, 2, 3;`,
+  },
+  {
+    name: "triggers",
+    sql: `
+      select n.nspname as schema, c.relname as table, t.tgname as name,
+             t.tgenabled as enabled, pg_catalog.pg_get_triggerdef(t.oid) as definition
+      from pg_catalog.pg_trigger t
+      join pg_catalog.pg_class c on c.oid = t.tgrelid
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where not t.tgisinternal and n.nspname in ('public', 'auth', 'storage')
+      order by 1, 2, 3;`,
+  },
+  {
+    name: "policies",
+    sql: `
+      select p.schemaname, p.tablename, p.policyname, p.permissive, p.roles, p.cmd, p.qual, p.with_check
+      from pg_catalog.pg_policies p
+      where p.schemaname in ('public', 'storage')
+      order by 1, 2, 3;`,
+  },
+  {
+    name: "rls",
+    sql: `
+      select n.nspname as schema, c.relname as table, c.relrowsecurity as rls_enabled, c.relforcerowsecurity as rls_forced
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind in ('r', 'p')
+      order by 1, 2;`,
+  },
+  {
+    name: "columns",
+    sql: `
+      select c.table_schema, c.table_name, c.column_name, c.ordinal_position, c.data_type, c.udt_name,
+             c.is_nullable, c.column_default, c.is_identity, c.is_generated, c.generation_expression
+      from information_schema.columns c
+      where c.table_schema in ('public', 'auth', 'storage')
+      order by 1, 2, 4;`,
+  },
+  {
+    name: "cron_jobs",
+    sql: `select j.jobid, j.jobname, j.schedule, j.command, j.database, j.username, j.active from cron.job j order by j.jobid;`,
+  },
+  {
+    name: "storage_buckets",
+    sql: `select * from storage.buckets b order by b.id;`,
+  },
+  {
+    name: "schema_migrations",
+    sql: `select * from supabase_migrations.schema_migrations m order by m.version;`,
+  },
+  {
+    name: "extensions",
+    sql: `
+      select e.extname as name, e.extversion as version, n.nspname as schema
+      from pg_catalog.pg_extension e join pg_catalog.pg_namespace n on n.oid = e.extnamespace
+      order by 1;`,
+  },
+];
+
+async function dumpSchemaLive(dir: string, files: FileManifest): Promise<SchemaLive> {
+  if (!MGMT) {
+    log("→ schema/live: SALTEADO (sin token de la Management API)");
+    return { mode: "skipped", counts: {}, errors: [], warnings: ["sin token de la Management API"] };
+  }
+  const counts: Record<string, number> = {};
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  for (const q of LIVE_QUERIES) {
+    try {
+      const rows = await mgmtQuery<Record<string, unknown>>(`schema/${q.name}`, q.sql);
+      counts[q.name] = rows.length;
+      await writeTracked(dir, files, `schema/live/${q.name}.json`, jsonBody(rows));
+      if (q.name === "functions") {
+        const sql = rows
+          .map((r) => `-- ${r.schema}.${r.name}(${r.args})\n${String(r.definition).trimEnd()};\n`)
+          .join("\n");
+        await writeTracked(dir, files, "schema/live/functions.sql", sql);
+      }
+      if (q.name === "triggers") {
+        const sql = rows
+          .map((r) => `${String(r.definition)};${r.enabled === "D" ? " -- DESACTIVADO" : ""}`)
+          .join("\n");
+        await writeTracked(dir, files, "schema/live/triggers.sql", `${sql}\n`);
+      }
+      if (q.name === "policies") {
+        const sql = (rows as unknown as PolicyRow[]).map(renderPolicySql).join("\n");
+        await writeTracked(dir, files, "schema/live/policies.sql", `${sql}\n`);
+      }
+      if (q.name === "cron_jobs" && rows.length === 0) {
+        warnings.push("cron.job devolvió 0 filas: puede ser la RLS de pg_cron para supabase_read_only_user");
+      }
+    } catch (err) {
+      errors.push(`${q.name}: ${(err as Error).message.slice(0, 300)}`);
+    }
+  }
+  const summary = Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(" · ");
+  log(`→ schema/live: ${summary}`);
+  for (const e of errors) log(`   ! schema/live ${e}`);
+  for (const w of warnings) log(`   ! schema/live ${w}`);
+  return { mode: "read-only", counts, errors, warnings };
 }
 
 // ─── Primary keys (target de conflicto para el restore idempotente) ───
 
 async function discoverPrimaryKeys(tables: string[]): Promise<Record<string, string[]>> {
   const out: Record<string, string[]> = {};
-  if (MGMT_PAT) {
+  if (MGMT) {
     try {
-      const rows = await mgmtQuery<{ tabla: string; pk: string | null }>(`
+      const rows = await mgmtQuery<{ tabla: string; pk: string | null }>(
+        "primary keys",
+        `
         select c.relname as tabla,
                string_agg(a.attname, ',' order by k.ord) as pk
-        from pg_class c
-        join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
-        join pg_constraint con on con.conrelid = c.oid and con.contype = 'p'
+        from pg_catalog.pg_class c
+        join pg_catalog.pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+        join pg_catalog.pg_constraint con on con.conrelid = c.oid and con.contype = 'p'
         join lateral unnest(con.conkey) with ordinality as k(attnum, ord) on true
-        join pg_attribute a on a.attrelid = c.oid and a.attnum = k.attnum
+        join pg_catalog.pg_attribute a on a.attrelid = c.oid and a.attnum = k.attnum
         where c.relkind = 'r'
         group by c.relname;
-      `);
+      `,
+      );
       for (const r of rows) if (r.pk) out[r.tabla] = r.pk.split(",");
       return out;
     } catch (err) {
       log(`   ! no pude leer las PKs (${(err as Error).message}); asumo "id" donde exista`);
     }
   }
-  // Sin PAT: asumimos "id" para las tablas que lo tengan. Las de PK
+  // Sin token: asumimos "id" para las tablas que lo tengan. Las de PK
   // compuesta quedan sin entrada y el restore usa INSERT plano.
   for (const t of tables) out[t] = ["id"];
   return out;
@@ -397,17 +622,20 @@ async function discoverPrimaryKeys(tables: string[]): Promise<Record<string, str
 // ─── Orden de restore desde el grafo real de FKs ───
 
 async function computeRestoreOrder(tables: string[]): Promise<{ order: string[]; source: string }> {
-  if (MGMT_PAT) {
+  if (MGMT) {
     try {
-      const edges = await mgmtQuery<{ tabla: string; depende_de: string }>(`
+      const edges = await mgmtQuery<{ tabla: string; depende_de: string }>(
+        "foreign keys",
+        `
         select src.relname as tabla, tgt.relname as depende_de
-        from pg_constraint con
-        join pg_class src on src.oid = con.conrelid
-        join pg_namespace sn on sn.oid = src.relnamespace and sn.nspname = 'public'
-        join pg_class tgt on tgt.oid = con.confrelid
-        join pg_namespace tn on tn.oid = tgt.relnamespace and tn.nspname = 'public'
+        from pg_catalog.pg_constraint con
+        join pg_catalog.pg_class src on src.oid = con.conrelid
+        join pg_catalog.pg_namespace sn on sn.oid = src.relnamespace and sn.nspname = 'public'
+        join pg_catalog.pg_class tgt on tgt.oid = con.confrelid
+        join pg_catalog.pg_namespace tn on tn.oid = tgt.relnamespace and tn.nspname = 'public'
         where con.contype = 'f' and src.relname <> tgt.relname;
-      `);
+      `,
+      );
       const deps = new Map<string, Set<string>>();
       for (const t of tables) deps.set(t, new Set());
       for (const e of edges) {
@@ -523,6 +751,24 @@ function buildResumen(
   return lines.join("\n");
 }
 
+async function renameWithRetry(from: string, to: string): Promise<void> {
+  // En Windows un antivirus o el indexador pueden tener un archivo abierto
+  // unos segundos justo después de escribirlo.
+  for (let i = 0; ; i++) {
+    try {
+      await fs.rename(from, to);
+      return;
+    } catch (err) {
+      if (i >= 5) throw err;
+      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+}
+
+async function exists(p: string): Promise<boolean> {
+  return fs.stat(p).then(() => true).catch(() => false);
+}
+
 // ─── Main ───
 
 async function main() {
@@ -532,52 +778,67 @@ async function main() {
     );
   }
   const startedAt = new Date();
-  const stamp = startedAt.toISOString().replace(/[:T]/g, "-").slice(0, 16); // 2026-07-26-15-30
-  const dir = path.join(BACKUP_ROOT, stamp);
+  const stamp = backupStamp(startedAt); // 2026-07-26-15-30
+  const finalDir = path.join(BACKUP_ROOT, stamp);
+  const dir = path.join(BACKUP_ROOT, partialDirName(stamp));
+  if ((await exists(finalDir)) || (await exists(dir))) {
+    throw new Error(`Ya existe ${finalDir} (o su .partial). Esperá un minuto y corré de nuevo.`);
+  }
   await fs.mkdir(dir, { recursive: true });
 
-  const projectRef = new URL(SUPABASE_URL).hostname.split(".")[0];
+  const projectRef = projectRefFromUrl(SUPABASE_URL);
   log(`\n=== Backup de La Polla ===`);
   log(`Proyecto : ${projectRef}`);
-  log(`Destino  : ${dir}`);
-  log(`Auth     : ${SKIP_PII ? "NO (SKIP_PII=1)" : MGMT_PAT ? "completo (PAT presente)" : "admin API"}`);
+  log(`Destino  : ${finalDir}  (se escribe en .partial hasta terminar)`);
+  log(`Token    : ${MGMT ? `${MGMT.source} (SQL de solo lectura)` : "ninguno — auth reducido, sin schema/live ni cruce de Storage"}`);
+  log(`Auth     : ${SKIP_PII ? "NO (SKIP_PII=1)" : MGMT ? "completo" : "admin API"}`);
   log(`Storage  : ${SKIP_STORAGE ? "NO (SKIP_STORAGE=1)" : "sí"}\n`);
 
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  const files: FileManifest = {};
+
   // 1) Tablas
   const tables = await discoverTables();
   log(`Descubiertas ${tables.length} tablas en public.\n`);
 
-  const files: Record<string, { rows: number; bytes: number; sha256: string; orderedBy: string }> = {};
+  const tableFiles: Record<string, { rows: number; bytes: number; sha256: string; orderedBy: string }> = {};
   const loaded: Record<string, Record<string, unknown>[]> = {};
   for (const meta of tables) {
     const { rows, count, orderedBy } = await dumpTable(sb, meta);
-    const { bytes, sha256: hash } = await writeJson(path.join(dir, "tables", `${meta.name}.json`), rows);
-    files[meta.name] = { rows: count, bytes, sha256: hash, orderedBy };
+    const body = jsonBody(rows);
+    const dest = path.join(dir, "tables", `${meta.name}.json`);
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.writeFile(dest, body, "utf8");
+    const { bytes, sha256 } = fileEntry(body);
+    tableFiles[meta.name] = { rows: count, bytes, sha256, orderedBy };
     loaded[meta.name] = rows;
     log(`→ ${meta.name.padEnd(42)} ${String(count).padStart(6)} filas  (${(bytes / 1024).toFixed(0)} KB)`);
   }
 
   // 2) auth
   log("");
-  const auth = await dumpAuth(sb, dir);
+  const auth = await dumpAuth(sb, dir, files);
 
   // 3) Storage
-  const storage = await dumpStorage(sb, dir);
+  const storage = await dumpStorage(sb, dir, files);
   if (!SKIP_STORAGE) {
-    log(`→ storage total: ${storage.files} archivos, ${(storage.bytes / 1024 / 1024).toFixed(1)} MB`);
+    log(
+      `→ storage total: ${storage.files} archivos, ${(storage.bytes / 1024 / 1024).toFixed(1)} MB ` +
+        `(cruce: ${storage.crossCheck})`,
+    );
   }
 
-  // 4) Schema (las migraciones son la definición del esquema)
+  // 4) Schema: migraciones del repo + definiciones vivas de prod.
   const migSrc = path.join(REPO_ROOT, "supabase", "migrations");
-  const migDst = path.join(dir, "schema", "migrations");
-  await fs.mkdir(migDst, { recursive: true });
   const migrations = (await fs.readdir(migSrc)).filter((f) => f.endsWith(".sql")).sort();
-  for (const f of migrations) await fs.copyFile(path.join(migSrc, f), path.join(migDst, f));
-  log(`\n→ schema: ${migrations.length} migraciones copiadas`);
+  for (const f of migrations) {
+    await writeTracked(dir, files, `schema/migrations/${f}`, await fs.readFile(path.join(migSrc, f)));
+  }
+  log(`\n→ schema: ${migrations.length} migraciones del repo copiadas`);
+  const schemaLive = await dumpSchemaLive(dir, files);
 
   // 5) Orden de restore + primary keys
   const { order, source } = await computeRestoreOrder(tables.map((t) => t.name));
@@ -585,30 +846,10 @@ async function main() {
   const primaryKeys = await discoverPrimaryKeys(tables.map((t) => t.name));
 
   // 6) Resumen humano
-  const resumen = buildResumen(loaded, startedAt.toISOString());
-  await fs.writeFile(path.join(dir, "RESUMEN.md"), resumen, "utf8");
+  const totalRows = Object.values(tableFiles).reduce((a, f) => a + f.rows, 0);
+  await writeTracked(dir, files, "RESUMEN.md", buildResumen(loaded, startedAt.toISOString()));
 
-  // 7) Manifiesto
-  const totalRows = Object.values(files).reduce((a, f) => a + f.rows, 0);
-  const manifest = {
-    generatedAt: startedAt.toISOString(),
-    finishedAt: new Date().toISOString(),
-    projectRef,
-    supabaseUrl: SUPABASE_URL,
-    script: "scripts/export-backup.ts",
-    formatVersion: 1,
-    totals: { tables: tables.length, rows: totalRows, storageFiles: storage.files, storageBytes: storage.bytes },
-    auth,
-    tables: files,
-    primaryKeys,
-    restoreOrder: order,
-    restoreOrderSource: source,
-    migrations,
-    flags: { SKIP_STORAGE, SKIP_PII, hadManagementPat: Boolean(MGMT_PAT) },
-  };
-  await writeJson(path.join(dir, "_manifest.json"), manifest);
-
-  // 8) README del backup
+  // 7) README del backup
   const readme = `# Backup de La Polla — ${stamp}
 
 Snapshot completo del proyecto Supabase \`${projectRef}\`, tomado con
@@ -617,39 +858,88 @@ Snapshot completo del proyecto Supabase \`${projectRef}\`, tomado con
 ## ⚠️ Esto tiene datos personales
 
 \`auth/\` y \`tables/users.json\` llevan **teléfonos** (y emails) de ${auth.users || "…"} personas
-reales, y \`storage/\` lleva comprobantes de pago. Tratalo como tal:
+reales, \`storage/\` lleva comprobantes de pago y \`schema/live/cron_jobs.json\`
+puede llevar secretos de los crons. Trátalo como tal:
 
 - **NUNCA** lo commitees. El repo de la app es público (MIT).
 - No lo subas a Drive/Dropbox compartido ni lo pases por chat.
-- Si lo movés, que sea a un disco tuyo o a una máquina tuya.
+- Si lo mueves, que sea cifrado y a un disco o una máquina tuya.
 
 ## Qué hay acá
 
 | Ruta | Qué es |
 | --- | --- |
 | \`RESUMEN.md\` | Los números en texto plano: totales y la tabla final de cada polla. Se lee sin DB. |
-| \`_manifest.json\` | Inventario: filas y sha256 por tabla, orden de restore, migraciones. |
+| \`_manifest.json\` | Inventario: filas y sha256 por tabla, sha256 y bytes de cada archivo, orden de restore. |
 | \`tables/*.json\` | Una tabla de \`public\` por archivo, filas completas. |
 | \`auth/\` | Cuentas. \`restore-auth.sql\` recrea usuarios con su MISMO uuid. |
-| \`storage/\` | Archivos de los buckets (comprobantes de pago/premio). |
-| \`schema/migrations/\` | Las ${migrations.length} migraciones = definición del esquema. |
+| \`storage/\` | Archivos de los buckets (comprobantes, premios, evidencias). |
+| \`schema/migrations/\` | Las ${migrations.length} migraciones del repo. |
+| \`schema/live/\` | Definiciones REALES de prod: funciones, triggers, policies, RLS, columnas, crons, buckets y migraciones registradas. |
 
 ## Reabrir desde acá
 
-Ver \`docs/backup-restore.md\` en el repo. Resumen: proyecto Supabase nuevo →
-correr las migraciones en orden → \`auth/restore-auth.sql\` → \`npx tsx
-scripts/restore-backup.ts\` apuntando a esta carpeta.
+Ver \`docs/backup-restore.md\` en el repo. Primero \`npx tsx scripts/verify-backup.ts\`
+sobre esta carpeta.
 
 Total: ${totalRows.toLocaleString("es-CO")} filas en ${tables.length} tablas.
 `;
-  await fs.writeFile(path.join(dir, "README.md"), readme, "utf8");
+  await writeTracked(dir, files, "README.md", readme);
 
-  log(`\n=== Listo ===`);
-  log(`${totalRows.toLocaleString("es-CO")} filas · ${tables.length} tablas · ${auth.users} cuentas · ${storage.files} archivos de storage`);
-  log(`${dir}\n`);
+  // 8) Manifiesto (lo último que se escribe dentro de la carpeta)
+  const finishedAt = new Date();
+  const manifest = {
+    generatedAt: startedAt.toISOString(),
+    finishedAt: finishedAt.toISOString(),
+    durationSeconds: Math.round((finishedAt.getTime() - startedAt.getTime()) / 1000),
+    projectRef,
+    supabaseUrl: SUPABASE_URL,
+    script: "scripts/export-backup.ts",
+    formatVersion: 2,
+    totals: {
+      tables: tables.length,
+      rows: totalRows,
+      storageFiles: storage.files,
+      storageBytes: storage.bytes,
+      authUsers: auth.users,
+      authIdentities: auth.identities,
+      trackedFiles: Object.keys(files).length,
+    },
+    auth,
+    storage: { buckets: storage.buckets, crossCheck: storage.crossCheck },
+    schemaLive,
+    tables: tableFiles,
+    files,
+    primaryKeys,
+    restoreOrder: order,
+    restoreOrderSource: source,
+    migrations,
+    flags: {
+      SKIP_STORAGE,
+      SKIP_PII,
+      managementTokenSource: MGMT?.source ?? null,
+      hadManagementPat: Boolean(MGMT),
+    },
+  };
+  await fs.writeFile(path.join(dir, "_manifest.json"), jsonBody(manifest), "utf8");
+
+  // 9) Recién ahora el backup existe con su nombre definitivo.
+  await renameWithRetry(dir, finalDir);
+
+  log(`\n=== Listo en ${manifest.durationSeconds} s ===`);
+  log(
+    `${totalRows.toLocaleString("es-CO")} filas · ${tables.length} tablas · ${auth.users} cuentas · ` +
+      `${storage.files} archivos de storage (${(storage.bytes / 1024 / 1024).toFixed(1)} MB)`,
+  );
+  if (schemaLive.errors.length) log(`! schema/live con ${schemaLive.errors.length} error(es): ver _manifest.json`);
+  if (auth.mode === "admin-api" || storage.crossCheck === "sin token") {
+    log(`! Backup REDUCIDO (auth ${auth.mode}, cruce de Storage: ${storage.crossCheck}): verify-backup lo rechaza salvo ALLOW_REDUCED_BACKUP=1.`);
+  }
+  log(`${finalDir}\n`);
 }
 
 main().catch((err) => {
   console.error(`\nBACKUP FALLÓ: ${err.message}\n`);
+  console.error(`Si quedó una carpeta .partial, no es un backup válido.\n`);
   process.exit(1);
 });

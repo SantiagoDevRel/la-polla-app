@@ -1,18 +1,18 @@
 # Backup y restore de La Polla
 
-Cómo sacar una copia completa de la app —datos, cuentas, comprobantes,
-esquema— y cómo devolverla a un proyecto Supabase el día que se reabra.
+Cómo sacar una copia completa de la app —datos, cuentas, archivos de Storage,
+esquema— y cómo devolverla a una base Postgres/Supabase.
 
-Nació del cierre de temporada post-Mundial 2026 (2026-07-26). Con la app
-dormida hay dos riesgos reales:
+Nació del cierre de temporada post-Mundial 2026 (2026-07-26) y se endureció
+el 2026-09-13, antes del lanzamiento de Casa. Los riesgos que cubre:
 
-- **Supabase pausa los proyectos free inactivos.** Un proyecto pausado se
-  puede restaurar, pero es una dependencia de un tercero sobre datos que no
-  se pueden volver a generar: los pronósticos de 294 personas.
-- **El plan free no tiene backups automáticos** (eso es Pro). Si el
-  proyecto se pierde, se perdió.
+- **Un proyecto Supabase se puede pausar, perder o corromper.** Los
+  pronósticos, las inscripciones y los comprobantes no se pueden volver a
+  generar.
+- **Los backups diarios de Supabase Pro no incluyen Storage**, no bajan de
+  24 h de RPO, no restauran por tabla y viven en la misma cuenta.
 
-Por eso el backup vive **fuera** de Supabase: en el disco y en el DGX.
+Por eso el backup vive **fuera** de Supabase.
 
 ---
 
@@ -22,50 +22,98 @@ Por eso el backup vive **fuera** de Supabase: en el disco y en el DGX.
 npx tsx scripts/export-backup.ts
 ```
 
-Escribe `backups/<fecha-hora>/`. Es **solo lectura**: no toca ni una fila.
-Tarda ~2-3 minutos (la mayor parte es bajar los comprobantes de pago).
+Escribe `backups/<fecha-hora>.partial/` y la renombra a `backups/<fecha-hora>/`
+**solo cuando terminó bien**. Una carpeta `.partial` es un export que se cortó:
+no es un backup y los demás scripts la ignoran (se puede borrar a mano). Es
+**solo lectura**: no escribe ni una fila en la base. Tarda ~1,5 min con los
+datos de septiembre de 2026 (58 tablas, 40 mil filas, 17 MB de Storage).
 
-Variables (todas de `.env`):
+Variables (de `.env`, o `DOTENV_CONFIG_PATH=<ruta>` para leer otro archivo):
 
 | Env | Para qué |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | requerido |
-| `SUPABASE_SERVICE_ROLE_KEY` | requerido — lee todo, bypass RLS |
-| `SUPABASE_30_DAYS` | opcional pero **muy recomendado**: PAT de la Management API. Con él el dump de `auth` es completo (todas las columnas) y sale el SQL de restore de cuentas. Sin él, `auth` queda reducido a lo que expone la admin API y **no se pueden recrear las cuentas con su mismo uuid**. |
+| `SUPABASE_SERVICE_ROLE_KEY` | requerido — lee tablas y Storage, bypass RLS |
+| `SUPABASE_BACKUP_PAT` → `SUPABASE_ACCESS_TOKEN` → `SUPABASE_30_DAYS` | Token de la Management API, se usa el primero que exista. **Muy recomendado.** Basta un token con scope de proyecto y permiso `database_read`: todo el SQL va por `POST /v1/projects/<ref>/database/query/read-only`, que corre como `supabase_read_only_user`. |
 
-Flags: `BACKUP_DIR=<path>` · `SKIP_STORAGE=1` · `SKIP_PII=1`.
+Sin token el backup sale **reducido**: `auth` sale por la admin API (no se
+pueden recrear las cuentas con su mismo uuid), no hay `schema/live` y el
+listado de Storage no se puede cruzar contra la base. `verify-backup.ts` lo
+rechaza salvo `ALLOW_REDUCED_BACKUP=1`.
+
+**Con** token, si el dump completo de auth falla (token vencido, red), el
+export **aborta** igual que cuando no puede cruzar Storage. Antes caía en
+silencio a la admin API y dejaba un backup que parecía bueno. Para aceptar
+esa degradación a propósito: `ALLOW_REDUCED_BACKUP=1`.
+
+Flags: `BACKUP_DIR=<path>` · `SKIP_STORAGE=1` · `SKIP_PII=1` · `ALLOW_REDUCED_BACKUP=1`.
+
+### Qué verifica mientras exporta (y aborta si no cuadra)
+
+- **Tablas:** PostgREST topa en 1000 filas por request incluso con
+  service_role. Se pagina con orden estable y al final se compara contra
+  `count(*)` exacto y contra ids únicos.
+- **Storage:** `storage.list` también devuelve máximo 1000 entradas por
+  llamada. Se pagina con `offset`, recursivo por carpetas, y el resultado se
+  cruza contra `storage.objects` por bucket: **conteo y nombres**. Si alguien
+  sube un archivo en medio, reintenta una vez; si sigue sin cuadrar, aborta.
+- **Archivos:** cada archivo de `auth/`, `storage/`, `schema/`, `RESUMEN.md` y
+  `README.md` queda en el manifiesto con **sha256 y bytes**. Las tablas
+  guardan filas + sha256.
+
+Los logs no imprimen tokens, teléfonos ni rutas de objetos de Storage.
 
 ### Qué queda adentro
 
 ```
-backups/2026-07-26-21-17/
+backups/2026-09-13-12-01/
 ├── README.md                  qué es esto + aviso de datos personales
 ├── RESUMEN.md                 los números en texto plano: totales y la
 │                              tabla final de CADA polla. Se lee sin DB.
-├── _manifest.json             filas + sha256 por tabla, PKs, orden de
-│                              restore, migraciones aplicadas
+├── _manifest.json             formato 2: filas + sha256 por tabla, sha256 +
+│                              bytes por archivo, buckets, PKs, orden de
+│                              restore, errores de schema/live
 ├── tables/*.json              una tabla de `public` por archivo
 ├── auth/
 │   ├── users.full.json        auth.users completo
 │   ├── identities.full.json   auth.identities completo
-│   └── restore-auth.sql       INSERTs listos, idempotentes
-├── storage/<bucket>/…         comprobantes de pago y de premio
-└── schema/migrations/*.sql    las migraciones = definición del esquema
+│   └── restore-auth.sql       restore de cuentas para psql (ver abajo)
+├── storage/<bucket>/…         comprobantes, premios, evidencias
+└── schema/
+    ├── migrations/*.sql       las migraciones del repo
+    └── live/                  definiciones REALES de prod (read-only):
+        ├── functions.sql/.json    pg_get_functiondef de public
+        ├── triggers.sql/.json     public, auth y storage
+        ├── policies.sql/.json     pg_policies de public y storage
+        ├── rls.json               RLS activada/forzada por tabla
+        ├── columns.json           columnas, defaults, identity, generadas
+        ├── cron_jobs.json         cron.job (puede llevar secretos)
+        ├── storage_buckets.json
+        ├── schema_migrations.json supabase_migrations.schema_migrations
+        └── extensions.json
 ```
 
-Snapshot del 2026-07-26: **38.061 filas · 36 tablas · 294 cuentas · 117
-archivos · 33 MB**.
+Backup del 2026-09-13: **40.452 filas · 58 tablas · 297 cuentas · 504
+identities · 119 archivos (17,3 MB) · 96 funciones · 36 triggers · 71
+policies · 4 crons**, en 90 s.
+
+> ⚠️ **Las migraciones del repo NO reconstruyen prod.** Aplicadas en orden
+> sobre un Postgres limpio fallan 18 de 112 (tablas creadas fuera de
+> migraciones como `app_config`, columnas como `matches.elapsed`, funciones
+> duplicadas). Prod registra 97 migraciones. Para saber qué había de verdad,
+> la fuente es `schema/live/`.
 
 ### ⚠️ Esto tiene datos personales
 
-Teléfonos, emails, hashes de contraseña y comprobantes de pago de gente
-real. El repo de la app es **público (MIT)**:
+Teléfonos, emails, hashes de contraseña, comprobantes de pago de gente real
+y, en `schema/live/cron_jobs.json`, posibles secretos de los crons. El repo
+de la app es **público (MIT)**:
 
-- `backups/` está en `.gitignore`. **Nunca** lo saques de ahí.
+- `backups/` está en `.gitignore`. **Nunca** lo saques de ahí sin cifrar.
 - No lo subas a un Drive compartido ni lo pases por chat/Slack/email.
-- Si lo movés, que sea a un disco o una máquina tuya.
-- Habeas Data (Ley 1581): esta copia es un tratamiento de datos. Guardala
-  con la misma seriedad que la DB.
+- Si lo mueves, cífralo antes (gpg) y llévalo a un disco o máquina tuya.
+- Habeas Data (Ley 1581): esta copia es un tratamiento de datos. Guárdala
+  con la misma seriedad que la base.
 
 ---
 
@@ -74,117 +122,210 @@ real. El repo de la app es **público (MIT)**:
 Un backup sin verificar es una promesa, no un respaldo.
 
 ```bash
-npx tsx scripts/verify-backup.ts                        # el más nuevo
-npx tsx scripts/verify-backup.ts backups/2026-07-26-21-17
-ONLINE=1 npx tsx scripts/verify-backup.ts               # + compara contra la DB viva
+npx tsx scripts/verify-backup.ts                          # el más nuevo (ignora .partial)
+npx tsx scripts/verify-backup.ts backups/2026-09-13-12-01
+npx tsx scripts/verify-backup.ts --json                   # una línea JSON, para automatizar
+MAX_AGE_HOURS=7 npx tsx scripts/verify-backup.ts          # además exige que sea reciente
+ONLINE=1 npx tsx scripts/verify-backup.ts                 # + compara counts contra la DB viva
 ```
 
-Corre **offline**: chequea que cada archivo exista, que su sha256 coincida
-con el manifiesto y que traiga las filas que dice traer. Sale con código 1
-si algo no cuadra, así que se puede encadenar. Vale la pena correrlo cada
-tanto sobre la copia guardada — el bit rot existe.
+Corre **offline** y sale con **código 1 ante cualquier diferencia**:
+
+- cada tabla: existe, sha256 y número de filas;
+- cada archivo del manifiesto (auth, Storage, esquema, RESUMEN, README):
+  existe, mismos bytes y mismo sha256;
+- un archivo en disco que **no** está en el manifiesto también es un problema;
+- los totales de Storage coinciden con el inventario, y los usuarios e
+  identities en disco con lo declarado;
+- `MAX_AGE_HOURS`: si el backup es más viejo, falla (un valor inválido también
+  falla, para no creer que se vigila la frescura cuando no);
+- una carpeta `.partial` pasada a mano se rechaza;
+- **un backup reducido falla**: `auth` en modo `admin-api` (sin
+  `users.full.json` ni `restore-auth.sql`, con el motivo de `auth.note`) o
+  Storage sin cruce contra `storage.objects`. Todos los archivos pueden estar
+  íntegros y aun así no alcanzar para reabrir con las mismas cuentas.
+  `ALLOW_REDUCED_BACKUP=1` lo baja a aviso; el ejecutor automático **no** debe
+  usarlo. `SKIP_PII=1` y `SKIP_STORAGE=1` son decisiones explícitas y quedan
+  como aviso.
+
+`--json` imprime solo `{ ok, dir, formatVersion, generatedAt, ageHours,
+tables, rows, authMode, storageCrossCheck, authUsers, authIdentities,
+storageFiles, storageBytes, filesVerified, problems, warnings }`. Los errores
+de `schema/live` salen como `warnings` (no invalidan los datos).
+
+Los backups de **formato 1** (antes del 2026-09-13) se siguen verificando:
+tablas por sha256, y Storage/auth solo por conteo, con un aviso.
 
 ---
 
 ## Guardar una copia afuera
 
-El backup no sirve de nada si vive solo en el mismo disco. Copialo a otra
-máquina (ej. un server propio por ssh):
+El backup no sirve de nada si vive solo en el mismo disco. Verifícalo,
+cífralo y cópialo a otra máquina:
 
 ```bash
-cd backups
-tar -cf - 2026-07-26-21-17 | ssh $HOST 'mkdir -p ~/apps/la-polla-backup && tar -xf - -C ~/apps/la-polla-backup'
+npx tsx scripts/verify-backup.ts backups/2026-09-13-12-01
+tar -C backups -cf - 2026-09-13-12-01 | zstd -19 | gpg --encrypt -r "$GPG_RECIPIENT" > 2026-09-13-12-01.tar.zst.gpg
+sha256sum 2026-09-13-12-01.tar.zst.gpg > 2026-09-13-12-01.tar.zst.gpg.sha256
+scp 2026-09-13-12-01.tar.zst.gpg* $HOST:~/apps/la-polla-backup/snapshots/
+ssh $HOST 'cd ~/apps/la-polla-backup/snapshots && sha256sum -c 2026-09-13-12-01.tar.zst.gpg.sha256'
 ```
 
-Y verificá la transferencia comparando huellas (ojo con el locale: usá
-`LC_ALL=C sort` de los dos lados o vas a ver "diferencias" que son solo
-orden):
+Si comparas listados de huellas entre Windows y Linux, normaliza el `*` de
+modo binario y usa `LC_ALL=C sort` de los dos lados:
 
 ```bash
-cd backups/2026-07-26-21-17
-find . -type f | xargs sha256sum | sed -E 's/^([0-9a-f]+) [ *](.*)$/\1  \2/' | LC_ALL=C sort > /tmp/l.txt
-ssh $HOST 'cd ~/apps/la-polla-backup/2026-07-26-21-17 && find . -type f | xargs sha256sum' | LC_ALL=C sort > /tmp/r.txt
-diff /tmp/l.txt /tmp/r.txt && echo "idénticos"
+find . -type f | xargs sha256sum | sed -E 's/^([0-9a-f]+) [ *](.*)$/\1  \2/' | LC_ALL=C sort
 ```
 
 ---
 
-## Reabrir: restaurar en un proyecto Supabase
+## Restaurar
 
-Orden obligatorio. Saltarse un paso deja FKs colgando.
+Orden obligatorio: esquema → cuentas y tablas (SQL) → Storage → comprobar.
 
-### 1. Proyecto destino con el esquema puesto
+### Por qué las tablas NO van por PostgREST
 
-Proyecto Supabase nuevo (o el mismo despausado). Aplicá **en orden** las
-migraciones de `schema/migrations/` del backup. Son la definición completa
-del esquema: tablas, RLS, triggers, RPCs.
+`restore-backup.ts` inserta por PostgREST, y con el esquema actual eso falla o
+deja datos alterados:
 
-### 2. Las cuentas primero
+- `trigger_lock_predictions` (`check_prediction_lock`) rechaza pronósticos de
+  partidos ya jugados: *"No se pueden crear ni modificar pronósticos a menos
+  de 5 minutos del partido"* (reproducido el 2026-09-13).
+- Los guards de Casa v2 rechazan filas de Casa fuera de su ciclo de vida.
+- `on_auth_user_created` crea `public.users` con valores por defecto al
+  insertar `auth.users`, y después la fila real de `public.users` choca.
 
-Todo cuelga de los uuid de `auth.users`. La admin API **no** deja elegir el
-id al crear un usuario, así que las cuentas van por SQL:
+La salida es un `.sql` para psql que corre todo en **una transacción** con
+`SET LOCAL session_replication_role = replica`: triggers y FKs apagados solo
+dentro de esa transacción. En la imagen `supabase/postgres:17.6.1.159` el rol
+`postgres` (que no es superusuario) tiene permiso para ese `SET`; si en otro
+entorno da `permission denied`, conéctate como `supabase_admin`.
 
-```
-SQL editor de Supabase  ←  auth/restore-auth.sql
-```
+### 1. Destino con el esquema puesto
 
-Es idempotente (`ON CONFLICT DO NOTHING`), se puede correr de nuevo sin
-miedo. Restaura `auth.users` y `auth.identities` con los mismos uuid, así
-que cada persona vuelve a entrar **con su mismo teléfono** y encuentra su
-historial.
+Un **Supabase local** (`npx supabase start` + `supabase db reset`) con el
+esquema aplicado. Si las migraciones del repo no alcanzan (ver el aviso de
+arriba), usa `schema/live/` del backup como referencia de lo que falta.
 
-### 3. Los datos
+### 2. Generar y correr el SQL de cuentas + tablas
 
 ```bash
-# 1) Apuntá .env al proyecto DESTINO (leelo dos veces).
-# 2) Dry run — no escribe nada:
-npx tsx scripts/restore-backup.ts backups/2026-07-26-21-17
+npx tsx scripts/restore-backup-sql.ts backups/2026-09-13-12-01
+# → backups/2026-09-13-12-01.restore.sql (fuera de la carpeta del backup)
 
-# 3) De verdad:
-CONFIRM=RESTAURAR npx tsx scripts/restore-backup.ts backups/2026-07-26-21-17
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+  -v ON_ERROR_STOP=1 -f backups/2026-09-13-12-01.restore.sql
 ```
 
-Restaura en orden FK-safe (derivado del grafo real de FKs y guardado en el
-manifiesto), en lotes de 500, con upsert idempotente sobre la PK de cada
-tabla. Al final verifica que los counts del destino igualen al manifiesto.
+El generador no se conecta a ninguna base. Antes de escribir el `.sql`
+verifica el sha256 de cada tabla y de los dumps de auth. El SQL:
 
-Guardas incorporadas:
+- incluye `auth.users` y `auth.identities` primero (salvo `SKIP_AUTH=1`);
+- **reemplaza las tablas que las migraciones siembran**: `app_config` (028 y
+  064) y `casa_operation_control` (097 la crea con `mode='legacy'`). Un
+  destino recién creado no las tiene vacías; dentro de la transacción se
+  borran y quedan **exactamente** con el contenido del backup (por ejemplo
+  `mode='v2'`). `REPLACE_TABLES=a,b` cambia la lista y `REPLACE_TABLES=` (vacío)
+  no reemplaza ninguna;
+- **aborta si cualquier otra tabla destino ya tiene filas**. El mensaje dice
+  qué hacer: para `auth.*`, generar con `SKIP_AUTH=1` si las cuentas ya se
+  restauraron; para el resto, partir de `supabase db reset` o sumar la tabla a
+  `REPLACE_TABLES` si la siembra una migración;
+- convierte cada lote con `jsonb_populate_recordset(NULL::tabla, …)`, así
+  Postgres usa los tipos reales del destino (arrays, jsonb, enums, fechas);
+- omite columnas generadas (`auth.users.confirmed_at`,
+  `auth.identities.email`…) e inserta identity con `OVERRIDING SYSTEM VALUE`;
+- **aborta si el backup trae una columna que el destino no tiene** (salvo
+  `ALLOW_MISSING_COLUMNS=1`, que las ignora: úsalo solo para ensayos);
+- **en cada lote** exige que se hayan escrito todas sus filas (una clave que
+  choca ya no se descarta en silencio) y que cada fila, buscada por su PK,
+  tenga en el destino el mismo contenido que en el backup (columna por
+  columna, como texto; sin PK se compara contra la tabla entera);
+- ajusta las secuencias al máximo restaurado;
+- compara el `count(*)` de cada tabla con el backup. Si algo no cuadra,
+  `ROLLBACK` y no queda nada escrito.
+
+Otros flags: `OUT=<archivo>` · `OVERWRITE=1` · `TABLES=a,b` (solo esas de
+`public`) · `ALLOW_NONEMPTY=1`, **solo para ensayos**: quita la guarda y las
+filas que chocan o difieren se saltan con un `NOTICE` por lote. No es un
+restore fiel. Nunca es la salida para un destino recién creado que "no está
+vacío".
+
+**Cuentas: una sola vía.** Lo recomendado es dejar que este SQL traiga
+`auth.users` y `auth.identities` junto con las tablas, en la misma
+transacción. `auth/restore-auth.sql` (dentro del backup) es la misma mecánica
+solo para las cuentas. Si lo corres primero, genera el SQL de tablas con
+`SKIP_AUTH=1`: sin eso, su guarda aborta porque `auth.users` ya tiene filas.
+
+Ensayo del 2026-09-13 en un contenedor desechable de
+`supabase/postgres:17.6.1.159`, con las migraciones del repo aplicadas y como
+rol `postgres`: 9 tablas centrales (users, matches, pollas,
+polla_participants, predictions y cuatro de Casa), 19.626 filas en 2 s, con
+los triggers de lock presentes; la suma de `points_earned` (34.223) y de
+`total_points` coincide con el backup. Ese ensayo no incluyó tablas
+sembradas. Con `app_config` (16 filas) y `casa_operation_control` del backup
+real, restauradas sobre esas semillas en un `postgres:17-alpine` desechable,
+el resultado quedó en `mode='v2'` y 16 filas (antes: `ROLLBACK` por la
+guarda, o `mode='legacy'` con `ALLOW_NONEMPTY=1`).
+
+Prueba automática contra un Postgres real (opt-in, necesita Docker):
+
+```bash
+BACKUP_SQL_DOCKER_TEST=1 npx vitest run tests/backup-restore-sql.docker.test.ts
+```
+
+### 3. Storage
+
+```bash
+# Apunta .env al Supabase LOCAL (NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321).
+STORAGE_ONLY=1 npx tsx scripts/restore-backup.ts backups/2026-09-13-12-01            # dry run
+STORAGE_ONLY=1 CONFIRM=RESTAURAR npx tsx scripts/restore-backup.ts backups/2026-09-13-12-01
+```
+
+Guardas de `restore-backup.ts`:
 
 - Sin `CONFIRM=RESTAURAR` es **dry run**.
-- Si el destino ya tiene filas, **aborta** (salvo `ALLOW_NONEMPTY=1`). Un
-  destino con datos casi siempre significa que apuntaste al proyecto
-  equivocado.
-- `TABLES=a,b,c` para restaurar solo algunas · `SKIP_STORAGE=1` para no
-  volver a subir los comprobantes.
+- **Solo escribe en `localhost` / `127.0.0.1` / `::1`.** Para un host remoto
+  hay que nombrarlo exacto: `ALLOW_REMOTE_TARGET=<ref>` (o el hostname
+  completo si no es `*.supabase.co`). Un `.env` apuntando a prod no alcanza.
+  En dry run solo avisa.
+- Si el destino ya tiene filas, aborta (salvo `ALLOW_NONEMPTY=1`).
+- Rechaza carpetas `.partial`.
+- `TABLES=a,b,c` · `SKIP_STORAGE=1` · `STORAGE_ONLY=1`.
 
 > 🚨 **Regla del repo:** los `predictions` son datos sagrados y no se tocan
-> sin orden explícita del owner. Correr el restore con `CONFIRM=RESTAURAR`
-> *es* esa orden — no lo dispares "para probar" contra una DB con datos
-> vivos.
+> sin orden explícita del owner. Correr el SQL de restore o
+> `CONFIRM=RESTAURAR` contra una base con datos vivos *es* tocarlos: solo
+> contra Supabase local, o con orden explícita.
 
 ### 4. Comprobar
 
-Abrí `RESUMEN.md` del backup y contrastá dos o tres tablas finales de
-pollas contra lo que muestra la app. Si los puntos coinciden, la
-restauración quedó bien.
+Abre `RESUMEN.md` del backup y contrasta dos o tres tablas finales de
+pollas contra lo que muestra la app, y los montos de 2-3 pollas Casa con
+`casa_polla_pot`. Si coinciden, la restauración quedó bien.
 
 ### 5. Volver a abrir la app
 
 El modo cierre se controla desde **un solo lugar**:
 `CREATABLE_TOURNAMENT_SLUGS` en `lib/tournaments.ts`. Con la lista vacía la
-app está cerrada (banner + `/pollas/crear` bloqueado + POST rechazado).
-Agregale el slug del torneo que vuelva y se reabre todo solo — ver
-`lib/closure.ts`. Acordate de sumar el slug también a
-`SYNCABLE_TOURNAMENT_SLUGS` para que los partidos vuelvan a sincronizarse.
+app está cerrada (banner + creación bloqueada). Agrégale el slug del torneo
+que vuelva y se reabre todo solo — ver `lib/closure.ts`. Suma el slug también
+a `SYNCABLE_TOURNAMENT_SLUGS` para que los partidos vuelvan a sincronizarse.
 
 ---
 
 ## Cada cuánto
 
-Con la app cerrada y sin partidos, los datos no cambian: el backup del
-cierre alcanza. Vale la pena sacar uno nuevo si:
+Con la app en operación (Casa), un backup es útil solo si es reciente. Hasta
+que exista el ejecutor automático del DGX, saca uno:
 
-- se reabre la temporada (backup antes y después),
-- Supabase avisa que va a pausar el proyecto,
-- pasó un año y querés confirmar que la copia sigue sana
-  (`verify-backup.ts`).
+- antes de cualquier cambio de infraestructura (transferencia de organización,
+  cambio de compute, upgrade de Postgres),
+- antes de aplicar migraciones que toquen dinero o pronósticos,
+- antes y después de cada cierre de temporada,
+- y verifica la copia guardada cada tanto (`verify-backup.ts`): el bit rot
+  existe.
+
+Pendiente (fuera de este documento): ejecutor programado en el DGX con copia
+cifrada, latido `backup_runs`, alerta de frescura y ensayo semanal de restore.
