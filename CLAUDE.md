@@ -6,6 +6,28 @@
 
 ## READ THIS FIRST
 
+### API-Football es la única fuente de partidos (2026-09-13, PR #67)
+
+Decisión del dueño: calendario, vivo y verificación de resultados salen solo de
+API-Football (Pro, se renueva; vence 2026-10-09). El interruptor es
+`app_config.data_provider_mode` (`lib/matches/provider-mode.ts`): **en prod vale
+`af` desde 2026-09-13 13:15 UTC**. Con `legacy` vuelve el camino ESPN/football-data,
+que sigue en el código solo como respaldo; no crear código nuevo sobre él.
+
+- Filas nuevas: `external_id = apifootball:<fixture.id>`, escritas por
+  `lib/api-football/calendar.ts` vía `upsert_match_safe` (Regla #1). Filas viejas
+  con pronósticos o Casa conservan su uuid y llevan `apifootball:<id>` en
+  `source_external_ids`. Vivo y cierre emparejan por ese id + liga, nunca por nombre.
+- TBD, aplazados y rondas de relleno (≥75 % a la misma hora) quedan
+  `scheduled_at_confirmed=false` aunque falten menos de 10 días. Casa rechaza cierre
+  automático con partidos provisionales: cierre manual.
+- Temporada completa por liga (1 solicitud por liga); el cron `discover` refresca por
+  diff con presupuesto de 35 s; importación manual: `npx tsx scripts/af-import.ts`.
+- Corte y rollback: `docs/af-cutover-today.md`. Respaldo:
+  `matches_backup_20260913_af_cutover` y `backups/2026-09-13-13-07`.
+- Pendiente: quitar lecturas ESPN de plantel/noticias/proxy de escudos y el código
+  legacy; RPC atómica de cuota para el calendario.
+
 ### Precisión de horarios y torneos (2026-09-13, migración 103)
 
 `matches.scheduled_at_confirmed=false` significa fecha provisional, no medianoche

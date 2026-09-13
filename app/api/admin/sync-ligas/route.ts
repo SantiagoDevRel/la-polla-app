@@ -16,6 +16,10 @@
 // ⚠️ REGLA #2: los cruces de bracket sin equipos definidos no generan filas;
 // el discover los descarta antes de llamar al RPC.
 //
+// Modo 'af' (app_config.data_provider_mode, 2026-09-13): ESPN ya no escribe
+// partidos. El POST pasa por refreshTournamentSchedule, que trae la temporada
+// completa de API-Football con la misma reserva de 15 minutos del calendario.
+//
 // Autorizacion: la columna `users.is_admin`, nunca el telefono. Se deja como
 // unica puerta a proposito (mismo patron que /api/casa/admin/entries): el path
 // con CRON_SECRET ya existe en /api/matches/discover para el cron.
@@ -27,6 +31,9 @@ import { getAuthenticatedUser } from "@/lib/auth/admin";
 import { discoverTournament } from "@/lib/espn/discover";
 import { ESPN_LEAGUE_BY_TOURNAMENT } from "@/lib/espn/client";
 import { CREATABLE_TOURNAMENT_SLUGS, getTournamentName } from "@/lib/tournaments";
+import { getDataProviderMode } from "@/lib/matches/provider-mode";
+import { refreshTournamentScheduleDetailed } from "@/lib/matches/refresh-schedule";
+import { afLeagueIdForTournament } from "@/lib/api-football/season";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -61,6 +68,7 @@ export async function GET() {
 
   const db = createAdminClient();
   const ahora = new Date().toISOString();
+  const modo = await getDataProviderMode();
 
   const ligas = await Promise.all(
     CREATABLE_TOURNAMENT_SLUGS.map(async (slug) => {
@@ -75,8 +83,8 @@ export async function GET() {
         slug,
         nombre: getTournamentName(slug),
         partidosFuturos,
-        // Sin mapeo de ESPN el boton de sincronizar no puede hacer nada.
-        sincronizable: !!ESPN_LEAGUE_BY_TOURNAMENT[slug],
+        // Sin mapeo de la fuente activa el boton de sincronizar no puede hacer nada.
+        sincronizable: modo === "af" ? !!afLeagueIdForTournament(slug) : !!ESPN_LEAGUE_BY_TOURNAMENT[slug],
         vacia: partidosFuturos === 0,
       };
     }),
@@ -97,6 +105,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
   const { tournament, diasAdelante, diasAtras } = parsed.data;
+
+  if ((await getDataProviderMode()) === "af") {
+    if (!afLeagueIdForTournament(tournament)) {
+      return NextResponse.json({ error: "API-Football no tiene esa liga." }, { status: 400 });
+    }
+    const r = await refreshTournamentScheduleDetailed(tournament, { mode: "af" });
+    if (!r.refreshed) {
+      const error = r.state === "pending"
+        ? "Ya hay una actualización de este calendario en curso. Intenta de nuevo en unos minutos."
+        : "No pude actualizar el calendario desde API-Football. Intenta de nuevo en unos minutos.";
+      return NextResponse.json({ error, estado: r.state }, { status: r.state === "pending" ? 409 : 502 });
+    }
+    return NextResponse.json({
+      ok: true,
+      torneo: tournament,
+      nombre: getTournamentName(tournament),
+      fuente: "api-football",
+      traidos: r.af?.fetched ?? 0,
+      guardados: (r.af?.inserted ?? 0) + (r.af?.updated ?? 0) + (r.af?.linked ?? 0),
+      errores: r.af?.errors ?? 0,
+      avisos: [],
+    });
+  }
 
   // Se acepta cualquier liga mapeada en ESPN, no solo las creables: es una
   // acción manual del administrador y puede necesitar resincronizar una liga

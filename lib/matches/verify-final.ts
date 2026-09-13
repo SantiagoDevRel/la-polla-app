@@ -5,6 +5,12 @@
 // status='finished' o cuando un match ya finished todavía no tiene
 // final_verified_at.
 //
+// 'af' mode (2026-09-13, app_config.data_provider_mode): API-Football is the
+// only source. ESPN and football-data are not fetched; rows linked to a fixture
+// ('apifootball:<id>') are matched by id; a result needs two separate provider
+// fetches with the same 90' score (a stored snapshot can veto, never confirm).
+// See verifyPendingFinalsApiFootball below. 'legacy' keeps the chain that follows.
+//
 // Provider contract (2026-09-09): strict identity; 90-minute scoring;
 // disagreement vetoes; a lone provider requires two separate observations.
 // Stored DB scores are not independent corroboration. API-Football's cached
@@ -26,8 +32,16 @@ import {
 import { COMPETITIONS } from "@/lib/football-data/sync";
 import { fetchCompetitionMatches, type FDMatch } from "@/lib/football-data/client";
 import { notifyAdmin } from "@/lib/notifications/admin-alert";
-import { apiFootballFinalsEnabled, loadDailyResults, type DailyResults } from "@/lib/api-football/daily-results";
-import { confirmedObservation, findResultFixture, readFinalResult, resultTeamKey, scorePair } from "@/lib/api-football/results";
+import {
+  apiFootballFinalsEnabled, loadAfDailyResults, loadDailyResults, loadFixturesByIds,
+  type DailyResults, type FixtureObservation,
+} from "@/lib/api-football/daily-results";
+import {
+  confirmedObservation, findResultFixture, linkedFixtureId, readFinalResult, resolveResultFixture,
+  resultTeamKey, scorePair,
+} from "@/lib/api-football/results";
+import { RESULT_LEAGUES } from "@/lib/api-football/leagues";
+import { getDataProviderMode, type DataProviderMode } from "./provider-mode";
 
 export interface VerifyResult {
   match_id: string;
@@ -126,7 +140,8 @@ function findFdMatch(match: MatchRow, fdMatches: FDMatch[]): FDMatch | null {
  * NULL`, intenta verificar contra las dos fuentes y actualiza la DB.
  * Devuelve el detalle por match para logging.
  */
-export async function verifyPendingFinals(): Promise<VerifyResult[]> {
+export async function verifyPendingFinals(mode?: DataProviderMode): Promise<VerifyResult[]> {
+  if ((mode ?? await getDataProviderMode()) === "af") return verifyPendingFinalsApiFootball();
   const admin = createAdminClient();
 
   // Solo matches recién finalizados sin verificar QUE ESTÁN EN ALGUNA POLLA.
@@ -600,6 +615,164 @@ async function verifyOneMatch(
   result.status = "discrepancy";
   result.notes = `DISCREPANCIA — ESPN: ${espnHome}-${espnAway}, DB: ${fdHomeDb}-${fdAwayDb}.`;
   await alertOnce(admin, match, result.notes, alertedSuffix);
+  return result;
+}
+
+// ─── 'af' mode: API-Football only ──────────────────────────────────────────
+
+interface AfMatchRow extends MatchRow {
+  source_external_ids: string[] | null;
+}
+
+const AF_COLS =
+  "id, external_id, espn_id, tournament, phase, home_team, away_team, home_score, away_score, status, scheduled_at, final_verified_at, final_verification_notes, live_status_detail, regulation_home_score, regulation_away_score, source_external_ids";
+const AF_KICKOFF_TOLERANCE_MS = 2 * 60 * 60 * 1000;
+const utcDate = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+
+/**
+ * Same candidates as legacy (in a polla, unverified, 105 min after kickoff,
+ * last 7 days) but every status is resolved by API-Football alone:
+ *   · d-1..d  → the shared daily feed (one reservation per date).
+ *   · older, or linked but absent from its date feed → /fixtures?ids= in
+ *     batches of 20 (loadFixturesByIds, reserved per fixture).
+ * A tick without a fresh observation writes nothing, so the first-read marker
+ * survives until the reservation TTL allows the second fetch.
+ */
+async function verifyPendingFinalsApiFootball(): Promise<VerifyResult[]> {
+  const admin = createAdminClient();
+  const { filas: candidates, errores } = await matchesEnJuego<AfMatchRow>(admin, AF_COLS, (q) =>
+    q
+      .in("status", ["finished", "live", "scheduled"])
+      .is("final_verified_at", null)
+      .lte("scheduled_at", new Date(Date.now() - 105 * 60000).toISOString())
+      .gte("scheduled_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+  );
+  if (errores.length > 0) console.error("[verify-final:af] db query:", errores.join(" | "));
+  if (candidates.length === 0) return [];
+
+  const today = utcDate(new Date().toISOString());
+  const yesterday = utcDate(new Date(Date.now() - 86400000).toISOString());
+  const daily = await loadAfDailyResults(candidates);
+  const observed = new Map<string, FixtureObservation>();
+  const byIdRequest = new Map<string, number>();
+  for (const match of candidates) {
+    const linked = linkedFixtureId(match);
+    if (linked === "ambiguous") continue;
+    const date = utcDate(match.scheduled_at);
+    const feed = daily.get(date);
+    const fixture = feed ? resolveResultFixture(match, feed.fixtures) : null;
+    if (fixture && feed) observed.set(match.id, { fixture, fetchedAt: feed.fetchedAt });
+    else if (typeof linked === "number" && (feed || (date !== today && date !== yesterday))) {
+      byIdRequest.set(match.id, linked);
+    }
+  }
+  const byId = await loadFixturesByIds(Array.from(byIdRequest.values()));
+
+  const results: VerifyResult[] = [];
+  for (const match of candidates) {
+    const linked = linkedFixtureId(match);
+    const base: VerifyResult = { match_id: match.id, external_id: match.external_id, espn_id: match.espn_id, status: "pending", notes: "" };
+    const alertedSuffix = (match.final_verification_notes ?? "").match(/ alerted=[^ ]+/)?.[0] ?? "";
+    try {
+      if (linked === "ambiguous") {
+        base.status = "discrepancy";
+        base.notes = "API-Football: la fila está vinculada a dos fixtures distintos. No se puntúa; resolver en /admin/discrepancias.";
+        await alertOnce(admin, match, base.notes, alertedSuffix);
+        results.push(base);
+        continue;
+      }
+      const requestedId = byIdRequest.get(match.id);
+      const observation = observed.get(match.id) ?? (requestedId !== undefined ? byId.get(requestedId) : undefined);
+      if (!observation) {
+        // No fresh provider data this tick: never overwrite notes (keeps afseen).
+        if (match.status === "finished") {
+          base.notes = "API-Football: sin lectura nueva en este ciclo.";
+          results.push(base);
+        }
+        continue;
+      }
+      if (match.status !== "finished" && !readFinalResult(observation.fixture)) continue;
+      results.push(await verifyOneApiFootballMatch(admin, match, observation, typeof linked === "number", alertedSuffix));
+    } catch {
+      results.push({ ...base, status: "error", notes: "No se pudo guardar la verificación; se reintentará." });
+    }
+  }
+  return results;
+}
+
+async function verifyOneApiFootballMatch(
+  admin: ReturnType<typeof createAdminClient>,
+  match: AfMatchRow,
+  { fixture, fetchedAt }: FixtureObservation,
+  linked: boolean,
+  alertedSuffix: string,
+): Promise<VerifyResult> {
+  const result: VerifyResult = { match_id: match.id, external_id: match.external_id, espn_id: match.espn_id, status: "pending", notes: "" };
+  const previousNotes = match.final_verification_notes ?? "";
+  const af = readFinalResult(fixture);
+  if (!af) {
+    result.notes = `API-Football todavía no entrega un resultado final utilizable (estado ${fixture.fixture.status.short}).`;
+    await persistNote(admin, match.id, result.notes + alertedSuffix);
+    return result;
+  }
+  // Nor the competition: an id pointing at another league's fixture is a bad
+  // link, never a result for this row.
+  if (linked && fixture.league?.id !== RESULT_LEAGUES[match.tournament]) {
+    result.status = "discrepancy";
+    result.notes = `API-Football: el fixture ${fixture.fixture.id} es de otra competición (liga ${fixture.league?.id}). No se puntúa; resolver en /admin/discrepancias.`;
+    await alertOnce(admin, match, result.notes, alertedSuffix);
+    return result;
+  }
+  // An id link never skips the kickoff part of identity: a fixture played at
+  // another time than the stored calendar waits for the calendar refresh.
+  if (linked && Math.abs(Date.parse(fixture.fixture.date) - Date.parse(match.scheduled_at)) > AF_KICKOFF_TOLERANCE_MS) {
+    result.notes = `API-Football: el saque del fixture ${fixture.fixture.id} (${fixture.fixture.date}) no coincide con el calendario guardado; se espera su actualización.`;
+    await persistNote(admin, match.id, result.notes + alertedSuffix);
+    return result;
+  }
+  const snapshot = { home: match.regulation_home_score, away: match.regulation_away_score };
+  const etStored = scorePair(snapshot) || (match.live_status_detail !== null && ET_STATUS_DETAILS.has(match.live_status_detail));
+  const snapshotConflict = scorePair(snapshot) && (snapshot.home !== af.home || snapshot.away !== af.away);
+  if (snapshotConflict || (etStored && !af.wentToExtraTime)) {
+    result.status = "discrepancy";
+    result.notes = snapshotConflict
+      ? `DISCREPANCIA — API-Football 90': ${af.home}-${af.away}; marcador guardado al final de los 90': ${snapshot.home}-${snapshot.away}. No se puntúa.`
+      : `DISCREPANCIA — la fila registró alargue pero API-Football reporta final en 90' (${af.home}-${af.away}). No se puntúa.`;
+    await alertOnce(admin, match, result.notes, alertedSuffix);
+    return result;
+  }
+  const isKnockout = match.phase !== null && KNOCKOUT_PHASES.has(match.phase);
+  if (isKnockout && (!af.fulltime || (fixture.fixture.status.short === "PEN" && !af.penalty))) {
+    result.notes = "API-Football: faltan el marcador completo o los penales; esperando confirmación.";
+    await persistNote(admin, match.id, result.notes + alertedSuffix);
+    return result;
+  }
+  if (!confirmedObservation(previousNotes, fixture.fixture.id, af.home, af.away, fetchedAt)) {
+    // Keep the newest read of this same score; an older cached response never replaces it.
+    const seen = previousNotes.match(/ afseen=(\d+):(\d+)-(\d+)@(\S+)/);
+    const keep = seen !== null && Number(seen[1]) === fixture.fixture.id && Number(seen[2]) === af.home
+      && Number(seen[3]) === af.away && Date.parse(seen[4]) > Date.parse(fetchedAt);
+    const marker = keep ? seen![0] : ` afseen=${fixture.fixture.id}:${af.home}-${af.away}@${fetchedAt}`;
+    result.notes = `API-Football 90': ${af.home}-${af.away}; esperando otra lectura del proveedor.`;
+    await persistNote(admin, match.id, result.notes + marker + alertedSuffix);
+    return result;
+  }
+  // Match winner != aggregate qualifier: only a decisive shootout names the advancer.
+  const advancer: "home" | "away" | null = isKnockout && af.penalty && af.penalty.home !== af.penalty.away
+    ? af.penalty.home > af.penalty.away ? "home" : "away" : null;
+  result.notes = `Verificado API-Football: 90' ${af.home}-${af.away}, 1X2=${af.outcome}; dos lecturas del proveedor`
+    + (af.wentToExtraTime && af.fulltime ? ` (${fixture.fixture.status.short}, final ${af.fulltime.home}-${af.fulltime.away} — los puntos usan el 90').` : ".");
+  const { data: finalized, error } = await admin.rpc("finalize_verified_match_result", {
+    p_match_id: match.id, p_home_score: af.home, p_away_score: af.away, p_notes: result.notes,
+    p_fulltime_home: isKnockout ? af.fulltime?.home ?? null : null,
+    p_fulltime_away: isKnockout ? af.fulltime?.away ?? null : null,
+    p_penalty_home: isKnockout ? af.penalty?.home ?? null : null,
+    p_penalty_away: isKnockout ? af.penalty?.away ?? null : null,
+    p_advancer: advancer,
+  });
+  if (error) throw new Error("API-Football finalization failed");
+  result.status = finalized === true ? "verified" : "pending";
+  if (finalized !== true) result.notes = "Otro proceso ya verificó el partido o dejó de estar disponible.";
   return result;
 }
 
