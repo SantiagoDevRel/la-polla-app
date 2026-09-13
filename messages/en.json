@@ -71,6 +71,8 @@
     "errInvalidPhone": "Enter a valid number with country code",
     "errCooldown": "Wait {seconds}s to resend the code",
     "errSendFailed": "Couldn't send the code",
+    "errDailySmsCap": "We already sent all the SMS codes allowed today for this number. Try again tomorrow or contact support.",
+    "errDailySmsCapSupport": "Go to support",
     "errNetwork": "Network error",
     "errOtpLength": "The code has 6 digits",
     "errOtpInvalid": "Invalid or expired code",

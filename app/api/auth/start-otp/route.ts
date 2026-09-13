@@ -7,22 +7,35 @@
 // Aplica rate-limit por phone para no abrir la puerta a fuerza bruta
 // del verify-otp.
 //
+// La llamada a Supabase Auth sale con la IP real de la persona
+// (`Sb-Forwarded-For`, lib/supabase/auth-ip.ts). Sin eso, el límite por IP de
+// Supabase se repartía entre todos los usuarios detrás de las IPs de Vercel.
+//
 // NOTA: el gate Turnstile fue rolleado back temporalmente porque el
 // widget interaction-only no rendereaba en algunos browsers y bloqueaba
 // login. El vector de bill-bombing de SMS por phones rotados queda abierto
 // hasta que cablemos un widget visible probado (TaskList #8).
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createSbClient } from "@supabase/supabase-js";
 import {
   checkAndRecordAttempt,
   checkIpRateLimit,
   checkDailySmsCap,
+  otpRejectedBeforeSending,
+  releaseGenerateAttempt,
 } from "@/lib/auth/rate-limit";
 import { normalizePhone } from "@/lib/auth/phone";
+import { DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
+import { createAuthClient, getClientIp } from "@/lib/supabase/auth-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Respuesta del tope diario. `code` lo usa /login para mostrar el texto
+// traducido (Login.errDailySmsCap) con el enlace a /soporte; `error` queda
+// para clientes viejos que solo pintan el texto.
+const DAILY_SMS_CAP_MESSAGE =
+  "Ya enviamos los códigos por SMS permitidos hoy para este número. Inténtalo de nuevo mañana o escríbenos a soporte.";
 
 // Admins — exentos del tope diario de SMS para que las pruebas de login
 // del equipo no se choquen con el cap. Se leen de env (ADMIN_PHONES_E164,
@@ -57,8 +70,7 @@ export async function POST(request: NextRequest) {
   }
   const phoneNormalized = phoneE164.replace(/\D/g, "");
 
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
+  const ip = getClientIp(request.headers) ?? undefined;
 
   // Rate limit por IP (defensa anti bill-bombing de SMS). El límite por
   // phone de abajo NO frena al bot que rota números; este sí, porque el
@@ -77,18 +89,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Tope DIARIO de SMS por teléfono (2/día). Más allá, empujamos al
-  // usuario a WhatsApp (gratis e instantáneo) — el botón de WhatsApp del
-  // /login ya da el camino, así que NO lo dejamos afuera, solo movemos el
-  // costo del canal pago al gratis. Admins exentos. Va ANTES del envío.
+  // Tope DIARIO de SMS por teléfono (2/día). Acota el costo del re-login
+  // crónico. Admins exentos. Va ANTES del envío. WhatsApp está apagado, así
+  // que el mensaje remite a soporte, no a otro canal.
   if (!ADMIN_PHONES.has(phoneNormalized)) {
     const daily = await checkDailySmsCap(phoneNormalized);
     if (daily.blocked) {
       return NextResponse.json(
         {
-          error:
-            "Ya usaste tus 2 ingresos por SMS de hoy. Entra gratis y al instante con el botón verde de WhatsApp 👇",
-          useWhatsapp: true,
+          error: DAILY_SMS_CAP_MESSAGE,
+          code: DAILY_SMS_CAP_CODE,
+          supportPath: SUPPORT_PATH,
         },
         { status: 429 },
       );
@@ -111,18 +122,18 @@ export async function POST(request: NextRequest) {
   }
 
   // Supabase signInWithOtp dispara el SMS (Twilio hoy; LabsMobile cuando
-  // el Send SMS Hook esté cableado en el dashboard de Auth).
-  // Anon client (no cookies — no hay sesión todavía).
-  const supabase = createSbClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-  const { error } = await supabase.auth.signInWithOtp({
+  // el Send SMS Hook esté cableado en el dashboard de Auth). Sin cookies:
+  // todavía no hay sesión.
+  const auth = createAuthClient(ip);
+  const { error } = await auth.signInWithOtp({
     phone: phoneE164,
     options: { channel: "sms" },
   });
   if (error) {
+    // Supabase lo rechazó sin mandar SMS → ese intento no gasta el cupo.
+    if (limit.attemptId && otpRejectedBeforeSending(error)) {
+      await releaseGenerateAttempt(limit.attemptId);
+    }
     const msg = (error.message || "").toLowerCase();
     if (msg.includes("phone signups") || msg.includes("provider")) {
       return NextResponse.json(
@@ -130,7 +141,7 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       );
     }
-    if (msg.includes("rate") || msg.includes("limit")) {
+    if (error.status === 429 || msg.includes("rate") || msg.includes("limit")) {
       return NextResponse.json(
         { error: "Muchos intentos. Espera un minuto." },
         { status: 429 },

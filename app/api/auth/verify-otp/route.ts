@@ -7,11 +7,11 @@
 // Mismo patrón que los-del-sur-app.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
 import { recordLoginEvent } from "@/lib/auth/login-event";
 import { normalizePhone } from "@/lib/auth/phone";
+import { createAuthRouteClient, getClientIp } from "@/lib/supabase/auth-ip";
 
 export const runtime = "nodejs";
 
@@ -36,8 +36,7 @@ export async function POST(request: NextRequest) {
     const code = parsed.data.token;
 
     // Defense in depth: rate limit por phone (5 intentos / 15 min).
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
+    const ip = getClientIp(request.headers) ?? undefined;
     const limit = await checkAndRecordAttempt(phoneNormalized, "verify", ip);
     if (limit.blocked) {
       return NextResponse.json(
@@ -49,7 +48,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    // Cliente SOLO de Auth, con las cookies del request y la IP real de la
+    // persona (Sb-Forwarded-For): el límite de /verify de Supabase es por IP y
+    // desde Vercel lo compartían todos los usuarios. lib/supabase/auth-ip.ts.
+    const auth = await createAuthRouteClient(ip);
     // Defensive: clear any existing session BEFORE verifying. Users
     // legitimately have multiple accounts (one per phone), and if they
     // come into /login already logged into account A and then submit
@@ -60,9 +62,9 @@ export async function POST(request: NextRequest) {
     // scope:'local' — solo limpia ESTE browser. El default 'global'
     // revocaba todas las sesiones del user anterior en sus otros
     // dispositivos (hallazgo codex 2026-06-11).
-    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    await auth.signOut({ scope: "local" }).catch(() => {});
 
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { data, error } = await auth.verifyOtp({
       phone: phoneE164,
       token: code,
       type: "sms",
