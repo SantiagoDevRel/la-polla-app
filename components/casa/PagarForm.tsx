@@ -4,11 +4,18 @@
 //
 // Un solo campo y un solo botón. La gente está en la calle, con una mano, con
 // mala señal: cualquier paso extra acá se traduce en alguien que no entra.
+//
+// La imagen se prepara UNA vez al elegirla (lib/casa/prepare-proof.ts): una
+// captura de varios MB baja a unos cientos de KB antes del hash. Ese mismo
+// Blob se reutiliza en begin, reintento y reemplazo, y el original válido
+// queda como segundo candidato para retomar cargas iniciadas con otros bytes.
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SelectorBoleta } from "./Boletas";
-import { casaPost, fileDigest, uploadSignedFile } from "@/lib/casa/upload-client";
+import { casaPost, uploadSignedFile } from "@/lib/casa/upload-client";
+import { ImagePreparationError, prepareImageUpload, type PreparedImage } from "@/lib/casa/prepare-proof";
+import { submitProof } from "@/lib/casa/proof-submit";
 import { Label, StreetCard } from "@/components/street";
 
 interface Props {
@@ -19,12 +26,15 @@ interface Props {
   resumeOnly?: boolean;
 }
 
-const MAX_MB = 8;
-
 export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
+  // Cada selección recibe un turno: si la persona elige otra imagen mientras
+  // se prepara la anterior, el resultado viejo se descarta.
+  const selectionRef = useRef(0);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [prepared, setPrepared] = useState<PreparedImage | null>(null);
+  const [preparando, setPreparando] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [ticket, setTicket] = useState(initialTicket);
   const [revision, setRevision] = useState(0);
@@ -34,20 +44,30 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
-  function elegir(f: File | null) {
-    setError(null);
+  async function elegir(f: File | null) {
     if (!f) return;
-    if (f.size > MAX_MB * 1024 * 1024) {
-      setError(`La imagen supera los ${MAX_MB} MB.`);
-      return;
+    const turn = ++selectionRef.current;
+    setError(null);
+    setPrepared(null);
+    setPreview(null);
+    setFileName(f.name);
+    setPreparando(true);
+    try {
+      const result = await prepareImageUpload(f);
+      if (turn !== selectionRef.current) return;
+      setPrepared(result);
+      setPreview(URL.createObjectURL(result.candidates[0].blob));
+    } catch (cause) {
+      if (turn !== selectionRef.current) return;
+      setFileName(null);
+      setError(cause instanceof ImagePreparationError ? cause.message : "No pudimos preparar la imagen. Toma una captura de pantalla y sube esa imagen.");
+    } finally {
+      if (turn === selectionRef.current) setPreparando(false);
     }
-    if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) { setError("Usa una imagen JPG, PNG o WEBP. En iPhone puedes tomar una captura de la transferencia."); return; }
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
   }
 
   async function enviar() {
-    if (!file) {
+    if (!prepared) {
       setError("Sube el comprobante de la transferencia.");
       return;
     }
@@ -60,46 +80,19 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
     setError(null);
     try {
       const url = `/api/casa/pollas/${slug}/join`;
-      const sha256 = await fileDigest(file);
       const key = `casa-proof:${slug}:${ticket || "entry"}`;
-      let stored: { sha256: string; requestId: string; attemptId?: string } | null = null;
-      try { stored = JSON.parse(sessionStorage.getItem(key) ?? "null"); } catch { /* Storage may be disabled. */ }
-      if (stored && stored.sha256 !== sha256) {
-        if (stored.attemptId) await casaPost(url, { action: "fail", attemptId: stored.attemptId });
-        stored = null;
-      }
-      const record = stored ?? { sha256, requestId: crypto.randomUUID() };
-      const save = () => { try { sessionStorage.setItem(key, JSON.stringify(record)); } catch { /* Retry within this render still works. */ } };
-      save();
-      let begun;
-      for (let retry = 0; retry < 2; retry += 1) {
-        try {
-          begun = await casaPost(url, { action: "begin", requestId: record.requestId, ticketNumber: esRifa ? Number(ticket) : null,
-            sha256, contentType: file.type, bytes: file.size });
-          break;
-        } catch (cause) {
-          if (retry === 0 && ["UPLOAD_EXPIRED", "ATTEMPT_REPLACED"].includes((cause as { code?: string }).code ?? "")) {
-            record.requestId = crypto.randomUUID(); delete record.attemptId; save();
-          } else throw cause;
-        }
-      }
-      if (!begun) throw new Error("No se pudo iniciar la carga.");
-      record.attemptId = begun.attempt_id; save();
-      if (begun.state !== "confirmed") {
-        await uploadSignedFile(begun.upload, file);
-        // A timed-out upload may have succeeded. Verification resolves that ambiguity.
-        try { await casaPost(url, { action: "confirm", attemptId: begun.attempt_id }); }
-        catch (cause) {
-          if ((cause as { code?: string }).code !== "UPLOAD_MISMATCH") throw cause;
-          await casaPost(url, { action: "fail", attemptId: begun.attempt_id });
-          record.requestId = crypto.randomUUID(); delete record.attemptId; save();
-          const replacement = await casaPost(url, { action: "begin", requestId: record.requestId, ticketNumber: esRifa ? Number(ticket) : null,
-            sha256, contentType: file.type, bytes: file.size });
-          record.attemptId = replacement.attempt_id; save();
-          await uploadSignedFile(replacement.upload, file);
-          await casaPost(url, { action: "confirm", attemptId: replacement.attempt_id });
-        }
-      }
+      await submitProof({
+        sourceSha256: prepared.sourceSha256,
+        candidates: prepared.candidates,
+        ticketNumber: esRifa ? Number(ticket) : null,
+        preserveStoredAttempt: resumeOnly,
+      }, {
+        post: (body) => casaPost(url, body),
+        upload: (upload, blob) => uploadSignedFile(upload, blob),
+        readRecord: () => sessionStorage.getItem(key),
+        writeRecord: (value) => sessionStorage.setItem(key, value),
+        newRequestId: () => crypto.randomUUID(),
+      });
       setListo(true);
       // Un respiro para que se lea la confirmación antes de volver.
       setTimeout(() => router.push(`/casa/${slug}`), 1600);
@@ -138,7 +131,11 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         // que el pago quedaba imposible de completar.
         accept="image/jpeg,image/png,image/webp"
         disabled={enviando}
-        onChange={(e) => elegir(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          void elegir(e.target.files?.[0] ?? null);
+          // Permite volver a elegir el mismo archivo después de un error.
+          e.target.value = "";
+        }}
         className="sr-only"
       />
 
@@ -155,6 +152,10 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
             alt="Vista previa del comprobante"
             className="max-h-[240px] w-auto"
           />
+        ) : preparando ? (
+          <span role="status" className="text-[15px] text-text-secondary">
+            Preparando la imagen…
+          </span>
         ) : (
           <span className="text-[13px] text-text-muted">
             Sube aquí el comprobante
@@ -162,9 +163,9 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         )}
       </button>
 
-      {file && (
-        <p className="mt-2 text-center text-[13px] text-text-muted">
-          {file.name} · toca la imagen para cambiarla
+      {prepared && fileName && (
+        <p className="mt-2 text-center text-[13px] text-text-muted [overflow-wrap:anywhere]">
+          {fileName} · toca la imagen para cambiarla
         </p>
       )}
 
@@ -178,7 +179,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       <button
         type="button"
         onClick={enviar}
-        disabled={enviando || !file}
+        disabled={enviando || preparando || !prepared}
         className="lp-btn lp-btn-primary mt-4 w-full"
       >
         {enviando ? "Enviando..." : "Enviar el comprobante"}

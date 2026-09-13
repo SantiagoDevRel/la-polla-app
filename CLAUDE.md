@@ -1867,3 +1867,17 @@ Migraciones 097–102; activación explícita `legacy → paused → v2`. No act
 revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
 [docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
 de 096 arriba no es el contrato de liquidación una vez activado v2.
+
+### Comprobantes: compresión determinista en el navegador (2026-09-13)
+
+Preparar UNA vez al elegir (`prepareImageUpload`) y reutilizar ese mismo Blob en
+begin, reintento y reemplazo; el hash es el de lo que se sube. No cambiar la ruta
+de decodificación (`<img>` y luego `createImageBitmap`), el canvas en CPU
+(`willReadFrequently`) ni los parámetros (300 KB, 1600/720 px, 4 MP, JPEG
+0,82/0,72) sin repetir la prueba de determinismo de
+`scripts/casa-proof-compression-browser-check.mjs`: sessionStorage, la
+recuperación entre pestañas/dispositivos y la carga tras el cierre comparan hashes.
+El original válido siempre va como segundo candidato y `submitProof` prueba el
+siguiente ante UPLOAD_IN_PROGRESS/REQUEST_CONFLICT. Nunca marcar como fallado un
+intento guardado con la inscripción cerrada. Servidor, SQL y bucket sin cambios.
+Detalle en README → «Comprobantes comprimidos en el navegador».

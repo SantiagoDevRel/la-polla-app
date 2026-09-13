@@ -26,6 +26,7 @@ import {
   nextColombiaSaturdayInput,
   toColombiaDateTimeInput,
 } from "@/lib/time/colombia";
+import { ImagePreparationError, PRIZE_IMAGE_PREPARE_OPTIONS, prepareImageUpload } from "@/lib/casa/prepare-proof";
 
 type Kind = "partidos" | "manual" | "rifa";
 
@@ -337,8 +338,11 @@ export function CrearPollaForm() {
     setSubiendoFoto(true);
     setError(null);
     try {
+      // La función de Vercel corta el cuerpo en 4,5 MB: se reduce aquí a menos
+      // de 1 MB (el servidor sigue validando tipo y tamaño).
+      const preparada = (await prepareImageUpload(file, PRIZE_IMAGE_PREPARE_OPTIONS)).candidates[0];
       const fd = new FormData();
-      fd.append("image", file);
+      fd.append("image", preparada.blob, preparada.prepared ? "premio.jpg" : file.name);
       const res = await fetch("/api/casa/admin/prize-image", {
         method: "POST",
         body: fd,
@@ -350,8 +354,8 @@ export function CrearPollaForm() {
       }
       setPrizeImagePath(json.path);
       setPrizeImageUrl(json.url);
-    } catch {
-      setError("Se cayó la conexión al subir la imagen.");
+    } catch (cause) {
+      setError(cause instanceof ImagePreparationError ? cause.message : "Se cayó la conexión al subir la imagen.");
     } finally {
       setSubiendoFoto(false);
     }
