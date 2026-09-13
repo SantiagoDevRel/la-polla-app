@@ -22,6 +22,7 @@ import { isCurrentUserAdmin, getAuthenticatedUser } from "@/lib/auth/admin";
 import { cachedApiFootballResult } from "@/lib/matches/af-cached-result";
 import { readFinalResult } from "@/lib/api-football/results";
 import { KNOCKOUT_PHASES } from "@/lib/utils/points";
+import { overrideReadyForManualResult } from "@/lib/matches/override-resolution";
 
 const BodySchema = z.discriminatedUnion("source", [
   z.object({
@@ -63,13 +64,17 @@ export async function POST(
   // Obtener el match para diagnóstico + status check.
   const { data: match, error: matchErr } = await admin
     .from("matches")
-    .select("id, status, home_score, away_score, final_verified_at, tournament, phase, home_team, away_team, scheduled_at, external_id, source_external_ids")
+    .select("id, status, home_score, away_score, final_verified_at, tournament, phase, home_team, away_team, scheduled_at, schedule_override_at, external_id, source_external_ids")
     .eq("id", matchId)
     .maybeSingle();
   if (matchErr || !match) {
     return NextResponse.json({ error: "Match no encontrado" }, { status: 404 });
   }
-  if (match.status !== "finished") {
+  // Hora fijada por el admin (migración 118): si el proveedor no tiene el
+  // partido en esa fecha nunca pasa a finished; pasado el tiempo de juego se
+  // admite solo el marcador manual.
+  const overrideManual = parsed.data.source === "manual" && overrideReadyForManualResult(match);
+  if (match.status !== "finished" && !overrideManual) {
     return NextResponse.json(
       { error: `El partido no está finalizado (status=${match.status}). No se puede resolver una discrepancia que aún no terminó.` },
       { status: 409 },

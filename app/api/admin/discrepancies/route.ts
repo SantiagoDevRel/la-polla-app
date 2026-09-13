@@ -13,6 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { cachedApiFootballResult } from "@/lib/matches/af-cached-result";
 import { readFinalResult } from "@/lib/api-football/results";
+import { overrideResolutionCutoffIso } from "@/lib/matches/override-resolution";
 
 interface MatchRow {
   id: string;
@@ -27,6 +28,7 @@ interface MatchRow {
   away_score: number | null;
   status: string;
   scheduled_at: string;
+  schedule_override_at: string | null;
   final_verification_notes: string | null;
 }
 
@@ -46,10 +48,12 @@ export async function GET() {
   // solo corriendo SQL a mano.
   const { filas: matches, errores } = await matchesEnJuego<MatchRow>(
     admin,
-    "id, external_id, source_external_ids, tournament, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, scheduled_at, final_verification_notes",
+    "id, external_id, source_external_ids, tournament, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, scheduled_at, schedule_override_at, final_verification_notes",
     (q) =>
       q
-        .eq("status", "finished")
+        // También los de hora fijada por el admin (migración 118) que ya debieron
+        // terminar: si el proveedor no los tiene en esa fecha, nunca pasan a finished.
+        .or(`status.eq.finished,and(schedule_override_at.not.is.null,status.neq.cancelled,scheduled_at.lte."${overrideResolutionCutoffIso()}")`)
         .is("final_verified_at", null)
         .order("scheduled_at", { ascending: false }),
   );
