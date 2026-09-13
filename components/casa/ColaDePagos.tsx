@@ -179,7 +179,7 @@ export function ColaDePagos({ pollaId, onReviewed, refreshKey = 0, status = "pen
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="lp-display text-[20px]">{paid ? "Pagos aprobados" : "Recibos pendientes"}</h3>
+        <h3 className="font-display text-[20px] font-normal uppercase leading-tight tracking-[0.04em] text-text-primary">{paid ? "Pagos aprobados" : "Recibos pendientes"}</h3>
         <button type="button" onClick={actualizar} disabled={loading || resolviendo !== null} className="lp-btn lp-btn-ghost !px-3 !text-[15px]">
           <RefreshCw className="h-4 w-4" aria-hidden="true" /> Actualizar
         </button>
@@ -265,7 +265,7 @@ export function ColaDePagos({ pollaId, onReviewed, refreshKey = 0, status = "pen
       </ul>
       {loading && <div role="status" className="mt-3 space-y-3"><span className="sr-only">Cargando pagos...</span>{[0, 1].map((row) => <div key={row} aria-hidden="true" className="rounded-md border border-border-default p-4"><Skeleton className="h-4 w-2/3" /><Skeleton className="mt-3 h-12 w-full" /></div>)}</div>}
       {error && !loading && <div role="alert" className="mt-3 text-[13px] text-red-alert"><p>{error}</p><button type="button" onClick={() => setPageRequest((value) => value + 1)} className="lp-btn lp-btn-ghost mt-2 text-[13px]">Reintentar</button></div>}
-      {!loading && !error && pendientes?.length === 0 && <div className="py-5 text-center"><CheckCircle2 className="mx-auto h-7 w-7 text-text-secondary" aria-hidden="true" /><p className="lp-display mt-2 text-[20px]">{paid ? "Todavía no hay pagos aprobados" : "No hay recibos pendientes"}</p><p className="mt-1 text-[13px] text-text-secondary">{paid ? "Aquí encontrarás los comprobantes que ya aprobaste." : "Los nuevos comprobantes aparecerán aquí para revisarlos."}</p></div>}
+      {!loading && !error && pendientes?.length === 0 && <div className="py-5 text-center"><CheckCircle2 className="mx-auto h-7 w-7 text-text-secondary" aria-hidden="true" /><p className="mt-2 font-display text-[20px] font-normal uppercase leading-tight tracking-[0.04em] text-text-primary">{paid ? "Todavía no hay pagos aprobados" : "No hay recibos pendientes"}</p><p className="mt-1 text-[13px] text-text-secondary">{paid ? "Aquí encontrarás los comprobantes que ya aprobaste." : "Los nuevos comprobantes aparecerán aquí para revisarlos."}</p></div>}
       {!loading && !error && hasMore && <button type="button" onClick={cargarMas} disabled={resolviendo !== null} className="lp-btn lp-btn-ghost mt-4 w-full !text-[15px]">Cargar más pagos</button>}
     </div>
   );

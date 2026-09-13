@@ -42,16 +42,20 @@ try {
   const page=admin.page;
   inspectedPage=page;
   page.setDefaultTimeout(30000); page.setDefaultNavigationTimeout(90000);
-  await page.goto(`${origin}/admin/pollas/crear`,{waitUntil:"domcontentloaded"});
+  await page.goto(`${origin}/admin/pollas/crear`,{waitUntil:"networkidle"});
   await page.getByRole("button",{name:"Manual",exact:true}).click();
   await page.getByPlaceholder("Fecha 5 · Premier",{exact:true}).fill(name);
-  await page.getByLabel("Valor del premio (COP)",{exact:true}).fill("1000000");
+  await page.getByLabel("Premio garantizado (COP)",{exact:true}).fill("1000000");
   const cut=page.locator('input[type=number][max="100"]');
   assert.equal(await cut.inputValue(),"0");
-  await cut.fill("30");
-  assert.equal(await page.getByRole("button",{name:"Pozo proporcional",exact:true}).getAttribute("aria-pressed"),"true");
+  // Migration 109: the percentage and the prize selector are independent choices.
+  await cut.fill("50");
+  assert.equal(await page.getByRole("button",{name:"Pozo fijo",exact:true}).getAttribute("aria-pressed"),"true");
+  await page.getByRole("button",{name:"Pozo proporcional",exact:true}).click();
+  assert.equal(await cut.inputValue(),"50");
   await page.getByRole("button",{name:"Pozo fijo",exact:true}).click();
-  assert.equal(await cut.inputValue(),"0");
+  assert.equal(await cut.inputValue(),"50");
+  await page.getByText("Premio garantizado de $1.000.000. Se cubre con 100 inscritos; desde el inscrito 101, cada entrada suma $5.000 al pozo y $5.000 a la casa.",{exact:true}).waitFor();
   await page.getByPlaceholder("300 123 4567",{exact:true}).fill("3000000000");
   await page.getByPlaceholder("A nombre de...",{exact:true}).fill("Cuenta ficticia local");
   await page.getByRole("button",{name:"Fecha manual",exact:true}).last().click();
@@ -68,17 +72,19 @@ try {
   await page.evaluate(()=>{for(const el of document.querySelectorAll("body *"))el.style.removeProperty("font-size");});
   await page.getByRole("button",{name:"Programar publicación",exact:true}).click();
   await page.getByText(/Publicación programada:/).waitFor();
-  const result=await localDb.from("casa_pollas").select("id,slug,pot_mode,fixed_prize_cop,opens_at,closes_at").eq("name",name).single();
+  const result=await localDb.from("casa_pollas").select("id,slug,pot_mode,fixed_prize_cop,house_cut_pct,opens_at,closes_at").eq("name",name).single();
   assert.ifError(result.error); const polla=result.data;
   assert.equal(polla.opens_at,"2030-09-20T14:15:00+00:00");
   assert.equal(polla.closes_at,"2030-09-22T23:30:00+00:00");
-  assert.equal(polla.pot_mode,"fijo"); assert.equal(polla.fixed_prize_cop,1000000);
+  assert.equal(polla.pot_mode,"fijo"); assert.equal(polla.fixed_prize_cop,1000000); assert.equal(polla.house_cut_pct,50);
   const hidden=await oldest.context.request.get(`${origin}/casa/${polla.slug}`);
   const hiddenHtml=await hidden.text();
   // Next can stream the shell before notFound: the generic page is a soft 404.
   assert.ok([200,404].includes(hidden.status())); assert.ok(!hiddenHtml.includes(name)); assert.match(hiddenHtml,/noindex/);
   await api(oldest,`/api/casa/pollas/${polla.slug}/join`,{action:"begin",requestId:randomUUID(),ticketNumber:null,sha256:"a".repeat(64),contentType:"image/png",bytes:64},"POST",404);
-  console.log("PASS create real form, Berlin browser -> Bogotá dates, fixed prize, scheduled privacy");
+  const balance=localSql(`SELECT house_cop FROM casa_pot_summaries_v2(ARRAY[${q(polla.id)}::uuid]);`);
+  assert.equal(balance,"0","an unpublished scheduled fixed pool must not subtract its prize from the house balance");
+  console.log("PASS create real form, Berlin browser -> Bogotá dates, guaranteed minimum with 50% house cut, scheduled privacy");
   await page.goto(`${origin}/admin/pollas`,{waitUntil:"domcontentloaded"});
   const card=page.locator("li").filter({has:page.locator('button[id^="polla-toggle-"]').filter({hasText:name})});
   await page.waitForFunction((id) => { const button=document.getElementById(`polla-toggle-${id}`); return button && Object.keys(button).some(key=>key.startsWith("__reactProps$") && button[key]?.onClick); },polla.id);
@@ -89,8 +95,9 @@ try {
   assert.equal(visible.status(),200);
   console.log("PASS scheduled pool can be published from admin");
   for(const actor of [oldest,newest]) {
-    await actor.page.goto(`${origin}/casa/${polla.slug}/pagar`,{waitUntil:"domcontentloaded",timeout:90000});
-    await actor.page.getByText(/Participas por un pozo fijo/).waitFor();
+    // networkidle: a file chosen before hydration never reaches React and the submit stays disabled.
+    await actor.page.goto(`${origin}/casa/${polla.slug}/pagar`,{waitUntil:"networkidle",timeout:90000});
+    await actor.page.getByText(/con un premio mínimo garantizado de \$1\.000\.000\. Cuando las entradas superan ese mínimo, el 50% de cada nueva entrada se suma al pozo\./).waitFor();
     const png=await actor.page.evaluate(()=>{const c=document.createElement("canvas");c.width=500;c.height=180;const x=c.getContext("2d");x.fillStyle="white";x.fillRect(0,0,500,180);x.fillStyle="black";x.font="22px sans-serif";x.fillText("COMPROBANTE LOCAL DE PRUEBA",10,90);return c.toDataURL("image/png").split(",")[1];});
     await actor.page.locator('input[type=file]').setInputFiles({name:"prueba-local.png",mimeType:"image/png",buffer:Buffer.from(png,"base64")});
     await actor.page.getByRole("button",{name:"Enviar el comprobante",exact:true}).click();

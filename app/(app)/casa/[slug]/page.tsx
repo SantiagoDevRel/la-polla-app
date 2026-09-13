@@ -145,10 +145,14 @@ export default async function PollaPage({
         <h1 className="lp-display mt-2 text-[34px]">{polla.name}</h1>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : polla.pot_mode === "fijo" ? "Pozo fijo" : "Pozo"}</Label>
+            <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label>
             <div className="lp-money text-[32px] leading-none text-gold">
               {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
             </div>
+            {/* Pozo fijo = mínimo garantizado (migración 109): la cifra de arriba puede crecer. */}
+            {polla.prize_kind !== "objeto" && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
+              <p className="mt-1 text-[13px] text-text-secondary">Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</p>
+            )}
           </div>
           <span className="text-[12px] text-text-secondary">
             {pot.paid_entries} inscritos ·{" "}
@@ -412,10 +416,13 @@ function PollaPublica({
           {polla.name}
         </h1>
         <div className="mt-3">
-          <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : polla.pot_mode === "fijo" ? "Pozo fijo" : "Pozo"}</Label>
+          <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label>
           <div className="lp-money mt-0.5 text-[40px] leading-none text-gold">
             {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
           </div>
+          {polla.prize_kind !== "objeto" && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
+            <p className="mt-1 text-[13px] text-text-secondary">Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</p>
+          )}
         </div>
       </HeroFrame>
 

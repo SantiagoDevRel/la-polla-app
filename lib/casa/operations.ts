@@ -10,7 +10,7 @@ export function requireCasaContract(request: Request) {
 }
 
 const messages: Record<string, string> = {
-  INVALID_FIXED_PRIZE: "Elige un premio fijo mayor a cero y deja el porcentaje de la casa en 0%.",
+  INVALID_FIXED_PRIZE: "Elige un premio fijo mayor a cero.",
   INVALID_PUBLICATION_DATE: "La publicación debe ser futura y anterior al cierre de inscripciones.",
   PUBLICATION_HAS_ENTRIES: "Esta polla ya tiene inscripciones; su publicación no puede cambiar.",
   POLLA_NOT_PUBLISHED: "Esta polla todavía no está publicada.",
@@ -47,6 +47,10 @@ const messages: Record<string, string> = {
   REQUEST_CONFLICT: "Este intento corresponde a otros datos. Conserva el archivo y el ganador originales.",
   INVALID_DRAW_WINNER: "El ganador debe pertenecer a la lista de participantes empatados.",
   ADMIN_REQUIRED: "No tienes permiso para esa operación.",
+  ISSUE_NOT_FOUND: "No encontramos ese caso.",
+  ISSUE_ALREADY_DECIDED: "Este caso ya fue decidido.",
+  INVALID_DECISION: "Elige anular o mantener el partido.",
+  OPEN_MATCH_ISSUES: "Hay partidos con novedades sin decidir. Revísalos en Issues antes de repartir.",
 };
 
 export function casaErrorMessage(error: { message?: string; code?: string }): string {

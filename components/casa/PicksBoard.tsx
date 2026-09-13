@@ -47,12 +47,11 @@ interface Props {
   distribution: CasaDistribution;
   /** false = ya cerro, o el usuario todavia no se inscribio */
   canEdit: boolean;
-  lockedReason?: string;
   /** Participants and admins only; the group picks endpoint answers 403 to anyone else. */
   canViewOthers: boolean;
+  lockedReason?: string;
 }
 
-/** Nombre corto: "Manchester City FC" no entra en un boton de 110px. */
 const REFRESH_INTERVAL_MS = 30_000;
 const REFRESH_LEAD_MS = 10 * 60_000;
 const REFRESH_TAIL_MS = 3 * 60 * 60_000;
@@ -88,6 +87,7 @@ export function msUntilNextRefreshWindow(matches: RefreshTiming[], now: number):
   return next === null ? null : next - now;
 }
 
+/** Nombre corto: "Manchester City FC" no entra en un boton de 110px. */
 function corto(nombre: string): string {
   return nombre
     // Solo sufijos/prefijos societarios. "United" y "Club" NO se tocan:
@@ -119,8 +119,8 @@ export function PicksBoard({
   initialPicks,
   distribution,
   canEdit,
-  lockedReason,
   canViewOthers,
+  lockedReason,
 }: Props) {
   const [picks, setPicks] = useState(initialPicks);
   const [saving, setSaving] = useState(false);

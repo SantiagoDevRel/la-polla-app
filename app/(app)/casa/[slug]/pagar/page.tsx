@@ -100,7 +100,11 @@ export default async function PagarPage({
               </div>
             </div>
           </div>
-          {polla.prize_kind === "objeto" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary">El premio es <strong className="text-text-primary">{polla.prize_object}</strong>. La inscripción te permite participar por ese objeto. No hay reparto del pozo ni premio adicional en dinero.</p> : polla.pot_mode === "fijo" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary">Participas por un pozo fijo de <strong className="text-text-primary">{formatCop(pot.prize_cop)}</strong>. El premio no cambia con el número de inscritos. Si varios ganadores empatan, se divide entre ellos.</p> : <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
+          {polla.prize_kind === "objeto" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary">El premio es <strong className="text-text-primary">{polla.prize_object}</strong>. La inscripción te permite participar por ese objeto. No hay reparto del pozo ni premio adicional en dinero.</p> : polla.pot_mode === "fijo" ? <div className="mt-4 space-y-2 text-[15px] leading-relaxed text-text-secondary">
+            {/* Mínimo garantizado (migración 109). Las cifras salen de casa_payment_details_v2. */}
+            <p>Participas por un pozo de <strong className="text-text-primary">{formatCop(pot.prize_cop)}</strong>{typeof polla.fixed_prize_cop === "number" && <>, con un premio mínimo garantizado de <strong className="text-text-primary">{formatCop(polla.fixed_prize_cop)}</strong></>}.{100 - polla.house_cut_pct > 0 && ` Cuando las entradas superan ese mínimo, el ${100 - polla.house_cut_pct}% de cada nueva entrada se suma al pozo.`} Si varios ganadores empatan, se divide entre ellos.</p>
+            {pot.projected_prize_cop > pot.prize_cop && <p>Con tu entrada, el pozo queda en <strong className="text-text-primary">{formatCop(pot.projected_prize_cop)}</strong>.</p>}
+          </div> : <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
             <div className="flex justify-between">
               <span className="text-text-secondary">
                 Va al pozo

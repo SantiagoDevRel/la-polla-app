@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
 import { getPots, getHouseTotal, listAllPollas } from "@/lib/casa/queries";
 import { pollaStatusLabel } from "@/lib/casa/types";
+import { countOpenMatchIssues } from "@/lib/casa/match-issues";
 import { CasaAdminPanel } from "@/components/casa/CasaAdminPanel";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,8 @@ export default async function CasaAdminPage() {
   const pollas = await listAllPollas();
   const pots = await getPots(pollas.map((polla) => polla.id));
   const totalCasa = await getHouseTotal(pollas.map((polla) => polla.id));
+  // Partidos suspendidos/aplazados/cancelados/abandonados sin decidir.
+  const openIssues = await countOpenMatchIssues();
 
   return (
     <CasaAdminPanel
@@ -38,6 +41,7 @@ export default async function CasaAdminPage() {
       }))}
       pots={pots}
       totalCasa={totalCasa}
+      openIssues={openIssues}
     />
   );
 }

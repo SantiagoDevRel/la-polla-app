@@ -28,7 +28,7 @@ export async function AdminPaymentReview({ status, pollaId }: { status: "pendien
     <Link href="/admin/pollas" className="mb-4 inline-flex min-h-11 items-center gap-2 text-[15px] text-text-secondary transition-colors hover:text-text-primary">
       <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" /> Administrar pollas
     </Link>
-    <h1 className="lp-display text-[32px] leading-[1.1]">Revisión de pagos</h1>
+    <h1 className="font-display text-[32px] font-normal uppercase leading-[1.1] tracking-[0.04em] text-text-primary">Revisión de pagos</h1>
     {polla?.state === "found" && <p className="mt-2 text-[15px] leading-[1.45] text-text-primary [overflow-wrap:anywhere]">Polla: {polla.name}</p>}
     {polla?.state === "missing" ? <div role="alert" className="mt-5 rounded-md border border-border-default p-4">
       <p className="text-[15px] font-semibold leading-[1.45] text-text-primary">Polla no encontrada</p>

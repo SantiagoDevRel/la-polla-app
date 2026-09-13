@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, Plus, RefreshCw, Ticket, Files, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Plus, RefreshCw, Ticket, Files, CheckCircle2, AlertTriangle } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { HeroFrame, Label, Tape } from "@/components/street";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -18,10 +18,12 @@ export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "stat
   label: ReturnType<typeof pollaStatusLabel>;
 };
 
-export function CasaAdminPanel({ pollas, pots, totalCasa }: {
+export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
   pollas: AdminPolla[];
   pots: Record<string, CasaPot>;
   totalCasa: number;
+  /** Casos de partidos sin decidir; `null` si no se pudo leer el conteo. */
+  openIssues?: number | null;
 }) {
   const reducedMotion = useReducedMotion();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa }: {
           <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" /> Administración
         </Link>
         <Label>Administración</Label>
-        <h1 className="lp-display mt-1 text-[36px] leading-none">Administrar pollas</h1>
+        <h1 className="mt-1 font-display text-[32px] font-normal uppercase leading-[1.1] tracking-[0.04em] text-text-primary">Administrar pollas</h1>
         <div className="mt-4 grid grid-cols-2 gap-4">
           <div className="min-w-0">
             <Label>Balance de la casa</Label>
@@ -95,11 +97,22 @@ export function CasaAdminPanel({ pollas, pots, totalCasa }: {
         </nav>
         <p className="mb-5 text-[13px] leading-relaxed text-text-secondary">Revisa todos los recibos pendientes o abre una polla para ver solo los suyos. Los pagos aprobados quedan en su historial.</p>
         {error && <div role="alert" className="mb-4 rounded-md border border-red-alert/30 p-3 text-[13px] text-red-alert">No se pudieron actualizar los conteos. Puedes abrir una polla para revisar sus pagos o intentar actualizar otra vez.</div>}
+        <Link href="/admin/issues"
+          className={`mb-5 flex min-h-14 items-center gap-3 rounded-md border px-4 py-3 transition-colors duration-200 hover:bg-bg-elevated/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold ${openIssues !== null && openIssues > 0 ? "border-amber/60 bg-amber/10" : "border-border-default"}`}>
+          <AlertTriangle className={`h-5 w-5 shrink-0 ${openIssues !== null && openIssues > 0 ? "text-amber" : "text-text-secondary"}`} aria-hidden="true" />
+          <span className="min-w-0 grow">
+            <span className="block text-[15px] font-semibold leading-[1.45] text-text-primary">Issues de partidos</span>
+            <span className={`block text-[13px] leading-[1.5] ${openIssues !== null && openIssues > 0 ? "font-medium text-amber" : "text-text-secondary"}`}>
+              {openIssues === null ? "No se pudo leer el conteo. Abre la lista para revisarla." : openIssues === 0 ? "Sin partidos por decidir" : `${openIssues} ${openIssues === 1 ? "partido por decidir" : "partidos por decidir"}`}
+            </span>
+          </span>
+          <ChevronRight className="h-5 w-5 shrink-0 text-text-secondary" aria-hidden="true" />
+        </Link>
 
         {pollas.length === 0 ? (
           <div className="lp-card px-5 py-8 text-center">
             <Ticket className="mx-auto h-8 w-8 text-text-secondary" aria-hidden="true" />
-            <h2 className="lp-display mt-3 text-[28px]">Todavía no hay pollas</h2>
+            <h2 className="mt-3 font-display text-[24px] font-normal uppercase leading-tight tracking-[0.04em] text-text-primary">Todavía no hay pollas</h2>
             <p className="mt-2 text-[14px] text-text-secondary">Crea la primera polla para recibir inscripciones y revisar sus pagos aquí.</p>
             <Link href="/admin/pollas/crear" className="lp-btn lp-btn-ghost mt-5">Crear la primera polla</Link>
           </div>

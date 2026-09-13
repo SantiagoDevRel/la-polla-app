@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { Label, SectionHead, StreetCard, Tape } from "@/components/street";
-import { formatCop, formatMatchTime } from "@/lib/casa/format";
+import { formatCop, formatMatchTime, formatNumber } from "@/lib/casa/format";
 import { LOCK_MINUTES } from "@/lib/casa/types";
 import { CREATABLE_TOURNAMENTS, getTournamentLogo, getTournamentLogoClassName } from "@/lib/tournaments";
 import { TeamCrest } from "@/components/match/TeamCrest";
@@ -295,7 +295,7 @@ export function CrearPollaForm() {
     if (prizeKind === "objeto" && premioObjeto.trim().length < 3)
       return setError("Escribe cuál es el premio.");
     if (prizeKind === "pozo" && potMode === "fijo" && (!fixedPrize || fixedPrize <= 0))
-      return setError("Escribe el valor del pozo fijo.");
+      return setError("Escribe el premio garantizado.");
     if (publicar && publicationMode !== "oculta" && precio > 0 && payoutAccount.trim().length < 5)
       return setError("Falta la cuenta de cobro: sin eso nadie puede pagar.");
 
@@ -365,7 +365,10 @@ export function CrearPollaForm() {
     }
   }
 
-  const [previewMoney, setPreviewMoney] = useState<{ entry_prize: number; entry_house: number; ten_prize: number; all_prize: number } | null>(null);
+  // Pozo fijo = premio mínimo garantizado (migración 109). Todas las cifras,
+  // incluidos los inscritos que cubren el mínimo, salen del preview en SQL.
+  const [previewMoney, setPreviewMoney] = useState<{ entry_prize: number; entry_house: number; ten_prize: number; all_prize: number;
+    fixed_prize?: number; entries_to_cover?: number | null } | null>(null);
   const [previewError, setPreviewError] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -384,6 +387,18 @@ export function CrearPollaForm() {
     return () => { controller.abort(); clearTimeout(timer); };
   }, [precio, houseCut, boletas, prizeKind, potMode, fixedPrize]);
   const previewCop = (field: "entry_prize" | "entry_house" | "ten_prize" | "all_prize") => previewMoney ? formatCop(previewMoney[field]) : "—";
+  const fixedHelp = (() => {
+    if (!fixedPrize) return "Escribe el premio que la casa garantiza al ganador o a los ganadores empatados.";
+    if (previewMoney?.fixed_prize === undefined) return previewError ? "" : "Calculando el reparto...";
+    const premio = `Premio garantizado de ${formatCop(previewMoney.fixed_prize)}.`;
+    const cover = previewMoney.entries_to_cover;
+    if (cover === null || cover === undefined) return `${premio} La casa cubre el premio completo.`;
+    const split = [
+      previewMoney.entry_prize > 0 && `${formatCop(previewMoney.entry_prize)} al pozo`,
+      previewMoney.entry_house > 0 && `${formatCop(previewMoney.entry_house)} a la casa`,
+    ].filter(Boolean).join(" y ");
+    return `${premio} Se cubre con ${formatNumber(cover)} ${cover === 1 ? "inscrito" : "inscritos"}; desde el inscrito ${formatNumber(cover + 1)}, cada entrada suma ${split}.`;
+  })();
 
   return (
     <div className="space-y-5">
@@ -459,11 +474,7 @@ export function CrearPollaForm() {
                 max={100}
                 value={prizeKind === "objeto" ? 100 : houseCut}
                 disabled={prizeKind === "objeto"}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                setHouseCut(value);
-                if (value > 0) { setPrizeKind("pozo"); setPotMode("proporcional"); }
-              }}
+              onChange={(e) => setHouseCut(Number(e.target.value))}
                 className="lp-input lp-money text-[18px]"
               />
               <span className="lp-money shrink-0 text-[18px] text-text-muted">%</span>
@@ -471,8 +482,6 @@ export function CrearPollaForm() {
           </div>
         </div>
 
-        {/* La cuenta, en vivo. Que Tama vea el reparto antes de publicar. */}
-        <p className="border-t border-border-subtle pt-3 text-[12px] text-text-muted">
         {/* ── El premio ──────────────────────────────────────────────── */}
         <div>
           <Label>Premio</Label>
@@ -490,7 +499,7 @@ export function CrearPollaForm() {
                   key={o.v}
                   type="button"
                   aria-pressed={on}
-                  onClick={() => { setPrizeKind(o.v === "objeto" ? "objeto" : "pozo"); if (o.v !== "objeto") setPotMode(o.v); if (o.v === "fijo") setHouseCut(0); }}
+                  onClick={() => { setPrizeKind(o.v === "objeto" ? "objeto" : "pozo"); if (o.v !== "objeto") setPotMode(o.v); }}
                   className={`lp-btn min-w-0 px-3 py-3 text-[15px] font-semibold ${
                     on ? "lp-btn-primary" : "lp-btn-ghost bg-bg-elevated"
                   }`}
@@ -503,11 +512,11 @@ export function CrearPollaForm() {
 
           {prizeKind === "pozo" && potMode === "fijo" ? (
             <div className="mt-3">
-              <label htmlFor="fixed-prize" className="block text-[15px] font-semibold text-text-primary">Valor del premio (COP)</label>
+              <label htmlFor="fixed-prize" className="block text-[15px] font-semibold text-text-primary">Premio garantizado (COP)</label>
               <input id="fixed-prize" type="number" min={1} max={1000000000} step={1000} value={fixedPrize}
                 onChange={(event) => setFixedPrize(event.target.value === "" ? "" : Number(event.target.value))}
                 placeholder="Ej. 1000000" className="lp-input mt-2 text-[18px] tabular-nums" />
-              <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">{fixedPrize ? `${previewCop("all_prize")} para el ganador o los ganadores empatados. ` : ""}El valor no cambia con las inscripciones.</p>
+              {fixedHelp && <p className="mt-2 text-[13px] leading-relaxed text-text-secondary" aria-live="polite">{fixedHelp}</p>}
             </div>
           ) : prizeKind === "pozo" ? (
             // La cifra es VIVA: crece con cada inscripción. Por eso se muestra
@@ -562,9 +571,11 @@ export function CrearPollaForm() {
           )}
         </div>
 
+        {/* La cuenta, en vivo. Que Tama vea el reparto antes de publicar. */}
+        <p className="border-t border-border-subtle pt-3 text-[12px] text-text-muted">
           {previewError && <span className="block text-red-alert">No se pudo consultar el cálculo. Revisa los valores antes de publicar.</span>}
           {prizeKind === "objeto" ? <>La inscripción es para participar por el objeto anunciado. La casa recibe <b className="text-text-primary">{previewCop("entry_house")}</b> por persona y entrega el objeto; no se reparte dinero.</>
-            : potMode === "fijo" ? <>El premio es fijo, independientemente de cuántas personas participen. La casa cubre el valor anunciado aunque las entradas no lo alcancen.</>
+            : potMode === "fijo" ? <>Las entradas cubren primero el premio garantizado; si no alcanzan, la casa pone la diferencia. Lo que entre por encima se reparte entre el pozo y la casa según el porcentaje que definiste.</>
             : <>Por cada persona que entre: <b className="text-text-primary">{previewCop("entry_prize")}</b> al pozo y <b className="text-text-primary">{previewCop("entry_house")}</b> a la casa.</>}
         </p>
 

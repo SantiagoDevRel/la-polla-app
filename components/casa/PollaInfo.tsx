@@ -1,9 +1,10 @@
 import { Clock3, Eye, Trophy, Target, Ban, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CasaPolla } from "@/lib/casa/types";
+import { formatCop } from "@/lib/casa/format";
 import { PayoutAccountButton } from "./PayoutAccountButton";
 
-type Rules = Pick<CasaPolla, "kind" | "scoring_mode" | "points_exact" | "points_one_team" | "points_result" | "prize_kind" | "prize_object" | "description" | "draw_method" | "pot_mode">;
+type Rules = Pick<CasaPolla, "kind" | "scoring_mode" | "points_exact" | "points_one_team" | "points_result" | "prize_kind" | "prize_object" | "description" | "draw_method" | "pot_mode" | "fixed_prize_cop" | "house_cut_pct">;
 
 function Rule({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return <section className="lp-card p-4">
@@ -35,12 +36,12 @@ export function PollaInfo({ polla }: { polla: Rules }) {
     </Rule>}
     {polla.kind === "manual" && <Rule icon={<Target size={20} />} title="Cómo sumas puntos"><p>Cada pregunta indica cuántos puntos ganas si aciertas. Una respuesta incorrecta suma 0 puntos.</p></Rule>}
     <Rule icon={<Trophy size={20} />} title="Premio y ganadores">
-      {money && polla.pot_mode === "fijo" && <p>El pozo es fijo: el premio anunciado se mantiene sin importar cuántas personas participen.</p>}
+      {money && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && <p>El premio mínimo es {formatCop(polla.fixed_prize_cop)}.{100 - polla.house_cut_pct > 0 && ` Cuando las entradas superan ese valor, el ${100 - polla.house_cut_pct}% de cada nueva entrada se suma al pozo.`}</p>}
       {polla.kind !== "rifa" && <p>Debes sumar al menos un punto para ganar. Si todos terminan con 0 puntos, no se adjudica el premio.</p>}
       {polla.kind === "rifa" ? <><p>Gana la boleta que coincida con el número del sorteo anunciado.</p>{polla.draw_method && <p>{polla.draw_method}</p>}</> : money ? <p>Gana quien obtenga el mayor puntaje. Si varias personas empatan en el primer puesto, el pozo completo se divide en partes iguales entre ellas. Los pesos sobrantes del redondeo también se entregan a los ganadores.</p> : <p>El premio es {polla.prize_object}. Gana quien obtenga el mayor puntaje. Si hay empate en el primer puesto, realizaremos un sorteo entre los empatados. El objeto no se divide ni se convierte en dinero.</p>}
     </Rule>
     {polla.kind === "partidos" && <>
-      <Rule icon={<Ban size={20} />} title="Si se suspende un partido"><p>Si el partido se suspende después de haber empezado, se anula para esta polla y todos reciben 0 puntos, aunque se reanude después.</p><p>Un aplazamiento antes de empezar conserva el partido y sus pronósticos para la nueva fecha.</p></Rule>
+      <Rule icon={<Ban size={20} />} title="Si se suspende un partido"><p>Si un partido se suspende, se aplaza, se cancela o se abandona, la administración revisa el caso. Puede anularlo, y en ese caso todos reciben 0 puntos en ese partido, o mantenerlo si se juega o se completa.</p></Rule>
       <Rule icon={<Clock3 size={20} />} title="Marcador válido"><p>Solo cuenta el marcador de los 90 minutos más el tiempo de adición. Los goles del alargue y la tanda de penales no cuentan.</p></Rule>
       <Rule icon={<Clock3 size={20} />} title="Hasta cuándo puedes pronosticar"><p>Cada partido se cierra 5 minutos antes de su hora de inicio. Desde ese momento no puedes agregar ni cambiar su pronóstico.</p><p>El cierre de inscripciones no cambia ese plazo para quienes ya están inscritos.</p></Rule>
       <Rule icon={<Eye size={20} />} title="Pronósticos de otros jugadores"><p>Puedes verlos en «Ver pronósticos de otros» dentro de cada partido, solo cuando el partido ya haya empezado. Antes del inicio permanecen privados.</p></Rule>

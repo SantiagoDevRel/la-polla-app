@@ -52,7 +52,9 @@ try {
     assert.ok(await page.getByText("Marcador exacto: 7 puntos.", { exact: true }).isVisible());
     assert.ok(await page.getByText("Goles de un solo equipo: 2 puntos.", { exact: true }).isVisible());
     assert.equal(await page.getByText("Acertar el resultado:", { exact: false }).count(), 0);
-    assert.ok(await page.getByText("Pozo fijo", { exact: true }).isVisible());
+    // Migration 109: fixed = guaranteed minimum; with a 0% house cut every entry above it goes to the pot.
+    assert.ok(await page.getByText("Mínimo garantizado: $1.000.000", { exact: true }).isVisible());
+    assert.ok(await page.getByText("El premio mínimo es $1.000.000. Cuando las entradas superan ese valor, el 100% de cada nueva entrada se suma al pozo.", { exact: true }).isVisible());
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     await page.screenshot({ path: `${output}/info-${width}.png`, fullPage: true });
     evidence.push({ width, font: await page.getByRole("heading", { name: "Info de esta polla" }).evaluate(el => { const s = getComputedStyle(el); return { family: s.fontFamily, size: s.fontSize, weight: s.fontWeight, line: s.lineHeight }; }) });
@@ -143,8 +145,8 @@ try {
   const anon = await browser.newContext({ colorScheme: "dark" });
   const publicPage = await anon.newPage();
   await publicPage.goto(`${origin}/casa/${slug}`, { waitUntil: "domcontentloaded" });
-  await publicPage.getByText("Pozo fijo", { exact: true }).waitFor();
-  assert.ok(await publicPage.getByText("Pozo fijo", { exact: true }).isVisible());
+  await publicPage.getByText("Mínimo garantizado: $1.000.000", { exact: true }).waitFor();
+  assert.ok(await publicPage.getByText("Mínimo garantizado: $1.000.000", { exact: true }).isVisible());
   assert.equal(await publicPage.getByRole("tab", { name: "Info", exact: true }).count(), 0);
   const anonymousResponse = await publicPage.request.get(`${origin}/api/casa/pollas/${slug}/match-picks?match=${matchA}`, { maxRedirects: 0 });
   assert.ok([401, 307].includes(anonymousResponse.status()));

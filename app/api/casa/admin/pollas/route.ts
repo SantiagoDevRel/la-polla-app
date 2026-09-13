@@ -113,8 +113,9 @@ export async function POST(req: NextRequest) {
   }
   const body = parsed.data;
 
-  if (body.potMode === "fijo" && (body.prizeKind !== "pozo" || !body.fixedPrizeCop || body.houseCutPct !== 0)) {
-    return casaJson({ error: "El pozo fijo necesita un premio mayor a cero y un porcentaje de la casa de 0%." }, 400);
+  // Fixed = guaranteed minimum (migration 109): any house percentage 0..100 is valid.
+  if (body.potMode === "fijo" && (body.prizeKind !== "pozo" || !body.fixedPrizeCop)) {
+    return casaJson({ error: "Elige un premio fijo mayor a cero." }, 400);
   }
   if (body.publicationMode === "programada" && !body.publishesAt) {
     return casaJson({ error: "Elige la fecha y hora de publicación en Colombia." }, 400);

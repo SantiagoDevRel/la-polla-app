@@ -1,7 +1,7 @@
 # Casa: Info, comprobantes, premio fijo y publicación
 
 Implementación del pedido del 13 de septiembre de 2026. Requiere Casa v2 activa
-y las migraciones **104, 105, 106 y 107**, además de sus migraciones anteriores.
+y las migraciones **104, 105, 106, 107, 108 y 109**, además de sus migraciones anteriores.
 El calendario de proveedores y sus torneos se mantiene en un carril independiente.
 
 ## Info y pronósticos
@@ -26,11 +26,34 @@ fuente confirme inicio (`live` o `finished`), incluso si pasó el horario y el
 partido está retrasado. La lista es paginada, autenticada y disponible solo
 para inscritos o administradores. Las respuestas usan `private, no-store`.
 
-Una suspensión observada después de iniciar anula permanentemente ese partido
-**dentro de Casa**, mediante `casa_polla_matches.voided_at`. Reanudar el partido
-global no reactiva sus puntos en estas pollas. Un aplazamiento antes de iniciar
-no lo anula. El trigger registra solo observaciones nuevas en pollas no
-finalizadas; la migración no repuntúa historia ni modifica `predictions`.
+**Partidos con novedades (migración 108): nada se anula solo.** Si un partido de
+una polla Casa no finalizada queda suspendido/interrumpido, aplazado, cancelado o
+abandonado (antes o después de iniciar), el trigger de `matches` abre un caso en
+`casa_match_issues` cuando el partido **entra** en ese estado. Hay a lo sumo un caso
+abierto por partido y tipo (índice único parcial); las lecturas repetidas sin
+transición solo refrescan el caso abierto.
+El administrador decide en `/admin/issues` con `casa_decide_match_issue`:
+**Anular** marca `voided_at` y deja 0 puntos en las pollas no finalizadas que lo
+contienen (liquidadas, archivadas o con desempate se saltan); **Mantener** solo lo
+registra y el partido se juega y verifica normal. `casa_settle_polla_v2` falla con
+`OPEN_MATCH_ISSUES` mientras haya casos sin decidir. El vivo global nunca falla por
+Casa, en ningún modo; la migración no repuntúa historia ni modifica `predictions`.
+
+- **Reapertura.** Un partido mantenido que se reanuda y vuelve a suspenderse (o
+  entra en otro estado con novedades) abre un caso **nuevo**; el decidido queda
+  como historial. Un partido con una decisión **Anular** ya no abre casos nuevos.
+  Al vincular un partido a una polla se abre caso solo si ese tipo nunca se decidió.
+- **Registros perdidos.** El trigger traga cualquier error (incluido `lock_timeout`)
+  para no bloquear el vivo. `casa_sweep_match_issues()` (solo `service_role`)
+  recupera esos casos: partidos sin verificar de pollas activas cuyo estado actual
+  es un problema, sin caso abierto ni decisión previa de ese tipo y sin anulación.
+  Corre como backfill de la migración, al inicio de cada reparto (si el reparto
+  falla, los casos que abrió se deshacen con él) y al cargar `/admin/issues`, donde
+  sí quedan guardados.
+- **Conteo.** El aviso de `/admin/pollas` cuenta solo casos abiertos con al menos
+  una polla Casa activa (`casa_active_open_match_issue_ids`). En `/admin/issues`
+  los abiertos que ya no afectan pollas activas van al final, en «Sin pollas
+  activas»: no bloquean repartos y se pueden decidir igual.
 
 ## Comprobantes
 
@@ -52,15 +75,49 @@ Se conserva `prize_kind=pozo|objeto`; el dinero agrega `pot_mode=proporcional|fi
 y `fixed_prize_cop`. No se cambia el tipo de los premios históricos.
 
 En creación: entrada, porcentaje de la casa y **Pozo fijo / Pozo proporcional /
-Objeto**. Un porcentaje mayor a cero selecciona proporcional. Elegir fijo
-deja el porcentaje en cero y exige un valor positivo, en pesos enteros.
-La casa garantiza ese importe aunque las entradas no lo cubran.
+Objeto**. Son elecciones independientes: cambiar el porcentaje no cambia el tipo
+de premio, y elegir fijo no cambia el porcentaje (0 a 100). Solo **Objeto** fija
+el porcentaje en 100. El pozo fijo exige un valor positivo, en pesos enteros
+(«Premio garantizado (COP)»).
 
-Todos los cálculos permanecen en SQL. Con un premio fijo de $1.000.000, el pozo
-es $1.000.000 tanto con 0 como con 100 o 1.000 inscritos. El **balance de la casa**
-es lo recaudado menos ese compromiso y puede ser negativo. No se confunde con
-un porcentaje de comisión. El desglose proporcional no aparece en el pago de
-una polla de premio fijo. Las liquidaciones conservan las reglas de Casa v2.
+**Pozo fijo = premio mínimo garantizado (migración 109).** Con G = recaudado
+pagado, F = premio garantizado y c = porcentaje de la casa:
+
+- G ≤ F: premio = F; balance de la casa = G − F (cero o negativo: la casa pone la diferencia).
+- G > F: E = G − F. El pozo recibe `floor(E × (100 − c) / 100)`, el mismo redondeo
+  del pozo proporcional sobre lo recaudado; la casa se queda el resto de E.
+  Premio = F + esa parte; balance = E − esa parte.
+
+Ejemplos con entrada de $10.000 y F = $1.000.000 (verificados en
+`scripts/casa-publication-prize-check.sql`):
+
+| c | Inscritos | Premio | Balance de la casa |
+|---|---|---|---|
+| 50 % | 0 | $1.000.000 | −$1.000.000 |
+| 50 % | 100 | $1.000.000 | $0 |
+| 50 % | 101 | $1.005.000 | $5.000 |
+| 50 % | 102 | $1.010.000 | $10.000 |
+| 50 % | 200 | $1.500.000 | $500.000 |
+| 0 % | 150 | $1.500.000 | $0 |
+| 100 % | 150 | $1.000.000 | $500.000 |
+
+Todos los cálculos permanecen en SQL: `casa_money_prize_cop` es la única fórmula
+del premio en dinero (proporcional y fijo) y la usan `casa_pot_summaries_v2`
+(pozo, balance, pozo si entras; de ahí `casa_polla_pot`, `casa_payment_details_v2`,
+`casa_house_total_v2` y la liquidación) y el preview
+`casa_fixed_prize_threshold_preview_v2`. El preview del formulario devuelve el
+premio para N inscritos, los inscritos que cubren el mínimo (`ceil(F / entrada)`,
+nulo con entrada gratis) y cuánto va al pozo y a la casa por cada entrada por
+encima del mínimo. El preview de tres argumentos de 104 sigue disponible y
+equivale al nuevo con 0 % de casa.
+
+El **balance de la casa** no se confunde con un porcentaje de comisión. Una polla
+oculta, o programada cuyo `opens_at` todavía no llega, no resta el premio
+(balance = recaudado) hasta publicarse; el resto de los casos de 107 se conserva.
+En la pantalla de pago, una polla de pozo fijo muestra el pozo actual, el mínimo
+garantizado, el porcentaje de cada nueva entrada que suma al pozo y el pozo si
+entras. Info y el encabezado de la polla muestran «Mínimo garantizado». Las
+liquidaciones conservan las reglas de Casa v2 y pagan el `prize_cop` vigente.
 
 ## Publicación y fechas
 
@@ -86,20 +143,15 @@ de cuota del proveedor conservan su significado; no se desplazan artificialmente
 Corrige hallazgos de revisión sobre 104 y 106. No cambia filas existentes,
 `predictions`, partidos globales, pagos ni liquidaciones al instalarse.
 
-- **Abandono después de iniciar.** Además de la suspensión, anulan dentro de Casa
-  `STATUS_ABANDONED`/`ABANDONED`/`ABD` y cualquier `status='cancelled'` cuyo detalle
-  no sea aplazamiento (`STATUS_POSTPONED`/`POSTPONED`/`PST`), incluido el
-  `cancelled` sin detalle de football-data. La evidencia de inicio no cambia:
-  cancelar, aplazar o abandonar antes de iniciar nunca anula.
-- **El vivo global no depende de Casa.** Con Casa en `paused` el trigger no escribe
-  en Casa: guarda el partido y abre `admin_alerts` (`casa_match_void_pending:<match_id>`).
-  Si una polla falla al anularse, solo esa polla se revierte y queda en la alerta.
-  Con Casa en v2, la siguiente lectura del proveedor anula y resuelve la alerta;
-  si ya no llegan lecturas, hay que revisarla antes de liquidar.
+- **Abandono y alerta de anulación: reemplazados por la 108.** La anulación
+  automática y la alerta `casa_match_void_pending` ya no existen; esos estados
+  abren un caso en Issues (ver «Partidos con novedades»).
 - **Balance con pozo fijo.** `prize_cop` conserva el compromiso configurado. Solo
   `house_cop` cambia: borrador/oculta, anulada o `house_retained_zero_points` →
   recaudado; resuelta con premios → recaudado menos lo pagado; el resto (abierta,
   programada, cerrada) → recaudado menos el premio fijo. El pozo proporcional no cambia.
+  *(Actualizado por 109: el premio fijo es un mínimo que crece con el excedente y
+  una programada todavía no publicada tampoco resta el premio. Ver «Premios».)*
 - **Aplazado y reprogramado.** Un partido que quedó `cancelled` sin minutos jugados
   vuelve a admitir pronósticos, con el bloqueo de cinco minutos sobre su nueva hora.
   Espejo en `canEditCasaMatch`.
@@ -108,13 +160,14 @@ Corrige hallazgos de revisión sobre 104 y 106. No cambia filas existentes,
 
 Lista de verificación antes de desplegar 107:
 
-1. Aplicar 104, 105, 106 y 107 en orden, antes del build.
+1. Aplicar 104, 105, 106, 107, 108 y 109 en orden, antes del build.
 2. Confirmar ACL: `pg_proc.proacl` de las cuatro funciones reemplazadas solo con
    `postgres` y `service_role`.
 3. Solo en Docker local, nunca contra producción: correr los tres SQL de abajo
    (`casa-publication-prize-check.sql`, `casa-match-rules-check.sql` y
    `casa-v2-check.sql`); los tres terminan en ROLLBACK.
-4. Revisar en `/admin` que una alerta `casa_match_void_pending` sea visible.
+4. Con la 108 aplicada, revisar en `/admin/issues` que un caso abierto sea visible
+   y que decidirlo funcione.
 
 ## Verificación local
 
