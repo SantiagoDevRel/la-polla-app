@@ -34,7 +34,20 @@ const row = (over: Record<string, unknown> = {}) => ({
   home_team: 'Club Brugge KV', away_team: 'Aston Villa', scheduled_at: '2026-09-08T16:45:00+00:00',
   external_id: 'apifootball:1635643', source_external_ids: [] as string[], ...over,
 });
-const fetchedAt = '2026-09-08T17:52:00Z';
+const fetchedAt = "2026-09-08T17:52:00Z";
+// Builder encadenable de supabase-js: cada filtro devuelve el mismo objeto y
+// await entrega el resultado. Guarda las columnas pedidas y los torneos.
+const selects: string[] = [];
+const tournamentsAsked: string[][] = [];
+const chain = (result: object) => {
+  const q: Record<string, unknown> = {};
+  for (const m of ["is", "gte", "lte", "limit", "eq", "or"]) q[m] = () => q;
+  q.select = (cols: string) => { selects.push(cols); return q; };
+  q.in = (_col: string, values: string[]) => { tournamentsAsked.push(values); return q; };
+  q.then = (resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve);
+  return q;
+};
+const afRows = (filas: unknown[]) => mocks.from.mockReturnValue(chain({ data: filas, count: 1, error: null }));
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -44,36 +57,45 @@ beforeEach(() => {
 
 describe("syncApiFootballLive en modo 'af'", () => {
   it('fila vinculada: empareja por id aunque los nombres guardados sean de otro proveedor', async () => {
-    mocks.enJuego.mockResolvedValue({ filas: [row({ home_team: 'Brujas', away_team: 'Villa', external_id: '551234',
-      source_external_ids: ['apifootball:1635643'] })], errores: [] });
+    afRows([row({ home_team: 'Brujas', away_team: 'Villa', external_id: '551234',
+      source_external_ids: ['apifootball:1635643'] })]);
     mocks.feed.mockResolvedValue({ fixtures: [live()], fetchedAt, stale: false });
     const covered = await syncApiFootballLive('af');
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('update_match_live_provider', expect.objectContaining({
       p_source: 'api-football', p_provider_id: '1635643', p_status: 'live', p_home_score: 1, p_away_score: 2,
       p_elapsed: 67, p_status_detail: 'STATUS_SECOND_HALF', p_observed_at: fetchedAt }));
     expect(covered.size).toBe(1);
-    expect(mocks.enJuego.mock.calls[0][1]).toContain('source_external_ids');
+    expect(selects.at(-1)).toContain('source_external_ids');
+    expect(mocks.enJuego).not.toHaveBeenCalled();
   });
 
   it('el id manda: otro fixture con los mismos nombres no se usa', async () => {
-    mocks.enJuego.mockResolvedValue({ filas: [row()], errores: [] });
+    afRows([row()]);
     mocks.feed.mockResolvedValue({ fixtures: [live(777)], fetchedAt, stale: false });
     expect((await syncApiFootballLive('af')).size).toBe(0);
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it('dos ids distintos en la fila no escriben nada', async () => {
-    mocks.enJuego.mockResolvedValue({ filas: [row({ source_external_ids: ['apifootball:777'] })], errores: [] });
+    afRows([row({ source_external_ids: ['apifootball:777'] })]);
     mocks.feed.mockResolvedValue({ fixtures: [live(), live(777)], fetchedAt, stale: false });
     await syncApiFootballLive('af');
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it('fila vieja sin vínculo: sigue por nombres, competición y saque', async () => {
-    mocks.enJuego.mockResolvedValue({ filas: [row({ external_id: '551234' })], errores: [] });
+    afRows([row({ external_id: '551234' })]);
     mocks.feed.mockResolvedValue({ fixtures: [live(777)], fetchedAt, stale: false });
     await syncApiFootballLive('af');
     expect(mocks.rpc.mock.calls[0][1]).toMatchObject({ p_provider_id: '777' });
+  });
+
+  it("'af': cubre partidos que no están en ninguna polla (sin matchesEnJuego) de los diez torneos", async () => {
+    afRows([row({ id: "00000000-0000-4000-8000-000000000999" })]);
+    mocks.feed.mockResolvedValue({ fixtures: [live()], fetchedAt, stale: false });
+    expect((await syncApiFootballLive("af")).size).toBe(1);
+    expect(mocks.enJuego).not.toHaveBeenCalled();
+    expect(tournamentsAsked.at(-1)).toEqual(expect.arrayContaining(["champions_2025", "laliga_2025", "betplay_2026", "europa_2026"]));
   });
 
   it('legacy: sin cambios, identidad por nombres y columnas de siempre', async () => {
@@ -86,7 +108,7 @@ describe("syncApiFootballLive en modo 'af'", () => {
 
   it('sin modo explícito lee el interruptor', async () => {
     mocks.mode.mockResolvedValue('af');
-    mocks.enJuego.mockResolvedValue({ filas: [], errores: [] });
+    afRows([]);
     await syncApiFootballLive();
     expect(mocks.mode).toHaveBeenCalledOnce();
   });
@@ -96,7 +118,7 @@ describe('/api/matches/sync-live según el modo', () => {
   const request = () => new NextRequest('http://localhost/api/matches/sync-live', { headers: { 'x-cron-secret': 'test-secret' } });
   beforeEach(() => {
     vi.stubEnv('CRON_SECRET', 'test-secret');
-    mocks.from.mockReturnValue({ select: () => ({ or: async () => ({ count: 1, error: null }) }) });
+    afRows([row()]);
     mocks.enJuego.mockResolvedValue({ filas: [row()], errores: [] });
     mocks.feed.mockResolvedValue({ fixtures: [live()], fetchedAt, stale: false });
     mocks.verify.mockResolvedValue([]);
