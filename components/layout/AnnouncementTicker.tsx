@@ -28,6 +28,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { usePathname } from "next/navigation";
 
 type TickerProps = {
   // Key de mensaje en el namespace "Ticker" de messages/{es,en}.json.
@@ -45,6 +46,7 @@ export default function AnnouncementTicker({
   dismissKey = "lp_ticker_dismissed:pred-deadline-10min",
 }: TickerProps = {}) {
   const t = useTranslations("Ticker");
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -58,7 +60,9 @@ export default function AnnouncementTicker({
     }
   }, [dismissKey]);
 
-  if (!visible) return null;
+  // The football center shows the actual match score, including extra time.
+  // Pool scoring rules belong in the pool context, not above these results.
+  if (!visible || pathname.startsWith('/futbol')) return null;
 
   const msg = t(messageKey);
   const copies = [0, 1, 2, 3];

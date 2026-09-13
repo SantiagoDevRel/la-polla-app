@@ -2,7 +2,7 @@
 // Single source of truth for rendering tournament identity across the app
 "use client";
 
-import { getTournamentBySlug } from "@/lib/tournaments";
+import { getTournamentBySlug, getTournamentLogo } from "@/lib/tournaments";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
 
@@ -65,7 +65,7 @@ export default function TournamentBadge({
         <FallbackTrophy size={logoSize} />
       ) : tournament ? (
         <img
-          src={tournament.logoPath}
+          src={getTournamentLogo(tournamentSlug, 'small')}
           alt={tournament.name}
           width={logoSize}
           height={logoSize}

@@ -7,6 +7,7 @@
 // Se auto-oculta si no hay ninguna encuesta ni polla en goles_v2.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import axios from "axios";
@@ -203,6 +204,7 @@ export default function ScoringSurveyCard() {
                   Cuenta con goles_v2 desde{" "}
                   {s.changedAt
                     ? new Date(s.changedAt).toLocaleDateString("es-CO", {
+                        timeZone: COLOMBIA_TIME_ZONE,
                         day: "numeric",
                         month: "short",
                       })

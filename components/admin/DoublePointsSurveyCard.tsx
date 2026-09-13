@@ -7,6 +7,7 @@
 // encuesta ni polla con el doble activo.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import axios from "axios";
@@ -203,6 +204,7 @@ export default function DoublePointsSurveyCard() {
                   Dobla desde octavos{" "}
                   {s.decidedAt
                     ? `(activado ${new Date(s.decidedAt).toLocaleDateString("es-CO", {
+                        timeZone: COLOMBIA_TIME_ZONE,
                         day: "numeric",
                         month: "short",
                       })})`

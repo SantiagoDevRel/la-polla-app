@@ -17,16 +17,21 @@
 //    lo que se ve mientras la app carga.
 // 2. El video NO se pide hasta DESPUES del evento `load` y de un hueco de
 //    idle. Antes competia por ancho de banda con el JS y los datos.
-// 3. UNA sola fuente: se le pregunta al browser que sabe reproducir y se pide
-//    ese archivo. Nunca los dos.
+// 3. UNA sola fuente MP4 lite, elegida por menor peso y mayor fidelidad medida
+//    contra el master. Nunca se tantean dos codecs.
 // 4. Sin `poster`: el humo YA es el placeholder. 93 KB menos.
-// 5. La rotacion es del CLIENTE. Ademas de que el primer video siempre es el
-//    mismo (y por lo tanto cacheable), esto permitio sacar el `headers()` de
-//    AppBackground, que obligaba a render dinamico del layout en cada request.
+// 5. Red lenta o ahorro de datos = humo; las demas conexiones conservan la
+//    rotacion existente. Si la conexion empeora, la politica se ajusta sin
+//    esperar otra navegacion.
 
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  getBackgroundPlaybackMode,
+  getNavigatorConnection,
+  type BackgroundPlaybackMode,
+} from "@/lib/background-connection";
 import { cn } from "@/lib/cn";
 import type { BackgroundVariant } from "./background-variants";
 import { BACKGROUND_SOURCES, BACKGROUND_VARIANTS } from "./background-variants";
@@ -40,93 +45,140 @@ export interface AppBackgroundClientProps {
   overlayOpacity?: number;
   /** Forzar una variante (testing / pantallas tematicas). No rota. */
   variant?: BackgroundVariant;
-}
-
-/** ¿Vale la pena pedir 1-2 MB de video en esta conexion? */
-function conexionAguanta(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const c = (
-    navigator as Navigator & {
-      connection?: { saveData?: boolean; effectiveType?: string };
-    }
-  ).connection;
-  // `connection` no existe en Safari, y ahi el default correcto es dejar
-  // pasar: el iPhone ya tiene Low Power Mode, que hace fallar el play() solo
-  // y nos deja igual con el humo.
-  if (!c) return true;
-  if (c.saveData) return false;
-  return !(c.effectiveType && /(^|-)2g$|^3g$/.test(c.effectiveType));
+  /** Mantener solo el humo CSS, sin solicitar archivos de video. */
+  video?: boolean;
 }
 
 export function AppBackgroundClient({
   className,
   overlayOpacity = 0.78,
   variant,
+  video = true,
 }: AppBackgroundClientProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const playableRef = useRef(false);
   // `null` = todavia no se pidio nada. Solo humo.
   const [actual, setActual] = useState<BackgroundVariant | null>(null);
   const [src, setSrc] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
+  const [mode, setMode] = useState<BackgroundPlaybackMode>("off");
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (!conexionAguanta()) return;
-
     let cancelado = false;
-    let rotarId: number | undefined;
-    let cambioId: number | undefined;
-    let i = 0;
+    let arrancado = false;
+    let fallbackId: number | undefined;
+    let idleId: number | undefined;
+    const connection = getNavigatorConnection();
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-    function arrancar() {
+    const actualizarModo = () => {
+      if (!arrancado || cancelado) return;
+      setMode(
+        !video || reducedMotion.matches
+          ? "off"
+          : getBackgroundPlaybackMode(connection),
+      );
+    };
+
+    const arrancar = () => {
       if (cancelado) return;
-      // El primero es SIEMPRE el indice 0, no uno al azar: asi la segunda
-      // visita lo saca del cache en vez de bajar otro de 2 MB.
-      setActual(variant ?? BACKGROUND_VARIANTS[0]);
-      if (variant) return;
-      rotarId = window.setInterval(() => {
-        i = (i + 1) % BACKGROUND_VARIANTS.length;
-        setVisible(false);
-        // Se espera el fade-out antes de cambiar el src para que el corte no
-        // se vea como un parpadeo.
-        cambioId = window.setTimeout(() => {
-          if (!cancelado) setActual(BACKGROUND_VARIANTS[i]);
-        }, 400);
-      }, ROTAR_MS);
-    }
+      arrancado = true;
+      actualizarModo();
+    };
 
     // Despues de `load` Y en un hueco de idle: son dos guardas distintas
     // porque `load` puede dispararse con el hilo principal todavia ocupado
     // hidratando.
     function cuandoHayaAire() {
       const w = window as Window & {
-        requestIdleCallback?: (cb: () => void) => number;
+        requestIdleCallback?: (
+          cb: () => void,
+          options?: { timeout: number },
+        ) => number;
       };
-      if (w.requestIdleCallback) w.requestIdleCallback(arrancar);
-      else window.setTimeout(arrancar, 900);
+      if (w.requestIdleCallback) {
+        idleId = w.requestIdleCallback(arrancar, { timeout: 2_000 });
+      } else {
+        fallbackId = window.setTimeout(arrancar, 900);
+      }
     }
 
-    if (document.readyState === "complete") cuandoHayaAire();
-    else window.addEventListener("load", cuandoHayaAire, { once: true });
+    connection?.addEventListener?.("change", actualizarModo);
+    reducedMotion.addEventListener("change", actualizarModo);
+    if (!video) {
+      arrancado = true;
+      actualizarModo();
+    } else if (document.readyState === "complete") {
+      cuandoHayaAire();
+    } else {
+      window.addEventListener("load", cuandoHayaAire, { once: true });
+    }
 
     return () => {
       cancelado = true;
       window.removeEventListener("load", cuandoHayaAire);
-      if (rotarId) window.clearInterval(rotarId);
-      if (cambioId) window.clearTimeout(cambioId);
+      connection?.removeEventListener?.("change", actualizarModo);
+      reducedMotion.removeEventListener("change", actualizarModo);
+      if (fallbackId !== undefined) window.clearTimeout(fallbackId);
+      if (idleId !== undefined) {
+        const w = window as Window & {
+          cancelIdleCallback?: (id: number) => void;
+        };
+        w.cancelIdleCallback?.(idleId);
+      }
     };
-  }, [variant]);
+  }, [video]);
 
-  // Una sola fuente. Preguntar antes evita que el browser tantee los dos
-  // archivos, que era la mitad de los requests de video.
+  useEffect(() => {
+    if (mode === "off") {
+      playableRef.current = false;
+      setVisible(false);
+      setActual(null);
+      return;
+    }
+
+    // El primero es SIEMPRE el indice 0, no uno al azar: asi la segunda
+    // visita lo saca del cache en vez de bajar otro archivo.
+    setActual((current) => variant ?? current ?? BACKGROUND_VARIANTS[0]);
+  }, [mode, variant]);
+
+  useEffect(() => {
+    if (mode !== "rotate" || variant || !actual) return;
+
+    let cambioId: number | undefined;
+    const rotarId = window.setInterval(() => {
+      const nextIndex =
+        (BACKGROUND_VARIANTS.indexOf(actual) + 1) % BACKGROUND_VARIANTS.length;
+      setVisible(false);
+      // Se espera el fade-out antes de cambiar el src para que el corte no
+      // se vea como un parpadeo.
+      cambioId = window.setTimeout(() => {
+        cambioId = undefined;
+        playableRef.current = false;
+        setActual(BACKGROUND_VARIANTS[nextIndex]);
+      }, 400);
+    }, ROTAR_MS);
+
+    return () => {
+      window.clearInterval(rotarId);
+      if (cambioId !== undefined) {
+        window.clearTimeout(cambioId);
+        if (playableRef.current) setVisible(true);
+      }
+    };
+  }, [actual, mode, variant]);
+
+  // Una sola fuente. Los MP4 lite son universales, pesan menos y conservaron
+  // mejor fidelidad contra los masters que las versiones WebM medidas.
   useEffect(() => {
     if (!actual) {
+      playableRef.current = false;
       setSrc(null);
       return;
     }
-    const s = BACKGROUND_SOURCES[actual];
-    const probe = document.createElement("video");
-    setSrc(probe.canPlayType("video/webm") ? s.webm : s.mp4);
+    playableRef.current = false;
+    setVisible(false);
+    setSrc(BACKGROUND_SOURCES[actual].mp4);
   }, [actual]);
 
   useEffect(() => {
@@ -149,7 +201,12 @@ export function AppBackgroundClient({
           Amarillo, azul y rojo — los colores de la bandera, de donde sale la
           identidad de la marca. Muy difuminado para que se lea como humo de
           bengala y no como tres circulos de colores. */}
-      <div className="lp-humo absolute inset-0">
+      <div
+        className={cn(
+          "lp-humo absolute inset-0",
+          visible && "lp-humo-paused",
+        )}
+      >
         <span className="lp-humo-a" />
         <span className="lp-humo-b" />
         <span className="lp-humo-c" />
@@ -178,7 +235,15 @@ export function AppBackgroundClient({
             controls={false}
             disablePictureInPicture
             preload="auto"
-            onCanPlay={() => setVisible(true)}
+            onCanPlay={() => {
+              playableRef.current = true;
+              setVisible(true);
+            }}
+            onError={() => {
+              playableRef.current = false;
+              setVisible(false);
+              setSrc(null);
+            }}
             className="absolute inset-0 h-full w-full object-cover"
             style={{ transform: "scale(1.18) translateY(-7%)" }}
             src={src}

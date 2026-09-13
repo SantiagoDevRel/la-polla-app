@@ -8,6 +8,7 @@
 // Es client porque /casa/admin es Server Component y esto necesita onClick.
 "use client";
 
+import { CASA_HEADERS } from "@/lib/casa/contract";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -22,7 +23,7 @@ export function AccionesBorrador({ id }: { id: string }) {
     try {
       const res = await fetch(`/api/casa/admin/pollas/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: CASA_HEADERS,
         body: JSON.stringify({ action: "publicar" }),
       });
       const json = await res.json().catch(() => ({}));

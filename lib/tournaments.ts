@@ -1,5 +1,6 @@
 // lib/tournaments.ts — Single source of truth for tournament metadata
 // Logo paths must match exact filenames in /public/tournaments/
+import leagueLogos from './teams/league-logos.json' with { type: 'json' };
 
 // Cache-bust version para los logos de torneos. Incrementar (por ejemplo
 // "2" -> "3") cada vez que se reemplace el archivo fuente de un logo
@@ -14,6 +15,14 @@ export const TOURNAMENTS = [
     logoPath: `/tournaments/champions_league.svg?v=${LOGO_V}`,
     smallLogoPath: `/tournaments/champions_league-96.webp?v=${LOGO_V}`,
     color: "#1a1aff",
+  },
+  {
+    slug: "europa_2026",
+    name: "Europa League",
+    apiCode: "EL",
+    logoPath: "/team-crests/db7cc73aab0c238e-96.webp",
+    smallLogoPath: "/team-crests/db7cc73aab0c238e-96.webp",
+    color: "#ff6900",
   },
   {
     slug: "worldcup_2026",
@@ -47,9 +56,8 @@ export const TOURNAMENTS = [
     smallLogoPath: `/tournaments/seria_a-96.webp?v=${LOGO_V}`,
     color: "#007bc0",
   },
-  // Latin American leagues — ESPN-only (football-data plan free no las
-  // cubre). Single-source verification por ahora; cuando agreguemos
-  // un segundo proveedor (API-Football u otro), pasan a doble check.
+  // Latin American leagues: API-Football + ESPN. The football-data free
+  // plan does not cover these competitions.
   {
     slug: "libertadores_2026",
     name: "Copa Libertadores",
@@ -120,7 +128,9 @@ export const CREATABLE_TOURNAMENT_SLUGS: readonly TournamentSlug[] = [
   "bundesliga_2025",
   "ligue1_2025",
   "champions_2025",
+  "europa_2026",
   "libertadores_2026",
+  "sudamericana_2026",
   "betplay_2026",
 ];
 
@@ -164,6 +174,7 @@ export function isSyncableTournament(slug: string): boolean {
 // (no se traducen). Solo cambian Mundial→World Cup, Copa→Cup, Liga.
 const TOURNAMENT_NAMES_EN: Record<string, string> = {
   champions_2025: "Champions League",
+  europa_2026: "Europa League",
   worldcup_2026: "World Cup 2026",
   laliga_2025: "La Liga",
   premier_2025: "Premier League",
@@ -189,21 +200,19 @@ export function getTournamentName(slug: string, locale: string = "es"): string {
 export function getTournamentLogo(slug: string, size: "original" | "small" = "original"): string {
   const tournament = getTournamentBySlug(slug) ?? TOURNAMENTS[0];
   // Static 96 px assets cover a 32 px logo at 3x without Image Optimization.
-  return size === "small" ? tournament.smallLogoPath : tournament.logoPath;
+  return (leagueLogos as Record<string,string>)[slug] ?? (size === "small" ? tournament.smallLogoPath : tournament.logoPath);
+}
+
+/** Monochrome marks need their light treatment on our dark surfaces. */
+export function getTournamentLogoClassName(slug: string): string {
+  if (slug === 'ligue1_2025' || slug === 'sudamericana_2026' || slug === 'europa_2026') return 'brightness-0 invert';
+  if (slug === 'betplay_2026') return 'brightness-200';
+  return '';
 }
 
 // Flat slug → icon-path map. Relocated from components/shared/PollaCard.tsx
 // during Phase 3a so multiple UI surfaces can import without depending on a
 // component file.
-export const TOURNAMENT_ICONS: Record<string, string> = {
-  champions_2025: `/tournaments/champions_league.svg?v=${LOGO_V}`,
-  worldcup_2026: `/tournaments/mundial-2026.webp?v=${LOGO_V}`,
-  laliga_2025: `/tournaments/la_liga.png?v=${LOGO_V}`,
-  premier_2025: `/tournaments/premier_league.webp?v=${LOGO_V}`,
-  seriea_2025: `/tournaments/seria_a.png?v=${LOGO_V}`,
-  libertadores_2026: `/tournaments/copa_libertadores.svg?v=${LOGO_V}`,
-  sudamericana_2026: `/tournaments/copa_sudamericana.svg?v=${LOGO_V}`,
-  betplay_2026: `/tournaments/liga_betplay.svg?v=${LOGO_V}`,
-  bundesliga_2025: `/tournaments/bundesliga.svg?v=${LOGO_V}`,
-  ligue1_2025: `/tournaments/ligue_1.svg?v=${LOGO_V}`,
-};
+export const TOURNAMENT_ICONS: Record<string, string> = Object.fromEntries(
+  TOURNAMENTS.map((tournament) => [tournament.slug, tournament.smallLogoPath]),
+);

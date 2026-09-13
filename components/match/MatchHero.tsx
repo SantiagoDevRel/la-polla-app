@@ -1,9 +1,11 @@
 // components/match/MatchHero.tsx — Tribuna Caliente §3.3
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
+import { TeamCrest } from './TeamCrest';
 
 interface Team {
   name: string;
@@ -38,6 +40,7 @@ export interface MatchHeroProps {
 
 function formatKickoff(date: Date): string {
   return new Intl.DateTimeFormat("es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
     hour: "numeric",
@@ -52,26 +55,7 @@ function diffHoursMinutes(target: Date, now: Date): { h: number; m: number; ms: 
 }
 
 function Crest({ team, size = 40 }: { team: Team; size?: number }) {
-  if (team.crestUrl) {
-    return (
-      <Image
-        src={team.crestUrl}
-        alt={team.name}
-        width={size}
-        height={size}
-        className="object-contain"
-      />
-    );
-  }
-  return (
-    <div
-      className="flex items-center justify-center rounded-md bg-bg-elevated border border-border-default font-display tracking-[0.04em] text-text-primary"
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.36) }}
-      aria-label={team.name}
-    >
-      {team.shortCode}
-    </div>
-  );
+  return <TeamCrest team={team.name} src={team.crestUrl} className={size===48?'h-12 w-12':'h-10 w-10'}/>;
 }
 
 function TeamSide({ team, onClick }: { team: Team; onClick?: () => void }) {

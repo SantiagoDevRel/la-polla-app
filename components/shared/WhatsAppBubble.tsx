@@ -5,8 +5,8 @@
 // pantalla que lo montaba. El componente se conserva a proposito (no se
 // borra) porque el bot de WhatsApp sigue vivo en el backend y este boton es
 // lo unico que habria que volver a montar si se decide reactivarlo.
-// No confundir con el boton de WhatsApp de /login: ese NO es un bot, es el
-// segundo metodo de entrada a la cuenta cuando el SMS no llega, y sigue en pie.
+// 2026-09-13: el numero del bot ahora es de otra app. Sin
+// NEXT_PUBLIC_WHATSAPP_BOT_NUMBER este componente no renderiza nada.
 //
 // Small clickable WhatsApp icon that
 // opens a chat with the bot. Drops into the header next to "LA POLLA
@@ -38,6 +38,7 @@ export default function WhatsAppBubble({
   const t = useTranslations("Common");
   const text = prefilledText ?? t("whatsappBubbleText");
   const href = botDeepLink(text);
+  if (!href) return null;
 
   return (
     <a

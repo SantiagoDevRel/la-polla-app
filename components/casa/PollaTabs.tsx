@@ -10,14 +10,16 @@ interface Props {
   slug: string;
   firstLabel: string;
   children: ReactNode;
+  info?: ReactNode;
   initialRows: CasaLeaderboardRow[];
   entryStatus: CasaEntryStatus | null;
   pollaStatus: CasaPollaStatus;
+  drawPending?: boolean;
   userId: string;
 }
 
-export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus, pollaStatus, userId }: Props) {
-  const [tab, setTab] = useState<0 | 1>(0);
+export function PollaTabs({ slug, firstLabel, children, info, initialRows, entryStatus, pollaStatus, userId, drawPending = false }: Props) {
+  const [tab, setTab] = useState(0);
   const [rows, setRows] = useState(initialRows);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -25,6 +27,7 @@ export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus
   const buttons = useRef<Array<HTMLButtonElement | null>>([]);
   const id = useId();
   const router = useRouter();
+  const labels = [firstLabel, "Tabla", ...(info ? ["Info"] : [])];
 
   useEffect(() => { setRows(initialRows); }, [initialRows]);
 
@@ -49,7 +52,7 @@ export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus
         if (!active) return;
         setRows(data.rows);
         setError(null);
-        if (data.entryStatus !== entryStatus || data.pollaStatus !== pollaStatus) router.refresh();
+        if (data.entryStatus !== entryStatus || data.pollaStatus !== pollaStatus || Boolean(data.drawPending) !== drawPending) router.refresh();
       } catch (cause) {
         if (active && !controller?.signal.aborted) {
           setError(cause instanceof Error ? cause.message : "No se pudo actualizar la tabla.");
@@ -69,12 +72,12 @@ export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [tab, slug, revision, entryStatus, pollaStatus, router]);
+  }, [tab, slug, revision, entryStatus, pollaStatus, drawPending, router]);
 
   return (
     <section className="mt-7">
-      <div role="tablist" aria-label="Contenido de la polla" className="grid grid-cols-2 gap-1 rounded-full border border-border-subtle bg-bg-card p-1">
-        {[firstLabel, "Tabla"].map((label, index) => (
+      <div role="tablist" aria-label="Contenido de la polla" className="flex gap-1 overflow-x-auto rounded-full border border-border-subtle bg-bg-card p-1">
+        {labels.map((label, index) => (
           <button
             key={label}
             ref={(element) => { buttons.current[index] = element; }}
@@ -84,15 +87,16 @@ export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus
             aria-selected={tab === index}
             aria-controls={`${id}-panel-${index}`}
             tabIndex={tab === index ? 0 : -1}
-            onClick={() => setTab(index as 0 | 1)}
+            onClick={() => setTab(index)}
             onKeyDown={(event) => {
               if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
               event.preventDefault();
-              const next = event.key === "Home" ? 0 : event.key === "End" ? 1 : tab === 0 ? 1 : 0;
+              const next = event.key === "Home" ? 0 : event.key === "End" ? labels.length - 1
+                : (index + (event.key === "ArrowRight" ? 1 : -1) + labels.length) % labels.length;
               setTab(next);
               buttons.current[next]?.focus();
             }}
-            className={`min-h-12 min-w-0 cursor-pointer rounded-full px-3 py-2 text-sm font-semibold uppercase tracking-wide transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${tab === index ? "bg-bg-elevated text-text-primary" : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"}`}
+            className={`min-h-12 flex-1 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-3 py-2 text-[15px] font-semibold leading-normal transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${tab === index ? "bg-bg-elevated text-text-primary" : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"}`}
           >{label}</button>
         ))}
       </div>
@@ -143,6 +147,7 @@ export function PollaTabs({ slug, firstLabel, children, initialRows, entryStatus
           </table>
         )}
       </div>
+      {info && <div id={`${id}-panel-2`} role="tabpanel" aria-labelledby={`${id}-tab-2`} hidden={tab !== 2} tabIndex={0}>{info}</div>}
     </section>
   );
 }

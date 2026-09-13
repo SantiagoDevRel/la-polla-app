@@ -4,6 +4,7 @@
 // aprobar / rechazar. Aplica a admins de pollas + global admins.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -64,6 +65,7 @@ function fmtCOP(n: number | null): string {
 
 function fmtDate(iso: string): string {
   return new Intl.DateTimeFormat("es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
     hour: "numeric",

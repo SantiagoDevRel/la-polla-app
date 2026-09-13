@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import { colombiaDateKey, colombiaDateTimeToIso } from "@/lib/time/colombia";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { ScoringRules } from "@/components/ui/ScoringRules";
@@ -22,10 +23,8 @@ const IN_2H_14M = new Date(NOW + 2 * 60 * 60 * 1000 + 14 * 60 * 1000);
 const IN_3H = new Date(NOW + 3 * 60 * 60 * 1000);
 const IN_26H = new Date(NOW + 26 * 60 * 60 * 1000);
 const IN_TOMORROW_15H = (() => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(15, 0, 0, 0);
-  return d;
+  const tomorrow = colombiaDateKey(new Date(NOW + 24 * 60 * 60 * 1000));
+  return new Date(colombiaDateTimeToIso(`${tomorrow}T15:00`));
 })();
 
 const ARSENAL = { name: "Arsenal", shortCode: "ARS" };
@@ -169,7 +168,7 @@ export default function DesignPage() {
         <div className="space-y-4 bg-bg-card p-6 rounded-lg border border-white/10">
           <div>
             <span className="text-xs text-text-muted uppercase tracking-wider">Bebas 56</span>
-            <p className="font-display text-[56px] leading-none">Santiago</p>
+            <p className="font-display text-[56px] leading-none">Jugador</p>
           </div>
           <div>
             <span className="text-xs text-text-muted uppercase tracking-wider">Bebas 40 gold</span>
@@ -406,7 +405,7 @@ export default function DesignPage() {
             pollaName="Champions Pana"
             currentUserId="u1"
             top3={[
-              { userId: "u1", name: "Santiago", points: 28 },
+              { userId: "u1", name: "Jugador", points: 28 },
               { userId: "u2", name: "Andrés", points: 24 },
               { userId: "u3", name: "Laura", points: 21 },
             ]}

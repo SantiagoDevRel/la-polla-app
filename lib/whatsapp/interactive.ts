@@ -1,6 +1,8 @@
 // lib/whatsapp/interactive.ts — Helper functions for WhatsApp Cloud API interactive messages
 // Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/messages/interactive-reply-buttons-messages
 
+import { whatsappOutboundEnabled, WHATSAPP_OUTBOUND_DISABLED } from "./outbound";
+
 // Resolve env at call time, not module-load. Module-level throws break
 // Vercel's build "collect page data" pass when any preview env scope
 // lacks META_WA_*. Defer the check so unrelated builds stay green.
@@ -21,6 +23,10 @@ function getWhatsAppConfig(): { token: string; url: string } {
 }
 
 async function sendInteractive(to: string, payload: Record<string, unknown>) {
+  if (!whatsappOutboundEnabled()) {
+    console.warn(`[WA interactive] ${WHATSAPP_OUTBOUND_DISABLED} — skip send`);
+    return;
+  }
   const { token, url } = getWhatsAppConfig();
   const res = await fetch(url, {
     method: "POST",

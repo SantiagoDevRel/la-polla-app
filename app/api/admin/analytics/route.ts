@@ -5,6 +5,7 @@
 //
 // Returns a single payload so the dashboard renders in one round-trip.
 import { NextResponse } from "next/server";
+import { colombiaDateKey, toColombiaDateTimeInput } from "@/lib/time/colombia";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -118,9 +119,9 @@ export async function GET() {
     if (meta.method === "otp") otpUsers.add(e.user_id);
     // Password method removed — la app no usa password (solo SMS OTP via
     // Twilio Verify desde abril 2026). Quitado del analytics.
-    const day = e.created_at.slice(0, 10);
+    const day = colombiaDateKey(e.created_at);
     loginsByDay[day] = (loginsByDay[day] ?? 0) + 1;
-    const hour = new Date(e.created_at).getHours();
+    const hour = Number(toColombiaDateTimeInput(e.created_at).slice(11, 13));
     loginsByHour[hour]++;
   }
 
@@ -135,11 +136,11 @@ export async function GET() {
   // Build a 14-day series for signups + logins (fill zeros for empty days).
   const days: string[] = [];
   for (let i = 13; i >= 0; i--) {
-    days.push(new Date(now - i * DAY_MS).toISOString().slice(0, 10));
+    days.push(colombiaDateKey(new Date(now - i * DAY_MS)));
   }
   const signupsByDay: Record<string, number> = {};
   for (const u of newUsers) {
-    const day = u.created_at.slice(0, 10);
+    const day = colombiaDateKey(u.created_at);
     signupsByDay[day] = (signupsByDay[day] ?? 0) + 1;
   }
   const series = days.map(day => ({

@@ -4,6 +4,7 @@
 // Lee el match desde Supabase (read-only). Si no se encuentra, devuelve
 // la OG default de marca para que igual exista una imagen útil.
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { ImageResponse } from "next/og";
 import { getSiteFromHeaders } from "@/lib/seo/sites";
 import { findByInternalSlug } from "@/lib/seo/tournaments";
@@ -71,6 +72,7 @@ export default async function Image({ params }: Props) {
 
   const dateFmt = m
     ? new Intl.DateTimeFormat(isEs ? "es-CO" : "en-US", {
+        timeZone: COLOMBIA_TIME_ZONE,
         weekday: "long",
         day: "numeric",
         month: "long",

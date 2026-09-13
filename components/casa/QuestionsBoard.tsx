@@ -97,7 +97,7 @@ export function QuestionsBoard({
   }
 
   return (
-    <div>
+    <div data-app-update-blocked={dirty || saving}>
       <ul className="space-y-px">
         {questions.map((q) => {
           const resuelta = q.resolved_at != null;

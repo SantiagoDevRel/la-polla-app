@@ -3,8 +3,9 @@
 
 import { redirect } from "next/navigation";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
-import { getPots, listAllPollas } from "@/lib/casa/queries";
+import { getPots, getHouseTotal, listAllPollas } from "@/lib/casa/queries";
 import { pollaStatusLabel } from "@/lib/casa/types";
+import { countOpenMatchIssues } from "@/lib/casa/match-issues";
 import { CasaAdminPanel } from "@/components/casa/CasaAdminPanel";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,9 @@ export default async function CasaAdminPage() {
 
   const pollas = await listAllPollas();
   const pots = await getPots(pollas.map((polla) => polla.id));
-  const totalCasa = pollas.reduce((total, polla) => total + (pots[polla.id]?.house_cop ?? 0), 0);
+  const totalCasa = await getHouseTotal(pollas.map((polla) => polla.id));
+  // Partidos suspendidos/aplazados/cancelados/abandonados sin decidir.
+  const openIssues = await countOpenMatchIssues();
 
   return (
     <CasaAdminPanel
@@ -24,12 +27,21 @@ export default async function CasaAdminPage() {
         id: polla.id,
         slug: polla.slug,
         name: polla.name,
+        // `kind` decide si el panel muestra los controles para resolver
+        // preguntas (manual) o registrar el número sorteado (rifa).
+        kind: polla.kind,
+        prize_kind: polla.prize_kind,
+        prize_object: polla.prize_object,
+        draw_pending: polla.draw_pending,
         status: polla.status,
         closes_at: polla.closes_at,
+        opens_at: polla.opens_at,
+        publication_mode: polla.publication_mode,
         label: pollaStatusLabel(polla),
       }))}
       pots={pots}
       totalCasa={totalCasa}
+      openIssues={openIssues}
     />
   );
 }

@@ -1,11 +1,12 @@
 // components/match/LiveChip.tsx — Tribuna Caliente §3.7
 "use client";
 
+import { COLOMBIA_TIME_ZONE, colombiaDateKey } from "@/lib/time/colombia";
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
 import { cn } from "@/lib/cn";
-import { flagUrlForTeam } from "@/lib/flags/country-iso";
+import { TeamCrest } from './TeamCrest';
 
 // El popup carga sólo cuando se abre (es pesado: framer-motion + portal).
 const LiveMatchPopup = dynamic(() => import("@/components/match/LiveMatchPopup"), {
@@ -49,73 +50,30 @@ function formatUpcoming(
   tomorrowLabel: string,
 ): string {
   const now = new Date();
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
-  const sameTomorrow =
-    date.getFullYear() === tomorrow.getFullYear() &&
-    date.getMonth() === tomorrow.getMonth() &&
-    date.getDate() === tomorrow.getDate();
+  const day = colombiaDateKey(date);
+  const sameDay = day === colombiaDateKey(now);
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const sameTomorrow = day === colombiaDateKey(tomorrow);
 
   const intlTag = locale === "en" ? "en-US" : "es-CO";
   const time = new Intl.DateTimeFormat(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
 
   if (sameDay) return `${todayLabel} · ${time}`;
   if (sameTomorrow) return `${tomorrowLabel} · ${time}`;
-  const weekday = new Intl.DateTimeFormat(intlTag, { weekday: "short" })
+  const weekday = new Intl.DateTimeFormat(intlTag, { timeZone: COLOMBIA_TIME_ZONE, weekday: "short" })
     .format(date)
     .replace(".", "")
     .toUpperCase();
   return `${weekday} · ${time}`;
 }
 
-/**
- * Renderiza el logo del equipo. Si la URL falla en runtime (404, host
- * caído como crests.football-data.org, CSP block), cae al code de
- * letras (ATM/ARS/etc.) en vez de quedar en blanco. El bug previo
- * usaba e.currentTarget.style.display = "none" pero no había sibling
- * para mostrar — simplemente desaparecía el escudo y nada lo reemplazaba.
- */
-function TeamLogoOrCode({
-  logo,
-  code,
-  teamName,
-}: {
-  logo: string | null | undefined;
-  code: string;
-  teamName?: string;
-}) {
-  const [errored, setErrored] = useState(false);
-  // Si el teamName matchea una seleccion nacional conocida, preferir
-  // la bandera del pais sobre el logo del provider — eso resuelve el
-  // caso del Mundial donde ESPN no siempre devuelve crest util.
-  const countryFlag = teamName ? flagUrlForTeam(teamName) : null;
-  const src = countryFlag ?? logo;
-  if (src && !errored) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt={code}
-        width={24}
-        height={24}
-        className="object-contain"
-        style={{ width: 24, height: 24, borderRadius: countryFlag ? 4 : 0 }}
-        onError={() => setErrored(true)}
-      />
-    );
-  }
-  return (
-    <span className="font-display text-[16px] tracking-[0.04em] text-text-primary">
-      {code}
-    </span>
-  );
+/** Shared local artwork for every club and national team. */
+function TeamLogoOrCode({logo,code,teamName}:{logo:string|null|undefined;code:string;teamName?:string}) {
+ return <TeamCrest team={teamName??code} src={logo} />;
 }
 
 export function LiveChip(props: LiveChipProps) {

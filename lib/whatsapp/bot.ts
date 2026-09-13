@@ -12,6 +12,7 @@
 // Meta verificado en un canal de spam/scam para cualquier cuenta con OTP.
 import axios from "axios";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { whatsappOutboundEnabled, WHATSAPP_OUTBOUND_DISABLED } from "./outbound";
 
 // Resolve config at call time, not module-load. Si faltan envs el build
 // no se cae; los sends loud-fail solo cuando se intentan.
@@ -52,7 +53,7 @@ export async function sendTextMessage(to: string, text: string, opts?: SendOpts)
     type: "text",
     text: { body: text },
   });
-  await logMessage(to, "outbound", "text", text, opts);
+  if (response) await logMessage(to, "outbound", "text", text, opts);
   return response;
 }
 
@@ -79,7 +80,7 @@ export async function sendButtonMessage(
       action: { buttons: buttonActions },
     },
   });
-  await logMessage(to, "outbound", "interactive_button", `${header}: ${body}`, opts);
+  if (response) await logMessage(to, "outbound", "interactive_button", `${header}: ${body}`, opts);
   return response;
 }
 
@@ -111,7 +112,7 @@ export async function sendListMessage(
       },
     },
   });
-  await logMessage(to, "outbound", "interactive_list", `${header}: ${body}`, opts);
+  if (response) await logMessage(to, "outbound", "interactive_list", `${header}: ${body}`, opts);
   return response;
 }
 
@@ -123,6 +124,10 @@ export async function sendWhatsAppMessage(to: string, text: string, opts?: SendO
 // ─── Internal ───
 
 async function callMetaAPI(payload: Record<string, unknown>) {
+  if (!whatsappOutboundEnabled()) {
+    console.warn(`[WA] ${WHATSAPP_OUTBOUND_DISABLED} — skip send`);
+    return null;
+  }
   const { token, url } = getWhatsAppConfig();
   try {
     return await axios.post(url, payload, {

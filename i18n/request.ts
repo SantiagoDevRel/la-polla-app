@@ -1,5 +1,6 @@
 import { getRequestConfig } from "next-intl/server";
 import { headers } from "next/headers";
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 
 const SUPPORTED = ["es", "en"] as const;
 type Locale = (typeof SUPPORTED)[number];
@@ -17,6 +18,7 @@ export default getRequestConfig(async () => {
 
   return {
     locale,
+    timeZone: COLOMBIA_TIME_ZONE,
     messages: (await import(`../messages/${locale}.json`)).default,
   };
 });

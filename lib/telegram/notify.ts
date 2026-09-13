@@ -28,6 +28,9 @@ export async function signedProofUrl(path: string): Promise<string | null> {
 
 interface ProofNotice {
   entryId: string;
+  attemptId: string;
+  prizeKind: "pozo" | "objeto";
+  prizeObject: string | null;
   pollaName: string;
   pollaSlug: string;
   userName: string;
@@ -51,8 +54,8 @@ export async function notifyNewProof(n: ProofNotice): Promise<void> {
 
   const buttons: InlineButton[][] = [
     [
-      { text: "✅ Aprobar", callback_data: `ok:${n.entryId}` },
-      { text: "❌ Rechazar", callback_data: `no:${n.entryId}` },
+      { text: "✅ Aprobar", callback_data: `ok2:${n.attemptId}` },
+      { text: "❌ Rechazar", callback_data: `no2:${n.attemptId}` },
     ],
   ];
 
@@ -64,7 +67,7 @@ export async function notifyNewProof(n: ProofNotice): Promise<void> {
     n.ticketNumber != null ? `Boleta: <b>#${n.ticketNumber}</b>` : null,
     `Valor: <b>${formatCop(n.amountCop)}</b>`,
     ``,
-    `Si lo apruebas, el pozo queda en <b>${formatCop(n.potAfterCop)}</b>.`,
+    n.prizeKind === "objeto" ? `Participa por <b>${esc(n.prizeObject ?? "el premio en objeto")}</b>. No hay reparto de dinero.` : `Si lo apruebas, el pozo queda en <b>${formatCop(n.potAfterCop)}</b>.`,
   ]
     .filter(Boolean)
     .join("\n");

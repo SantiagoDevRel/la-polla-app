@@ -6,7 +6,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { getIOSTournamentName } from "@/lib/platform/tournament-name-ios";
-import Image from "next/image";
+import { TeamCrest } from "@/components/match/TeamCrest";
 import { TOURNAMENT_ICONS } from "@/lib/tournaments";
 import { formatCOP } from "@/lib/formatCurrency";
 import { getPollitoByPosition } from "@/lib/pollitos";
@@ -132,13 +132,7 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                       border: "1px solid rgba(255,255,255,0.08)", display: "flex",
                       alignItems: "center", justifyContent: "center", overflow: "hidden",
                     }}>
-                      {match.home_team_flag ? (
-                        <Image src={match.home_team_flag} alt={match.home_team} width={24} height={24} style={{ width: 24, height: 24, objectFit: "cover", borderRadius: "50%" }} />
-                      ) : (
-                        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 7, color: "#F5F7FA", letterSpacing: "0.04em" }}>
-                          {match.home_team.substring(0, 3).toUpperCase()}
-                        </span>
-                      )}
+                      <TeamCrest team={match.home_team} src={match.home_team_flag} className="h-6 w-6" />
                     </div>
                     {/* Wrap libre, sin nowrap/ellipsis/maxWidth fijo: con
                         text-zoom de accesibilidad la fuente escala pero los
@@ -170,13 +164,7 @@ function LiveMatchesBanner({ matches }: { matches: LiveMatch[] }) {
                       border: "1px solid rgba(255,255,255,0.08)", display: "flex",
                       alignItems: "center", justifyContent: "center", overflow: "hidden",
                     }}>
-                      {match.away_team_flag ? (
-                        <Image src={match.away_team_flag} alt={match.away_team} width={24} height={24} style={{ width: 24, height: 24, objectFit: "cover", borderRadius: "50%" }} />
-                      ) : (
-                        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 7, color: "#F5F7FA", letterSpacing: "0.04em" }}>
-                          {match.away_team.substring(0, 3).toUpperCase()}
-                        </span>
-                      )}
+                      <TeamCrest team={match.away_team} src={match.away_team_flag} className="h-6 w-6" />
                     </div>
                     {/* Wrap libre, sin nowrap/ellipsis/maxWidth fijo: con
                         text-zoom de accesibilidad la fuente escala pero los

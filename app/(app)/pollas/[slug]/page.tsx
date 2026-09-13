@@ -2,9 +2,11 @@
 // 4 tabs: Partidos, Ranking, Pagos, Info — con marcadores Bebas Neue y inputs gold glow
 "use client";
 
+import { COLOMBIA_TIME_ZONE, colombiaDateKey } from "@/lib/time/colombia";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { TeamCrest as ClubCrest } from '@/components/match/TeamCrest';
 import axios from "axios";
 import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
@@ -165,6 +167,7 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
   // unoptimized: skipea el optimizador de imágenes de Vercel para
   // logos externos pequeños (24x24).
   const countryFlag = flagUrlForTeam(teamName);
+  if (!isIOSApp && !countryFlag) return <ClubCrest team={teamName} src={flagUrl}/>;
   const src = isIOSApp ? countryFlag : (countryFlag ?? flagUrl);
   if (src && !errored) {
     // Bandera de país (flag-icons, ratio 4:3): caja 4:3 (24×18) que la
@@ -223,6 +226,7 @@ function TeamCrest({ flagUrl, teamName }: { flagUrl: string | null; teamName: st
 function formatKickoffShort(iso: string, locale: string): string {
   const intlTag = locale === "en" ? "en-US" : "es-CO";
   return new Intl.DateTimeFormat(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
     hour: "numeric",
@@ -230,16 +234,9 @@ function formatKickoffShort(iso: string, locale: string): string {
   }).format(new Date(iso));
 }
 
-// Group date key (YYYY-MM-DD in the user's local timezone) used to bucket
-// upcoming matches by kickoff day. Local timezone matters so a match at
-// 19:30 CO time on Apr 24 never sneaks into the Apr 25 bucket just
-// because UTC rolls over.
+// Group by Colombia's calendar day, including users abroad and UTC servers.
 function dateKey(iso: string): string {
-  const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return colombiaDateKey(iso);
 }
 
 // Human-friendly date header, e.g. "HOY · MIÉ 23 ABR" or "JUEVES 24 ABR".
@@ -251,12 +248,13 @@ function formatDateHeader(
 ): string {
   const d = new Date(iso);
   const now = new Date();
-  const sameDay = d.toDateString() === now.toDateString();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
-  const isTomorrow = d.toDateString() === tomorrow.toDateString();
+  const day = colombiaDateKey(d);
+  const sameDay = day === colombiaDateKey(now);
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const isTomorrow = day === colombiaDateKey(tomorrow);
   const intlTag = locale === "en" ? "en-US" : "es-CO";
   const base = new Intl.DateTimeFormat(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     weekday: "long",
     day: "numeric",
     month: "short",

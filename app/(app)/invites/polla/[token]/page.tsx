@@ -7,9 +7,10 @@
 // so the invitee can decide informed.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
+import { TeamCrest } from "@/components/match/TeamCrest";
 import axios from "axios";
 import { ChevronDown, CreditCard, Info, Target } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -60,11 +61,13 @@ function formatMatchDate(iso: string, locale: string): string {
   const intlTag = locale === "en" ? "en-US" : "es-CO";
   const d = new Date(iso);
   const date = d.toLocaleDateString(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     weekday: "short",
     day: "numeric",
     month: "short",
   });
   const time = d.toLocaleTimeString(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -76,34 +79,10 @@ function MatchRowView({ m, locale, vsLabel }: { m: MatchRow; locale: string; vsL
   return (
     <li className="rounded-lg p-3 bg-bg-elevated border border-border-subtle">
       <div className="flex items-center gap-2 text-sm text-text-primary min-w-0">
-        {m.home_team_flag ? (
-          <Image
-            src={m.home_team_flag}
-            alt=""
-            width={18}
-            height={18}
-            className="flex-shrink-0"
-            style={{ objectFit: "contain" }}
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : null}
+        <TeamCrest team={m.home_team} src={m.home_team_flag} className="h-[18px] w-[18px]" />
         <span className="truncate flex-1 min-w-0">{m.home_team}</span>
         <span className="text-text-muted text-xs shrink-0">{vsLabel}</span>
-        {m.away_team_flag ? (
-          <Image
-            src={m.away_team_flag}
-            alt=""
-            width={18}
-            height={18}
-            className="flex-shrink-0"
-            style={{ objectFit: "contain" }}
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : null}
+        <TeamCrest team={m.away_team} src={m.away_team_flag} className="h-[18px] w-[18px]" />
         <span className="truncate flex-1 min-w-0">{m.away_team}</span>
       </div>
       <p className="text-[11px] text-text-muted mt-1">
@@ -466,24 +445,12 @@ export default function OpenInvitePage() {
               <p className="text-text-secondary text-sm mt-0.5">{t("pollaEndedBody")}</p>
             </div>
           ) : authed === false ? (
-            <>
-              <button
-                onClick={goLogin}
-                className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all text-base"
-              >
-                {t("loginAndJoin")}
-              </button>
-              {polla.join_code ? (
-                <a
-                  href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER ?? "573117312391"}?text=${encodeURIComponent(`unirse ${polla.join_code}`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full block text-center text-text-muted text-xs pt-3 hover:text-[#25D366] transition-colors"
-                >
-                  {t("preferWhatsapp")}
-                </a>
-              ) : null}
-            </>
+            <button
+              onClick={goLogin}
+              className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all text-base"
+            >
+              {t("loginAndJoin")}
+            </button>
           ) : (
             <button
               onClick={handleJoin}

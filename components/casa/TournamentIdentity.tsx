@@ -1,6 +1,6 @@
 import { Trophy } from "lucide-react";
 import type { CasaPollaKind } from "@/lib/casa/types";
-import { getTournamentBySlug, getTournamentLogo, getTournamentName } from "@/lib/tournaments";
+import { getTournamentBySlug, getTournamentLogo, getTournamentLogoClassName, getTournamentName } from "@/lib/tournaments";
 
 /** Compact lists keep every logo; detail views also show tournament names. */
 export function TournamentIdentity({
@@ -27,7 +27,7 @@ export function TournamentIdentity({
           title={getTournamentName(slug)}
           className={showNames ? "flex min-w-0 max-w-full items-center gap-2 last:odd:col-span-2" : "flex shrink-0"}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-text-primary">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm">
             {getTournamentBySlug(slug) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -35,9 +35,9 @@ export function TournamentIdentity({
                 alt=""
                 width={24}
                 height={24}
-                className="h-6 w-6 max-w-none object-contain"
+                className={`h-6 w-6 max-w-none object-contain ${getTournamentLogoClassName(slug)}`}
               />
-            ) : <Trophy aria-hidden="true" className="h-5 w-5 text-bg-base" />}
+            ) : <Trophy aria-hidden="true" className="h-5 w-5 text-text-secondary" />}
           </span>
           <span className={showNames ? "min-w-0 text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted [overflow-wrap:anywhere]" : "sr-only"}>{getTournamentName(slug)}</span>
         </li>

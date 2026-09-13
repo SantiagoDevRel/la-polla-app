@@ -1,8 +1,6 @@
 // app/(auth)/layout.tsx — Layout para las páginas de autenticación (login, verify)
-// Shares the same AppBackground as the authenticated shell so the
-// stadium ambience is visible before sign-in. Auth pages previously
-// had their own static radial gradients; those stay on the page as a
-// local highlight, layered on top of the global ambient.
+// Login keeps the zero-byte CSS smoke it historically rendered, while the
+// authenticated onboarding route preserves its ambient video.
 //
 // WelcomeIntro is mounted here so it covers /login and /onboarding —
 // the first two surfaces a brand-new visitor lands on. It self-gates
@@ -15,7 +13,7 @@
 // early-returns, so the chunk download is wasted only on the first
 // visit per session — acceptable trade for shaving ~50 kB off /login
 // First Load JS (was 312 kB, now ~260 kB).
-import { AppBackground } from "@/components/layout/AppBackground";
+import { AuthBackground } from "@/components/layout/AuthBackground";
 import { WelcomeIntroLoader } from "@/components/auth/WelcomeIntroLoader";
 
 export default function AuthLayout({
@@ -25,7 +23,7 @@ export default function AuthLayout({
 }) {
   return (
     <>
-      <AppBackground />
+      <AuthBackground />
       <WelcomeIntroLoader />
       <div className="contents" data-auth-content>
         {children}

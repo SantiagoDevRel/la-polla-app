@@ -7,6 +7,7 @@
 //   2. El trigger SQL trigger_score_predictions corre solo y puntúa.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -51,6 +52,7 @@ interface EndedNoPayouts {
 
 function fmtDate(iso: string): string {
   return new Intl.DateTimeFormat("es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
     hour: "numeric",

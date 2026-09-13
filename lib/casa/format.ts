@@ -28,14 +28,15 @@ export function formatNumber(n: number): string {
 }
 
 /** "sáb 30 ago · 3:00 p.m." en hora de Colombia. */
-export function formatMatchTime(iso: string): string {
+export function formatMatchTime(iso: string, confirmed = true): string {
   const d = new Date(iso);
   const fecha = new Intl.DateTimeFormat("es-CO", {
-    timeZone: "America/Bogota",
+    timeZone: confirmed ? "America/Bogota" : "UTC",
     weekday: "short",
     day: "numeric",
     month: "short",
   }).format(d);
+  if (!confirmed) return `${fecha} · hora por confirmar`;
   const hora = new Intl.DateTimeFormat("es-CO", {
     timeZone: "America/Bogota",
     hour: "numeric",

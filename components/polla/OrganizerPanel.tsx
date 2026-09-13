@@ -5,6 +5,7 @@
 // Sección C: estado de la polla (status, pozo total, completitud de pronósticos).
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -330,7 +331,7 @@ export default function OrganizerPanel({
               .map((p) => {
                 const name = p.users?.display_name?.trim() || p.users?.whatsapp_number || t("participantFallback");
                 const sub = p.users?.display_name ? p.users?.whatsapp_number : null;
-                const joined = p.joined_at ? new Date(p.joined_at).toLocaleDateString(intlTag) : null;
+                const joined = p.joined_at ? new Date(p.joined_at).toLocaleDateString(intlTag, { timeZone: COLOMBIA_TIME_ZONE }) : null;
                 const isExpelled = p.status === "rejected";
                 return (
                   <li
@@ -470,6 +471,7 @@ export default function OrganizerPanel({
             <p className="text-[11px] text-text-muted">
               {t("proofUploadedAt", {
                 date: new Date(viewingProof.proof.created_at).toLocaleString(intlTag, {
+                  timeZone: COLOMBIA_TIME_ZONE,
                   day: "numeric",
                   month: "short",
                   hour: "2-digit",

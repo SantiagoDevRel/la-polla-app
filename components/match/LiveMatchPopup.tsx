@@ -17,6 +17,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { BarChart3, List, UsersRound, X } from "lucide-react";
 import { DURATION } from "@/lib/animations";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
+import { TeamCrest } from './TeamCrest';
 import { eventLabel, statLabel } from "@/lib/espn/labels-es";
 import type { MatchStat, MatchSummary, TimelineEvent, Lineup, LineupPlayer } from "@/lib/espn/summary";
 
@@ -114,6 +115,7 @@ function initials(value: string): string {
 function TeamFlag({ flag, team, size }: { flag: string | null | undefined; team: string; size: number }) {
   const [errored, setErrored] = useState(false);
   const countryFlag = flagUrlForTeam(team);
+  if (!countryFlag) return <TeamCrest team={team} src={flag} className={size===28?'h-7 w-7':'h-[18px] w-[18px]'}/>;
   const src = countryFlag ?? flag;
   if (src && !errored) {
     // Bandera de país (flag-icons 4:3): caja 4:3 que la bandera llena

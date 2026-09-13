@@ -29,10 +29,10 @@ export default async function SoportePage() {
           <p className="text-[14px] leading-[1.7] text-text-secondary">
             {t("contactBodyBefore")}
             <a
-              href="mailto:santiagotrujillozuluaga@gmail.com"
+              href="mailto:info@lapollacolombiana.com"
               className="text-gold underline underline-offset-2 transition-colors hover:text-amber"
             >
-              santiagotrujillozuluaga@gmail.com
+              info@lapollacolombiana.com
             </a>
             {t("contactBodyAfter")}
           </p>
@@ -62,10 +62,10 @@ export default async function SoportePage() {
                   <>
                     {t("a6Before")}
                     <a
-                      href="mailto:santiagotrujillozuluaga@gmail.com"
+                      href="mailto:info@lapollacolombiana.com"
                       className="text-gold underline underline-offset-2 transition-colors hover:text-amber"
                     >
-                      santiagotrujillozuluaga@gmail.com
+                      info@lapollacolombiana.com
                     </a>
                     {t("a6After")}
                   </>

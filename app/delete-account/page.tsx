@@ -31,10 +31,10 @@ export default async function DeleteAccountPage() {
           <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
             {t("section1BodyBefore")}
             <a
-              href="mailto:santiagotrujillozuluaga@gmail.com?subject=Eliminar%20cuenta"
+              href="mailto:info@lapollacolombiana.com?subject=Eliminar%20cuenta"
               style={{ color: "#FFD700", textDecoration: "underline" }}
             >
-              santiagotrujillozuluaga@gmail.com
+              info@lapollacolombiana.com
             </a>
             {t("section1BodyMid")}
             <strong>{t("section1Subject")}</strong>
@@ -103,10 +103,10 @@ export default async function DeleteAccountPage() {
           <p style={{ fontSize: 14, lineHeight: 1.7, color: "#b0b8c8" }}>
             {t("section5BodyBefore")}
             <a
-              href="mailto:santiagotrujillozuluaga@gmail.com"
+              href="mailto:info@lapollacolombiana.com"
               style={{ color: "#FFD700", textDecoration: "underline" }}
             >
-              santiagotrujillozuluaga@gmail.com
+              info@lapollacolombiana.com
             </a>
             {t("section5BodyAfter")}
           </p>

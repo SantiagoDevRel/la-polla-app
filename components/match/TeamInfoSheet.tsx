@@ -10,6 +10,7 @@
 // fijo) para sobrevivir text-zoom de accesibilidad.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -20,6 +21,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { X, CalendarDays, Shield, Check, ExternalLink, Users, Newspaper, LayoutGrid } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { flagUrlForTeam } from "@/lib/flags/country-iso";
+import { TeamCrest } from './TeamCrest';
 import { getTeamFacts } from "@/lib/teams/worldcup-facts";
 import { positionLabel } from "@/lib/espn/labels-es";
 import { DURATION } from "@/lib/animations";
@@ -94,6 +96,7 @@ function isLockedForPrediction(scheduledAt: string): boolean {
 function FlagCircle({ team, apiFlag, size }: { team: string; apiFlag: string | null; size: number }) {
   const [errored, setErrored] = useState(false);
   const countryFlag = flagUrlForTeam(team);
+  if (!countryFlag) return <TeamCrest team={team} src={apiFlag} className={size===44?'h-11 w-11':size===18?'h-[18px] w-[18px]':'h-4 w-4'}/>;
   const src = countryFlag ?? apiFlag;
   if (src && !errored) {
     // Bandera de país (flag-icons 4:3): caja 4:3 que la bandera llena
@@ -140,6 +143,7 @@ function FlagCircle({ team, apiFlag, size }: { team: string; apiFlag: string | n
 
 function fmtShortDate(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
     hour: "numeric",
@@ -161,6 +165,7 @@ function fmtRelativeDate(iso: string | null, locale: string): string {
   const days = Math.round(hrs / 24);
   if (Math.abs(days) < 7) return rtf.format(-days, "day");
   return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
   }).format(new Date(iso));

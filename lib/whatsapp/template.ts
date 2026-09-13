@@ -8,6 +8,8 @@
 // Templates tienen que estar pre-aprobados en Meta Business Manager.
 // Acá solo los referenciamos por `name` + `language` + `components`.
 
+import { whatsappOutboundEnabled, WHATSAPP_OUTBOUND_DISABLED } from "./outbound";
+
 const GRAPH_API_VERSION = "v21.0";
 
 /**
@@ -39,7 +41,7 @@ export interface SendTemplateResult {
 /**
  * Envia un template message via Meta Cloud API.
  *
- * @param to       E.164 sin "+" — ej "573117312391"
+ * @param to       E.164 sin "+" — ej "573001234567"
  * @param templateName   Nombre exacto del template aprobado en Meta
  * @param languageCode   "es" / "es_CO" / "en_US" — debe matchear el
  *                       template aprobado
@@ -51,6 +53,9 @@ export async function sendTemplateMessage(
   languageCode: string,
   components: TemplateComponent[],
 ): Promise<SendTemplateResult> {
+  if (!whatsappOutboundEnabled()) {
+    return { ok: false, error: WHATSAPP_OUTBOUND_DISABLED };
+  }
   const token = process.env.META_WA_ACCESS_TOKEN;
   const phoneNumberId = process.env.META_WA_PHONE_NUMBER_ID;
   if (!token || !phoneNumberId) {

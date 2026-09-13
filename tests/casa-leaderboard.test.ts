@@ -69,7 +69,7 @@ describe("GET casa leaderboard", () => {
     const result = await request();
     expect(result.status).toBe(200);
     expect(result.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(await result.json()).toEqual({ rows, entryStatus: "pagada", pollaStatus: "abierta" });
+    expect(await result.json()).toEqual({ rows, entryStatus: "pagada", pollaStatus: "abierta", drawPending: false });
     expect(mocks.getPollaBySlug).toHaveBeenCalledWith("prueba");
     expect(mocks.getLeaderboard).toHaveBeenCalledWith(pollaId);
     expect(mocks.getMyEntry).toHaveBeenCalledWith(pollaId, userId);
@@ -79,7 +79,7 @@ describe("GET casa leaderboard", () => {
     mocks.getPollaBySlug.mockResolvedValue({ id: pollaId, status });
     const result = await request();
     expect(result.status).toBe(200);
-    expect(await result.json()).toEqual({ rows: [], entryStatus: null, pollaStatus: status });
+    expect(await result.json()).toEqual({ rows: [], entryStatus: null, pollaStatus: status, drawPending: false });
   });
 
   it.each(["getUser", "getPollaBySlug", "getLeaderboard", "getMyEntry"] as const)("returns a private generic error if %s fails", async (method) => {

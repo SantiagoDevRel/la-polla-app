@@ -5,37 +5,15 @@
 // status='finished' o cuando un match ya finished todavía no tiene
 // final_verified_at.
 //
-// Reglas (v3, 2026-06-11 — decisión de Santiago tras el inaugural del
-// Mundial: FD flapeó post-pitazo (FINISHED con fullTime null / regreso a
-// TIMED) y congeló el scoring de 142 predicciones; ESPN pasa a ser la
-// fuente primaria y FD corroborador NO-bloqueante):
-//   1. ESPN-primario: sin señal de alargue, dos lecturas de ESPN en ticks
-//      SEPARADOS que coincidan verifican el match. El sync live y verify
-//      corren en el MISMO request, así que "ESPN == row" recién al pitazo
-//      es UNA sola lectura — el guard de 2 ticks (marker `espnseen=` en
-//      final_verification_notes, >=50s) exige re-ver el mismo score un
-//      tick después. Costo: ~1 min de delay. La ausencia o lag de
-//      football-data ya NO detiene el scoring.
-//   2. football-data corrobora cuando tiene score canónico: si coincide,
-//      nota dual-source; si DISCREPA, veta (alerta al admin, no se
-//      finaliza). El row de DB solo vale como proxy de la lectura ESPN al
-//      cruzar contra FD (lo escribió el sync de ESPN) — nunca como fuente
-//      independiente contra el MISMO proveedor que lo escribió (hallazgo
-//      auditoría 2026-06-10); la separación ESPN-vs-ESPN la da el guard
-//      de 2 ticks, no el row.
-//   3. REGLA DE PRODUCTO: puntos = marcador de los 90 + adición. Con
-//      alargue, el canónico es regularTime de FD si llegó este tick; si
-//      no, el snapshot regulation_* propio (migración 063). Sin ninguno →
-//      alerta y resolución manual (o espera, si ESPN aún no marcó
-//      full-time). Si FD reporta duration != REGULAR, el path ESPN-
-//      primario se bloquea aunque nuestra row no tenga señal de ET. El
-//      cierre va SIEMPRE por el RPC finalize_match_result (migración 063).
-//   4. Si las fuentes discrepan → notificar al admin UNA SOLA VEZ por
-//      match (track via final_verification_notes con "alerted").
-//   5. Tournaments ESPN-only (libertadores, etc.): single-source, igual
-//      que antes — pero NUNCA auto-verifican si hay señal de alargue
-//      sin snapshot 90'.
+// Provider contract (2026-09-09): strict identity; 90-minute scoring;
+// disagreement vetoes; a lone provider requires two separate observations.
+// Stored DB scores are not independent corroboration. API-Football's cached
+// response is one observation regardless of how many requests reread it.
+// Extras + final score commit together through finalize_verified_match_result
+// (093), which serializes against live writes and refuses an already verified row.
 
+import { normalizeResultTeam, findEspnResult } from './result-identity';
+import { fdPlayedScore, fdRegulationScore } from '@/lib/football-data/scores';
 import { matchesEnJuego } from "./en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -48,6 +26,8 @@ import {
 import { COMPETITIONS } from "@/lib/football-data/sync";
 import { fetchCompetitionMatches, type FDMatch } from "@/lib/football-data/client";
 import { notifyAdmin } from "@/lib/notifications/admin-alert";
+import { apiFootballFinalsEnabled, loadDailyResults, type DailyResults } from "@/lib/api-football/daily-results";
+import { confirmedObservation, findResultFixture, readFinalResult, resultTeamKey, scorePair } from "@/lib/api-football/results";
 
 export interface VerifyResult {
   match_id: string;
@@ -103,8 +83,7 @@ const FD_COMPETITION_BY_TOURNAMENT: Record<string, number> = Object.fromEntries(
 );
 
 // Señales de que el partido fue a alargue/penales. Si alguna está presente,
-// JAMÁS auto-verificamos sin la confirmación de football-data (que trae el
-// regularTime de los 90).
+// Exigen un marcador explícito de 90 minutos o un snapshot de fin reglamentario.
 const ET_STATUS_DETAILS = new Set([
   "STATUS_END_OF_REGULATION",
   "STATUS_OVERTIME",
@@ -124,69 +103,22 @@ function hasEtSignal(match: MatchRow): boolean {
   );
 }
 
-/**
- * Normalizador para comparar nombres entre nuestra DB (openfootball) y
- * football-data. Espejo TS de los aliases de public.normalize_team_name
- * (migración 061) — mantener en sync.
- */
-function normalizeTeamForCompare(name: string): string {
-  let v = name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  const aliases: Array<[RegExp, string]> = [
-    [/\busa\b|\bunited states of america\b/g, "united states"],
-    [/\bczechia\b/g, "czech republic"],
-    [/\bbosnia(?: and | & |-)herzegovina\b/g, "bosnia herzegovina"],
-    [/\bcote d.?ivoire\b/g, "ivory coast"],
-    [/\bcape verde islands\b/g, "cape verde"], // football-data
-    [/\bcabo verde\b/g, "cape verde"],
-    [/\bsouth korea\b|\brepublic of korea\b/g, "korea republic"],
-    [/\bir iran\b/g, "iran"], // football-data
-    [/\bchina pr\b/g, "china"], // football-data
-    [/\bcurazao\b/g, "curacao"],
-    [/\bturkiye\b/g, "turkey"],
-    [/\bcongo dr\b|\bcongo-kinshasa\b|\bdemocratic republic of congo\b/g, "dr congo"],
-  ];
-  for (const [rx, to] of aliases) v = v.replace(rx, to);
-  return v.replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-/**
- * Match laxo de nombres entre fuentes: igualdad normalizada o contención
- * de tokens en cualquier dirección ("Korea Republic" vs "South Korea" pasa
- * por alias; "Bayern Munich" vs "FC Bayern München" pasa por contención).
- */
-function teamsLooselyMatch(a: string, b: string): boolean {
-  const na = normalizeTeamForCompare(a);
-  const nb = normalizeTeamForCompare(b);
-  if (!na || !nb) return false;
-  return na === nb || na.includes(nb) || nb.includes(na);
-}
-
 /** Matchea un row nuestro contra la lista de matches de football-data. */
 function findFdMatch(match: MatchRow, fdMatches: FDMatch[]): FDMatch | null {
   const kickMs = new Date(match.scheduled_at).getTime();
-  const nh = normalizeTeamForCompare(match.home_team);
-  const na = normalizeTeamForCompare(match.away_team);
+  const nh = normalizeResultTeam(match.home_team);
+  const na = normalizeResultTeam(match.away_team);
 
-  // 1. Por nombres normalizados + kickoff ±3h.
-  for (const fd of fdMatches) {
+  const found = fdMatches.filter((fd) => {
     const fdMs = new Date(fd.utcDate).getTime();
-    if (Math.abs(fdMs - kickMs) > 3 * 60 * 60 * 1000) continue;
-    if (
-      normalizeTeamForCompare(fd.homeTeam.name) === nh &&
-      normalizeTeamForCompare(fd.awayTeam.name) === na
-    ) {
-      return fd;
-    }
-  }
-  // 2. Fallback: candidato ÚNICO en ±2h (cubre variantes de nombre que el
-  //    normalizador no conozca). Si hay 2+, ambiguo → no matchear.
-  const windowed = fdMatches.filter(
-    (fd) => Math.abs(new Date(fd.utcDate).getTime() - kickMs) <= 2 * 60 * 60 * 1000,
-  );
-  return windowed.length === 1 ? windowed[0] : null;
+    if (Math.abs(fdMs - kickMs) > 3 * 60 * 60 * 1000) return false;
+    return (
+      normalizeResultTeam(fd.homeTeam.name) === nh &&
+      normalizeResultTeam(fd.awayTeam.name) === na
+    );
+  });
+  // A unique kickoff alone is not proof of identity across providers.
+  return found.length === 1 ? found[0] : null;
 }
 
 /**
@@ -229,8 +161,10 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
     COLS,
     (q) =>
       q
-        .eq("status", "finished")
+        .in("status", apiFootballFinalsEnabled() ? ["finished", "live", "scheduled"] : ["finished"])
+        .or(`status.eq.finished,scheduled_at.gte.${new Date(Date.now() - 86400000).toISOString().slice(0, 10)}T00:00:00Z`)
         .is("final_verified_at", null)
+        .lte("scheduled_at", new Date(Date.now() - (apiFootballFinalsEnabled() ? 105 * 60000 : 0)).toISOString())
         .gte("scheduled_at", desde),
   );
   if (errores.length > 0) {
@@ -239,6 +173,8 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
   }
 
   if (candidates.length === 0) return [];
+
+  const apiFootballByDate = await loadDailyResults(candidates);
 
   // UN fetch a football-data por torneo por tick (no por match) — cubre
   // a todos los candidatos del torneo y respeta el rate limit de 10/min.
@@ -282,12 +218,25 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
 
   const results: VerifyResult[] = [];
   for (const match of candidates) {
-    const result = await verifyOneMatch(
+    const daily = apiFootballByDate.get(new Date(match.scheduled_at).toISOString().slice(0, 10));
+    // A delayed ESPN status must not hide a final from API-Football. Without
+    // an actual final response, scheduled/live rows never enter legacy scoring.
+    if (match.status !== "finished") {
+      const fixture = daily ? findResultFixture(match, daily.fixtures) : null;
+      if (!fixture || !readFinalResult(fixture)) continue;
+    }
+    try {
+      const result = await verifyOneMatch(
       match,
       fdByTournament.get(match.tournament),
       espnByTournament.get(match.tournament),
+      daily,
     );
     results.push(result);
+    } catch {
+      results.push({match_id: match.id, external_id: match.external_id, espn_id: match.espn_id,
+        status: "error", notes: "No se pudo guardar la verificación; se reintentará."});
+    }
   }
   return results;
 }
@@ -296,6 +245,7 @@ async function verifyOneMatch(
   match: MatchRow,
   fdMatches: FDMatch[] | null | undefined,
   espnEvents: Awaited<ReturnType<typeof fetchEspnScoreboard>> | null | undefined,
+  daily?: DailyResults,
 ): Promise<VerifyResult> {
   const result: VerifyResult = {
     match_id: match.id,
@@ -317,6 +267,7 @@ async function verifyOneMatch(
 
   // 1. ESPN — buscar el evento en el scoreboard (memoizado por torneo).
   let espnFinished = false;
+  let espnEt = false;
   let espnHome: number | null = null;
   let espnAway: number | null = null;
   // Extras de knockout (migración 077): el `score` de ESPN es el marcador de
@@ -327,29 +278,11 @@ async function verifyOneMatch(
   let espnPenAway: number | null = null;
   {
     const events = espnEvents ?? [];
-    let event = match.espn_id ? events.find((e) => e.id === match.espn_id) : null;
-    if (!event) {
-      // Fallback por kickoff ±2h, pero VALIDANDO equipos: en jornadas con
-      // kickoffs simultáneos (última fecha de grupos: 4+ a la misma hora)
-      // el primer evento de la ventana puede ser OTRO partido y generar
-      // una falsa discrepancia que bloquea el scoring (review 2026-06-10).
-      const kickMs = new Date(match.scheduled_at).getTime();
-      event = events.find((e) => {
-        const eventMs = new Date(e.date).getTime();
-        if (Math.abs(eventMs - kickMs) >= 2 * 60 * 60 * 1000) return false;
-        const competition = e.competitions[0];
-        const h = competition?.competitors.find((c) => c.homeAway === "home");
-        const a = competition?.competitors.find((c) => c.homeAway === "away");
-        if (!h || !a) return false;
-        return (
-          teamsLooselyMatch(h.team.displayName, match.home_team) &&
-          teamsLooselyMatch(a.team.displayName, match.away_team)
-        );
-      }) ?? null;
-    }
+    const event = findEspnResult(match, events);
     if (event) {
       const mapped = mapEspnStatus(event.status);
       espnFinished = mapped === "finished";
+      espnEt = ET_STATUS_DETAILS.has(event.status.type.name);
       const competition = event.competitions[0];
       const home = competition?.competitors.find((c) => c.homeAway === "home");
       const away = competition?.competitors.find((c) => c.homeAway === "away");
@@ -387,42 +320,72 @@ async function verifyOneMatch(
   const previousAlertedMatch = previousNotes.match(/ alerted=[^ ]+/);
   const alertedSuffix = previousAlertedMatch ? previousAlertedMatch[0] : "";
 
-  const etSignal = hasEtSignal(match);
-
-  // Persistir los extras de knockout (120'/penales/avance) ANTES de cualquier
-  // finalize: score_match corre al setear final_verified_at dentro de
-  // finalize_match_result, así que las columnas ya tienen que estar escritas.
-  // Si la escritura FALLA, NO finalizamos este tick → el match queda sin
-  // verificar y reintenta el próximo (codex: no scorear sin los extras).
-  // fulltime/penales como par atómico (los dos o ninguno). Migración 077.
-  if (knockoutExtras) {
-    const patch: Record<string, number | string> = {};
-    if (
-      knockoutExtras.fulltime_home_score !== null &&
-      knockoutExtras.fulltime_away_score !== null
-    ) {
-      patch.fulltime_home_score = knockoutExtras.fulltime_home_score;
-      patch.fulltime_away_score = knockoutExtras.fulltime_away_score;
+  const afFixture = daily ? findResultFixture(match, daily.fixtures) : null;
+  const etSignal = hasEtSignal(match) || espnEt || (afFixture !== null && ['AET','PEN'].includes(afFixture.fixture.status.short));
+  const af = afFixture ? readFinalResult(afFixture) : null;
+  if (af && afFixture && daily) {
+    // FD must match BOTH team names here. Provider numeric IDs are unrelated.
+    const fdCandidates = (fdMatches ?? []).filter(f => f.status === "FINISHED"
+      && Math.abs(Date.parse(f.utcDate) - Date.parse(match.scheduled_at)) <= 2 * 3600000
+      && resultTeamKey(f.homeTeam.name) === resultTeamKey(match.home_team)
+      && resultTeamKey(f.awayTeam.name) === resultTeamKey(match.away_team));
+    const fd = fdCandidates.length === 1 ? fdCandidates[0] : null;
+    const fd90 = fd ? fdRegulationScore(fd.score, etSignal) : null;
+    const signals: Array<{home: number; away: number}> = [];
+    if (scorePair(fd90)) signals.push(fd90);
+    const snapshot = {home: match.regulation_home_score, away: match.regulation_away_score};
+    if (scorePair(snapshot)) signals.push(snapshot);
+    if (espnFinished && !espnEt && !etSignal && !af.wentToExtraTime && scorePair({home: espnHome, away: espnAway})) {
+      signals.push({home: espnHome!, away: espnAway!});
     }
-    if (knockoutExtras.penalty_home !== null && knockoutExtras.penalty_away !== null) {
-      patch.penalty_home = knockoutExtras.penalty_home;
-      patch.penalty_away = knockoutExtras.penalty_away;
+    const fulltimeConflict = espnFinished && af.fulltime && espnHome !== null && espnAway !== null
+      && (af.fulltime.home !== espnHome || af.fulltime.away !== espnAway);
+    const fdPlayed = fd ? fdPlayedScore(fd.score) : null;
+    const fdPlayedConflict = af.fulltime && fdPlayed && (af.fulltime.home !== fdPlayed.home || af.fulltime.away !== fdPlayed.away);
+    const penaltySources = [fd?.score.penalties, espnFinished ? {home:espnPenHome,away:espnPenAway} : null].filter(scorePair);
+    const penaltyConflict = af.penalty && penaltySources.some(p=>p.home!==af.penalty!.home || p.away!==af.penalty!.away);
+    if (fulltimeConflict || fdPlayedConflict || penaltyConflict || signals.some(s => s.home !== af.home || s.away !== af.away)) {
+      result.status = "discrepancy";
+      result.notes = `DISCREPANCIA — API-Football 90': ${af.home}-${af.away}; otra fuente no coincide. No se puntúa.`;
+      await alertOnce(admin, match, result.notes, alertedSuffix);
+      return result;
     }
-    if (knockoutExtras.advancer !== null) patch.advancer = knockoutExtras.advancer;
-    if (Object.keys(patch).length > 0) {
-      const { error: exErr } = await admin
-        .from("matches")
-        .update(patch)
-        .eq("id", match.id);
-      if (exErr) {
-        console.error(`[verify-final] knockout extras update failed for ${match.id}:`, exErr.message);
-        result.status = "pending";
-        result.notes = `Captura de 120'/avance falló — reintenta el próximo tick.`;
+    if (signals.length === 0 && !confirmedObservation(previousNotes, afFixture.fixture.id, af.home, af.away, daily.fetchedAt)) {
+      result.notes = `API-Football 90': ${af.home}-${af.away}; esperando otra lectura del proveedor.`;
+      // Keep the FIRST observation of this score until an actual new fetch arrives.
+      const marker = ` afseen=${afFixture.fixture.id}:${af.home}-${af.away}@${daily.fetchedAt}`;
+      await persistNote(admin, match.id, result.notes + marker + alertedSuffix);
+      return result;
+    }
+    const isKnockout = match.phase !== null && KNOCKOUT_PHASES.has(match.phase);
+    let afAdvancer: "home" | "away" | null = null;
+    if (isKnockout) {
+      if (!af.fulltime || (afFixture.fixture.status.short === "PEN" && !af.penalty)) {
+        result.notes = "API-Football: faltan el marcador completo o los penales; esperando confirmación.";
         await persistNote(admin, match.id, result.notes + alertedSuffix);
         return result;
       }
+      // Match winner != aggregate qualifier. Only ESPN's established advance
+      // signal or a decisive shootout supplies advancer; never teams.winner.
+      afAdvancer = espnFinished ? espnAdvancer : af.penalty && af.penalty.home !== af.penalty.away
+        ? af.penalty.home > af.penalty.away ? "home" : "away" : null;
     }
+    result.notes = `Verificado API-Football: 90' ${af.home}-${af.away}, 1X2=${af.outcome}; ${signals.length ? "corroborado" : "dos lecturas del proveedor"}.`;
+    const {data: finalized, error} = await admin.rpc("finalize_verified_match_result", {
+      p_match_id: match.id, p_home_score: af.home, p_away_score: af.away, p_notes: result.notes,
+      p_fulltime_home: isKnockout ? af.fulltime?.home ?? null : null,
+      p_fulltime_away: isKnockout ? af.fulltime?.away ?? null : null,
+      p_penalty_home: isKnockout ? af.penalty?.home ?? null : null,
+      p_penalty_away: isKnockout ? af.penalty?.away ?? null : null,
+      p_advancer: afAdvancer,
+    });
+    if (error) throw new Error("API-Football finalization failed");
+    result.status = finalized === true ? "verified" : "pending";
+    if (finalized !== true) result.notes = "Otro proceso ya verificó el partido o dejó de estar disponible.";
+    return result;
   }
+
+  // Extras are written only inside the locked finalization transaction.
 
   // ── Path A: torneo cubierto por football-data (Mundial) ─────────────
   // La segunda fuente es el fetch REAL a FD, nunca el row de DB.
@@ -448,11 +411,11 @@ async function verifyOneMatch(
       const fd = findFdMatch(match, fdMatches);
       if (!fd) {
         fdState = "match no encontrado";
-      } else if (fd.status !== "FINISHED" && fd.status !== "AWARDED") {
+      } else if (fd.status !== "FINISHED") {
         fdState = `status=${fd.status}`;
       } else {
         fdDuration = fd.score?.duration ?? "REGULAR";
-        fdWentToEt = fdDuration !== "REGULAR";
+        fdWentToEt = fdDuration !== "REGULAR" || etSignal;
         // REGLA DE PRODUCTO: canónico = 90 minutos. Con alargue, regularTime.
         fdCanonHome = fdWentToEt
           ? fd.score?.regularTime?.home ?? null
@@ -469,27 +432,14 @@ async function verifyOneMatch(
           fdCanonAway = null;
         } else {
           fdState = "scored";
-          // ⚠️ Para PENALTY_SHOOTOUT el fullTime de FD v4 puede incluir los
-          // goles de la tanda, mientras ESPN los excluye (verificado: Qatar
-          // 2022 → ESPN score 3-3, shootout aparte) — comparar contra
-          // fullTime crudo daba falsa discrepancia en CADA partido definido
-          // por penales. Construimos el set de scores equivalentes y
-          // aceptamos match contra cualquiera. extraTime puede venir
-          // acumulado o solo los goles del alargue — cubrimos ambas.
-          const etHomeRaw = fd.score?.extraTime?.home ?? null;
-          const etAwayRaw = fd.score?.extraTime?.away ?? null;
-          if (fdFtHome !== null && fdFtAway !== null) fdEquivalents.push([fdFtHome, fdFtAway]);
-          if (fdWentToEt && etHomeRaw !== null && etAwayRaw !== null) {
-            fdEquivalents.push([etHomeRaw, etAwayRaw]);
-            fdEquivalents.push([fdCanonHome + etHomeRaw, fdCanonAway + etAwayRaw]);
-          }
-          if (fdWentToEt) fdEquivalents.push([fdCanonHome, fdCanonAway]);
+          const played = fdPlayedScore(fd.score);
+          if (played) fdEquivalents.push([played.home, played.away]);
         }
       }
     }
 
     // ── Caso 1: FD trae score canónico → dual-source clásico. FD manda el
-    // 90'; ESPN (o DB como proxy) debe coincidir con algún equivalente.
+    // 90'; ESPN debe coincidir con el marcador jugado (sin penales).
     if (fdState === "scored" && fdCanonHome !== null && fdCanonAway !== null) {
       const matchesAny = (h: number | null, a: number | null): boolean =>
         h !== null && a !== null && fdEquivalents.some(([eh, ea]) => eh === h && ea === a);
@@ -498,16 +448,15 @@ async function verifyOneMatch(
       // fullTime aún vacío), ESPN y DB traen scores ET-inclusive que no se
       // pueden comparar contra el canon de 90' — tratarlos como "sin
       // segunda señal" (→ single-source FD), no como veto espurio.
-      const etIncomparable = fdWentToEt && (fdFtHome === null || fdFtAway === null);
+      const etIncomparable = fdWentToEt && fdEquivalents.length === 0;
       const espnAgrees =
         !etIncomparable && espnFinished && espnHome !== null && espnAway !== null
           ? matchesAny(espnHome, espnAway)
           : null;
-      const dbAgrees =
-        !etIncomparable && match.home_score !== null && match.away_score !== null
-          ? matchesAny(match.home_score, match.away_score)
-          : null;
-      const agrees = espnAgrees ?? dbAgrees;
+      // The database may contain this same FD response; it cannot corroborate it.
+      const snapshotAgrees = match.regulation_home_score !== null && match.regulation_away_score !== null
+        ? match.regulation_home_score === fdCanonHome && match.regulation_away_score === fdCanonAway : null;
+      const agrees = snapshotAgrees === false || espnAgrees === false ? false : snapshotAgrees ?? espnAgrees;
 
       if (agrees === false) {
         result.status = "discrepancy";
@@ -517,17 +466,24 @@ async function verifyOneMatch(
         return result;
       }
 
+      if (agrees === null) {
+        const seen = previousNotes.match(/ fdseen=(\d+)-(\d+)@(\S+)/);
+        const same = seen !== null && Number(seen[1]) === fdCanonHome && Number(seen[2]) === fdCanonAway;
+        if (!same || Date.now() - Date.parse(seen![3]) < 50_000) {
+          result.notes = "football-data: esperando segunda lectura independiente del proveedor.";
+          const marker = same ? seen![0] : ` fdseen=${fdCanonHome}-${fdCanonAway}@${new Date().toISOString()}`;
+          await persistNote(admin, match.id, result.notes + marker + alertedSuffix);
+          return result;
+        }
+      }
       result.status = "verified";
       result.notes =
         agrees === null
-          ? // Ni ESPN (evicted del scoreboard) ni DB tienen score para
-            // comparar — FD es la única fuente. Mejor finalizar con nota
-            // que congelar el scoring para siempre.
-            `Verificado (FD single-source, sin segunda señal): ${fdCanonHome}-${fdCanonAway} (duration=${fdDuration}).`
+          ? `Verificado (FD, dos lecturas separadas): ${fdCanonHome}-${fdCanonAway} (duration=${fdDuration}).`
           : fdWentToEt
             ? `Verificado dual-source: 90' = ${fdCanonHome}-${fdCanonAway} (${fdDuration}, final ${fdFtHome}-${fdFtAway} — los puntos usan el 90').`
             : `Verificado dual-source: ESPN y football-data coinciden en ${fdCanonHome}-${fdCanonAway}.`;
-      await finalize(admin, match.id, fdCanonHome, fdCanonAway, result.notes, knockoutExtras);
+      await finalize(admin, match.id, fdCanonHome, fdCanonAway, result, knockoutExtras);
       return result;
     }
 
@@ -554,7 +510,7 @@ async function verifyOneMatch(
         if (sameScoreSeen && Date.now() - new Date(seen![3]).getTime() >= 50_000) {
           result.status = "verified";
           result.notes = `Verificado ESPN-primario (FD ${fdState}): ${espnHome}-${espnAway}, mismo score en 2 ticks separados.`;
-          await finalize(admin, match.id, espnHome, espnAway, result.notes, knockoutExtras);
+          await finalize(admin, match.id, espnHome, espnAway, result, knockoutExtras);
           return result;
         }
         const marker = sameScoreSeen
@@ -581,7 +537,7 @@ async function verifyOneMatch(
     ) {
       result.status = "verified";
       result.notes = `Verificado con snapshot 90' (FD ${fdState}): ${match.regulation_home_score}-${match.regulation_away_score} (ET final ESPN ${espnHome}-${espnAway} — los puntos usan el 90').`;
-      await finalize(admin, match.id, match.regulation_home_score, match.regulation_away_score, result.notes, knockoutExtras);
+      await finalize(admin, match.id, match.regulation_home_score, match.regulation_away_score, result, knockoutExtras);
       return result;
     }
     if (!espnFinished) {
@@ -602,18 +558,6 @@ async function verifyOneMatch(
   const fdAwayDb = match.away_score;
 
   if (!espnFinished) {
-    if (
-      ESPN_ONLY_TOURNAMENTS.has(match.tournament) &&
-      fdFinishedDb &&
-      fdHomeDb !== null &&
-      fdAwayDb !== null &&
-      !etSignal
-    ) {
-      result.status = "verified";
-      result.notes = `Verificado (single-source ESPN): ${fdHomeDb}-${fdAwayDb}.`;
-      await finalize(admin, match.id, fdHomeDb, fdAwayDb, result.notes, knockoutExtras);
-      return result;
-    }
 
     result.status = "pending";
     result.notes = `ESPN aún no marca finished (espn=${espnHome}-${espnAway}). DB: ${fdHomeDb}-${fdAwayDb}.${etSignal ? " Match con alargue — requiere confirmación." : ""}`;
@@ -628,7 +572,7 @@ async function verifyOneMatch(
     if (match.regulation_home_score !== null && match.regulation_away_score !== null) {
       result.status = "verified";
       result.notes = `Verificado con snapshot 90': ${match.regulation_home_score}-${match.regulation_away_score} (ET final ESPN ${espnHome}-${espnAway} — los puntos usan el 90').`;
-      await finalize(admin, match.id, match.regulation_home_score, match.regulation_away_score, result.notes, knockoutExtras);
+      await finalize(admin, match.id, match.regulation_home_score, match.regulation_away_score, result, knockoutExtras);
       return result;
     }
     result.status = "discrepancy";
@@ -638,9 +582,18 @@ async function verifyOneMatch(
   }
 
   if (espnHome === fdHomeDb && espnAway === fdAwayDb && fdFinishedDb) {
+    if (espnHome === null || espnAway === null) return result;
+    const seen = previousNotes.match(/ espnseen=(\d+)-(\d+)@(\S+)/);
+    const same = seen !== null && Number(seen[1]) === espnHome && Number(seen[2]) === espnAway;
+    if (!same || Date.now() - Date.parse(seen![3]) < 50_000) {
+      result.notes = "ESPN: esperando segundo tick de confirmación.";
+      const marker = same ? seen![0] : ` espnseen=${espnHome}-${espnAway}@${new Date().toISOString()}`;
+      await persistNote(admin, match.id, result.notes + marker + alertedSuffix);
+      return result;
+    }
     result.status = "verified";
-    result.notes = `Verificado: ESPN y DB coinciden en ${fdHomeDb}-${fdAwayDb}.`;
-    await finalize(admin, match.id, fdHomeDb!, fdAwayDb!, result.notes, knockoutExtras);
+    result.notes = `Verificado ESPN: ${fdHomeDb}-${fdAwayDb}, dos ticks separados.`;
+    await finalize(admin, match.id, fdHomeDb!, fdAwayDb!, result, knockoutExtras);
     return result;
   }
 
@@ -650,28 +603,25 @@ async function verifyOneMatch(
   return result;
 }
 
-/** Cierra el match vía el RPC autoritativo (migración 063). `extras` (knockouts)
- *  se persisten ANTES del RPC para que score_match los vea (migración 077). */
+/** Extras and regulation score are written atomically under the same row lock. */
 async function finalize(
   admin: ReturnType<typeof createAdminClient>,
   matchId: string,
   homeScore: number,
   awayScore: number,
-  notes: string,
+  result: VerifyResult,
   extras: KnockoutExtras | null = null,
 ): Promise<void> {
-  // Los extras de knockout (120'/penales/avance) ya se escribieron en
-  // verifyOneMatch ANTES de llamar a finalize (y si fallaron, no se llega
-  // hasta acá: se reintenta). Acá solo cerramos vía el RPC autoritativo.
-  void extras;
-  const { error } = await admin.rpc("finalize_match_result", {
-    p_match_id: matchId,
-    p_home_score: homeScore,
-    p_away_score: awayScore,
-    p_notes: notes,
+  const { data, error } = await admin.rpc("finalize_verified_match_result", {
+    p_match_id: matchId, p_home_score: homeScore, p_away_score: awayScore, p_notes: result.notes,
+    p_fulltime_home: extras?.fulltime_home_score ?? null, p_fulltime_away: extras?.fulltime_away_score ?? null,
+    p_penalty_home: extras?.penalty_home ?? null, p_penalty_away: extras?.penalty_away ?? null,
+    p_advancer: extras?.advancer ?? null,
   });
-  if (error) {
-    console.error(`[verify-final] finalize_match_result failed for ${matchId}:`, error.message);
+  if (error) throw new Error("Finalization failed");
+  if (data !== true) {
+    result.status = "pending";
+    result.notes = "Otro proceso ya verificó el partido o dejó de estar disponible.";
   }
 }
 
@@ -700,14 +650,14 @@ async function alertOnce(
       .update({
         final_verification_notes: `${notes} alerted=${new Date().toISOString()}`,
       })
-      .eq("id", match.id);
+      .eq("id", match.id).is("final_verified_at", null);
   } else {
     await admin
       .from("matches")
       .update({
         final_verification_notes: `${notes}${alertedSuffix}`,
       })
-      .eq("id", match.id);
+      .eq("id", match.id).is("final_verified_at", null);
   }
 }
 
@@ -719,5 +669,5 @@ async function persistNote(
   await admin
     .from("matches")
     .update({ final_verification_notes: note })
-    .eq("id", matchId);
+    .eq("id", matchId).is("final_verified_at", null);
 }

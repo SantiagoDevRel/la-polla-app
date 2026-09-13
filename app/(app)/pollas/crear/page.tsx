@@ -4,9 +4,10 @@
 // Paso 3: Configuración (cuota de entrada + modo de pago)
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { TeamCrest } from "@/components/match/TeamCrest";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
@@ -801,7 +802,7 @@ export default function CrearPollaPage() {
                       const intlTag = locale === "en" ? "en-US" : "es-CO";
                       const time = isPlaceholder
                         ? t("tbd")
-                        : new Date(m.scheduled_at).toLocaleTimeString(intlTag, { hour: "2-digit", minute: "2-digit" });
+                        : new Date(m.scheduled_at).toLocaleTimeString(intlTag, { timeZone: COLOMBIA_TIME_ZONE, hour: "2-digit", minute: "2-digit" });
                       // Para placeholders mostramos el label de la fase
                       // + slot ("Cuartos · #1") en vez de "TBD vs TBD"
                       // que no le dice nada al user. Cuando ESPN publica
@@ -843,13 +844,7 @@ export default function CrearPollaPage() {
                             <>
                               {/* Home team */}
                               <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                                {m.home_team_flag ? (
-                                  <Image src={m.home_team_flag} alt={m.home_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                                ) : (
-                                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#F5F7FA", flexShrink: 0 }}>
-                                    {m.home_team.substring(0, 3).toUpperCase()}
-                                  </div>
-                                )}
+                                <TeamCrest team={m.home_team} src={m.home_team_flag} className="h-5 w-5" />
                                 <span style={{ fontSize: 12, fontWeight: 500, color: "#f0f4ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {m.home_team}
                                 </span>
@@ -859,13 +854,7 @@ export default function CrearPollaPage() {
 
                               {/* Away team */}
                               <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                                {m.away_team_flag ? (
-                                  <Image src={m.away_team_flag} alt={m.away_team} width={20} height={20} style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                                ) : (
-                                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#131d2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 7, color: "#F5F7FA", flexShrink: 0 }}>
-                                    {m.away_team.substring(0, 3).toUpperCase()}
-                                  </div>
-                                )}
+                                <TeamCrest team={m.away_team} src={m.away_team_flag} className="h-5 w-5" />
                                 <span style={{ fontSize: 12, fontWeight: 500, color: "#f0f4ff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {m.away_team}
                                 </span>

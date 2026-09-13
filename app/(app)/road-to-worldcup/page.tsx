@@ -1,3 +1,4 @@
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import type { Metadata } from "next";
 import BracketBoard, {
   type BracketBoardMatch,
@@ -245,6 +246,7 @@ function getPhaseLabel(phase: KnockoutPhase) {
 function formatKickoff(iso: string | null) {
   if (!iso) return null;
   return new Intl.DateTimeFormat("es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
     hour: "numeric",

@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { matchesEnJuego } from "@/lib/matches/en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
+import { findEspnResult } from "@/lib/matches/result-identity";
 import {
   ESPN_LEAGUE_BY_TOURNAMENT,
   fetchEspnScoreboard,
@@ -97,11 +98,7 @@ export async function GET() {
       let espnStatus: string | null = null;
       let espnHome: number | null = null;
       let espnAway: number | null = null;
-      let event = m.espn_id ? events.find((e) => e.id === m.espn_id) : null;
-      if (!event) {
-        const kickMs = new Date(m.scheduled_at).getTime();
-        event = events.find((e) => Math.abs(new Date(e.date).getTime() - kickMs) < 2 * 60 * 60 * 1000) ?? null;
-      }
+      const event = findEspnResult(m, events);
       if (event) {
         espnStatus = mapEspnStatus(event.status);
         const competition = event.competitions[0];

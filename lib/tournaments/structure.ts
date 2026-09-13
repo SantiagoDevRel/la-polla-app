@@ -48,6 +48,18 @@ export interface TournamentStructure {
 }
 
 export const TOURNAMENT_STRUCTURE: Record<string, TournamentStructure> = {
+  // UEFA's 2026/27 calendar, verified 2026-09-13:
+  // https://www.uefa.com/uefaeuropaleague/news/02a6-20d57d095740-e1e0b3de85df-1000--2026-27-europa-league-teams-dates-draws-format-final/
+  europa_2026: {
+    phases: [
+      { phase: "league_stage", label: "Fase de liga", slots: 144, estimatedDate: "2026-09-16" },
+      { phase: "playoff", label: "Playoffs", slots: 16, estimatedDate: "2027-02-18" },
+      { phase: "round_of_16", label: "Octavos", slots: 16, estimatedDate: "2027-03-11" },
+      { phase: "quarter_finals", label: "Cuartos", slots: 8, estimatedDate: "2027-04-08" },
+      { phase: "semi_finals", label: "Semifinales", slots: 4, estimatedDate: "2027-04-29" },
+      { phase: "final", label: "Final", slots: 1, estimatedDate: "2027-05-26" },
+    ],
+  },
   champions_2025: {
     phases: [
       { phase: "league_stage", label: "Fase de liga", slots: null, estimatedDate: null },

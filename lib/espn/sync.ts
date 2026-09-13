@@ -1,3 +1,4 @@
+import { espnMatchesIdentity } from '@/lib/matches/result-identity';
 // lib/espn/sync.ts — Aplica updates de ESPN a la tabla `matches` sin
 // pisar a football-data.
 //
@@ -11,7 +12,7 @@
 //     bajadas de score: goles anulados por VAR se reflejan en vivo.)
 //   * Match strategy: primero por espn_id (fast path después del
 //     primer encuentro). Si no hay, por (tournament + scheduled_at
-//     ±2h + fuzzy team match). Cuando matchea, se persiste el
+//     ±2h + ambos nombres normalizados únicos). Cuando matchea, se persiste el
 //     espn_id para que la próxima vez sea lookup directo.
 //
 // Llamado desde /api/matches/sync-live cuando el cron pega.
@@ -50,68 +51,11 @@ interface DbMatch {
   scheduled_at: string;
 }
 
-/**
- * Normaliza para comparar nombres de equipos entre fuentes.
- * "FC Bayern München" → "bayern munchen" (lower, sin "FC", sin
- * acentos, espacios colapsados).
- */
-function normalizeTeam(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // quita diacríticos
-    .replace(/\b(fc|cf|club|atlético|atletico|de|the|saint)\b/g, " ") // quita ruido común
-    .replace(/[^a-z0-9 ]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Mide overlap por substring bidireccional. 1 = igual, 0 = nada. */
-function teamSimilarity(a: string, b: string): number {
-  const na = normalizeTeam(a);
-  const nb = normalizeTeam(b);
-  if (!na || !nb) return 0;
-  if (na === nb) return 1;
-  // Tokenize y contar tokens compartidos.
-  const ta = new Set(na.split(" ").filter((t) => t.length > 2));
-  const tb = new Set(nb.split(" ").filter((t) => t.length > 2));
-  if (ta.size === 0 || tb.size === 0) {
-    return na.includes(nb) || nb.includes(na) ? 0.7 : 0;
-  }
-  let shared = 0;
-  ta.forEach((t) => {
-    if (tb.has(t)) shared++;
-  });
-  return shared / Math.min(ta.size, tb.size);
-}
-
-/**
- * Encuentra el row de DB que mejor matchea con un evento ESPN.
- * Devuelve null si no hay match razonable (>= 0.5 de similarity en
- * AMBOS equipos y kickoff dentro de la ventana).
- */
+/** Unique semantic identity; partial shared tokens never select a match. */
 function findMatchingDbRow(event: ESPNEvent, candidates: DbMatch[]): DbMatch | null {
-  const eventMs = new Date(event.date).getTime();
-  if (!Number.isFinite(eventMs)) return null;
-  const competition = event.competitions[0];
-  if (!competition) return null;
-  const home = competition.competitors.find((c) => c.homeAway === "home");
-  const away = competition.competitors.find((c) => c.homeAway === "away");
-  if (!home || !away) return null;
-
-  let best: { row: DbMatch; score: number } | null = null;
-  for (const row of candidates) {
-    const rowMs = new Date(row.scheduled_at).getTime();
-    if (Math.abs(rowMs - eventMs) > KICKOFF_TOLERANCE_MS) continue;
-    const homeScore = teamSimilarity(home.team.displayName, row.home_team);
-    const awayScore = teamSimilarity(away.team.displayName, row.away_team);
-    if (homeScore < 0.5 || awayScore < 0.5) continue;
-    const total = homeScore + awayScore;
-    if (!best || total > best.score) {
-      best = { row, score: total };
-    }
-  }
-  return best?.row ?? null;
+ const found=candidates.filter(row=>espnMatchesIdentity(row,event));
+ const direct=found.filter(row=>row.espn_id===event.id);
+ return direct.length===1 ? direct[0] : found.length===1 ? found[0] : null;
 }
 
 export interface EspnSyncResult {
@@ -125,7 +69,7 @@ export interface EspnSyncResult {
   unmatched_samples: string[];
 }
 
-export async function syncEspnLive(): Promise<EspnSyncResult[]> {
+export async function syncEspnLive(primaryCovered: ReadonlySet<string> = new Set()): Promise<EspnSyncResult[]> {
   const supabase = createAdminClient();
   const results: EspnSyncResult[] = [];
 
@@ -199,14 +143,7 @@ export async function syncEspnLive(): Promise<EspnSyncResult[]> {
 
     // 3. Iterar eventos y aplicar updates.
     for (const event of events) {
-      let row: DbMatch | null = null;
-      // Fast path: si ya tenemos espn_id guardado, lookup directo.
-      const direct = candidateRows.find((r) => r.espn_id && r.espn_id === event.id);
-      if (direct) {
-        row = direct;
-      } else {
-        row = findMatchingDbRow(event, candidateRows);
-      }
+      const row = findMatchingDbRow(event, candidateRows);
       if (!row) {
         result.unmatched++;
         if (result.unmatched_samples.length < 3) {
@@ -217,6 +154,7 @@ export async function syncEspnLive(): Promise<EspnSyncResult[]> {
         continue;
       }
       result.matched++;
+      if (primaryCovered.has(row.id)) continue;
 
       // 4. Mapear status + scores + minute.
       const newStatus = mapEspnStatus(event.status);

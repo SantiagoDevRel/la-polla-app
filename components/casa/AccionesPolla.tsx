@@ -13,27 +13,33 @@
 // práctica (se puede anular), así que van directo.
 "use client";
 
+import { CASA_HEADERS, settlementMessage, type CasaSettlement } from "@/lib/casa/contract";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CasaPollaStatus } from "@/lib/casa/types";
 import { EliminarPolla } from "@/components/casa/EliminarPolla";
+import { PublicacionPolla } from "@/components/casa/PublicacionPolla";
 
 type Accion = "publicar" | "cerrar" | "repartir";
 
 export function AccionesPolla({
   id,
   status,
-  nombre,
+  nombre, prizeKind = "pozo", drawPending = false, opensAt,
 }: {
   id: string;
   status: CasaPollaStatus;
   nombre: string;
+  prizeKind?: "pozo" | "objeto";
+  drawPending?: boolean;
+  opensAt?: string;
 }) {
   const router = useRouter();
   const [enviando, setEnviando] = useState<Accion | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const scheduled = status === "abierta" && Boolean(opensAt && new Date(opensAt) > new Date());
 
   async function ejecutar(action: Accion) {
     setEnviando(action);
@@ -42,7 +48,7 @@ export function AccionesPolla({
     try {
       const res = await fetch(`/api/casa/admin/pollas/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: CASA_HEADERS,
         body: JSON.stringify({ action }),
       });
       const json = await res.json().catch(() => ({}));
@@ -51,10 +57,7 @@ export function AccionesPolla({
         return;
       }
       if (action === "repartir" && json.reparto) {
-        const r = json.reparto as { winners: number; each_cop: number };
-        setOk(
-          `Repartida entre ${r.winners} ${r.winners === 1 ? "ganador" : "ganadores"}.`,
-        );
+        setOk(settlementMessage(json.reparto as CasaSettlement));
       }
       setConfirmando(false);
       router.refresh();
@@ -67,23 +70,9 @@ export function AccionesPolla({
 
   return (
     <div className="bg-bg-card px-3 pb-3">
-      {status === "borrador" && (
-        <>
-          <button
-            type="button"
-            onClick={() => ejecutar("publicar")}
-            disabled={enviando !== null}
-            className="lp-btn lp-btn-primary h-10 min-h-0 w-full text-[14px]"
-          >
-            {enviando === "publicar" ? "Publicando..." : "Publicar"}
-          </button>
-          <p className="mt-2 text-[11px] text-text-muted">
-            Mientras esté en borrador no la ve nadie.
-          </p>
-        </>
-      )}
+      {(status === "borrador" || scheduled) && <PublicacionPolla id={id} opensAt={opensAt} scheduled={scheduled} />}
 
-      {status === "abierta" && (
+      {status === "abierta" && !scheduled && (
         <button
           type="button"
           onClick={() => ejecutar("cerrar")}
@@ -94,12 +83,12 @@ export function AccionesPolla({
         </button>
       )}
 
-      {status === "cerrada" &&
+      {status === "cerrada" && !drawPending &&
         (confirmando ? (
           <div className="border border-red-alert/40 bg-red-alert/10 p-3">
             <p className="text-[13px] leading-relaxed text-text-primary">
               Vas a repartir <span className="font-semibold">{nombre}</span>.
-              Esto escribe a quién le toca cuánto y{" "}
+              Esto registra el resultado del premio y{" "}
               <span className="font-semibold">no se puede deshacer</span>.
             </p>
             <div className="mt-3 flex gap-2">
@@ -109,7 +98,7 @@ export function AccionesPolla({
                 disabled={enviando !== null}
                 className="lp-btn lp-btn-primary h-10 min-h-0 flex-1 text-[14px]"
               >
-                {enviando === "repartir" ? "Repartiendo..." : "Sí, repartir"}
+                {enviando === "repartir" ? "Resolviendo..." : "Confirmar resultado"}
               </button>
               <button
                 type="button"
@@ -127,13 +116,13 @@ export function AccionesPolla({
             onClick={() => setConfirmando(true)}
             className="lp-btn lp-btn-primary h-10 min-h-0 w-full text-[14px]"
           >
-            Repartir el pozo
+            {prizeKind === "objeto" ? "Resolver el premio" : "Repartir el pozo"}
           </button>
         ))}
 
       {error && <p className="mt-2 text-[12px] text-red-alert">{error}</p>}
       {ok && <p className="mt-2 text-[12px] text-turf">{ok}</p>}
-      <EliminarPolla id={id} nombre={nombre} />
+      {!drawPending && <EliminarPolla id={id} nombre={nombre} />}
     </div>
   );
 }

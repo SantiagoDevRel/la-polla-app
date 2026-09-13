@@ -53,7 +53,7 @@ export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
         </p>
         <button
           type="button"
-          onClick={() => router.push("/pollas")}
+          onClick={() => router.push("/casa")}
           className="mt-4 inline-flex items-center justify-center rounded-full border border-border-subtle px-5 py-2.5 font-body text-[14px] font-semibold text-text-primary cursor-pointer transition-all duration-200 hover:border-gold/30 hover:bg-bg-elevated"
         >
           {tClosure("createCta")}
@@ -76,7 +76,7 @@ export function ActivePollasEmpty({ userPollitoType }: ActivePollasEmptyProps) {
         cta={
           isIOSApp
             ? { label: tNav("joinWithCode"), onClick: () => setJoinOpen(true) }
-            : { label: t("createPolla"), onClick: () => router.push("/pollas/crear") }
+            : { label: tClosure("createCta"), onClick: () => router.push("/casa") }
         }
       />
       <p className="mt-4 font-body text-[14px] text-text-secondary text-center">

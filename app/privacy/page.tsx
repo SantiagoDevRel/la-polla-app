@@ -56,10 +56,10 @@ export default async function PrivacyPage() {
           <p className="text-[14px] leading-[1.7] text-text-secondary">
             {t("section5BodyBefore")}
             <a
-              href="mailto:santiagotrujillozuluaga@gmail.com"
+              href="mailto:info@lapollacolombiana.com"
               className="text-gold underline underline-offset-2 transition-colors hover:text-amber"
             >
-              santiagotrujillozuluaga@gmail.com
+              info@lapollacolombiana.com
             </a>
             {t("section5BodyAfter")}
           </p>
@@ -72,10 +72,10 @@ export default async function PrivacyPage() {
           <p className="text-[14px] leading-[1.7] text-text-secondary">
             {t("section6BodyBefore")}
             <a
-              href="mailto:santiagotrujillozuluaga@gmail.com"
+              href="mailto:info@lapollacolombiana.com"
               className="text-gold underline underline-offset-2 transition-colors hover:text-amber"
             >
-              santiagotrujillozuluaga@gmail.com
+              info@lapollacolombiana.com
             </a>
           </p>
         </section>

@@ -65,7 +65,7 @@ export async function POST(
   // Obtener el match para diagnóstico + status check.
   const { data: match, error: matchErr } = await admin
     .from("matches")
-    .select("id, status, home_score, away_score, final_verified_at, final_verification_notes, tournament, phase, home_team, away_team, scheduled_at, espn_id")
+    .select("id, status, home_score, away_score, final_verified_at, final_verification_notes, tournament, phase, home_team, away_team, scheduled_at, espn_id, regulation_home_score, regulation_away_score")
     .eq("id", (await params).matchId)
     .maybeSingle();
   if (matchErr || !match) {
@@ -89,7 +89,6 @@ export async function POST(
     : `manual override`;
 
   const updates: {
-    final_verified_at: string;
     final_verification_notes: string;
     home_score?: number;
     away_score?: number;
@@ -99,7 +98,6 @@ export async function POST(
     penalty_away?: number | null;
     advancer?: "home" | "away" | null;
   } = {
-    final_verified_at: verifiedAt,
     final_verification_notes: `${adminNote} via /admin/discrepancias source=${parsed.data.source} at=${verifiedAt}`,
   };
 
@@ -122,6 +120,13 @@ export async function POST(
         home_team: match.home_team,
         away_team: match.away_team,
       });
+      if (extras?.wentToExtraTime) {
+        if (match.regulation_home_score === null || match.regulation_away_score === null) {
+          return NextResponse.json({error:"ESPN incluye alargue o penales. Ingresa manualmente el marcador de los 90 minutos."},{status:409});
+        }
+        updates.home_score=match.regulation_home_score;
+        updates.away_score=match.regulation_away_score;
+      }
       if (extras) {
         if (
           extras.fulltime_home_score !== null &&
@@ -149,13 +154,27 @@ export async function POST(
     }
   }
 
-  const { error: updErr } = await admin
-    .from("matches")
-    .update(updates)
-    .eq("id", (await params).matchId);
+  const home = updates.home_score ?? match.home_score;
+  const away = updates.away_score ?? match.away_score;
+  if (home === null || away === null) {
+    return NextResponse.json({error:"Falta el marcador de los 90 minutos."},{status:409});
+  }
+  // The admin and automatic providers use the same row lock and scoring transaction.
+  const { data: finalized, error: updErr } = await admin.rpc("finalize_verified_match_result", {
+    p_match_id: match.id, p_home_score: home, p_away_score: away,
+    p_notes: updates.final_verification_notes,
+    p_fulltime_home: updates.fulltime_home_score ?? null,
+    p_fulltime_away: updates.fulltime_away_score ?? null,
+    p_penalty_home: updates.penalty_home ?? null,
+    p_penalty_away: updates.penalty_away ?? null,
+    p_advancer: updates.advancer ?? null,
+  });
   if (updErr) {
     console.error("[admin/discrepancies/resolve] update failed:", updErr);
     return NextResponse.json({ error: "No se pudo resolver" }, { status: 500 });
+  }
+  if (finalized !== true) {
+    return NextResponse.json({error:"El partido ya fue verificado por otro proceso. Actualiza la lista."},{status:409});
   }
 
   return NextResponse.json({

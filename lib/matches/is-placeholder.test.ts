@@ -24,6 +24,12 @@ describe("isPlaceholderTeam", () => {
     }
   });
 
+  it("TBD con sufijo de ESPN → placeholder (semifinales Libertadores 2026)", () => {
+    for (const s of ["TBD Home", "TBD Away", "tbd home", "TBA", "TBC"]) {
+      expect(isPlaceholderTeam(s)).toBe(true);
+    }
+  });
+
   it("null/empty → placeholder defensivo", () => {
     expect(isPlaceholderTeam(null)).toBe(true);
     expect(isPlaceholderTeam(undefined)).toBe(true);

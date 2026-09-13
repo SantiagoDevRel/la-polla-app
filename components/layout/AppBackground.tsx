@@ -10,10 +10,10 @@
 //     aleatoriedad de una decoracion le estaba costando el render estatico a
 //     la aplicacion entera.
 //
-// Ahora es un componente sin logica y la rotacion vive en el cliente, DESPUES
-// de `load` (ver AppBackgroundClient). El primer video es siempre el mismo,
-// asi que se cachea; los que rotan entran cuando ya no le quitan ancho de
-// banda a nadie. Mientras tanto se ve el humo en CSS, que no cuesta bytes.
+// Ahora es un componente sin logica y la politica vive en el cliente, DESPUES
+// de `load` (ver AppBackgroundClient). El primer video es siempre el mismo;
+// las conexiones aptas conservan la misma rotacion. Mientras tanto se ve el
+// humo en CSS, que no cuesta bytes.
 
 import { AppBackgroundClient } from "./AppBackgroundClient";
 import type { BackgroundVariant } from "./background-variants";
@@ -25,16 +25,20 @@ export interface AppBackgroundProps {
   overlayOpacity?: number;
   /** Forzar una variante (testing / pantallas tematicas). Si se pasa, no rota. */
   variant?: BackgroundVariant;
+  /** Mantener solo el humo CSS, sin solicitar archivos de video. */
+  video?: boolean;
 }
 
 export function AppBackground({
   className,
   overlayOpacity,
   variant,
+  video,
 }: AppBackgroundProps) {
   return (
     <AppBackgroundClient
       variant={variant}
+      video={video}
       className={className}
       overlayOpacity={overlayOpacity}
     />
