@@ -60,7 +60,7 @@ export function MyPollas({ initialPollas, defaultOpen = true, pendingByPolla = {
                   <h3 className="min-w-0 flex-1 font-display text-[22px] leading-tight tracking-wide text-text-primary [overflow-wrap:anywhere]">{polla.name}</h3>
                   <ChevronRight aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-text-secondary" />
                 </div>
-                <TournamentIdentity tournaments={polla.tournaments} kind={polla.kind} showNames={false} />
+                <TournamentIdentity tournaments={polla.tournaments} kind={polla.kind} />
                 <p className={`text-[13px] ${finished ? "text-text-secondary" : polla.entry_status === "pendiente" ? "text-amber" : "text-turf"}`}>{status}</p>
                 {!!pendingByPolla[polla.id] && <p className="text-[13px] text-amber">{en ? "Predictions remaining" : "Pronósticos pendientes"}: {pendingByPolla[polla.id]}</p>}
               </Link>

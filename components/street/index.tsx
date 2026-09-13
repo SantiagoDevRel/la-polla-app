@@ -192,8 +192,9 @@ export function SectionHead({
   return (
     <div className={cn("mb-3", className)}>
       <span className="lp-accent-rule mb-2" />
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="lp-display-sm text-text-primary">{title}</h2>
+      {/* flex-wrap: con texto ampliado la meta baja de línea en vez de salirse de la pantalla. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="lp-display-sm min-w-0 text-text-primary [overflow-wrap:anywhere]">{title}</h2>
         {meta ? <span className="lp-label shrink-0">{meta}</span> : null}
       </div>
     </div>

@@ -14,7 +14,7 @@ export default function FootballTeamProfile({id}:{id:string}) {
  const {data,error,loading,reload}=useFootballResource<FootballTeam>(`/api/football/teams/${id}`,300_000);
  const [view,setView]=useState<'upcoming'|'results'|'squad'|'info'>('upcoming'),[venueFailed,setVenueFailed]=useState(false);
  if(loading)return <main className="space-y-4 px-4"><FootballBack/><FootballLoading/></main>;
- if(!data)return <main className="space-y-4 px-4"><FootballBack/><FootballEmpty title={en?'Team unavailable':'Equipo no disponible'} message={en?'Try opening the team from a recent match.':'Intenta abrir el equipo desde un partido reciente.'} onRetry={reload}/></main>;
+ if(!data)return <main className="space-y-4 px-4"><FootballBack/><FootballEmpty title={en?'Team unavailable':'Equipo no disponible'} message={en?'For now we only show teams with matches in the last or next 7 days. Try another team or open a recent match.':'Por ahora solo mostramos equipos con partidos en los últimos o próximos 7 días. Prueba con otro equipo o abre un partido reciente.'} onRetry={reload}/></main>;
  const positions=[...POSITIONS.map(([key,es,label])=>({key,label:en?label:es})),{key:'Other',label:en?'Other players':'Otros jugadores'}];
  const results=data.matches.filter(m=>['FT','AET','PEN'].includes(m.status));
  const lastMatch=results.at(-1);

@@ -75,7 +75,7 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, entry
   }, [tab, slug, revision, entryStatus, pollaStatus, drawPending, router]);
 
   return (
-    <section className="mt-7">
+    <section className="mt-5">
       <div role="tablist" aria-label="Contenido de la polla" className="flex gap-1 overflow-x-auto rounded-full border border-border-subtle bg-bg-card p-1">
         {labels.map((label, index) => (
           <button

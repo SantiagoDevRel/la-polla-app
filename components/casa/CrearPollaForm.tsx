@@ -12,7 +12,7 @@
 import { CASA_HEADERS } from "@/lib/casa/contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { ChevronDown, Search, SearchX, X } from "lucide-react";
 import { Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { formatCop, formatMatchTime, formatNumber } from "@/lib/casa/format";
 import { LOCK_MINUTES } from "@/lib/casa/types";
@@ -27,6 +27,14 @@ import {
   toColombiaDateTimeInput,
 } from "@/lib/time/colombia";
 import { ImagePreparationError, PRIZE_IMAGE_PREPARE_OPTIONS, prepareImageUpload } from "@/lib/casa/prepare-proof";
+import {
+  groupMatchesByWeek,
+  matchDayKey,
+  matchesTeamQuery,
+  teamQueryStatus,
+  weekDetail,
+  weekTitle,
+} from "@/lib/casa/match-weeks";
 
 type Kind = "partidos" | "manual" | "rifa";
 
@@ -44,17 +52,6 @@ function matchesUrl(tournament: string, ventana: Ventana): string {
   if (ventana === "todo") query.set("todo", "1");
   else query.set("dias", ventana);
   return `/api/casa/admin/matches?${query}`;
-}
-
-/**
- * Día del encabezado. Un partido con hora confirmada se agrupa por su día en
- * Colombia; uno con hora por confirmar guarda solo la fecha (medianoche UTC,
- * migración 103), así que se lee en UTC para no correrlo al día anterior.
- */
-function matchDayKey(match: { scheduled_at: string; scheduled_at_confirmed?: boolean }): string {
-  return match.scheduled_at_confirmed === false
-    ? new Date(match.scheduled_at).toISOString().slice(0, 10)
-    : colombiaDateKey(match.scheduled_at);
 }
 
 function dayHeading(key: string): string {
@@ -79,6 +76,8 @@ interface MatchOption {
   away_team_flag: string | null;
   scheduled_at: string;
   scheduled_at_confirmed?: boolean;
+  /** Jornada del torneo; null en fases eliminatorias. */
+  match_day?: number | null;
 }
 
 interface SelectedMatch extends MatchOption {
@@ -157,25 +156,33 @@ export function CrearPollaForm() {
   const [truncado, setTruncado] = useState(false);
   const [proximoPartido, setProximoPartido] = useState<{ scheduled_at: string; scheduled_at_confirmed: boolean } | null>(null);
 
-  // Encabezados por día. Dentro de cada día van primero los de hora
-  // confirmada, en orden, y al final los de hora por confirmar.
-  const matchesPorDia = useMemo(() => {
-    const groups = new Map<string, MatchOption[]>();
-    for (const match of matches) {
-      const key = matchDayKey(match);
-      const list = groups.get(key);
-      if (list) list.push(match);
-      else groups.set(key, [match]);
-    }
-    return [...groups.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, list]) => ({
-        key,
-        list: [...list].sort((a, b) =>
-          Number(a.scheduled_at_confirmed === false) - Number(b.scheduled_at_confirmed === false) ||
-          Date.parse(a.scheduled_at) - Date.parse(b.scheduled_at)),
-      }));
-  }, [matches]);
+  // Búsqueda por equipo sobre la lista cargada (torneo y rango visibles). No
+  // se borra al cambiar de torneo ni de rango.
+  const [busqueda, setBusqueda] = useState("");
+  const busquedaRef = useRef<HTMLInputElement>(null);
+  const consulta = busqueda.trim();
+  const buscando = consulta.length > 0;
+  // Semanas que el admin abrió o cerró a mano. Sin búsqueda todas empiezan
+  // cerradas; con búsqueda, abiertas para ver los resultados sin tocar nada.
+  // Se identifican por su lunes, así que una semana abierta sigue abierta al
+  // cambiar de torneo o de rango.
+  const [semanasTocadas, setSemanasTocadas] = useState<ReadonlySet<string>>(() => new Set());
+  const partidosVisibles = useMemo(
+    () => (consulta ? matches.filter((match) => matchesTeamQuery(match, consulta)) : matches),
+    [matches, consulta],
+  );
+  // Semanas de lunes a domingo en Colombia, con la misma clave de día de los
+  // encabezados. Dentro de cada día van primero los de hora confirmada, en
+  // orden, y al final los de hora por confirmar.
+  const hoyKey = colombiaDateKey(new Date());
+  const semanas = useMemo(
+    () => groupMatchesByWeek(partidosVisibles, matchDayKey, hoyKey),
+    [partidosVisibles, hoyKey],
+  );
+  // El conteo solo existe cuando hay una lista cargada que filtrar.
+  const resultadosBusqueda =
+    buscando && !cargando && !matchesError && matches.length > 0 ? partidosVisibles.length : null;
+  const nombreTorneo = CREATABLE_TOURNAMENTS.find((t) => t.slug === tournament)?.name ?? "este torneo";
   const provisionalesElegidos = seleccion.filter((m) => m.scheduled_at_confirmed === false).length;
 
   // ── Cierre vs primer pitazo ──────────────────────────────────────────
@@ -366,6 +373,32 @@ export function CrearPollaForm() {
       if (prev.some((item) => item.id === match.id)) return prev.filter((item) => item.id !== match.id);
       if (prev.length >= 30) return prev;
       return [...prev, { ...match, tournament }];
+    });
+  }
+
+  // Cada búsqueda nueva, y borrarla, devuelve las semanas a su estado
+  // inicial: abiertas con resultados, cerradas sin búsqueda.
+  function cambiarBusqueda(value: string) {
+    if (value.trim() !== consulta) setSemanasTocadas(new Set());
+    setBusqueda(value);
+  }
+
+  function borrarBusqueda() {
+    setBusqueda("");
+    setSemanasTocadas(new Set());
+    busquedaRef.current?.focus();
+  }
+
+  // `<details>` controlado: el navegador ya cambió `open` cuando llega el
+  // evento, así que solo se registra si difiere del estado inicial.
+  function alternarSemana(key: string, abierta: boolean) {
+    setSemanasTocadas((prev) => {
+      const tocada = abierta !== buscando;
+      if (prev.has(key) === tocada) return prev;
+      const next = new Set(prev);
+      if (tocada) next.add(key);
+      else next.delete(key);
+      return next;
     });
   }
 
@@ -864,32 +897,36 @@ export function CrearPollaForm() {
 
             <div>
               <Label>Cómo se puntúa</Label>
-              <div className="mt-2 grid grid-cols-2 gap-px">
+              {/* Mismo vocabulario que ven los jugadores. Con "1X2 · 3 pts" se
+                  crearon pollas llamadas MARCADORES que quedaron en 1X2. */}
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
                   type="button"
+                  aria-pressed={scoringMode === "1x2"}
                   onClick={() => setScoringMode("1x2")}
-                  className={`lp-btn text-[12px] ${
+                  className={`lp-btn min-w-0 text-center text-[15px] ${
                     scoringMode === "1x2" ? "lp-btn-primary" : "lp-btn-ghost bg-bg-elevated"
                   }`}
                 >
-                  1X2 · 3 pts
+                  Acierta ganador del partido
                 </button>
                 <button
                   type="button"
+                  aria-pressed={scoringMode === "marcador"}
                   onClick={() => setScoringMode("marcador")}
-                  className={`lp-btn text-[12px] ${
+                  className={`lp-btn min-w-0 text-center text-[15px] ${
                     scoringMode === "marcador"
                       ? "lp-btn-primary"
                       : "lp-btn-ghost bg-bg-elevated"
                   }`}
                 >
-                  Marcador · 3/1
+                  Acierta marcador exacto
                 </button>
               </div>
-              <p className="mt-2 text-[11px] text-text-muted">
+              <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
                 {scoringMode === "1x2"
-                  ? "Local, empate o visitante. Solo esas 3 opciones, 3 puntos el acierto."
-                  : "Marcador exacto vale 3. Acertarle a los goles de un solo equipo vale 1."}
+                  ? "Local, empate o visitante. Acertar suma 3 puntos."
+                  : "Marcador exacto suma 3 puntos. Acertar los goles de un solo equipo suma 1 punto."}
               </p>
             </div>
           </StreetCard>
@@ -920,6 +957,52 @@ export function CrearPollaForm() {
                   {option.t}
                 </button>
               ))}
+            </div>
+            <div className="mb-3">
+              <label htmlFor="buscar-equipo" className="block text-[15px] font-semibold text-text-primary">
+                Buscar equipo
+              </label>
+              <div className="relative mt-2">
+                <Search
+                  aria-hidden
+                  className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary"
+                />
+                {/* Se oculta la X nativa del campo de búsqueda: la propia es
+                    más grande y también se ve en iOS. */}
+                <input
+                  id="buscar-equipo"
+                  ref={busquedaRef}
+                  type="search"
+                  value={busqueda}
+                  onChange={(e) => cambiarBusqueda(e.target.value)}
+                  placeholder="Ej.: Nacional"
+                  autoComplete="off"
+                  enterKeyHint="search"
+                  className="lp-input !pl-11 !pr-14 [&::-webkit-search-cancel-button]:hidden"
+                />
+                {busqueda && (
+                  <button
+                    type="button"
+                    onClick={borrarBusqueda}
+                    aria-label="Borrar búsqueda"
+                    className="absolute inset-y-0 right-1 my-auto flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-bg-card hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+                  >
+                    <X className="h-5 w-5" aria-hidden />
+                  </button>
+                )}
+              </div>
+              {/* Región viva siempre montada. Sin resultados, el conteo solo
+                  se anuncia: la tarjeta de abajo ya lo dice en pantalla. */}
+              <p
+                role="status"
+                className={
+                  resultadosBusqueda
+                    ? "mt-2 text-[13px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]"
+                    : "sr-only"
+                }
+              >
+                {resultadosBusqueda === null ? "" : teamQueryStatus(resultadosBusqueda, consulta)}
+              </p>
             </div>
             {/* Único aviso de hora por confirmar: el cierre está arriba y el
                 admin elige partidos acá abajo. Con cierre manual no hay
@@ -1004,66 +1087,121 @@ export function CrearPollaForm() {
                   <p className="mt-2 text-[12px] text-text-muted">{syncMsg}</p>
                 )}
               </StreetCard>
+            ) : partidosVisibles.length === 0 ? (
+              // Hay partidos cargados, pero ninguno del equipo buscado.
+              <StreetCard className="p-5 text-center">
+                <SearchX aria-hidden className="mx-auto h-6 w-6 text-text-secondary" />
+                <p className="mt-2 text-[15px] text-text-primary [overflow-wrap:anywhere]">
+                  No hay partidos de «{consulta}» en {nombreTorneo} para estas fechas.
+                </p>
+                <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
+                  {ventana === "todo"
+                    ? "Revisa el nombre del equipo o elige otro torneo."
+                    : "Prueba con «Toda la temporada» o elige otro torneo."}
+                </p>
+                <button type="button" onClick={borrarBusqueda} className="lp-btn lp-btn-ghost mt-3 w-full">
+                  Borrar búsqueda
+                </button>
+              </StreetCard>
             ) : (
               <>
-                <ul className="max-h-[min(65dvh,560px)] overflow-y-auto overscroll-contain" aria-label="Partidos disponibles">
-                  {matchesPorDia.map((day) => (
-                    <li key={day.key}>
-                      {/* Encabezado fijo mientras se recorre el día: con la
-                          temporada completa son cientos de filas. */}
-                      <h3 className="sticky top-0 z-10 flex flex-wrap items-baseline justify-between gap-x-3 border-b border-border-subtle bg-bg-base/95 px-3 py-2 backdrop-blur">
-                        <span className="text-[13px] font-semibold text-text-primary">{dayHeading(day.key)}</span>
-                        <span className="text-[13px] text-text-muted">
-                          {day.list.length} {day.list.length === 1 ? "partido" : "partidos"}
-                        </span>
-                      </h3>
-                      <ul className="space-y-px">
-                        {day.list.map((m) => {
-                          const on = selectedIds.has(m.id);
-                          const provisional = m.scheduled_at_confirmed === false;
-                          const hora = provisional ? "hora por confirmar" : kickoffHour(m.scheduled_at);
-                          return (
-                            <li key={m.id}>
-                              <button
-                                type="button"
-                                onClick={() => toggleMatch(m)}
-                                disabled={!on && seleccion.length >= 30}
-                                aria-label={`${m.home_team} vs ${m.away_team}, ${hora}`}
-                                aria-pressed={on}
-                                className={`flex min-h-[44px] w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-50 ${
-                                  on ? "bg-gold/10" : "bg-bg-card"
-                                }`}
-                              >
-                                <span
-                                  className={`h-4 w-4 shrink-0 border-2 ${
-                                    on ? "border-gold bg-gold" : "border-border-strong"
-                                  }`}
-                                  aria-hidden
-                                />
-                                <span className="min-w-0 flex-1">
-                                  <span className="grid grid-cols-2 gap-3 text-[13px] text-text-primary">
-                                    <span className="min-w-0">
-                                      <TeamCrest team={m.home_team} src={m.home_team_flag} />
-                                      <span className="mt-1 block [overflow-wrap:anywhere]">{m.home_team}</span>
-                                    </span>
-                                    <span className="min-w-0 text-right">
-                                      <TeamCrest team={m.away_team} src={m.away_team_flag} />
-                                      <span className="mt-1 block [overflow-wrap:anywhere]">{m.away_team}</span>
-                                    </span>
+                {/* Semanas plegables en vez de un scroll interno: con la
+                    temporada completa son cientos de filas y así se salta a
+                    cualquier semana sin recorrerlas. */}
+                <ul className="space-y-3" aria-label="Partidos disponibles">
+                  {semanas.map((semana) => {
+                    const partidosSemana = semana.days.reduce((total, day) => total + day.list.length, 0);
+                    const elegidosSemana = semana.days.reduce(
+                      (total, day) => total + day.list.filter((m) => selectedIds.has(m.id)).length,
+                      0,
+                    );
+                    return (
+                      <li key={semana.key}>
+                        <details
+                          open={buscando !== semanasTocadas.has(semana.key)}
+                          onToggle={(event) => alternarSemana(semana.key, event.currentTarget.open)}
+                          className="lp-card overflow-hidden"
+                        >
+                          <summary className="grid min-h-14 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-3 transition-colors hover:bg-bg-elevated/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold [&::-webkit-details-marker]:hidden">
+                            <h3 className="col-start-1 font-display text-[20px] font-normal uppercase leading-tight text-text-primary [overflow-wrap:anywhere]">
+                              {weekTitle(semana)}
+                            </h3>
+                            <span className="col-start-1 mt-1 text-[13px] leading-relaxed text-text-secondary">
+                              {weekDetail(semana, partidosSemana, elegidosSemana)}
+                            </span>
+                            {/* Variante arbitraria y no `group-open`: con las
+                                dependencias actuales Tailwind descarta en
+                                silencio toda clase `group-*`. */}
+                            <ChevronDown
+                              aria-hidden
+                              className="col-start-2 row-span-2 row-start-1 h-5 w-5 text-text-secondary transition-transform duration-200 [[open]>summary>&]:rotate-180"
+                            />
+                          </summary>
+                          <ul className="border-t border-border-default bg-bg-base/60">
+                            {semana.days.map((day) => (
+                              <li key={day.key}>
+                                <h4 className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-border-subtle bg-bg-base/95 px-3 py-2">
+                                  <span className="text-[13px] font-semibold text-text-primary">{dayHeading(day.key)}</span>
+                                  <span className="text-[13px] text-text-muted">
+                                    {day.list.length} {day.list.length === 1 ? "partido" : "partidos"}
                                   </span>
-                                  {provisional ? (
-                                    <span className="mt-1 block text-[13px] font-semibold text-amber">Hora por confirmar</span>
-                                  ) : (
-                                    <span className="mt-1 block text-[13px] tabular-nums text-text-secondary">{hora}</span>
-                                  )}
-                                </span>
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </li>
-                  ))}
+                                </h4>
+                                <ul className="space-y-px">
+                                  {day.list.map((m) => {
+                                    const on = selectedIds.has(m.id);
+                                    const provisional = m.scheduled_at_confirmed === false;
+                                    const hora = provisional ? "hora por confirmar" : kickoffHour(m.scheduled_at);
+                                    const jornada = m.match_day ?? null;
+                                    return (
+                                      <li key={m.id}>
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleMatch(m)}
+                                          disabled={!on && seleccion.length >= 30}
+                                          aria-label={`${m.home_team} vs ${m.away_team}, ${hora}${jornada === null ? "" : `, jornada ${jornada}`}`}
+                                          aria-pressed={on}
+                                          className={`flex min-h-[44px] w-full cursor-pointer items-center gap-3 p-3 text-left transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-50 ${
+                                            on ? "bg-gold/10" : "bg-bg-card"
+                                          }`}
+                                        >
+                                          <span
+                                            className={`h-4 w-4 shrink-0 border-2 ${
+                                              on ? "border-gold bg-gold" : "border-border-strong"
+                                            }`}
+                                            aria-hidden
+                                          />
+                                          <span className="min-w-0 flex-1">
+                                            <span className="grid grid-cols-2 gap-3 text-[13px] text-text-primary">
+                                              <span className="min-w-0">
+                                                <TeamCrest team={m.home_team} src={m.home_team_flag} />
+                                                <span className="mt-1 block [overflow-wrap:anywhere]">{m.home_team}</span>
+                                              </span>
+                                              <span className="min-w-0 text-right">
+                                                <TeamCrest team={m.away_team} src={m.away_team_flag} />
+                                                <span className="mt-1 block [overflow-wrap:anywhere]">{m.away_team}</span>
+                                              </span>
+                                            </span>
+                                            <span className="mt-1 block text-[13px] text-text-secondary">
+                                              {provisional ? (
+                                                <span className="font-semibold text-amber">Hora por confirmar</span>
+                                              ) : (
+                                                <span className="tabular-nums">{hora}</span>
+                                              )}
+                                              {jornada !== null && <>&nbsp;· Jornada&nbsp;{jornada}</>}
+                                            </span>
+                                          </span>
+                                        </button>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      </li>
+                    );
+                  })}
                 </ul>
                 {truncado && (
                   <p className="mt-2 text-[13px] text-text-muted">Se muestran los primeros 1.000 partidos por fecha.</p>

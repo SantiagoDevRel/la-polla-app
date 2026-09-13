@@ -22,6 +22,7 @@ import {
   getPot,
   getPayouts,
   getActiveProofs,
+  getFixedPrizeThreshold,
 } from "@/lib/casa/queries";
 import {
   isPollaOpen,
@@ -34,6 +35,7 @@ import { formatCop, prizeImageUrl, timeLeft } from "@/lib/casa/format";
 import { getPollitoBase } from "@/lib/pollitos";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
+import { ScoringModeBadge } from "@/components/casa/ScoringModeBadge";
 import { HeroFrame, Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { PicksBoard } from "@/components/casa/PicksBoard";
 import { QuestionsBoard } from "@/components/casa/QuestionsBoard";
@@ -81,7 +83,7 @@ export default async function PollaPage({
     );
   }
 
-  const [pot, entry, matches, questions, picks, distribution, tabla, payouts, isAdmin] =
+  const [pot, entry, matches, questions, picks, distribution, tabla, payouts, isAdmin, threshold] =
     await Promise.all([
       getPot(polla.id),
       getMyEntry(polla.id, user.id),
@@ -93,6 +95,8 @@ export default async function PollaPage({
       // Solo tiene filas cuando la polla ya se repartio.
       getPayouts(polla.id),
       isCurrentUserAdmin(),
+      // Punto de equilibrio del premio fijo para Info, calculado en SQL.
+      getFixedPrizeThreshold(polla),
     ]);
 
   const abierta = isPollaOpen(polla);
@@ -132,36 +136,63 @@ export default async function PollaPage({
     }
   }
 
+  const objeto = polla.prize_kind === "objeto";
+  const mostrarEntrar = !inscrito && (abierta || canResumeProof) && polla.kind !== "rifa";
+
   return (
     <div className="pb-32">
-      {/* ── Hero ──────────────────────────────────────────────────────── */}
-      <HeroFrame height="min-h-[214px]" className="flex flex-col justify-end">
-        <div className="mb-3 flex justify-end">
-          <Tape tone={estado.tone}>
+      {/* ── Hero ──────────────────────────────────────────────────────────
+            (2026-09-13) Compacto para que las pestañas aparezcan sin bajar:
+            solo logos, estado junto al nombre, qué hay que acertar, y pozo +
+            entrada en un solo bloque. Antes la entrada y "se lleva el ganador"
+            iban en otra tarjeta que repetía la cifra del pozo. */}
+      <HeroFrame height="min-h-[200px]" className="flex flex-col justify-end">
+        <TournamentIdentity tournaments={tournaments} kind={polla.kind} size="lg" />
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <h1 className="lp-display min-w-0 flex-1 text-[34px] [overflow-wrap:anywhere]">{polla.name}</h1>
+          <Tape tone={estado.tone} className="mt-1 shrink-0">
             {estado.text}
           </Tape>
         </div>
-        <TournamentIdentity tournaments={tournaments} kind={polla.kind} />
-        <h1 className="lp-display mt-2 text-[34px]">{polla.name}</h1>
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label>
-            <div className="lp-money text-[32px] leading-none text-gold">
-              {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
-            </div>
-            {/* Pozo fijo = mínimo garantizado (migración 109): la cifra de arriba puede crecer. */}
-            {polla.prize_kind !== "objeto" && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
-              <p className="mt-1 text-[13px] text-text-secondary">Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</p>
+        {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className="mt-3 self-start" />}
+        <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4">
+          <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : "min-w-0"}>
+            {objeto && polla.prize_image_path && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={prizeImageUrl(polla.prize_image_path)}
+                alt=""
+                aria-hidden="true"
+                className="h-14 w-14 max-w-none shrink-0 rounded-md object-cover"
+              />
             )}
+            <div className="min-w-0">
+              <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : objeto ? "Premio" : "Pozo"}</Label>
+              <div className="lp-money mt-1 text-[32px] leading-none text-gold [overflow-wrap:anywhere]">
+                {objeto ? polla.prize_object : formatCop(pot.prize_cop)}
+              </div>
+            </div>
           </div>
-          <span className="text-[12px] text-text-secondary">
-            {pot.paid_entries} inscritos ·{" "}
-            {abierta ? `cierra en ${timeLeft(polla.closes_at)}` : estado.text}
-          </span>
+          <div className={objeto ? "min-w-0" : "min-w-0 border-l border-border-subtle pl-3"}>
+            <Label>Entrada</Label>
+            <div className="lp-money mt-1 text-[32px] leading-none text-text-primary [overflow-wrap:anywhere]">
+              {formatCop(polla.entry_price_cop)}
+            </div>
+          </div>
         </div>
+        {/* Una línea por dato: seguidos en la misma fila se leían como una sola frase. */}
+        <p className="mt-3 grid gap-1 text-[13px] leading-snug text-text-secondary">
+          {/* Pozo fijo = mínimo garantizado (migración 109): la cifra del pozo puede crecer. */}
+          {!objeto && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
+            <span>Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</span>
+          )}
+          <span>
+            {pot.paid_entries} inscritos · {abierta ? `cierra en ${timeLeft(polla.closes_at)}` : estado.text}
+          </span>
+        </p>
       </HeroFrame>
 
-      <div className="px-4 pt-5">
+      <div className="px-4 pt-4">
         {/* ── El resultado, cuando ya se repartió ──────────────────────────
               (2026-09-02) Esto no existía. `casa_settle_polla` escribía
               casa_payouts desde el día uno y NINGÚN archivo de la app la
@@ -178,85 +209,30 @@ export default async function PollaPage({
         </StreetCard>}
         {polla.prize_kind === "objeto" && (polla.draw_pending || payouts.length > 0) && (isAdmin || entry?.status === "pagada") && <PremioObjeto slug={polla.slug} />}
 
-        {/* (2026-09-03) Antes esto desglosaba "A los ganadores 70% / A la
-              casa 30%". El dueño pidió sacar el porcentaje, así que queda lo
-              que de verdad le sirve a quien va a pagar: cuánto cuesta entrar y
-              cuánto hay para el ganador, en pesos. La cifra del pozo es viva
-              — sale de casa_polla_pot — así que sigue siendo verdad sin tener
-              que explicar la aritmética. */}
-        <StreetCard className="p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Entrada</Label>
-              <div className="lp-money mt-1 text-[17px] text-text-primary">
-                {formatCop(polla.entry_price_cop)}
-              </div>
-            </div>
-            <div>
-              {/* Con la polla ya repartida y un empate, decir "se lleva el
-                  ganador $21.000" al lado de un premio de $10.500 se lee como
-                  si le hubieran pagado de menos a alguien. El pozo es el mismo;
-                  lo que cambia es entre cuántos se dividió. */}
-              <Label>
-                {payouts.length > 1
-                  ? `Repartido entre ${payouts.length}`
-                  : polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Se lleva el ganador"}
-              </Label>
-              <div className="lp-money mt-1 text-[17px] text-gold">
-                {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
-              </div>
-            </div>
+        {polla.kind === "rifa" && <div className="mt-4 first:mt-0"><MisBoletas slug={polla.slug} open={abierta} /></div>}
+
+        {/* ── Entrar y compartir, en una fila ───────────────────────────────
+              (2026-09-13) Antes eran dos filas más la tarjeta de entrada, y las
+              pestañas quedaban debajo del primer pantallazo. Compartir solo
+              mientras esté abierta: pasar el link de una polla cerrada no le
+              sirve a nadie. Si la fila no cabe (320 px o texto ampliado), se
+              parte en dos y cada botón ocupa todo el ancho. */}
+        {(mostrarEntrar || abierta) && (
+          <div className="mt-4 flex flex-wrap gap-2 first:mt-0">
+            {mostrarEntrar && (
+              <Link href={`/casa/${polla.slug}/pagar`} className="lp-btn lp-btn-primary flex-[2_1_auto] !px-4">
+                {entry ? "Retomar comprobante" : `Entrar por ${formatCop(polla.entry_price_cop)}`}
+              </Link>
+            )}
+            {abierta && (
+              <CompartirPolla
+                slug={polla.slug}
+                nombre={polla.name}
+                entradaCop={polla.entry_price_cop}
+                className="flex-[1_0_auto]"
+              />
+            )}
           </div>
-          {/* El premio en objeto (migración 089). Cuando `prize_kind` es
-              "pozo" no se dibuja nada acá: la cifra del pozo ya está arriba en
-              el hero y repetirla en palabras la haría envejecer mal — el pozo
-              crece con cada inscripción y un texto no. */}
-          {polla.prize_kind === "objeto" && polla.prize_object && (
-            <div className="mt-3 flex items-center gap-3 border-t border-border-subtle pt-3">
-              {polla.prize_image_path && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={prizeImageUrl(polla.prize_image_path)}
-                  alt=""
-                  aria-hidden="true"
-                  className="h-16 w-16 max-w-none shrink-0 rounded-md object-cover"
-                />
-              )}
-              <p className="min-w-0 text-[15px] leading-relaxed text-text-secondary">
-                {polla.kind === "rifa" ? `El premio es ${polla.prize_object}. Se entrega al ganador del sorteo anunciado. No hay reparto de dinero.` : `El premio es ${polla.prize_object}. Gana quien obtenga el mayor puntaje. Si dos o más participantes empatan en el primer puesto, realizaremos un sorteo entre ellos para definir quién recibe el premio. El premio no se divide ni se convierte en dinero.`}
-              </p>
-            </div>
-          )}
-          {polla.kind === "rifa" && polla.draw_method && (
-            <p className="mt-3 border-t border-border-subtle pt-3 text-[13px] text-text-secondary">
-              <span className="lp-label mb-1 block">Cómo se define el ganador</span>
-              {polla.draw_method}
-            </p>
-          )}
-        </StreetCard>
-
-        {/* Compartir. Solo mientras esté abierta: pasar el link de una polla
-            ya cerrada no le sirve a nadie y ensucia la pantalla. La casa vive
-            de que la gente entre, así que esto va arriba, no escondido. */}
-        {abierta && (
-          <div className="mt-4">
-            <CompartirPolla
-              slug={polla.slug}
-              nombre={polla.name}
-              entradaCop={polla.entry_price_cop}
-            />
-          </div>
-        )}
-
-        {polla.kind === "rifa" && <div className="mt-4"><MisBoletas slug={polla.slug} open={abierta} /></div>}
-
-        {/* ── Estado de tu inscripción ─────────────────────────────────── */}
-        {!inscrito && (abierta || canResumeProof) && polla.kind !== "rifa" && (
-          <Link href={`/casa/${polla.slug}/pagar`} className="mt-4 block">
-            <span className="lp-btn lp-btn-primary w-full">
-              {entry ? "Retomar comprobante" : `Entrar por ${formatCop(polla.entry_price_cop)}`}
-            </span>
-          </Link>
         )}
 
         {/* Estás dentro. Antes, cuando Tama aprobaba, simplemente DESAPARECÍA
@@ -306,7 +282,7 @@ export default async function PollaPage({
 
         <PollaTabs
           slug={polla.slug}
-          info={<PollaInfo polla={polla} />}
+          info={<PollaInfo polla={polla} threshold={threshold} />}
           firstLabel={polla.kind === "manual" ? "Preguntas" : polla.kind === "rifa" ? "Sorteo" : "Partidos"}
           initialRows={tabla}
           entryStatus={entry?.status ?? null}
@@ -411,10 +387,11 @@ function PollaPublica({
   return (
     <div className="pb-32">
       <HeroFrame height="min-h-[236px]" className="flex flex-col justify-end">
-        <TournamentIdentity tournaments={tournaments} kind={polla.kind} />
-        <h1 className="lp-display-sm mt-1 text-[28px] text-text-primary">
+        <TournamentIdentity tournaments={tournaments} kind={polla.kind} size="lg" />
+        <h1 className="lp-display-sm mt-3 text-[28px] text-text-primary [overflow-wrap:anywhere]">
           {polla.name}
         </h1>
+        {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className="mt-3 self-start" />}
         <div className="mt-3">
           <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label>
           <div className="lp-money mt-0.5 text-[40px] leading-none text-gold">

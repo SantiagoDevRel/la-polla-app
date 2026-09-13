@@ -76,6 +76,34 @@ vuelve a caer en ese estado abre un caso nuevo; uno anulado no reabre.
 Fechas visibles e inputs: `lib/time/colombia.ts`, siempre Colombia. No modificar
 `predictions` históricos ni activar modos operativos al instalar estas reglas.
 
+### Claridad de Casa, filtros y un gotcha de Tailwind (2026-09-13)
+
+Pedido del dueño con capturas de producción. Detalle de polla: hero compacto para
+que **Partidos / Tabla / Info** se vea sin bajar. Solo logos
+(`TournamentIdentity size="lg"`: una fila, se desliza si hay más de seis; nunca
+nombres visibles), estado junto al nombre, `ScoringModeBadge` («Acierta ganador del
+partido» = 1X2 o `null`, «Acierta marcador exacto»), Pozo + Entrada en un solo bloque
+(se quitó la tarjeta que repetía el pozo) y Entrar + Compartir en una fila. Las
+tarjetas de Pollas abiertas/cerradas llevan el mismo badge; Mis pollas no.
+Info: cada regla es un `<details>` cerrado con viñetas cortas. El pozo fijo se explica
+por punto de equilibrio con `getFixedPrizeThreshold` (RPC
+`casa_fixed_prize_threshold_preview_v2`): «Si más de N personas se inscriben, el
+pozo crece $X por cada persona adicional». Esas cifras no se calculan en TS.
+
+Crear polla: el toggle usa el mismo vocabulario del badge; los partidos van en
+semanas plegables (lunes–domingo en Colombia, `lib/casa/match-weeks.ts`) con
+búsqueda por equipo sobre la lista cargada y jornada por fila. `/futbol`: filtros
+Torneos | Equipos; la búsqueda usa el catálogo local (`lib/teams/team-search.ts`
+sobre `crest-coverage.json`, armado en el server, cero cuota). La ficha de un
+equipo solo carga si tiene partidos en caché de ±7 días (`reserve_api_football_team`).
+
+**Tailwind no genera `group-*` ni `peer-*`** con el lock actual
+(`tailwindcss@3.4.19` + `postcss-selector-parser@6.1.3`), sin error visible: usa
+variantes arbitrarias, p. ej. `[[open]>summary>&]:rotate-180`. `.lp-btn` y
+`.lp-input` se cargan después de las utilidades: para cambiar su padding usa
+`!px-4` / `!pl-11`. Pruebas: `tests/casa-polla-info.test.ts`,
+`tests/casa-match-weeks.test.ts`, `tests/football-team-search.test.ts`.
+
 ### Navegación y actualización de la app (2026-09-09)
 
 Casa: Pollas abiertas → Mis pollas → Pollas cerradas, todas cerradas inicialmente,

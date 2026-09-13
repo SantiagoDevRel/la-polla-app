@@ -73,6 +73,11 @@ El mes aprobado el 9 de septiembre de 2026 vence el 9 de octubre de 2026;
 la autoridad es la fecha que devuelve el proveedor. Al vencer, las reservas
 vuelven a los límites gratuitos y el detalle conserva la última información.
 
+- Filtros: **Torneos** (lista) y **Equipos** (búsqueda). Buscar un equipo filtra
+  los partidos del día y lista hasta seis clubes del catálogo local
+  (`lib/teams/crest-coverage.json`, armado en el servidor, sin consultas a la API)
+  con enlace a su ficha. La ficha solo carga equipos con partidos en caché de
+  los últimos o próximos siete días.
 - Calendario de Fútbol: ±6 días, agrupados por **día de Colombia** (dos feeds UTC).
   Los equipos agregan sus últimos cinco y próximos cinco partidos, filtrados
   a los nueve torneos. No se fija un año de temporada para estas consultas.
@@ -254,6 +259,11 @@ incluir teléfonos en URLs. El panel
   visible conserva la selección. Cada liga muestra su cantidad de elegidos y
   el resumen permite quitar partidos. El cierre automático usa el primer
   partido de toda la selección, sin importar qué liga estás mirando.
+  Los partidos se agrupan en semanas plegables de lunes a domingo («Esta semana»,
+  «Próxima semana», «Semana del…»), cerradas al entrar, y **Buscar equipo** filtra
+  la lista cargada y abre las semanas con resultados. Cada fila muestra la jornada.
+  El modo de puntaje se elige con «Acierta ganador del partido» o «Acierta marcador
+  exacto», el mismo texto que ven los jugadores.
 - `/admin/pollas`: una card desplegable por polla, con su cantidad de pagos
   pendientes. Al abrirla puedes ver cada comprobante y aprobar o rechazar el
   pago. Los conteos se actualizan cada 30 segundos mientras el panel está visible;
@@ -316,8 +326,14 @@ docker exec -i supabase_db_la-polla psql -U postgres -d postgres < scripts/casa-
 
 `/casa` muestra **Pollas disponibles** y **Pollas cerradas**, estas últimas
 comprimidas inicialmente. Cada polla muestra todos sus torneos, resueltos desde
-los partidos asociados. El detalle tiene pestañas **Partidos / Tabla**; cambiar
-de pestaña conserva los pronósticos sin guardar. La tabla muestra posiciones,
+los partidos asociados, solo con sus logos. Cada tarjeta de pollas abiertas o
+cerradas indica qué hay que acertar: «Acierta ganador del partido» (1X2) o
+«Acierta marcador exacto». El detalle arranca con un hero compacto (logos,
+nombre, estado, modo de puntaje, pozo y entrada, Entrar + Compartir) para que las
+pestañas **Partidos / Tabla / Info** se vean sin bajar; cambiar de pestaña
+conserva los pronósticos sin guardar. Info agrupa las reglas en desplegables
+cerrados con viñetas cortas; con premio fijo explica desde cuántas inscripciones
+crece el pozo y cuánto suma cada persona adicional (cifras calculadas en SQL). La tabla muestra posiciones,
 nombres, avatares y puntos sin el antiguo límite visual de 20 jugadores.
 
 La tabla se actualiza cada 30 segundos mientras está visible mediante
