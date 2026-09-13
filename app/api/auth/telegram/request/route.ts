@@ -5,7 +5,9 @@
 // cookie httpOnly lp_tg_req (lib/auth/telegram-login/request-cookie.ts) y
 // devuelve el deep link t.me/<bot>?start=<nonce>. El nonce solo viaja en esta
 // respuesta; la base guarda sha256 del nonce y del secreto de la cookie.
-// Tope: 10 solicitudes / 15 min por IP (en la misma transacción del insert).
+// Tope: 10 solicitudes / 15 min por IPv4 o por /64 de IPv6 (en la misma
+// transacción del insert), sin tope global que deje a todos sin Telegram.
+// La solicitud no abre sesión: solo ata el enlace del bot a este navegador.
 //
 // DELETE (mismo origen): botón Cancelar. Cancela la solicitud de esta cookie
 // (pendiente o aprobada sin usar) y borra la cookie.

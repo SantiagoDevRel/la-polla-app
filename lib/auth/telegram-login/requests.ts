@@ -2,6 +2,12 @@
 // migración 119 (solicitud del navegador + enlace de un solo uso). La base
 // decide todo estado en una transacción; aquí solo se calculan hashes y se
 // normalizan las respuestas. Sin select("*"): todo pasa por funciones.
+//
+// A propósito no hay «consumir la solicitud con la cookie»: la sesión solo
+// sale del enlace que el bot manda al Telegram de la cuenta (consumeLoginLink).
+// Si la cookie del navegador que pidió abriera sesión, cualquiera podría crear
+// una solicitud, hacerle llegar el deep link a otra persona y quedarse con su
+// sesión cuando ella toca Iniciar.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseDeviceLabel } from "@/lib/auth/user-agent";
@@ -131,29 +137,6 @@ export async function getLoginRequestStatus(
   const status = requestStatusOf(row?.status);
   if (!status) return { status: "error" };
   return { status, expiresAt: str(row?.expires_at) };
-}
-
-export type ConsumeRequestResult =
-  | { status: "ok"; grant: LoginGrant; locale: LoginLocale; label: string | null }
-  | { status: Exclude<RequestStatus, "approved"> | "error" };
-
-export async function consumeLoginRequest(
-  db: SupabaseClient,
-  browserHash: string,
-): Promise<ConsumeRequestResult> {
-  const { data, error } = await db.rpc("telegram_login_request_consume", {
-    p_browser_hash: browserHash,
-  });
-  if (error) return { status: "error" };
-  const row = firstRow(data);
-  if (row?.status === "ok") {
-    const grant = grantOf(row);
-    return grant
-      ? { status: "ok", grant, locale: localeOf(row.locale), label: str(row.requester_label) }
-      : { status: "error" };
-  }
-  const status = requestStatusOf(row?.status);
-  return status && status !== "approved" ? { status } : { status: "error" };
 }
 
 export async function cancelLoginRequest(

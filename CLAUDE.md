@@ -657,7 +657,7 @@ están documentadas en migration 056-057.
   limitan POR IP (30 cada 5 min); llamados desde Vercel, todos los usuarios
   compartían las IPs de salida de Vercel. `start-otp`, `verify-otp` y
   `lib/auth/phone-session.ts` (sesión de `wa-magic` y de Telegram v2:
-  `telegram/request/complete` y `telegram/link`, que le pasan `clientIp`) llaman a Auth SOLO con `lib/supabase/auth-ip.ts`:
+  `telegram/link`, la única vía de sesión de Telegram; le pasan `clientIp`) llaman a Auth SOLO con `lib/supabase/auth-ip.ts`:
   `getClientIp` (`x-real-ip` → primer `x-forwarded-for`, IP validada) +
   `SUPABASE_SECRET_KEY` (`sb_secret_`) + cabecera `Sb-Forwarded-For`. Supabase
   la respeta solo con secret key y `security_sb_forwarded_for_enabled=true`.
@@ -734,24 +734,41 @@ minutos y una sola sesión por enlace. v2 lo implementa así:
   «Entrar con Telegram» (no necesita el número). En el paso del código SMS:
   «¿No te llegó el SMS?» + «Entrar con Telegram». **No volver a poner un input
   de código de Telegram.**
+- **🚨 La sesión SOLO sale del enlace del bot, en el navegador que lo abre.**
+  La primera versión del PR #78 abría sesión en la pestaña que CREÓ la
+  solicitud apenas alguien la aprobaba en Telegram. Eso es phishing tipo device
+  code: un servidor crea la solicitud (Origin falsificado, sin problema), manda
+  el deep link por WhatsApp y entra a la cuenta de quien toque Iniciar. La
+  revisión lo reprodujo en la base local. No existe consumo por cookie
+  (`telegram_login_request_consume` no se crea; `request/complete` → 410 sin
+  DB). **No volver a agregar ninguna vía que abra sesión con la cookie
+  `lp_tg_req` sola, ni aprobar sin que el token llegue al Telegram de quien
+  aprueba.** El dueño no aceptó ese riesgo.
 - **Solicitud atada al navegador** (`telegram_login_requests`): `POST
-  /api/auth/telegram/request` fija la cookie httpOnly `lp_tg_req`
-  (`Path=/api/auth/telegram`, 5 min) y devuelve `t.me/<bot>?start=<nonce>`. El
-  clic abre la ventana ANTES del fetch (bloqueadores) y la pestaña espera sin
-  input: `status` cada 2 s visible + `visibilitychange`/`focus`, y `complete`
-  consume (una solicitud = una sesión). En la base solo sha256 del nonce y del
-  secreto de la cookie.
-- **Bot:** cuenta de Telegram ya vinculada → NO pide el número: aprueba y manda
-  «Listo…» + enlace. Sin vínculo → pide el número UNA vez con teclado
-  `request_contact` **`is_persistent: true`** (el no persistente queda escondido
-  en Telegram Web: screenshot del dueño), versión corta si repite antes de 2
-  min. Nunca manda códigos. `allowed_updates` sigue siendo `["message"]`: no
-  depender de `callback_query` (cambiarlo exige re-registrar el webhook).
-- **Enlace** `/api/auth/telegram/link?t=` (bajo el Path de la cookie; en
-  `/api/auth/telegram-link` la cookie no viaja): 5 min, un uso, HMAC. GET con la
-  cookie de ESA solicitud → auto-submit POST; sin ella → «Confirma tu ingreso»
-  con número enmascarado (login CSRF). Enlace y solicitud son la MISMA fila:
-  consumir uno cierra el otro.
+  /api/auth/telegram/request` fija la cookie httpOnly `lp_tg_req` (`Path=/`,
+  5 min) y devuelve `t.me/<bot>?start=<nonce>`. Solo sirve para que el enlace,
+  abierto en ESE navegador, entre sin confirmar. En pantalla táctil Telegram se
+  abre en la MISMA pestaña (con una pestaña nueva el navegador volvía a t.me y
+  no a la espera); en escritorio, ventana abierta antes del fetch. La espera no
+  tiene input: pasos numerados (Iniciar/Start → Compartir mi número la primera
+  vez → botón Entrar a La Polla) y `status` cada 2 s visible +
+  `visibilitychange`/`focus`/`pageshow`. `consumed` + cookie de sesión → sigue;
+  `consumed` sin sesión → «Entraste en otro navegador» (nunca rebote mudo a
+  /login). 429 → «Espera unos minutos» con SMS primario.
+- **Bot:** cuenta de Telegram ya vinculada → NO pide el número: manda UN
+  mensaje con el botón «Entrar a La Polla» (enlace ligado a la solicitud si vino
+  con nonce). Sin vínculo → pide el número UNA vez con teclado `request_contact`
+  **`is_persistent: true`**; la pista describe el control por forma y lugar
+  («ícono de cuatro cuadritos junto a la carita»: en Telegram Web es ⌘, no un
+  teclado; screenshot del dueño). Nunca manda códigos. `allowed_updates` sigue
+  siendo `["message"]`.
+- **Enlace** → página `/login/telegram?t=` (dentro de `(auth)`, sistema de
+  diseño, sin bienvenida, `referrer: no-referrer`, noindex). GET nunca abre
+  sesión: con la cookie de ESA solicitud envía solo el POST; sin ella «Confirma
+  tu ingreso» con número enmascarado (login CSRF). Canje: `POST
+  /api/auth/telegram/link` (mismo origen, formulario), 5 min, un uso, HMAC;
+  fallos → 303 a `/login/telegram?estado=gone|failed|forbidden|sms_only|unavailable`.
+  Al entrar, el bot avisa con el dispositivo que abrió el enlace.
 - **Propiedad del teléfono y número reciclado:** igual que v1 — solo
   `message.contact` propio (`contact.user_id === from.id`, chat privado, sin
   reenvío), y una cuenta existente solo acepta la cuenta de Telegram vinculada
@@ -759,23 +776,24 @@ minutos y una sola sesión por enlace. v2 lo implementa así:
   El vínculo se crea al recibir el contacto; aprobar/emitir lo exigen en SQL
   (`telegram_login_grant_is_valid`) y la sesión lo vuelve a exigir
   (`telegramGrantAuthorizer`, sin crear vínculos). No quitar ninguna de las tres.
-- **Riesgo residual conocido:** aprobar con un toque es phishing-able (alguien
-  manda el deep link de SU navegador a una persona vinculada). Mitigado con 5
-  min, «pedido desde …» en el bot, aviso «Entraste a La Polla…» y `/avisos`.
-  Cerrarlo del todo = un toque de confirmación extra en Telegram (decisión del
-  dueño; ver README).
 - **Sesión:** `lib/auth/phone-session.ts` sigue siendo el ÚNICO mecanismo
   (`resolveAccountForVerifiedPhone` es su parte sin cookies, para el bot).
-- Topes en SQL, en la misma transacción: 10 solicitudes/15 min por IP, 5
-  enlaces/15 min y 20/día por cuenta de Telegram. v1 retirado:
-  `telegram-verify` y `telegram-link` → 410 sin tocar DB.
+- **Topes** en SQL, en la misma transacción: 10 solicitudes/15 min por IPv4 o
+  por /64 de IPv6, **sin tope global** (con uno, 60 IPs dejaban a todos sin
+  Telegram), 5 enlaces/15 min y 20/día por cuenta de Telegram. v1 retirado:
+  `telegram-verify` → 410; `telegram-link` → página «ya no sirve».
+- **Pendiente de probar en dispositivos reales:** en el teléfono el botón del
+  bot se abre por defecto en el navegador interno de Telegram (cookies
+  aparte): la sesión queda ahí y la pestaña original muestra «Entraste en otro
+  navegador». Verificar en iPhone y Android si el deep link abre la app directo.
 - Pruebas: `tests/telegram-login.test.ts`, `scripts/telegram-login-v2-check.sql`
   (y `telegram-login-check.sql` de 115). Detalle: README → «Login por Telegram (v2)».
 
 Files: `app/(auth)/{login,onboarding}/page.tsx`,
-`app/(auth)/login/LoginClient.tsx`, `lib/auth/phone-session.ts`,
+`app/(auth)/login/LoginClient.tsx`, `app/(auth)/login/telegram/*`,
+`components/auth/login-styles.ts`, `lib/auth/phone-session.ts`,
 `lib/auth/telegram-login/*`, `app/api/auth/telegram/{request,link}/**`,
-`app/api/auth/telegram-{verify,link}/route.ts` (410),
+`app/api/auth/telegram-{verify,link}/route.ts` (retirados),
 `app/api/telegram/login/route.ts`,
 `app/api/auth/verify-otp/route.ts`, `app/api/users/me/route.ts`,
 `lib/auth/{phone,login-event,user-agent,rate-limit}.ts`,

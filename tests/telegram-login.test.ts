@@ -1,7 +1,8 @@
 // tests/telegram-login.test.ts — Login por Telegram v2 (migración 119):
-// solicitud atada al navegador, aprobación desde el bot sin códigos y enlace de
-// un solo uso. Base y API de Telegram falsas; la regresión SQL real está en
-// scripts/telegram-login-v2-check.sql.
+// solicitud atada al navegador, enlace de un solo uso desde el bot sin códigos.
+// La sesión SOLO sale del enlace (nunca de la cookie del navegador que pidió:
+// eso era phishing tipo device code). Base y API de Telegram falsas; la
+// regresión SQL real está en scripts/telegram-login-v2-check.sql.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -32,15 +33,18 @@ import {
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { telegramLoginDeepLink } from "@/lib/auth/telegram-login/deep-link";
 import { loginLinkOrigin, loginLinkUrl, localeForHost } from "@/lib/auth/telegram-login/links";
-import { maskPhone } from "@/lib/auth/telegram-login/messages";
+import { loginBotCopy, maskPhone } from "@/lib/auth/telegram-login/messages";
 import { handleLoginUpdate, PROMPT_REPEAT_MS } from "@/lib/auth/telegram-login/handler";
+import * as requestsModule from "@/lib/auth/telegram-login/requests";
 import {
   consumeLoginLink,
   linkedAccountFor,
   peekLoginLink,
   requesterLabel,
 } from "@/lib/auth/telegram-login/requests";
+import { resolveLinkPageView } from "@/lib/auth/telegram-login/link-page";
 import {
+  hasSessionCookie,
   readRequestBrowserHash,
   setRequestCookie,
   TG_REQUEST_COOKIE,
@@ -335,10 +339,10 @@ describe("configuration and link host", () => {
     expect(getTelegramLoginConfig(base)).toEqual(CONFIG);
     expect(getTelegramLoginConfig({ ...base, TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS: "true" })?.allowExistingAccounts).toBe(true);
   });
-  it("points single-use links to /api/auth/telegram/link on the locale's domain", () => {
+  it("points single-use links to the /login/telegram page on the locale's domain", () => {
     const env = { NEXT_PUBLIC_APP_URL: "https://lapollacolombiana.com" };
     expect(loginLinkOrigin("en", env)).toBe("https://chickenpicks.app");
-    expect(loginLinkUrl("es", "tok", env)).toBe("https://lapollacolombiana.com/api/auth/telegram/link?t=tok");
+    expect(loginLinkUrl("es", "tok", env)).toBe("https://lapollacolombiana.com/login/telegram?t=tok");
     expect(loginLinkOrigin("en", { NEXT_PUBLIC_APP_URL: "http://localhost:3005" })).toBe("http://localhost:3005");
     expect(localeForHost("chickenpicks.app")).toBe("en");
     expect(localeForHost(null)).toBe("es");
@@ -347,14 +351,15 @@ describe("configuration and link host", () => {
 });
 
 describe("browser request cookie", () => {
-  it("is httpOnly, SameSite=Lax, host-only, limited to /api/auth/telegram and lasts 5 minutes", async () => {
+  it("is httpOnly, SameSite=Lax, host-only, readable by the link page and lasts 5 minutes", async () => {
     const { NextResponse } = await import("next/server");
     const secret = generateBrowserSecret();
     const dev = NextResponse.json({});
     setRequestCookie(dev, secret, { NODE_ENV: "development" });
     const header = dev.headers.get("set-cookie")!;
     expect(header).toContain(`${TG_REQUEST_COOKIE}=${secret}`);
-    expect(header).toMatch(/Path=\/api\/auth\/telegram(;|$)/);
+    // /login/telegram tiene que verla para entrar sin confirmar en el mismo navegador.
+    expect(header).toMatch(/Path=\/(;|$)/);
     expect(header).toMatch(/Max-Age=300/);
     expect(header).toMatch(/HttpOnly/i);
     expect(header).toMatch(/SameSite=lax/i);
@@ -375,6 +380,13 @@ describe("browser request cookie", () => {
     const bad = new NextRequest("http://localhost/x", { headers: { cookie: `${TG_REQUEST_COOKIE}=short` } });
     expect(readRequestBrowserHash(bad)).toBeNull();
     expect(readRequestBrowserHash(new NextRequest("http://localhost/x"))).toBeNull();
+  });
+
+  it("detects a Supabase session cookie (plain or chunked) only by its name", () => {
+    const jar = (names: string[]) => ({ getAll: () => names.map((name) => ({ name })) });
+    expect(hasSessionCookie(jar(["sb-127-auth-token"]))).toBe(true);
+    expect(hasSessionCookie(jar(["sb-sgmygyrvytzaushiqrst-auth-token.0"]))).toBe(true);
+    expect(hasSessionCookie(jar([TG_REQUEST_COOKIE, "lp_onb"]))).toBe(false);
   });
 
   it("labels the request without IP or exact browser", () => {
@@ -407,7 +419,7 @@ describe("handleLoginUpdate — linked Telegram account never shares its number 
   const env = { NEXT_PUBLIC_APP_URL: "https://lapollacolombiana.com" };
   const linkedRows = { data: [{ user_id: "account-1", phone_e164: PHONE }] };
 
-  it("approves the browser request from /start <nonce> and sends a 5-minute single-use link", async () => {
+  it("from /start <nonce> binds a 5-minute single-use link to the request and sends ONE message with ONE instruction", async () => {
     const nonce = generateNonce();
     const admin = fakeAdmin(
       {
@@ -430,16 +442,17 @@ describe("handleLoginUpdate — linked Telegram account never shares its number 
 
     expect(send).toHaveBeenCalledTimes(1);
     const body = send.mock.calls[0][1];
-    expect(body.text).toContain("Listo. Vuelve a La Polla: vas a entrar automáticamente.");
-    expect(body.text).toContain("Windows en Bogotá, CO");
-    expect(body.text).toContain("vence en 5 minutos");
+    // Una sola instrucción: el botón. Nada de «vuelve a la web, entrarás sola»
+    // (esa pestaña no entra por la aprobación).
+    expect(body.text).toBe("Toca el botón para entrar a La Polla. El enlace sirve una sola vez y vence en 5 minutos.");
+    expect(body.text).not.toMatch(/automáticamente|Vuelve a La Polla/);
     expect(body.text).not.toMatch(/\b\d{6}\b/);
     expect(body.protect_content).toBe(true);
     expect(body.link_preview_options).toEqual({ is_disabled: true });
     const button = body.reply_markup.inline_keyboard[0][0];
     const url = new URL(button.url);
     expect(url.origin).toBe("https://lapollacolombiana.com");
-    expect(url.pathname).toBe("/api/auth/telegram/link");
+    expect(url.pathname).toBe("/login/telegram");
     const token = url.searchParams.get("t")!;
     expect(token).toMatch(LINK_TOKEN_RE);
     expect(approve.p_link_token_hash).toBe(hashLinkToken(BOT_TOKEN, token));
@@ -464,8 +477,9 @@ describe("handleLoginUpdate — linked Telegram account never shares its number 
     await handleLoginUpdate(privateMessage({ text: `/start ${nonce}` }), { config: CONFIG, db: admin as never, send, env });
     expect(send).toHaveBeenCalledTimes(2);
     expect(send.mock.calls[0][1].reply_markup).toEqual({ remove_keyboard: true });
-    expect(send.mock.calls[0][1].text).toContain("Listo");
+    expect(send.mock.calls[0][1].text).toBe("Tu cuenta de Telegram ya está confirmada para La Polla.");
     expect(send.mock.calls[1][1].reply_markup.inline_keyboard[0][0].text).toBe("Entrar a La Polla");
+    expect(sentTexts(send).join("\n")).not.toMatch(/automáticamente|Vuelve a La Polla/);
   });
 
   it("without nonce sends only a single-use link", async () => {
@@ -543,7 +557,11 @@ describe("handleLoginUpdate — first time with Telegram asks for the number onc
       input_field_placeholder: "Toca Compartir mi número",
     });
     expect(body.text).toContain("Para entrar por primera vez con Telegram necesitamos confirmar tu número.");
-    expect(body.text).toContain("ícono de teclado");
+    // El control del teclado del bot se describe por forma y lugar (en Telegram
+    // Web es un ícono de cuatro lóbulos junto a la carita), no como «teclado».
+    expect(body.text).toContain("ícono de cuatro cuadritos");
+    expect(body.text).toContain("junto a la carita");
+    expect(body.text).not.toContain("ícono de teclado");
     expect(rpcNames(admin.rpc)).not.toContain("telegram_login_request_approve");
     expect(admin.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ telegram_user_id: TG, pending_request_id: "req-9", reply_keyboard_open: true, contact_prompted_at: new Date(1_000_000).toISOString() }),
@@ -559,7 +577,10 @@ describe("handleLoginUpdate — first time with Telegram asks for the number onc
     );
     const send = vi.fn().mockResolvedValue(true);
     await handleLoginUpdate(privateMessage({ text: "hola" }), { config: CONFIG, db: admin as never, send, env, now: () => promptedAt + 30_000 });
-    expect(send.mock.calls[0][1].text).toBe("Toca <b>Compartir mi número</b> (ícono de teclado junto al campo de mensaje).");
+    expect(send.mock.calls[0][1].text).toBe(
+      "Toca <b>Compartir mi número</b> abajo. Si no lo ves, toca el ícono de cuatro cuadritos junto a la carita, en la barra donde escribes.",
+    );
+    expect(loginBotCopy("en").promptShort).toContain("four-squares icon next to the smiley face");
     expect(send.mock.calls[0][1].reply_markup.is_persistent).toBe(true);
     // El texto suelto no pierde la solicitud pendiente.
     expect(admin.upsert.mock.calls[0][0].pending_request_id).toBe("req-9");
@@ -580,7 +601,7 @@ describe("handleLoginUpdate — first time with Telegram asks for the number onc
     expect(send.mock.calls[0][1].reply_markup.is_persistent).toBe(true);
   });
 
-  it("own contact of a new number: creates and links the account, approves the pending request, removes the keyboard", async () => {
+  it("own contact of a new number: creates and links the account, binds the link to the pending request, removes the keyboard", async () => {
     const admin = fakeAdmin(
       {
         telegram_login_identity_status: { data: "new" },
@@ -596,8 +617,10 @@ describe("handleLoginUpdate — first time with Telegram asks for the number onc
     expect(rpcArgs(admin.rpc, "telegram_login_authorize")).toEqual({ p_user_id: "new-user-id", p_telegram_user_id: TG, p_allow_first_link: true });
     expect(rpcArgs(admin.rpc, "telegram_login_request_approve")).toMatchObject({ p_request_id: "req-9", p_user_id: "new-user-id", p_phone_e164: PHONE });
     expect(send.mock.calls[0][1].reply_markup).toEqual({ remove_keyboard: true });
-    expect(send.mock.calls[1][1].reply_markup.inline_keyboard[0][0].url).toContain("/api/auth/telegram/link?t=");
+    expect(send.mock.calls[1][1].reply_markup.inline_keyboard[0][0].url).toContain("/login/telegram?t=");
+    expect(send.mock.calls[1][1].text).toContain("vence en 5 minutos");
     expect(sentTexts(send).join("\n")).not.toMatch(/\b\d{6}\b/);
+    expect(sentTexts(send).join("\n")).not.toMatch(/automáticamente/);
     // Sesión no se abre desde el webhook.
     expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
   });
@@ -801,103 +824,126 @@ describe("GET /api/auth/telegram/request/status", () => {
     expect(await res.json()).toEqual({ status: "approved", expiresAt: "2026-09-13T20:05:00Z" });
     expect(rpcArgs(admin.rpc, "telegram_login_request_status")).toEqual({ p_browser_hash: sha256Hex(secret) });
   });
+
+  it("once consumed, tells the tab whether THIS browser has the session (link opened here) or not (opened elsewhere)", async () => {
+    setLoginEnv(true);
+    const secret = generateBrowserSecret();
+    fakeAdmin({ telegram_login_request_status: { data: [{ status: "consumed", expires_at: "2026-09-13T20:05:00Z" }] } });
+    const here = await statusGET(
+      apiRequest("/api/auth/telegram/request/status", {
+        headers: { cookie: `${TG_REQUEST_COOKIE}=${secret}; sb-127-auth-token=abc` },
+      }),
+    );
+    expect(await here.json()).toEqual({ status: "consumed", expiresAt: "2026-09-13T20:05:00Z", signedIn: true });
+    const elsewhere = await statusGET(
+      apiRequest("/api/auth/telegram/request/status", { headers: { cookie: `${TG_REQUEST_COOKIE}=${secret}` } }),
+    );
+    expect(await elsewhere.json()).toEqual({ status: "consumed", expiresAt: "2026-09-13T20:05:00Z", signedIn: false });
+    expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
+  });
 });
 
-describe("POST /api/auth/telegram/request/complete — one request, one session", () => {
+// Hallazgo bloqueante del PR #78: la cookie del navegador que CREÓ la solicitud
+// abría la sesión de la cuenta que aprobaba en Telegram. Un servidor atacante
+// (que falsifica Origin sin problema) se quedaba con la cuenta de quien tocaba
+// Iniciar. Ahora no existe esa vía.
+describe("device-code phishing: the browser that created the request can never open a session", () => {
   const secret = generateBrowserSecret();
-  const completeRequest = (headers: Record<string, string> = {}) =>
-    apiRequest("/api/auth/telegram/request/complete", {
-      method: "POST",
-      headers: { ...SAME_ORIGIN, "content-type": "application/json", cookie: `${TG_REQUEST_COOKIE}=${secret}`, "x-real-ip": "203.0.113.5", ...headers },
-      body: "{}",
-    });
+  // Lo que manda un servidor atacante: su propia cookie y un Origin falsificado.
+  const forged = { host: "localhost", origin: "http://localhost", "content-type": "application/json", cookie: `${TG_REQUEST_COOKIE}=${secret}` };
 
-  it("rejects cross-site requests and requests without the browser cookie before consuming", async () => {
+  it("the same-origin guard cannot tell a server with a forged Origin apart (so it is not the defense)", () => {
+    expect(isSameOriginRequest({ headers: new Headers(forged) }, { requireProof: true })).toBe(true);
+  });
+
+  it("POST /request/complete answers 410 without touching the database, Auth or cookies, even for an approved request", async () => {
     setLoginEnv(true);
-    const cross = await completePOST(completeRequest({ "sec-fetch-site": "cross-site", origin: "https://evil.example" }));
-    expect(cross.status).toBe(403);
-    const noCookie = await completePOST(
-      apiRequest("/api/auth/telegram/request/complete", { method: "POST", headers: { ...SAME_ORIGIN, "content-type": "application/json" }, body: "{}" }),
-    );
-    expect(noCookie.status).toBe(410);
+    const admin = fakeAdmin({
+      telegram_login_request_status: { data: [{ status: "approved", expires_at: "2026-09-13T20:05:00Z" }] },
+    });
+    const res = completePOST();
+    expect(res.status).toBe(410);
+    expect(await res.json()).toEqual({ error: "gone" });
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(admin.rpc).not.toHaveBeenCalled();
     expect(adminFactory.createAdminClient).not.toHaveBeenCalled();
     expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
   });
 
-  it("keeps waiting while the request is pending", async () => {
+  it("there is no helper that consumes a request by browser cookie", () => {
+    expect("consumeLoginRequest" in requestsModule).toBe(false);
+  });
+
+  it("the attacker's status poll only learns 'approved' and never gets account data", async () => {
     setLoginEnv(true);
-    fakeAdmin({ telegram_login_request_consume: { data: [{ status: "pending" }] } });
-    const res = await completePOST(completeRequest());
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "not_approved" });
+    fakeAdmin({ telegram_login_request_status: { data: [{ status: "approved", expires_at: "2026-09-13T20:05:00Z" }] } });
+    const res = await statusGET(apiRequest("/api/auth/telegram/request/status", { headers: forged }));
+    const body = await res.json();
+    expect(body).toEqual({ status: "approved", expiresAt: "2026-09-13T20:05:00Z" });
+    expect(JSON.stringify(body)).not.toMatch(/user|phone|token/);
     expect(res.headers.get("set-cookie")).toBeNull();
-    expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
-  });
-
-  it("answers 410 and clears the cookie for expired, cancelled or already consumed requests", async () => {
-    setLoginEnv(true);
-    for (const status of ["expired", "cancelled", "consumed", "invalid"]) {
-      fakeAdmin({ telegram_login_request_consume: { data: [{ status }] } });
-      const res = await completePOST(completeRequest());
-      expect(res.status).toBe(410);
-      expect(await res.json()).toEqual({ error: status });
-      expect(res.headers.get("set-cookie")).toMatch(/lp_tg_req=;/);
-    }
-    expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
-  });
-
-  it("opens the session of the approved account with the real IP, clears the cookie and notifies Telegram", async () => {
-    setLoginEnv(true);
-    const fetchStub = vi.fn().mockResolvedValue(Response.json({ ok: true, result: {} }));
-    vi.stubGlobal("fetch", fetchStub);
-    const admin = fakeAdmin(
-      {
-        telegram_login_request_consume: { data: [{ status: "ok", user_id: "account-1", telegram_user_id: TG, phone_e164: PHONE, locale: "es", requester_label: "Windows en Bogotá, CO" }] },
-        telegram_login_authorize: { data: true },
-      },
-      { existingUserId: "account-1" },
-    );
-    const cookies = fakeCookieClient();
-    const res = await completePOST(completeRequest());
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, newUser: false });
-    expect(rpcArgs(admin.rpc, "telegram_login_request_consume")).toEqual({ p_browser_hash: sha256Hex(secret) });
-    expect(rpcArgs(admin.rpc, "telegram_login_authorize")).toEqual({ p_user_id: "account-1", p_telegram_user_id: TG, p_allow_first_link: false });
-    expect(authIpFactory.createAuthRouteClient).toHaveBeenCalledWith("203.0.113.5");
-    expect(cookies.auth.verifyOtp).toHaveBeenCalledTimes(1);
-    expect(res.headers.get("set-cookie")).toMatch(/lp_tg_req=;/);
-    await vi.waitFor(() => expect(fetchStub).toHaveBeenCalled());
-    const notice = JSON.parse(String(fetchStub.mock.calls[0][1].body));
-    expect(notice.chat_id).toBe(TG);
-    expect(notice.text).toContain("Entraste a La Polla desde Windows en Bogotá, CO");
-  });
-
-  it("does not open a session when the phone now belongs to another account or the link was removed", async () => {
-    setLoginEnv(true);
-    for (const scenario of [
-      { existingUserId: "other-account", authorize: true },
-      { existingUserId: "account-1", authorize: false },
-    ]) {
-      const admin = fakeAdmin(
-        {
-          telegram_login_request_consume: { data: [{ status: "ok", user_id: "account-1", telegram_user_id: TG, phone_e164: PHONE, locale: "es" }] },
-          telegram_login_authorize: { data: scenario.authorize },
-        },
-        { existingUserId: scenario.existingUserId },
-      );
-      const cookies = fakeCookieClient();
-      const res = await completePOST(completeRequest());
-      expect(res.status).toBe(409);
-      expect(await res.json()).toEqual({ error: "sms_only" });
-      expect(admin.auth.admin.generateLink).not.toHaveBeenCalled();
-      expect(cookies.auth.verifyOtp).not.toHaveBeenCalled();
-    }
   });
 });
 
-describe("/api/auth/telegram/link — 5-minute single-use link", () => {
+describe("/login/telegram page — what the single-use link shows (never signs in)", () => {
   const token = "Q".repeat(43);
-  const url = `http://localhost/api/auth/telegram/link?t=${token}`;
+  const ownHash = sha256Hex(generateBrowserSecret());
+
+  it("is unavailable without configuration and does not touch the database", async () => {
+    const db = vi.fn();
+    expect(await resolveLinkPageView({ params: { t: token }, config: null, browserHash: ownHash, db })).toEqual({
+      kind: "state",
+      state: "unavailable",
+    });
+    expect(db).not.toHaveBeenCalled();
+  });
+
+  it("auto-submits only in the browser whose own cookie created that request", async () => {
+    const admin = fakeAdmin({ telegram_login_link_peek: { data: [{ status: "ok", phone_e164: PHONE, same_browser: true }] } });
+    const view = await resolveLinkPageView({ params: { t: token }, config: CONFIG, browserHash: ownHash, db: () => admin as never });
+    expect(view).toEqual({ kind: "auto", token });
+    expect(rpcArgs(admin.rpc, "telegram_login_link_peek")).toEqual({
+      p_link_token_hash: hashLinkToken(BOT_TOKEN, token),
+      p_browser_hash: ownHash,
+    });
+    expect(rpcNames(admin.rpc)).toEqual(["telegram_login_link_peek"]);
+  });
+
+  it("any other browser confirms first, seeing only the masked number", async () => {
+    const admin = fakeAdmin({ telegram_login_link_peek: { data: [{ status: "ok", phone_e164: PHONE, same_browser: false }] } });
+    const view = await resolveLinkPageView({ params: { t: token }, config: CONFIG, browserHash: null, db: () => admin as never });
+    expect(view).toEqual({ kind: "confirm", token, maskedPhone: "+57 ••• ••• 4567" });
+  });
+
+  it("used, expired or malformed links and post-redeem states show a clear state", async () => {
+    for (const status of ["used", "expired", "invalid"]) {
+      const admin = fakeAdmin({ telegram_login_link_peek: { data: [{ status, phone_e164: null, same_browser: false }] } });
+      expect(await resolveLinkPageView({ params: { t: token }, config: CONFIG, browserHash: null, db: () => admin as never })).toEqual({
+        kind: "state",
+        state: "gone",
+      });
+    }
+    const db = vi.fn();
+    expect(await resolveLinkPageView({ params: { t: "short" }, config: CONFIG, browserHash: null, db: () => ({ rpc: db }) as never })).toEqual({ kind: "state", state: "gone" });
+    expect(db).not.toHaveBeenCalled();
+    expect(await resolveLinkPageView({ params: { estado: "sms_only" }, config: CONFIG, browserHash: null, db })).toEqual({ kind: "state", state: "sms_only" });
+    expect(await resolveLinkPageView({ params: { estado: "<script>" }, config: CONFIG, browserHash: null, db })).toEqual({ kind: "state", state: "gone" });
+  });
+
+  it("page copy has no routes as text and names the actions", async () => {
+    const es = (await import("@/messages/es.json")).default.Login;
+    const en = (await import("@/messages/en.json")).default.Login;
+    for (const copy of [es, en]) {
+      const all = JSON.stringify(copy);
+      expect(all).not.toMatch(/\/login|\/api\//);
+    }
+    expect(es.tgLinkState.gone.title).toBe("ESTE ENLACE YA NO SIRVE");
+    expect(es.tgLinkBackToLogin).toBe("Volver a iniciar sesión");
+  });
+});
+
+describe("POST /api/auth/telegram/link — the only way to a Telegram session", () => {
+  const token = "Q".repeat(43);
   const ownSecret = generateBrowserSecret();
 
   function formPost(headers: Record<string, string>, body = `t=${token}`) {
@@ -908,56 +954,18 @@ describe("/api/auth/telegram/link — 5-minute single-use link", () => {
     });
   }
 
-  it("HEAD never consumes and GET without env does not touch the database", async () => {
+  it("HEAD never consumes; GET forwards old-style links to the page without touching the database", async () => {
     expect(linkHEAD().status).toBe(405);
-    const res = await linkGET(new NextRequest(url));
-    expect(res.status).toBe(404);
+    const res = linkGET(new NextRequest(`http://localhost/api/auth/telegram/link?t=${token}`));
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe(`http://localhost/login/telegram?t=${token}`);
+    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
     expect(adminFactory.createAdminClient).not.toHaveBeenCalled();
   });
 
-  it("GET from the browser that asked auto-submits a same-origin POST; nothing is consumed yet", async () => {
-    setLoginEnv(true);
-    const admin = fakeAdmin({ telegram_login_link_peek: { data: [{ status: "ok", phone_e164: PHONE, same_browser: true }] } });
-    const res = await linkGET(new NextRequest(url, { headers: { host: "localhost", cookie: `${TG_REQUEST_COOKIE}=${ownSecret}` } }));
-    expect(res.status).toBe(200);
-    expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(res.headers.get("referrer-policy")).toBe("same-origin");
-    const html = await res.text();
-    expect(html).toMatch(/<form id="lp-auto" method="post" action="\/api\/auth\/telegram\/link">/);
-    expect(html).toContain('document.getElementById("lp-auto").submit()');
-    expect(html).toContain("<noscript><button");
-    expect(html).not.toContain("3001234567");
-    expect(rpcArgs(admin.rpc, "telegram_login_link_peek")).toEqual({
-      p_link_token_hash: hashLinkToken(BOT_TOKEN, token),
-      p_browser_hash: sha256Hex(ownSecret),
-    });
-    expect(rpcNames(admin.rpc)).toEqual(["telegram_login_link_peek"]);
-    expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
-  });
-
-  it("GET from any other browser shows the masked number and asks to confirm (no auto-submit)", async () => {
-    setLoginEnv(true);
-    fakeAdmin({ telegram_login_link_peek: { data: [{ status: "ok", phone_e164: PHONE, same_browser: false }] } });
-    const res = await linkGET(new NextRequest(url, { headers: { host: "localhost", cookie: "sb-127-auth-token.0=abc" } }));
-    const html = await res.text();
-    expect(html).toContain("Confirma tu ingreso");
-    expect(html).toContain("+57 ••• ••• 4567");
-    expect(html).not.toContain("submit()");
-    expect(html).toContain("Este navegador ya tiene una sesión abierta");
-    expect(authIpFactory.createAuthRouteClient).not.toHaveBeenCalled();
-  });
-
-  it("GET of a used or expired link says so clearly", async () => {
-    setLoginEnv(true);
-    for (const status of ["used", "expired", "invalid"]) {
-      fakeAdmin({ telegram_login_link_peek: { data: [{ status, phone_e164: null, same_browser: false }] } });
-      const res = await linkGET(new NextRequest(url, { headers: { host: "localhost" } }));
-      expect(res.status).toBe(410);
-      expect(await res.text()).toContain("Este enlace ya se usó o venció. Pide uno nuevo en el bot.");
-    }
-  });
-
-  it("POST from another site, without origin proof or not as a form never touches the database", async () => {
+  it("without env, from another site, without origin proof or not as a form never touches the database", async () => {
+    const off = await linkPOST(formPost(SAME_ORIGIN));
+    expect(off.headers.get("location")).toBe("http://localhost/login/telegram?estado=unavailable");
     setLoginEnv(true);
     for (const request of [
       formPost({ "sec-fetch-site": "cross-site", origin: "https://evil.example" }),
@@ -965,14 +973,17 @@ describe("/api/auth/telegram/link — 5-minute single-use link", () => {
       formPost({ "sec-fetch-site": "same-origin", "content-type": "application/json" }, JSON.stringify({ t: token })),
     ]) {
       const res = await linkPOST(request);
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(303);
+      expect(res.headers.get("location")).toBe("http://localhost/login/telegram?estado=forbidden");
       expect(res.headers.get("set-cookie")).toBeNull();
     }
     expect(adminFactory.createAdminClient).not.toHaveBeenCalled();
   });
 
-  it("same-origin POST redeems once and signs in; a second POST is rejected without a session", async () => {
+  it("redeems once and signs in with the real IP, notifies Telegram with the opener's device; a second POST lands on the 'gone' page without a session", async () => {
     setLoginEnv(true);
+    const fetchStub = vi.fn().mockResolvedValue(Response.json({ ok: true, result: {} }));
+    vi.stubGlobal("fetch", fetchStub);
     let used = false;
     const admin = fakeAdmin(
       {
@@ -986,25 +997,59 @@ describe("/api/auth/telegram/link — 5-minute single-use link", () => {
       { existingUserId: "account-1" },
     );
     const cookies = fakeCookieClient();
-    const first = await linkPOST(formPost({ ...SAME_ORIGIN, cookie: `${TG_REQUEST_COOKIE}=${ownSecret}`, "x-real-ip": "203.0.113.5" }));
+    const first = await linkPOST(
+      formPost({
+        ...SAME_ORIGIN,
+        cookie: `${TG_REQUEST_COOKIE}=${ownSecret}`,
+        "x-real-ip": "203.0.113.5",
+        "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+      }),
+    );
     expect(first.status).toBe(303);
     expect(first.headers.get("location")).toBe("http://localhost/casa");
     expect(first.headers.get("cache-control")).toBe("no-store");
-    expect(first.headers.get("set-cookie")).toMatch(/lp_tg_req=;/);
+    // La cookie de la solicitud se queda: la pestaña que espera en este mismo
+    // navegador la usa para ver «consumed» con sesión (si no, diría «venció»).
+    expect(first.headers.get("set-cookie") ?? "").not.toMatch(/lp_tg_req=/);
     expect(authIpFactory.createAuthRouteClient).toHaveBeenCalledWith("203.0.113.5");
     expect(rpcArgs(admin.rpc, "telegram_login_link_consume")).toEqual({
       p_link_token_hash: hashLinkToken(BOT_TOKEN, token),
       p_browser_hash: sha256Hex(ownSecret),
     });
+    await vi.waitFor(() => expect(fetchStub).toHaveBeenCalled());
+    const notice = JSON.parse(String(fetchStub.mock.calls[0][1].body));
+    expect(notice.chat_id).toBe(TG);
+    expect(notice.text).toContain("Entraste a La Polla desde iPhone");
 
     const second = await linkPOST(formPost(SAME_ORIGIN));
-    expect(second.status).toBe(410);
-    expect(await second.text()).toContain("ya se usó o venció");
+    expect(second.status).toBe(303);
+    expect(second.headers.get("location")).toBe("http://localhost/login/telegram?estado=gone");
     expect(cookies.auth.verifyOtp).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not open a session when the phone now belongs to another account or the Telegram link was removed", async () => {
+    setLoginEnv(true);
+    for (const scenario of [
+      { existingUserId: "other-account", authorize: true },
+      { existingUserId: "account-1", authorize: false },
+    ]) {
+      const admin = fakeAdmin(
+        {
+          telegram_login_link_consume: { data: [{ status: "ok", user_id: "account-1", telegram_user_id: TG, phone_e164: PHONE, same_browser: false }] },
+          telegram_login_authorize: { data: scenario.authorize },
+        },
+        { existingUserId: scenario.existingUserId },
+      );
+      const cookies = fakeCookieClient();
+      const res = await linkPOST(formPost(SAME_ORIGIN));
+      expect(res.headers.get("location")).toBe("http://localhost/login/telegram?estado=sms_only");
+      expect(admin.auth.admin.generateLink).not.toHaveBeenCalled();
+      expect(cookies.auth.verifyOtp).not.toHaveBeenCalled();
+    }
   });
 });
 
-describe("retired v1 endpoints", () => {
+describe("retired endpoints", () => {
   it("telegram-verify answers 410 without touching the database, even with a valid-looking code", async () => {
     setLoginEnv(true);
     const res = await legacyVerifyPOST();
@@ -1012,12 +1057,12 @@ describe("retired v1 endpoints", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(adminFactory.createAdminClient).not.toHaveBeenCalled();
   });
-  it("telegram-link answers 410 for GET and POST, 405 for HEAD", async () => {
+  it("telegram-link (v1) sends GET to the 'gone' page, answers 410 to POST and 405 to HEAD", async () => {
     setLoginEnv(true);
     const get = legacyLinkGET(new NextRequest(`http://localhost/api/auth/telegram-link?t=${"a".repeat(43)}`));
-    expect(get.status).toBe(410);
-    expect(await get.text()).toContain("ya se usó o venció");
-    expect(legacyLinkPOST(new NextRequest("http://localhost/api/auth/telegram-link", { method: "POST" })).status).toBe(410);
+    expect(get.status).toBe(303);
+    expect(get.headers.get("location")).toBe("http://localhost/login/telegram?estado=gone");
+    expect(legacyLinkPOST().status).toBe(410);
     expect(legacyLinkHEAD().status).toBe(405);
     expect(adminFactory.createAdminClient).not.toHaveBeenCalled();
   });

@@ -6,13 +6,26 @@
 // token no debe viajar por un redirect extra). En local o preview,
 // NEXT_PUBLIC_APP_URL manda para no sacar a nadie de su entorno.
 //
-// v2: el enlace vive bajo /api/auth/telegram/ para recibir la cookie lp_tg_req
-// (request-cookie.ts). /api/auth/telegram-link queda solo como respuesta 410.
+// v2: el botón del bot abre la PÁGINA /login/telegram (sistema de diseño,
+// fuentes de la app), que muestra la confirmación y envía el formulario al
+// endpoint /api/auth/telegram/link. /api/auth/telegram-link (v1) solo explica
+// que el enlace ya no sirve.
 
 import { SITES } from "@/lib/seo/sites";
 import type { LoginLocale } from "./update";
 
-export const LOGIN_LINK_PATH = "/api/auth/telegram/link";
+/** Página que abre el botón del bot. */
+export const LOGIN_LINK_PATH = "/login/telegram";
+/** Endpoint que canjea el enlace (POST del formulario de esa página). */
+export const LOGIN_LINK_ACTION = "/api/auth/telegram/link";
+
+/** Estados que la página del enlace muestra sin token (después de un POST). */
+export const LINK_PAGE_STATES = ["gone", "failed", "forbidden", "sms_only", "unavailable"] as const;
+export type LinkPageState = (typeof LINK_PAGE_STATES)[number];
+
+export function linkPageStateUrl(state: LinkPageState): string {
+  return `${LOGIN_LINK_PATH}?estado=${state}`;
+}
 
 const PRODUCTION_HOSTS = new Set([
   SITES.ES.host,

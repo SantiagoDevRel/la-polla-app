@@ -7,6 +7,10 @@
 --
 -- Termina con "telegram-login-v2-check OK". Cualquier ASSERT roto aborta.
 -- La regresión de 115 (scripts/telegram-login-check.sql) sigue vigente.
+--
+-- Cubre, además del ciclo de vida: la cookie del navegador que pidió NUNCA abre
+-- sesión (phishing tipo device code), topes por IPv4 exacta e IPv6 /64 sin
+-- tope global, y permisos denegados a anon/authenticated.
 
 \set ON_ERROR_STOP 1
 BEGIN;
@@ -67,9 +71,9 @@ BEGIN
   SELECT * INTO r FROM public.telegram_login_request_find(repeat('1', 64));
   ASSERT r.request_id = req_id AND r.status = 'pending' AND r.requester_label = 'Windows en Bogotá, CO';
 
-  -- Consumir antes de aprobar: nada.
-  SELECT * INTO r FROM public.telegram_login_request_consume(repeat('a', 64));
-  ASSERT r.status = 'pending' AND r.user_id IS NULL;
+  -- No existe consumo por cookie: la pestaña que pidió no abre sesión nunca.
+  ASSERT to_regprocedure('public.telegram_login_request_consume(text)') IS NULL,
+    'la cookie del navegador no debe poder abrir sesión';
 
   -- ── Aprobar: solo con vínculo y teléfono de esa misma cuenta ──
   SELECT * INTO r FROM public.telegram_login_request_approve(req_id, 7002, linked, '+573119000001', repeat('9', 64));
@@ -98,32 +102,42 @@ BEGIN
   SELECT * INTO r FROM public.telegram_login_link_peek(repeat('8', 64), NULL);
   ASSERT r.status = 'ok' AND NOT r.same_browser;
 
-  -- ── Un solo consumo: navegador, y el enlace ya no sirve ──
-  SELECT * INTO r FROM public.telegram_login_request_consume(repeat('a', 64));
+  -- Aprobada: el navegador que pidió solo ve el estado. Sin el token (que
+  -- llegó al Telegram de la cuenta) no hay nada que canjear.
+  SELECT * INTO r FROM public.telegram_login_request_status(repeat('a', 64));
+  ASSERT r.status = 'approved';
+  SELECT * INTO r FROM public.telegram_login_link_consume(repeat('0', 64), repeat('a', 64));
+  ASSERT r.status = 'invalid' AND r.user_id IS NULL, 'la cookie sin token no canjea nada';
+
+  -- ── Un solo consumo: el enlace, y la solicitud queda cerrada ──
+  SELECT * INTO r FROM public.telegram_login_link_consume(repeat('8', 64), repeat('a', 64));
   ASSERT r.status = 'ok' AND r.user_id = linked AND r.telegram_user_id = 7001
-     AND r.phone_e164 = '+573119000001';
-  SELECT * INTO r FROM public.telegram_login_request_consume(repeat('a', 64));
-  ASSERT r.status = 'consumed' AND r.user_id IS NULL, 'segundo consumo rechazado';
-  SELECT * INTO r FROM public.telegram_login_link_consume(repeat('8', 64), NULL);
-  ASSERT r.status = 'used' AND r.user_id IS NULL, 'enlace y solicitud son excluyentes';
+     AND r.phone_e164 = '+573119000001' AND r.same_browser;
+  SELECT * INTO r FROM public.telegram_login_link_consume(repeat('8', 64), repeat('a', 64));
+  ASSERT r.status = 'used' AND r.user_id IS NULL, 'segundo canje rechazado';
   SELECT * INTO r FROM public.telegram_login_link_peek(repeat('8', 64), NULL);
   ASSERT r.status = 'used';
+  SELECT * INTO r FROM public.telegram_login_request_status(repeat('a', 64));
+  ASSERT r.status = 'consumed';
   SELECT * INTO r FROM public.telegram_login_request_approve(req_id, 7001, linked, '+573119000001', repeat('7', 64));
   ASSERT r.status = 'unavailable', 'no se reabre una solicitud consumida';
 
-  -- ── Al revés: el enlace consume la solicitud ──
-  PERFORM public.telegram_login_request_create(repeat('3', 64), repeat('c', 64), 'en', '203.0.113.9', NULL);
+  -- ── Phishing tipo device code: el atacante crea la solicitud y la víctima
+  -- vinculada la aprueba en Telegram. El enlace es de la víctima; abierto desde
+  -- OTRO navegador pide confirmación (same_browser falso) y la cookie del
+  -- atacante no aporta nada.
+  PERFORM public.telegram_login_request_create(repeat('3', 64), repeat('c', 64), 'en', '198.51.100.66', NULL);
   SELECT request_id INTO req_id FROM public.telegram_login_request_find(repeat('3', 64));
   SELECT * INTO r FROM public.telegram_login_request_approve(req_id, 7001, linked, '+573119000001', repeat('6', 64));
   ASSERT r.status = 'ok' AND r.locale = 'en';
-  SELECT * INTO r FROM public.telegram_login_link_consume(repeat('6', 64), repeat('c', 64));
-  ASSERT r.status = 'ok' AND r.user_id = linked AND r.same_browser;
-  SELECT * INTO r FROM public.telegram_login_link_consume(repeat('6', 64), repeat('c', 64));
-  ASSERT r.status = 'used';
-  SELECT * INTO r FROM public.telegram_login_request_consume(repeat('c', 64));
-  ASSERT r.status = 'consumed' AND r.user_id IS NULL;
+  SELECT * INTO r FROM public.telegram_login_link_peek(repeat('6', 64), repeat('f', 64));
+  ASSERT r.status = 'ok' AND NOT r.same_browser, 'otro navegador confirma antes de entrar';
+  SELECT * INTO r FROM public.telegram_login_link_consume(repeat('6', 64), NULL);
+  ASSERT r.status = 'ok' AND r.user_id = linked AND NOT r.same_browser;
   SELECT * INTO r FROM public.telegram_login_request_status(repeat('c', 64));
-  ASSERT r.status = 'consumed';
+  ASSERT r.status = 'consumed', 'la pestaña del atacante solo ve consumida';
+  SELECT * INTO r FROM public.telegram_login_link_consume(repeat('6', 64), repeat('c', 64));
+  ASSERT r.status = 'used' AND r.user_id IS NULL;
 
   -- ── Vencimiento ──
   PERFORM public.telegram_login_request_create(repeat('4', 64), repeat('d', 64), 'es', '203.0.113.9', NULL);
@@ -135,8 +149,6 @@ BEGIN
   ASSERT r.status = 'expired';
   SELECT * INTO r FROM public.telegram_login_request_approve(req_id, 7001, linked, '+573119000001', repeat('5', 64));
   ASSERT r.status = 'expired', 'una solicitud vencida no se aprueba';
-  SELECT * INTO r FROM public.telegram_login_request_consume(repeat('d', 64));
-  ASSERT r.status = 'expired';
 
   -- Aprobada y vencida antes de usarse: ni navegador ni enlace.
   PERFORM public.telegram_login_request_create(repeat('5', 64), repeat('e', 64), 'es', '203.0.113.9', NULL);
@@ -147,7 +159,7 @@ BEGIN
   ASSERT r.status = 'expired' AND r.phone_e164 IS NULL;
   SELECT * INTO r FROM public.telegram_login_link_consume(repeat('4', 64), repeat('e', 64));
   ASSERT r.status = 'expired';
-  SELECT * INTO r FROM public.telegram_login_request_consume(repeat('e', 64));
+  SELECT * INTO r FROM public.telegram_login_request_status(repeat('e', 64));
   ASSERT r.status = 'expired';
 
   -- ── Cancelar ──
@@ -190,7 +202,8 @@ BEGIN
   SELECT * INTO r FROM public.telegram_login_link_issue(7001, linked, '+573119000001', repeat('e', 64), 'es');
   ASSERT r.status = 'rate_limited';
 
-  -- Tope por IP: 10 / 15 min (ya van 5 desde 203.0.113.9).
+  -- Tope por IP: 10 / 15 min (ya van 4 desde 203.0.113.9).
+  PERFORM public.telegram_login_request_create(md5('extra') || md5('extra2'), md5('bx') || md5('bx2'), 'es', '203.0.113.9', NULL);
   FOR i IN 1..5 LOOP
     SELECT * INTO r FROM public.telegram_login_request_create(
       md5('n' || i) || md5('n2' || i), md5('b' || i) || md5('b2' || i), 'es', '203.0.113.9', NULL);
@@ -202,6 +215,38 @@ BEGIN
   SELECT * INTO r FROM public.telegram_login_request_create(
     repeat('7', 64), repeat('3', 64), 'es', '198.51.100.7', NULL);
   ASSERT r.status = 'ok', 'otra IP sigue pudiendo';
+
+  -- IPv6: el balde es el /64. Diez direcciones del mismo /64 agotan el cupo
+  -- de todo el /64; otro /64 sigue pudiendo.
+  FOR i IN 1..10 LOOP
+    SELECT * INTO r FROM public.telegram_login_request_create(
+      md5('v6n' || i) || md5('v6n2' || i), md5('v6b' || i) || md5('v6b2' || i), 'es',
+      ('2001:db8:1:2::' || to_hex(i))::inet, NULL);
+    ASSERT r.status = 'ok';
+  END LOOP;
+  SELECT * INTO r FROM public.telegram_login_request_create(
+    md5('v6n11') || md5('v6n211'), md5('v6b11') || md5('v6b211'), 'es', '2001:db8:1:2:ffff::1', NULL);
+  ASSERT r.status = 'rate_limited', 'otra dirección del mismo /64 comparte el tope';
+  SELECT * INTO r FROM public.telegram_login_request_create(
+    md5('v6n12') || md5('v6n212'), md5('v6b12') || md5('v6b212'), 'es', '2001:db8:1:3::1', NULL);
+  ASSERT r.status = 'ok', 'otro /64 sigue pudiendo';
+
+  -- Sin tope global: 70 IPs x 10 solicitudes (más de 600 en 15 min) no dejan
+  -- sin servicio a una IP nueva.
+  FOR i IN 1..70 LOOP
+    FOR j IN 1..10 LOOP
+      PERFORM public.telegram_login_request_create(
+        md5('gn' || i || ':' || j) || md5('gn2' || i || ':' || j),
+        md5('gb' || i || ':' || j) || md5('gb2' || i || ':' || j), 'es',
+        ('192.0.2.' || i)::inet, NULL);
+    END LOOP;
+  END LOOP;
+  SELECT count(*) INTO n FROM public.telegram_login_requests
+   WHERE nonce_hash IS NOT NULL AND created_at > clock_timestamp() - interval '15 minutes';
+  ASSERT n > 600, format('se esperaban más de 600 solicitudes, hay %s', n);
+  SELECT * INTO r FROM public.telegram_login_request_create(
+    repeat('8', 64), repeat('4', 64), 'es', '198.51.100.8', NULL);
+  ASSERT r.status = 'ok', 'sin tope global que deje a todos sin Telegram';
 
   -- Filas coherentes: una aprobada sin cuenta no puede existir.
   BEGIN
@@ -233,7 +278,7 @@ DO $$ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM public.telegram_login_request_status(repeat('a',64)); ASSERT false, 'anon consultó estado';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
-  BEGIN PERFORM public.telegram_login_request_consume(repeat('a',64)); ASSERT false, 'anon consumió';
+  BEGIN PERFORM public.telegram_login_ip_bucket('203.0.113.9'); ASSERT false, 'anon usó el balde';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM public.telegram_login_link_consume(repeat('a',64), NULL); ASSERT false, 'anon canjeó enlace';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;

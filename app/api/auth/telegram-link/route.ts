@@ -1,32 +1,31 @@
 // app/api/auth/telegram-link/route.ts — Enlace del login por Telegram v1.
 //
 // Retirado en v2 (migración 119). El bot ya no emite estos enlaces y los que
-// alcanzó a emitir vencían a los 10 minutos. El enlace v2 vive en
-// /api/auth/telegram/link, bajo el Path de la cookie lp_tg_req.
+// alcanzó a emitir vencían a los 10 minutos. El enlace v2 abre la página
+// /login/telegram.
 //
-// GET → página 410 con la salida clara; POST → 410. Ninguno toca la base ni
-// las cookies. HEAD 405 (Next derivaría HEAD de GET).
+// GET → 303 a /login/telegram?estado=gone (la página explica que el enlace ya
+// no sirve, con el sistema de diseño); POST → 410. Ninguno toca la base ni las
+// cookies. HEAD 405 (Next derivaría HEAD de GET).
 
 import { NextRequest, NextResponse } from "next/server";
-import { authErrorPage } from "@/lib/auth/auth-error-page";
-import { localeForHost } from "@/lib/auth/telegram-login/links";
+import { linkPageStateUrl } from "@/lib/auth/telegram-login/links";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const GONE = {
-  es: "Este enlace ya se usó o venció. Pide uno nuevo en el bot.",
-  en: "This link was already used or expired. Request a new one in the bot.",
-} as const;
-
 export function GET(request: NextRequest) {
-  const locale = localeForHost(request.headers.get("host"));
-  return authErrorPage(GONE[locale], 410, locale);
+  const response = NextResponse.redirect(new URL(linkPageStateUrl("gone"), request.url), 303);
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  return response;
 }
 
-export function POST(request: NextRequest) {
-  const locale = localeForHost(request.headers.get("host"));
-  return authErrorPage(GONE[locale], 410, locale);
+export function POST() {
+  return NextResponse.json(
+    { error: "gone" },
+    { status: 410, headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export function HEAD() {

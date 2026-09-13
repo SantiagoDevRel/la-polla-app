@@ -311,6 +311,13 @@ a:focus-visible {
   outline: 2px solid rgba(255, 215, 0, 0.75);
   outline-offset: 2px;
 }
+/* Títulos que reciben foco por código (tabindex="-1") para que el lector de
+   pantalla anuncie un cambio de estado: no son controles, sin anillo dorado
+   (sumaba oro a la pantalla y parecía un botón). */
+h1[tabindex="-1"]:focus-visible,
+h2[tabindex="-1"]:focus-visible {
+  outline: none;
+}
 
 /* Cinta de advertencia (AnnouncementTicker) — marquee infinito.
    El track tiene 2 mitades identicas; -50% hace el loop seamless.

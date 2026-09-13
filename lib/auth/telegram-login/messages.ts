@@ -2,8 +2,14 @@
 // Registro neutro de casa seria (CLAUDE.md, Tone Rules): claro, en tú, sin jerga
 // y sin emojis. HTML de Telegram: todo lo variable pasa por esc().
 //
-// v2 nunca manda códigos: la persona entra sola en la pestaña donde tocó
-// «Entrar con Telegram», o con el botón de enlace de un solo uso.
+// v2 nunca manda códigos: la persona entra con el botón del enlace de un solo
+// uso, que solo llega a su propio Telegram. Un solo mensaje con una sola
+// instrucción: nada de «vuelve a la web, vas a entrar sola» compitiendo con el
+// botón (la sesión la abre el enlace, nunca la pestaña que pidió).
+//
+// El control que muestra el teclado del bot no se ve igual en todos los
+// clientes (en Telegram Web es un ícono de cuatro lóbulos junto a la carita):
+// se describe por su forma y su lugar, no como «ícono de teclado».
 
 import type { LoginLocale } from "./update";
 
@@ -26,21 +32,14 @@ const COPY = {
     promptLong: [
       "Para entrar por primera vez con Telegram necesitamos confirmar tu número.",
       "",
-      "Toca el botón <b>Compartir mi número</b>. Si no lo ves, toca el ícono de teclado junto al campo de mensaje.",
+      "Toca el botón <b>Compartir mi número</b> que aparece abajo. Si no lo ves, toca el ícono de cuatro cuadritos que está en la barra donde escribes, junto a la carita.",
     ].join("\n"),
     promptShort:
-      "Toca <b>Compartir mi número</b> (ícono de teclado junto al campo de mensaje).",
+      "Toca <b>Compartir mi número</b> abajo. Si no lo ves, toca el ícono de cuatro cuadritos junto a la carita, en la barra donde escribes.",
     requestExpired:
       "La solicitud de ese navegador ya venció o ya se usó. Si quieres entrar desde allá, vuelve a La Polla y toca Entrar con Telegram otra vez.",
-    approved: (label: string | null) =>
-      [
-        "Listo. Vuelve a La Polla: vas a entrar automáticamente.",
-        ...(label ? ["", `Ingreso pedido desde ${esc(label)}. Si no fuiste tú, escríbenos a soporte.`] : []),
-      ].join("\n"),
     linkOnly:
       "Toca el botón para entrar a La Polla. El enlace sirve una sola vez y vence en 5 minutos.",
-    linkAfterApproval:
-      "Si prefieres entrar desde aquí, toca <b>Entrar a La Polla</b>. El enlace sirve una sola vez y vence en 5 minutos.",
     linkButton: "Entrar a La Polla",
     linkedReady: "Tu cuenta de Telegram ya está confirmada para La Polla.",
     contactConfirmed:
@@ -67,21 +66,14 @@ const COPY = {
     promptLong: [
       "To sign in with Telegram for the first time we need to confirm your number.",
       "",
-      "Tap the <b>Share my number</b> button. If you do not see it, tap the keyboard icon next to the message field.",
+      "Tap the <b>Share my number</b> button below. If you do not see it, tap the four-squares icon in the bar where you type, next to the smiley face.",
     ].join("\n"),
     promptShort:
-      "Tap <b>Share my number</b> (keyboard icon next to the message field).",
+      "Tap <b>Share my number</b> below. If you do not see it, tap the four-squares icon next to the smiley face, in the bar where you type.",
     requestExpired:
       "The request from that browser already expired or was used. To sign in there, go back to Chicken Picks and tap Sign in with Telegram again.",
-    approved: (label: string | null) =>
-      [
-        "Done. Go back to Chicken Picks: you will be signed in automatically.",
-        ...(label ? ["", `Sign-in requested from ${esc(label)}. If this was not you, contact support.`] : []),
-      ].join("\n"),
     linkOnly:
       "Tap the button to sign in to Chicken Picks. The link works only once and expires in 5 minutes.",
-    linkAfterApproval:
-      "If you prefer to sign in from here, tap <b>Sign in to Chicken Picks</b>. The link works only once and expires in 5 minutes.",
     linkButton: "Sign in to Chicken Picks",
     linkedReady: "Your Telegram account is already confirmed for Chicken Picks.",
     contactConfirmed:

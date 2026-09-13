@@ -10,9 +10,12 @@
 // bot de login configurado, el paso del teléfono y el del código ofrecen
 // «Entrar con Telegram»: se crea una solicitud atada a este navegador
 // (/api/auth/telegram/request, cookie httpOnly), se abre Telegram directo con
-// t.me/<bot>?start=<nonce> y esta pestaña espera SIN input. Cuando la persona
-// toca Iniciar en el bot, la solicitud queda aprobada y esta pestaña entra
-// sola (/status → /complete). No hay código que escribir.
+// t.me/<bot>?start=<nonce> y esta pestaña espera SIN input, con los pasos.
+// En Telegram, el bot manda el botón «Entrar a La Polla» (enlace de un solo
+// uso): ese enlace es lo ÚNICO que abre sesión, en el navegador donde se abre.
+// Esta pestaña nunca entra por la aprobación (eso sería phishing tipo device
+// code); consulta /status y, si el enlace se abrió en este mismo navegador,
+// ya tiene la sesión y sigue. Si se abrió en otro (el de Telegram), lo explica.
 //
 // NOTA Turnstile: el cableado del widget se rolleó back porque
 // interaction-only no renderaba en algunos browsers y bloqueaba login.
@@ -30,6 +33,14 @@ import { safeReturnTo } from "@/lib/auth/safe-return-to";
 import { DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
+import {
+  GHOST_BTN,
+  LOGIN_CARD,
+  LOGIN_TITLE,
+  PRIMARY_BTN,
+  PRIMARY_GLOW,
+  SECONDARY_BTN,
+} from "@/components/auth/login-styles";
 
 function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;
@@ -51,27 +62,55 @@ type Step = "input" | "otp" | "telegram";
 // (la cookie httpOnly de la solicitud sobrevive sola) para retomar la espera.
 const TELEGRAM_PENDING_KEY = "lp_login_telegram_request";
 const TELEGRAM_POLL_MS = 2_000;
-// Tope absoluto de la espera: 5 min pendiente + 5 min del enlace aprobado.
+// Tope absoluto de la espera: 5 min pendiente + 5 min del enlace emitido.
 const TELEGRAM_MAX_WAIT_MS = 10 * 60_000;
+// Consumida sin sesión: margen para que llegue la cookie si el enlace se abrió
+// en otra pestaña de este mismo navegador.
+const TELEGRAM_SESSION_GRACE_MS = 6_000;
 
-type TelegramPhase = "opening" | "waiting" | "completing" | "expired" | "sms_only" | "error";
+type TelegramPhase =
+  | "opening"
+  | "waiting"
+  | "elsewhere"
+  | "expired"
+  | "sms_only"
+  | "rate_limited"
+  | "unavailable"
+  | "error";
 
 interface TelegramState {
   phase: TelegramPhase;
   deepLink: string | null;
+  /** Escritorio: el navegador no dejó abrir la ventana de Telegram. */
   popupBlocked: boolean;
+  /** El bot ya mandó el botón del enlace (solicitud «approved»). */
+  linkSent: boolean;
+  /** Pantalla táctil: Telegram se abre en ESTA pestaña, sin pestaña extra. */
+  sameTab: boolean;
   error: string | null;
 }
 
-const PRIMARY_BTN =
-  "w-full min-h-[48px] bg-gold text-bg-base font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base leading-snug inline-flex items-center justify-center gap-2 text-center break-words cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-card";
+const TELEGRAM_IDLE: TelegramState = {
+  phase: "opening",
+  deepLink: null,
+  popupBlocked: false,
+  linkSent: false,
+  sameTab: false,
+  error: null,
+};
 
-// Secundario del sistema: borde sutil, sin oro, objetivo táctil ≥ 44 px.
-const SECONDARY_BTN =
-  "w-full min-h-[44px] rounded-xl border border-border-subtle bg-transparent px-4 py-3 text-sm leading-snug font-medium text-text-primary hover:border-gold/30 hover:bg-bg-card-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gold/40 transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-2 text-center break-words";
-
-const GHOST_BTN =
-  "w-full min-h-[44px] text-text-secondary font-medium py-2 px-4 rounded-xl hover:text-gold hover:bg-bg-card-hover transition-colors flex items-center justify-center gap-1.5 text-sm leading-snug text-center cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gold/40";
+/**
+ * En el teléfono se abre Telegram en la MISMA pestaña: con una pestaña nueva,
+ * al volver de Telegram el navegador muestra esa pestaña (t.me) y no la que
+ * espera. En escritorio la ventana nueva se ve y la espera queda a la mano.
+ */
+function prefersSameTab(): boolean {
+  try {
+    return window.matchMedia("(pointer: coarse)").matches;
+  } catch {
+    return false;
+  }
+}
 
 interface PollaPreview {
   slug: string;
@@ -82,11 +121,23 @@ interface PollaPreview {
   participantCount: number;
 }
 
-function readTelegramPending(): { deepLink: string; expiresAt: number; startedAt: number } | null {
+interface TelegramPending {
+  deepLink: string;
+  expiresAt: number;
+  startedAt: number;
+  sameTab: boolean;
+}
+
+function readTelegramPending(): TelegramPending | null {
   try {
     const raw = window.sessionStorage.getItem(TELEGRAM_PENDING_KEY);
     if (!raw) return null;
-    const saved = JSON.parse(raw) as { deepLink?: unknown; expiresAt?: unknown; startedAt?: unknown };
+    const saved = JSON.parse(raw) as {
+      deepLink?: unknown;
+      expiresAt?: unknown;
+      startedAt?: unknown;
+      sameTab?: unknown;
+    };
     if (
       typeof saved.deepLink === "string" &&
       /^https:\/\/t\.me\/[A-Za-z0-9_]+\?start=[A-Za-z0-9_-]{43}$/.test(saved.deepLink) &&
@@ -95,7 +146,12 @@ function readTelegramPending(): { deepLink: string; expiresAt: number; startedAt
       saved.expiresAt > Date.now() &&
       Date.now() - saved.startedAt < TELEGRAM_MAX_WAIT_MS
     ) {
-      return { deepLink: saved.deepLink, expiresAt: saved.expiresAt, startedAt: saved.startedAt };
+      return {
+        deepLink: saved.deepLink,
+        expiresAt: saved.expiresAt,
+        startedAt: saved.startedAt,
+        sameTab: saved.sameTab === true,
+      };
     }
     window.sessionStorage.removeItem(TELEGRAM_PENDING_KEY);
   } catch {
@@ -104,7 +160,7 @@ function readTelegramPending(): { deepLink: string; expiresAt: number; startedAt
   return null;
 }
 
-function writeTelegramPending(value: { deepLink: string; expiresAt: number; startedAt: number } | null) {
+function writeTelegramPending(value: TelegramPending | null) {
   try {
     if (value) window.sessionStorage.setItem(TELEGRAM_PENDING_KEY, JSON.stringify(value));
     else window.sessionStorage.removeItem(TELEGRAM_PENDING_KEY);
@@ -121,12 +177,7 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
   const [step, setStep] = useState<Step>("input");
   // Paso al que vuelve «Cancelar» desde la espera de Telegram.
   const [telegramReturnStep, setTelegramReturnStep] = useState<"input" | "otp">("input");
-  const [telegram, setTelegram] = useState<TelegramState>({
-    phase: "opening",
-    deepLink: null,
-    popupBlocked: false,
-    error: null,
-  });
+  const [telegram, setTelegram] = useState<TelegramState>(TELEGRAM_IDLE);
   const telegramExpiresAt = useRef<number>(0);
   const telegramStartedAt = useRef<number>(0);
   const telegramBusy = useRef(false);
@@ -167,7 +218,12 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
     if (!saved) return;
     telegramExpiresAt.current = saved.expiresAt;
     telegramStartedAt.current = saved.startedAt;
-    setTelegram({ phase: "waiting", deepLink: saved.deepLink, popupBlocked: false, error: null });
+    setTelegram({
+      ...TELEGRAM_IDLE,
+      phase: "waiting",
+      deepLink: saved.deepLink,
+      sameTab: saved.sameTab,
+    });
     setStep("telegram");
   }, [telegramEnabled]);
 
@@ -361,26 +417,32 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
 
   // ── Telegram ────────────────────────────────────────────────────────────
 
-  // Abre Telegram directo. La ventana se abre en el mismo clic, ANTES del
-  // fetch, para que el bloqueador de ventanas no la frene; cuando llega el
-  // deep link se navega ahí (en el teléfono abre la app de Telegram). Si el
-  // navegador no dejó abrirla, la pantalla de espera muestra un botón grande.
+  // Abre Telegram directo.
+  //   - Pantalla táctil: pide la solicitud y navega ESTA pestaña al deep link
+  //     (la app de Telegram lo intercepta). Al volver, el navegador muestra
+  //     esta misma pestaña esperando. Si la pestaña se descarga, sessionStorage
+  //     y la cookie retoman la espera.
+  //   - Escritorio: la ventana se abre en el mismo clic, ANTES del fetch, para
+  //     que el bloqueador no la frene; si igual la bloquea, un botón grande.
   async function startTelegram(from: "input" | "otp") {
     if (telegramBusy.current) return;
     telegramBusy.current = true;
     setError(null);
     setTelegramReturnStep(from);
 
+    const sameTab = prefersSameTab();
     let popup: Window | null = null;
-    try {
-      popup = window.open("about:blank", "_blank");
-      // Telegram no debe poder tocar esta pestaña (tabnabbing).
-      if (popup) popup.opener = null;
-    } catch {
-      popup = null;
+    if (!sameTab) {
+      try {
+        popup = window.open("about:blank", "_blank");
+        // Telegram no debe poder tocar esta pestaña (tabnabbing).
+        if (popup) popup.opener = null;
+      } catch {
+        popup = null;
+      }
     }
 
-    setTelegram({ phase: "opening", deepLink: null, popupBlocked: false, error: null });
+    setTelegram({ ...TELEGRAM_IDLE, sameTab });
     setStep("telegram");
 
     try {
@@ -399,17 +461,23 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
         typeof body?.expiresAt === "string" ? Date.parse(body.expiresAt) : Number.NaN;
       if (!res.ok || !deepLink || !Number.isFinite(expiresAt)) {
         popup?.close();
+        // 429 y 404 no se arreglan reintentando: el SMS pasa a ser lo primero.
         setTelegram({
-          phase: "error",
-          deepLink: null,
-          popupBlocked: false,
-          error:
-            res.status === 429
-              ? t("tgErrRateLimited")
-              : res.status === 404
-                ? t("tgErrUnavailable")
-                : t("tgErrGeneric"),
+          ...TELEGRAM_IDLE,
+          sameTab,
+          phase: res.status === 429 ? "rate_limited" : res.status === 404 ? "unavailable" : "error",
         });
+        return;
+      }
+
+      const startedAt = Date.now();
+      telegramExpiresAt.current = expiresAt;
+      telegramStartedAt.current = startedAt;
+      writeTelegramPending({ deepLink, expiresAt, startedAt, sameTab });
+
+      if (sameTab) {
+        setTelegram({ ...TELEGRAM_IDLE, sameTab, phase: "waiting", deepLink });
+        window.location.assign(deepLink);
         return;
       }
 
@@ -422,21 +490,17 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
           popup.close();
         }
       }
-      const startedAt = Date.now();
-      telegramExpiresAt.current = expiresAt;
-      telegramStartedAt.current = startedAt;
-      writeTelegramPending({ deepLink, expiresAt, startedAt });
-      setTelegram({ phase: "waiting", deepLink, popupBlocked: !opened, error: null });
+      setTelegram({ ...TELEGRAM_IDLE, sameTab, phase: "waiting", deepLink, popupBlocked: !opened });
     } catch {
       popup?.close();
-      setTelegram({ phase: "error", deepLink: null, popupBlocked: false, error: t("errNetwork") });
+      setTelegram({ ...TELEGRAM_IDLE, sameTab, phase: "error", error: t("errNetwork") });
     } finally {
       telegramBusy.current = false;
     }
   }
 
   const endTelegramWait = useCallback(
-    (phase: Exclude<TelegramPhase, "opening" | "waiting" | "completing">) => {
+    (phase: Exclude<TelegramPhase, "opening" | "waiting">) => {
       writeTelegramPending(null);
       setTelegram((prev) => ({ ...prev, phase }));
     },
@@ -446,7 +510,7 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
   async function cancelTelegram() {
     writeTelegramPending(null);
     setStep(telegramReturnStep);
-    setTelegram({ phase: "opening", deepLink: null, popupBlocked: false, error: null });
+    setTelegram(TELEGRAM_IDLE);
     // Mejor esfuerzo: la solicitud también vence sola a los 5 minutos.
     try {
       await fetch("/api/auth/telegram/request", { method: "DELETE", credentials: "same-origin" });
@@ -455,47 +519,15 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
     }
   }
 
-  const completeTelegram = useCallback(async (): Promise<void> => {
-    setTelegram((prev) => ({ ...prev, phase: "completing" }));
-    try {
-      const res = await fetch("/api/auth/telegram/request/complete", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}",
-        credentials: "same-origin",
-      });
-      const body = (await res.json().catch(() => null)) as {
-        newUser?: boolean;
-        error?: string;
-      } | null;
-      if (res.ok) {
-        writeTelegramPending(null);
-        goAfterLogin(Boolean(body?.newUser));
-        return;
-      }
-      if (res.status === 409 && body?.error === "not_approved") {
-        setTelegram((prev) => ({ ...prev, phase: "waiting" }));
-        return;
-      }
-      writeTelegramPending(null);
-      if (res.status === 409 && body?.error === "sms_only") {
-        setTelegram((prev) => ({ ...prev, phase: "sms_only" }));
-      } else if (res.status === 410) {
-        setTelegram((prev) => ({ ...prev, phase: "expired" }));
-      } else {
-        setTelegram((prev) => ({ ...prev, phase: "error", error: t("tgErrGeneric") }));
-      }
-    } catch {
-      setTelegram((prev) => ({ ...prev, phase: "waiting" }));
-    }
-  }, [goAfterLogin, t]);
-
   // Consulta el estado cada 2 s mientras la pestaña está visible, y al volver
-  // a ella (visibilitychange/focus): al regresar de Telegram entra de una.
+  // a ella (visibilitychange/focus/pageshow). Esta pestaña NUNCA abre sesión:
+  // si el enlace del bot se abrió en este mismo navegador la sesión ya está en
+  // las cookies (signedIn) y sigue; si se abrió en otro, lo explica.
   useEffect(() => {
     if (step !== "telegram" || telegram.phase !== "waiting") return;
     let stopped = false;
     let inFlight = false;
+    let consumedSince: number | null = null;
 
     async function poll() {
       if (stopped || inFlight || document.visibilityState !== "visible") return;
@@ -516,19 +548,30 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
         const body = (await res.json().catch(() => null)) as {
           status?: string;
           expiresAt?: string | null;
+          signedIn?: boolean;
         } | null;
         const expires = body?.expiresAt ? Date.parse(body.expiresAt) : Number.NaN;
         if (Number.isFinite(expires)) telegramExpiresAt.current = expires;
         switch (body?.status) {
           case "approved":
-            stopped = true;
-            await completeTelegram();
+            // El bot ya mandó el botón: se sigue esperando a que lo abran.
+            setTelegram((prev) => (prev.linkSent ? prev : { ...prev, linkSent: true }));
             break;
           case "consumed":
-            // Entró con el enlace del bot en este mismo navegador.
-            stopped = true;
-            writeTelegramPending(null);
-            goAfterLogin(false);
+            if (body.signedIn === true) {
+              stopped = true;
+              writeTelegramPending(null);
+              goAfterLogin(false);
+              break;
+            }
+            // La fila se consume en la base ANTES de que la otra pestaña de
+            // este mismo navegador reciba las cookies de sesión: se espera un
+            // poco antes de concluir que el enlace se abrió en otro navegador.
+            consumedSince ??= Date.now();
+            if (Date.now() - consumedSince >= TELEGRAM_SESSION_GRACE_MS) {
+              stopped = true;
+              endTelegramWait("elsewhere");
+            }
             break;
           case "cancelled":
             stopped = true;
@@ -555,60 +598,73 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
     };
     document.addEventListener("visibilitychange", onReturn);
     window.addEventListener("focus", onReturn);
+    window.addEventListener("pageshow", onReturn);
     void poll();
     return () => {
       stopped = true;
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onReturn);
       window.removeEventListener("focus", onReturn);
+      window.removeEventListener("pageshow", onReturn);
     };
-  }, [step, telegram.phase, completeTelegram, endTelegramWait, goAfterLogin]);
+  }, [step, telegram.phase, endTelegramWait, goAfterLogin]);
 
   // Al cambiar de estado la espera, el foco va al título: un lector de
   // pantalla anuncia la nueva situación y el teclado sigue en la tarjeta.
   useEffect(() => {
     if (step !== "telegram") return;
-    if (telegram.phase === "expired" || telegram.phase === "sms_only" || telegram.phase === "error") {
+    if (telegram.phase !== "opening" && telegram.phase !== "waiting") {
       telegramHeading.current?.focus();
     }
   }, [step, telegram.phase]);
 
-  const telegramTitle =
-    telegram.phase === "expired"
-      ? t("tgExpiredTitle")
-      : telegram.phase === "sms_only"
-        ? t("tgSmsOnlyTitle")
-        : telegram.phase === "error"
-          ? t("tgErrorTitle")
-          : t("tgWaitTitle");
+  const telegramTitle = {
+    opening: t("tgWaitTitle"),
+    waiting: t("tgWaitTitle"),
+    elsewhere: t("tgElsewhereTitle"),
+    expired: t("tgExpiredTitle"),
+    sms_only: t("tgSmsOnlyTitle"),
+    rate_limited: t("tgRateLimitedTitle"),
+    unavailable: t("tgSmsOnlyTitle"),
+    error: t("tgErrorTitle"),
+  }[telegram.phase];
 
-  const telegramMessage =
-    telegram.phase === "expired"
-      ? t("tgExpired")
-      : telegram.phase === "sms_only"
-        ? t("tgErrSmsOnly")
-        : telegram.phase === "error"
-          ? (telegram.error ?? t("tgErrGeneric"))
-          : telegram.popupBlocked
-            ? t("tgPopupBlocked")
-            : t("tgWaitBody");
+  const telegramMessage = {
+    opening: null,
+    waiting: telegram.popupBlocked ? t("tgPopupBlocked") : null,
+    elsewhere: t("tgElsewhere"),
+    expired: t("tgExpired"),
+    sms_only: t("tgErrSmsOnly"),
+    rate_limited: t("tgErrRateLimited"),
+    unavailable: t("tgErrUnavailable"),
+    error: telegram.error ?? t("tgErrGeneric"),
+  }[telegram.phase];
 
+  const telegramWaiting = telegram.phase === "opening" || telegram.phase === "waiting";
+
+  // Sin «Esperando…» mientras Telegram no se abrió (ventana bloqueada).
   const telegramStatus =
     telegram.phase === "opening"
       ? t("tgOpening")
-      : telegram.phase === "completing"
-        ? t("tgCompleting")
-        : telegram.phase === "waiting"
-          ? t("tgWaiting")
-          : null;
+      : telegram.phase === "waiting" && !telegram.popupBlocked
+        ? telegram.linkSent
+          ? t("tgLinkSent")
+          : t("tgWaiting")
+        : null;
+
+  // Pantallas donde reintentar Telegram no sirve ahora: el SMS va primero.
+  const telegramSmsFirst =
+    telegram.phase === "sms_only" ||
+    telegram.phase === "rate_limited" ||
+    telegram.phase === "unavailable" ||
+    telegram.phase === "elsewhere";
 
   function backToSms() {
     writeTelegramPending(null);
     setError(null);
     setStep("input");
-    setTelegram({ phase: "opening", deepLink: null, popupBlocked: false, error: null });
+    setTelegram(TELEGRAM_IDLE);
   }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {step === "input" && (
@@ -842,7 +898,7 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
 
       {step === "telegram" && (
         <div
-          className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle"
+          className={LOGIN_CARD}
           data-testid="telegram-wait"
           data-phase={telegram.phase}
         >
@@ -853,17 +909,34 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
             >
               <Send className="h-6 w-6 text-text-primary" />
             </span>
-            <h2
-              ref={telegramHeading}
-              tabIndex={-1}
-              className="font-display text-2xl text-gold tracking-wide outline-none break-words"
-            >
+            <h2 ref={telegramHeading} tabIndex={-1} className={LOGIN_TITLE}>
               {telegramTitle}
             </h2>
-            <p className="text-text-secondary text-sm leading-relaxed break-words">
-              {telegramMessage}
-            </p>
+            {telegramMessage && (
+              <p className="text-text-secondary text-sm leading-relaxed break-words">
+                {telegramMessage}
+              </p>
+            )}
           </div>
+
+          {telegramWaiting && (
+            <ol
+              aria-label={t("tgStepsLabel")}
+              className="space-y-2 text-left text-sm leading-relaxed text-text-secondary"
+            >
+              {[t("tgStep1"), t("tgStep2"), t("tgStep3")].map((text, i) => (
+                <li key={i} className="flex gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="font-display text-xl leading-6 text-text-primary tabular-nums shrink-0 w-5 text-center"
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 break-words">{text}</span>
+                </li>
+              ))}
+            </ol>
+          )}
 
           <p
             role="status"
@@ -879,13 +952,19 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
           </p>
 
           <div className="space-y-3">
-            {(telegram.phase === "waiting" || telegram.phase === "completing") && telegram.deepLink && (
+            {telegram.phase === "waiting" && telegram.deepLink && (
               <a
                 href={telegram.deepLink}
-                target="_blank"
+                // Táctil: misma pestaña (la app intercepta y se vuelve aquí).
+                target={telegram.sameTab ? undefined : "_blank"}
                 rel="noopener noreferrer"
+                onClick={() => {
+                  if (telegram.popupBlocked) {
+                    setTelegram((prev) => ({ ...prev, popupBlocked: false }));
+                  }
+                }}
                 className={telegram.popupBlocked ? PRIMARY_BTN : SECONDARY_BTN}
-                style={telegram.popupBlocked ? { boxShadow: "0 0 20px rgba(255, 215, 0, 0.15)" } : undefined}
+                style={telegram.popupBlocked ? PRIMARY_GLOW : undefined}
               >
                 <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
                 <span>{telegram.popupBlocked ? t("tgOpenBot") : t("tgOpenAgain")}</span>
@@ -893,34 +972,43 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
             )}
 
             {(telegram.phase === "expired" || telegram.phase === "error") && (
-              <button
-                type="button"
-                onClick={() => void startTelegram(telegramReturnStep)}
-                className={PRIMARY_BTN}
-                style={{ boxShadow: "0 0 20px rgba(255, 215, 0, 0.15)" }}
-              >
-                <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
-                <span>{t("tgRetry")}</span>
+              <>
+                <button
+                  type="button"
+                  onClick={() => void startTelegram(telegramReturnStep)}
+                  className={PRIMARY_BTN}
+                  style={PRIMARY_GLOW}
+                >
+                  <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span>{t("tgRetry")}</span>
+                </button>
+                <button type="button" onClick={backToSms} className={SECONDARY_BTN}>
+                  <MessageSquare className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span>{t("tgUseSms")}</span>
+                </button>
+              </>
+            )}
+
+            {telegramSmsFirst && (
+              <button type="button" onClick={backToSms} className={PRIMARY_BTN} style={PRIMARY_GLOW}>
+                <MessageSquare className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span>{t("tgUseSms")}</span>
               </button>
             )}
 
-            {telegram.phase === "sms_only" ? (
-              <button type="button" onClick={backToSms} className={PRIMARY_BTN}>
-                <MessageSquare className="w-5 h-5 shrink-0" aria-hidden="true" />
-                <span>{t("tgUseSms")}</span>
-              </button>
-            ) : telegram.phase === "expired" || telegram.phase === "error" ? (
-              <button type="button" onClick={backToSms} className={SECONDARY_BTN}>
-                <MessageSquare className="w-5 h-5 shrink-0" aria-hidden="true" />
-                <span>{t("tgUseSms")}</span>
-              </button>
-            ) : (
+            {telegram.phase === "elsewhere" && (
               <button
                 type="button"
-                onClick={() => void cancelTelegram()}
-                disabled={telegram.phase === "completing"}
-                className={`${GHOST_BTN} disabled:opacity-40 disabled:cursor-not-allowed`}
+                onClick={() => void startTelegram(telegramReturnStep)}
+                className={SECONDARY_BTN}
               >
+                <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
+                <span>{t("tgRetryTelegram")}</span>
+              </button>
+            )}
+
+            {telegramWaiting && (
+              <button type="button" onClick={() => void cancelTelegram()} className={GHOST_BTN}>
                 <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>{t("tgCancel")}</span>
               </button>

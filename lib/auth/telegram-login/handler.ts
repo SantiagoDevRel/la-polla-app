@@ -3,13 +3,19 @@
 // exportar handlers HTTP, y así se prueba con dependencias falsas.
 //
 // Flujo:
-//   - Cuenta de Telegram YA vinculada: no se pide el número. Con /start <nonce>
-//     se aprueba la solicitud del navegador (entra solo) y se manda además un
-//     enlace de un solo uso; sin nonce, solo el enlace.
+//   - Cuenta de Telegram YA vinculada: no se pide el número. Se manda un
+//     enlace de un solo uso (5 min). Con /start <nonce> el enlace queda en la
+//     fila de esa solicitud, así abierto en el mismo navegador entra sin
+//     confirmar.
 //   - Sin vínculo: se pide el número UNA vez (teclado persistente). Al llegar
 //     el contacto propio se busca o crea la cuenta, se vincula si las reglas lo
-//     permiten (identity.ts) y se aprueba la solicitud pendiente o se manda el
-//     enlace.
+//     permiten (identity.ts) y se manda el enlace (ligado a la solicitud
+//     pendiente si la hay).
+//   - La sesión SOLO sale del enlace, que llega a este chat. Aprobar una
+//     solicitud no le da nada al navegador que la creó: si alguien hace llegar
+//     su deep link a otra persona, esa persona recibe SU enlace y nadie más
+//     entra (phishing tipo device code). Vincular una cuenta existente desde un
+//     nonce ajeno tampoco le da nada a quien lo creó.
 //   - Nunca se mandan códigos. allowed_updates sigue siendo ["message"]: nada
 //     depende de callback_query.
 
@@ -184,8 +190,9 @@ async function answerRemovingKeyboard(
 }
 
 /**
- * La cuenta ya se sabe (vinculada o recién vinculada): aprueba la solicitud
- * del navegador si hay una usable y manda el enlace; si no, solo el enlace.
+ * La cuenta ya se sabe (vinculada o recién vinculada): manda el enlace. Si hay
+ * una solicitud del navegador usable, el enlace queda en su fila (así el mismo
+ * navegador entra sin confirmar); si no, un enlace suelto.
  */
 async function grantAccess(
   deps: LoginHandlerDeps,
@@ -210,12 +217,14 @@ async function grantAccess(
     const linkToken = generateLinkToken();
     const approved = await approveLoginRequest(db, config, input.requestId, grant, linkToken);
     if (approved.status === "ok") {
+      // Un solo camino: el botón del enlace. La pestaña que pidió no entra por
+      // la aprobación; entra solo si el enlace se abre en ese mismo navegador.
       const approvedCopy = loginBotCopy(approved.locale);
       const sent = await deliverLink(send, {
         chatId,
         copy: approvedCopy,
-        lead: approvedCopy.approved(approved.label),
-        linkText: approvedCopy.linkAfterApproval,
+        lead: input.defaultLead,
+        linkText: approvedCopy.linkOnly,
         url: loginLinkUrl(approved.locale, linkToken, deps.env),
         removeKeyboard,
       });

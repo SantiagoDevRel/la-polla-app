@@ -95,23 +95,60 @@
     "tgDidntArrive": "Didn't get the text message?",
     "tgOpenBot": "Open Telegram",
     "tgUseSms": "Sign in with a text message",
-    "tgErrRateLimited": "Too many attempts. Wait 15 minutes and try again.",
+    "tgErrRateLimited": "Too many Telegram attempts. Wait 15 minutes or sign in with a text message.",
     "tgErrUnavailable": "Telegram sign-in is not available right now. Use the text message.",
-    "tgErrGeneric": "We couldn't start the Telegram sign-in. Please try again.",
+    "tgErrGeneric": "We couldn't prepare the Telegram sign-in. Please try again.",
     "tgErrSmsOnly": "For your security, this number can only sign in with the text message code.",
     "tgWaitTitle": "CONTINUE IN TELEGRAM",
-    "tgWaitBody": "Tap Start in the bot. Once you confirm, you will be signed in here automatically.",
-    "tgPopupBlocked": "Your browser didn't open Telegram. Tap Open Telegram and then Start in the bot. Once you confirm, you will be signed in here automatically.",
+    "tgPopupBlocked": "Your browser didn't open Telegram. Tap Open Telegram to begin.",
     "tgOpening": "Opening Telegram…",
-    "tgWaiting": "Waiting for your confirmation in Telegram…",
-    "tgCompleting": "Signing in…",
+    "tgWaiting": "Waiting…",
     "tgOpenAgain": "Open Telegram again",
     "tgCancel": "Cancel",
     "tgExpiredTitle": "THE REQUEST EXPIRED",
-    "tgExpired": "5 minutes passed without confirming in Telegram. Please try again.",
+    "tgExpired": "5 minutes passed without opening the bot's button. Please try again.",
     "tgRetry": "Try again",
     "tgSmsOnlyTitle": "SIGN IN WITH A TEXT MESSAGE",
-    "tgErrorTitle": "WE COULDN'T OPEN TELEGRAM"
+    "tgErrorTitle": "WE COULDN'T CONTINUE",
+    "tgStepsLabel": "Steps in Telegram",
+    "tgStep1": "Tap Start in the bot chat.",
+    "tgStep2": "If this is your first time, tap Share my number.",
+    "tgStep3": "Tap the Sign in to Chicken Picks button the bot sends you.",
+    "tgLinkSent": "The bot already sent you the Sign in to Chicken Picks button.",
+    "tgElsewhereTitle": "YOU SIGNED IN ON ANOTHER BROWSER",
+    "tgElsewhere": "The bot's button opened in another browser (for example, Telegram's) and the session stayed there. To sign in on this browser, use a text message or try Telegram again.",
+    "tgRateLimitedTitle": "WAIT A FEW MINUTES",
+    "tgRetryTelegram": "Try Telegram again",
+    "tgLinkAutoTitle": "SIGNING IN TO CHICKEN PICKS",
+    "tgLinkAutoBody": "One moment, we are opening your session.",
+    "tgLinkConfirmTitle": "CONFIRM SIGN-IN",
+    "tgLinkConfirmLead": "You are about to sign in to Chicken Picks on this browser with the number:",
+    "tgLinkConfirmNotYours": "If this is not your number, do not continue.",
+    "tgLinkOtherBrowser": "If you requested the sign-in from another browser, open this link in that browser.",
+    "tgLinkSubmit": "Sign in",
+    "tgLinkBackToLogin": "Back to sign in",
+    "tgLinkState": {
+      "gone": {
+        "title": "THIS LINK NO LONGER WORKS",
+        "body": "It was already used or it expired. Request a new one in the Telegram bot or sign in with a text message."
+      },
+      "failed": {
+        "title": "WE COULDN'T CONTINUE",
+        "body": "We could not sign you in. Please try again."
+      },
+      "forbidden": {
+        "title": "OPEN THE LINK AGAIN",
+        "body": "For your security, tap the bot's button again and confirm from the page that opens."
+      },
+      "sms_only": {
+        "title": "SIGN IN WITH A TEXT MESSAGE",
+        "body": "For your security, this number can only sign in with the text message code."
+      },
+      "unavailable": {
+        "title": "NOT AVAILABLE",
+        "body": "Telegram sign-in is not available right now. Use the text message."
+      }
+    }
   },
   "Welcome": {
     "introLine": "Every weekend we post the pools.\nYou join, you pick, you play for the pot.",

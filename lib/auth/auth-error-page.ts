@@ -2,6 +2,8 @@
 // se abren desde otra app (WhatsApp, Telegram). Un JSON crudo no le sirve a
 // quien tocó un botón: se muestra un mensaje y un botón de vuelta.
 // HTML autocontenido (sin JS ni recursos externos), nunca cacheable.
+// Hoy lo usa el enlace de WhatsApp; el de Telegram se ve en /login/telegram
+// con el sistema de diseño. Sin rutas como texto: el botón dice a dónde lleva.
 
 import { NextResponse } from "next/server";
 
@@ -14,8 +16,8 @@ function escapeHtml(s: string): string {
 }
 
 const COPY = {
-  es: { lang: "es", title: "La Polla · Error", heading: "Algo no anda bien", back: "Volver a /login" },
-  en: { lang: "en", title: "Chicken Picks · Error", heading: "Something went wrong", back: "Back to /login" },
+  es: { lang: "es", title: "La Polla · Error", heading: "No pudimos continuar", back: "Volver a iniciar sesión" },
+  en: { lang: "en", title: "Chicken Picks · Error", heading: "We could not continue", back: "Back to sign in" },
 } as const;
 
 type Locale = "es" | "en";
@@ -96,41 +98,6 @@ export interface AuthConfirmPageInput {
   fields: Record<string, string>;
   submit: string;
   cancel: string;
-}
-
-export interface AuthAutoSubmitPageInput {
-  locale: Locale;
-  title: string;
-  heading: string;
-  lead: string;
-  action: string;
-  fields: Record<string, string>;
-  submit: string;
-}
-
-/**
- * Página que envía sola un POST del mismo origen. Solo para el caso en que el
- * servidor ya comprobó que este navegador es el que pidió el ingreso (cookie
- * propia): no hay nada que confirmar. Sin JS, el botón hace lo mismo.
- */
-export function authAutoSubmitPage(input: AuthAutoSubmitPageInput): NextResponse {
-  const hidden = Object.entries(input.fields)
-    .map(
-      ([name, value]) =>
-        `      <input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" />`,
-    )
-    .join("\n");
-  const inner = `    <h1>${escapeHtml(input.heading)}</h1>
-    <p role="status">${escapeHtml(input.lead)}</p>
-    <form id="lp-auto" method="post" action="${escapeHtml(input.action)}">
-${hidden}
-      <noscript><button type="submit">${escapeHtml(input.submit)}</button></noscript>
-    </form>
-    <script>document.getElementById("lp-auto").submit();</script>`;
-  return new NextResponse(page(input.locale, input.title, inner), {
-    status: 200,
-    headers: NO_STORE_HTML,
-  });
 }
 
 /**

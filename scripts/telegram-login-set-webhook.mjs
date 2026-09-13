@@ -63,7 +63,7 @@ const textSteps = [
     short_description: "Entra a La Polla Colombiana con tu cuenta de Telegram, sin códigos.",
   }],
   ["setMyDescription", {
-    description: "Entra a La Polla Colombiana con tu cuenta de Telegram. La primera vez confirmas tu número con el botón Compartir mi número; después basta con tocar Iniciar. No aceptamos números escritos a mano ni contactos de otras personas.",
+    description: "Entra a La Polla Colombiana con tu cuenta de Telegram. La primera vez confirmas tu número con el botón Compartir mi número. Después tocas Iniciar y el botón Entrar a La Polla, un enlace que sirve una sola vez. No aceptamos números escritos a mano ni contactos de otras personas.",
   }],
 ];
 

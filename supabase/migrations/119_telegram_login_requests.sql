@@ -3,24 +3,30 @@
 -- Numeración: 118 la reservó la rama de UI de Casa (sin mergear al crear esta).
 --
 -- Feedback del dueño sobre v1 (115): pedir el código al bot y escribirlo en la
--- web no se entendía, y el botón «Compartir mi número» quedaba escondido. v2:
+-- web no se entendía, y el botón «Compartir mi número» quedaba escondido. Pidió
+-- un enlace de un solo uso que dure 5 minutos y abra una sola sesión. v2:
 --
 --   1. /login crea una SOLICITUD atada al navegador (cookie httpOnly con un
 --      secreto; aquí solo su sha256) y abre t.me/<bot>?start=<nonce>.
 --   2. En Telegram, una cuenta ya vinculada (telegram_login_identities, 115)
---      aprueba la solicitud con solo tocar Iniciar. Una cuenta nueva comparte
---      su número UNA vez (misma prueba de propiedad de 115) y queda vinculada.
---   3. La pestaña original consulta el estado y, aprobada, la consume: una
---      solicitud abre UNA sola sesión.
---   4. El bot manda además un ENLACE de un solo uso que vence en 5 minutos. El
---      enlace vive en la misma fila: consumir el enlace consume la solicitud y
---      viceversa. Sin nonce (alguien que escribe al bot directo) la fila nace
---      aprobada, sin navegador.
+--      recibe el enlace sin volver a compartir el número. Una cuenta nueva
+--      comparte su número UNA vez (misma prueba de propiedad de 115).
+--   3. El bot manda un ENLACE de un solo uso que vence en 5 minutos, guardado
+--      en la fila de la solicitud («approved» = cuenta confirmada y enlace
+--      emitido). SOLO el enlace abre sesión, y la abre en el navegador que lo
+--      abre: si tiene la cookie de esa solicitud entra sin confirmar; si no,
+--      confirma viendo el número enmascarado.
+--   4. La pestaña que pidió NUNCA abre sesión con su cookie: consulta el estado
+--      y, si el enlace se abrió en ese mismo navegador, ya tiene la sesión.
+--      Así nadie puede crear una solicitud, hacerle llegar el deep link a otra
+--      persona y quedarse con su sesión cuando ella toca Iniciar (phishing tipo
+--      device code): el enlace llega solo al Telegram de quien aprueba.
 --
--- Las tablas y funciones de 115 NO se borran: telegram_login_tokens y sus
--- funciones de código quedan sin uso. Se reutilizan telegram_login_identities,
--- telegram_login_identity_status, telegram_login_authorize y
--- telegram_login_chats (con columnas nuevas).
+-- Sin nonce (alguien que escribe al bot directo) la fila nace aprobada, sin
+-- navegador. Las tablas y funciones de 115 NO se borran: telegram_login_tokens
+-- y sus funciones de código quedan sin uso. Se reutilizan
+-- telegram_login_identities, telegram_login_identity_status,
+-- telegram_login_authorize y telegram_login_chats (con columnas nuevas).
 --
 -- Todo es service_role: RLS activado con deny-all explícito, REVOKE a PUBLIC,
 -- anon y authenticated, SECURITY DEFINER con search_path fijo.
@@ -65,8 +71,6 @@ CREATE TABLE public.telegram_login_requests (
     CHECK ((status = 'consumed') = (consumed_at IS NOT NULL))
 );
 
-CREATE INDEX telegram_login_requests_ip_idx
-  ON public.telegram_login_requests (requester_ip, created_at DESC);
 CREATE INDEX telegram_login_requests_created_idx
   ON public.telegram_login_requests (created_at DESC);
 CREATE INDEX telegram_login_requests_tg_user_idx
@@ -83,8 +87,7 @@ GRANT SELECT, INSERT, UPDATE ON TABLE public.telegram_login_requests TO service_
 COMMENT ON TABLE public.telegram_login_requests IS
   'Service-role only. Login por Telegram v2: solicitud atada a un navegador
    (sha256 del nonce y del secreto de cookie) y enlace de un solo uso (HMAC).
-   Una fila = una sola sesión: consumirla por el navegador o por el enlace la
-   cierra para ambos.';
+   Solo el enlace abre sesión, una sola vez, en el navegador que lo abre.';
 
 -- ── 2. Estado del chat con el bot ──────────────────────────────────────────
 -- pending_request_id: solicitud que trajo el /start mientras se espera el
@@ -101,10 +104,33 @@ ALTER TABLE public.telegram_login_chats
   ALTER COLUMN reply_keyboard_open SET DEFAULT false;
 
 -- ── 3. Crear solicitud del navegador ───────────────────────────────────────
--- 'ok' o 'rate_limited'. Tope: 10 solicitudes / 15 min por IP (sin IP, un balde
--- común) y 600 / 15 min en total. Se cuentan en esta misma tabla bajo un lock
--- por IP, así el conteo y el insert son atómicos (otp_rate_limits se consulta y
--- se escribe en dos pasos).
+-- Balde del tope por origen: la IPv4 exacta y, en IPv6, el /64 (una conexión
+-- IPv6 suele traer un /64 entero: contar por dirección exacta no frena nada).
+CREATE FUNCTION public.telegram_login_ip_bucket(p_ip inet)
+RETURNS inet
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+SET search_path = public, pg_temp
+AS $$
+  SELECT CASE
+    WHEN p_ip IS NULL THEN NULL
+    WHEN family(p_ip) = 6 THEN network(set_masklen(p_ip, 64))
+    ELSE set_masklen(p_ip, 32)
+  END;
+$$;
+REVOKE ALL ON FUNCTION public.telegram_login_ip_bucket(inet) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.telegram_login_ip_bucket(inet) TO service_role;
+
+CREATE INDEX telegram_login_requests_ip_bucket_idx
+  ON public.telegram_login_requests (public.telegram_login_ip_bucket(requester_ip), created_at DESC);
+
+-- 'ok' o 'rate_limited'. Tope: 10 solicitudes / 15 min por balde (IPv4 exacta,
+-- IPv6 /64; sin IP, un balde común). SIN tope global: con uno, un atacante con
+-- unas decenas de IPs llenaba el cupo y dejaba a todos sin Telegram (el
+-- respaldo justo cuando el SMS falla). Una fila de más cuesta poco. Se cuenta
+-- en esta misma tabla bajo un lock por balde: conteo e insert son atómicos
+-- (otp_rate_limits se consulta y se escribe en dos pasos).
 CREATE FUNCTION public.telegram_login_request_create(
   p_nonce_hash text,
   p_browser_hash text,
@@ -119,6 +145,7 @@ AS $$
 #variable_conflict use_column
 DECLARE
   t timestamptz := clock_timestamp();
+  v_bucket inet := public.telegram_login_ip_bucket(p_requester_ip);
 BEGIN
   IF p_nonce_hash IS NULL OR p_nonce_hash !~ '^[0-9a-f]{64}$'
      OR p_browser_hash IS NULL OR p_browser_hash !~ '^[0-9a-f]{64}$'
@@ -128,16 +155,13 @@ BEGIN
   END IF;
 
   PERFORM pg_advisory_xact_lock(
-    hashtextextended('tglogin:req-ip:' || COALESCE(host(p_requester_ip), 'unknown'), 0)
+    hashtextextended('tglogin:req-ip:' || COALESCE(v_bucket::text, 'unknown'), 0)
   );
 
   IF (SELECT count(*) FROM public.telegram_login_requests r
-       WHERE r.requester_ip IS NOT DISTINCT FROM p_requester_ip
+       WHERE public.telegram_login_ip_bucket(r.requester_ip) IS NOT DISTINCT FROM v_bucket
          AND r.nonce_hash IS NOT NULL
          AND r.created_at > t - interval '15 minutes') >= 10
-     OR (SELECT count(*) FROM public.telegram_login_requests r
-       WHERE r.nonce_hash IS NOT NULL
-         AND r.created_at > t - interval '15 minutes') >= 600
   THEN
     RETURN QUERY SELECT 'rate_limited'::text, NULL::timestamptz;
     RETURN;
@@ -313,10 +337,12 @@ REVOKE ALL ON FUNCTION public.telegram_login_link_rate_limited(bigint, timestamp
 GRANT EXECUTE ON FUNCTION public.telegram_login_link_rate_limited(bigint, timestamptz)
   TO service_role;
 
--- ── 8. Aprobar una solicitud del navegador ─────────────────────────────────
+-- ── 8. Confirmar la cuenta y emitir el enlace de una solicitud ─────────────
 -- status: ok | invalid | expired | unavailable | not_linked | rate_limited.
--- Solo una pendiente y vigente. Si la MISMA cuenta de Telegram la vuelve a
--- pedir (tocó Iniciar dos veces), se reemplaza el enlace sin extender el plazo.
+-- Solo una pendiente y vigente. Guarda la cuenta y el hash del enlace que el
+-- bot manda a ESA cuenta de Telegram; no le da nada al navegador que pidió
+-- (no hay consumo por cookie). Si la MISMA cuenta de Telegram la vuelve a pedir
+-- (tocó Iniciar dos veces), se reemplaza el enlace sin extender el plazo.
 CREATE FUNCTION public.telegram_login_request_approve(
   p_request_id uuid,
   p_telegram_user_id bigint,
@@ -458,70 +484,16 @@ REVOKE ALL ON FUNCTION public.telegram_login_link_issue(bigint, uuid, text, text
 GRANT EXECUTE ON FUNCTION public.telegram_login_link_issue(bigint, uuid, text, text, text)
   TO service_role;
 
--- ── 10. Consumir desde el navegador que pidió ──────────────────────────────
--- status: ok | invalid | pending | expired | consumed | cancelled. Con 'ok'
--- devuelve a qué cuenta entrar. approved → consumed en la misma transacción:
--- el enlace de esa fila deja de servir.
-CREATE FUNCTION public.telegram_login_request_consume(
-  p_browser_hash text
-) RETURNS TABLE (
-  status text,
-  user_id uuid,
-  telegram_user_id bigint,
-  phone_e164 text,
-  locale text,
-  requester_label text
-)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-#variable_conflict use_column
-DECLARE
-  t timestamptz := clock_timestamp();
-  req public.telegram_login_requests%ROWTYPE;
-BEGIN
-  IF p_browser_hash IS NULL THEN
-    RETURN QUERY SELECT 'invalid'::text, NULL::uuid, NULL::bigint, NULL::text, NULL::text, NULL::text;
-    RETURN;
-  END IF;
-
-  SELECT * INTO req FROM public.telegram_login_requests r
-   WHERE r.browser_hash = p_browser_hash
-   FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RETURN QUERY SELECT 'invalid'::text, NULL::uuid, NULL::bigint, NULL::text, NULL::text, NULL::text;
-    RETURN;
-  END IF;
-
-  IF req.status IN ('pending', 'approved') AND req.expires_at <= t THEN
-    UPDATE public.telegram_login_requests r SET status = 'expired' WHERE r.id = req.id;
-    RETURN QUERY SELECT 'expired'::text, NULL::uuid, NULL::bigint, NULL::text, NULL::text, NULL::text;
-    RETURN;
-  END IF;
-
-  IF req.status <> 'approved' THEN
-    RETURN QUERY SELECT req.status, NULL::uuid, NULL::bigint, NULL::text, NULL::text, NULL::text;
-    RETURN;
-  END IF;
-
-  UPDATE public.telegram_login_requests r
-     SET status = 'consumed', consumed_at = t
-   WHERE r.id = req.id;
-
-  RETURN QUERY SELECT 'ok'::text, req.user_id, req.telegram_user_id, req.phone_e164,
-                      req.locale, req.requester_label;
-END;
-$$;
-REVOKE ALL ON FUNCTION public.telegram_login_request_consume(text)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.telegram_login_request_consume(text) TO service_role;
+-- ── 10. (sin consumo por cookie) ───────────────────────────────────────────
+-- A propósito NO existe una función que abra sesión con la cookie del
+-- navegador que pidió: esa vía entregaba la sesión de quien aprobaba en
+-- Telegram a quien había creado la solicitud. La única vía es el enlace (12).
 
 -- ── 11. Ver un enlace SIN canjearlo ────────────────────────────────────────
 -- status: ok | used | expired | invalid. same_browser = el navegador que abre
 -- el enlace es el que pidió la solicitud (cookie propia): solo entonces la web
--- entra sin pedir confirmación.
+-- entra sin pedir confirmación. Quien abre el enlace ya tiene el token, que
+-- solo llegó al Telegram de la cuenta: la cookie sola no alcanza para nada.
 CREATE FUNCTION public.telegram_login_link_peek(
   p_link_token_hash text,
   p_browser_hash text
@@ -561,8 +533,8 @@ REVOKE ALL ON FUNCTION public.telegram_login_link_peek(text, text)
 GRANT EXECUTE ON FUNCTION public.telegram_login_link_peek(text, text) TO service_role;
 
 -- ── 12. Canjear el enlace ──────────────────────────────────────────────────
--- status: ok | used | expired | invalid. Consume la fila entera: la pestaña
--- que esperaba ya no puede abrir otra sesión con esa solicitud.
+-- status: ok | used | expired | invalid. Consume la fila entera: una solicitud
+-- abre UNA sola sesión, en el navegador que envía el POST con el token.
 CREATE FUNCTION public.telegram_login_link_consume(
   p_link_token_hash text,
   p_browser_hash text

@@ -1,11 +1,10 @@
 // lib/auth/telegram-login/notify.ts — Aviso en Telegram después de entrar.
 //
-// Una solicitud del navegador se aprueba con un solo toque en Telegram. Si
-// alguien le hace llegar a otra persona el deep link de SU navegador, esa
-// persona podría aprobarle el ingreso sin darse cuenta. El aviso llega al
-// Telegram de la cuenta en el momento en que se abre la sesión, con desde
-// dónde se pidió, para que lo note y escriba a soporte. Mejor esfuerzo: nunca
-// bloquea ni rompe el login.
+// La sesión solo sale del enlace que el bot manda a este chat. Si alguien
+// igual consigue que la persona le pase ese enlace (copiado a mano), el aviso
+// llega al Telegram de la cuenta en el momento en que se abre la sesión, con el
+// dispositivo que abrió el enlace, para que lo note y escriba a soporte. Mejor
+// esfuerzo: nunca bloquea ni rompe el login.
 
 import { after } from "next/server";
 import type { TelegramLoginConfig } from "./config";

@@ -71,4 +71,12 @@ describe("middleware: webhook de login por Telegram", () => {
       expect(response.status).not.toBe(307);
     }
   });
+
+  it("la página del enlace /login/telegram es pública sin sesión (no rebota a /login)", async () => {
+    for (const path of ["/login/telegram?t=abc", "/login/telegram?estado=gone"]) {
+      const response = await updateSession(new NextRequest(`http://localhost${path}`));
+      expect(response.status).not.toBe(307);
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
 });
