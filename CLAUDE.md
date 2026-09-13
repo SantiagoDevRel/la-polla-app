@@ -433,6 +433,10 @@ que le escribe al admin (`ADMIN_ALERT_EMAIL`, o `FEEDBACK_NOTIFY_EMAIL`) con asu
 (`BACKUP_MAX_AGE_HOURS`) o la última verificación buena de 30 h
 (`BACKUP_VERIFY_MAX_AGE_HOURS`), o si no hay filas. Si el DGX se apaga, la
 falta de filas ES la alerta. Se repite cada hora mientras siga atrasado.
+⚠️ "Cada hora" es el `schedule` de GitHub, que en este repo corre con horas de
+retraso (los diarios de 13:00 UTC arrancan entre 15:54 y 16:48) y puede saltarse
+corridas: el aviso real puede llegar varias horas después. Ver README → «Crons
+de GitHub Actions».
 
 - `backup_runs`: RLS + deny-all para anon/authenticated; `service_role` solo
   `SELECT, INSERT` (nadie edita ni borra la bitácora). Regresión:
@@ -709,8 +713,11 @@ Foto completa, con rollback por pieza: README → «Estado en producción
 - **Captcha de Auth: apagada** (ver Open ideas).
 - **Backup:** runner del DGX detached en `main` 7d9ca5a + `backup_runs` +
   alerta horaria `backup-freshness.yml` (ver sección de backup).
-- **Monitoreo:** no hay Sentry ni integración de monitoreo; hoy solo quedan
-  los logs de Vercel y los correos de alerta.
+- **Monitoreo:** existe un monitor de uptime en Sentry (proyecto
+  `santi-apps`): `HEAD /api/app-version` cada 5 min. **No tiene
+  alerta conectada**, así que un incidente no le avisa a nadie. No hay SDK de
+  Sentry en el código. Los errores de la app se ven en los logs de Vercel y en
+  los correos de alerta.
 - **Cookies de sesión:** salen sin `HttpOnly` ni `Secure` (default de
   `@supabase/ssr`, igual en todos los canales). Pendiente revisar
   `cookieOptions` antes del lanzamiento.
