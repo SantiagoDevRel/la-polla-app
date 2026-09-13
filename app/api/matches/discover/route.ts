@@ -13,6 +13,13 @@
 // Sin tournament param: actualiza los 30 días próximos de todos los torneos,
 // aunque todavía no exista una polla de Casa o P2P.
 //
+// Modo 'af' (app_config.data_provider_mode, 2026-09-13): ESPN, football-data y
+// openfootball ya no escriben partidos. Sin tournament, recorre las ligas en
+// serie de la última intentada a la más reciente con un presupuesto de ~40 s
+// (temporada completa de API-Football); con ?tournament pasa por la misma
+// reserva de refreshTournamentSchedule. La resolución de brackets del Mundial
+// no corre: sus tres fuentes son legacy.
+//
 // Auth: CRON_SECRET solo. Aceptado via header `x-cron-secret` o
 // `Authorization: Bearer …`. La opción ?secret=… fue removida porque
 // querystrings quedan persistidas en logs/CDN/Referer.
@@ -22,7 +29,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { discoverTournament } from "@/lib/espn/discover";
 import { ESPN_LEAGUE_BY_TOURNAMENT } from "@/lib/espn/client";
 import { SYNCABLE_TOURNAMENT_SLUGS } from "@/lib/tournaments";
-import { refreshTournamentSchedule } from "@/lib/matches/refresh-schedule";
+import {
+  refreshAfSchedules,
+  refreshTournamentSchedule,
+  refreshTournamentScheduleDetailed,
+} from "@/lib/matches/refresh-schedule";
+import { getDataProviderMode } from "@/lib/matches/provider-mode";
+import { afLeagueIdForTournament } from "@/lib/api-football/season";
 import { hasPlaceholderTeam } from "@/lib/matches/is-placeholder";
 import { syncWorldCup2026 } from "@/lib/api-football/sync-worldcup";
 import { syncCompetition } from "@/lib/football-data/sync";
@@ -112,8 +125,31 @@ async function resolveWorldCupBrackets(): Promise<{
   return out;
 }
 
+async function runDiscoverAf(explicit: string | null) {
+  if (explicit) {
+    if (!afLeagueIdForTournament(explicit)) {
+      throw new Error(`Sin liga de API-Football para tournament=${explicit}`);
+    }
+    return {
+      ok: true,
+      skipped: false,
+      mode: "af" as const,
+      results: [await refreshTournamentScheduleDetailed(explicit, { mode: "af" })],
+      brackets: { pending: 0, ran: false },
+    };
+  }
+  return {
+    ok: true,
+    skipped: false,
+    mode: "af" as const,
+    results: await refreshAfSchedules(),
+    brackets: { pending: 0, ran: false },
+  };
+}
+
 async function runDiscover(request: NextRequest) {
   const explicit = request.nextUrl.searchParams.get("tournament");
+  if ((await getDataProviderMode()) === "af") return runDiscoverAf(explicit);
   const tournaments = await tournamentsToDiscover(explicit);
 
   // La resolución de brackets corre SIEMPRE que haya slots pendientes,

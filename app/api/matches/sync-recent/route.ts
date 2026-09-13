@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncRecentCompetitions } from "@/lib/football-data/sync";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getDataProviderMode } from "@/lib/matches/provider-mode";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,6 +20,8 @@ function checkSecret(request: NextRequest): boolean {
 }
 
 async function runSync() {
+  // Modo 'af': football-data ya no escribe partidos (decisión del 2026-09-13).
+  if ((await getDataProviderMode()) === "af") return { ok: true, skipped: true, reason: "af_mode" };
   const started = Date.now();
   const results = await syncRecentCompetitions(3, 1);
   const ms = Date.now() - started;
