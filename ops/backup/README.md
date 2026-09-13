@@ -141,6 +141,14 @@ tar --zstd -xf snap.tar.zst            # o: tar.exe -xf snap.tar.zst (bsdtar de 
 npx tsx scripts/verify-backup.ts 2026-09-13-17-10
 ```
 
+Si el gpg de Git for Windows responde `Bad secret key` recién importada la
+llave, reinicia el agente de ese llavero (`gpgconf --kill gpg-agent`) y
+repite: pasó en la prueba del 13-sep-2026 y el segundo intento descifró bien.
+
+Prueba real del 13-sep-2026: snapshot `2026-09-13-12-39` (15 MB cifrado)
+descifrado en el PC, extraído con `tar.exe` y `verify-backup.ts` en verde
+(58 tablas, 40.452 filas, 297 cuentas, 119 archivos, 248 sha256).
+
 Después sigue `docs/backup-restore.md` (restore SQL con `session_replication_role = replica`).
 La carpeta descifrada tiene teléfonos y comprobantes: se borra al terminar.
 
