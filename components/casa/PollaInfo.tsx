@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 import { LOCK_MINUTES, type CasaPolla } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
 import { PayoutAccountButton } from "./PayoutAccountButton";
+import { FixedPrizeGrowth, fixedPrizeGrows, type FixedPrizeThreshold } from "./FixedPrizeGrowth";
+
+export type { FixedPrizeThreshold };
 
 type Rules = Pick<CasaPolla, "kind" | "scoring_mode" | "points_exact" | "points_one_team" | "points_result" | "prize_kind" | "prize_object" | "description" | "draw_method" | "pot_mode" | "fixed_prize_cop" | "house_cut_pct">;
-
-/** Punto de equilibrio del premio fijo, calculado en SQL por getFixedPrizeThreshold. */
-export interface FixedPrizeThreshold { entriesToCover: number | null; entryPrizeCop: number }
 
 /**
  * Una regla = un desplegable cerrado con viñetas cortas.
@@ -42,10 +42,6 @@ function Strong({ children }: { children: ReactNode }) {
 export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold?: FixedPrizeThreshold | null }) {
   const money = polla.prize_kind !== "objeto";
   const minimo = money && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" ? polla.fixed_prize_cop : null;
-  // Pedido del dueño (2026-09-13): decir cuántas personas cubren el mínimo y
-  // cuánto crece el pozo por cada una de ahí en adelante, en vez de explicar
-  // el porcentaje. Ambas cifras vienen de SQL; si faltan, la línea no sale.
-  const crece = minimo !== null && threshold?.entriesToCover != null && threshold.entryPrizeCop > 0 ? threshold : null;
 
   return <div className="space-y-3 pt-5">
     <h2 className="font-display text-[24px] leading-tight tracking-[0.04em]">Info de esta polla</h2>
@@ -68,9 +64,7 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
 
     <Rule icon={<Trophy size={20} />} title="Premio y ganadores">
       {minimo !== null && <li><Strong>Premio mínimo garantizado:</Strong> {formatCop(minimo)}.</li>}
-      {crece && <li>
-        Si más de {crece.entriesToCover} {crece.entriesToCover === 1 ? "persona se inscribe" : "personas se inscriben"}, el pozo crece <Strong>{formatCop(crece.entryPrizeCop)}</Strong> por cada persona adicional.
-      </li>}
+      {minimo !== null && fixedPrizeGrows(threshold) && <li><FixedPrizeGrowth threshold={threshold} /></li>}
       {polla.kind === "rifa" ? <>
         <li>Gana la boleta que coincida con el número del sorteo anunciado.</li>
         {polla.draw_method && <li>{polla.draw_method}</li>}
