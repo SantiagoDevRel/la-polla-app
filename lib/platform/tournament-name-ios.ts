@@ -17,6 +17,7 @@ const IOS_NAMES: Record<string, string> = {
   // jugando en junio 2026" sin invocar la marca FIFA World Cup.
   worldcup_2026: "Torneo de Selecciones 2026",
   champions_2025: "Copa de Europa",
+  europa_2026: "Copa de Europa · Segunda",
   laliga_2025: "Liga de España",
   premier_2025: "Liga de Inglaterra",
   seriea_2025: "Liga de Italia",

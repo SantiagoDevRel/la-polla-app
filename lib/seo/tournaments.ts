@@ -23,6 +23,23 @@ export interface TournamentSeo {
 
 export const TOURNAMENTS_SEO: TournamentSeo[] = [
   {
+    internalSlug: "europa_2026",
+    publicSlug: "europa-league",
+    name: { es: "Europa League 2026/27", en: "Europa League 2026/27" },
+    description: {
+      es: "Pollas de la UEFA Europa League publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "UEFA Europa League pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de la Europa League",
+      en: "Europa League pools",
+    },
+    keywords: {
+      es: ["polla europa league", "quiniela europa league", "pronosticos europa league"],
+      en: ["europa league pool", "europa league predictions"],
+    },
+  },
+  {
     internalSlug: "worldcup_2026",
     publicSlug: "mundial-2026",
     name: { es: "Mundial 2026", en: "World Cup 2026" },

@@ -30,6 +30,7 @@ interface MatchOption {
   home_team_flag: string | null;
   away_team_flag: string | null;
   scheduled_at: string;
+  scheduled_at_confirmed?: boolean;
 }
 
 interface SelectedMatch extends MatchOption {
@@ -103,6 +104,8 @@ export function CrearPollaForm() {
   const [cargando, setCargando] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [ventanaDias, setVentanaDias] = useState(10);
+  const [proximoPartido, setProximoPartido] = useState<{ scheduled_at: string; scheduled_at_confirmed: boolean } | null>(null);
 
   // ── Cierre vs primer pitazo ──────────────────────────────────────────
   // (2026-09-02) El default era "el proximo sabado a las 12:00", fijo. Para
@@ -180,6 +183,7 @@ export function CrearPollaForm() {
     setMatches([]);
     setMatchesError(null);
     setSyncMsg(null);
+    setProximoPartido(null);
     setSincronizando(false);
     fetch(`/api/casa/admin/matches?tournament=${tournament}`, { signal: controller.signal })
       .then(async (r) => {
@@ -190,6 +194,9 @@ export function CrearPollaForm() {
         if (controller.signal.aborted) return;
         const loaded: MatchOption[] = j.matches ?? [];
         setMatches(loaded);
+        setVentanaDias(j.dias ?? 10);
+        setProximoPartido(j.nextMatch ?? null);
+        if (j.scheduleRefreshed === false) setSyncMsg("No pudimos actualizar los horarios. Se muestran los últimos datos guardados.");
         // Refresca horarios de los elegidos sin perder los de otras ligas.
         setSeleccion((prev) => prev.map((match) => {
           const fresh = loaded.find((item) => item.id === match.id);
@@ -236,10 +243,14 @@ export function CrearPollaForm() {
       if (controller.signal.aborted) return;
       const traidos = j.matches ?? [];
       setMatches(traidos);
+      setVentanaDias(j.dias ?? 10);
+      setProximoPartido(j.nextMatch ?? null);
       setSyncMsg(
         traidos.length > 0
           ? `Listo: ${traidos.length} partidos.`
-          : "ESPN tampoco tiene partidos próximos de este torneo. Puede estar fuera de temporada.",
+          : j.nextMatch
+            ? null
+            : "Los proveedores de datos todavía no publican partidos próximos de este torneo.",
       );
     } catch {
       if (!controller.signal.aborted) setSyncMsg("Se cayó la conexión.");
@@ -805,6 +816,7 @@ export function CrearPollaForm() {
             <SectionHead
               title="Partidos"
               meta={`${seleccion.length}/30 elegidos`}
+              className="[&>div]:flex-wrap"
             />
             {seleccion.length > 0 && (
               <details className="mb-3 rounded-lg border border-border-subtle bg-bg-card/80 transition-colors hover:border-border-strong">
@@ -817,7 +829,7 @@ export function CrearPollaForm() {
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] text-text-primary [overflow-wrap:anywhere]">{m.home_team} vs {m.away_team}</p>
                         <p className="mt-1 text-[11px] text-text-secondary">
-                          {CREATABLE_TOURNAMENTS.find((t) => t.slug === m.tournament)?.name} · {formatMatchTime(m.scheduled_at)}
+                          {CREATABLE_TOURNAMENTS.find((t) => t.slug === m.tournament)?.name} · {formatMatchTime(m.scheduled_at, m.scheduled_at_confirmed)}
                         </p>
                       </div>
                       <button
@@ -850,18 +862,28 @@ export function CrearPollaForm() {
               // veía la caja vacía y no tenía nada que hacer al respecto.
               // La causa real es que esas ligas nunca se sincronizaron, y ESPN
               // sí las tiene — así que acá va el botón que las trae.
+              // (2026-09-13) Si la liga sí está cargada pero no juega en la
+              // ventana (Champions entre jornadas), se dice cuándo es el
+              // próximo partido y el botón no aparece: no hay nada que traer.
               <StreetCard className="p-5 text-center">
                 <p className="text-[13px] text-text-secondary">
-                  No hay partidos cargados de este torneo.
+                  No hay partidos de este torneo en los próximos {ventanaDias} días.
                 </p>
-                <button
-                  type="button"
-                  onClick={traerDeEspn}
-                  disabled={sincronizando}
-                  className="lp-btn lp-btn-ghost mt-3 h-10 min-h-0 w-full text-[14px]"
-                >
-                  {sincronizando ? "Trayendo el calendario..." : "Traer el calendario"}
-                </button>
+                {proximoPartido ? (
+                  <p className="mt-2 text-[13px] text-text-primary">
+                    El próximo partido es el{" "}
+                    {formatMatchTime(proximoPartido.scheduled_at, proximoPartido.scheduled_at_confirmed)}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={traerDeEspn}
+                    disabled={sincronizando}
+                    className="lp-btn lp-btn-ghost mt-3 h-10 min-h-0 w-full text-[14px]"
+                  >
+                    {sincronizando ? "Trayendo el calendario..." : "Traer el calendario"}
+                  </button>
+                )}
                 {syncMsg && (
                   <p className="mt-2 text-[12px] text-text-muted">{syncMsg}</p>
                 )}
@@ -900,7 +922,7 @@ export function CrearPollaForm() {
                             </span>
                           </span>
                           <span className="lp-label mt-0.5 block">
-                            {formatMatchTime(m.scheduled_at)}
+                            {formatMatchTime(m.scheduled_at, m.scheduled_at_confirmed)}
                           </span>
                         </span>
                       </button>

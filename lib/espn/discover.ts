@@ -65,6 +65,7 @@ async function upsertMatch(
     home_team_abbr: string | null;
     away_team_abbr: string | null;
     scheduled_at: string;
+    scheduled_at_confirmed: boolean;
     venue: string | null;
     status: string;
     home_score: number | null;
@@ -85,6 +86,7 @@ async function upsertMatch(
     p_home_team_abbr: payload.home_team_abbr,
     p_away_team_abbr: payload.away_team_abbr,
     p_scheduled_at: payload.scheduled_at,
+    p_scheduled_at_confirmed: payload.scheduled_at_confirmed,
     p_venue: payload.venue,
     p_home_score: payload.home_score,
     p_away_score: payload.away_score,
@@ -122,6 +124,7 @@ const DEFAULT_PHASE_BY_TOURNAMENT: Record<string, string> = {
   sudamericana_2026: "group_stage",
   worldcup_2026: "group_stage",
   champions_2025: "league_stage",
+  europa_2026: "league_stage",
   laliga_2025: "regular_season",
   premier_2025: "regular_season",
   seriea_2025: "regular_season",
@@ -267,6 +270,7 @@ export async function discoverTournament(
         home_team_abbr: home.team.abbreviation ?? null,
         away_team_abbr: away.team.abbreviation ?? null,
         scheduled_at: event.date,
+        scheduled_at_confirmed: competition.timeValid !== false,
         venue: null,
         status,
         home_score: homeScore,
@@ -293,10 +297,11 @@ export async function discoverTournament(
 // Fetch privado con date range (ESPN no lo expone en el helper estándar
 // del client pero acepta el query param).
 async function fetchEspnScoreboardWithDates(leagueCode: string, datesParam: string) {
-  const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueCode}/scoreboard?dates=${datesParam}`;
+  const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${leagueCode}/scoreboard?dates=${datesParam}&limit=1000`;
   const res = await fetch(url, {
     headers: { accept: "application/json" },
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = (await res.json()) as { events?: Awaited<ReturnType<typeof fetchEspnScoreboard>> };

@@ -15,7 +15,10 @@
 //   - lib/api-football/sync-worldcup.ts (dispatch al RPC)
 
 const PLACEHOLDER_PATTERNS: RegExp[] = [
-  /^TBD$/i,
+  // "TBD" solo, y también "TBD Home" / "TBD Away": así publica ESPN las
+  // semifinales y la final de la Libertadores (2026-09-13). Con /^TBD$/ se
+  // colaron y el dedup semántico fusionó dos semifinales en una sola fila.
+  /^TB[DAC]\b/i,
   // api-football style: "1A", "2B", "3C/D/F" (ranking + group letter, optionally
   // multiple groups separated by /)
   /^[0-9][A-Z]([/][A-Z])*$/,

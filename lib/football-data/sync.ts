@@ -154,6 +154,8 @@ export async function syncCompetition(
         p_home_team_abbr: row.home_team_abbr,
         p_away_team_abbr: row.away_team_abbr,
         p_scheduled_at: row.scheduled_at,
+        // SCHEDULED is a provisional date; TIMED has a confirmed kickoff.
+        p_scheduled_at_confirmed: match.status !== "SCHEDULED",
         p_venue: row.venue,
         p_home_score: row.home_score,
         p_away_score: row.away_score,

@@ -17,6 +17,14 @@ export const TOURNAMENTS = [
     color: "#1a1aff",
   },
   {
+    slug: "europa_2026",
+    name: "Europa League",
+    apiCode: "EL",
+    logoPath: "/team-crests/db7cc73aab0c238e-96.webp",
+    smallLogoPath: "/team-crests/db7cc73aab0c238e-96.webp",
+    color: "#ff6900",
+  },
+  {
     slug: "worldcup_2026",
     name: "Mundial 2026",
     apiCode: "WC",
@@ -48,9 +56,8 @@ export const TOURNAMENTS = [
     smallLogoPath: `/tournaments/seria_a-96.webp?v=${LOGO_V}`,
     color: "#007bc0",
   },
-  // Latin American leagues — ESPN-only (football-data plan free no las
-  // cubre). Single-source verification por ahora; cuando agreguemos
-  // un segundo proveedor (API-Football u otro), pasan a doble check.
+  // Latin American leagues: API-Football + ESPN. The football-data free
+  // plan does not cover these competitions.
   {
     slug: "libertadores_2026",
     name: "Copa Libertadores",
@@ -121,7 +128,9 @@ export const CREATABLE_TOURNAMENT_SLUGS: readonly TournamentSlug[] = [
   "bundesliga_2025",
   "ligue1_2025",
   "champions_2025",
+  "europa_2026",
   "libertadores_2026",
+  "sudamericana_2026",
   "betplay_2026",
 ];
 
@@ -165,6 +174,7 @@ export function isSyncableTournament(slug: string): boolean {
 // (no se traducen). Solo cambian Mundial→World Cup, Copa→Cup, Liga.
 const TOURNAMENT_NAMES_EN: Record<string, string> = {
   champions_2025: "Champions League",
+  europa_2026: "Europa League",
   worldcup_2026: "World Cup 2026",
   laliga_2025: "La Liga",
   premier_2025: "Premier League",
@@ -195,7 +205,7 @@ export function getTournamentLogo(slug: string, size: "original" | "small" = "or
 
 /** Monochrome marks need their light treatment on our dark surfaces. */
 export function getTournamentLogoClassName(slug: string): string {
-  if (slug === 'ligue1_2025' || slug === 'sudamericana_2026') return 'brightness-0 invert';
+  if (slug === 'ligue1_2025' || slug === 'sudamericana_2026' || slug === 'europa_2026') return 'brightness-0 invert';
   if (slug === 'betplay_2026') return 'brightness-200';
   return '';
 }

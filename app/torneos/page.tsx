@@ -73,12 +73,12 @@ export default async function TorneosIndexPage() {
 
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {TOURNAMENTS_SEO.map((t) => (
-            <li key={t.publicSlug}>
+            <li key={t.publicSlug} className={TOURNAMENTS_SEO.length % 2 === 1 ? "last:sm:col-span-2" : undefined}>
               <Link
                 href={pathForLocale(site.locale, "torneo", t.publicSlug)}
                 className="group lp-card flex h-full min-h-[172px] flex-col p-5 transition-all hover:border-gold/30"
               >
-                <h2 className="lp-display text-[26px] tracking-[0.04em]">{t.name[site.locale]}</h2>
+                <h2 className="lp-display-sm [overflow-wrap:anywhere]">{t.name[site.locale]}</h2>
                 <p className="mt-2 flex-1 text-sm leading-relaxed text-text-secondary">{t.description[site.locale]}</p>
                 <span className="mt-4 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-text-secondary transition-colors group-hover:text-gold">
                   {isEs ? "Ver detalles" : "View details"}

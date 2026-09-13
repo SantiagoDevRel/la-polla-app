@@ -26,6 +26,7 @@ interface MatchLite {
   home_team_flag: string | null;
   away_team_flag: string | null;
   scheduled_at: string;
+  scheduled_at_confirmed?: boolean;
   home_score: number | null;
   away_score: number | null;
   final_verified_at: string | null;
@@ -258,7 +259,7 @@ export function PicksBoard({
             <li key={m.id} className="bg-bg-card p-4">
               {/* Encabezado del partido: hora + estado */}
               <div className="mb-3 flex items-center justify-between gap-2">
-                <Label>{formatMatchTime(m.scheduled_at)}</Label>
+                <Label>{formatMatchTime(m.scheduled_at, m.scheduled_at_confirmed)}</Label>
                 {m.voided_at ? <span className="text-[13px] text-text-secondary">Anulado · 0 puntos</span> : m.final_verified_at ? (
                   <span className="lp-money text-[13px] text-text-primary">
                     {m.home_score}–{m.away_score}
