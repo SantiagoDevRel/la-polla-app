@@ -652,7 +652,8 @@ están documentadas en migration 056-057.
 - **IP real en Supabase Auth (2026-09-13).** `/otp` y `/verify` de Supabase
   limitan POR IP (30 cada 5 min); llamados desde Vercel, todos los usuarios
   compartían las IPs de salida de Vercel. `start-otp`, `verify-otp` y
-  `wa-magic` llaman a Auth SOLO con `lib/supabase/auth-ip.ts`:
+  `lib/auth/phone-session.ts` (sesión de `wa-magic`, `telegram-link` y
+  `telegram-verify`, que le pasan `clientIp`) llaman a Auth SOLO con `lib/supabase/auth-ip.ts`:
   `getClientIp` (`x-real-ip` → primer `x-forwarded-for`, IP validada) +
   `SUPABASE_SECRET_KEY` (`sb_secret_`) + cabecera `Sb-Forwarded-For`. Supabase
   la respeta solo con secret key y `security_sb_forwarded_for_enabled=true`.
@@ -687,7 +688,51 @@ están documentadas en migration 056-057.
   5 generate attempts / hour, enforced in `app/api/auth/verify-otp/
   route.ts` via `lib/auth/rate-limit.ts`.
 
+### Canal alternativo: Telegram (2026-09-13, migración 115)
+
+Si el SMS no llega, `/login` ofrece «Recibe tu código por Telegram». Bot
+**público y separado** del admin (`@LaPollaColombianaAdminBot` no es la cara
+pública). Variables: `TELEGRAM_LOGIN_BOT_TOKEN`, `TELEGRAM_LOGIN_WEBHOOK_SECRET`,
+`NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME` — las tres o el canal queda apagado
+(la opción no aparece, el webhook responde 503 sin tocar DB).
+
+- **Propiedad del teléfono:** el bot nunca acepta un número escrito. Solo
+  `message.contact` en chat privado con `contact.user_id === from.id` y sin
+  reenvío (`lib/auth/telegram-login/update.ts`). No relajar esto.
+- **Tokens:** `telegram_login_tokens` guarda solo HMAC (pepper derivado del
+  token del bot; el hash del código incluye el teléfono). 10 min, un solo uso,
+  emitir invalida los anteriores, canjear código o enlace invalida ambos, 5
+  fallos matan el token. Toda la lógica de estado vive en las RPC
+  `telegram_login_issue` / `_redeem_code` / `_redeem_link` / `_peek_link`
+  (service_role).
+- **El GET del enlace NUNCA abre sesión:** muestra el número enmascarado y un
+  botón que hace POST de formulario same-origin (prueba positiva:
+  `Sec-Fetch-Site` u `Origin`). Canjear en el GET era login CSRF: un enlace
+  ajeno reenviado por chat metía a la víctima en la cuenta del atacante.
+- **Telegram no es un espejo del SMS (número reciclado):** una cuenta que YA
+  existe solo acepta la cuenta de Telegram vinculada en
+  `telegram_login_identities` (`lib/auth/telegram-login/identity.ts`). Cuentas
+  creadas por SMS: solo SMS, salvo `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`
+  (decisión del dueño; vincula la primera cuenta de Telegram). No quitar el
+  `authorize` de `startSessionForVerifiedPhone` en las rutas de Telegram.
+- **Sesión:** `lib/auth/phone-session.ts` es el ÚNICO mecanismo para iniciar
+  sesión de un teléfono probado por un canal propio (lo usan wa-magic y
+  Telegram). No duplicarlo en rutas nuevas.
+- Webhook `app/api/telegram/login/route.ts` (exento en el middleware; secreto en
+  tiempo constante ANTES del body). Canje: `/api/auth/telegram-verify` (POST
+  JSON same-origin, 5/15 min por teléfono con `otp_rate_limits`
+  `telegram_verify`) y `/api/auth/telegram-link` (GET confirma, POST canjea;
+  HEAD 405). Rechazo por identidad → 409 `sms_only`.
+- `app/(auth)/login/page.tsx` es server wrapper: decide si el canal está
+  completo y solo pasa el usuario del bot a `LoginClient.tsx`. Cambiar las
+  variables exige redeploy (Next incrusta `NEXT_PUBLIC_*` en el build).
+- Pruebas: `tests/telegram-login.test.ts` y `scripts/telegram-login-check.sql`
+  (Supabase local). Activación y detalle: README → «Login por Telegram».
+
 Files: `app/(auth)/{login,onboarding}/page.tsx`,
+`app/(auth)/login/LoginClient.tsx`, `lib/auth/phone-session.ts`,
+`lib/auth/telegram-login/*`, `app/api/auth/telegram-{verify,link}/route.ts`,
+`app/api/telegram/login/route.ts`,
 `app/api/auth/verify-otp/route.ts`, `app/api/users/me/route.ts`,
 `lib/auth/{phone,login-event,user-agent,rate-limit}.ts`,
 `lib/users/needs-name.ts`, `lib/supabase/middleware.ts` (gating logic),

@@ -11,7 +11,8 @@ import { parseDeviceLabel } from "@/lib/auth/user-agent";
 
 interface RecordLoginEventParams {
   userId: string;
-  method: "password" | "otp";
+  // 'telegram' = código o enlace emitido por el bot de login de Telegram.
+  method: "password" | "otp" | "telegram";
   request: NextRequest;
 }
 
@@ -51,7 +52,9 @@ export async function recordLoginEvent(
   const title =
     method === "password"
       ? "Iniciaste sesión"
-      : "Iniciaste sesión con código";
+      : method === "telegram"
+        ? "Iniciaste sesión con Telegram"
+        : "Iniciaste sesión con código";
 
   const admin = createAdminClient();
   const { error } = await admin.from("notifications").insert({

@@ -454,6 +454,9 @@ describe("rutas de sesión: solo Auth con IP real, nunca el cliente de datos", (
     "app/api/auth/start-otp/route.ts",
     "app/api/auth/verify-otp/route.ts",
     "app/api/auth/wa-magic/route.ts",
+    "app/api/auth/telegram-link/route.ts",
+    "app/api/auth/telegram-verify/route.ts",
+    "lib/auth/phone-session.ts",
   ];
 
   it.each(files)("%s llama a Auth por lib/supabase/auth-ip", (file) => {
@@ -462,5 +465,17 @@ describe("rutas de sesión: solo Auth con IP real, nunca el cliente de datos", (
     expect(source).not.toMatch(/NEXT_PUBLIC_SUPABASE_ANON_KEY/);
     expect(source).not.toMatch(/from "@\/lib\/supabase\/server"/);
     expect(source).not.toMatch(/\.auth\.(verifyOtp|signInWithOtp|signOut)\(/);
+  });
+
+  // lib/auth/phone-session.ts abre la sesión de WhatsApp y Telegram: cada ruta
+  // le pasa la IP del request para que Supabase no vea la IP de Vercel.
+  it.each([
+    "app/api/auth/wa-magic/route.ts",
+    "app/api/auth/telegram-link/route.ts",
+    "app/api/auth/telegram-verify/route.ts",
+  ])("%s pasa la IP real a startSessionForVerifiedPhone", (file) => {
+    const source = readFileSync(join(process.cwd(), file), "utf8");
+    expect(source).toMatch(/getClientIp\(request\.headers\)/);
+    expect(source).toMatch(/clientIp/);
   });
 });

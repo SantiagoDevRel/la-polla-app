@@ -159,6 +159,11 @@ export async function updateSession(request: NextRequest) {
     // X-Telegram-Bot-Api-Secret-Token, que el handler verifica antes de leer
     // una sola línea del body (ver app/api/telegram/webhook/route.ts).
     path.startsWith("/api/telegram/webhook") ||
+    // Bot PÚBLICO de login por Telegram (otro bot, otro secreto). Mismo caso:
+    // llama Telegram. Auth propia: su X-Telegram-Bot-Api-Secret-Token en
+    // tiempo constante antes de leer el body (app/api/telegram/login/route.ts).
+    // Sus endpoints de canje (/api/auth/telegram-*) ya son públicos vía /api/auth.
+    path === "/api/telegram/login" ||
     // DLR de LabsMobile. Quien llama es el proveedor, no un browser: si esto
     // cae al gate de sesión, el middleware responde 307 a /login y el acuse
     // muere (y el secreto de la query viajaría en returnTo). Auth propia:

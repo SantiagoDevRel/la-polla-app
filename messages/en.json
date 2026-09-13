@@ -89,7 +89,22 @@
     "otpVerify": "Verify code",
     "otpResend": "Resend code or change number",
     "otpDidntArrive": "Didn't get it?",
-    "otpTryWhatsapp": "Try WhatsApp"
+    "otpTryWhatsapp": "Try WhatsApp",
+    "tgOr": "or",
+    "tgUseTelegram": "Get your code on Telegram",
+    "tgDidntArrive": "Didn't get the text message?",
+    "tgTitle": "CODE ON TELEGRAM",
+    "tgFor": "For the number",
+    "tgStep1": "Open our Telegram bot.",
+    "tgOpenBot": "Open Telegram",
+    "tgStep2": "Tap “Share my number”. It must be the same number you entered here.",
+    "tgStep3": "Enter the 6-digit code the bot sends you.",
+    "tgBackToSms": "Back to the text message code",
+    "tgUseSms": "I'd rather get a text message",
+    "tgErrRateLimited": "Too many attempts. Wait 15 minutes and try again.",
+    "tgErrUnavailable": "Telegram sign-in is not available right now. Use the text message.",
+    "tgErrGeneric": "We couldn't verify the code. Please try again.",
+    "tgErrSmsOnly": "For your security, this number can only sign in with the text message code."
   },
   "Welcome": {
     "introLine": "Every weekend we post the pools.\nYou join, you pick, you play for the pot.",
