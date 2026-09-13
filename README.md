@@ -554,14 +554,17 @@ El plan free de Supabase no incluye backups automáticos y pausa los
 proyectos inactivos, así que la copia de los datos vive afuera:
 
 ```bash
-npx tsx scripts/export-backup.ts    # dump completo (solo lectura)
-npx tsx scripts/verify-backup.ts    # sha256 + filas, 100% offline
-npx tsx scripts/restore-backup.ts   # dry run por default
+npx tsx scripts/export-backup.ts       # dump completo (solo lectura)
+npx tsx scripts/verify-backup.ts       # sha256 de tablas, auth, Storage y esquema, offline
+npx tsx scripts/restore-backup-sql.ts  # genera el .sql para psql contra Supabase local
+npx tsx scripts/restore-backup.ts      # dry run por default; escribe solo en local
 ```
 
 Deja `backups/<fecha>/` con todas las tablas de `public`, `auth` (+ SQL de
-restore con los mismos uuid), los archivos de Storage, las migraciones y un
-`RESUMEN.md` con la tabla final de cada polla en texto plano. `backups/`
+restore con los mismos uuid), los archivos de Storage (paginados y cruzados
+contra `storage.objects`), las migraciones del repo, el esquema vivo de prod
+(`schema/live`) y un `RESUMEN.md` con la tabla final de cada polla en texto
+plano. Se escribe en `<fecha>.partial/` y se renombra al terminar. `backups/`
 está en `.gitignore`: **lleva teléfonos y este repo es público.**
 
 Guía completa: [docs/backup-restore.md](docs/backup-restore.md).
