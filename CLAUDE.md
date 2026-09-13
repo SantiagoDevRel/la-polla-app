@@ -488,10 +488,11 @@ cuando el user diga sí/no explícito o se haya completado.
   revisión del PR #71).** `/auth/v1/otp` acepta llamadas directas con la anon
   key pública y la captcha está apagada: los topes de `start-otp` no frenan a
   quien llama a Supabase directo, que puede gastar hasta 300 SMS/h y dejar sin
-  login a todos. Falta decidir y probar: activar la captcha de Auth después de
-  que `SUPABASE_SECRET_KEY` funcione en producción (GoTrue se la salta con
-  credenciales de admin), probándola primero en un proyecto de prueba, o un
-  Send SMS Hook. Plan y verificación: README → «IP real en Supabase Auth».
+  login a todos. Falta decidir y probar: activar la captcha de Auth (la
+  `SUPABASE_SECRET_KEY` ya funciona en producción desde el 2026-09-13; GoTrue
+  se salta la captcha con credenciales de admin), probándola primero en un
+  proyecto de prueba, o un Send SMS Hook. Plan y verificación: README → «IP
+  real en Supabase Auth».
 <!-- Pollas combinadas multi-torneo: COMPLETADO 2026-04-30. Migración
      038 + UI de creación con multi-select + display con stack de logos
      en PollaCard y header de detail. Removido de pendings. -->
@@ -687,6 +688,33 @@ están documentadas en migration 056-057.
 - Rate limit: `otp_rate_limits` table, 5 verify attempts / 15 min and
   5 generate attempts / hour, enforced in `app/api/auth/verify-otp/
   route.ts` via `lib/auth/rate-limit.ts`.
+
+### Estado de activación en producción (2026-09-13)
+
+Foto completa, con rollback por pieza: README → «Estado en producción
+(2026-09-13)». Resumen para no pisar nada:
+
+- **IP real (`Sb-Forwarded-For`): ACTIVA.** `security_sb_forwarded_for_enabled=true`
+  + `SUPABASE_SECRET_KEY` en Production; los logs de Auth ya muestran la IP
+  del usuario en `remote_addr`.
+- **SMS por LabsMobile (Send SMS Hook): configurado y APAGADO.** URI y
+  secreto quedaron guardados en Auth; `sms_provider=twilio_verify` sigue
+  enviando. La prueba real del 2026-09-13 llegó al celular (`handset`,
+  `DELIVERED`), pero con **2.002 s** de demora, y el código vence a los 600 s.
+  No prendas el hook (`hook_send_sms_enabled`) sin dos cosas: una prueba en
+  horario hábil con acuse en segundos y el vigía de silencio
+  (`revisarSilencios`) conectado a un cron, porque hoy no hay cron que lo
+  llame. Rollback = PATCH `hook_send_sms_enabled:false`, sin deploy.
+- **Login por Telegram: ACTIVO.** `@LaPollaColombianaAccesoBot`, webhook en
+  `/api/telegram/login`, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`.
+- **Captcha de Auth: apagada** (ver Open ideas).
+- **Backup:** runner del DGX detached en `main` 7d9ca5a + `backup_runs` +
+  alerta horaria `backup-freshness.yml` (ver sección de backup).
+- **Monitoreo:** no hay Sentry ni integración de monitoreo; hoy solo quedan
+  los logs de Vercel y los correos de alerta.
+- **Cookies de sesión:** salen sin `HttpOnly` ni `Secure` (default de
+  `@supabase/ssr`, igual en todos los canales). Pendiente revisar
+  `cookieOptions` antes del lanzamiento.
 
 ### Canal alternativo: Telegram (2026-09-13, migración 115)
 
