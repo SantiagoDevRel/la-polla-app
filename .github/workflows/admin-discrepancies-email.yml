@@ -4,6 +4,12 @@
 # (8:00 AM Bogota, UTC-5) — temprano en la manana del admin.
 # Solo envia email si hay items que reportar (matches sin verify, pollas
 # trabadas, pollas ended sin payouts). Si todo OK, no spamea.
+#
+# El paso falla si: la respuesta no es 2xx (un 307 a /login también es
+# fallo: hasta 2026-09-13 el middleware redirigía y el job quedaba verde),
+# el body no trae "ok": true, o curl pasa de 90 s. En el log solo se
+# imprimen contadores, nunca el body. Sin --retry: el correo no es
+# idempotente.
 
 name: Admin Discrepancies Email Daily
 
@@ -12,6 +18,12 @@ on:
     # 13:00 UTC = 8:00 AM Bogota
     - cron: "0 13 * * *"
   workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: cron-admin-discrepancies-email
+  cancel-in-progress: false
 
 jobs:
   email:
@@ -22,21 +34,28 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           APP_URL: ${{ secrets.APP_URL }}
+        shell: bash
         run: |
+          set -euo pipefail
           : "${APP_URL:=https://lapollacolombiana.com}"
-          if [ -z "$CRON_SECRET" ]; then
-            echo "CRON_SECRET secret no configurado en repo settings"
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET no está configurado en los secrets del repo"
             exit 1
           fi
-          response=$(curl -sS -w "\nHTTP_STATUS:%{http_code}" -X POST \
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+          status="$(curl -sS --max-time 90 -o "$body_file" -w '%{http_code}' -X POST \
             "$APP_URL/api/cron/admin-discrepancies-email" \
             -H "Authorization: Bearer $CRON_SECRET" \
-            -H "Content-Type: application/json")
-          body="${response%HTTP_STATUS:*}"
-          status="${response##*HTTP_STATUS:}"
-          echo "Status: $status"
-          echo "Body: $body"
-          if [ "$status" -ge 400 ]; then
-            echo "Email cron failed with status $status"
+            -H "Content-Type: application/json")"
+          echo "HTTP status: $status"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            error_code="$(jq -r '.error // empty | tostring | .[0:80]' "$body_file" 2>/dev/null || true)"
+            echo "::error::El cron respondió HTTP $status (se esperaba 2xx) ${error_code:+error=$error_code}"
             exit 1
           fi
+          if ! jq -e '.ok == true' "$body_file" > /dev/null 2>&1; then
+            echo "::error::La respuesta no trae \"ok\": true"
+            exit 1
+          fi
+          jq -c '{ok, sent, stuckPollas: .counts.stuckPollas, endedNoPayouts: .counts.endedNoPayouts, matchDiscrepancies: .counts.matchDiscrepancies}' "$body_file"

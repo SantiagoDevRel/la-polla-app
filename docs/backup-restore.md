@@ -36,11 +36,17 @@ Variables (de `.env`, o `DOTENV_CONFIG_PATH=<ruta>` para leer otro archivo):
 | `SUPABASE_SERVICE_ROLE_KEY` | requerido — lee tablas y Storage, bypass RLS |
 | `SUPABASE_BACKUP_PAT` → `SUPABASE_ACCESS_TOKEN` → `SUPABASE_30_DAYS` | Token de la Management API, se usa el primero que exista. **Muy recomendado.** Basta un token con scope de proyecto y permiso `database_read`: todo el SQL va por `POST /v1/projects/<ref>/database/query/read-only`, que corre como `supabase_read_only_user`. |
 
-Sin token el backup sigue sirviendo, pero reducido: `auth` sale por la admin
-API (no se pueden recrear las cuentas con su mismo uuid), no hay
-`schema/live` y el listado de Storage no se puede cruzar contra la base.
+Sin token el backup sale **reducido**: `auth` sale por la admin API (no se
+pueden recrear las cuentas con su mismo uuid), no hay `schema/live` y el
+listado de Storage no se puede cruzar contra la base. `verify-backup.ts` lo
+rechaza salvo `ALLOW_REDUCED_BACKUP=1`.
 
-Flags: `BACKUP_DIR=<path>` · `SKIP_STORAGE=1` · `SKIP_PII=1`.
+**Con** token, si el dump completo de auth falla (token vencido, red), el
+export **aborta** igual que cuando no puede cruzar Storage. Antes caía en
+silencio a la admin API y dejaba un backup que parecía bueno. Para aceptar
+esa degradación a propósito: `ALLOW_REDUCED_BACKUP=1`.
+
+Flags: `BACKUP_DIR=<path>` · `SKIP_STORAGE=1` · `SKIP_PII=1` · `ALLOW_REDUCED_BACKUP=1`.
 
 ### Qué verifica mientras exporta (y aborta si no cuadra)
 
@@ -133,12 +139,19 @@ Corre **offline** y sale con **código 1 ante cualquier diferencia**:
   identities en disco con lo declarado;
 - `MAX_AGE_HOURS`: si el backup es más viejo, falla (un valor inválido también
   falla, para no creer que se vigila la frescura cuando no);
-- una carpeta `.partial` pasada a mano se rechaza.
+- una carpeta `.partial` pasada a mano se rechaza;
+- **un backup reducido falla**: `auth` en modo `admin-api` (sin
+  `users.full.json` ni `restore-auth.sql`, con el motivo de `auth.note`) o
+  Storage sin cruce contra `storage.objects`. Todos los archivos pueden estar
+  íntegros y aun así no alcanzar para reabrir con las mismas cuentas.
+  `ALLOW_REDUCED_BACKUP=1` lo baja a aviso; el ejecutor automático **no** debe
+  usarlo. `SKIP_PII=1` y `SKIP_STORAGE=1` son decisiones explícitas y quedan
+  como aviso.
 
 `--json` imprime solo `{ ok, dir, formatVersion, generatedAt, ageHours,
-tables, rows, authUsers, authIdentities, storageFiles, storageBytes,
-filesVerified, problems, warnings }`. Los errores de `schema/live` salen como
-`warnings` (no invalidan los datos).
+tables, rows, authMode, storageCrossCheck, authUsers, authIdentities,
+storageFiles, storageBytes, filesVerified, problems, warnings }`. Los errores
+de `schema/live` salen como `warnings` (no invalidan los datos).
 
 Los backups de **formato 1** (antes del 2026-09-13) se siguen verificando:
 tablas por sha256, y Storage/auth solo por conteo, con un aviso.
@@ -209,29 +222,58 @@ El generador no se conecta a ninguna base. Antes de escribir el `.sql`
 verifica el sha256 de cada tabla y de los dumps de auth. El SQL:
 
 - incluye `auth.users` y `auth.identities` primero (salvo `SKIP_AUTH=1`);
-- **aborta si alguna tabla destino ya tiene filas** (salvo `ALLOW_NONEMPTY=1`);
+- **reemplaza las tablas que las migraciones siembran**: `app_config` (028 y
+  064) y `casa_operation_control` (097 la crea con `mode='legacy'`). Un
+  destino recién creado no las tiene vacías; dentro de la transacción se
+  borran y quedan **exactamente** con el contenido del backup (por ejemplo
+  `mode='v2'`). `REPLACE_TABLES=a,b` cambia la lista y `REPLACE_TABLES=` (vacío)
+  no reemplaza ninguna;
+- **aborta si cualquier otra tabla destino ya tiene filas**. El mensaje dice
+  qué hacer: para `auth.*`, generar con `SKIP_AUTH=1` si las cuentas ya se
+  restauraron; para el resto, partir de `supabase db reset` o sumar la tabla a
+  `REPLACE_TABLES` si la siembra una migración;
 - convierte cada lote con `jsonb_populate_recordset(NULL::tabla, …)`, así
   Postgres usa los tipos reales del destino (arrays, jsonb, enums, fechas);
 - omite columnas generadas (`auth.users.confirmed_at`,
   `auth.identities.email`…) e inserta identity con `OVERRIDING SYSTEM VALUE`;
 - **aborta si el backup trae una columna que el destino no tiene** (salvo
   `ALLOW_MISSING_COLUMNS=1`, que las ignora: úsalo solo para ensayos);
+- **en cada lote** exige que se hayan escrito todas sus filas (una clave que
+  choca ya no se descarta en silencio) y que cada fila, buscada por su PK,
+  tenga en el destino el mismo contenido que en el backup (columna por
+  columna, como texto; sin PK se compara contra la tabla entera);
 - ajusta las secuencias al máximo restaurado;
 - compara el `count(*)` de cada tabla con el backup. Si algo no cuadra,
   `ROLLBACK` y no queda nada escrito.
 
 Otros flags: `OUT=<archivo>` · `OVERWRITE=1` · `TABLES=a,b` (solo esas de
-`public`).
+`public`) · `ALLOW_NONEMPTY=1`, **solo para ensayos**: quita la guarda y las
+filas que chocan o difieren se saltan con un `NOTICE` por lote. No es un
+restore fiel. Nunca es la salida para un destino recién creado que "no está
+vacío".
 
-`auth/restore-auth.sql` (dentro del backup) es la misma mecánica solo para las
-cuentas, por si se necesitan aparte.
+**Cuentas: una sola vía.** Lo recomendado es dejar que este SQL traiga
+`auth.users` y `auth.identities` junto con las tablas, en la misma
+transacción. `auth/restore-auth.sql` (dentro del backup) es la misma mecánica
+solo para las cuentas. Si lo corres primero, genera el SQL de tablas con
+`SKIP_AUTH=1`: sin eso, su guarda aborta porque `auth.users` ya tiene filas.
 
 Ensayo del 2026-09-13 en un contenedor desechable de
 `supabase/postgres:17.6.1.159`, con las migraciones del repo aplicadas y como
 rol `postgres`: 9 tablas centrales (users, matches, pollas,
 polla_participants, predictions y cuatro de Casa), 19.626 filas en 2 s, con
 los triggers de lock presentes; la suma de `points_earned` (34.223) y de
-`total_points` coincide con el backup.
+`total_points` coincide con el backup. Ese ensayo no incluyó tablas
+sembradas. Con `app_config` (16 filas) y `casa_operation_control` del backup
+real, restauradas sobre esas semillas en un `postgres:17-alpine` desechable,
+el resultado quedó en `mode='v2'` y 16 filas (antes: `ROLLBACK` por la
+guarda, o `mode='legacy'` con `ALLOW_NONEMPTY=1`).
+
+Prueba automática contra un Postgres real (opt-in, necesita Docker):
+
+```bash
+BACKUP_SQL_DOCKER_TEST=1 npx vitest run tests/backup-restore-sql.docker.test.ts
+```
 
 ### 3. Storage
 

@@ -75,13 +75,16 @@ export async function notifyNewProof(n: ProofNotice): Promise<void> {
   const url = n.proofPath ? await signedProofUrl(n.proofPath) : null;
 
   for (const chat of chats) {
-    const sent = url
-      ? await sendPhoto(chat, url, lineas, buttons)
-      : await sendMessage(
-          chat,
-          `${lineas}\n\n⚠️ No pude cargar el comprobante. Revísalo en la web.`,
-          buttons,
-        );
+    // Si Telegram no puede bajar la foto (URL vencida, >5 MB, medidas fuera de
+    // sus límites), sendPhoto devuelve null. Antes eso dejaba al admin sin
+    // ningún aviso; ahora llega el texto con los mismos botones.
+    const sent =
+      (url ? await sendPhoto(chat, url, lineas, buttons) : null) ??
+      (await sendMessage(
+        chat,
+        `${lineas}\n\n⚠️ ${url ? "No pude mostrar la foto del comprobante" : "No pude cargar el comprobante"}. Revísalo en la web.`,
+        buttons,
+      ));
 
     if (sent) {
       await createAdminClient()

@@ -29,6 +29,10 @@
 //   SKIP_STORAGE=1     no baja los archivos de Storage
 //   SKIP_PII=1         no exporta auth (teléfonos/emails). Ojo: sin auth
 //                      no se puede reabrir con las MISMAS cuentas.
+//   ALLOW_REDUCED_BACKUP=1  con token, si el dump completo de auth falla,
+//                      cae a la admin API en vez de abortar. Ese backup no
+//                      recrea cuentas y verify-backup lo rechaza salvo el
+//                      mismo flag.
 //
 // ─── Notas de diseño ───
 // · `select("*")`: la regla del repo prohíbe el `*` en código de APP (para
@@ -76,6 +80,7 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const MGMT = resolveManagementToken(process.env);
 const SKIP_STORAGE = process.env.SKIP_STORAGE === "1";
 const SKIP_PII = process.env.SKIP_PII === "1";
+const ALLOW_REDUCED = process.env.ALLOW_REDUCED_BACKUP === "1";
 const PAGE = 1000; // cap duro de PostgREST y de storage.list
 
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -320,8 +325,18 @@ async function dumpAuth(sb: SupabaseClient, dir: string, files: FileManifest): P
       log(`→ auth: dump COMPLETO — ${users.length} usuarios, ${identities.length} identities (+ SQL de restore)`);
       return { mode: "full", users: users.length, identities: identities.length };
     } catch (err) {
+      // Con token presente, caer a la admin API deja un backup que no puede
+      // recrear las cuentas: igual que el cruce de Storage, se aborta salvo
+      // que se acepte explícitamente un backup reducido.
+      if (!ALLOW_REDUCED) {
+        throw new Error(
+          `el dump completo de auth falló (${(err as Error).message.slice(0, 300)}). Backup ABORTADO: ` +
+            `sin él no se pueden recrear las cuentas. Revisa que ${MGMT.source} siga vigente y tenga database_read; ` +
+            `para aceptar un backup reducido, ALLOW_REDUCED_BACKUP=1.`,
+        );
+      }
       note = `dump completo falló: ${(err as Error).message.slice(0, 200)}`;
-      log(`   ! dump completo de auth falló (${(err as Error).message}); caigo a la admin API`);
+      log(`   ! dump completo de auth falló (${(err as Error).message}); caigo a la admin API (ALLOW_REDUCED_BACKUP=1)`);
     }
   } else {
     note = "sin token de la Management API";
@@ -917,6 +932,9 @@ Total: ${totalRows.toLocaleString("es-CO")} filas en ${tables.length} tablas.
       `${storage.files} archivos de storage (${(storage.bytes / 1024 / 1024).toFixed(1)} MB)`,
   );
   if (schemaLive.errors.length) log(`! schema/live con ${schemaLive.errors.length} error(es): ver _manifest.json`);
+  if (auth.mode === "admin-api" || storage.crossCheck === "sin token") {
+    log(`! Backup REDUCIDO (auth ${auth.mode}, cruce de Storage: ${storage.crossCheck}): verify-backup lo rechaza salvo ALLOW_REDUCED_BACKUP=1.`);
+  }
   log(`${finalDir}\n`);
 }
 

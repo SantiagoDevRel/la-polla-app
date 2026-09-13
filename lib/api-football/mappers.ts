@@ -115,7 +115,7 @@ export interface MatchRow {
  * - "PEN"  → After Penalties
  * - "SUSP" → Suspended
  * - "INT"  → Interrupted
- * - "PST"  → Postponed
+ * - "PST"  → Postponed (scheduled: se reprograma, NO se cancela)
  * - "CANC" → Cancelled
  * - "ABD"  → Abandoned
  * - "AWD"  → Technical Loss (awarded)
@@ -142,10 +142,15 @@ const STATUS_MAP: Record<string, MatchRow['status']> = {
   PEN: 'finished',
   AWD: 'finished',
   WO: 'finished',
-  // Cancelado / Aplazado
+  // Cancelado / abandonado
   CANC: 'cancelled',
   ABD: 'cancelled',
-  PST: 'cancelled',
+  // Aplazado: el partido sigue vivo con otra fecha, así que queda
+  // 'scheduled'. El detalle STATUS_POSTPONED lo escribe quien tiene campo
+  // de detalle (live.ts → live_status_detail). Antes PST→'cancelled', y
+  // como matches_prevent_status_regress no deja pasar cancelled→scheduled,
+  // la fila quedaba cancelada aunque el partido se reprogramara.
+  PST: 'scheduled',
 };
 
 /**

@@ -2,7 +2,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { CASA_HEADERS } from "./contract";
 
-export async function fileDigest(file: File) {
+export async function fileDigest(file: Blob) {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
   return Array.from(new Uint8Array(digest), (x) => x.toString(16).padStart(2, "0")).join("");
 }
@@ -14,7 +14,7 @@ export async function casaPost(url: string, body: unknown) {
   return data;
 }
 
-export async function uploadSignedFile(upload: { bucket: string; path: string; token: string | null }, file: File) {
+export async function uploadSignedFile(upload: { bucket: string; path: string; token: string | null }, file: Blob) {
   if (upload.token === null) return null;
   // Never overwrite a previous proof. If a retry finds an existing file, the
   // confirmation endpoint verifies its digest before accepting that result.

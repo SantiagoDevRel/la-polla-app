@@ -12,10 +12,15 @@
 // Path throttled (caso comun): un solo await al RPC de reserva, return inmediato.
 // Path no-throttled (caso raro): fire-and-forget del heal + del sync HTTP. Cero awaits adicionales.
 // Todos los call sites son `void ensureMatchesFresh()` — nadie depende del side effect sincrono.
+//
+// Modo 'af' (app_config.data_provider_mode, 2026-09-13): no-op. sync-recent es
+// football-data, que ya no escribe partidos; vivo y resultados son de API-Football.
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getDataProviderMode } from "@/lib/matches/provider-mode";
 
 export async function ensureMatchesFresh(): Promise<void> {
   try {
+    if ((await getDataProviderMode()) === "af") return;
     const admin = createAdminClient();
 
     // Reserva primero: si estamos throttled, salimos antes de gastar nada mas.

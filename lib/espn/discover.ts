@@ -108,13 +108,46 @@ export interface DiscoverResult {
 
 /**
  * Mapea fase de ESPN a nuestro enum. ESPN puede tener:
- *   - season.type.id (1=preseason, 2=regular, 3=playoffs)
- *   - notes con el nombre de fase
- *   - season.slug ("2025-2026")
+ *   - season.slug con la ronda ("quarterfinals", "league-phase"…) — la
+ *     fuente estructurada, se lee PRIMERO.
+ *   - notes con un headline libre ("1st Leg", "2nd Leg - X advance…")
+ *   - season.type: id numérico distinto por temporada (13923, 13682…),
+ *     NO sirve como enum.
  *
  * Para CONMEBOL/UEFA hay rounds estructuradas. Para ligas locales
  * normalmente todo es 'regular_season' hasta que entren playoffs.
  */
+
+// season.slug → fase canónica (PhaseSlug de lib/tournaments/structure.ts).
+// Valores OBSERVADOS el 2026-09-13 en el scoreboard de ESPN (1 request por
+// liga: conmebol.libertadores/sudamericana ago-nov 2026, uefa.champions/
+// europa ene-may 2026, col.1 sep-dic 2026). Solo se mapea lo visto; un slug
+// desconocido cae al headline + default de antes (no inventamos fases).
+//
+// Por qué slug antes que headline: en knockouts el headline es "1st Leg" o
+// "2nd Leg - …", sin nombre de ronda → los cuartos CONMEBOL caían al default
+// group_stage y los playoffs/octavos UEFA a league_stage. La final de UCL
+// trae "Paris Saint-Germain win 4-3 on penalties" (tampoco dice "final").
+//
+// BetPlay (col.1): la fase regular trae slug "clausura"/"apertura" (sin ronda
+// → regular_season por default). Las eliminatorias de temporadas anteriores
+// llegaron compuestas: "clausura---semifinals", "apertura---quarterfinals",
+// "playoffs---finals"; se mapea la parte después de "---". Los playoffs
+// 2026-II aún no estaban publicados al 2026-09-13.
+//
+// "knockout-round-playoffs" → "playoff" (el canónico de structure.ts y de
+// football-data PLAYOFF). Ojo: las 16 filas FD de playoffs 2025/26 en prod
+// quedaron como "playoffs" (plural, fallback de lib/football-data/sync.ts).
+const PHASE_BY_ESPN_SEASON_SLUG: Record<string, string> = {
+  "league-phase": "league_stage",
+  "knockout-round-playoffs": "playoff",
+  "round-of-16": "round_of_16",
+  quarterfinals: "quarter_finals",
+  semifinals: "semi_finals",
+  final: "final",
+  finals: "final",
+};
+
 // Default phase per tournament cuando ESPN no incluye headline (típico
 // en torneos de liga regular y CONMEBOL group stage). Para torneos
 // con bracket fijo desde el día 1 (Champions, Mundial), default es
@@ -132,7 +165,16 @@ const DEFAULT_PHASE_BY_TOURNAMENT: Record<string, string> = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapEspnPhase(event: any, tournamentSlug: string): string | null {
+export function mapEspnPhase(event: any, tournamentSlug: string): string | null {
+  // 1. Ronda estructurada de season.slug (ver PHASE_BY_ESPN_SEASON_SLUG).
+  const rawSlug = typeof event?.season?.slug === "string" ? event.season.slug.toLowerCase() : "";
+  // Slugs compuestos de BetPlay ("clausura---semifinals"): manda la ronda.
+  const slug = rawSlug.includes("---") ? rawSlug.slice(rawSlug.lastIndexOf("---") + 3) : rawSlug;
+  const fromSlug = Object.prototype.hasOwnProperty.call(PHASE_BY_ESPN_SEASON_SLUG, slug)
+    ? PHASE_BY_ESPN_SEASON_SLUG[slug]
+    : undefined;
+  if (fromSlug) return fromSlug;
+  // 2. Fallback de siempre: headline + default del torneo.
   // ESPN incluye un array de "notes" en competitions[0] con la headline
   // que indica fase ("Round of 16", "Quarterfinal", etc). No está en
   // nuestros types modelados, así que parseamos defensive.

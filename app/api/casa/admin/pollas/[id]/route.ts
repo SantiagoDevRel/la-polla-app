@@ -32,6 +32,41 @@ const BodySchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+/**
+ * Devuelve la respuesta 400 si la polla va a pasar a publicada con cierre
+ * automático y alguno de sus partidos tiene hora por confirmar. Null = seguir.
+ * Si la polla no existe o ya está publicada, decide el RPC (mensajes propios).
+ */
+async function provisionalKickoffGuard(db: ReturnType<typeof createAdminClient>, id: string) {
+  const { data: polla, error } = await db
+    .from("casa_pollas")
+    .select("kind, close_mode, status, opens_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return casaJson({ error: "No se pudo leer la polla." }, 500);
+  if (!polla || polla.kind !== "partidos" || polla.close_mode !== "auto") return null;
+  const pending = polla.status === "borrador" ||
+    (polla.status === "abierta" && polla.opens_at !== null && new Date(polla.opens_at).getTime() > Date.now());
+  if (!pending) return null;
+
+  const { data: links, error: linksError } = await db
+    .from("casa_polla_matches")
+    .select("match_id")
+    .eq("polla_id", id);
+  if (linksError || !Array.isArray(links)) return casaJson({ error: "No se pudieron revisar los horarios de los partidos. Intenta de nuevo." }, 500);
+  const matchIds = links.map((link: { match_id: string }) => link.match_id);
+  if (matchIds.length === 0) return null;
+
+  const { data: kickoffs, error: kickoffError } = await db
+    .from("matches")
+    .select("id, scheduled_at_confirmed")
+    .in("id", matchIds);
+  if (kickoffError || !Array.isArray(kickoffs)) return casaJson({ error: "No se pudieron revisar los horarios de los partidos. Intenta de nuevo." }, 500);
+  return kickoffs.some((match: { scheduled_at_confirmed: boolean | null }) => match.scheduled_at_confirmed === false)
+    ? casaJson({ error: "Hay partidos con hora por confirmar. Elige cierre manual o quítalos.", code: "PROVISIONAL_KICKOFF" }, 400)
+    : null;
+}
+
 /** GET — lo que el panel necesita para resolver: preguntas y número sorteado. */
 export async function GET(
   _request: Request,
@@ -93,6 +128,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!parsed.success) return casaJson({ error: "Acción inválida." }, 400);
   const body = parsed.data;
   const db = createAdminClient();
+
+  // Mismo guard que la creación: publicar una polla de partidos con cierre
+  // automático exige horarios confirmados. El cierre se fijó al crearla desde
+  // el primer pitazo; si ahora algún partido quedó con hora por confirmar
+  // (aplazado, reprogramado), ese cierre ya no es confiable.
+  const publishes = body.action === "publicar" || (body.action === "publicacion" && body.mode !== "oculta");
+  if (publishes) {
+    const guard = await provisionalKickoffGuard(db, id);
+    if (guard) return guard;
+  }
+
   const args = { p_polla_id: id, p_contract: 2, p_actor_id: user.id };
   const result = body.action === "publicacion"
     ? await db.rpc("casa_set_publication_v2", { ...args, p_mode: body.mode, p_opens_at: body.opensAt ?? null })

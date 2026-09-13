@@ -15,8 +15,10 @@
 //    apunta a prod no alcanza para pisar datos reales.
 // 3. El destino tiene que tener el ESQUEMA ya aplicado (las migraciones de
 //    `schema/migrations/` del backup, en orden).
-// 4. Las cuentas van PRIMERO y por SQL: `auth/restore-auth.sql` con psql.
-//    Todo lo demás cuelga de esos uuids.
+// 4. Las cuentas van PRIMERO y por SQL. Lo recomendado es
+//    `scripts/restore-backup-sql.ts`, que las trae junto con las tablas en
+//    una sola transacción. Si ya corriste `auth/restore-auth.sql`, genera
+//    ese SQL con SKIP_AUTH=1 (si no, su guarda aborta por auth.users).
 // 5. Por default NO escribe (DRY RUN) y se niega a tocar tablas que ya
 //    tengan filas. Eso es a propósito.
 //
@@ -151,8 +153,9 @@ async function main() {
   }
   if (manifest.auth.mode !== "skipped" && !STORAGE_ONLY) {
     console.log(
-      `Recordatorio: las ${manifest.auth.users} cuentas van primero (o todo junto con restore-backup-sql.ts):\n` +
-        `  psql -v ON_ERROR_STOP=1 -f ${path.join(dir, "auth", "restore-auth.sql")}\n`,
+      `Recordatorio: las ${manifest.auth.users} cuentas van primero. Lo recomendado, cuentas + tablas juntas:\n` +
+        `  npx tsx scripts/restore-backup-sql.ts ${dir}\n` +
+        `o solo cuentas con auth/restore-auth.sql y después restore-backup-sql.ts con SKIP_AUTH=1.\n`,
     );
   }
 

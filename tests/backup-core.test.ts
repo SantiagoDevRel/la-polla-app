@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assessBackupCompleteness,
   backupAgeHours,
   backupStamp,
   buildRestoreSql,
@@ -14,11 +15,13 @@ import {
   isPartialBackupDir,
   listAllStorageObjects,
   parseMaxAgeHours,
+  parseReplaceTables,
   partialDirName,
   pickNewestBackup,
   quoteQualified,
   renderPolicySql,
   resolveManagementToken,
+  SCHEMA_SEEDED_TABLES,
   sha256Hex,
   StorageEntry,
   verifyFileManifest,
@@ -256,11 +259,16 @@ describe("SQL de restore", () => {
     expect(sql.match(/lp_restore_chunk\('"public"."predictions"'/g)).toHaveLength(3);
     expect(sql.match(/lp_restore_chunk\('"auth"."users"'/g)).toHaveLength(1);
     expect(sql).not.toMatch(/lp_restore_chunk\('"public"."vacia"'/);
-    // Por defecto una columna desconocida aborta.
-    expect(sql).toMatch(/::jsonb, false\) AS insertadas;/);
+    // Por defecto una columna desconocida aborta y una fila que no se escribe también.
+    expect(sql).toMatch(/::jsonb, false, false\) AS insertadas;/);
+    expect(sql).toMatch(/IF v_count < v_expected THEN/);
+    expect(sql).toMatch(/EXCEPT ALL/);
+    // La guarda ya no empuja a ALLOW_NONEMPTY como salida.
+    expect(sql).not.toMatch(/ya tiene % filas \(generar con ALLOW_NONEMPTY/);
+    expect(sql).toMatch(/auth.users ya tiene % filas \(si las cuentas ya se restauraron con auth\/restore-auth.sql, genera este SQL con SKIP_AUTH=1\)/);
   });
 
-  it("con ALLOW_NONEMPTY no pone guarda y compara con >=", () => {
+  it("con ALLOW_NONEMPTY no pone guarda, compara con >= y salta con NOTICE", () => {
     const sql = buildRestoreSql({
       title: "mezcla",
       sections: [{ schemaTable: "public.users", rows: [{ id: 1 }] }],
@@ -269,7 +277,80 @@ describe("SQL de restore", () => {
     });
     expect(sql).not.toContain("$guard$");
     expect(sql).toMatch(/IF v_n < 1 THEN/);
-    expect(sql).toMatch(/::jsonb, true\) AS insertadas;/);
+    expect(sql).toMatch(/::jsonb, true, true\) AS insertadas;/);
+    expect(sql).toMatch(/RAISE NOTICE 'restore: % saltó/);
+  });
+
+  it("reemplaza las tablas que siembra el esquema en vez de exigirlas vacías", () => {
+    const sections = [
+      { schemaTable: "public.casa_operation_control", rows: [{ singleton: true, mode: "v2" }] },
+      { schemaTable: "public.app_config", rows: [] },
+      { schemaTable: "public.users", rows: [{ id: 1 }] },
+    ];
+    const sql = buildRestoreSql({ title: "semillas", sections });
+    const guard = sql.slice(sql.indexOf("DO $guard$"), sql.indexOf("$guard$;"));
+    expect(guard).toContain(`"public"."users"`);
+    expect(guard).not.toContain("casa_operation_control");
+    expect(guard).not.toContain("app_config");
+    // DELETE dentro de la transacción, después de la guarda y antes de insertar.
+    const del = sql.indexOf(`DELETE FROM "public"."casa_operation_control";`);
+    expect(del).toBeGreaterThan(sql.indexOf("$guard$;"));
+    expect(del).toBeLessThan(sql.indexOf(`lp_restore_chunk('"public"."casa_operation_control"'`));
+    // Una sembrada vacía en el backup también se vacía en el destino, y el conteo final es exacto.
+    expect(sql).toContain(`DELETE FROM "public"."app_config";`);
+    expect(sql).toMatch(/"app_config"' INTO v_n;\s+IF v_n <> 0 THEN/);
+
+    // Solo se reemplaza lo que viene en el backup, y REPLACE_TABLES vacío apaga el reemplazo.
+    const soloUsers = buildRestoreSql({ title: "t", sections: [sections[2]] });
+    expect(soloUsers).not.toContain("DELETE FROM");
+    const sinReemplazo = buildRestoreSql({ title: "t", sections, replaceTables: [] });
+    expect(sinReemplazo).not.toContain("DELETE FROM");
+    expect(sinReemplazo.slice(sinReemplazo.indexOf("DO $guard$"))).toMatch(/casa_operation_control ya tiene % filas/);
+  });
+
+  it("interpreta REPLACE_TABLES", () => {
+    expect(parseReplaceTables(undefined)).toEqual([...SCHEMA_SEEDED_TABLES]);
+    expect(parseReplaceTables("")).toEqual([]);
+    expect(parseReplaceTables(" app_config , otra.tabla ")).toEqual(["public.app_config", "otra.tabla"]);
+  });
+});
+
+describe("assessBackupCompleteness", () => {
+  it("acepta un backup completo sin avisos", () => {
+    expect(
+      assessBackupCompleteness({ formatVersion: 2, auth: { mode: "full" }, storage: { crossCheck: "storage.objects" } }),
+    ).toEqual({ problems: [], warnings: [] });
+  });
+
+  it("rechaza auth por la admin API y Storage sin cruce, con el motivo", () => {
+    const res = assessBackupCompleteness({
+      formatVersion: 2,
+      auth: { mode: "admin-api", note: "dump completo falló: 500" },
+      storage: { crossCheck: "sin token" },
+    });
+    expect(res.problems).toHaveLength(2);
+    expect(res.problems[0]).toMatch(/auth salió en modo admin-api: dump completo falló: 500/);
+    expect(res.problems[0]).toMatch(/ALLOW_REDUCED_BACKUP=1/);
+    expect(res.problems[1]).toMatch(/no se cruzó contra storage.objects \(cruce: sin token\)/);
+    expect(res.warnings).toEqual([]);
+    // Un manifiesto de formato 2 sin dato de cruce tampoco pasa como completo.
+    expect(assessBackupCompleteness({ formatVersion: 2, auth: { mode: "full" } }).problems).toHaveLength(1);
+  });
+
+  it("con allowReduced lo baja a aviso", () => {
+    const res = assessBackupCompleteness(
+      { formatVersion: 2, auth: { mode: "admin-api" }, storage: { crossCheck: "sin token" } },
+      { allowReduced: true },
+    );
+    expect(res.problems).toEqual([]);
+    expect(res.warnings).toHaveLength(2);
+  });
+
+  it("saltarse auth o Storage a propósito es aviso, y el formato 1 no tiene cruce que exigir", () => {
+    const res = assessBackupCompleteness({ formatVersion: 2, auth: { mode: "skipped" }, storage: { crossCheck: "salteado" } });
+    expect(res.problems).toEqual([]);
+    expect(res.warnings).toHaveLength(2);
+    expect(assessBackupCompleteness({ auth: { mode: "full" } })).toEqual({ problems: [], warnings: [] });
   });
 });
 
