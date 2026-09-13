@@ -22,7 +22,8 @@ export const runtime = "nodejs";
 
 const schema = z.object({
   attemptId: z.string().uuid(),
-  decision: z.enum(["aprobar", "rechazar"]),
+  decision: z.enum(["aprobar", "rechazar", "desmarcar"]),
+  revision: z.number().int().min(0).default(0),
   motivo: z.string().trim().max(200).optional(),
 });
 
@@ -30,6 +31,7 @@ const cursorSchema = z.object({
   id: z.string().uuid(),
   uploadedAt: z.string().datetime({ offset: true }).nullable(),
   pollaId: z.string().uuid().nullable(),
+  status: z.enum(["pendiente", "pagada"]).default("pendiente"),
 }).strict();
 
 function privateJson(body: unknown, status = 200) {
@@ -49,6 +51,8 @@ export async function GET(req: NextRequest) {
 
     const db = createAdminClient();
     const params = req.nextUrl.searchParams;
+    const status = params.get("status") ?? "pendiente";
+    if (status !== "pendiente" && status !== "pagada") return privateJson({ error: "Estado de pago inválido." }, 400);
     if (params.get("summary") === "1") {
       const counts: Record<string, number> = {};
       let after: string | null = null;
@@ -90,7 +94,7 @@ export async function GET(req: NextRequest) {
       try {
         if (rawCursor.length > 512 || !/^[A-Za-z0-9_-]+$/.test(rawCursor)) throw new Error("Invalid cursor");
         cursor = cursorSchema.parse(JSON.parse(Buffer.from(rawCursor, "base64url").toString("utf8")));
-        if (cursor.pollaId !== pollaId || page !== 0) throw new Error("Wrong cursor scope");
+        if (cursor.pollaId !== pollaId || cursor.status !== status || page !== 0) throw new Error("Wrong cursor scope");
       } catch {
         return privateJson({ error: "Cursor de pagos inválido." }, 400);
       }
@@ -98,20 +102,19 @@ export async function GET(req: NextRequest) {
 
     let query = db
       .from("casa_entries")
-      .select("id, polla_id, user_id, amount_cop, ticket_number, proof_path, current_proof_attempt_id, proof_uploaded_at, casa_pollas!inner(archived_at,status)")
-      .eq("status", "pendiente")
-      .is("casa_pollas.archived_at", null)
-          .in("casa_pollas.status", ["abierta", "cerrada"])
+      .select("id, polla_id, user_id, amount_cop, ticket_number, proof_path, current_proof_attempt_id, proof_uploaded_at, reviewed_at, casa_pollas!inner(archived_at,status)")
+      .eq("status", status)
       .not("proof_path", "is", null)
-      .order("proof_uploaded_at", { ascending: true, nullsFirst: false })
-      .order("id", { ascending: true });
+      .order("proof_uploaded_at", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: false });
+    if (status === "pendiente") query = query.is("casa_pollas.archived_at", null).in("casa_pollas.status", ["abierta", "cerrada"]);
     if (pollaId) query = query.eq("polla_id", pollaId);
     if (cursor) {
       // Seek after the last visible row, even if another admin or Telegram
       // has since resolved it or any preceding payment. NULL dates sort last.
       query = cursor.uploadedAt === null
-        ? query.is("proof_uploaded_at", null).gt("id", cursor.id)
-        : query.or(`proof_uploaded_at.gt.${cursor.uploadedAt},and(proof_uploaded_at.eq.${cursor.uploadedAt},id.gt.${cursor.id}),proof_uploaded_at.is.null`);
+        ? query.is("proof_uploaded_at", null).lt("id", cursor.id)
+        : query.or(`proof_uploaded_at.lt.${cursor.uploadedAt},and(proof_uploaded_at.eq.${cursor.uploadedAt},id.lt.${cursor.id}),proof_uploaded_at.is.null`);
     }
     // Keep ?page for older clients; the current queue always uses cursors.
     const { data: fetched, error: entriesError } = await (params.has("page") && !cursor
@@ -128,6 +131,7 @@ export async function GET(req: NextRequest) {
       id: lastEntry.id,
       uploadedAt: lastEntry.proof_uploaded_at ?? null,
       pollaId,
+      status,
     })).toString("base64url") : null;
 
     // Nombres y pollas en dos queries, no una por fila.
@@ -143,18 +147,28 @@ export async function GET(req: NextRequest) {
 
     const [{ data: users, error: usersError }, { data: pollas, error: pollasError }] = await Promise.all([
       db.from("users").select("id, display_name").in("id", userIds),
-      db.from("casa_pollas").select("id, name, slug").in("id", pollaIds),
+      db.from("casa_pollas").select("id, name, slug, status, archived_at, settled_at, settlement_outcome, casa_object_draws(id), casa_payouts(id)").in("id", pollaIds),
     ]);
     if (usersError || pollasError) return privateJson({ error: "No se pudieron cargar los datos de los pagos." }, 500);
 
     const nombre = new Map((users ?? []).map((u) => [u.id, u.display_name]));
     const polla = new Map((pollas ?? []).map((p) => [p.id, p]));
+    const attemptIds = entries.map((entry) => entry.current_proof_attempt_id).filter((id): id is string => Boolean(id));
+    const attemptsResult = attemptIds.length
+      ? await db.from("casa_entry_proof_attempts").select("id, review_revision").in("id", attemptIds)
+      : { data: [], error: null };
+    if (attemptsResult.error) return privateJson({ error: "No se pudo verificar la revisión de los comprobantes." }, 500);
+    const revisions = new Map((attemptsResult.data ?? []).map((attempt) => [attempt.id, attempt.review_revision]));
 
     const pendientes = await Promise.all(
       entries.map(async (e) => {
         // Capture legacy metadata once, then bind the displayed proof to its attempt.
         let attemptId = e.current_proof_attempt_id;
-        if (!attemptId) {
+        const pool = polla.get(e.polla_id);
+        const frozen = !pool || !["abierta", "cerrada"].includes(pool.status) || pool.archived_at != null
+          || pool.settled_at != null || pool.settlement_outcome != null
+          || (pool.casa_object_draws?.length ?? 0) > 0 || (pool.casa_payouts?.length ?? 0) > 0;
+        if (!attemptId && !(status === "pagada" && frozen)) {
           const captured = await db.rpc("casa_legacy_proof_attempt_v2", { p_entry_id: e.id, p_contract: 2, p_actor_id: user.id });
           if (captured.error) {
             if (["OPERATIONS_PAUSED", "CASA_V2_NOT_ACTIVE"].includes(captured.error.message)) throw captured.error;
@@ -170,6 +184,8 @@ export async function GET(req: NextRequest) {
         return ({
         id: e.id,
         attemptId,
+        revision: attemptId ? revisions.get(attemptId) ?? 0 : 0,
+        puedeDesmarcar: status === "pagada" && !frozen && Boolean(attemptId),
         pollaId: e.polla_id,
         jugador: nombre.get(e.user_id) ?? "Sin nombre",
         polla: polla.get(e.polla_id)?.name ?? "?",
@@ -177,6 +193,7 @@ export async function GET(req: NextRequest) {
         montoCop: e.amount_cop,
         boleta: e.ticket_number,
         subidoEn: e.proof_uploaded_at,
+        aprobadoEn: e.reviewed_at,
         // URL firmada de 1h: el bucket es privado y así se ve sin exponerlo.
         comprobanteUrl: e.proof_path ? await signedProofUrl(e.proof_path) : null,
       }); }),
@@ -198,12 +215,13 @@ export async function POST(req: NextRequest) {
   if (contractError) return contractError;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return casaJson({ error: "Datos inválidos." }, 400);
-  const { attemptId, decision, motivo } = parsed.data;
-  const { data, error } = await createAdminClient().rpc("casa_review_attempt_v2", {
-    p_attempt_id: attemptId, p_decision: decision === "aprobar" ? "pagada" : "rechazada",
-    p_reason: motivo ?? null, p_contract: 2, p_actor_id: user.id,
-  });
+  const { attemptId, decision, motivo, revision } = parsed.data;
+  if (decision === "desmarcar" && !motivo) return casaJson({ error: "Escribe el motivo de la corrección." }, 400);
+  const args = { p_attempt_id: attemptId, p_revision: revision, p_reason: motivo ?? null, p_contract: 2, p_actor_id: user.id };
+  const { data, error } = decision === "desmarcar"
+    ? await createAdminClient().rpc("casa_unpay_attempt_v2", args)
+    : await createAdminClient().rpc("casa_review_attempt_v3", { ...args, p_decision: decision === "aprobar" ? "pagada" : "rechazada" });
   if (error) return casaError(error);
-  if (data.changed) await notifyCasaReview(data.entry_id, data.polla_id, decision === "aprobar");
+  if (data.changed && decision !== "desmarcar") await notifyCasaReview(data.entry_id, data.polla_id, decision === "aprobar");
   return casaJson({ ok: true, ...data });
 }

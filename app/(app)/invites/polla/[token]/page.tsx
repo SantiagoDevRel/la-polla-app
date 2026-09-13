@@ -7,6 +7,7 @@
 // so the invitee can decide informed.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { TeamCrest } from "@/components/match/TeamCrest";
@@ -60,11 +61,13 @@ function formatMatchDate(iso: string, locale: string): string {
   const intlTag = locale === "en" ? "en-US" : "es-CO";
   const d = new Date(iso);
   const date = d.toLocaleDateString(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     weekday: "short",
     day: "numeric",
     month: "short",
   });
   const time = d.toLocaleTimeString(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -442,24 +445,12 @@ export default function OpenInvitePage() {
               <p className="text-text-secondary text-sm mt-0.5">{t("pollaEndedBody")}</p>
             </div>
           ) : authed === false ? (
-            <>
-              <button
-                onClick={goLogin}
-                className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all text-base"
-              >
-                {t("loginAndJoin")}
-              </button>
-              {polla.join_code ? (
-                <a
-                  href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER ?? "573117312391"}?text=${encodeURIComponent(`unirse ${polla.join_code}`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full block text-center text-text-muted text-xs pt-3 hover:text-[#25D366] transition-colors"
-                >
-                  {t("preferWhatsapp")}
-                </a>
-              ) : null}
-            </>
+            <button
+              onClick={goLogin}
+              className="w-full bg-gold text-bg-base font-semibold py-3.5 rounded-xl hover:brightness-110 transition-all text-base"
+            >
+              {t("loginAndJoin")}
+            </button>
           ) : (
             <button
               onClick={handleJoin}

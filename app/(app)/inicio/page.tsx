@@ -25,6 +25,7 @@
 // explicit user-scope filter.
 
 import { redirect } from "next/navigation";
+import { colombiaDateKey } from "@/lib/time/colombia";
 import { Clock } from "lucide-react";
 import { getLocale, getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
@@ -706,9 +707,8 @@ export default async function InicioPage() {
   let upcomingStripEntries: StripEntry[] = [];
   if (allUserMatchIds.length > 0) {
     const lockCutoff = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-    const tomorrowEnd = new Date();
-    tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
-    tomorrowEnd.setHours(23, 59, 59, 999);
+    const tomorrow = colombiaDateKey(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const tomorrowEnd = new Date(`${tomorrow}T23:59:59.999-05:00`);
     const { data: rows } = await admin
       .from("matches")
       .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, status, tournament")

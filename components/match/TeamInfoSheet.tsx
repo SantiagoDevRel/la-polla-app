@@ -10,6 +10,7 @@
 // fijo) para sobrevivir text-zoom de accesibilidad.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -142,6 +143,7 @@ function FlagCircle({ team, apiFlag, size }: { team: string; apiFlag: string | n
 
 function fmtShortDate(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
     hour: "numeric",
@@ -163,6 +165,7 @@ function fmtRelativeDate(iso: string | null, locale: string): string {
   const days = Math.round(hrs / 24);
   if (Math.abs(days) < 7) return rtf.format(-days, "day");
   return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
   }).format(new Date(iso));

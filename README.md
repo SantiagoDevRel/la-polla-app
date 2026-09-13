@@ -42,6 +42,10 @@ Get-Content -Raw scripts/match-schedule-check.sql | docker exec -i supabase_db_l
 npm test -- tests/match-schedule.test.ts tests/tournament-availability.test.ts tests/football-media.test.ts
 ```
 
+Info por polla, cuenta personal de pago, revisión de comprobantes, pozo fijo,
+publicación programada y fechas en Colombia: [contrato y pruebas de Casa](docs/casa-admin-rules.md)
+(migraciones 104–109; requieren Casa v2).
+
 ## Fútbol: calendario, partidos y equipos (API-Football Pro)
 
 La pestaña **Fútbol** (`/futbol`) presenta los diez torneos con sus logos,
@@ -402,7 +406,11 @@ CRON_SECRET=
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=573117312391
+# WhatsApp: apagado. El número anterior del bot ahora es de otra app.
+# Solo con un número propio: WHATSAPP_OUTBOUND_ENABLED=true y
+# NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=<E.164 sin +>.
+WHATSAPP_OUTBOUND_ENABLED=
+NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=
 ```
 
 ### 3. Supabase migrations

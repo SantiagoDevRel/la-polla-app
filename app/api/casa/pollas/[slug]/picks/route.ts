@@ -21,12 +21,10 @@ import {
   getPollaMatches,
 } from "@/lib/casa/queries";
 import { isPollaOpen } from "@/lib/casa/types";
+import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-/** Margen antes del pitazo. Igual criterio que el resto del repo: 5 minutos. */
-const LOCK_MS = 5 * 60_000;
 
 const pickSchema = z
   .object({
@@ -75,7 +73,7 @@ export async function PUT(
   if (!polla || polla.status === "borrador") {
     return NextResponse.json({ error: "Esa polla no existe." }, { status: 404 });
   }
-  if (!isPollaOpen(polla)) {
+  if (polla.kind === "partidos" ? !acceptsCasaMatchPicks(polla.status, polla.draw_pending) : !isPollaOpen(polla)) {
     return NextResponse.json(
       { error: "Esta polla ya cerró. Los pronósticos quedaron como estaban." },
       { status: 409 },
@@ -104,10 +102,7 @@ export async function PUT(
   const matches = await getPollaMatches(polla.id);
   const abiertos = new Set(
     matches
-      .filter(
-        (m: { scheduled_at: string }) =>
-          new Date(m.scheduled_at).getTime() - LOCK_MS > Date.now(),
-      )
+      .filter((m) => canEditCasaMatch(m))
       .map((m: { id: string }) => m.id),
   );
   const deLaPolla = new Set(matches.map((m: { id: string }) => m.id));
@@ -132,7 +127,7 @@ export async function PUT(
         continue;
       }
       if (!abiertos.has(p.matchId)) {
-        rechazados.push("Un partido ya arrancó y no se puede cambiar.");
+        rechazados.push("Un partido ya cerró sus pronósticos (5 minutos antes del inicio) o fue anulado.");
         continue;
       }
       // En modo 1X2 solo importa la opcion; en marcador, los dos numeros.

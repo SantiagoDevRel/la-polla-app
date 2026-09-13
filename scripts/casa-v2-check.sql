@@ -31,8 +31,12 @@ BEGIN
   FOR i IN 1..array_length(players,1) LOOP
     INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop)
       VALUES(p,players[i],CASE WHEN i<=3 THEN 'pagada'::public.casa_entry_status ELSE 'pendiente'::public.casa_entry_status END,10001) RETURNING id INTO e;
-    INSERT INTO public.casa_picks(entry_id,polla_id,user_id,question_id,option_id)
-      VALUES(e,p,players[i],q,CASE WHEN NOT zero_points AND (tied OR i=1) THEN yes_id ELSE no_id END);
+    -- A pending inscription without a submitted proof cannot author picks.
+    -- Keep that fourth account for unpaid exclusion and pending-draw guards.
+    IF i<=3 THEN
+      INSERT INTO public.casa_picks(entry_id,polla_id,user_id,question_id,option_id)
+        VALUES(e,p,players[i],q,CASE WHEN NOT zero_points AND (tied OR i=1) THEN yes_id ELSE no_id END);
+    END IF;
   END LOOP;
   PERFORM public.casa_resolve_question_v2(p,q,yes_id,NULL,2,admin_id,NULL);
   PERFORM public.casa_change_status_v2(p,'cerrar',2,admin_id,NULL);

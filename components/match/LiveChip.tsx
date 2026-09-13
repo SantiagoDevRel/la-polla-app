@@ -1,6 +1,7 @@
 // components/match/LiveChip.tsx — Tribuna Caliente §3.7
 "use client";
 
+import { COLOMBIA_TIME_ZONE, colombiaDateKey } from "@/lib/time/colombia";
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
@@ -49,26 +50,21 @@ function formatUpcoming(
   tomorrowLabel: string,
 ): string {
   const now = new Date();
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
-  const sameTomorrow =
-    date.getFullYear() === tomorrow.getFullYear() &&
-    date.getMonth() === tomorrow.getMonth() &&
-    date.getDate() === tomorrow.getDate();
+  const day = colombiaDateKey(date);
+  const sameDay = day === colombiaDateKey(now);
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const sameTomorrow = day === colombiaDateKey(tomorrow);
 
   const intlTag = locale === "en" ? "en-US" : "es-CO";
   const time = new Intl.DateTimeFormat(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
 
   if (sameDay) return `${todayLabel} · ${time}`;
   if (sameTomorrow) return `${tomorrowLabel} · ${time}`;
-  const weekday = new Intl.DateTimeFormat(intlTag, { weekday: "short" })
+  const weekday = new Intl.DateTimeFormat(intlTag, { timeZone: COLOMBIA_TIME_ZONE, weekday: "short" })
     .format(date)
     .replace(".", "")
     .toUpperCase();

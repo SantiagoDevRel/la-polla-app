@@ -8,6 +8,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MATCH_COLUMNS } from "@/lib/db/columns";
+import { hasCasaMatchStarted } from "./match-rules";
 import {
   CASA_ENTRY_COLUMNS,
   CASA_PICK_COLUMNS,
@@ -20,6 +21,7 @@ import {
   type CasaPolla,
   type CasaPot,
   type CasaQuestion,
+  isPollaPublished,
 } from "./types";
 
 async function withDrawState(pollas: CasaPolla[]): Promise<CasaPolla[]> {
@@ -43,6 +45,8 @@ export async function listPublicPollas(): Promise<CasaPolla[]> {
     .is("archived_at", null)
     .neq("status", "borrador")
     .neq("status", "anulada")
+    .neq("publication_mode", "oculta")
+    .lte("opens_at", new Date().toISOString())
     .order("closes_at", { ascending: true });
 
   if (error) throw error;
@@ -72,7 +76,7 @@ export async function getPollaBySlug(slug: string): Promise<CasaPolla | null> {
     .maybeSingle();
 
   if (error) throw error;
-  return data ? (await withDrawState([data as CasaPolla]))[0] : null;
+  return data && isPollaPublished(data as CasaPolla) ? (await withDrawState([data as CasaPolla]))[0] : null;
 }
 
 /**
@@ -129,7 +133,7 @@ export async function getPollaMatches(pollaId: string) {
   const db = createAdminClient();
   const { data: links, error } = await db
     .from("casa_polla_matches")
-    .select("match_id, order_index")
+    .select("match_id, order_index, voided_at")
     .eq("polla_id", pollaId)
     .order("order_index", { ascending: true });
 
@@ -149,7 +153,8 @@ export async function getPollaMatches(pollaId: string) {
       l.order_index,
     ]),
   );
-  return (matches ?? []).sort(
+  const voided = new Map((links ?? []).map(link => [link.match_id, link.voided_at]));
+  return (matches ?? []).map(match => ({ ...match, voided_at: voided.get(match.id) ?? null })).sort(
     (a: { id: string }, b: { id: string }) =>
       (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
   );
@@ -320,11 +325,18 @@ export async function getDistribution(pollaId: string): Promise<CasaDistribution
     p_polla_id: pollaId,
   });
   if (error) throw error;
-  return (data ?? {
+  const distribution = (data ?? {
     resultado: {},
     marcador: {},
     preguntas: {},
   }) as CasaDistribution;
+  const matches = await getPollaMatches(pollaId);
+  const visible = new Set(matches.filter(match => hasCasaMatchStarted(match)).map(match => match.id));
+  return {
+    resultado: Object.fromEntries(Object.entries(distribution.resultado ?? {}).filter(([id]) => visible.has(id))),
+    marcador: Object.fromEntries(Object.entries(distribution.marcador ?? {}).filter(([id]) => visible.has(id))),
+    preguntas: distribution.preguntas,
+  };
 }
 
 /** La cola del bot: pagos con pantallazo esperando que Tama decida. */
@@ -337,7 +349,7 @@ export async function listPendingProofs(limit = 20) {
     .is("casa_pollas.archived_at", null)
     .in("casa_pollas.status", ["abierta", "cerrada"])
     .not("proof_path", "is", null)
-    .order("proof_uploaded_at", { ascending: true })
+    .order("proof_uploaded_at", { ascending: false })
     .limit(limit);
 
   if (error) throw error;

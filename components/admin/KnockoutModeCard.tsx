@@ -7,6 +7,7 @@
 // pollas candidatas del Mundial.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import axios from "axios";
@@ -154,12 +155,14 @@ export default function KnockoutModeCard() {
                         120&apos; desde{" "}
                         {p.changedAt
                           ? new Date(p.changedAt).toLocaleDateString("es-CO", {
+                              timeZone: COLOMBIA_TIME_ZONE,
                               day: "numeric",
                               month: "short",
                             })
                           : "?"}
                         {p.advanceFrom
                           ? ` · avance desde ${new Date(p.advanceFrom).toLocaleDateString("es-CO", {
+                              timeZone: COLOMBIA_TIME_ZONE,
                               day: "numeric",
                               month: "short",
                             })}`

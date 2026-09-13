@@ -14,6 +14,8 @@ export type CasaPollaStatus =
 export type CasaEntryStatus = "pendiente" | "pagada" | "rechazada" | "anulada";
 export type CasaPrizeKind = "pozo" | "objeto";
 export type CasaCloseMode = "auto" | "manual";
+export type CasaPotMode = "proporcional" | "fijo";
+export type CasaPublicationMode = "ahora" | "programada" | "oculta";
 
 /** Margen antes del pitazo. UN solo numero para todo el repo. */
 export const LOCK_MINUTES = 5;
@@ -40,6 +42,9 @@ export interface CasaPolla {
    *   "objeto" -> una cosa. Ahi manda prize_object y la foto opcional.
    */
   prize_kind: CasaPrizeKind;
+  pot_mode?: CasaPotMode;
+  fixed_prize_cop?: number | null;
+  publication_mode?: CasaPublicationMode;
   prize_object: string | null;
   /** Ruta en el bucket publico `prize-images`. Solo para prize_kind objeto. */
   prize_image_path: string | null;
@@ -184,7 +189,7 @@ export interface CasaDistribution {
    Regla dura del repo: nunca `select("*")` en tablas con datos de usuario.
    Enumerar evita que una columna sensible futura se filtre sola. */
 export const CASA_POLLA_COLUMNS =
-  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_kind, prize_object, prize_image_path, points_exact, points_one_team, points_result, status, opens_at, closes_at, close_mode, ticket_count, draw_method, drawn_number, settled_at, settle_notes, settlement_outcome, payout_method, payout_account, payout_account_name, created_by, created_at" as const;
+  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_kind, pot_mode, fixed_prize_cop, publication_mode, prize_object, prize_image_path, points_exact, points_one_team, points_result, status, opens_at, closes_at, close_mode, ticket_count, draw_method, drawn_number, settled_at, settle_notes, settlement_outcome, payout_method, payout_account, payout_account_name, created_by, created_at" as const;
 
 export const CASA_ENTRY_COLUMNS =
   "id, polla_id, user_id, status, amount_cop, proof_path, current_proof_attempt_id, proof_uploaded_at, reviewed_at, reject_reason, ticket_number, created_at" as const;
@@ -195,8 +200,13 @@ export const CASA_PICK_COLUMNS =
 /* ── Helpers de dominio ─────────────────────────────────────────────── */
 
 /** Se puede seguir entrando / cambiando pronosticos? */
-export function isPollaOpen(polla: Pick<CasaPolla, "status" | "closes_at">): boolean {
-  return polla.status === "abierta" && new Date(polla.closes_at) > new Date();
+export function isPollaPublished(polla: Pick<CasaPolla, "status"> & Partial<Pick<CasaPolla, "opens_at" | "publication_mode">>, now = new Date()): boolean {
+  return polla.status !== "borrador" && polla.publication_mode !== "oculta" &&
+    (!polla.opens_at || new Date(polla.opens_at) <= now);
+}
+
+export function isPollaOpen(polla: Pick<CasaPolla, "status" | "closes_at"> & Partial<Pick<CasaPolla, "opens_at" | "publication_mode">>): boolean {
+  return isPollaPublished(polla) && polla.status === "abierta" && new Date(polla.closes_at) > new Date();
 }
 
 /** Etiqueta corta de estado, en el idioma de la app. */
@@ -206,7 +216,8 @@ export function pollaStatusLabel(polla: CasaPolla): {
 } {
   if (polla.status === "resuelta") return { text: "Resuelta", tone: "mute" };
   if (polla.status === "anulada") return { text: "Anulada", tone: "red" };
-  if (polla.status === "borrador") return { text: "Borrador", tone: "mute" };
+  if (polla.status === "borrador" || polla.publication_mode === "oculta") return { text: "Oculta", tone: "mute" };
+  if (new Date(polla.opens_at) > new Date()) return { text: "Programada", tone: "mute" };
   if (polla.draw_pending) return { text: "Desempate pendiente", tone: "red" };
   if (polla.status === "cerrada") return { text: "Cerrada", tone: "red" };
   if (new Date(polla.closes_at) <= new Date())

@@ -4,6 +4,7 @@
 // Paso 3: Configuración (cuota de entrada + modo de pago)
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { TeamCrest } from "@/components/match/TeamCrest";
@@ -801,7 +802,7 @@ export default function CrearPollaPage() {
                       const intlTag = locale === "en" ? "en-US" : "es-CO";
                       const time = isPlaceholder
                         ? t("tbd")
-                        : new Date(m.scheduled_at).toLocaleTimeString(intlTag, { hour: "2-digit", minute: "2-digit" });
+                        : new Date(m.scheduled_at).toLocaleTimeString(intlTag, { timeZone: COLOMBIA_TIME_ZONE, hour: "2-digit", minute: "2-digit" });
                       // Para placeholders mostramos el label de la fase
                       // + slot ("Cuartos · #1") en vez de "TBD vs TBD"
                       // que no le dice nada al user. Cuando ESPN publica

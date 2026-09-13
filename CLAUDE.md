@@ -22,6 +22,26 @@ anuncian como datos frescos. Sudamericana y `europa_2026` están activas; Europa
 API-Football 3 / ESPN `uefa.europa` y no consulta football-data sin cobertura.
 Pruebas y detalle del incidente: README → Horarios y torneos.
 
+### Info, pagos y publicación (2026-09-13, migraciones 104–109)
+
+Ver [docs/casa-admin-rules.md](docs/casa-admin-rules.md). El pozo fijo mantiene
+`prize_kind=pozo` y añade `pot_mode=fijo` + `fixed_prize_cop`: desde la migración
+109 es un **premio mínimo garantizado** con cualquier % de casa; las entradas lo
+cubren y del excedente la casa toma su % (mismo redondeo que el proporcional).
+Cálculo único `casa_money_prize_cop`, balance y preview en SQL; nunca en TS.
+`publication_mode` + `opens_at` filtran también en RLS y en las
+reservas. No mostrar ni admitir entradas antes de publicación. Pendientes en
+`/admin/pollas/recibos`, aprobados en `/admin/pollas/pagos`; desmarcar conserva
+comprobante/auditoría y exige revisión vigente. Info usa puntos configurados;
+el cierre de inscripciones no cierra partidos futuros. Nada se anula
+automáticamente: los partidos suspendidos, aplazados, cancelados o abandonados
+de pollas Casa activas van a `/admin/issues` (migración 108), donde el admin
+decide anular (0 puntos) o mantener; no se reparte con casos abiertos;
+`casa_sweep_match_issues` recupera registros perdidos. Un partido mantenido que
+vuelve a caer en ese estado abre un caso nuevo; uno anulado no reabre.
+Fechas visibles e inputs: `lib/time/colombia.ts`, siempre Colombia. No modificar
+`predictions` históricos ni activar modos operativos al instalar estas reglas.
+
 ### Navegación y actualización de la app (2026-09-09)
 
 Casa: Pollas abiertas → Mis pollas → Pollas cerradas, todas cerradas inicialmente,
@@ -393,13 +413,8 @@ se pierden ideas grandes que el usuario sí quería.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
-- **Chat embebido de Claude en /admin para hacer cambios al repo
-  desde el celular cuando no tiene PC a la mano.** Discutido
-  2026-04-29. El user pidió "este claude api tendria las mismas
-  capabilities tuyas" + opción de usar Opus. Le pasé 3 caminos
-  rankeados (Codespaces zero-code, GitHub Actions worker, Vercel
-  Sandbox v2). **Pendiente:** que el user elija un camino. Re-asks
-  pendientes hasta que decida.
+- (Sin ideas abiertas. El chat embebido de Claude en /admin quedó descartado
+  por ahora el 2026-09-13, por decisión del dueño.)
 <!-- Pollas combinadas multi-torneo: COMPLETADO 2026-04-30. Migración
      038 + UI de creación con multi-select + display con stack de logos
      en PollaCard y header de detail. Removido de pendings. -->
@@ -1164,7 +1179,14 @@ Where it matters most we use reply buttons:
 - `META_WA_ACCESS_TOKEN`, `META_WA_PHONE_NUMBER_ID` — outbound sends.
 - `META_WA_APP_SECRET` — inbound HMAC signature verification.
 - `META_WA_WEBHOOK_VERIFY_TOKEN` — Meta subscription handshake.
-- `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` — bot's E.164 number (no plus).
+- `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` — bot's E.164 number (no plus). Sin
+  valor por defecto: sin la variable no existe enlace al bot.
+
+⛔ **WhatsApp apagado (2026-09-13).** El número del bot ahora pertenece a
+otra app. La Polla no lo muestra ni envía desde él: login solo por SMS, sin
+enlaces `wa.me` al bot, y `lib/whatsapp/outbound.ts` convierte todo envío
+(texto, interactivo, template y el cron de recordatorios) en no-op salvo
+`WHATSAPP_OUTBOUND_ENABLED=true`. No reactivar sin un número propio.
 
 ### Tone Rules (non-negotiable) — REESCRITAS 2026-09-02
 

@@ -14,10 +14,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { Label, SectionHead, StreetCard, Tape } from "@/components/street";
-import { formatCop, formatMatchTime } from "@/lib/casa/format";
+import { formatCop, formatMatchTime, formatNumber } from "@/lib/casa/format";
 import { LOCK_MINUTES } from "@/lib/casa/types";
 import { CREATABLE_TOURNAMENTS, getTournamentLogo, getTournamentLogoClassName } from "@/lib/tournaments";
 import { TeamCrest } from "@/components/match/TeamCrest";
+import { ColombiaDateTimeField } from "@/components/casa/ColombiaDateTimeField";
+import { colombiaDateTimeToIso, nextColombiaSaturdayInput, toColombiaDateTimeInput } from "@/lib/time/colombia";
 
 type Kind = "partidos" | "manual" | "rifa";
 
@@ -43,16 +45,8 @@ interface Pregunta {
 }
 
 /** Por defecto la polla cierra el sábado que viene a las 12:00 (Bogotá). */
-function proximoCierre(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7));
-  d.setHours(12, 0, 0, 0);
-  return toLocalInput(d);
-}
-function toLocalInput(d: Date): string {
-  const off = d.getTimezoneOffset() * 60_000;
-  return new Date(d.getTime() - off).toISOString().slice(0, 16);
-}
+const proximoCierre = nextColombiaSaturdayInput;
+const toLocalInput = toColombiaDateTimeInput;
 
 export function CrearPollaForm() {
   const router = useRouter();
@@ -61,7 +55,7 @@ export function CrearPollaForm() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [precio, setPrecio] = useState(10000);
-  const [houseCut, setHouseCut] = useState(30);
+  const [houseCut, setHouseCut] = useState(0);
   const [closesAt, setClosesAt] = useState(proximoCierre);
 
   // ── Premio ─────────────────────────────────────────────────────────
@@ -69,6 +63,10 @@ export function CrearPollaForm() {
   // decir "el premio es el pozo" habia que escribirlo a mano, con lo que
   // cada polla lo contaba distinto y la cifra nunca se actualizaba sola.
   const [prizeKind, setPrizeKind] = useState<"pozo" | "objeto">("pozo");
+  const [potMode, setPotMode] = useState<"proporcional" | "fijo">("fijo");
+  const [fixedPrize, setFixedPrize] = useState<number | "">("");
+  const [publicationMode, setPublicationMode] = useState<"ahora" | "programada" | "oculta">("ahora");
+  const [publishesAt, setPublishesAt] = useState(() => toColombiaDateTimeInput(new Date(Date.now() + 60 * 60_000)));
   const [premioObjeto, setPremioObjeto] = useState("");
   const [prizeImagePath, setPrizeImagePath] = useState<string | null>(null);
   const [prizeImageUrl, setPrizeImageUrl] = useState<string | null>(null);
@@ -85,6 +83,7 @@ export function CrearPollaForm() {
   const [payoutMethod, setPayoutMethod] = useState("Nequi");
   const [payoutAccount, setPayoutAccount] = useState("");
   const [payoutAccountName, setPayoutAccountName] = useState("");
+  const payoutTouched = useRef(false);
 
   // partidos
   const [tournament, setTournament] = useState(
@@ -144,7 +143,7 @@ export function CrearPollaForm() {
   }, [kind, closeMode]);
 
   const cierreTarde =
-    primerKickoff !== null && new Date(closesAt).getTime() > primerKickoff;
+    primerKickoff !== null && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(closesAt) && new Date(`${closesAt}:00-05:00`).getTime() > primerKickoff;
 
   // manual
   const [preguntas, setPreguntas] = useState<Pregunta[]>([
@@ -169,7 +168,7 @@ export function CrearPollaForm() {
         const ultima = (j.pollas ?? []).find(
           (p: { payout_account?: string | null }) => p.payout_account,
         );
-        if (!ultima) return;
+        if (!ultima || payoutTouched.current) return;
         setPayoutMethod(ultima.payout_method ?? "Nequi");
         setPayoutAccount(ultima.payout_account ?? "");
         setPayoutAccountName(ultima.payout_account_name ?? "");
@@ -304,11 +303,11 @@ export function CrearPollaForm() {
       return setError("Elige al menos un partido.");
     if (kind === "manual" && preguntas.every((q) => !q.prompt.trim()))
       return setError("Escribe al menos una pregunta.");
-    if (kind === "rifa" && premioObjeto.trim().length < 3)
-      return setError("Escribe qué se rifa.");
     if (prizeKind === "objeto" && premioObjeto.trim().length < 3)
       return setError("Escribe cuál es el premio.");
-    if (publicar && precio > 0 && payoutAccount.trim().length < 5)
+    if (prizeKind === "pozo" && potMode === "fijo" && (!fixedPrize || fixedPrize <= 0))
+      return setError("Escribe el premio garantizado.");
+    if (publicar && publicationMode !== "oculta" && precio > 0 && payoutAccount.trim().length < 5)
       return setError("Falta la cuenta de cobro: sin eso nadie puede pagar.");
 
     setGuardando(true);
@@ -320,9 +319,13 @@ export function CrearPollaForm() {
         houseCutPct: prizeKind === "objeto" ? 100 : houseCut,
         // En modo auto el server ignora este valor y lo recalcula desde el
         // primer partido; se manda igual porque el schema lo exige.
-        closesAt: new Date(closesAt).toISOString(),
+        closesAt: colombiaDateTimeToIso(closesAt),
         closeMode,
         prizeKind,
+        potMode: prizeKind === "objeto" ? "proporcional" : potMode,
+        fixedPrizeCop: prizeKind === "pozo" && potMode === "fijo" ? fixedPrize : undefined,
+        publicationMode: publicar ? publicationMode : "oculta",
+        publishesAt: publicar && publicationMode === "programada" ? colombiaDateTimeToIso(publishesAt) : undefined,
         prizeObject: premioObjeto.trim() || undefined,
         prizeImagePath: prizeImagePath ?? undefined,
         payoutMethod: payoutMethod.trim() || undefined,
@@ -363,37 +366,57 @@ export function CrearPollaForm() {
         router.push(`/casa/${json.slug}`);
       } else {
         setError(null);
-        setMsgOk("Guardado como borrador. No es visible hasta que lo publiques.");
+        setMsgOk(json.programada ? `Publicación programada: ${formatMatchTime(json.opens_at)}. Puedes administrarla desde el panel.` : "Polla guardada oculta. Puedes publicarla desde Administrar pollas.");
       }
       router.refresh();
-    } catch {
-      setError("Error de conexión.");
+    } catch (cause) {
+      setError(cause instanceof RangeError ? "Completa una fecha y hora válidas de Colombia." : "Error de conexión.");
     } finally {
       setGuardando(false);
     }
   }
 
-  const [previewMoney, setPreviewMoney] = useState<{ entry_prize: number; entry_house: number; ten_prize: number; all_prize: number } | null>(null);
+  // Pozo fijo = premio mínimo garantizado (migración 109). Todas las cifras,
+  // incluidos los inscritos que cubren el mínimo, salen del preview en SQL.
+  const [previewMoney, setPreviewMoney] = useState<{ entry_prize: number; entry_house: number; ten_prize: number; all_prize: number;
+    fixed_prize?: number; entries_to_cover?: number | null } | null>(null);
   const [previewError, setPreviewError] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     setPreviewMoney(null); setPreviewError(false);
     const timer = setTimeout(() => {
       const query = new URLSearchParams({ price: String(precio), cut: String(houseCut), tickets: String(boletas), kind: prizeKind });
+      query.set("mode", prizeKind === "objeto" ? "proporcional" : potMode);
+      if (prizeKind === "pozo" && potMode === "fijo") {
+        if (!fixedPrize) return;
+        query.set("fixed", String(fixedPrize));
+      }
       fetch(`/api/casa/admin/prize-preview?${query}`, { signal: controller.signal, cache: "no-store" })
         .then(async (response) => { if (!response.ok) throw new Error(); return response.json(); }).then(setPreviewMoney)
         .catch(() => { if (!controller.signal.aborted) setPreviewError(true); });
     }, 300);
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [precio, houseCut, boletas, prizeKind]);
+  }, [precio, houseCut, boletas, prizeKind, potMode, fixedPrize]);
   const previewCop = (field: "entry_prize" | "entry_house" | "ten_prize" | "all_prize") => previewMoney ? formatCop(previewMoney[field]) : "—";
+  const fixedHelp = (() => {
+    if (!fixedPrize) return "Escribe el premio que la casa garantiza al ganador o a los ganadores empatados.";
+    if (previewMoney?.fixed_prize === undefined) return previewError ? "" : "Calculando el reparto...";
+    const premio = `Premio garantizado de ${formatCop(previewMoney.fixed_prize)}.`;
+    const cover = previewMoney.entries_to_cover;
+    if (cover === null || cover === undefined) return `${premio} La casa cubre el premio completo.`;
+    const split = [
+      previewMoney.entry_prize > 0 && `${formatCop(previewMoney.entry_prize)} al pozo`,
+      previewMoney.entry_house > 0 && `${formatCop(previewMoney.entry_house)} a la casa`,
+    ].filter(Boolean).join(" y ");
+    return `${premio} Se cubre con ${formatNumber(cover)} ${cover === 1 ? "inscrito" : "inscritos"}; desde el inscrito ${formatNumber(cover + 1)}, cada entrada suma ${split}.`;
+  })();
 
   return (
     <div className="space-y-5">
       {/* ── Tipo ────────────────────────────────────────────────────────── */}
       <div>
         <Label>Tipo de polla</Label>
-        <div className="mt-2 grid grid-cols-3 gap-px">
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
           {(
             [
               ["partidos", "Partidos"],
@@ -421,6 +444,7 @@ export function CrearPollaForm() {
           <Label>Nombre</Label>
           <input
             value={name}
+            aria-label="Nombre de la polla"
             onChange={(e) => setName(e.target.value)}
             placeholder="Fecha 5 · Premier"
             className="lp-input mt-2"
@@ -431,17 +455,19 @@ export function CrearPollaForm() {
           <Label>Descripción (opcional)</Label>
           <input
             value={description}
+            aria-label="Descripción de la polla"
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Los 8 del sábado. Solo local, empate o visitante."
             className="lp-input mt-2"
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="min-w-0">
             <Label>Entrada (COP)</Label>
             <input
               type="number"
+              aria-label="Entrada (COP)"
               min={0}
               step={1000}
               value={precio}
@@ -449,16 +475,17 @@ export function CrearPollaForm() {
               className="lp-input lp-money mt-2 text-[18px]"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <Label>Se queda la casa</Label>
             <div className="mt-2 flex items-center gap-2">
               <input
                 type="number"
+                aria-label="Porcentaje que se queda la casa"
                 min={0}
                 max={100}
                 value={prizeKind === "objeto" ? 100 : houseCut}
                 disabled={prizeKind === "objeto"}
-                onChange={(e) => setHouseCut(Number(e.target.value))}
+              onChange={(e) => setHouseCut(Number(e.target.value))}
                 className="lp-input lp-money text-[18px]"
               />
               <span className="lp-money shrink-0 text-[18px] text-text-muted">%</span>
@@ -466,151 +493,26 @@ export function CrearPollaForm() {
           </div>
         </div>
 
-        {/* La cuenta, en vivo. Que Tama vea el reparto antes de publicar. */}
-        <p className="border-t border-border-subtle pt-3 text-[12px] text-text-muted">
-          {previewError && <span className="block text-red-alert">No se pudo consultar el cálculo. Revisa los valores antes de publicar.</span>}
-          {prizeKind === "objeto" ? <>La inscripción es para participar por el objeto anunciado. La casa recibe <b className="text-text-primary">{previewCop("entry_house")}</b> por persona y entrega el objeto; no se reparte dinero.</>
-            : <>Por cada persona que entre: <b className="text-text-primary">{previewCop("entry_prize")}</b> al pozo y <b className="text-text-primary">{previewCop("entry_house")}</b> a la casa.</>}
-        </p>
-
-        {/* Cuenta de cobro — sin esto la polla no se puede pagar. */}
-        <div className="border-t border-border-subtle pt-4">
-          <Label>Cuenta de cobro</Label>
-          <div className="mt-2 grid grid-cols-3 gap-px">
-            {["Nequi", "Daviplata", "Banco"].map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setPayoutMethod(m)}
-                className={`lp-btn text-[12px] ${
-                  payoutMethod === m ? "lp-btn-primary" : "lp-btn-ghost bg-bg-elevated"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-          <input
-            value={payoutAccount}
-            onChange={(e) => setPayoutAccount(e.target.value)}
-            placeholder="300 123 4567"
-            inputMode="numeric"
-            className="lp-input lp-money mt-2 text-[18px]"
-          />
-          <input
-            value={payoutAccountName}
-            onChange={(e) => setPayoutAccountName(e.target.value)}
-            placeholder="A nombre de..."
-            className="lp-input mt-2"
-          />
-          <p className="mt-2 text-[11px] text-text-muted">
-            Es la cuenta que ven los inscritos para transferir. Sin esto no
-            puedes publicar una polla con precio.
-          </p>
-        </div>
-
-        {/* ── Cuándo cierra ──────────────────────────────────────────
-              El modo automático es el default porque es el que casi siempre
-              se quiere y el que no se puede equivocar: la hora la calcula el
-              server leyendo los partidos, no el navegador. */}
-        <div>
-          <Label>Cuándo cierra</Label>
-          <div className="mt-2 grid grid-cols-2 gap-px">
-            {(
-              [
-                { v: "auto", t: "Automático" },
-                { v: "manual", t: "Fecha manual" },
-              ] as const
-            ).map((o) => {
-              const on = closeMode === o.v;
-              const off = o.v === "auto" && kind !== "partidos";
-              return (
-                <button
-                  key={o.v}
-                  type="button"
-                  disabled={off}
-                  onClick={() => setCloseMode(o.v)}
-                  className={`px-4 py-3 text-[14px] font-semibold transition-colors ${
-                    on
-                      ? "bg-gold text-bg-base"
-                      : off
-                        ? "bg-bg-elevated text-text-muted opacity-40"
-                        : "bg-bg-elevated text-text-secondary"
-                  }`}
-                >
-                  {o.t}
-                </button>
-              );
-            })}
-          </div>
-
-          {closeMode === "auto" ? (
-            <p className="mt-2 text-[12px] leading-relaxed text-text-secondary">
-              Cierra 5 minutos antes de que arranque el primer partido que
-              elijas
-              {primerKickoff !== null ? (
-                <>
-                  {" "}
-                  &mdash;{" "}
-                  <span className="text-text-primary">
-                    {formatMatchTime(
-                      new Date(primerKickoff - LOCK_MINUTES * 60_000).toISOString(),
-                    )}
-                  </span>
-                </>
-              ) : (
-                ". Elige los partidos abajo y aquí te muestro la hora exacta."
-              )}
-            </p>
-          ) : (
-            <>
-              <input
-                type="datetime-local"
-                value={closesAt}
-                onChange={(e) => {
-                  cierreTocado.current = true;
-                  setClosesAt(e.target.value);
-                }}
-                className="lp-input mt-2"
-              />
-              {cierreTarde ? (
-                // No es un error que impida publicar: es una decisión válida
-                // (dejar entrar gente el domingo aunque el sábado ya se jugó).
-                // Pero tiene que estar dicho, porque cambia lo que recibe el
-                // que entra tarde.
-                <p className="mt-2 text-[12px] leading-relaxed text-amber">
-                  Cierra después de que arranque el primer partido. Quien entre
-                  tarde igual va a poder inscribirse, pero NO va a poder
-                  pronosticar los partidos ya empezados: entra con esos puntos
-                  perdidos.
-                </p>
-              ) : (
-                <p className="mt-2 text-[11px] text-text-muted">
-                  Hora de tu teléfono.
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
         {/* ── El premio ──────────────────────────────────────────────── */}
         <div>
           <Label>Premio</Label>
-          <div className="mt-2 grid grid-cols-2 gap-px">
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {(
               [
-                { v: "pozo", t: "El pozo" },
-                { v: "objeto", t: "Un objeto" },
+                { v: "fijo", t: "Pozo fijo" },
+                { v: "proporcional", t: "Pozo proporcional" },
+                { v: "objeto", t: "Objeto" },
               ] as const
             ).map((o) => {
-              const on = prizeKind === o.v;
+              const on = o.v === "objeto" ? prizeKind === "objeto" : prizeKind === "pozo" && potMode === o.v;
               return (
                 <button
                   key={o.v}
                   type="button"
-                  onClick={() => setPrizeKind(o.v)}
-                  className={`px-4 py-3 text-[14px] font-semibold transition-colors ${
-                    on ? "bg-gold text-bg-base" : "bg-bg-elevated text-text-secondary"
+                  aria-pressed={on}
+                  onClick={() => { setPrizeKind(o.v === "objeto" ? "objeto" : "pozo"); if (o.v !== "objeto") setPotMode(o.v); }}
+                  className={`lp-btn min-w-0 px-3 py-3 text-[15px] font-semibold ${
+                    on ? "lp-btn-primary" : "lp-btn-ghost bg-bg-elevated"
                   }`}
                 >
                   {o.t}
@@ -619,7 +521,15 @@ export function CrearPollaForm() {
             })}
           </div>
 
-          {prizeKind === "pozo" ? (
+          {prizeKind === "pozo" && potMode === "fijo" ? (
+            <div className="mt-3">
+              <label htmlFor="fixed-prize" className="block text-[15px] font-semibold text-text-primary">Premio garantizado (COP)</label>
+              <input id="fixed-prize" type="number" min={1} max={1000000000} step={1000} value={fixedPrize}
+                onChange={(event) => setFixedPrize(event.target.value === "" ? "" : Number(event.target.value))}
+                placeholder="Ej. 1000000" className="lp-input mt-2 text-[18px] tabular-nums" />
+              {fixedHelp && <p className="mt-2 text-[13px] leading-relaxed text-text-secondary" aria-live="polite">{fixedHelp}</p>}
+            </div>
+          ) : prizeKind === "pozo" ? (
             // La cifra es VIVA: crece con cada inscripción. Por eso se muestra
             // calculada y no como un texto que el admin escriba.
             <div className="mt-3 border border-border-subtle bg-bg-elevated p-3">
@@ -671,6 +581,152 @@ export function CrearPollaForm() {
             </div>
           )}
         </div>
+
+        {/* La cuenta, en vivo. Que Tama vea el reparto antes de publicar. */}
+        <p className="border-t border-border-subtle pt-3 text-[12px] text-text-muted">
+          {previewError && <span className="block text-red-alert">No se pudo consultar el cálculo. Revisa los valores antes de publicar.</span>}
+          {prizeKind === "objeto" ? <>La inscripción es para participar por el objeto anunciado. La casa recibe <b className="text-text-primary">{previewCop("entry_house")}</b> por persona y entrega el objeto; no se reparte dinero.</>
+            : potMode === "fijo" ? <>Las entradas cubren primero el premio garantizado; si no alcanzan, la casa pone la diferencia. Lo que entre por encima se reparte entre el pozo y la casa según el porcentaje que definiste.</>
+            : <>Por cada persona que entre: <b className="text-text-primary">{previewCop("entry_prize")}</b> al pozo y <b className="text-text-primary">{previewCop("entry_house")}</b> a la casa.</>}
+        </p>
+
+        {/* Cuenta de cobro — sin esto la polla no se puede pagar. */}
+        <div className="border-t border-border-subtle pt-4">
+          <Label>Cuenta de cobro</Label>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {["Nequi", "Daviplata", "Banco"].map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => { payoutTouched.current = true; setPayoutMethod(m); }}
+                className={`lp-btn text-[12px] ${
+                  payoutMethod === m ? "lp-btn-primary" : "lp-btn-ghost bg-bg-elevated"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <input
+            value={payoutAccount}
+            onChange={(e) => { payoutTouched.current = true; setPayoutAccount(e.target.value); }}
+            aria-label="Número de cuenta de cobro"
+            placeholder="300 123 4567"
+            inputMode="numeric"
+            className="lp-input lp-money mt-2 text-[18px]"
+          />
+          <input
+            value={payoutAccountName}
+            onChange={(e) => { payoutTouched.current = true; setPayoutAccountName(e.target.value); }}
+            aria-label="Titular de la cuenta de cobro"
+            placeholder="A nombre de..."
+            className="lp-input mt-2"
+          />
+          <p className="mt-2 text-[11px] text-text-muted">
+            Es la cuenta que ven los inscritos para transferir. Sin esto no
+            puedes publicar una polla con precio.
+          </p>
+        </div>
+
+        {/* ── Cuándo cierra ──────────────────────────────────────────
+              El modo automático es el default porque es el que casi siempre
+              se quiere y el que no se puede equivocar: la hora la calcula el
+              server leyendo los partidos, no el navegador. */}
+        <div>
+          <Label>Cuándo se cierra la entrada de participantes</Label>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {(
+              [
+                { v: "auto", t: "Automático" },
+                { v: "manual", t: "Fecha manual" },
+              ] as const
+            ).map((o) => {
+              const on = closeMode === o.v;
+              const off = o.v === "auto" && kind !== "partidos";
+              return (
+                <button
+                  key={o.v}
+                  type="button"
+                  disabled={off}
+                  onClick={() => setCloseMode(o.v)}
+                  className={`min-w-0 cursor-pointer rounded-full px-4 py-3 text-[15px] font-semibold transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold ${
+                    on
+                      ? "bg-gold text-bg-base"
+                      : off
+                        ? "bg-bg-elevated text-text-muted opacity-40"
+                        : "bg-bg-elevated text-text-secondary"
+                  }`}
+                >
+                  {o.t}
+                </button>
+              );
+            })}
+          </div>
+
+          {closeMode === "auto" ? (
+            <p className="mt-2 text-[12px] leading-relaxed text-text-secondary">
+              Cierra 5 minutos antes de que arranque el primer partido que
+              elijas
+              {primerKickoff !== null ? (
+                <>
+                  {" "}
+                  &mdash;{" "}
+                  <span className="text-text-primary">
+                    {formatMatchTime(
+                      new Date(primerKickoff - LOCK_MINUTES * 60_000).toISOString(),
+                    )}
+                  </span>
+                </>
+              ) : (
+                ". Elige los partidos abajo y aquí te muestro la hora exacta."
+              )}
+            </p>
+          ) : (
+            <>
+              <ColombiaDateTimeField
+                label="Cierre de inscripciones"
+                value={closesAt}
+                onChange={(value) => {
+                  cierreTocado.current = true;
+                  setClosesAt(value);
+                }}
+              />
+              {cierreTarde ? (
+                // No es un error que impida publicar: es una decisión válida
+                // (dejar entrar gente el domingo aunque el sábado ya se jugó).
+                // Pero tiene que estar dicho, porque cambia lo que recibe el
+                // que entra tarde.
+                <p className="mt-2 text-[12px] leading-relaxed text-amber">
+                  Cierra después de que arranque el primer partido. Quien entre
+                  tarde igual va a poder inscribirse, pero NO va a poder
+                  pronosticar los partidos ya empezados: entra con esos puntos
+                  perdidos.
+                </p>
+              ) : (
+                <p className="mt-2 text-[11px] text-text-muted">
+                  La inscripción cierra a esta hora; cada partido permite pronosticar hasta 5 minutos antes de su inicio.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div>
+          <Label>Cuándo se publica esta polla</Label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {([{ v: "ahora", t: "Ya" }, { v: "programada", t: "Fecha manual" }, { v: "oculta", t: "Dejar oculta" }] as const).map((option) => (
+              <button key={option.v} type="button" aria-pressed={publicationMode === option.v} onClick={() => setPublicationMode(option.v)}
+                className={`lp-btn min-w-0 grow basis-32 text-[15px] ${publicationMode === option.v ? "lp-btn-primary" : "lp-btn-ghost bg-bg-elevated"}`}>
+                {option.t}
+              </button>
+            ))}
+          </div>
+          {publicationMode === "programada" && <ColombiaDateTimeField label="Publicación" value={publishesAt} onChange={setPublishesAt} />}
+          <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
+            {publicationMode === "programada" ? "Aparecerá automáticamente en la fecha elegida, antes del cierre de inscripciones." : publicationMode === "oculta" ? "Solo la administración podrá verla. Puedes publicarla o programarla después." : "Estará disponible al guardar la polla."}
+          </p>
+        </div>
+
 
       </StreetCard>
 
@@ -907,8 +963,8 @@ export function CrearPollaForm() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="min-w-0">
                     <Label>Puntos</Label>
                     <input
                       type="number"
@@ -921,13 +977,13 @@ export function CrearPollaForm() {
                       className="lp-input lp-money mt-2"
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <Label>Respuesta</Label>
-                    <div className="mt-2 grid grid-cols-2 gap-px">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => setPregunta(i, { inputKind: "opciones" })}
-                        className={`lp-btn text-[11px] ${
+                        className={`lp-btn grow basis-32 text-[15px] ${
                           q.inputKind === "opciones"
                             ? "lp-btn-primary"
                             : "lp-btn-ghost bg-bg-elevated"
@@ -938,7 +994,7 @@ export function CrearPollaForm() {
                       <button
                         type="button"
                         onClick={() => setPregunta(i, { inputKind: "texto" })}
-                        className={`lp-btn text-[11px] ${
+                        className={`lp-btn grow basis-32 text-[15px] ${
                           q.inputKind === "texto"
                             ? "lp-btn-primary"
                             : "lp-btn-ghost bg-bg-elevated"
@@ -1005,18 +1061,7 @@ export function CrearPollaForm() {
           {/* En una rifa el premio es obligatorio: es LA razón por la que
               alguien compra la boleta. En las otras pollas el premio es el
               pozo en plata y esto es un extra opcional (el campo de arriba). */}
-          <div>
-            <Label>Qué se rifa</Label>
-            <input
-              value={premioObjeto}
-              onChange={(e) => setPremioObjeto(e.target.value)}
-              placeholder="Camiseta firmada por el plantel"
-              className="lp-input mt-2"
-            />
-            <p className="mt-2 text-[11px] text-text-muted">
-              Obligatorio. Es lo primero que se lee.
-            </p>
-          </div>
+          <p className="text-[13px] text-text-secondary">Las boletas participan por el premio que elegiste arriba.</p>
 
           <div>
             <Label>Cuántas boletas</Label>
@@ -1060,7 +1105,7 @@ export function CrearPollaForm() {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-px">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button
           type="button"
           onClick={() => crear(false)}
@@ -1075,12 +1120,12 @@ export function CrearPollaForm() {
           disabled={guardando}
           className="lp-btn lp-btn-primary"
         >
-          {guardando ? "Creando..." : "Publicar"}
+          {guardando ? "Creando..." : publicationMode === "programada" ? "Programar publicación" : publicationMode === "oculta" ? "Guardar oculta" : "Publicar"}
         </button>
       </div>
 
       <p className="pb-6 text-center text-[11px] text-text-muted">
-        <Tape tone="mute">Borrador</Tape> queda oculta hasta que la publiques.
+        Si guardas un borrador, solo aparecerá en Administrar pollas hasta que lo publiques.
       </p>
     </div>
   );

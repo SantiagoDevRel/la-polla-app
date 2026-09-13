@@ -10,6 +10,10 @@ export function requireCasaContract(request: Request) {
 }
 
 const messages: Record<string, string> = {
+  INVALID_FIXED_PRIZE: "Elige un premio fijo mayor a cero.",
+  INVALID_PUBLICATION_DATE: "La publicación debe ser futura y anterior al cierre de inscripciones.",
+  PUBLICATION_HAS_ENTRIES: "Esta polla ya tiene inscripciones; su publicación no puede cambiar.",
+  POLLA_NOT_PUBLISHED: "Esta polla todavía no está publicada.",
   OPERATIONS_PAUSED: "Estamos actualizando las inscripciones. Intenta de nuevo en unos minutos; si ya transferiste, no repitas el pago.",
   UPDATE_REQUIRED: "Actualiza la app para continuar.",
   CASA_V2_NOT_ACTIVE: "Estamos actualizando la app. Intenta de nuevo en unos minutos.",
@@ -43,6 +47,10 @@ const messages: Record<string, string> = {
   REQUEST_CONFLICT: "Este intento corresponde a otros datos. Conserva el archivo y el ganador originales.",
   INVALID_DRAW_WINNER: "El ganador debe pertenecer a la lista de participantes empatados.",
   ADMIN_REQUIRED: "No tienes permiso para esa operación.",
+  ISSUE_NOT_FOUND: "No encontramos ese caso.",
+  ISSUE_ALREADY_DECIDED: "Este caso ya fue decidido.",
+  INVALID_DECISION: "Elige anular o mantener el partido.",
+  OPEN_MATCH_ISSUES: "Hay partidos con novedades sin decidir. Revísalos en Issues antes de repartir.",
 };
 
 export function casaErrorMessage(error: { message?: string; code?: string }): string {

@@ -18,6 +18,7 @@
 
 import { sendTextMessage } from "@/lib/whatsapp/bot";
 import { Resend } from "resend";
+import { formatColombiaDateTime } from "@/lib/time/colombia";
 
 export interface AdminAlertArgs {
   /** Título corto. Se muestra como subject del email + primer línea WA. */
@@ -38,12 +39,13 @@ export async function notifyAdmin({ title, body, category }: AdminAlertArgs): Pr
     whatsapp: { sent: false },
     email: { sent: false },
   };
+  const timestamp = `${formatColombiaDateTime(new Date(), { dateStyle: "medium", timeStyle: "short" })} (Colombia)`;
 
   // ── WhatsApp ──────────────────────────────────────────────────────
   const waPhone = process.env.FEEDBACK_NOTIFY_WHATSAPP?.trim();
   if (waPhone) {
     try {
-      const text = `⚠️ *${title}*\n\n${body}\n\n_Alert: ${category}_\n_${new Date().toISOString()}_`;
+      const text = `⚠️ *${title}*\n\n${body}\n\n_Alert: ${category}_\n_${timestamp}_`;
       await sendTextMessage(waPhone, text);
       result.whatsapp.sent = true;
     } catch (err) {
@@ -63,7 +65,7 @@ export async function notifyAdmin({ title, body, category }: AdminAlertArgs): Pr
         from,
         to: adminEmail,
         subject: `[La Polla][${category}] ${title}`,
-        text: `${body}\n\n---\nCategory: ${category}\nTimestamp: ${new Date().toISOString()}`,
+        text: `${body}\n\n---\nCategory: ${category}\nTimestamp: ${timestamp}`,
       });
       result.email.sent = true;
     } catch (err) {

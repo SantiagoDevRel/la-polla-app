@@ -38,10 +38,12 @@ import { HeroFrame, Label, SectionHead, StreetCard, Tape } from "@/components/st
 import { PicksBoard } from "@/components/casa/PicksBoard";
 import { QuestionsBoard } from "@/components/casa/QuestionsBoard";
 import { PollaTabs } from "@/components/casa/PollaTabs";
+import { PollaInfo } from "@/components/casa/PollaInfo";
 import { EliminarPolla } from "@/components/casa/EliminarPolla";
 import { MisBoletas } from "@/components/casa/Boletas";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
+import { acceptsCasaMatchPicks } from "@/lib/casa/match-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -147,6 +149,10 @@ export default async function PollaPage({
             <div className="lp-money text-[32px] leading-none text-gold">
               {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
             </div>
+            {/* Pozo fijo = mínimo garantizado (migración 109): la cifra de arriba puede crecer. */}
+            {polla.prize_kind !== "objeto" && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
+              <p className="mt-1 text-[13px] text-text-secondary">Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</p>
+            )}
           </div>
           <span className="text-[12px] text-text-secondary">
             {pot.paid_entries} inscritos ·{" "}
@@ -227,13 +233,6 @@ export default async function PollaPage({
               {polla.draw_method}
             </p>
           )}
-          {polla.scoring_mode && (
-            <p className="mt-3 border-t border-border-subtle pt-3 text-[12px] text-text-muted">
-              {polla.scoring_mode === "1x2"
-                ? `Acertar local, empate o visitante vale ${polla.points_result} puntos. No hay más opciones.`
-                : `Marcador exacto: ${polla.points_exact} puntos. Acertarle a los goles de un solo equipo: ${polla.points_one_team}.`}
-            </p>
-          )}
         </StreetCard>
 
         {/* Compartir. Solo mientras esté abierta: pasar el link de una polla
@@ -307,6 +306,7 @@ export default async function PollaPage({
 
         <PollaTabs
           slug={polla.slug}
+          info={<PollaInfo polla={polla} />}
           firstLabel={polla.kind === "manual" ? "Preguntas" : polla.kind === "rifa" ? "Sorteo" : "Partidos"}
           initialRows={tabla}
           entryStatus={entry?.status ?? null}
@@ -329,9 +329,10 @@ export default async function PollaPage({
                 matches={matches as never}
                 initialPicks={picksPorPartido}
                 distribution={distribution}
-                canEdit={inscrito && abierta}
+                canEdit={inscrito && acceptsCasaMatchPicks(polla.status, polla.draw_pending)}
+                canViewOthers={inscrito || isAdmin}
                 lockedReason={
-                  !abierta ? "Esta polla ya cerró." : !inscrito
+                  !acceptsCasaMatchPicks(polla.status, polla.draw_pending) ? "Esta polla ya no recibe pronósticos." : !inscrito
                     ? "Inscríbete para pronosticar."
                     : "Esta polla ya cerró."
                 }
@@ -419,6 +420,9 @@ function PollaPublica({
           <div className="lp-money mt-0.5 text-[40px] leading-none text-gold">
             {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
           </div>
+          {polla.prize_kind !== "objeto" && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
+            <p className="mt-1 text-[13px] text-text-secondary">Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</p>
+          )}
         </div>
       </HeroFrame>
 

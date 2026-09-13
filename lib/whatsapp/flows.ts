@@ -1,5 +1,6 @@
 // lib/whatsapp/flows.ts — All WhatsApp bot conversation flows
 // Español neutro (registro de casa de apuestas) + rich formatting + interactive messages
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTextMessage } from "./bot";
 import {
@@ -530,6 +531,7 @@ export async function handlePronosticar(
 
   const rows = pageMatches.map((m) => {
     const dateStr = new Date(m.scheduled_at).toLocaleDateString("es-CO", {
+      timeZone: COLOMBIA_TIME_ZONE,
       weekday: "short",
       month: "short",
       day: "numeric",
@@ -590,6 +592,7 @@ async function showPredictionPrompt(
   });
 
   const dateStr = new Date(match.scheduled_at).toLocaleDateString("es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     weekday: "short",
     month: "short",
     day: "numeric",

@@ -1,6 +1,7 @@
 // components/match/MatchHero.tsx — Tribuna Caliente §3.3
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
@@ -39,6 +40,7 @@ export interface MatchHeroProps {
 
 function formatKickoff(date: Date): string {
   return new Intl.DateTimeFormat("es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
     hour: "numeric",

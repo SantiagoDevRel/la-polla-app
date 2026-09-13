@@ -7,6 +7,7 @@
 // solo ve los comprobantes de sus propias pollas — no el global.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Image from "next/image";
@@ -51,7 +52,7 @@ function fmtCOP(n: number | null): string {
   return `$${Math.round(n).toLocaleString("es-CO")}`;
 }
 function fmtDate(iso: string): string {
-  return new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("es-CO", { timeZone: COLOMBIA_TIME_ZONE, day: "2-digit", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
 }
 function relTime(iso: string): string {
   const days = Math.ceil((new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));

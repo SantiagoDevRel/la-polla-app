@@ -33,10 +33,15 @@ import {
   unlink,
 } from "@/lib/telegram/admin";
 import { formatCop, timeLeft } from "@/lib/casa/format";
+import { formatColombiaDateTime } from "@/lib/time/colombia";
 import { getPot, listAllPollas, listPendingProofs } from "@/lib/casa/queries";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+function appOrigin() {
+  return process.env.NEXT_PUBLIC_APP_URL ?? "https://lapollacolombiana.com";
+}
 
 const AYUDA = [
   "<b>Panel de La Polla</b>",
@@ -223,7 +228,11 @@ async function handleCallback(cb: TelegramCallbackQuery) {
     p_attempt_id: attemptId, p_decision: aprobado ? "pagada" : "rechazada",
     p_reason: aprobado ? null : "Rechazado desde el panel de Telegram", p_contract: 2, p_chat_id: chatId,
   });
-  if (error) { await answerCallback(cb.id, casaErrorMessage(error)); return; }
+  if (error) {
+    // A corrected payment carries a review revision the bot cannot confirm.
+    await answerCallback(cb.id, error.message === "UPDATE_REQUIRED" ? "Este pago fue corregido; revísalo desde la web." : casaErrorMessage(error));
+    return;
+  }
   await answerCallback(cb.id, data.changed ? (aprobado ? "Pago aprobado" : "Comprobante rechazado") : "La revisión ya estaba registrada.");
   if (!data.changed) return;
   await notifyCasaReview(data.entry_id, data.polla_id, aprobado);
@@ -261,8 +270,18 @@ async function sendPending(chatId: number) {
       attemptId = captured.data;
     }
     const { data: attempt, error: attemptError } = await db.from("casa_entry_proof_attempts")
-      .select("proof_path").eq("id", attemptId).eq("entry_id", entry.id).single();
+      .select("proof_path, review_revision").eq("id", attemptId).eq("entry_id", entry.id).single();
     if (attemptError || attempt.proof_path !== entry.proof_path) { await sendMessage(chatId, "La cola cambió. Abre /pendientes de nuevo."); continue; }
+    // Corrected payments are reviewed only from the web: the bot's buttons
+    // cannot carry the review revision, so they would always fail.
+    if ((attempt.review_revision ?? 0) > 0) {
+      await sendMessage(chatId, [
+        `<b>${esc(user?.display_name ?? "Sin nombre")}</b>`,
+        `Polla: ${esc(polla?.name ?? "?")}`,
+        `Este pago fue corregido. Revísalo en la web: ${esc(`${appOrigin()}/admin/pollas/recibos?pollaId=${encodeURIComponent(entry.polla_id)}`)}`,
+      ].join("\n"));
+      continue;
+    }
     const proofUrl = await signedProofUrl(attempt.proof_path);
     if (!proofUrl) { await sendMessage(chatId, "No pude cargar el comprobante. Revísalo en la web."); continue; }
     const buttons: InlineButton[][] = [
@@ -303,7 +322,9 @@ async function sendPollas(chatId: number) {
       const pot = await getPot(p.id);
       return [
         `<b>${esc(p.name)}</b>  <code>${esc(p.slug)}</code>`,
-        `${p.status === "abierta" ? `cierra en ${timeLeft(p.closes_at)}` : "cerrada"} · ${pot.paid_entries} jugando`,
+        `${p.status !== "abierta" ? "cerrada" : new Date(p.opens_at) > new Date()
+          ? `se publica el ${esc(formatColombiaDateTime(p.opens_at, { day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true }))}`
+          : `cierra en ${timeLeft(p.closes_at)}`} · ${pot.paid_entries} jugando`,
         p.prize_kind === "objeto" ? `Premio: <b>${esc(p.prize_object ?? "Objeto")}</b>` : `Pozo: <b>${formatCop(pot.prize_cop)}</b> · casa: ${formatCop(pot.house_cop)}`,
       ].join("\n");
     }),
@@ -409,7 +430,7 @@ Esta es de respuesta libre. Mándame:
   if (error) { await sendMessage(chatId, casaErrorMessage(error)); return; }
   const result = data as CasaSettlement;
   const next = result.outcome === "object_draw_pending" || result.outcome === "object_awarded"
-    ? `\n\nContinúa en la ficha para ${result.outcome === "object_draw_pending" ? "registrar el sorteo y su evidencia" : "registrar la entrega"}: ${process.env.NEXT_PUBLIC_APP_URL ?? "https://lapollacolombiana.com"}/casa/${slug}` : "";
+    ? `\n\nContinúa en la ficha para ${result.outcome === "object_draw_pending" ? "registrar el sorteo y su evidencia" : "registrar la entrega"}: ${appOrigin()}/casa/${slug}` : "";
   await sendMessage(chatId, `<b>${esc(polla.name)}</b>\n${esc(settlementMessage(result))}${esc(next)}`);
 }
 
