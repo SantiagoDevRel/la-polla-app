@@ -11,6 +11,7 @@
 
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { ChevronDown, Image as ImageIcon, Check, Clock, X } from "lucide-react";
@@ -183,7 +184,7 @@ export default function PayoutsByPolla() {
                             {tx.paid && tx.paidAt
                               ? `Pagado ${new Date(tx.paidAt).toLocaleDateString(
                                   "es-CO",
-                                  { day: "2-digit", month: "short" },
+                                  { timeZone: COLOMBIA_TIME_ZONE, day: "2-digit", month: "short" },
                                 )}`
                               : "Pendiente"}
                           </p>

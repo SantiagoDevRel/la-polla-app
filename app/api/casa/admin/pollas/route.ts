@@ -28,6 +28,10 @@ const baseSchema = z.object({
   // no es fuente de verdad para algo que decide hasta cuando entra plata.
   closeMode: z.enum(["auto", "manual"]).default("manual"),
   prizeKind: z.enum(["pozo", "objeto"]).default("pozo"),
+  potMode: z.enum(["proporcional", "fijo"]).default("proporcional"),
+  fixedPrizeCop: z.number().int().min(1).max(1_000_000_000).optional(),
+  publicationMode: z.enum(["ahora", "programada", "oculta"]).optional(),
+  publishesAt: z.string().datetime().optional(),
   prizeObject: z.string().trim().max(160).optional(),
   prizeImagePath: z.string().trim().max(300).optional(),
   // A dónde transfiere la gente. Opcional en el schema porque un borrador
@@ -108,6 +112,13 @@ export async function POST(req: NextRequest) {
     );
   }
   const body = parsed.data;
+
+  if (body.potMode === "fijo" && (body.prizeKind !== "pozo" || !body.fixedPrizeCop || body.houseCutPct !== 0)) {
+    return casaJson({ error: "El pozo fijo necesita un premio mayor a cero y un porcentaje de la casa de 0%." }, 400);
+  }
+  if (body.publicationMode === "programada" && !body.publishesAt) {
+    return casaJson({ error: "Elige la fecha y hora de publicación en Colombia." }, 400);
+  }
 
   if (body.prizeKind === "objeto" && (!body.prizeObject || body.prizeObject.length < 3)) {
     return casaJson({ error: "Describe el premio en objeto." }, 400);

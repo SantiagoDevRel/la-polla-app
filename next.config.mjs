@@ -48,6 +48,10 @@ const withSerwist = withSerwistInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Keep local database/browser checks independent of the usual :3001 server.
+  distDir: process.env.CASA_LOCAL_TEST === "1" ? `.next-casa-local-${/^\d{4,5}$/.test(process.env.CASA_LOCAL_PORT ?? "") ? process.env.CASA_LOCAL_PORT : "3101"}` : ".next",
+  // Next writes the per-port distDir globs into this ignored copy instead of tsconfig.json.
+  ...(process.env.CASA_LOCAL_TEST === "1" ? { typescript: { tsconfigPath: "tsconfig.casa-local.json" } } : {}),
   env: {
     NEXT_PUBLIC_APP_BUILD_ID: process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_URL || process.env.APP_BUILD_ID || 'development',
   },

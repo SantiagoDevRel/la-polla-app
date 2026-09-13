@@ -6,15 +6,16 @@ const mocks = vi.hoisted(() => ({
   getAuthenticatedUser: vi.fn(),
   createAdminClient: vi.fn(),
   signedProofUrl: vi.fn(),
+  notifyCasaReview: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/admin", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }));
 vi.mock("@/lib/telegram/notify", () => ({ signedProofUrl: mocks.signedProofUrl }));
-vi.mock("@/lib/casa/review-notify", () => ({ notifyCasaReview: vi.fn() }));
+vi.mock("@/lib/casa/review-notify", () => ({ notifyCasaReview: mocks.notifyCasaReview }));
 vi.mock("@/lib/casa/queries", () => ({ getPot: vi.fn() }));
 
-import { GET } from "@/app/api/casa/admin/entries/route";
+import { GET, POST } from "@/app/api/casa/admin/entries/route";
 
 const pollaId = "00000000-0000-4000-8000-000000000001";
 const otraPolla = "00000000-0000-4000-8000-000000000002";
@@ -119,7 +120,8 @@ describe("GET /api/casa/admin/entries", () => {
     }));
     dbFetch.mockResolvedValueOnce(response(entries))
       .mockResolvedValueOnce(response([{ id: userId, display_name: "Persona de prueba" }]))
-      .mockResolvedValueOnce(response([{ id: pollaId, name: "Polla de prueba", slug: "prueba" }]));
+      .mockResolvedValueOnce(response([{ id: pollaId, name: "Polla de prueba", slug: "prueba" }]))
+      .mockResolvedValueOnce(response([{ id: userId, review_revision: 0 }]));
     const result = await GET(request({ pollaId, page: "1" }));
     const data = await result.json();
     expect(result.status).toBe(200);
@@ -130,9 +132,9 @@ describe("GET /api/casa/admin/entries", () => {
     expect(calledUrl().searchParams.get("casa_pollas.archived_at")).toBe("is.null");
     expect(calledUrl().searchParams.get("offset")).toBe("25");
     expect(calledUrl().searchParams.get("limit")).toBe("26");
-    expect(calledUrl().searchParams.get("order")).toBe("proof_uploaded_at.asc.nullslast,id.asc");
+    expect(calledUrl().searchParams.get("order")).toBe("proof_uploaded_at.desc.nullslast,id.desc");
     expect(JSON.parse(Buffer.from(data.nextCursor, "base64url").toString("utf8"))).toEqual({
-      id: entries[24].id, uploadedAt: entries[24].proof_uploaded_at, pollaId,
+      id: entries[24].id, uploadedAt: entries[24].proof_uploaded_at, pollaId, status: "pendiente",
     });
     expect(mocks.signedProofUrl).toHaveBeenCalledTimes(25);
   });
@@ -167,16 +169,17 @@ describe("GET /api/casa/admin/entries", () => {
       polla_id: pollaId, user_id: userId, current_proof_attempt_id: userId, amount_cop: 1000, ticket_number: null,
       proof_path: `fixtures/${index}.webp`, proof_uploaded_at: "2026-09-08T00:00:00.000Z",
     }));
-    let pendingEntries = allEntries;
+    let pendingEntries = [...allEntries].reverse();
     dbFetch.mockImplementation(async (input) => {
       const url = new URL(String(input));
       if (url.pathname.endsWith("/users")) return response([{ id: userId, display_name: "Persona" }]);
       if (url.pathname.endsWith("/casa_pollas")) return response([{ id: pollaId, name: "Polla", slug: "polla" }]);
+      if (url.pathname.endsWith("/casa_entry_proof_attempts")) return response([{ id: userId, review_revision: 0 }]);
       let rows = pendingEntries;
       // Model the filtered server collection: offsets shift after approval,
       // while the UUID boundary for equal upload timestamps stays stable.
-      const boundary = url.searchParams.get("or")?.match(/id\.gt\.([a-f0-9-]+)/)?.[1];
-      if (boundary) rows = rows.filter((entry) => entry.id > boundary);
+      const boundary = url.searchParams.get("or")?.match(/id\.lt\.([a-f0-9-]+)/)?.[1];
+      if (boundary) rows = rows.filter((entry) => entry.id < boundary);
       const offset = Number(url.searchParams.get("offset") ?? 0);
       return response(rows.slice(offset, offset + Number(url.searchParams.get("limit"))));
     });
@@ -187,12 +190,12 @@ describe("GET /api/casa/admin/entries", () => {
     // Approval may remove the first row or the cursor's own row.
     pendingEntries = pendingEntries.filter((_, index) => index !== reviewedIndex);
     const next = await (await GET(request({ pollaId, cursor: first.nextCursor }))).json();
-    expect(next.pendientes.map((entry: { id: string }) => entry.id)).toEqual([allEntries[25].id]);
+    expect(next.pendientes.map((entry: { id: string }) => entry.id)).toEqual([allEntries[0].id]);
     expect(next.hasMore).toBe(false);
     expect(next.nextCursor).toBeNull();
-    const nextQuery = calledUrl(3).searchParams;
+    const nextQuery = calledUrl(4).searchParams;
     expect(nextQuery.has("offset")).toBe(false);
-    expect(nextQuery.get("or")).toBe(`(proof_uploaded_at.gt.${allEntries[24].proof_uploaded_at},and(proof_uploaded_at.eq.${allEntries[24].proof_uploaded_at},id.gt.${allEntries[24].id}),proof_uploaded_at.is.null)`);
+    expect(nextQuery.get("or")).toBe(`(proof_uploaded_at.lt.${allEntries[1].proof_uploaded_at},and(proof_uploaded_at.eq.${allEntries[1].proof_uploaded_at},id.lt.${allEntries[1].id}),proof_uploaded_at.is.null)`);
   });
 
   it("continua de forma estable entre comprobantes antiguos sin fecha", async () => {
@@ -201,7 +204,7 @@ describe("GET /api/casa/admin/entries", () => {
     const result = await GET(request({ pollaId, cursor }));
     expect(result.status).toBe(200);
     expect(calledUrl().searchParams.get("proof_uploaded_at")).toBe("is.null");
-    expect(calledUrl().searchParams.get("id")).toBe(`gt.${userId}`);
+    expect(calledUrl().searchParams.get("id")).toBe(`lt.${userId}`);
     expect(calledUrl().searchParams.has("offset")).toBe(false);
   });
 
@@ -234,5 +237,64 @@ describe("GET /api/casa/admin/entries", () => {
     expect(await result.json()).toEqual({ pendientes: [], hasMore: false, nextCursor: null });
     expect(dbFetch).toHaveBeenCalledTimes(1);
     expect(mocks.signedProofUrl).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("el historial conserva pagos resueltos y solo permite corregir los abiertos: resuelto=%s", async (settled) => {
+    dbFetch.mockResolvedValueOnce(response([{ id: userId, polla_id: pollaId, user_id: userId, current_proof_attempt_id: userId,
+      amount_cop: 10000, proof_path: "paid.webp", proof_uploaded_at: "2026-09-12T12:00:00Z", reviewed_at: "2026-09-12T13:00:00Z" }]))
+      .mockResolvedValueOnce(response([{ id: userId, display_name: "Persona" }]))
+      .mockResolvedValueOnce(response([{ id: pollaId, name: "Polla", slug: "polla", status: settled ? "resuelta" : "abierta",
+        archived_at: null, settled_at: settled ? "2026-09-13T00:00:00Z" : null, settlement_outcome: null, casa_object_draws: [], casa_payouts: [] }]))
+      .mockResolvedValueOnce(response([{ id: userId, review_revision: 2 }]));
+    const result = await GET(request({ status: "pagada" }));
+    expect(result.status).toBe(200);
+    expect(calledUrl().searchParams.get("status")).toBe("eq.pagada");
+    expect(calledUrl().searchParams.has("casa_pollas.status")).toBe(false);
+    expect(calledUrl().searchParams.has("casa_pollas.archived_at")).toBe(false);
+    expect((await result.json()).pendientes[0]).toMatchObject({ revision: 2, puedeDesmarcar: !settled, aprobadoEn: "2026-09-12T13:00:00Z" });
+  });
+
+  it("un cursor de pendientes no sirve para recorrer pagos aprobados", async () => {
+    const cursor = Buffer.from(JSON.stringify({ id: userId, uploadedAt: null, pollaId, status: "pendiente" })).toString("base64url");
+    expect((await GET(request({ pollaId, status: "pagada", cursor }))).status).toBe(400);
+    expect(dbFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/casa/admin/entries", () => {
+  function post(body: unknown, contract = "2") {
+    return new NextRequest("http://localhost/api/casa/admin/entries", { method: "POST", headers: { "X-Casa-Contract": contract }, body: JSON.stringify(body) });
+  }
+
+  it.each([null, { id: userId, is_admin: false }])("no corrige pagos sin administrador: %j", async (user) => {
+    mocks.getAuthenticatedUser.mockResolvedValue(user);
+    const result = await POST(post({ attemptId: userId, decision: "desmarcar", motivo: "Error de revisión" }));
+    expect(result.status).toBe(user ? 403 : 401);
+    expect(mocks.createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("requiere un motivo antes de volver a pendientes", async () => {
+    const result = await POST(post({ attemptId: userId, revision: 0, decision: "desmarcar" }));
+    expect(result.status).toBe(400);
+    expect(dbFetch).not.toHaveBeenCalled();
+  });
+
+  it("envía revisión y actor al RPC de corrección sin enviar una aprobación o rechazo", async () => {
+    dbFetch.mockResolvedValueOnce(response({ changed: true, entry_id: userId, polla_id: pollaId, status: "pendiente" }));
+    const result = await POST(post({ attemptId: userId, revision: 3, decision: "desmarcar", motivo: "Recibo equivocado" }));
+    expect(result.status).toBe(200);
+    expect(calledUrl().pathname).toContain("/rpc/casa_unpay_attempt_v2");
+    expect(JSON.parse(String(dbFetch.mock.calls[0][1]?.body))).toEqual({
+      p_attempt_id: userId, p_revision: 3, p_reason: "Recibo equivocado", p_contract: 2, p_actor_id: userId,
+    });
+    expect(mocks.notifyCasaReview).not.toHaveBeenCalled();
+  });
+
+  it("un conflicto por otra revisión no confirma ni notifica la corrección", async () => {
+    dbFetch.mockResolvedValueOnce(response({ code: "55000", message: "ALREADY_REVIEWED" }, 409));
+    const result = await POST(post({ attemptId: userId, revision: 0, decision: "desmarcar", motivo: "Recibo equivocado" }));
+    expect(result.status).toBe(409);
+    expect((await result.json()).code).toBe("ALREADY_REVIEWED");
+    expect(mocks.notifyCasaReview).not.toHaveBeenCalled();
   });
 });

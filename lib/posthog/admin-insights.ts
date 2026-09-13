@@ -127,9 +127,9 @@ export async function getWebAnalytics(): Promise<WebAnalytics> {
     FROM (SELECT person_id, min(timestamp) AS fs FROM events WHERE event = '$pageview' GROUP BY person_id)
     WHERE person_id IN (SELECT person_id FROM events WHERE event = '$pageview' AND timestamp > now() - ${W7})`;
 
-  // 4) Serie diaria (14 días).
+  // 4) Serie diaria (14 días), con el mismo calendario colombiano del heatmap.
   const qDaily = `
-    SELECT toDate(timestamp) AS day, count() AS pv, uniq(person_id) AS vis
+    SELECT toDate(timestamp - INTERVAL ${BOGOTA_OFFSET_HOURS} HOUR) AS day, count() AS pv, uniq(person_id) AS vis
     FROM events WHERE event = '$pageview' AND timestamp > now() - ${W14}
     GROUP BY day ORDER BY day`;
 

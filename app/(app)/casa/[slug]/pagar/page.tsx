@@ -100,7 +100,7 @@ export default async function PagarPage({
               </div>
             </div>
           </div>
-          {polla.prize_kind === "objeto" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary">El premio es <strong className="text-text-primary">{polla.prize_object}</strong>. La inscripción te permite participar por ese objeto. No hay reparto del pozo ni premio adicional en dinero.</p> : <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
+          {polla.prize_kind === "objeto" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary">El premio es <strong className="text-text-primary">{polla.prize_object}</strong>. La inscripción te permite participar por ese objeto. No hay reparto del pozo ni premio adicional en dinero.</p> : polla.pot_mode === "fijo" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary">Participas por un pozo fijo de <strong className="text-text-primary">{formatCop(pot.prize_cop)}</strong>. El premio no cambia con el número de inscritos. Si varios ganadores empatan, se divide entre ellos.</p> : <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
             <div className="flex justify-between">
               <span className="text-text-secondary">
                 Va al pozo

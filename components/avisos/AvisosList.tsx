@@ -10,6 +10,7 @@
 
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -128,7 +129,7 @@ function timeAgo(
   const d = Math.floor(h / 24);
   if (d < 7) return t("timeDayAgo", { n: d });
   const intlTag = locale === "en" ? "en-US" : "es-CO";
-  return new Date(iso).toLocaleDateString(intlTag, { day: "2-digit", month: "short" });
+  return new Date(iso).toLocaleDateString(intlTag, { timeZone: COLOMBIA_TIME_ZONE, day: "2-digit", month: "short" });
 }
 
 export interface AvisosListProps {

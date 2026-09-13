@@ -6,6 +6,21 @@
 
 ## READ THIS FIRST
 
+### Info, pagos y publicación (2026-09-13, migraciones 104–107)
+
+Ver [docs/casa-admin-rules.md](docs/casa-admin-rules.md). El pozo fijo mantiene
+`prize_kind=pozo` y añade `pot_mode=fijo` + `fixed_prize_cop`; el cálculo y el
+balance son SQL. `publication_mode` + `opens_at` filtran también en RLS y en las
+reservas. No mostrar ni admitir entradas antes de publicación. Pendientes en
+`/admin/pollas/recibos`, aprobados en `/admin/pollas/pagos`; desmarcar conserva
+comprobante/auditoría y exige revisión vigente. Info usa puntos configurados;
+el cierre de inscripciones no cierra partidos futuros. Suspensiones, abandonos
+y cancelaciones después de iniciar anulan solo el vínculo Casa de forma
+permanente, sin cambiar la fila global; con Casa en `paused` el trigger nunca
+bloquea el vivo: deja alerta `casa_match_void_pending` (migración 107).
+Fechas visibles e inputs: `lib/time/colombia.ts`, siempre Colombia. No modificar
+`predictions` históricos ni activar modos operativos al instalar estas reglas.
+
 ### Navegación y actualización de la app (2026-09-09)
 
 Casa: Pollas abiertas → Mis pollas → Pollas cerradas, todas cerradas inicialmente,

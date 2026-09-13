@@ -8,6 +8,11 @@ export const dynamic = "force-dynamic";
 
 const BodySchema = z.discriminatedUnion("action", [
   z.object({
+    action: z.literal("publicacion"),
+    mode: z.enum(["ahora", "programada", "oculta"]),
+    opensAt: z.string().datetime().optional(),
+  }),
+  z.object({
     action: z.enum(["publicar", "cerrar", "repartir", "anular", "eliminar"]),
   }),
   // Resolver una pregunta de una polla manual. Mismo efecto que /resolver del
@@ -89,7 +94,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const body = parsed.data;
   const db = createAdminClient();
   const args = { p_polla_id: id, p_contract: 2, p_actor_id: user.id };
-  const result = body.action === "repartir"
+  const result = body.action === "publicacion"
+    ? await db.rpc("casa_set_publication_v2", { ...args, p_mode: body.mode, p_opens_at: body.opensAt ?? null })
+    : body.action === "repartir"
     ? await db.rpc("casa_settle_polla_v2", args)
     : body.action === "eliminar"
       ? await db.rpc("casa_archive_polla_v2", args)

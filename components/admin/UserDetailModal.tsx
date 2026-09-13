@@ -8,6 +8,7 @@
 
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { X, Phone, Mail, MapPin, Smartphone, Trophy, Banknote, Calendar, Hash, Eye, AlertTriangle } from "lucide-react";
@@ -68,6 +69,7 @@ interface DetailPayload {
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("es-CO", {
+    timeZone: COLOMBIA_TIME_ZONE,
     day: "2-digit",
     month: "short",
     year: "numeric",

@@ -9,6 +9,7 @@
 // de slots restantes (informativo, sin acción).
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useToast } from "@/components/ui/Toast";
@@ -197,6 +198,7 @@ export default function KnockoutStatusCard() {
                     {PHASE_LABEL[pr.p_phase ?? ""] ?? pr.p_phase}
                     {pr.p_match_day ? ` · partido #${pr.p_match_day}` : ""} · era {pr.slot_home} vs {pr.slot_away} ·{" "}
                     {new Date(pr.p_scheduled_at).toLocaleString("es-CO", {
+                      timeZone: COLOMBIA_TIME_ZONE,
                       day: "numeric",
                       month: "short",
                       hour: "2-digit",
@@ -239,6 +241,7 @@ export default function KnockoutStatusCard() {
               </span>
               <span className="flex-shrink-0 text-text-muted">
                 {new Date(p.scheduled_at).toLocaleString("es-CO", {
+                  timeZone: COLOMBIA_TIME_ZONE,
                   day: "numeric",
                   month: "short",
                   hour: "2-digit",

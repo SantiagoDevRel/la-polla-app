@@ -17,7 +17,7 @@
 //   - Después de guardar → vuelve a modo VIEW automáticamente.
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { CreditCard, Pencil, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -36,6 +36,7 @@ interface Props {
     accountType: PayoutAccountType | null,
   ) => Promise<void> | void;
   onClear?: () => Promise<void> | void;
+  allowedMethods?: readonly PayoutMethod[];
 }
 
 export default function PayoutDefaultEditor({
@@ -45,9 +46,12 @@ export default function PayoutDefaultEditor({
   initialAccountType,
   onSave,
   onClear,
+  allowedMethods,
 }: Props) {
+  const id = useId();
   const t = useTranslations("Payout");
   const tCommon = useTranslations("Common");
+  const tProfile = useTranslations("Profile");
   const METHOD_OPTIONS = useMemo<Array<{
     id: PayoutMethod;
     label: string;
@@ -105,6 +109,7 @@ export default function PayoutDefaultEditor({
     initialAccountType ?? null,
   );
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (mode === "edit" && saving === false) return;
@@ -127,17 +132,21 @@ export default function PayoutDefaultEditor({
   async function save() {
     if (!canSave) return;
     setSaving(true);
+    setError(null);
     try {
       const finalName = needsName ? accountName.trim() : null;
       const finalType = needsAccountType ? accountType : null;
       await onSave(method, account.trim(), finalName, finalType);
       setMode("view");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : tProfile("errSavePayout"));
     } finally {
       setSaving(false);
     }
   }
 
   function startEdit() {
+    if (allowedMethods && !allowedMethods.includes(method)) setMethod(allowedMethods[0] ?? "nequi");
     setMode("edit");
   }
 
@@ -161,12 +170,11 @@ export default function PayoutDefaultEditor({
             {t("editorTitle")}
           </p>
           <p
-            className="text-sm font-semibold text-text-primary truncate tabular-nums"
-            style={{ fontFeatureSettings: '"tnum"' }}
+            className="text-[15px] font-semibold leading-normal text-text-primary tabular-nums [overflow-wrap:anywhere]"
           >
             {initialAccount}
           </p>
-          <p className="text-[11px] text-text-muted truncate">
+          <p className="text-[13px] leading-normal text-text-secondary [overflow-wrap:anywhere]">
             {initialAccountType ? `${ACCOUNT_TYPE_LABEL[initialAccountType]} ` : ""}
             {METHOD_LABEL[initialMethod!]}
             {initialAccountName ? ` · ${initialAccountName}` : ""}
@@ -187,19 +195,20 @@ export default function PayoutDefaultEditor({
   // ── EDIT MODE ───────────────────────────────────────────────────────
   return (
     <section className="rounded-2xl p-5 lp-card space-y-3">
-      <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
-        <CreditCard className="w-5 h-5 text-gold" /> {t("editorTitle")}
+      <h3 className="flex items-center gap-2 text-[15px] font-semibold leading-normal text-text-primary">
+        <CreditCard className="h-5 w-5 shrink-0 text-gold" /> {t("editorTitle")}
       </h3>
 
       <div className="flex flex-wrap gap-1.5">
-        {METHOD_OPTIONS.map((m) => (
+        {METHOD_OPTIONS.filter((m) => !allowedMethods || allowedMethods.includes(m.id)).map((m) => (
           <button
             key={m.id}
             type="button"
             onClick={() => setMethod(m.id)}
-            className={`min-h-11 rounded-full border px-3 py-1.5 text-xs transition-colors ${
-              method === m.id
-                ? "bg-gold text-bg-base border-gold"
+            aria-pressed={method === m.id}
+            className={`min-h-11 cursor-pointer rounded-full border px-3 py-1.5 text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${
+                method === m.id
+                ? "bg-bg-elevated text-text-primary border-text-secondary"
                 : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
             }`}
           >
@@ -208,12 +217,16 @@ export default function PayoutDefaultEditor({
         ))}
       </div>
 
+      <label htmlFor={`${id}-account`} className="block text-[15px] font-medium text-text-primary">
+        {method === "nequi" ? t("placeholderPhone") : t("placeholderAccount")}
+      </label>
       <input
+        id={`${id}-account`}
         type="text"
         value={account}
         onChange={(e) => setAccount(e.target.value)}
         placeholder={cur.accountPlaceholder}
-        className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
+        className="lp-input min-w-0 text-[15px]"
       />
 
       {needsAccountType ? (
@@ -223,9 +236,10 @@ export default function PayoutDefaultEditor({
               key={accType}
               type="button"
               onClick={() => setAccountType(accType)}
-              className={`min-h-11 rounded-full border px-3 py-1.5 text-xs transition-colors ${
+              aria-pressed={accountType === accType}
+              className={`min-h-11 cursor-pointer rounded-full border px-3 py-1.5 text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${
                 accountType === accType
-                  ? "bg-gold text-bg-base border-gold"
+                  ? "bg-bg-elevated text-text-primary border-text-secondary"
                   : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
               }`}
             >
@@ -236,16 +250,21 @@ export default function PayoutDefaultEditor({
       ) : null}
 
       {needsName ? (
+        <div className="space-y-2">
+        <label htmlFor={`${id}-name`} className="block text-[15px] font-medium text-text-primary">{t("placeholderNameSimple")}</label>
         <input
+          id={`${id}-name`}
           type="text"
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
           placeholder={t("placeholderNameSimple")}
-          className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30"
+          className="lp-input min-w-0 text-[15px]"
         />
+        </div>
       ) : null}
 
-      <div className="flex gap-2">
+      {error && <p role="alert" className="text-[13px] text-red-alert">{error}</p>}
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={save}

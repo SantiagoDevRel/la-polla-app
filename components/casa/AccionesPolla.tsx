@@ -18,25 +18,28 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CasaPollaStatus } from "@/lib/casa/types";
 import { EliminarPolla } from "@/components/casa/EliminarPolla";
+import { PublicacionPolla } from "@/components/casa/PublicacionPolla";
 
 type Accion = "publicar" | "cerrar" | "repartir";
 
 export function AccionesPolla({
   id,
   status,
-  nombre, prizeKind = "pozo", drawPending = false,
+  nombre, prizeKind = "pozo", drawPending = false, opensAt,
 }: {
   id: string;
   status: CasaPollaStatus;
   nombre: string;
   prizeKind?: "pozo" | "objeto";
   drawPending?: boolean;
+  opensAt?: string;
 }) {
   const router = useRouter();
   const [enviando, setEnviando] = useState<Accion | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const scheduled = status === "abierta" && Boolean(opensAt && new Date(opensAt) > new Date());
 
   async function ejecutar(action: Accion) {
     setEnviando(action);
@@ -67,23 +70,9 @@ export function AccionesPolla({
 
   return (
     <div className="bg-bg-card px-3 pb-3">
-      {status === "borrador" && (
-        <>
-          <button
-            type="button"
-            onClick={() => ejecutar("publicar")}
-            disabled={enviando !== null}
-            className="lp-btn lp-btn-primary h-10 min-h-0 w-full text-[14px]"
-          >
-            {enviando === "publicar" ? "Publicando..." : "Publicar"}
-          </button>
-          <p className="mt-2 text-[11px] text-text-muted">
-            Mientras esté en borrador no la ve nadie.
-          </p>
-        </>
-      )}
+      {(status === "borrador" || scheduled) && <PublicacionPolla id={id} opensAt={opensAt} scheduled={scheduled} />}
 
-      {status === "abierta" && (
+      {status === "abierta" && !scheduled && (
         <button
           type="button"
           onClick={() => ejecutar("cerrar")}

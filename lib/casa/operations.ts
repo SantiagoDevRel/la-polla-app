@@ -10,6 +10,10 @@ export function requireCasaContract(request: Request) {
 }
 
 const messages: Record<string, string> = {
+  INVALID_FIXED_PRIZE: "Elige un premio fijo mayor a cero y deja el porcentaje de la casa en 0%.",
+  INVALID_PUBLICATION_DATE: "La publicación debe ser futura y anterior al cierre de inscripciones.",
+  PUBLICATION_HAS_ENTRIES: "Esta polla ya tiene inscripciones; su publicación no puede cambiar.",
+  POLLA_NOT_PUBLISHED: "Esta polla todavía no está publicada.",
   OPERATIONS_PAUSED: "Estamos actualizando las inscripciones. Intenta de nuevo en unos minutos; si ya transferiste, no repitas el pago.",
   UPDATE_REQUIRED: "Actualiza la app para continuar.",
   CASA_V2_NOT_ACTIVE: "Estamos actualizando la app. Intenta de nuevo en unos minutos.",

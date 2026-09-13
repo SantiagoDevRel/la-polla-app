@@ -32,6 +32,8 @@ export default async function CasaAdminPage() {
         draw_pending: polla.draw_pending,
         status: polla.status,
         closes_at: polla.closes_at,
+        opens_at: polla.opens_at,
+        publication_mode: polla.publication_mode,
         label: pollaStatusLabel(polla),
       }))}
       pots={pots}

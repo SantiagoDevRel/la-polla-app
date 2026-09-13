@@ -55,7 +55,7 @@ describe("Casa v2 API boundary (lifecycle invariants execute in the local SQL su
   it("reviews the displayed attempt, taking the administrator from the session", async () => {
     fetchDb.mockResolvedValueOnce(response({ changed: true, status: "pagada", entry_id: attemptId, polla_id: id }));
     expect((await POST(request({ attemptId, decision: "aprobar", actorId: "forged" }))).status).toBe(200);
-    expect(JSON.parse(String(fetchDb.mock.calls[0][1]?.body))).toEqual({ p_attempt_id: attemptId, p_decision: "pagada", p_reason: null, p_contract: 2, p_actor_id: adminId });
+    expect(JSON.parse(String(fetchDb.mock.calls[0][1]?.body))).toEqual({ p_attempt_id: attemptId, p_revision: 0, p_decision: "pagada", p_reason: null, p_contract: 2, p_actor_id: adminId });
     expect(mocks.notifyReview).toHaveBeenCalledExactlyOnceWith(attemptId, id, true);
   });
   it("does not resend a player notice on an idempotent review retry", async () => {

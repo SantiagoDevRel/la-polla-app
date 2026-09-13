@@ -1,5 +1,6 @@
 // Local integration runner only. Never reads production .env credentials.
 import { execFileSync, spawn } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -11,7 +12,8 @@ export function localCredentials() {
   if (!secret) throw new Error("Start the local Supabase project first.");
   const token = (role) => {
     const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-    const payload = Buffer.from(JSON.stringify({ role, iss: "supabase", iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 86400 })).toString("base64url");
+    // Backdated iat: a sub-second host/container clock skew made PostgREST reject fresh tokens ("JWT issued at future").
+    const payload = Buffer.from(JSON.stringify({ role, iss: "supabase", iat: Math.floor(Date.now() / 1000) - 60, exp:Math.floor(Date.now() / 1000) + 86400 })).toString("base64url");
     const signature = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url");
     return `${header}.${payload}.${signature}`;
   };
@@ -29,8 +31,12 @@ export function localEnvironment() {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const command = process.argv[2];
+  const port = process.argv[3] ?? "3101";
+  if (!/^\d{4,5}$/.test(port) || Number(port) < 1024 || Number(port) > 65535) throw new Error("Use an unprivileged local port.");
   if (!["dev", "build", "start"].includes(command)) throw new Error("Use dev, build or start; target is the local Supabase Docker project.");
-  const args = command === "build" ? ["build", "--webpack"] : command === "dev" ? ["dev", "--webpack", "-p", "3101"] : ["start", "-p", "3101"];
-  const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", ...args], { env: localEnvironment(), stdio: "inherit", windowsHide: true });
+  const args = command === "build" ? ["build", "--webpack"] : command === "dev" ? ["dev", "--webpack", "-p", port] : ["start", "-p", port];
+  // Next rewrites the include globs of its tsconfig; keep tsconfig.json clean across ports.
+  writeFileSync("tsconfig.casa-local.json", readFileSync("tsconfig.json", "utf8"));
+  const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", ...args], { env: { ...localEnvironment(), CASA_LOCAL_PORT: port, NEXT_PUBLIC_APP_URL: `http://localhost:${port}` }, stdio: "inherit", windowsHide: true });
   child.on("exit", (code) => { process.exitCode = code ?? 1; });
 }

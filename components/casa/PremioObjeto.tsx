@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { casaPost, fileDigest, uploadSignedFile } from "@/lib/casa/upload-client";
 import type { CasaPayout } from "@/lib/casa/types";
@@ -113,7 +114,7 @@ export function PremioObjeto({ slug }: { slug: string }) {
     </>}
     {data.payouts.map((award) => <div key={award.id} className="space-y-2 border-t border-border-default pt-3">
       <p className="font-semibold [overflow-wrap:anywhere]">{award.prize_object} — {award.display_name ?? "Ganador"}</p>
-      <p className="text-[13px] text-text-secondary">{award.delivered_at ? `Entrega registrada el ${new Date(award.delivered_at).toLocaleDateString("es-CO")}.` : "Entrega pendiente de coordinación con la casa."}</p>
+      <p className="text-[13px] text-text-secondary">{award.delivered_at ? `Entrega registrada el ${new Date(award.delivered_at).toLocaleDateString("es-CO", { timeZone: COLOMBIA_TIME_ZONE })}.` : "Entrega pendiente de coordinación con la casa."}</p>
       {data.admin && !award.delivered_at && award.id && <fieldset className="space-y-3" disabled={busy}>
         <label className="block text-[13px]">Constancia de la entrega realizada<textarea className="lp-input mt-2 w-full text-[15px]" maxLength={500} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Fecha, forma de entrega y referencia de recibido" /></label>
         <button type="button" disabled={busy || reference.trim().length < 3} className="lp-btn lp-btn-ghost w-full" onClick={() => entregar(award.id!)}>{busy ? "Guardando..." : "Confirmar que entregué el objeto"}</button>

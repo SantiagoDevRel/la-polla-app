@@ -186,7 +186,7 @@ function DetailBox({ children }: { children: React.ReactNode }) {
 function fmtDay(s: string): string {
   const [y, m, d] = s.split("-").map(Number);
   if (!y || !m || !d) return s;
-  const wd = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][new Date(y, m - 1, d).getDay()];
+  const wd = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
   return `${wd} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
 }
 

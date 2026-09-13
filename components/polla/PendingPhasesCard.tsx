@@ -9,6 +9,7 @@
 // aparecen en la sección normal.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { Calendar, Hourglass } from "lucide-react";
 import type { PendingPhase } from "@/lib/tournaments/structure";
 
@@ -18,9 +19,10 @@ interface Props {
 
 function formatEstimatedDate(iso: string | null): string {
   if (!iso) return "Fecha por confirmar";
-  const d = new Date(iso);
+  // Estimated phases contain a calendar date, not a UTC kickoff instant.
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T12:00:00-05:00` : iso);
   if (Number.isNaN(d.getTime())) return "Fecha por confirmar";
-  return d.toLocaleDateString("es-CO", { month: "long", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("es-CO", { timeZone: COLOMBIA_TIME_ZONE, month: "long", day: "numeric", year: "numeric" });
 }
 
 export default function PendingPhasesCard({ pending }: Props) {

@@ -115,7 +115,7 @@ describe("CASA creation across tournaments", () => {
 
     const matches = await getPollaMatches(pollaId);
 
-    expect(matches).toEqual(fixtures);
+    expect(matches).toEqual(fixtures.map(match => ({ ...match, voided_at: null })));
     expect(query(0).get("polla_id")).toBe(`eq.${pollaId}`);
     expect(query(1).get("id")).toBe(`in.(${matchIds.join(",")})`);
     expect(query(1).has("tournament")).toBe(false);

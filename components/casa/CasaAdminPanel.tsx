@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, Plus, RefreshCw, Ticket } from "lucide-react";
+import { ArrowLeft, ChevronDown, Plus, RefreshCw, Ticket, Files, CheckCircle2 } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { HeroFrame, Label, Tape } from "@/components/street";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -14,7 +14,7 @@ import { fadeUp, staggerContainer } from "@/lib/animations";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import type { pollaStatusLabel, CasaPolla, CasaPot } from "@/lib/casa/types";
 
-export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "prize_kind" | "prize_object" | "draw_pending"> & {
+export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "prize_kind" | "prize_object" | "draw_pending"> & {
   label: ReturnType<typeof pollaStatusLabel>;
 };
 
@@ -70,11 +70,11 @@ export function CasaAdminPanel({ pollas, pots, totalCasa }: {
         <h1 className="lp-display mt-1 text-[36px] leading-none">Administrar pollas</h1>
         <div className="mt-4 grid grid-cols-2 gap-4">
           <div className="min-w-0">
-            <Label>Acumulado casa</Label>
+            <Label>Balance de la casa</Label>
             <p className="lp-money mt-1 text-[24px] leading-none text-gold [overflow-wrap:anywhere]">{formatCop(totalCasa)}</p>
           </div>
           <div className="min-w-0">
-            <Label>Pagos por revisar</Label>
+            <Label>Recibos pendientes</Label>
             {counts === null && loading ? <Skeleton className="mt-1 h-6 w-12" /> : <p className="lp-money mt-1 text-[24px] leading-none text-text-primary">{error ? "—" : totalPendientes ?? "—"}</p>}
           </div>
         </div>
@@ -89,7 +89,11 @@ export function CasaAdminPanel({ pollas, pots, totalCasa }: {
             <RefreshCw className="h-4 w-4 shrink-0" aria-hidden="true" /> Actualizar pagos
           </button>
         </div>
-        <p className="mb-5 text-[13px] leading-relaxed text-text-secondary">Abre una polla para revisar cada comprobante y aprobar o rechazar su pago.</p>
+        <nav aria-label="Revisión de pagos" className="mb-5 grid grid-cols-2 gap-2">
+          <Link href="/admin/pollas/recibos" className="lp-btn lp-btn-ghost flex-col !px-3 !text-[15px]"><Files className="h-5 w-5 shrink-0" aria-hidden="true" />Recibos pendientes</Link>
+          <Link href="/admin/pollas/pagos" className="lp-btn lp-btn-ghost flex-col !px-3 !text-[15px]"><CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />Pagos aprobados</Link>
+        </nav>
+        <p className="mb-5 text-[13px] leading-relaxed text-text-secondary">Revisa todos los recibos pendientes o abre una polla para ver solo los suyos. Los pagos aprobados quedan en su historial.</p>
         {error && <div role="alert" className="mb-4 rounded-md border border-red-alert/30 p-3 text-[13px] text-red-alert">No se pudieron actualizar los conteos. Puedes abrir una polla para revisar sus pagos o intentar actualizar otra vez.</div>}
 
         {pollas.length === 0 ? (
@@ -135,6 +139,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa }: {
                     {expanded && (
                       <div className="border-t border-border-default p-4">
                         <ColaDePagos key={polla.id} pollaId={polla.id} refreshKey={revision} onReviewed={() => setRevision((value) => value + 1)} />
+                        <Link href={`/admin/pollas/pagos?pollaId=${polla.id}`} className="lp-btn lp-btn-ghost mt-4 w-full !text-[15px]">Ver pagos aprobados</Link>
                         <div className="mt-6 border-t border-border-default pt-4">
                           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <div className="min-w-0"><Label>{polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label><p className="lp-money mt-1 text-[24px] text-text-primary [overflow-wrap:anywhere]">{polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot?.prize_cop ?? 0)}</p></div>
@@ -149,7 +154,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa }: {
                                 <ResolverPolla id={polla.id} kind={polla.kind} />
                               )}
                             {polla.prize_kind === "objeto" && (polla.draw_pending || polla.status === "resuelta") && <PremioObjeto slug={polla.slug} />}
-                            <AccionesPolla id={polla.id} status={polla.status} nombre={polla.name} prizeKind={polla.prize_kind} drawPending={polla.draw_pending} />
+                            <AccionesPolla id={polla.id} status={polla.status} nombre={polla.name} prizeKind={polla.prize_kind} drawPending={polla.draw_pending} opensAt={polla.opens_at} />
                           </div>
                         </div>
                       </div>

@@ -34,6 +34,11 @@ const RETURN_TO_KEY = "lp_returnTo";
 // accidental rapid taps from the same browser.
 const OTP_COOLDOWN_MS = 60_000;
 const OTP_COOLDOWN_KEY = "lp_otp_cooldown_until";
+// Entrar por WhatsApp está oculto en producción: por ahora solo SMS.
+// Para volver a mostrarlo en prod: NEXT_PUBLIC_WA_LOGIN_ENABLED=true.
+const WA_LOGIN_ENABLED =
+  process.env.NEXT_PUBLIC_WA_LOGIN_ENABLED === "true" ||
+  process.env.NODE_ENV !== "production";
 
 type Step = "input" | "otp";
 
@@ -344,7 +349,7 @@ function LoginInner() {
                 primary). WhatsApp doesn't need the typed phone — the
                 bot identifies the user from the WA sender — so its
                 button is always enabled and just deep-links to wa.me. */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className={WA_LOGIN_ENABLED ? "grid grid-cols-2 gap-3" : "grid grid-cols-1"}>
               <button
                 type="submit"
                 disabled={sending || cooldownRemaining > 0}
@@ -366,6 +371,7 @@ function LoginInner() {
                 )}
               </button>
 
+              {WA_LOGIN_ENABLED && (
               <a
                 href={botDeepLink(tc("whatsappBotMessage"))}
                 target="_blank"
@@ -388,6 +394,7 @@ function LoginInner() {
                 </svg>
                 {t("btnWhatsapp")}
               </a>
+              )}
             </div>
           </form>
 
@@ -477,6 +484,7 @@ function LoginInner() {
               with a one-tap CTA button that hits /api/auth/wa-magic and
               signs the user in without ever copying a code. Kept tiny
               on purpose — gold is reserved for the primary CTA. */}
+          {WA_LOGIN_ENABLED && (
           <div className="text-center pt-1">
             <a
               href={botDeepLink(tc("whatsappBotMessage"))}
@@ -487,6 +495,7 @@ function LoginInner() {
               {t("otpDidntArrive")} <span className="underline">{t("otpTryWhatsapp")}</span>
             </a>
           </div>
+          )}
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@
 // so the invitee can decide informed.
 "use client";
 
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { TeamCrest } from "@/components/match/TeamCrest";
@@ -60,11 +61,13 @@ function formatMatchDate(iso: string, locale: string): string {
   const intlTag = locale === "en" ? "en-US" : "es-CO";
   const d = new Date(iso);
   const date = d.toLocaleDateString(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     weekday: "short",
     day: "numeric",
     month: "short",
   });
   const time = d.toLocaleTimeString(intlTag, {
+    timeZone: COLOMBIA_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,

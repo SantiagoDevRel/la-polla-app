@@ -6,6 +6,10 @@ El modelo histórico de grupos privados permanece disponible.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
+Info por polla, cuenta personal de pago, revisión de comprobantes, pozo fijo,
+publicación programada y fechas en Colombia: [contrato y pruebas de Casa](docs/casa-admin-rules.md)
+(migraciones 104–107; requieren Casa v2).
+
 ## Fútbol: calendario, partidos y equipos (API-Football Pro)
 
 La pestaña **Fútbol** (`/futbol`) presenta los nueve torneos con sus logos,

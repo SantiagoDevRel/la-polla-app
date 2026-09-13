@@ -9,12 +9,15 @@
 // Ese dato es la mitad de la gracia del producto ("¿cuántos pusieron 2-1?"),
 // asi que se muestra SIEMPRE que haya al menos un pronostico cargado.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { TeamCrest } from "@/components/match/TeamCrest";
 import { Label, PctBar } from "@/components/street";
 import { formatMatchTime } from "@/lib/casa/format";
 import type { CasaDistribution, Pick1x2 } from "@/lib/casa/types";
+import { canEditCasaMatch, hasCasaMatchStarted } from "@/lib/casa/match-rules";
+import { MatchPicks } from "./MatchPicks";
 
 interface MatchLite {
   id: string;
@@ -26,6 +29,10 @@ interface MatchLite {
   home_score: number | null;
   away_score: number | null;
   final_verified_at: string | null;
+  status: string;
+  elapsed?: number | null;
+  live_status_detail?: string | null;
+  voided_at?: string | null;
 }
 
 interface Props {
@@ -41,9 +48,46 @@ interface Props {
   /** false = ya cerro, o el usuario todavia no se inscribio */
   canEdit: boolean;
   lockedReason?: string;
+  /** Participants and admins only; the group picks endpoint answers 403 to anyone else. */
+  canViewOthers: boolean;
 }
 
 /** Nombre corto: "Manchester City FC" no entra en un boton de 110px. */
+const REFRESH_INTERVAL_MS = 30_000;
+const REFRESH_LEAD_MS = 10 * 60_000;
+const REFRESH_TAIL_MS = 3 * 60 * 60_000;
+/** Browsers overflow timers longer than 2^31-1 ms; a longer wait re-evaluates on wake. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
+
+type RefreshTiming = Pick<MatchLite, "scheduled_at" | "status" | "final_verified_at" | "voided_at">;
+
+function isPendingResult(match: RefreshTiming) {
+  return !match.final_verified_at && !match.voided_at;
+}
+
+/**
+ * A pending match needs live refreshes only while its result can change:
+ * live, finished awaiting verification, or from 10 min before kickoff until
+ * about 3 h after it. Outside that window the page stays still (free tier).
+ */
+export function isLiveRefreshWindow(match: RefreshTiming, now: number) {
+  if (!isPendingResult(match)) return false;
+  if (match.status === "live" || match.status === "finished") return true;
+  const kickoff = Date.parse(match.scheduled_at);
+  return Number.isFinite(kickoff) && now >= kickoff - REFRESH_LEAD_MS && now <= kickoff + REFRESH_TAIL_MS;
+}
+
+/** Milliseconds until the next pending match enters its refresh window, or null. */
+export function msUntilNextRefreshWindow(matches: RefreshTiming[], now: number): number | null {
+  let next: number | null = null;
+  for (const match of matches) {
+    if (!isPendingResult(match)) continue;
+    const opensAt = Date.parse(match.scheduled_at) - REFRESH_LEAD_MS;
+    if (Number.isFinite(opensAt) && opensAt > now && (next === null || opensAt < next)) next = opensAt;
+  }
+  return next === null ? null : next - now;
+}
+
 function corto(nombre: string): string {
   return nombre
     // Solo sufijos/prefijos societarios. "United" y "Club" NO se tocan:
@@ -68,9 +112,6 @@ function opcionesDe(m: { home_team: string; away_team: string }) {
   ];
 }
 
-/** 5 minutos antes del pitazo se traba, igual que el resto del repo. */
-const LOCK_MS = 5 * 60_000;
-
 export function PicksBoard({
   slug,
   scoringMode,
@@ -79,11 +120,50 @@ export function PicksBoard({
   distribution,
   canEdit,
   lockedReason,
+  canViewOthers,
 }: Props) {
   const [picks, setPicks] = useState(initialPicks);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const router = useRouter();
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (!matches.some(isPendingResult)) return;
+    let interval: number | undefined;
+    let wake: number | undefined;
+    const inWindow = () => matches.some(match => isLiveRefreshWindow(match, Date.now()));
+    const schedule = () => {
+      window.clearInterval(interval);
+      window.clearTimeout(wake);
+      interval = wake = undefined;
+      if (inWindow()) {
+        interval = window.setInterval(() => {
+          if (!inWindow()) { schedule(); return; }
+          if (!document.hidden) router.refresh();
+        }, REFRESH_INTERVAL_MS);
+        return;
+      }
+      const wait = msUntilNextRefreshWindow(matches, Date.now());
+      if (wait !== null) wake = window.setTimeout(schedule, Math.min(wait, MAX_TIMEOUT_MS));
+    };
+    const onVisibility = () => {
+      if (document.hidden) return;
+      schedule();
+      if (inWindow()) router.refresh();
+    };
+    schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(wake);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [matches, router]);
 
   const marcados = useMemo(
     () =>
@@ -125,7 +205,7 @@ export function PicksBoard({
     setMsg(null);
     try {
       const payload = matches
-        .filter((m) => picks[m.id])
+        .filter((m) => picks[m.id] && canEditCasaMatch(m))
         .map((m) => ({
           matchId: m.id,
           pick1x2: picks[m.id]?.pick1x2 ?? null,
@@ -167,10 +247,10 @@ export function PicksBoard({
     <div data-app-update-blocked={dirty || saving}>
       <ul className="space-y-px">
         {matches.map((m) => {
-          const cerrado =
-            new Date(m.scheduled_at).getTime() - LOCK_MS <= Date.now();
+          const cerrado = !canEditCasaMatch(m, now);
+          const started = hasCasaMatchStarted(m, now);
           const editable = canEdit && !cerrado;
-          const dist = distribution.resultado?.[m.id];
+          const dist = started ? distribution.resultado?.[m.id] : undefined;
           const total = dist?.total ?? 0;
           const mine = picks[m.id];
 
@@ -179,7 +259,7 @@ export function PicksBoard({
               {/* Encabezado del partido: hora + estado */}
               <div className="mb-3 flex items-center justify-between gap-2">
                 <Label>{formatMatchTime(m.scheduled_at)}</Label>
-                {m.final_verified_at ? (
+                {m.voided_at ? <span className="text-[13px] text-text-secondary">Anulado · 0 puntos</span> : m.final_verified_at ? (
                   <span className="lp-money text-[13px] text-text-primary">
                     {m.home_score}–{m.away_score}
                   </span>
@@ -268,7 +348,7 @@ export function PicksBoard({
               )}
 
               {/* "cuántos pusieron este marcador" — solo en modo marcador */}
-              {scoringMode === "marcador" &&
+              {started && scoringMode === "marcador" &&
                 mine?.homeScore != null &&
                 mine?.awayScore != null &&
                 (() => {
@@ -284,6 +364,7 @@ export function PicksBoard({
                     </p>
                   );
                 })()}
+              {started && canViewOthers && <MatchPicks slug={slug} matchId={m.id} scoringMode={scoringMode} home={m.home_team} away={m.away_team} />}
             </li>
           );
         })}
