@@ -670,3 +670,32 @@ Migraciones 097–102; activación explícita `legacy → paused → v2`. No act
 revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
 [docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
 de 096 arriba no es el contrato de liquidación una vez activado v2.
+
+### Comprobantes comprimidos en el navegador (2026-09-13)
+
+`components/casa/PagarForm.tsx` prepara la imagen UNA vez al elegirla
+(`lib/casa/prepare-proof.ts`) y calcula el SHA-256 sobre lo que sube. El
+servidor (`verifyCasaUpload`), el SQL 098 y el bucket no cambian.
+
+- Hasta 300 KB se sube el original sin decodificar. Por encima: JPEG 0,82
+  (0,72 si sigue pasando de 300 KB), lado largo 1600 px, lado corto mínimo
+  720 px y máximo 4 MP (`lib/casa/proof-image.ts`). Fondo blanco, orientación
+  EXIF aplicada y salida sin EXIF ni GPS. Si ahorra menos del 10 % o no hay
+  reducción legible, se sube el original. Entrada hasta 20 MB; subida hasta 8 MB.
+- Candidatos `[preparado, original válido]`. Ante `UPLOAD_IN_PROGRESS` o
+  `REQUEST_CONFLICT` (y `PROOF_IN_REVIEW`/`ALREADY_PAID`, que reconocen un
+  intento ya confirmado) `lib/casa/proof-submit.ts` prueba el siguiente: así se
+  retoman cargas del cliente anterior o de otro dispositivo, también con la
+  inscripción cerrada. sessionStorage guarda `sourceSha256` del original y
+  acepta registros viejos con solo `sha256`. Con la inscripción cerrada nunca
+  se marca como fallado un intento guardado.
+- Foto del premio (`CrearPollaForm`): se reduce a menos de 1 MB antes del
+  `FormData`; la función de Vercel corta el cuerpo en 4,5 MB.
+- Telegram: si `sendPhoto` falla, el admin recibe el texto con los mismos botones.
+- Pruebas: `npm test -- tests/casa-proof-image.test.ts tests/telegram-proof-notify.test.ts`.
+  E2E local (Supabase en Docker): `node scripts/casa-v2-local-env.mjs build <puerto>`,
+  `... start <puerto>` y `CASA_ORIGIN=http://localhost:<puerto> node scripts/casa-proof-compression-browser-check.mjs`
+  (captura 1179×2556, determinismo, recuperación tras cierre, registro anterior,
+  EXIF girado, foto del premio y HEIC ilegible).
+- Falta validar en dispositivos reales (iPhone Safari con HEIC y EXIF, Android
+  de gama media con fotos de 50 MP) y la legibilidad con comprobantes reales.
