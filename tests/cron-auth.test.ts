@@ -29,6 +29,7 @@ import { cronSecretMatches, requireCronSecret } from "@/lib/auth/cron-secret";
 import { updateSession } from "@/lib/supabase/middleware";
 import { proxy } from "@/proxy";
 import { POST as adminDiscrepancies } from "@/app/api/cron/admin-discrepancies-email/route";
+import { POST as backupFreshness } from "@/app/api/cron/backup-freshness/route";
 import { POST as cleanupProofs } from "@/app/api/cron/cleanup-payout-proofs/route";
 import { POST as matchReminders } from "@/app/api/cron/match-reminders/route";
 
@@ -37,6 +38,7 @@ const ORIGINAL_SECRET = process.env.CRON_SECRET;
 
 const handlers = [
   ["admin-discrepancies-email", adminDiscrepancies],
+  ["backup-freshness", backupFreshness],
   ["cleanup-payout-proofs", cleanupProofs],
   ["match-reminders", matchReminders],
 ] as const;
@@ -186,7 +188,8 @@ describe("guard estático: toda ruta de app/api/cron exige el secreto", () => {
   const files = routeFiles(root);
 
   it("encuentra las rutas de cron", () => {
-    expect(files.length).toBeGreaterThanOrEqual(3);
+    expect(files.length).toBeGreaterThanOrEqual(4);
+    expect(files.some((file) => /backup-freshness[\\/]route\.ts$/.test(file))).toBe(true);
   });
 
   it.each(files.map((file) => [file.slice(root.length + 1), file]))(

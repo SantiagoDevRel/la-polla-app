@@ -1,0 +1,6 @@
+*.sh text eol=lf
+systemd/* text eol=lf
+*.md text eol=lf
+tools/*.json text eol=lf
+pc/*.ps1 text eol=crlf
+*.mjs text eol=lf

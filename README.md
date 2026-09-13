@@ -397,6 +397,8 @@ Llenar en `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+# sb_secret_..., solo servidor: IP real en los límites de Supabase Auth
+SUPABASE_SECRET_KEY=
 
 # Meta WhatsApp Cloud API
 META_WA_ACCESS_TOKEN=
@@ -547,6 +549,80 @@ Después de un deploy nuevo:
 2. Confirmá envs en Vercel → Settings → Environment Variables (incluido `CLOUDFLARE_TURNSTILE_SECRET_KEY` que ahora se valida server-side)
 3. Confirmá que el webhook de Meta apunta a `https://lapollacolombiana.com/api/whatsapp/webhook`
 4. Confirmá Site URL de Supabase → Auth en `lapollacolombiana.com`
+5. Confirmá `SUPABASE_SECRET_KEY` (sb_secret_) y la IP real en Supabase Auth
+   (ver «IP real en Supabase Auth»)
+
+### IP real en Supabase Auth
+
+Supabase Auth limita `/auth/v1/otp` y `/auth/v1/verify` por IP (30 cada
+5 minutos). El login los llama desde Vercel, así que sin más configuración
+todos los usuarios comparten las IPs de salida de Vercel y un pico de logins
+agota el cupo de todos. `lib/supabase/auth-ip.ts` manda la IP del usuario en
+`Sb-Forwarded-For` ([doc](https://supabase.com/docs/guides/auth/rate-limits#ip-address-forwarding)).
+Supabase la respeta solo con las dos condiciones:
+
+1. **Env en Vercel** (Production y Preview), server-only:
+   `SUPABASE_SECRET_KEY=sb_secret_...` (Dashboard → Settings → API Keys →
+   Secret keys; conviene una key propia para esto, rotable sola). Redeploy.
+2. **Después del deploy**, activar el reenvío en el proyecto:
+
+   ```bash
+   curl -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_REF/config/auth"      -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN"      -H "Content-Type: application/json"      -d '{"security_sb_forwarded_for_enabled": true}'
+   ```
+
+   o Dashboard → Authentication → Rate Limits → IP Address Forwarding.
+
+Qué pasa con cada configuración incompleta:
+
+- **Sin la env:** anon key sin cabecera, como antes, con un `warn` en logs.
+- **Sin el flag:** Supabase ignora la cabecera.
+- **Con una key que Supabase rechaza** (revocada, rotada, de otro proyecto o
+  mal copiada): el gateway responde 401 `Invalid API key` antes de llegar a
+  Auth. `fetchWithAnonFallback` repite esa llamada una vez con la anon key sin
+  cabecera y deja un `console.error` con `[auth-ip] Supabase rechazó
+  SUPABASE_SECRET_KEY`. El login sigue funcionando, pero sin IP real, hasta
+  corregir la env y volver a desplegar. Cada llamada suma un viaje extra.
+  Rotar esa key: crear la nueva, actualizar Vercel, desplegar y solo después
+  revocar la vieja.
+
+**Smoke test en Preview antes de poner la env en Production:** con la env en
+Preview y el deploy listo, pide un código real desde `/login` del Preview,
+ingrésalo y confirma que entras a `/casa`. En los logs de ese deploy no debe
+aparecer `[auth-ip] Supabase rechazó`. Si aparece, la key está mal.
+
+Verificación: en los logs de Auth, `/otp` y `/verify` pasan de mostrar IPs de
+AWS (`3.236.x`, `54.82.x`) a las IPs de los usuarios.
+
+**Pendiente antes de producción: captcha de Auth.** `/auth/v1/otp` acepta
+llamadas directas con la anon key pública, así que el tope diario, el de IP y
+el de teléfono de `start-otp` no frenan a quien llame a Supabase directo. Solo
+lo frenan los límites de Supabase (`rate_limit_otp` 30 cada 5 min por IP,
+`rate_limit_sms_sent` 300 por hora para todo el proyecto). Un script con
+números rotados puede gastar 300 SMS por hora y dejar sin login a todos
+(2026-09-13: `security_captcha_enabled=false`, `disable_signup=false`).
+Plan, en este orden:
+
+1. La secret key funcionando en Production (arriba) y verificada en logs.
+2. En un proyecto de Supabase de prueba (Preview usa el mismo proyecto que
+   producción, así que ahí no sirve), activar la captcha de Auth
+   (`security_captcha_enabled`, proveedor y secret) y confirmar dos cosas:
+   `start-otp`, `verify-otp` y `wa-magic` siguen funcionando, porque GoTrue se
+   salta la captcha con credenciales de admin (`verifyCaptcha` en
+   `internal/api/middleware.go`), y un `POST /auth/v1/otp` directo con la anon
+   key responde `captcha_failed`. `/verify` no pide captcha; el refresh de
+   `/token` está exento.
+3. Recién ahí activarla en producción.
+
+Con captcha activa, la repetición con anon key de una secret key rechazada
+ya no salva `/otp`: ese caso también exige el smoke test de Preview. La
+alternativa es un Send SMS Hook que valide contra `otp_rate_limits`.
+
+Los helpers devuelven solo `client.auth`; para datos siguen
+`lib/supabase/server.ts` y `lib/supabase/admin.ts`. Prueba local: GoTrue con
+`GOTRUE_SECURITY_SB_FORWARDED_FOR_ENABLED=true` registra `remote_addr` con la
+IP reenviada y separa los baldes de `/verify` por esa IP; login completo con y
+sin la env deja la misma cookie `sb-<ref>-auth-token` y `/casa` responde 200.
+Unitarias: `npm test -- tests/auth-real-ip.test.ts`.
 
 ### Crons de GitHub Actions (`/api/cron/*`)
 
@@ -555,6 +631,17 @@ Después de un deploy nuevo:
 | `match-reminders.yml` | `/api/cron/match-reminders` | diario 13:00 UTC |
 | `admin-discrepancies-email.yml` | `/api/cron/admin-discrepancies-email` | diario 13:00 UTC |
 | `cleanup-payout-proofs.yml` | `/api/cron/cleanup-payout-proofs` | **solo manual** (pendiente de aprobación del dueño) |
+| `backup-freshness.yml` | `/api/cron/backup-freshness` | cada hora, minuto 17 |
+
+- `backup-freshness` lee `public.backup_runs` (migración 117, la llena el
+  backup del DGX) y le escribe a `ADMIN_ALERT_EMAIL` (o `FEEDBACK_NOTIFY_EMAIL`)
+  «Backup de La Polla atrasado» si el último backup bueno pasa de
+  `BACKUP_MAX_AGE_HOURS` (7) o la última verificación de
+  `BACKUP_VERIFY_MAX_AGE_HOURS` (30). La primera verificación tiene margen:
+  sin filas `kind=verify` y con el primer backup bueno de 30 h o menos, no
+  alerta. Responde `{ok, stale, age_hours,
+  verify_stale, verify_age_hours, sent}`; 502 si Resend falla, 500 si la tabla
+  no existe. Detalle: `ops/backup/README.md`.
 
 - El middleware exime `/api/cron/` (con barra final) del gate de sesión; cada
   handler se protege solo con `requireCronSecret(request)`

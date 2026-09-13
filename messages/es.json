@@ -71,6 +71,8 @@
     "errInvalidPhone": "Ingresa un número válido con código de país",
     "errCooldown": "Espera {seconds}s para reenviar el código",
     "errSendFailed": "No pudimos enviar el código",
+    "errDailySmsCap": "Ya enviamos los códigos por SMS permitidos hoy para este número. Inténtalo de nuevo mañana o escríbenos a soporte.",
+    "errDailySmsCapSupport": "Ir a soporte",
     "errNetwork": "Error de red",
     "errOtpLength": "El código tiene 6 dígitos",
     "errOtpInvalid": "Código inválido o vencido",
