@@ -286,6 +286,10 @@ export function inferPrecision(
   fixture: CalendarFixture,
   timings: Map<string, RoundTiming>,
   observedAt: string | number,
+  // (2026-09-13) El calendario lo usa con true: una ronda que sigue uniforme a
+  // menos de 10 días del saque no puede pasar a "confirmada" con la hora de
+  // relleno, porque Casa calcularía con ella un cierre automático falso.
+  ignoreLead = false,
 ): SchedulePrecision {
   const short = fixture.fixture.status.short;
   if (short === 'TBD') return { confirmed: false, movable: false, reason: 'time_to_be_defined' };
@@ -299,14 +303,14 @@ export function inferPrecision(
   const uniform = timing !== undefined
     && timing.fixtures >= UNIFORM_ROUND_MIN_FIXTURES
     && timing.share >= UNIFORM_ROUND_MIN_SHARE
-    && fixture.fixture.timestamp * 1000 - observed > UNIFORM_ROUND_MIN_LEAD_MS;
+    && (ignoreLead || fixture.fixture.timestamp * 1000 - observed > UNIFORM_ROUND_MIN_LEAD_MS);
   return uniform
     ? { confirmed: true, movable: false, reason: 'uniform_round' }
     : { confirmed: true, movable: true, reason: 'confirmed' };
 }
 
 /** Precisión de toda una respuesta de liga, por id de fixture. */
-export function inferFeedPrecision(fixtures: CalendarFixture[], observedAt: string | number): Map<number, SchedulePrecision> {
+export function inferFeedPrecision(fixtures: CalendarFixture[], observedAt: string | number, ignoreLead = false): Map<number, SchedulePrecision> {
   const timings = roundTimings(fixtures);
-  return new Map(fixtures.map((f) => [f.fixture.id, inferPrecision(f, timings, observedAt)] as const));
+  return new Map(fixtures.map((f) => [f.fixture.id, inferPrecision(f, timings, observedAt, ignoreLead)] as const));
 }

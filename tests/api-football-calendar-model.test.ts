@@ -150,6 +150,13 @@ describe('inferPrecision', () => {
     }
   });
 
+  it('with ignoreLead (calendar import) a filler round stays uniform even nine days before kickoff', () => {
+    const round = inRound(FEEDS.laliga, 'Regular Season - 8');
+    const nineDaysBefore = round[0].fixture.timestamp * 1000 - 9 * 86_400_000;
+    const precision = inferFeedPrecision(fixturesOf(FEEDS.laliga), nineDaysBefore, true);
+    for (const f of round) expect(precision.get(f.fixture.id)?.reason).toBe('uniform_round');
+  });
+
   it('treats genuinely simultaneous rounds as confirmed for inserts (UCL League Stage 8, BetPlay Clausura 19)', () => {
     const ucl = precisionOf(FEEDS.ucl);
     for (const f of inRound(FEEDS.ucl, 'League Stage - 8')) {
