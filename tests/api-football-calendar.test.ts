@@ -5,9 +5,10 @@ import {
   refreshAfTournament, validateFixturesEnvelope, writerWouldChange, memoizedSeasonResolver, estimateLegacyLinks,
   type AfMatchRow, type CalendarDeps, type ExistingMatch,
 } from '@/lib/api-football/calendar';
+import type { CalendarFixture } from '@/lib/api-football/calendar-model';
 
 // Respuestas reales de API-Football del 2026-09-13, recortadas. Cero red.
-type FeedFile = { observedAt: string; response: Array<Record<string, any>> };
+type FeedFile = { observedAt: string; response: CalendarFixture[] };
 const load = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/api-football/${name}`, import.meta.url), 'utf8')) as FeedFile;
 const LALIGA = load('laliga-2026.trimmed.json');
@@ -22,7 +23,11 @@ function fakeDb(existing: ExistingMatch[] = []) {
   const reads: string[] = [];
   let nextId = 1;
   const chain = (table: string) => {
-    const q: any = {
+    type Chain = {
+      select: () => Chain; eq: () => Chain; or: (f: string) => Chain; order: () => Chain;
+      range: (from: number) => Promise<{ data: ExistingMatch[]; error: null }>;
+    };
+    const q: Chain = {
       select: () => q, eq: () => q, or: (f: string) => { reads.push(`${table}:${f}`); return q; },
       order: () => q, range: async (from: number) => ({ data: existing.slice(from, from + 1000), error: null }),
     };
@@ -193,7 +198,7 @@ describe('refreshAfTournament safety', () => {
   it('counts a failing row and keeps writing the rest', async () => {
     const { db, calls } = fakeDb();
     let n = 0;
-    (db.rpc as any).mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+    (db.rpc as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (fn: string, args: Record<string, unknown>) => {
       calls.push({ fn, args });
       return ++n === 2 ? { data: null, error: { message: 'Ambiguous fixture identity' } } : { data: `id-${n}`, error: null };
     });
@@ -206,7 +211,7 @@ describe('refreshAfTournament safety', () => {
   it('stops writing at the deadline and reports the league as truncated', async () => {
     const { db } = fakeDb();
     let clock = NOW;
-    (db.rpc as any).mockImplementation(async () => { clock += 1_000; return { data: crypto.randomUUID(), error: null }; });
+    (db.rpc as unknown as ReturnType<typeof vi.fn>).mockImplementation(async () => { clock += 1_000; return { data: crypto.randomUUID(), error: null }; });
     const d = deps(envelope(LALIGA.response), db, NOW, { now: () => clock });
     const r = await refreshAfTournament('laliga_2025', { deadlineMs: NOW + 10_000 }, d);
     expect(r.truncated).toBe(true);
