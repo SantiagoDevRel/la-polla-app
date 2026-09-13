@@ -392,6 +392,8 @@ Llenar en `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+# sb_secret_..., solo servidor: IP real en los límites de Supabase Auth
+SUPABASE_SECRET_KEY=
 
 # Meta WhatsApp Cloud API
 META_WA_ACCESS_TOKEN=
@@ -542,6 +544,40 @@ Después de un deploy nuevo:
 2. Confirmá envs en Vercel → Settings → Environment Variables (incluido `CLOUDFLARE_TURNSTILE_SECRET_KEY` que ahora se valida server-side)
 3. Confirmá que el webhook de Meta apunta a `https://lapollacolombiana.com/api/whatsapp/webhook`
 4. Confirmá Site URL de Supabase → Auth en `lapollacolombiana.com`
+5. Confirmá `SUPABASE_SECRET_KEY` (sb_secret_) y la IP real en Supabase Auth
+   (ver «IP real en Supabase Auth»)
+
+### IP real en Supabase Auth
+
+Supabase Auth limita `/auth/v1/otp` y `/auth/v1/verify` por IP (30 cada
+5 minutos). El login los llama desde Vercel, así que sin más configuración
+todos los usuarios comparten las IPs de salida de Vercel y un pico de logins
+agota el cupo de todos. `lib/supabase/auth-ip.ts` manda la IP del usuario en
+`Sb-Forwarded-For` ([doc](https://supabase.com/docs/guides/auth/rate-limits#ip-address-forwarding)).
+Supabase la respeta solo con las dos condiciones:
+
+1. **Env en Vercel** (Production y Preview), server-only:
+   `SUPABASE_SECRET_KEY=sb_secret_...` (Dashboard → Settings → API Keys →
+   Secret keys; conviene una key propia para esto, rotable sola). Redeploy.
+2. **Después del deploy**, activar el reenvío en el proyecto:
+
+   ```bash
+   curl -X PATCH "https://api.supabase.com/v1/projects/$PROJECT_REF/config/auth"      -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN"      -H "Content-Type: application/json"      -d '{"security_sb_forwarded_for_enabled": true}'
+   ```
+
+   o Dashboard → Authentication → Rate Limits → IP Address Forwarding.
+
+El orden no rompe nada: sin la env el código usa la anon key sin cabecera
+(como antes, con un `warn` en logs); sin el flag Supabase ignora la cabecera.
+Verificación: en los logs de Auth, `/otp` y `/verify` pasan de mostrar IPs de
+AWS (`3.236.x`, `54.82.x`) a las IPs de los usuarios.
+
+Los helpers devuelven solo `client.auth`; para datos siguen
+`lib/supabase/server.ts` y `lib/supabase/admin.ts`. Prueba local: GoTrue con
+`GOTRUE_SECURITY_SB_FORWARDED_FOR_ENABLED=true` registra `remote_addr` con la
+IP reenviada y separa los baldes de `/verify` por esa IP; login completo con y
+sin la env deja la misma cookie `sb-<ref>-auth-token` y `/casa` responde 200.
+Unitarias: `npm test -- tests/auth-real-ip.test.ts`.
 
 ### Crons de GitHub Actions (`/api/cron/*`)
 

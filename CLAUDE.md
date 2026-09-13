@@ -595,6 +595,22 @@ están documentadas en migration 056-057.
   page.tsx`) calls `signInWithOtp` client-side and then verifies the
   code server-side at `/api/auth/verify-otp` so cookies stick on iOS
   Safari.
+- **IP real en Supabase Auth (2026-09-13).** `/otp` y `/verify` de Supabase
+  limitan POR IP (30 cada 5 min); llamados desde Vercel, todos los usuarios
+  compartían las IPs de salida de Vercel. `start-otp`, `verify-otp` y
+  `wa-magic` llaman a Auth SOLO con `lib/supabase/auth-ip.ts`:
+  `getClientIp` (`x-real-ip` → primer `x-forwarded-for`, IP validada) +
+  `SUPABASE_SECRET_KEY` (`sb_secret_`) + cabecera `Sb-Forwarded-For`. Supabase
+  la respeta solo con secret key y `security_sb_forwarded_for_enabled=true`.
+  Los helpers devuelven `client.auth`, nunca el cliente: con secret key y sin
+  sesión un `.from()` sería service_role. No usarlos para datos. Sin la env
+  cae a anon sin cabecera (warn). Cualquier ruta nueva que abra sesión desde
+  el servidor (p. ej. `lib/auth/phone-session.ts`) usa `createAuthRouteClient`.
+- Tope diario de SMS (2 por teléfono en 24 h): `start-otp` responde 429
+  `code: "daily_sms_cap"` y `/login` muestra `Login.errDailySmsCap` con
+  enlace a `/soporte` (WhatsApp está apagado). Un 4xx de Supabase (no salió
+  SMS) libera el `generate` que ese mismo request grabó; 5xx o error de red
+  siguen contando.
 - After OTP verify, new users land on `/onboarding`. Onboarding has
   two **mandatory** steps:
     1. Pick a real display name (not phone-shaped, ≥2 chars)

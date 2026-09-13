@@ -1,0 +1,328 @@
+// tests/auth-real-ip.test.ts — Las llamadas de Supabase Auth salen con la IP
+// real de la persona (Sb-Forwarded-For + secret key) y el tope diario de SMS
+// remite a soporte sin gastar cupo cuando Supabase rechaza el envío.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+
+const mocks = vi.hoisted(() => ({
+  sbCreateClient: vi.fn(),
+  ssrCreateServerClient: vi.fn(),
+  cookieStore: {
+    getAll: vi.fn(() => [{ name: "sb-test-auth-token", value: "old" }]),
+    set: vi.fn(),
+  },
+}));
+
+vi.mock("@supabase/supabase-js", () => ({ createClient: mocks.sbCreateClient }));
+vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.ssrCreateServerClient }));
+vi.mock("next/headers", () => ({ cookies: async () => mocks.cookieStore }));
+
+const route = vi.hoisted(() => ({
+  checkIpRateLimit: vi.fn(),
+  checkDailySmsCap: vi.fn(),
+  checkAndRecordAttempt: vi.fn(),
+  releaseGenerateAttempt: vi.fn(),
+  signInWithOtp: vi.fn(),
+  createAuthClient: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/rate-limit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/auth/rate-limit")>();
+  return {
+    ...actual,
+    checkIpRateLimit: route.checkIpRateLimit,
+    checkDailySmsCap: route.checkDailySmsCap,
+    checkAndRecordAttempt: route.checkAndRecordAttempt,
+    releaseGenerateAttempt: route.releaseGenerateAttempt,
+  };
+});
+
+import {
+  SB_FORWARDED_FOR_HEADER,
+  authRequestConfig,
+  createAuthClient,
+  createAuthRouteClient,
+  getClientIp,
+  normalizeIp,
+  resetAuthIpWarningForTests,
+} from "@/lib/supabase/auth-ip";
+import { otpRejectedBeforeSending } from "@/lib/auth/rate-limit";
+import { DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
+
+const SECRET = "sb_secret_fake";
+const ANON = "anon-test-key";
+const URL_ = "https://example-ref.supabase.co";
+const ORIGINAL_ENV = { ...process.env };
+
+function headers(values: Record<string, string>) {
+  return new Headers(values);
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetAuthIpWarningForTests();
+  process.env.NEXT_PUBLIC_SUPABASE_URL = URL_;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = ANON;
+  delete process.env.SUPABASE_SECRET_KEY;
+  mocks.sbCreateClient.mockImplementation(() => ({ auth: { kind: "plain" } }));
+  mocks.ssrCreateServerClient.mockImplementation(() => ({ auth: { kind: "ssr" } }));
+});
+
+afterEach(() => {
+  process.env = { ...ORIGINAL_ENV };
+});
+
+describe("getClientIp / normalizeIp", () => {
+  it("prefiere x-real-ip sobre un x-forwarded-for distinto", () => {
+    expect(
+      getClientIp(headers({ "x-real-ip": "190.25.1.7", "x-forwarded-for": "6.6.6.6" })),
+    ).toBe("190.25.1.7");
+  });
+
+  it("sin x-real-ip toma SOLO el primer valor de x-forwarded-for", () => {
+    expect(
+      getClientIp(headers({ "x-forwarded-for": " 181.49.2.3 , 10.0.0.1, 3.236.1.1" })),
+    ).toBe("181.49.2.3");
+  });
+
+  it("no salta a valores posteriores si el primero es basura", () => {
+    expect(getClientIp(headers({ "x-forwarded-for": "evil, 181.49.2.3" }))).toBeNull();
+  });
+
+  it("x-real-ip inválida cae al primer x-forwarded-for válido", () => {
+    expect(
+      getClientIp(headers({ "x-real-ip": "not-an-ip", "x-forwarded-for": "2800:e2:9f00::1" })),
+    ).toBe("2800:e2:9f00::1");
+  });
+
+  it("acepta IPv6, IPv4-mapeada y formas con puerto", () => {
+    expect(normalizeIp("2001:db8::1")).toBe("2001:db8::1");
+    expect(normalizeIp("::ffff:190.25.1.7")).toBe("::ffff:190.25.1.7");
+    expect(normalizeIp("[2001:db8::1]:443")).toBe("2001:db8::1");
+    expect(normalizeIp("190.25.1.7:5678")).toBe("190.25.1.7");
+  });
+
+  it("descarta vacío, texto, zonas, IPs imposibles y valores enormes", () => {
+    for (const bad of [
+      "",
+      "   ",
+      "unknown",
+      "300.1.1.1",
+      "1.2.3",
+      "fe80::1%eth0",
+      "190.25.1.7; DROP",
+      `${"1".repeat(80)}`,
+      "<script>",
+    ]) {
+      expect(normalizeIp(bad)).toBeNull();
+    }
+    expect(normalizeIp(null)).toBeNull();
+    expect(normalizeIp(undefined)).toBeNull();
+    expect(getClientIp(headers({}))).toBeNull();
+    expect(getClientIp(headers({ "x-forwarded-for": "" }))).toBeNull();
+  });
+});
+
+describe("selección de key y cabecera para Auth", () => {
+  it("sin SUPABASE_SECRET_KEY usa la anon key, sin cabecera, y avisa una sola vez", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(authRequestConfig("190.25.1.7")).toEqual({ key: ANON, headers: {}, forwardsIp: false });
+    authRequestConfig("190.25.1.8");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).not.toContain(ANON);
+    warn.mockRestore();
+  });
+
+  it("una key que no es sb_secret_ (p.ej. service_role legacy) no se usa", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    process.env.SUPABASE_SECRET_KEY = "eyJhbGciOiJIUzI1NiJ9.legacy.service";
+    expect(authRequestConfig("190.25.1.7")).toEqual({ key: ANON, headers: {}, forwardsIp: false });
+    expect(String(warn.mock.calls[0][0])).not.toContain("eyJ");
+    warn.mockRestore();
+  });
+
+  it("con secret key e IP válida manda Sb-Forwarded-For", () => {
+    process.env.SUPABASE_SECRET_KEY = SECRET;
+    expect(authRequestConfig("190.25.1.7")).toEqual({
+      key: SECRET,
+      headers: { [SB_FORWARDED_FOR_HEADER]: "190.25.1.7" },
+      forwardsIp: true,
+    });
+  });
+
+  it("con secret key pero sin IP válida no inventa cabecera", () => {
+    process.env.SUPABASE_SECRET_KEY = SECRET;
+    expect(authRequestConfig(null)).toEqual({ key: SECRET, headers: {}, forwardsIp: false });
+    expect(authRequestConfig("basura")).toEqual({ key: SECRET, headers: {}, forwardsIp: false });
+  });
+
+  it("createAuthClient (start-otp) pasa key y cabecera y devuelve SOLO auth", () => {
+    process.env.SUPABASE_SECRET_KEY = SECRET;
+    const auth = createAuthClient("2800:e2:9f00::1");
+    expect(auth).toEqual({ kind: "plain" });
+    expect(mocks.sbCreateClient).toHaveBeenCalledWith(URL_, SECRET, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { "Sb-Forwarded-For": "2800:e2:9f00::1" } },
+    });
+  });
+
+  it("createAuthClient sin secret key conserva el cliente anon de antes", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    createAuthClient("190.25.1.7");
+    expect(mocks.sbCreateClient).toHaveBeenCalledWith(URL_, ANON, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: {} },
+    });
+  });
+
+  it("createAuthRouteClient (verify-otp) usa las cookies del request", async () => {
+    process.env.SUPABASE_SECRET_KEY = SECRET;
+    const auth = await createAuthRouteClient("190.25.1.7");
+    expect(auth).toEqual({ kind: "ssr" });
+    const [url, key, options] = mocks.ssrCreateServerClient.mock.calls[0];
+    expect(url).toBe(URL_);
+    expect(key).toBe(SECRET);
+    expect(options.global).toEqual({ headers: { "Sb-Forwarded-For": "190.25.1.7" } });
+    expect(options.cookies.getAll()).toEqual([{ name: "sb-test-auth-token", value: "old" }]);
+    options.cookies.setAll([{ name: "sb-test-auth-token", value: "new", options: { path: "/" } }]);
+    expect(mocks.cookieStore.set).toHaveBeenCalledWith("sb-test-auth-token", "new", { path: "/" });
+  });
+});
+
+describe("otpRejectedBeforeSending", () => {
+  it("libera el cupo solo con respuestas 4xx de Supabase", () => {
+    expect(otpRejectedBeforeSending({ status: 429 })).toBe(true);
+    expect(otpRejectedBeforeSending({ status: 400 })).toBe(true);
+    expect(otpRejectedBeforeSending({ status: 422 })).toBe(true);
+    expect(otpRejectedBeforeSending({ status: 500 })).toBe(false);
+    expect(otpRejectedBeforeSending({ status: 0 })).toBe(false);
+    expect(otpRejectedBeforeSending({})).toBe(false);
+    expect(otpRejectedBeforeSending(null)).toBe(false);
+  });
+});
+
+describe("mensajes del tope diario", () => {
+  const read = (lang: string) =>
+    JSON.parse(readFileSync(join(process.cwd(), "messages", `${lang}.json`), "utf8")).Login;
+
+  it("es/en explican el tope y remiten a soporte, sin WhatsApp ni emojis", () => {
+    const es = read("es");
+    const en = read("en");
+    expect(es.errDailySmsCap).toMatch(/mañana/);
+    expect(es.errDailySmsCap).toMatch(/soporte/);
+    expect(en.errDailySmsCap).toMatch(/tomorrow/);
+    expect(en.errDailySmsCap).toMatch(/support/);
+    for (const text of [es.errDailySmsCap, es.errDailySmsCapSupport, en.errDailySmsCap]) {
+      expect(text).not.toMatch(/whatsapp|telegram|botón verde/i);
+      expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
+    }
+    expect(SUPPORT_PATH).toBe("/soporte");
+    expect(DAILY_SMS_CAP_CODE).toBe("daily_sms_cap");
+  });
+});
+
+describe("POST /api/auth/start-otp", () => {
+  async function loadRoute() {
+    vi.resetModules();
+    vi.doMock("@/lib/supabase/auth-ip", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@/lib/supabase/auth-ip")>();
+      return { ...actual, createAuthClient: route.createAuthClient };
+    });
+    return import("@/app/api/auth/start-otp/route");
+  }
+
+  function startRequest(extraHeaders: Record<string, string> = {}) {
+    return new NextRequest("https://lapollacolombiana.com/api/auth/start-otp", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...extraHeaders },
+      body: JSON.stringify({ phone: "+57 300 111 2233" }),
+    });
+  }
+
+  beforeEach(() => {
+    route.checkIpRateLimit.mockResolvedValue({ blocked: false, remaining: 0 });
+    route.checkDailySmsCap.mockResolvedValue({ blocked: false, remaining: 2 });
+    route.checkAndRecordAttempt.mockResolvedValue({
+      blocked: false,
+      remaining: 4,
+      attemptId: "attempt-1",
+    });
+    route.releaseGenerateAttempt.mockResolvedValue(undefined);
+    route.signInWithOtp.mockResolvedValue({ error: null });
+    route.createAuthClient.mockReturnValue({ signInWithOtp: route.signInWithOtp });
+  });
+
+  it("tope diario: 429 con código estable, enlace a soporte y sin WhatsApp", async () => {
+    route.checkDailySmsCap.mockResolvedValue({ blocked: true, remaining: 0 });
+    const { POST } = await loadRoute();
+    const res = await POST(startRequest({ "x-real-ip": "190.25.1.7" }));
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.code).toBe("daily_sms_cap");
+    expect(body.supportPath).toBe("/soporte");
+    expect(body.useWhatsapp).toBeUndefined();
+    expect(body.error).not.toMatch(/whatsapp|botón verde/i);
+    expect(route.checkAndRecordAttempt).not.toHaveBeenCalled();
+    expect(route.signInWithOtp).not.toHaveBeenCalled();
+  });
+
+  it("envío aceptado: usa la IP real para el límite propio y para Supabase, y no libera", async () => {
+    const { POST } = await loadRoute();
+    const res = await POST(
+      startRequest({ "x-real-ip": "190.25.1.7", "x-forwarded-for": "190.25.1.7" }),
+    );
+    expect(res.status).toBe(200);
+    expect(route.checkIpRateLimit).toHaveBeenCalledWith("190.25.1.7");
+    expect(route.checkAndRecordAttempt).toHaveBeenCalledWith("573001112233", "generate", "190.25.1.7");
+    expect(route.createAuthClient).toHaveBeenCalledWith("190.25.1.7");
+    expect(route.releaseGenerateAttempt).not.toHaveBeenCalled();
+  });
+
+  it("429 de Supabase: no gasta el cupo diario (libera el intento grabado)", async () => {
+    route.signInWithOtp.mockResolvedValue({
+      error: { status: 429, message: "email rate limit exceeded", code: "over_request_rate_limit" },
+    });
+    const { POST } = await loadRoute();
+    const res = await POST(startRequest({ "x-real-ip": "190.25.1.7" }));
+    expect(res.status).toBe(429);
+    expect(route.releaseGenerateAttempt).toHaveBeenCalledWith("attempt-1");
+  });
+
+  it("5xx de Supabase: el intento sigue contando (el SMS pudo salir)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    route.signInWithOtp.mockResolvedValue({
+      error: { status: 500, message: "Unexpected failure" },
+    });
+    const { POST } = await loadRoute();
+    const res = await POST(startRequest({ "x-real-ip": "190.25.1.7" }));
+    expect(res.status).toBe(500);
+    expect(route.releaseGenerateAttempt).not.toHaveBeenCalled();
+  });
+
+  it("límite por teléfono bloqueado: ni Supabase ni liberación", async () => {
+    route.checkAndRecordAttempt.mockResolvedValue({ blocked: true, remaining: 0 });
+    const { POST } = await loadRoute();
+    const res = await POST(startRequest());
+    expect(res.status).toBe(429);
+    expect(route.signInWithOtp).not.toHaveBeenCalled();
+    expect(route.releaseGenerateAttempt).not.toHaveBeenCalled();
+  });
+});
+
+describe("rutas de sesión: solo Auth con IP real, nunca el cliente de datos", () => {
+  const files = [
+    "app/api/auth/start-otp/route.ts",
+    "app/api/auth/verify-otp/route.ts",
+    "app/api/auth/wa-magic/route.ts",
+  ];
+
+  it.each(files)("%s llama a Auth por lib/supabase/auth-ip", (file) => {
+    const source = readFileSync(join(process.cwd(), file), "utf8");
+    expect(source).toMatch(/from "@\/lib\/supabase\/auth-ip"/);
+    expect(source).not.toMatch(/NEXT_PUBLIC_SUPABASE_ANON_KEY/);
+    expect(source).not.toMatch(/from "@\/lib\/supabase\/server"/);
+    expect(source).not.toMatch(/\.auth\.(verifyOtp|signInWithOtp|signOut)\(/);
+  });
+});

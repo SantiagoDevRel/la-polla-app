@@ -24,7 +24,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient as createServerSupabase } from "@/lib/supabase/server";
+import { createAuthRouteClient, getClientIp } from "@/lib/supabase/auth-ip";
 import { recordLoginEvent } from "@/lib/auth/login-event";
 import { emailForPhone, normalizePhone } from "@/lib/auth/phone";
 
@@ -193,15 +193,17 @@ export async function GET(request: NextRequest) {
     return errorPage("No pudimos firmar tu sesión. Inténtalo de nuevo.", 500);
   }
 
-  const supabase = await createServerSupabase();
+  // Cliente SOLO de Auth con la IP real (Sb-Forwarded-For): /verify tiene
+  // límite por IP en Supabase (lib/supabase/auth-ip.ts).
+  const auth = await createAuthRouteClient(getClientIp(request.headers));
   // Defensive: signOut before verify. Same reason as in
   // /api/auth/verify-otp — a user with a live session on a different
   // account would otherwise risk the cookie swap not landing.
   // scope:'local' — solo este browser; el default 'global' revocaba las
   // sesiones del user anterior en otros dispositivos (codex 2026-06-11).
-  await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+  await auth.signOut({ scope: "local" }).catch(() => {});
 
-  const { error: verifyErr } = await supabase.auth.verifyOtp({
+  const { error: verifyErr } = await auth.verifyOtp({
     email: syntheticEmail,
     token: emailOtp,
     type: "email",
