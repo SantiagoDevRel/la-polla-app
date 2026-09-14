@@ -6,7 +6,7 @@ vi.mock('server-only', () => ({}));
 // Builder encadenable de supabase-js para la lectura de filas del vivo.
 const chain = () => {
   const q: Record<string, unknown> = {};
-  for (const m of ['select', 'in', 'is', 'gte', 'lte', 'limit']) q[m] = () => q;
+  for (const m of ['select', 'in', 'is', 'gte', 'lte', 'limit', 'not']) q[m] = () => q;
   q.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: mocks.rows(), error: null }).then(resolve);
   return q;
 };

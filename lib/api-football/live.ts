@@ -30,9 +30,18 @@ export async function syncApiFootballLive(): Promise<Set<string>> {
  // polla: nadie más los actualiza. El corte del 2026-09-13 dejó a Celta–Málaga
  // en «vivo, minuto 48» dos horas después. No cuesta cuota extra: el feed por
  // fecha ya trae los diez torneos.
+ //
+ // Las filas ya terminadas (finished/cancelled) salen de la ventana: el vivo no
+ // tiene nada más que escribirles (matches_prevent_status_regress no deja bajar
+ // un finished) y el cierre lo hace verify-final con su propia lectura. Sin este
+ // filtro, después de medianoche UTC los partidos de ayer mantenían una consulta
+ // por minuto al feed de su fecha (2026-09-14). Las filas 'live' viejas siguen
+ // en la ventana hasta que el proveedor las cierre, y flip_stale_live_matches
+ // cubre las que el proveedor deja de reportar.
  const filas=((await admin.from('matches')
   .select('id,tournament,home_team,away_team,scheduled_at,external_id,source_external_ids')
   .in('tournament',Object.keys(RESULT_LEAGUES)).is('final_verified_at',null)
+  .not('status','in','(finished,cancelled)')
   .gte('scheduled_at',desde).lte('scheduled_at',hasta).limit(500)).data ?? []) as (LinkedResultMatch&{id:string})[];
  const dates=Array.from(new Set(filas.map(m=>m.scheduled_at.slice(0,10))));
  for (const date of dates) {

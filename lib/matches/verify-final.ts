@@ -15,7 +15,9 @@
 import { matchesEnJuego } from "./en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAdmin } from "@/lib/notifications/admin-alert";
-import { loadDailyResults, loadFixturesByIds, type FixtureObservation } from "@/lib/api-football/daily-results";
+import {
+  loadCachedDailyResults, loadDailyResults, loadFixturesByIds, type DailyResults, type FixtureObservation,
+} from "@/lib/api-football/daily-results";
 import {
   confirmedObservation, linkedFixtureId, readFinalResult, resolveResultFixture, scorePair,
 } from "@/lib/api-football/results";
@@ -77,6 +79,24 @@ const COLS =
 const KICKOFF_TOLERANCE_MS = 2 * 60 * 60 * 1000;
 const utcDate = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
+// Freno a cierres atascados (2026-09-14, migración 123). Un partido que no se
+// logra confirmar pedía el feed de su fecha cada minuto (~940 consultas/día).
+// Tras STUCK_AFTER_ATTEMPTS intentos sin cerrar, sus consultas propias se
+// espacian a STUCK_SPACING_MS y el admin recibe un aviso, una sola vez por
+// partido. Un intento es una lectura nueva del proveedor (no un tick que relee
+// la caché dentro del TTL) y cuenta solo cuando el partido ya debería tener resultado
+// (fila finished, lectura final del proveedor o saque hace más de 4 h): el
+// cierre normal necesita dos lecturas y nunca llega al freno, y los minutos de
+// juego o alargue no suman intentos. Mientras está espaciado sigue usando el
+// feed que otro proceso ya refrescó, sin gastar cuota.
+export const STUCK_AFTER_ATTEMPTS = 5;
+export const STUCK_SPACING_MS = 15 * 60 * 1000;
+const SHOULD_HAVE_RESULT_MS = 4 * 60 * 60 * 1000;
+// fetchedAt sale del reloj del servidor y last_attempt_at del de Postgres: una
+// lectura cuenta como nueva solo si es al menos 30 s posterior al último intento.
+const READ_CLOCK_SKEW_MS = 30_000;
+interface AttemptState { attempts: number; last_attempt_at: string }
+
 /**
  * Candidates: in a polla (P2P or Casa), unverified, 105 min after kickoff,
  * last 7 days. Every status is resolved by API-Football alone:
@@ -100,7 +120,18 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
 
   const today = utcDate(new Date().toISOString());
   const yesterday = utcDate(new Date(Date.now() - 86400000).toISOString());
-  const daily = await loadDailyResults(candidates);
+  const attempts = await loadAttempts(admin, candidates.map((m) => m.id));
+  const due = (match: MatchRow) => {
+    const state = attempts.get(match.id);
+    return !state || state.attempts < STUCK_AFTER_ATTEMPTS
+      || Date.now() - Date.parse(state.last_attempt_at) >= STUCK_SPACING_MS;
+  };
+  const dueCandidates = candidates.filter(due);
+  const daily: Map<string, DailyResults> = await loadDailyResults(dueCandidates);
+  const spacedDates = candidates.filter((m) => !due(m)).map((m) => utcDate(m.scheduled_at)).filter((d) => !daily.has(d));
+  if (spacedDates.length > 0) {
+    for (const [date, feed] of await loadCachedDailyResults(spacedDates)) daily.set(date, feed);
+  }
   const observed = new Map<string, FixtureObservation>();
   const byIdRequest = new Map<string, number>();
   for (const match of candidates) {
@@ -110,7 +141,7 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
     const feed = daily.get(date);
     const fixture = feed ? resolveResultFixture(match, feed.fixtures) : null;
     if (fixture && feed) observed.set(match.id, { fixture, fetchedAt: feed.fetchedAt });
-    else if (typeof linked === "number" && (feed || (date !== today && date !== yesterday))) {
+    else if (typeof linked === "number" && due(match) && (feed || (date !== today && date !== yesterday))) {
       byIdRequest.set(match.id, linked);
     }
   }
@@ -145,7 +176,73 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
       results.push({ ...base, status: "error", notes: "No se pudo guardar la verificación; se reintentará." });
     }
   }
+
+  const verified = new Set(results.filter((r) => r.status === "verified").map((r) => r.match_id));
+  const attempted = dueCandidates.filter((match) => {
+    if (verified.has(match.id)) return false;
+    const requestedId = byIdRequest.get(match.id);
+    const observation = observed.get(match.id) ?? (requestedId !== undefined ? byId.get(requestedId) : undefined);
+    // Solo cuenta una lectura NUEVA del proveedor, posterior al último intento:
+    // releer la caché mientras corre el TTL de la reserva (20 min del feed en
+    // Free, 1 h del detalle por id) no es un intento, ni un tick sin lectura.
+    const readAt = observation?.fetchedAt ?? daily.get(utcDate(match.scheduled_at))?.fetchedAt;
+    const last = attempts.get(match.id)?.last_attempt_at;
+    if (!readAt || (last !== undefined && Date.parse(readAt) <= Date.parse(last) + READ_CLOCK_SKEW_MS)) return false;
+    return match.status === "finished" || (observation !== undefined && readFinalResult(observation.fixture) !== null)
+      || Date.now() - Date.parse(match.scheduled_at) >= SHOULD_HAVE_RESULT_MS;
+  });
+  await noteAttempts(admin, attempted);
   return results;
+}
+
+async function loadAttempts(
+  admin: ReturnType<typeof createAdminClient>,
+  ids: string[],
+): Promise<Map<string, AttemptState>> {
+  const map = new Map<string, AttemptState>();
+  try {
+    const { data } = await admin.from("api_football_verify_attempts")
+      .select("match_id, attempts, last_attempt_at").in("match_id", ids);
+    for (const row of (Array.isArray(data) ? data : []) as (AttemptState & { match_id: string })[]) {
+      if (Number.isInteger(row.attempts) && Number.isFinite(Date.parse(row.last_attempt_at))) map.set(row.match_id, row);
+    }
+  } catch {
+    // Sin estado se consulta como siempre: preferible gastar cuota a frenar un cierre.
+  }
+  return map;
+}
+
+/** Suma un intento por partido y avisa al admin una sola vez (reclamo atómico en la 123). */
+async function noteAttempts(admin: ReturnType<typeof createAdminClient>, matches: MatchRow[]): Promise<void> {
+  if (matches.length === 0) return;
+  const ids = matches.map((m) => m.id);
+  let rows: unknown = null;
+  try {
+    const { data, error } = await admin.rpc("note_api_football_verify_attempts", {
+      p_match_ids: ids, p_alertable: ids, p_alert_after: STUCK_AFTER_ATTEMPTS,
+    });
+    if (!error) rows = data;
+  } catch {
+    return;
+  }
+  if (!Array.isArray(rows)) return;
+  for (const row of rows as { match_id: string; attempts: number; alert: boolean }[]) {
+    if (row.alert !== true) continue;
+    const match = matches.find((m) => m.id === row.match_id);
+    if (!match) continue;
+    const lastNote = (match.final_verification_notes ?? "").replace(/ (afseen|alerted)=\S+/g, "").trim();
+    try {
+      await notifyAdmin({
+        title: `Resultado sin confirmar: ${match.home_team} vs ${match.away_team}`,
+        body: `El resultado lleva ${row.attempts} lecturas sin poder confirmarse con API-Football. `
+          + `Desde ahora se consulta cada 15 minutos para cuidar la cuota.\n\nÚltima nota: ${lastNote || "sin nota"}`
+          + `\n\nMatch ID: ${match.id}\nKickoff: ${match.scheduled_at}\n\nRevísalo en /admin/discrepancias.`,
+        category: "verification_timeout",
+      });
+    } catch (err) {
+      console.error("[verify-final] notifyAdmin failed:", err);
+    }
+  }
 }
 
 async function verifyOneMatch(

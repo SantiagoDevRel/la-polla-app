@@ -34,9 +34,11 @@ const fetchedAt = "2026-09-08T17:52:00Z";
 // await entrega el resultado. Guarda las columnas pedidas y los torneos.
 const selects: string[] = [];
 const tournamentsAsked: string[][] = [];
+const notFilters: string[] = [];
 const chain = (result: object) => {
   const q: Record<string, unknown> = {};
   for (const m of ["is", "gte", "lte", "limit", "eq", "or"]) q[m] = () => q;
+  q.not = (col: string, op: string, value: string) => { notFilters.push(`${col} ${op} ${value}`); return q; };
   q.select = (cols: string) => { selects.push(cols); return q; };
   q.in = (_col: string, values: string[]) => { tournamentsAsked.push(values); return q; };
   q.then = (resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve);
@@ -91,6 +93,26 @@ describe("syncApiFootballLive", () => {
     expect((await syncApiFootballLive()).size).toBe(1);
     expect(mocks.enJuego).not.toHaveBeenCalled();
     expect(tournamentsAsked.at(-1)).toEqual(expect.arrayContaining(["champions_2025", "laliga_2025", "betplay_2026", "europa_2026"]));
+  });
+
+  it('las filas ya terminadas salen de la ventana: sin filas vivas no se pide el feed (2026-09-14)', async () => {
+    notFilters.length = 0;
+    // La base aplica el filtro: los partidos terminados de ayer ya no llegan.
+    afRows([]);
+    expect((await syncApiFootballLive()).size).toBe(0);
+    expect(notFilters).toContain('status in (finished,cancelled)');
+    expect(mocks.feed).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it('una fila live vieja sigue en la ventana hasta que el proveedor la cierre', async () => {
+    notFilters.length = 0;
+    afRows([row({ scheduled_at: '2026-09-08T12:00:00+00:00' })]);
+    const ft = live(); ft.fixture.status = { short: 'FT', long: 'Match Finished', elapsed: 90 };
+    ft.score.fulltime = { home: 1, away: 2 };
+    mocks.feed.mockResolvedValue({ fixtures: [ft], fetchedAt, stale: false });
+    expect((await syncApiFootballLive()).size).toBe(1);
+    expect(mocks.rpc.mock.calls[0][1]).toMatchObject({ p_status: 'finished', p_status_detail: 'STATUS_FULL_TIME' });
   });
 });
 
