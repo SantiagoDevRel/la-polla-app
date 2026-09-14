@@ -9,7 +9,7 @@
 // Ese dato es la mitad de la gracia del producto ("¿cuántos pusieron 2-1?"),
 // asi que se muestra SIEMPRE que haya al menos un pronostico cargado.
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TeamCrest } from "@/components/match/TeamCrest";
@@ -129,6 +129,7 @@ export function PicksBoard({
   const [dirty, setDirty] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const router = useRouter();
+  const inputs = useRef(new Map<string, HTMLInputElement | null>());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
@@ -201,6 +202,18 @@ export function PicksBoard({
     setMsg(null);
   }
 
+  /** Auto-jump: local → visitante → local del próximo partido editable; al final cierra el teclado. */
+  function saltarDesde(matchId: string, side: "home" | "away") {
+    if (side === "home") {
+      inputs.current.get(`${matchId}:away`)?.focus();
+      return;
+    }
+    const idx = matches.findIndex((m) => m.id === matchId);
+    const siguiente = matches.slice(idx + 1).map((m) => inputs.current.get(`${m.id}:home`)).find((el) => el && !el.disabled);
+    if (siguiente) siguiente.focus();
+    else inputs.current.get(`${matchId}:away`)?.blur();
+  }
+
   async function guardar() {
     setSaving(true);
     setMsg(null);
@@ -269,50 +282,52 @@ export function PicksBoard({
                 ) : null}
               </div>
 
-              {/* Equipos. Escudos y nombres en su propia fila para que el
-                  text-zoom de accesibilidad no los aplaste (regla del repo). */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between gap-2">
-                  <Link href={`/futbol/equipos/home.${m.id}`} aria-label={`Ver equipo: ${m.home_team}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-bg-elevated"><TeamCrest team={m.home_team} src={m.home_team_flag} /></Link>
-                  <span className="lp-label">vs</span>
-                  <Link href={`/futbol/equipos/away.${m.id}`} aria-label={`Ver equipo: ${m.away_team}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-bg-elevated"><TeamCrest team={m.away_team} src={m.away_team_flag} /></Link>
-                </div>
-                <div className="mt-1.5 grid grid-cols-2 gap-3 text-[14px] font-semibold text-text-primary">
-                  <span className="min-w-0 [overflow-wrap:anywhere]">{m.home_team}</span>
-                  <span className="min-w-0 text-right [overflow-wrap:anywhere]">{m.away_team}</span>
-                </div>
-              </div>
-
-              <Link href={`/futbol/partidos/${m.id}`} className="mb-3 flex min-h-11 items-center justify-center rounded-full border border-border-subtle px-3 text-[13px] font-medium text-text-secondary transition-colors hover:bg-bg-elevated">Ver partido y alineaciones</Link>
-
               {scoringMode === "1x2" ? (
-                <div className="grid grid-cols-3 gap-px">
+                /* (2026-09-14) Pedido del dueño: más compacto. El escudo con el
+                   nombre debajo ES el botón de cada equipo y «Empate» ocupa el
+                   lugar del «vs»; ya no hay una segunda fila de botones. La ficha
+                   del equipo sigue a un toque desde «Ver partido y alineaciones».
+                   Columnas con minmax(0,1fr): con texto ampliado el nombre baja
+                   de línea en vez de desaparecer. */
+                <div role="group" aria-label={`Tu pronóstico: ${m.home_team} contra ${m.away_team}`} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2">
                   {opcionesDe(m).map((op) => {
                     const elegido = mine?.pick1x2 === op.key;
                     const n = dist?.conteo?.[op.key] ?? 0;
                     const pct = total > 0 ? (n / total) * 100 : 0;
+                    const equipo = op.key === "L" ? { name: m.home_team, flag: m.home_team_flag } : op.key === "V" ? { name: m.away_team, flag: m.away_team_flag } : null;
                     return (
-                      <div key={op.key}>
+                      <div key={op.key} className="flex min-w-0 flex-col">
                         <button
                           type="button"
                           disabled={!editable}
                           onClick={() => set1x2(m.id, op.key)}
                           aria-pressed={elegido}
+                          aria-label={equipo ? `Gana ${equipo.name}` : "Empate"}
                           className={[
-                            "lp-btn w-full text-[13px]",
+                            "flex min-h-[88px] flex-1 flex-col items-center justify-center gap-1.5 rounded-md border px-1.5 py-2 text-center transition-colors",
+                            equipo ? "" : "px-3",
                             elegido
-                              ? "lp-btn-primary"
-                              : "lp-btn-ghost bg-bg-elevated",
-                            !editable ? "cursor-not-allowed opacity-45" : "",
+                              ? "border-gold bg-gold/15 text-gold"
+                              : editable
+                                ? "border-border-default bg-bg-elevated text-text-primary hover:border-gold/30"
+                                : "border-border-subtle text-text-primary",
+                            editable ? "cursor-pointer" : "cursor-default",
                           ].join(" ")}
                         >
-                          {op.label}
+                          {equipo ? (
+                            <>
+                              <TeamCrest team={equipo.name} src={equipo.flag} className="h-9 w-9" />
+                              <span className="w-full text-[14px] font-semibold leading-tight [overflow-wrap:anywhere]">{op.label}</span>
+                            </>
+                          ) : (
+                            <span className="text-[14px] font-semibold">Empate</span>
+                          )}
                         </button>
                         {total > 0 && (
                           <PctBar pct={pct} showValue={false} className="mt-1.5" />
                         )}
                         {total > 0 && (
-                          <span className="lp-money mt-1 block text-center text-[10px] text-text-muted">
+                          <span className="lp-money mt-1 block text-center text-[11px] text-text-muted">
                             {Math.round(pct)}%
                           </span>
                         )}
@@ -321,32 +336,48 @@ export function PicksBoard({
                   })}
                 </div>
               ) : (
-                <div className="flex items-center justify-center gap-3">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    max={30}
-                    disabled={!editable}
-                    value={mine?.homeScore ?? ""}
-                    onChange={(e) => setScore(m.id, "home", e.target.value)}
-                    aria-label={`Goles de ${m.home_team}`}
-                    className="lp-input lp-money h-[52px] w-[64px] text-center text-[22px]"
-                  />
-                  <span className="h-[2px] w-3 bg-border-strong" aria-hidden />
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    max={30}
-                    disabled={!editable}
-                    value={mine?.awayScore ?? ""}
-                    onChange={(e) => setScore(m.id, "away", e.target.value)}
-                    aria-label={`Goles de ${m.away_team}`}
-                    className="lp-input lp-money h-[52px] w-[64px] text-center text-[22px]"
-                  />
+                /* Equipos. Escudos y nombres en su propia fila para que el
+                   text-zoom de accesibilidad no los aplaste (regla del repo). */
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Link href={`/futbol/equipos/home.${m.id}`} aria-label={`Ver equipo: ${m.home_team}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-bg-elevated"><TeamCrest team={m.home_team} src={m.home_team_flag} /></Link>
+                    <span className="lp-label">vs</span>
+                    <Link href={`/futbol/equipos/away.${m.id}`} aria-label={`Ver equipo: ${m.away_team}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-bg-elevated"><TeamCrest team={m.away_team} src={m.away_team_flag} /></Link>
+                  </div>
+                  <div className="mt-1.5 grid grid-cols-2 gap-3 text-[14px] font-semibold text-text-primary">
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{m.home_team}</span>
+                    <span className="min-w-0 text-right [overflow-wrap:anywhere]">{m.away_team}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-center gap-3">
+                    {(["home", "away"] as const).map((side, i) => (
+                      <Fragment key={side}>
+                        {i === 1 && <span className="h-[2px] w-3 bg-border-strong" aria-hidden />}
+                        <input
+                          ref={(el) => { inputs.current.set(`${m.id}:${side}`, el); }}
+                          type="number"
+                          inputMode="numeric"
+                          enterKeyHint="next"
+                          min={0}
+                          max={30}
+                          disabled={!editable}
+                          value={(side === "home" ? mine?.homeScore : mine?.awayScore) ?? ""}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) => {
+                            setScore(m.id, side, e.target.value);
+                            // Un dígito completa la casilla: salta a la siguiente.
+                            // Para 10 o más, se vuelve a tocar la casilla y se agrega el segundo.
+                            if (e.target.value.length === 1) saltarDesde(m.id, side);
+                          }}
+                          aria-label={`Goles de ${side === "home" ? m.home_team : m.away_team}`}
+                          className="lp-input lp-money h-[52px] !w-[64px] text-center text-[22px]"
+                        />
+                      </Fragment>
+                    ))}
+                  </div>
                 </div>
               )}
+
+              <Link href={`/futbol/partidos/${m.id}`} className="mt-3 flex min-h-11 items-center justify-center rounded-full border border-border-subtle px-3 text-[13px] font-medium text-text-secondary transition-colors hover:bg-bg-elevated">Ver partido y alineaciones</Link>
 
               {/* "cuántos pusieron este marcador" — solo en modo marcador */}
               {started && scoringMode === "marcador" &&

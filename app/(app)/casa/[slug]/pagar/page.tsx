@@ -13,6 +13,7 @@ import { isPollaOpen } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
 import { HeroFrame, Label, StreetCard } from "@/components/street";
 import { PagarForm } from "@/components/casa/PagarForm";
+import { CopiarDato } from "@/components/casa/CopiarDato";
 
 export const dynamic = "force-dynamic";
 
@@ -139,8 +140,12 @@ export default async function PagarPage({
             <div className="lp-display-sm mt-1 text-gold">
               {(polla.payout_method ?? "").toUpperCase()}
             </div>
-            <div className="lp-money mt-2 select-all text-[26px] leading-none text-text-primary">
-              {polla.payout_account}
+            {/* Número + Copiar en una fila; con texto ampliado el botón baja de línea. */}
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+              <div id="copiar-numero" className="lp-money min-w-0 select-all text-[26px] leading-none text-text-primary [overflow-wrap:anywhere]">
+                {polla.payout_account}
+              </div>
+              <CopiarDato valor={polla.payout_account} etiqueta="numero" />
             </div>
             {polla.payout_account_name && (
               <p className="mt-2 text-[13px] text-text-secondary">

@@ -229,6 +229,7 @@ export default async function PollaPage({
                 slug={polla.slug}
                 nombre={polla.name}
                 entradaCop={polla.entry_price_cop}
+                premio={objeto && polla.prize_object ? { objeto: polla.prize_object } : !objeto && polla.pot_mode === "fijo" ? { cop: pot.prize_cop } : null}
                 className="flex-[1_0_auto]"
               />
             )}

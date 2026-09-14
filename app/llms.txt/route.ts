@@ -29,7 +29,7 @@ export async function GET() {
 ${site.name} es una app web (PWA) y móvil (Android/iOS) gratuita para crear pollas deportivas (quinielas) entre amigos. Soporta los principales torneos de fútbol mundial, sudamericano y colombiano. Cada participante predice resultados; el sistema calcula puntos automáticamente y muestra el ranking en tiempo real.
 
 ## Cómo funciona
-- [Crear una polla](${site.origin}/login): elige torneo, fija nombre y costo de entrada, comparte el código con tus parceros.
+- [Crear una polla](${site.origin}/login): elige torneo, fija nombre y costo de entrada, comparte el enlace con tus amigos.
 - [Unirme con código](${site.origin}/login): pegá el código que te pasó tu amigo y entrá a su polla.
 - [Privacidad](${site.origin}/privacy)
 - [Soporte](${site.origin}/soporte)

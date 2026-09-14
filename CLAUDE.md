@@ -6,6 +6,20 @@
 
 ## READ THIS FIRST
 
+### Pronosticar y compartir (2026-09-14)
+
+Acierta ganador: el escudo con el nombre debajo es el botón de cada equipo y
+«Empate» reemplaza el «vs»; no hay segunda fila de botones. En ese modo la ficha
+del equipo se abre desde «Ver partido y alineaciones» (un enlace dentro del botón
+sería inválido y perdía pronósticos sin guardar). Marcador exacto: auto-jump
+local → visitante → siguiente partido editable; un dígito completa la casilla.
+El badge rojo de POLLAS cuenta pollas con partidos que todavía se pueden
+pronosticar (misma regla `canEditCasaMatch`). Compartir: pozo fijo u objeto
+anuncian entrada y premio (`lib/casa/share-text.ts`); proporcional, solo entrada.
+La vista previa de lapollacolombiana.com es un JPEG horneado de 151 KB
+(`scripts/bake-og-image.cjs`): WhatsApp descarta imágenes de más de ~300 KB.
+Pagar: el número de cuenta se copia con un botón (`CopiarDato`).
+
 ### API-Football es la única fuente de partidos (2026-09-13, PR #67)
 
 Decisión del dueño: calendario, vivo y verificación de resultados salen solo de
@@ -1151,7 +1165,7 @@ Rules:
 - Inactive: ícono text-muted strokeWidth 2. Tap: `active:scale-90`.
 - Icons: lucide-react, w-6 h-6 fijo. NO emojis. SVG only.
 - FAB gold central 48px intacto (crear/unirse). Badges sobre el ícono
-  (gold = pendientes, red = avisos).
+  (rojo = pollas con partidos por pronosticar, desde 2026-09-14).
 - Touch targets mínimo 44px (tabs son min-h-[48px])
 
 ### Buttons

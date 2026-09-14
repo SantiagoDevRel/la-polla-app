@@ -263,6 +263,8 @@ incluir teléfonos en URLs. El panel
 
 ## Crear y administrar pollas
 
+**Pronosticar y compartir (2026-09-14).** 1X2 compacto (escudo + nombre como botón, «Empate» al centro), auto-jump en marcador exacto, badge rojo en POLLAS con pollas por pronosticar, texto para compartir con premio cuando es fijo u objeto, botón para copiar la cuenta de pago y vista previa de enlaces con los pollitos (`app/og-la-polla-colombiana.jpg`, regenerable con `node scripts/bake-og-image.cjs app/og-la-polla-colombiana.jpg`).
+
 - `/admin/pollas/crear`: formulario independiente para crear una polla.
   Puedes combinar hasta 30 partidos de distintas ligas; cambiar el torneo
   visible conserva la selección. Cada liga muestra su cantidad de elegidos y

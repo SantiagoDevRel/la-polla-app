@@ -12,17 +12,20 @@
 
 import { useState } from "react";
 import { Share2, Check } from "lucide-react";
-import { formatCop } from "@/lib/casa/format";
+import { textoCompartir, type PremioCompartir } from "@/lib/casa/share-text";
 
 export function CompartirPolla({
   slug,
   nombre,
   entradaCop,
+  premio = null,
   className = "w-full",
 }: {
   slug: string;
   nombre: string;
   entradaCop: number;
+  /** Premio fijo u objeto; null en pozo proporcional (solo se anuncia la entrada). */
+  premio?: PremioCompartir;
   /** Ancho/flex según dónde va: sola ocupa toda la fila; junto al CTA se reparte. */
   className?: string;
 }) {
@@ -38,9 +41,7 @@ export function CompartirPolla({
       ? "https://chickenpicks.app"
       : "https://lapollacolombiana.com";
     const url = `${origin}/casa/${slug}`;
-    const texto = english
-      ? `Join ${nombre} on Chicken Picks.\nEntry: ${formatCop(entradaCop)} COP`
-      : `Únete a ${nombre} en La Polla Colombiana.\nEntrada: ${formatCop(entradaCop)}`;
+    const texto = textoCompartir({ nombre, entradaCop, premio, english });
     return { url, texto };
   }
 
