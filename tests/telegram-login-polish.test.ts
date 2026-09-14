@@ -32,6 +32,18 @@ import { POST as webhookPOST } from "@/app/api/telegram/login/route";
 import { POST as profileCronPOST } from "@/app/api/cron/telegram-login-bot-profile/route";
 
 const ROOT = process.cwd();
+
+/**
+ * Fin de línea LF, venga como venga el checkout: con core.autocrlf=true (Windows)
+ * los archivos bajan con CRLF y las guardas de varias líneas fallarían.
+ */
+function normalizeEol(text: string): string {
+  return text.replace(/\r\n?/g, "\n");
+}
+
+function readSource(path: string): string {
+  return normalizeEol(readFileSync(join(ROOT, path), "utf8"));
+}
 const BOT_TOKEN = "123456789:AAFakeTokenForUnitTestsOnly_abcdefghijk";
 const OTHER_BOT_TOKEN = "987654321:AAFakeTokenForUnitTestsOnly_abcdefghijk";
 const WEBHOOK_SECRET = "unit-test-webhook-secret-0123456789abcdef";
@@ -117,12 +129,12 @@ describe("maskPhone — country calling code from the phone library, last 4 digi
   });
 
   it("the link page and the old messages module do not keep the 10-digit rule", () => {
-    const messages = readFileSync(join(ROOT, "lib/auth/telegram-login/messages.ts"), "utf8");
+    const messages = readSource("lib/auth/telegram-login/messages.ts");
     expect(messages).not.toMatch(/export function maskPhone/);
-    const linkPage = readFileSync(join(ROOT, "lib/auth/telegram-login/link-page.ts"), "utf8");
+    const linkPage = readSource("lib/auth/telegram-login/link-page.ts");
     expect(linkPage).toContain('import { maskPhone } from "./mask-phone";');
     // La página es de servidor: el componente React del selector rompe el build.
-    const mask = readFileSync(join(ROOT, "lib/auth/telegram-login/mask-phone.ts"), "utf8");
+    const mask = readSource("lib/auth/telegram-login/mask-phone.ts");
     expect(mask).toMatch(/from "libphonenumber-js\/min";/);
     expect(mask).not.toMatch(/from "react-phone-number-input/);
   });
@@ -178,7 +190,7 @@ describe("prefersSameTab — phones and tablets only", () => {
   });
 
   it("LoginClient uses the shared helper, not its own coarse-only query", () => {
-    const source = readFileSync(join(ROOT, "app/(auth)/login/LoginClient.tsx"), "utf8");
+    const source = readSource("app/(auth)/login/LoginClient.tsx");
     expect(source).toContain('import { prefersSameTab } from "@/lib/auth/telegram-login/open-mode";');
     expect(source).not.toMatch(/matchMedia\(/);
     expect(source).not.toMatch(/function prefersSameTab/);
@@ -249,7 +261,7 @@ describe("ensureBotProfile — commands and descriptions, once per version", () 
   });
 
   it("the manual setup script sends the same texts, so running it cannot bring v1 back", () => {
-    const script = readFileSync(join(ROOT, "scripts/telegram-login-set-webhook.mjs"), "utf8");
+    const script = readSource("scripts/telegram-login-set-webhook.mjs");
     const texts = new Set(
       BOT_PROFILE_STEPS.flatMap(([, body]) => [
         ...((body.commands as { description: string }[] | undefined) ?? []).map((c) => c.description),
@@ -452,6 +464,24 @@ describe("webhook: profile sync after an authenticated update", () => {
     );
   });
 
+  it("still answers 200 to Telegram when the admin client cannot be created", async () => {
+    setLoginEnv(true);
+    const fetchStub = vi.fn(async () => Response.json({ ok: true, result: true }));
+    vi.stubGlobal("fetch", fetchStub);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    adminFactory.createAdminClient.mockImplementation(() => {
+      throw new Error("supabaseUrl is required.");
+    });
+
+    const res = await webhookPOST(webhookRequest(WEBHOOK_SECRET, privateStart(1)));
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith("[telegram-login] perfil del bot sin sincronizar: unexpected"));
+    // Sin base no hay mensaje ni perfil que mandar.
+    expect(fetchStub).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith("[telegram-login] update falló:", "supabaseUrl is required.");
+  });
+
   it("never syncs on a wrong secret or without configuration", async () => {
     const fetchStub = vi.fn(async () => Response.json({ ok: true, result: true }));
     vi.stubGlobal("fetch", fetchStub);
@@ -526,7 +556,7 @@ describe("POST /api/cron/telegram-login-bot-profile", () => {
   });
 
   it("the manual workflow is hardened like the other cron workflows", () => {
-    const yml = readFileSync(join(ROOT, ".github/workflows/telegram-login-bot-profile.yml"), "utf8");
+    const yml = readSource(".github/workflows/telegram-login-bot-profile.yml");
     expect(yml).toMatch(/^permissions: \{\}$/m);
     expect(yml).toMatch(/workflow_dispatch:/);
     expect(yml).not.toMatch(/schedule:/);
@@ -542,10 +572,25 @@ describe("POST /api/cron/telegram-login-bot-profile", () => {
 });
 
 // ── 4. Un solo enlace vivo por cuenta de Telegram (migración 120) ─────────
-describe("migration 120 — issuing a link expires the account's other live links", () => {
-  const migrations = readdirSync(join(ROOT, "supabase/migrations"));
-  const file = migrations.find((f) => f.startsWith("120_"))!;
-  const sql = file ? readFileSync(join(ROOT, "supabase/migrations", file), "utf8") : "";
+const MIGRATIONS = readdirSync(join(ROOT, "supabase/migrations"));
+const MIGRATION_120 = MIGRATIONS.find((f) => f.startsWith("120_"));
+const MIGRATION_120_LF = MIGRATION_120 ? readSource(`supabase/migrations/${MIGRATION_120}`) : "";
+
+describe("static source reads", () => {
+  it("normalize CRLF checkouts (core.autocrlf=true) to LF", () => {
+    expect(normalizeEol("a\r\nb\rc\nd")).toBe("a\nb\nc\nd");
+    expect(MIGRATION_120_LF).not.toContain("\r");
+  });
+});
+
+// Las mismas guardas sobre el archivo tal como está y sobre una copia CRLF, que
+// es como lo baja git en Windows: sin normalizar, la variante CRLF falla.
+describe.each([
+  ["LF", MIGRATION_120_LF],
+  ["CRLF", MIGRATION_120_LF.replace(/\n/g, "\r\n")],
+])("migration 120 (%s checkout) — issuing a link expires the account's other live links", (_eol, raw) => {
+  const migrations = MIGRATIONS;
+  const sql = normalizeEol(raw);
 
   function body(fn: string): string {
     const m = new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\([\\s\\S]*?AS \\$\\$([\\s\\S]*?)\\$\\$;`).exec(sql);
@@ -601,18 +646,18 @@ describe("overlays skip the single-use link page", () => {
   });
 
   it("the root splash and the welcome intro both use the shared check", () => {
-    const splash = readFileSync(join(ROOT, "components/layout/SplashScreen.tsx"), "utf8");
+    const splash = readSource("components/layout/SplashScreen.tsx");
     expect(splash).toContain('import { isLoginLinkPath } from "@/lib/auth/telegram-login/link-path";');
     expect(splash).toMatch(/const skip = isLoginLinkPath\(usePathname\(\)\);/);
     expect(splash).toMatch(/if \(phase === "idle" \|\| skip\) return null;/);
-    const intro = readFileSync(join(ROOT, "components/auth/WelcomeIntroLoader.tsx"), "utf8");
+    const intro = readSource("components/auth/WelcomeIntroLoader.tsx");
     expect(intro).toMatch(/if \(isLoginLinkPath\(pathname\)\) return null;/);
   });
 });
 
 // ── 6. SMS primario, Telegram secundario ────────────────────────────────
 describe("/login keeps SMS first and Telegram second", () => {
-  const source = readFileSync(join(ROOT, "app/(auth)/login/LoginClient.tsx"), "utf8");
+  const source = readSource("app/(auth)/login/LoginClient.tsx");
 
   it("phone step: gold SMS submit first, Telegram as a secondary button below", () => {
     const input = source.slice(source.indexOf('{step === "input" && ('), source.indexOf('{step === "otp" && ('));

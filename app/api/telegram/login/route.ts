@@ -51,11 +51,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true }, { headers: NO_STORE });
   }
 
-  const db = createAdminClient();
+  // Un solo cliente por update, creado dentro de los try: si falta la env de
+  // Supabase, Telegram igual recibe su 200 y no reintenta en bucle.
+  let admin: ReturnType<typeof createAdminClient> | null = null;
+  const db = () => (admin ??= createAdminClient());
   try {
     await handleLoginUpdate(update, {
       config,
-      db,
+      db: db(),
       send: createLoginBotApi(config.botToken),
     });
   } catch (err) {
