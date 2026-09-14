@@ -51,6 +51,12 @@ export default async function CasaPage() {
   const joinedIds = new Set(myPollas.map(p => p.id));
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
 
+  // Siempre queda al menos una sección abierta, y las pollas abiertas se
+  // promueven: abiertas si hay disponibles, Mis pollas abierta si la persona
+  // está inscrita, y si no hay ninguna de las dos, abiertas (estado vacío).
+  const misPollasOpen = myPollas.length > 0;
+  const abiertasOpen = disponibles.length > 0 || !misPollasOpen;
+
   // El número grande de arriba: todo lo que hay repartible ahora mismo.
   const enJuego = abiertas.reduce((sum, p) => sum + (pots[p.id]?.prize_cop ?? 0), 0);
   const jugando = abiertas.reduce((sum, p) => sum + (pots[p.id]?.paid_entries ?? 0), 0);
@@ -73,7 +79,7 @@ export default async function CasaPage() {
       </HeroFrame>
 
       <div className="space-y-4 px-4 pt-6">
-        <PollaSection id="pollas-abiertas" kind="open" title="Pollas abiertas" description="Elige una polla e inscríbete." count={disponibles.length}>
+        <PollaSection id="pollas-abiertas" kind="open" title="Pollas abiertas" description="Elige una polla e inscríbete." count={disponibles.length} defaultOpen={abiertasOpen}>
         {disponibles.length === 0 ? (
           // `bg-bg-card` pisa a proposito el 80% de opacidad de .lp-card: es la
           // unica card de la app que lleva ilustracion adentro, y sobre el video
@@ -106,7 +112,7 @@ export default async function CasaPage() {
         )}
         </PollaSection>
 
-        <MyPollas initialPollas={myPollas} defaultOpen={false} pendingByPolla={Object.fromEntries(pendientes.map(p => [p.polla.id, p.faltan]))} />
+        <MyPollas initialPollas={myPollas} defaultOpen={misPollasOpen} pendingByPolla={Object.fromEntries(pendientes.map(p => [p.polla.id, p.faltan]))} />
 
         <PollaSection id="pollas-cerradas" kind="closed" title="Pollas cerradas" description="Consulta los resultados de pollas anteriores." count={cerradas.length}>
             {cerradas.length > 0 ? (

@@ -587,8 +587,9 @@ Construido con ☕ en Medellín / Lisboa por [@SantiagoDevRel](https://github.co
 
 `components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
-En `/casa`, el orden es Pollas abiertas, Mis pollas y Pollas cerradas. Las tres
-empiezan cerradas, comparten título/subtítulo y contienen sus tarjetas dentro de
+En `/casa`, el orden es Pollas abiertas, Mis pollas y Pollas cerradas. Pollas
+abiertas empieza abierta si hay disponibles o si la persona no tiene inscripciones;
+Mis pollas empieza abierta si tiene inscripciones; cerradas empieza cerrada. Comparten título/subtítulo y contienen sus tarjetas dentro de
 `PollaSection`. En Perfil, Mis pollas permanece abierta. Las inscripciones pendientes o pagadas se
 muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
 Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.
