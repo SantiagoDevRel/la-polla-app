@@ -203,3 +203,15 @@ Antes de desplegar, confirmar proyecto y modo v2, exportar/verificar el backup,
 aplicar las tres migraciones antes de publicar el build, y verificar las rutas
 con datos reales solo en lectura. Estas migraciones no activan Casa v2 ni el
 procedimiento de sorteo de objetos: respetan el estado operativo existente.
+
+## Historial de comprobantes por usuario (2026-09-13)
+
+En `/admin`, cada resultado de **Buscar un usuario** abre `/admin/usuarios/[id]`:
+conteos (enviados, aprobados, rechazados, sin decisión) y los comprobantes de
+todas sus pollas, del más reciente al más antiguo, con el pantallazo firmado por
+una hora. Fuente: `casa_entry_proof_attempts` con `state='confirmed'` (incluye
+rechazados y reemplazados). Solo lectura: aprobar/rechazar sigue en la cola de
+pagos y en el bot. Inicio del historial en `USER_RECEIPT_HISTORY_START`
+(`lib/casa/user-receipts.ts`, 13-sep-2026 hora Colombia). Autorización: layout,
+página y `GET /api/admin/users/[id]/receipts` validan sesión + `users.is_admin`
+antes de leer; respuesta `private, no-store`.

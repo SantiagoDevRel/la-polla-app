@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Search, Users } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronRight, Search, Users } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { fadeUp, staggerContainer } from "@/lib/animations";
@@ -160,10 +161,18 @@ export default function UserDirectory({ admins, savingId, onPromote }: UserDirec
                 const isAdmin = admins === null ? user.is_admin : admins.some((admin) => admin.id === user.id);
                 return (
                   <motion.li key={user.id} variants={fadeUp} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 p-4 transition-colors duration-200 hover:bg-bg-elevated">
-                    <div className="min-w-0 grow basis-40">
-                      <p className="text-[14px] font-medium text-text-primary [overflow-wrap:anywhere]">{user.display_name || "Sin nombre"}</p>
-                      <p className="mt-1 text-[13px] tabular-nums text-text-secondary [overflow-wrap:anywhere]">{formatPhone(user.whatsapp_number) || "Sin teléfono"}</p>
-                    </div>
+                    <Link
+                      href={`/admin/usuarios/${user.id}`}
+                      aria-label={`Ver historial de ${user.display_name || "usuario sin nombre"}, ${formatPhone(user.whatsapp_number) || "sin teléfono"}`}
+                      className="group -m-2 flex min-h-11 min-w-0 grow basis-40 cursor-pointer items-center gap-2 rounded-md p-2 transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
+                    >
+                      <span className="min-w-0 grow">
+                        <span className="block text-[14px] font-medium text-text-primary underline-offset-4 group-hover:underline [overflow-wrap:anywhere]">{user.display_name || "Sin nombre"}</span>
+                        <span className="mt-1 block text-[13px] tabular-nums text-text-secondary [overflow-wrap:anywhere]">{formatPhone(user.whatsapp_number) || "Sin teléfono"}</span>
+                        <span className="mt-1 block text-[12px] text-text-secondary">Ver historial</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden="true" />
+                    </Link>
                     {isAdmin ? (
                       <span className="text-[12px] text-text-secondary">Administrador</span>
                     ) : (
