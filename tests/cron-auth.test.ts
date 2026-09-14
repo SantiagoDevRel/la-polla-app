@@ -32,6 +32,7 @@ import { POST as adminDiscrepancies } from "@/app/api/cron/admin-discrepancies-e
 import { POST as backupFreshness } from "@/app/api/cron/backup-freshness/route";
 import { POST as cleanupProofs } from "@/app/api/cron/cleanup-payout-proofs/route";
 import { POST as matchReminders } from "@/app/api/cron/match-reminders/route";
+import { POST as telegramLoginBotProfile } from "@/app/api/cron/telegram-login-bot-profile/route";
 
 const SECRET = "test-cron-secret-0123456789";
 const ORIGINAL_SECRET = process.env.CRON_SECRET;
@@ -41,6 +42,7 @@ const handlers = [
   ["backup-freshness", backupFreshness],
   ["cleanup-payout-proofs", cleanupProofs],
   ["match-reminders", matchReminders],
+  ["telegram-login-bot-profile", telegramLoginBotProfile],
 ] as const;
 
 function cronRequest(name: string, authorization?: string) {
@@ -188,7 +190,8 @@ describe("guard estático: toda ruta de app/api/cron exige el secreto", () => {
   const files = routeFiles(root);
 
   it("encuentra las rutas de cron", () => {
-    expect(files.length).toBeGreaterThanOrEqual(4);
+    expect(files.length).toBeGreaterThanOrEqual(5);
+    expect(files.some((file) => /telegram-login-bot-profile[\\/]route\.ts$/.test(file))).toBe(true);
     expect(files.some((file) => /backup-freshness[\\/]route\.ts$/.test(file))).toBe(true);
   });
 

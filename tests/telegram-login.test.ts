@@ -33,7 +33,9 @@ import {
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { telegramLoginDeepLink } from "@/lib/auth/telegram-login/deep-link";
 import { loginLinkOrigin, loginLinkUrl, localeForHost } from "@/lib/auth/telegram-login/links";
-import { loginBotCopy, maskPhone } from "@/lib/auth/telegram-login/messages";
+import { loginBotCopy } from "@/lib/auth/telegram-login/messages";
+import { maskPhone } from "@/lib/auth/telegram-login/mask-phone";
+import { resetBotProfileStateForTests } from "@/lib/auth/telegram-login/bot-profile";
 import { handleLoginUpdate, PROMPT_REPEAT_MS } from "@/lib/auth/telegram-login/handler";
 import * as requestsModule from "@/lib/auth/telegram-login/requests";
 import {
@@ -109,6 +111,7 @@ function privateMessage(extra: Record<string, unknown>, userId = TG) {
 }
 
 beforeEach(() => {
+  resetBotProfileStateForTests();
   adminFactory.createAdminClient.mockReset();
   authIpFactory.createAuthRouteClient.mockReset();
   setLoginEnv(false);
@@ -720,8 +723,11 @@ describe("webhook route", () => {
     fakeAdmin({ telegram_login_linked_accounts: { data: [] } });
     const res = await webhookPOST(webhookRequest({ "x-telegram-bot-api-secret-token": SECRET }));
     expect(res.status).toBe(200);
-    expect(fetchStub).toHaveBeenCalledTimes(1);
-    expect(String(fetchStub.mock.calls[0][0])).toMatch(/^https:\/\/api\.telegram\.org\/bot.+\/sendMessage$/);
+    // Además del mensaje, después de responder se sincroniza el perfil del bot
+    // (tests/telegram-login-polish.test.ts): aquí solo cuenta el sendMessage.
+    const sends = fetchStub.mock.calls.filter((c) => String(c[0]).endsWith("/sendMessage"));
+    expect(sends).toHaveLength(1);
+    expect(String(sends[0][0])).toMatch(/^https:\/\/api\.telegram\.org\/bot.+\/sendMessage$/);
   });
 });
 

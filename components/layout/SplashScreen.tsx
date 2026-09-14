@@ -7,12 +7,18 @@
 // skip it entirely. During actual page loading the per-route
 // loading.tsx takes over and paints the pollito loader over the
 // ambient video instead.
+//
+// (2026-09-14) Nunca en /login/telegram: esa página se abre desde el botón del
+// bot de login, casi siempre en el navegador de Telegram (sessionStorage nuevo),
+// y el splash tapaba «Confirma tu ingreso» durante segundos. Tampoco se marca
+// como visto ahí: la primera entrada real a la app lo sigue mostrando.
 
 "use client";
 
-
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { isLoginLinkPath } from "@/lib/auth/telegram-login/link-path";
 
 const SEEN_KEY = "lp_splash_seen_v2";
 const TOTAL_MS = 3200;
@@ -23,9 +29,10 @@ type Phase = "idle" | "playing" | "fading";
 export function SplashScreen() {
   const t = useTranslations("Brand");
   const [phase, setPhase] = useState<Phase>("idle");
+  const skip = isLoginLinkPath(usePathname());
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || skip) return;
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const alreadySeen = sessionStorage.getItem(SEEN_KEY) === "1";
@@ -48,9 +55,9 @@ export function SplashScreen() {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(doneTimer);
     };
-  }, []);
+  }, [skip]);
 
-  if (phase === "idle") return null;
+  if (phase === "idle" || skip) return null;
 
   const part1 = t("wordmarkPart1");
   const part2 = t("wordmarkPart2");

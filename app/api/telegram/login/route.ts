@@ -8,6 +8,9 @@
 //      ANTES de leer una sola línea del body → 401 si no coincide.
 //   3. Solo después se parsea el update. Siempre 200 hacia Telegram (si no,
 //      reintenta en bucle).
+//   4. Después de responder (after), y solo con un update autenticado: deja
+//      comandos y descripciones del bot al día, una vez por versión
+//      (lib/auth/telegram-login/bot-profile.ts). Nunca demora la respuesta.
 //
 // Exento del gate de sesión en lib/supabase/middleware.ts: quien llama es
 // Telegram, no un navegador.
@@ -16,7 +19,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { secretHeaderMatches } from "@/lib/auth/telegram-login/crypto";
 import { createLoginBotApi } from "@/lib/auth/telegram-login/bot-api";
+import { BOT_PROFILE_TIMEOUT_MS, ensureBotProfile } from "@/lib/auth/telegram-login/bot-profile";
 import { handleLoginUpdate } from "@/lib/auth/telegram-login/handler";
+import { runAfterResponse } from "@/lib/auth/telegram-login/notify";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -46,15 +51,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true }, { headers: NO_STORE });
   }
 
+  // Un solo cliente por update, creado dentro de los try: si falta la env de
+  // Supabase, Telegram igual recibe su 200 y no reintenta en bucle.
+  let admin: ReturnType<typeof createAdminClient> | null = null;
+  const db = () => (admin ??= createAdminClient());
   try {
     await handleLoginUpdate(update, {
       config,
-      db: createAdminClient(),
+      db: db(),
       send: createLoginBotApi(config.botToken),
     });
   } catch (err) {
     console.error("[telegram-login] update falló:", (err as Error).message);
   }
+
+  runAfterResponse(() =>
+    ensureBotProfile({
+      config,
+      db,
+      send: createLoginBotApi(config.botToken, process.env, { timeoutMs: BOT_PROFILE_TIMEOUT_MS }),
+    }),
+  );
 
   return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

@@ -31,6 +31,7 @@ import axios from "axios";
 import { useTranslations } from "next-intl";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
 import { DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
+import { prefersSameTab } from "@/lib/auth/telegram-login/open-mode";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
 import {
@@ -85,7 +86,7 @@ interface TelegramState {
   popupBlocked: boolean;
   /** El bot ya mandó el botón del enlace (solicitud «approved»). */
   linkSent: boolean;
-  /** Pantalla táctil: Telegram se abre en ESTA pestaña, sin pestaña extra. */
+  /** Teléfono o tableta: Telegram se abre en ESTA pestaña, sin pestaña extra. */
   sameTab: boolean;
   error: string | null;
 }
@@ -98,19 +99,6 @@ const TELEGRAM_IDLE: TelegramState = {
   sameTab: false,
   error: null,
 };
-
-/**
- * En el teléfono se abre Telegram en la MISMA pestaña: con una pestaña nueva,
- * al volver de Telegram el navegador muestra esa pestaña (t.me) y no la que
- * espera. En escritorio la ventana nueva se ve y la espera queda a la mano.
- */
-function prefersSameTab(): boolean {
-  try {
-    return window.matchMedia("(pointer: coarse)").matches;
-  } catch {
-    return false;
-  }
-}
 
 interface PollaPreview {
   slug: string;
@@ -418,7 +406,7 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
   // ── Telegram ────────────────────────────────────────────────────────────
 
   // Abre Telegram directo.
-  //   - Pantalla táctil: pide la solicitud y navega ESTA pestaña al deep link
+  //   - Teléfono o tableta (open-mode.ts): pide la solicitud y navega ESTA pestaña al deep link
   //     (la app de Telegram lo intercepta). Al volver, el navegador muestra
   //     esta misma pestaña esperando. Si la pestaña se descarga, sessionStorage
   //     y la cookie retoman la espera.
@@ -955,7 +943,7 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
             {telegram.phase === "waiting" && telegram.deepLink && (
               <a
                 href={telegram.deepLink}
-                // Táctil: misma pestaña (la app intercepta y se vuelve aquí).
+                // Teléfono o tableta: misma pestaña (la app intercepta y se vuelve aquí).
                 target={telegram.sameTab ? undefined : "_blank"}
                 rel="noopener noreferrer"
                 onClick={() => {
