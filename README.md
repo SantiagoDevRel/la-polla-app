@@ -86,6 +86,17 @@ vuelven a los límites gratuitos y el detalle conserva la última información.
   Un calendario cercano se comparte durante 60 segundos; el detalle activo,
   60 segundos; equipos y partidos finalizados, una hora. Cada ficha de equipo
   reserva cuatro llamadas antes de consultar. No se multiplican por espectador.
+- Contador fiel al proveedor (migración 123, 2026-09-14): `/status` se pide sin
+  caché de Next (`cache: 'no-store'`) y `record_api_football_account` guarda
+  **valor del proveedor + reservas hechas después de esa lectura**, sin el
+  `GREATEST` anterior. Un `/status` viejo tras el cambio de día UTC había dejado
+  el contador +1.133 sobre el real, y los topes de 6.000/7.000 se activaban antes.
+  Lecturas de hace más de 50 s o fuera de orden solo actualizan el plan. La
+  reserva atómica antes de cada llamada no cambia. Regresión local:
+  `scripts/af-quota-accuracy-check.sql`.
+- El vivo excluye filas `finished`/`cancelled`: los partidos terminados de ayer
+  ya no mantienen una consulta por minuto al feed de su fecha. Las filas `live`
+  siguen hasta que el proveedor las cierre; `flip_stale_live_matches` cubre el resto.
 - El cliente actualiza el marcador cada 30 segundos y el calendario cada minuto;
   pausa las consultas con la pestaña oculta. Esto es actualización periódica,
   no streaming. La caché compartida decide si hace falta consultar al proveedor.
@@ -193,6 +204,15 @@ quedan 20 de las 100 gratuitas para otras consultas. Con dos fechas activas y
 uso continuo puede alcanzar el límite (histórico del plan Free; con Pro rigen los
 topes de la sección Fútbol). No hay otra fuente: al agotarse la cuota la verificación
 espera al siguiente tick o a la resolución manual.
+
+**Cierres atascados (migración 123):** un partido que ya debería tener resultado
+(fila `finished`, lectura final del proveedor o saque hace más de 4 h) y no se
+confirma suma un intento por tick en `api_football_verify_attempts`. Desde el
+quinto intento su fecha se consulta cada 15 minutos (antes, cada minuto: ~940
+consultas/día por fecha) y el admin recibe un aviso `verification_timeout` una
+sola vez por partido. Mientras está espaciado sigue usando el feed que otro
+proceso refrescó en los últimos 3 minutos, sin gastar cuota. El cierre normal
+(dos lecturas) y los minutos de juego o alargue no cuentan intentos.
 
 El cron existente `/api/matches/sync-live` ejecuta la verificación. Se exigen ambos
 equipos, torneo y horario para identificar un partido. Una discrepancia bloquea

@@ -217,3 +217,99 @@ describe("verify-final con API-Football", () => {
     expect(mocks.get).not.toHaveBeenCalled();
   });
 });
+
+// Freno a cierres atascados (2026-09-14, migración 123): tras 5 intentos sin
+// cerrar, la fecha del partido se consulta cada 15 minutos y el admin recibe
+// un aviso una sola vez. El cierre normal (dos lecturas) no cambia.
+describe('verify-final: freno a cierres atascados', () => {
+  let attemptRows: { match_id: string; attempts: number; last_attempt_at: string }[];
+  let noteAnswer: (ids: string[]) => { match_id: string; attempts: number; alert: boolean }[];
+  let cacheRows: { fixture_date: string; fixtures: unknown; fetched_at: string }[];
+  const noteCalls = () => calls('/rpc/note_api_football_verify_attempts');
+  beforeEach(() => {
+    attemptRows = []; cacheRows = [];
+    noteAnswer = ids => ids.map(match_id => ({ match_id, attempts: 1, alert: false }));
+    dbFetch.mockImplementation(async (input, init) => {
+      const url = String(input);
+      const json = (v: unknown) => new Response(JSON.stringify(v), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (url.includes('/rest/v1/api_football_verify_attempts')) return json(attemptRows);
+      if (url.includes('/rest/v1/api_football_cache')) return json(cacheRows);
+      if (url.includes('/rpc/note_api_football_verify_attempts')) return json(noteAnswer(JSON.parse(String(init?.body)).p_match_ids));
+      if (url.includes('/rpc/reserve_api_football_detail')) return new Response('false');
+      return new Response(url.includes('/rpc/') ? 'true' : '', { status: 200 });
+    });
+  });
+
+  it('el cierre normal hace sus dos lecturas seguidas y no pasa por el freno', async () => {
+    vi.setSystemTime(new Date('2026-09-08T20:00:00Z'));
+    const r = row(FT);
+    mocks.matches.mockResolvedValue({ filas: [r], errores: [] });
+    mocks.feed.mockResolvedValue({ fixtures: [FT], fetchedAt: '2026-09-08T19:59:00Z', stale: false });
+    expect((await verifyPendingFinals())[0].status).toBe('pending');
+    expect(body(noteCalls()[0])).toMatchObject({ p_match_ids: [r.id], p_alert_after: 5 });
+    const note = body(noteWrites()[0]).final_verification_notes as string;
+
+    vi.setSystemTime(new Date('2026-09-08T20:01:00Z'));
+    attemptRows = [{ match_id: r.id, attempts: 1, last_attempt_at: '2026-09-08T20:00:00Z' }];
+    mocks.matches.mockResolvedValue({ filas: [{ ...r, final_verification_notes: note }], errores: [] });
+    mocks.feed.mockResolvedValue({ fixtures: [FT], fetchedAt: '2026-09-08T20:00:30Z', stale: false });
+    expect((await verifyPendingFinals())[0].status).toBe('verified');
+    expect(mocks.feed).toHaveBeenCalledTimes(2);
+    expect(noteCalls()).toHaveLength(1); // el verificado no suma intento
+    expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it('con 5 intentos recientes no consulta el proveedor y no suma intento', async () => {
+    vi.setSystemTime(new Date('2026-09-08T20:00:00Z'));
+    const r = row(FT);
+    attemptRows = [{ match_id: r.id, attempts: 7, last_attempt_at: '2026-09-08T19:52:00Z' }];
+    mocks.matches.mockResolvedValue({ filas: [r], errores: [] });
+    mocks.feed.mockResolvedValue({ fixtures: [FT], fetchedAt: '2026-09-08T19:59:50Z', stale: false });
+    await verifyPendingFinals();
+    expect(mocks.feed).not.toHaveBeenCalled();
+    expect(mocks.get).not.toHaveBeenCalled();
+    expect(calls('/rpc/reserve_api_football')).toHaveLength(0);
+    expect(calls('/rest/v1/api_football_cache')).toHaveLength(1);
+    expect(noteCalls()).toHaveLength(0);
+    expect(finalCalls()).toHaveLength(0);
+  });
+
+  it('espaciado, usa el feed que otro proceso ya refrescó y puede cerrar sin gastar cuota', async () => {
+    vi.setSystemTime(new Date('2026-09-08T20:00:00Z'));
+    const r = row(FT, { final_verification_notes: ' afseen=1635643:2-3@2026-09-08T19:00:00Z' });
+    attemptRows = [{ match_id: r.id, attempts: 9, last_attempt_at: '2026-09-08T19:55:00Z' }];
+    cacheRows = [{ fixture_date: '2026-09-08', fixtures: [FT], fetched_at: '2026-09-08T19:59:10Z' }];
+    mocks.matches.mockResolvedValue({ filas: [r], errores: [] });
+    expect((await verifyPendingFinals())[0].status).toBe('verified');
+    expect(mocks.feed).not.toHaveBeenCalled();
+  });
+
+  it('pasados 15 minutos vuelve a consultar, y al llegar a 5 intentos avisa una sola vez', async () => {
+    vi.setSystemTime(new Date('2026-09-08T20:00:00Z'));
+    const r = row(FT, { home_team: 'Brujas', final_verification_notes: 'API-Football: sin lectura nueva alerted=2026-01-01T00:00:00Z' });
+    attemptRows = [{ match_id: r.id, attempts: 5, last_attempt_at: '2026-09-08T19:44:00Z' }];
+    noteAnswer = ids => ids.map(match_id => ({ match_id, attempts: 6, alert: true }));
+    mocks.matches.mockResolvedValue({ filas: [r], errores: [] });
+    mocks.feed.mockResolvedValue({ fixtures: [], fetchedAt: '2026-09-08T19:59:50Z', stale: false });
+    await verifyPendingFinals();
+    expect(mocks.feed).toHaveBeenCalledOnce();
+    expect(noteCalls()).toHaveLength(1);
+    expect(mocks.alert).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      category: 'verification_timeout', title: 'Resultado sin confirmar: Brujas vs Aston Villa' }));
+    expect(mocks.alert.mock.calls[0][0].body).not.toContain('alerted=');
+
+    noteAnswer = ids => ids.map(match_id => ({ match_id, attempts: 7, alert: false }));
+    await verifyPendingFinals();
+    expect(mocks.alert).toHaveBeenCalledOnce();
+  });
+
+  it('un partido todavía en juego no suma intentos aunque pasen los 105 minutos', async () => {
+    vi.setSystemTime(new Date('2026-09-08T19:00:00Z')); // saque 16:45 → 2 h 15 min
+    const enJuego = structuredClone(FT); enJuego.fixture.status = { short: 'ET', long: 'Extra Time', elapsed: 105 };
+    mocks.matches.mockResolvedValue({ filas: [row(FT, { status: 'live' })], errores: [] });
+    mocks.feed.mockResolvedValue({ fixtures: [enJuego], fetchedAt: '2026-09-08T18:59:50Z', stale: false });
+    await verifyPendingFinals();
+    expect(mocks.feed).toHaveBeenCalledOnce();
+    expect(noteCalls()).toHaveLength(0);
+  });
+});

@@ -32,6 +32,28 @@ export async function loadDailyResults(matches: ResultMatch[]): Promise<Map<stri
   return result;
 }
 
+/**
+ * Cache-only read of the shared date feed: never reserves quota nor calls the
+ * provider. verify-final uses it for matches whose checks are spaced out
+ * (stuck closes), so a feed the live sync or another candidate just refreshed
+ * still serves them. Only responses at most three minutes old count.
+ */
+export async function loadCachedDailyResults(dates: string[]): Promise<Map<string, DailyResults>> {
+  const result = new Map<string, DailyResults>();
+  const wanted = Array.from(new Set(dates.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))));
+  if (wanted.length === 0) return result;
+  const { data } = await createAdminClient().from('api_football_cache')
+    .select('fixture_date,fixtures,fetched_at').in('fixture_date', wanted);
+  for (const row of (Array.isArray(data) ? data : []) as { fixture_date: string; fixtures: unknown; fetched_at: string | null }[]) {
+    if (!row.fetched_at || !Array.isArray(row.fixtures) || Date.now() - Date.parse(row.fetched_at) > 180_000) continue;
+    result.set(row.fixture_date, {
+      fixtures: (row.fixtures as ApiFootballFixture[]).filter(isValidFixture).filter(supportedResult),
+      fetchedAt: row.fetched_at,
+    });
+  }
+  return result;
+}
+
 export interface FixtureObservation { fixture: ApiFootballFixture; fetchedAt: string }
 
 /** API-Football accepts at most 20 ids per /fixtures?ids= request. */
