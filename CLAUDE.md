@@ -149,7 +149,7 @@ sin caché + reservas posteriores a esa lectura; nunca `GREATEST` contra un
 `/status` viejo (infló +1.133 tras el cambio de día). No agregar caché de Next a
 `/status` ni gastar sin reserva previa. `reserve_api_football_calendar` ya suma
 a ambos contadores: no duplicarla. El vivo no lee filas `finished`/`cancelled`.
-verify-final espacia a 15 min un cierre con 5 intentos sin confirmar
+verify-final espacia a 15 min un cierre con 5 lecturas nuevas sin confirmar
 (`api_football_verify_attempts`) y avisa una vez; el cierre normal no cambia.
 Las imágenes públicas de `media.api-sports.io` no llevan key del proveedor.
 No inventar fotos ni titulares cuando no están publicados. El diseño se trabajó

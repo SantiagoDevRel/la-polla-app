@@ -83,7 +83,8 @@ const utcDate = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 // logra confirmar pedía el feed de su fecha cada minuto (~940 consultas/día).
 // Tras STUCK_AFTER_ATTEMPTS intentos sin cerrar, sus consultas propias se
 // espacian a STUCK_SPACING_MS y el admin recibe un aviso, una sola vez por
-// partido. Un intento cuenta solo cuando el partido ya debería tener resultado
+// partido. Un intento es una lectura nueva del proveedor (no un tick que relee
+// la caché dentro del TTL) y cuenta solo cuando el partido ya debería tener resultado
 // (fila finished, lectura final del proveedor o saque hace más de 4 h): el
 // cierre normal necesita dos lecturas y nunca llega al freno, y los minutos de
 // juego o alargue no suman intentos. Mientras está espaciado sigue usando el
@@ -91,6 +92,9 @@ const utcDate = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 export const STUCK_AFTER_ATTEMPTS = 5;
 export const STUCK_SPACING_MS = 15 * 60 * 1000;
 const SHOULD_HAVE_RESULT_MS = 4 * 60 * 60 * 1000;
+// fetchedAt sale del reloj del servidor y last_attempt_at del de Postgres: una
+// lectura cuenta como nueva solo si es al menos 30 s posterior al último intento.
+const READ_CLOCK_SKEW_MS = 30_000;
 interface AttemptState { attempts: number; last_attempt_at: string }
 
 /**
@@ -178,6 +182,12 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
     if (verified.has(match.id)) return false;
     const requestedId = byIdRequest.get(match.id);
     const observation = observed.get(match.id) ?? (requestedId !== undefined ? byId.get(requestedId) : undefined);
+    // Solo cuenta una lectura NUEVA del proveedor, posterior al último intento:
+    // releer la caché mientras corre el TTL de la reserva (20 min del feed en
+    // Free, 1 h del detalle por id) no es un intento, ni un tick sin lectura.
+    const readAt = observation?.fetchedAt ?? daily.get(utcDate(match.scheduled_at))?.fetchedAt;
+    const last = attempts.get(match.id)?.last_attempt_at;
+    if (!readAt || (last !== undefined && Date.parse(readAt) <= Date.parse(last) + READ_CLOCK_SKEW_MS)) return false;
     return match.status === "finished" || (observation !== undefined && readFinalResult(observation.fixture) !== null)
       || Date.now() - Date.parse(match.scheduled_at) >= SHOULD_HAVE_RESULT_MS;
   });

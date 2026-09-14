@@ -207,7 +207,9 @@ espera al siguiente tick o a la resolución manual.
 
 **Cierres atascados (migración 123):** un partido que ya debería tener resultado
 (fila `finished`, lectura final del proveedor o saque hace más de 4 h) y no se
-confirma suma un intento por tick en `api_football_verify_attempts`. Desde el
+confirma suma un intento por **lectura nueva del proveedor** en
+`api_football_verify_attempts`; releer la caché dentro del TTL de la reserva
+(20 min del feed en Free, 1 h del detalle por id) no cuenta. Desde el
 quinto intento su fecha se consulta cada 15 minutos (antes, cada minuto: ~940
 consultas/día por fecha) y el admin recibe un aviso `verification_timeout` una
 sola vez por partido. Mientras está espaciado sigue usando el feed que otro
