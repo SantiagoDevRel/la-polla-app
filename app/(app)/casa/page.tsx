@@ -11,6 +11,9 @@ import Image from "next/image";
 import { PollaSection } from "@/components/casa/PollaSection";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
+import { canEditPolla, editorHref } from "@/lib/casa/editor";
+import { Settings } from "lucide-react";
 import {
   listPublicPollas,
   getPots,
@@ -37,7 +40,7 @@ export default async function CasaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?returnTo=/casa");
 
-  const [pollas, myPollas] = await Promise.all([listPublicPollas(), listMyPollas(user.id)]);
+  const [pollas, myPollas, isAdmin] = await Promise.all([listPublicPollas(), listMyPollas(user.id), isCurrentUserAdmin()]);
   const [pots, pendientes, tournaments] = await Promise.all([
     getPots(pollas.map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
@@ -101,7 +104,7 @@ export default async function CasaPage() {
         ) : (
           <ul className="grid auto-rows-fr gap-3">
             {disponibles.map((polla) => (
-              <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} />
+              <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} />
             ))}
           </ul>
         )}
@@ -113,7 +116,7 @@ export default async function CasaPage() {
             {cerradas.length > 0 ? (
               <ul className="grid auto-rows-fr gap-3">
                 {cerradas.map((polla) => (
-                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} />
+                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} />
                 ))}
               </ul>
             ) : (
@@ -132,21 +135,35 @@ function PollaRow({
   polla,
   pot,
   tournaments,
+  editable = false,
 }: {
   polla: CasaPolla;
   pot?: { prize_cop: number; paid_entries: number };
   tournaments: string[];
+  /** Solo administradores y solo hasta el cierre (2026-09-14). */
+  editable?: boolean;
 }) {
   const estado = pollaStatusLabel(polla);
   const abierta = isPollaOpen(polla);
 
   return (
-    <li>
+    <li className="relative">
+      {/* La tuerca va fuera del enlace de la tarjeta: un enlace dentro de otro no es válido. */}
+      {editable && (
+        <Link
+          href={editorHref(polla.id)}
+          aria-label={`Editar ${polla.name}`}
+          title="Editar polla"
+          className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-border-default bg-bg-card text-text-secondary transition-colors duration-200 hover:border-border-strong hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-95"
+        >
+          <Settings className="h-5 w-5" aria-hidden="true" />
+        </Link>
+      )}
       <Link href={`/casa/${polla.slug}`} className="block h-full">
         <StreetCard className="flex h-full flex-col bg-bg-elevated p-4 transition-colors hover:border-border-strong">
           {/* Equal-height list rows let names wrap without shifting the
               logos and amounts in neighboring cards. */}
-          <div className="flex items-start justify-between gap-3">
+          <div className={`flex items-start justify-between gap-3 ${editable ? "pr-12" : ""}`}>
             <h3 className="min-w-0 flex-1 font-display text-[22px] leading-[1.2] tracking-[0.04em] text-text-primary [overflow-wrap:anywhere]">
               {polla.name}
             </h3>

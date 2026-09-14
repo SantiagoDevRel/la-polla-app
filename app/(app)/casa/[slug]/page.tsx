@@ -46,6 +46,8 @@ import { MisBoletas } from "@/components/casa/Boletas";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
 import { acceptsCasaMatchPicks } from "@/lib/casa/match-rules";
+import { canEditPolla, editorHref } from "@/lib/casa/editor";
+import { Settings } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -147,7 +149,21 @@ export default async function PollaPage({
             entrada en un solo bloque. Antes la entrada y "se lleva el ganador"
             iban en otra tarjeta que repetía la cifra del pozo. */}
       <HeroFrame height="min-h-[200px]" className="flex flex-col justify-end">
-        <TournamentIdentity tournaments={tournaments} kind={polla.kind} size="lg" />
+        {/* (2026-09-14) Tuerca de edición: solo administradores y solo hasta
+            el cierre. SQL (migración 122) vuelve a validar al guardar. */}
+        <div className="flex items-start justify-between gap-3">
+          <TournamentIdentity tournaments={tournaments} kind={polla.kind} size="lg" />
+          {isAdmin && canEditPolla(polla) && (
+            <Link
+              href={editorHref(polla.id)}
+              aria-label="Editar polla"
+              title="Editar polla"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-default bg-bg-card/80 text-text-secondary backdrop-blur-sm transition-colors duration-200 hover:border-border-strong hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-95"
+            >
+              <Settings className="h-5 w-5" aria-hidden="true" />
+            </Link>
+          )}
+        </div>
         <div className="mt-3 flex items-start justify-between gap-3">
           <h1 className="lp-display min-w-0 flex-1 text-[34px] [overflow-wrap:anywhere]">{polla.name}</h1>
           <Tape tone={estado.tone} className="mt-1 shrink-0">

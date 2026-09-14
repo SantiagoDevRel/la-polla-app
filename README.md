@@ -326,6 +326,19 @@ pendientes ni cambiar inscripciones después del reparto o del archivo.
   rango de boletas. Ninguna de las dos vías toca una polla repartida,
   anulada o eliminada.
 
+### Editar una polla hasta el cierre (2026-09-14, migración 122)
+
+- Los administradores ven una tuerca en el detalle de la polla y en sus
+  tarjetas de `/casa` (y «Editar» en `/admin/pollas`) mientras la polla no
+  haya cerrado. Lleva a `/admin/pollas/[id]/editar`.
+- Se puede cambiar el nombre y la descripción (el enlace no cambia), agregar
+  partidos que no han empezado (máximo 30) y quitar partidos sin pronósticos.
+- Sin inscripciones también se cambia el modo de puntaje, la entrada, el premio
+  y la cuenta de cobro. Con una inscripción esas condiciones quedan fijas.
+- Todo lo valida `casa_edit_polla_v2` en SQL; los pronósticos nunca se tocan.
+- Antes de desplegar: aplicar `supabase/migrations/122_casa_polla_editor.sql`
+  (requiere 118). Regresión local con `scripts/casa-polla-editor-check.sql`.
+
 ### Reparto del pozo: solo el ganador (migración 096)
 
 `supabase/migrations/096_casa_pozo_solo_ganador.sql` deja el reparto en una
