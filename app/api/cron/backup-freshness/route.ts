@@ -7,7 +7,9 @@
 //
 // Auth: Authorization: Bearer ${CRON_SECRET} vía requireCronSecret, ANTES de
 // crear el admin client (el middleware exime /api/cron/ del gate de sesión).
-// Trigger: .github/workflows/backup-freshness.yml, cada hora.
+// Triggers: pg_cron backup-freshness-hourly (minuto 25, migración 124,
+// public.trigger_backup_freshness) y .github/workflows/backup-freshness.yml
+// (minuto 17, respaldo: GitHub llega con horas de retraso).
 //
 // Reglas:
 //   · backup  (kind=backup, status=ok): más de BACKUP_MAX_AGE_HOURS (7) → atrasado

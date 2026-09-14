@@ -489,7 +489,7 @@ npm test            # vitest unit tests (111 tests)
 
 ### Auth
 
-- **Login por SMS (principal)**: número → `/api/auth/start-otp` (Supabase `signInWithOtp`, hoy Twilio Verify) → código → `/api/auth/verify-otp` deja la sesión en cookies `sb-<ref>-auth-token` (hoy sin `HttpOnly` ni `Secure`, default de `@supabase/ssr`; ver «Estado en producción»). Sin contraseña. Usuarios nuevos pasan por `/onboarding` (nombre + pollito).
+- **Login por SMS (principal)**: número → `/api/auth/start-otp` (Supabase `signInWithOtp`, hoy Twilio Verify) → código → `/api/auth/verify-otp` deja la sesión en cookies `sb-<ref>-auth-token` (`Secure` en producción, `SameSite=Lax`, host-only; sin `HttpOnly` porque el cliente del navegador lee la sesión; ver «Cookies de sesión»). Sin contraseña. Usuarios nuevos pasan por `/onboarding` (nombre + pollito).
 - **SMS por LabsMobile (preparado, apagado)**: `app/api/auth/sms-hook` es el Send SMS Hook de Supabase Auth. Supabase genera y valida el código; el hook solo lo entrega con `lib/sms/labsmobile.ts` (SMS plano, nunca el endpoint 2FA del proveedor) y lo registra en `sms_entregas` (migración 088). LabsMobile avisa la entrega en `/api/sms/ack`, protegido con `SMS_ACK_SECRET`. Mientras `hook_send_sms_enabled=false`, Supabase sigue enviando por Twilio Verify.
 - **Orden en `/login`**: primero **Enviar código por SMS** (botón primario); debajo, **Entrar con Telegram** (secundario, no necesita el número). En el paso del código SMS: «¿No te llegó el SMS?» + **Entrar con Telegram**.
 - **Login por Telegram (v2, 2026-09-13, migración 119)**: sin códigos. Ver la sección siguiente.
@@ -686,10 +686,16 @@ más de 120 s (así salió el aviso de las 16:44:43Z). **El vigía de silencio
 conectado**: si LabsMobile nunca manda acuse, nadie se entera. Antes de
 prender el hook, conecta ese vigía a un cron.
 
-**Cookies de sesión.** En producción, las cookies `sb-<ref>-auth-token` salen
-sin `HttpOnly` ni `Secure`. Es el default de `@supabase/ssr` y pasa igual con
-SMS, magic-link y Telegram. Pendiente revisar `cookieOptions` antes del
-lanzamiento.
+**Cookies de sesión.** Desde el 2026-09-14 las cookies `sb-<ref>-auth-token`
+salen con `Secure` en producción, `SameSite=Lax`, `Path=/` y sin `Domain`
+(host-only), por SMS, magic-link o Telegram: los cuatro clientes de
+`@supabase/ssr` usan `sessionCookieOptions()` de
+`lib/supabase/cookie-options.ts`, y `lp_onb` usa `onboardingCookieOptions()`
+(además `HttpOnly`). Las `sb-*` **no** son `HttpOnly`: `lib/supabase/client.ts`
+(Perfil, Onboarding) lee la sesión desde `document.cookie`. En `next dev`
+(http) salen sin `Secure`. Prueba: `npx vitest run tests/supabase-cookie-options.test.ts`
+(revisa el `Set-Cookie` real de @supabase/ssr). Las sesiones ya abiertas pasan
+a `Secure` en el siguiente refresco del token.
 
 ### IP real en Supabase Auth
 
@@ -770,7 +776,7 @@ Unitarias: `npm test -- tests/auth-real-ip.test.ts`.
 | `match-reminders.yml` | `/api/cron/match-reminders` | diario 13:00 UTC |
 | `admin-discrepancies-email.yml` | `/api/cron/admin-discrepancies-email` | diario 13:00 UTC |
 | `cleanup-payout-proofs.yml` | `/api/cron/cleanup-payout-proofs` | **solo manual** (pendiente de aprobación del dueño) |
-| `backup-freshness.yml` | `/api/cron/backup-freshness` | cada hora, minuto 17 |
+| `backup-freshness.yml` | `/api/cron/backup-freshness` | cada hora, minuto 17 (respaldo; el principal es pg_cron, minuto 25) |
 
 - **Los `schedule` de GitHub llegan tarde en este repo.** `match-reminders` y
   `admin-discrepancies-email` (13:00 UTC) arrancaron entre las 15:54 y las
@@ -779,9 +785,13 @@ Unitarias: `npm test -- tests/auth-real-ip.test.ts`.
   `backup-freshness.yml` llegó a `main` a las 15:45 UTC del 2026-09-13 y, a
   las 18:37 UTC, sus horarios de las 16:17, 17:17 y 18:17 seguían sin correr
   (solo había corridas manuales). En la práctica, un backup atrasado puede
-  avisar varias horas después del umbral de 7 h. Si eso no alcanza, dispara la
-  misma ruta desde un segundo lugar (pg_cron + pg_net o un cron de Vercel,
-  que Pro permite) con `CRON_SECRET`.
+  avisar varias horas después del umbral de 7 h. Por eso la migración 124 agrega
+  el job de pg_cron `backup-freshness-hourly` (`25 * * * *`) →
+  `public.trigger_backup_freshness()` → `POST` con `Authorization: Bearer`,
+  URL de `app_config.app_base_url` y secreto de vault `app.cron_secret` (mismo
+  patrón y mismo secreto que `trigger_sync_live()`). El workflow sigue como
+  respaldo: con el backup atrasado pueden llegar hasta dos correos por hora.
+  Si rotas `CRON_SECRET` en Vercel, actualiza también `app.cron_secret` en vault.
 
 - `backup-freshness` lee `public.backup_runs` (migración 117, la llena el
   backup del DGX) y le escribe a `ADMIN_ALERT_EMAIL` (o `FEEDBACK_NOTIFY_EMAIL`)

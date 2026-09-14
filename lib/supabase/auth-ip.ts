@@ -27,6 +27,7 @@ import { isIP } from "node:net";
 import { createClient as createSbClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { sessionCookieOptions } from "@/lib/supabase/cookie-options";
 
 export const SB_FORWARDED_FOR_HEADER = "Sb-Forwarded-For";
 
@@ -181,6 +182,7 @@ export async function createAuthRouteClient(
   const { key, global } = authClientOptions(ip);
   return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
     global,
+    cookieOptions: sessionCookieOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll();

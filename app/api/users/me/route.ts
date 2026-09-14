@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { onboardingCookieOptions } from "@/lib/supabase/cookie-options";
 import { z } from "zod";
 import {
   DISPLAY_NAME_MAX,
@@ -200,12 +201,7 @@ export async function PATCH(request: NextRequest) {
 
     const response = NextResponse.json({ success: true });
     if (fresh && !needsName(fresh.display_name) && fresh.avatar_url) {
-      response.cookies.set("lp_onb", "1", {
-        httpOnly: true,
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24 * 30,
-        path: "/",
-      });
+      response.cookies.set("lp_onb", "1", onboardingCookieOptions());
     } else {
       // Defense-in-depth: si por alguna razón el row quedó con perfil
       // incompleto post-update (ej. user borró avatar via otro flow),

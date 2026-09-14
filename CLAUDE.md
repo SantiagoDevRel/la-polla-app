@@ -468,10 +468,16 @@ que le escribe al admin (`ADMIN_ALERT_EMAIL`, o `FEEDBACK_NOTIFY_EMAIL`) con asu
 (`BACKUP_MAX_AGE_HOURS`) o la última verificación buena de 30 h
 (`BACKUP_VERIFY_MAX_AGE_HOURS`), o si no hay filas. Si el DGX se apaga, la
 falta de filas ES la alerta. Se repite cada hora mientras siga atrasado.
-⚠️ "Cada hora" es el `schedule` de GitHub, que en este repo corre con horas de
-retraso (los diarios de 13:00 UTC arrancan entre 15:54 y 16:48) y puede saltarse
-corridas: el aviso real puede llegar varias horas después. Ver README → «Crons
-de GitHub Actions».
+⚠️ El `schedule` de GitHub corre en este repo con horas de retraso (los diarios
+de 13:00 UTC arrancan entre 15:54 y 16:48) y puede saltarse corridas. Por eso,
+desde la migración 124, el disparador principal es **pg_cron**: el job
+`backup-freshness-hourly` (minuto 25) ejecuta `public.trigger_backup_freshness()`,
+que hace `POST` con `Authorization: Bearer` usando `app_config.app_base_url` y el
+secreto de vault `app.cron_secret`, igual que `trigger_sync_live()`. El workflow
+de GitHub queda como segundo disparador, así que con el backup atrasado pueden
+llegar hasta dos correos por hora. Si rotas `CRON_SECRET` en Vercel, actualiza
+también `app.cron_secret` en vault o fallarán sync-live, discover y esta alerta.
+Ver README → «Crons de GitHub Actions».
 
 - `backup_runs`: RLS + deny-all para anon/authenticated; `service_role` solo
   `SELECT, INSERT` (nadie edita ni borra la bitácora). Regresión:
@@ -748,7 +754,8 @@ Foto completa, con rollback por pieza: README → «Estado en producción
   Ajustes del 2026-09-14 (migración 120, aditiva) en la sección de abajo.
 - **Captcha de Auth: apagada** (ver Open ideas).
 - **Backup:** runner del DGX detached en `main` 7d9ca5a + `backup_runs` +
-  alerta horaria `backup-freshness.yml` (ver sección de backup).
+  alerta horaria por pg_cron `backup-freshness-hourly` (migración 124, al
+  aplicarla) con `backup-freshness.yml` de respaldo (ver sección de backup).
 - **Monitoreo:** existe un monitor de uptime en Sentry (proyecto
   `santi-apps`): `HEAD /api/app-version` cada 5 min. **No tiene
   alerta conectada**, así que un incidente no le avisa a nadie. No hay SDK de
@@ -1515,6 +1522,32 @@ panel interno. La regla aplica a lo que LEE UN USUARIO.
   hasta que el dueño apruebe borrar los comprobantes históricos.
 - Los endpoints que llama pg_cron (`/api/matches/sync-live`, `discover`, ...)
   usan `x-cron-secret` y 401: tienen su propio chequeo, no son `/api/cron/`.
+  Excepción: `trigger_backup_freshness()` (migración 124) llama a
+  `/api/cron/backup-freshness` desde pg_cron con `Authorization: Bearer`.
+
+### Cookies de sesión (2026-09-14)
+- `lib/supabase/cookie-options.ts` es la única fuente: los cuatro clientes
+  de `@supabase/ssr` (`client.ts`, `server.ts`, `middleware.ts`, `auth-ip.ts`)
+  pasan `cookieOptions: sessionCookieOptions()` → `Secure` en producción,
+  `SameSite=Lax`, `Path=/`, **host-only (sin `domain`)**. `lp_onb` usa
+  `onboardingCookieOptions()` (además `HttpOnly`, 30 días).
+- **Las `sb-*-auth-token` NO son HttpOnly, y así deben quedar:** el cliente
+  del navegador (`lib/supabase/client.ts`, en Perfil y Onboarding) lee y
+  refresca la sesión desde `document.cookie`. @supabase/ssr 0.10 no ofrece un
+  modo HttpOnly compatible con ese cliente; activarlo exigiría sacar todo uso
+  de sesión del navegador y probar SMS + Telegram completos.
+- `tests/supabase-cookie-options.test.ts` verifica el `Set-Cookie` real de
+  @supabase/ssr y que ningún cliente nuevo omita las opciones.
+
+### Funciones SECURITY DEFINER usadas por RLS (migración 124)
+- Una función que evalúa una política corre con el rol de quien consulta: si le
+  quitas EXECUTE a `authenticated`, la tabla (y toda política que la consulte
+  por subconsulta) responde 42501. No se "arregla" el advisor con REVOKE a secas.
+- Patrón: la función vive en el esquema **`private`** (PostgREST no lo expone),
+  con USAGE + EXECUTE solo para `authenticated`/`service_role`, y la política
+  la referencia ahí. `participants_select` usa `private.is_approved_participant`
+  y aplica `TO authenticated`; `public.is_approved_participant` se conserva
+  solo para `service_role`, sin usos.
 
 ### WhatsApp Webhook Security
 - POST handler verifies `X-Hub-Signature-256` using HMAC-SHA256 with META_WA_APP_SECRET

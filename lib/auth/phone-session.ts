@@ -17,6 +17,7 @@ import type { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createAuthRouteClient } from "@/lib/supabase/auth-ip";
 import { emailForPhone, normalizePhone } from "@/lib/auth/phone";
+import { onboardingCookieOptions } from "@/lib/supabase/cookie-options";
 
 export type PhoneSessionResult =
   | { ok: true; userId: string; needsOnboarding: boolean }
@@ -192,12 +193,7 @@ export function applyOnboardingCookie(
   needsOnboarding: boolean,
 ): void {
   if (!needsOnboarding) {
-    response.cookies.set("lp_onb", "1", {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30,
-      path: "/",
-    });
+    response.cookies.set("lp_onb", "1", onboardingCookieOptions());
   } else {
     response.cookies.delete("lp_onb");
   }
