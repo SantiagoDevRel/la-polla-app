@@ -10,7 +10,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TelegramLoginConfig } from "./config";
 import { LINK_PAGE_STATES, type LinkPageState } from "./links";
-import { maskPhone } from "./messages";
+import { maskPhone } from "./mask-phone";
 import { peekLoginLink } from "./requests";
 
 export type LinkPageView =

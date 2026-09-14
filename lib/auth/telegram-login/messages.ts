@@ -17,14 +17,6 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** "+573001234567" → "+57 ••• ••• 4567": suficiente para reconocer el número. */
-export function maskPhone(phoneE164: string): string {
-  const digits = phoneE164.replace(/\D/g, "");
-  const last = digits.slice(-4);
-  const cc = digits.length > 10 ? digits.slice(0, digits.length - 10) : "";
-  return `+${cc}${cc ? " " : ""}••• ••• ${last}`;
-}
-
 const COPY = {
   es: {
     shareButton: "Compartir mi número",

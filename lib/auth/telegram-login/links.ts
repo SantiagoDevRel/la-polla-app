@@ -12,10 +12,10 @@
 // que el enlace ya no sirve.
 
 import { SITES } from "@/lib/seo/sites";
+import { LOGIN_LINK_PATH } from "./link-path";
 import type { LoginLocale } from "./update";
 
-/** Página que abre el botón del bot. */
-export const LOGIN_LINK_PATH = "/login/telegram";
+export { LOGIN_LINK_PATH } from "./link-path";
 /** Endpoint que canjea el enlace (POST del formulario de esa página). */
 export const LOGIN_LINK_ACTION = "/api/auth/telegram/link";
 

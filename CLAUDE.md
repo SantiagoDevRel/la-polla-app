@@ -743,9 +743,9 @@ Foto completa, con rollback por pieza: README → «Estado en producción
   horario hábil con acuse en segundos y el vigía de silencio
   (`revisarSilencios`) conectado a un cron, porque hoy no hay cron que lo
   llame. Rollback = PATCH `hook_send_sms_enabled:false`, sin deploy.
-- **Login por Telegram: ACTIVO (v1, migración 115).** `@LaPollaColombianaAccesoBot`, webhook en
-  `/api/telegram/login`, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`. v2 (119,
-  sin códigos) queda en su PR: aplicar 119 ANTES del deploy que la usa.
+- **Login por Telegram: ACTIVO (v2, migración 119, PR #78).** `@LaPollaColombianaAccesoBot`,
+  webhook en `/api/telegram/login`, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`.
+  Ajustes del 2026-09-14 (migración 120, aditiva) en la sección de abajo.
 - **Captcha de Auth: apagada** (ver Open ideas).
 - **Backup:** runner del DGX detached en `main` 7d9ca5a + `backup_runs` +
   alerta horaria `backup-freshness.yml` (ver sección de backup).
@@ -784,7 +784,9 @@ minutos y una sola sesión por enlace. v2 lo implementa así:
   5 min) y devuelve `t.me/<bot>?start=<nonce>`. Solo sirve para que el enlace,
   abierto en ESE navegador, entre sin confirmar. En pantalla táctil Telegram se
   abre en la MISMA pestaña (con una pestaña nueva el navegador volvía a t.me y
-  no a la espera); en escritorio, ventana abierta antes del fetch. La espera no
+  no a la espera); en escritorio, ventana abierta antes del fetch. «Táctil» es
+  `(hover: none) and (pointer: coarse)` (`open-mode.ts`): con `pointer: coarse`
+  solo, un PC con pantalla táctil perdía la espera. La espera no
   tiene input: pasos numerados (Iniciar/Start → Compartir mi número la primera
   vez → botón Entrar a La Polla) y `status` cada 2 s visible +
   `visibilitychange`/`focus`/`pageshow`. `consumed` + cookie de sesión → sigue;
@@ -798,7 +800,11 @@ minutos y una sola sesión por enlace. v2 lo implementa así:
   teclado; screenshot del dueño). Nunca manda códigos. `allowed_updates` sigue
   siendo `["message"]`.
 - **Enlace** → página `/login/telegram?t=` (dentro de `(auth)`, sistema de
-  diseño, sin bienvenida, `referrer: no-referrer`, noindex). GET nunca abre
+  diseño, `referrer: same-origin`, noindex). **Sin splash ni bienvenida encima**
+  (`isLoginLinkPath`): el SplashScreen del layout raíz la tapaba ~3 s en el
+  navegador de Telegram. Número enmascarado con `mask-phone.ts` (código de país
+  de libphonenumber-js, últimos 4: `+351 ••• ••• 5581`); no importar
+  `react-phone-number-input` en servidor (rompe el build). GET nunca abre
   sesión: con la cookie de ESA solicitud envía solo el POST; sin ella «Confirma
   tu ingreso» con número enmascarado (login CSRF). Canje: `POST
   /api/auth/telegram/link` (mismo origen, formulario), 5 min, un uso, HMAC;
@@ -815,14 +821,24 @@ minutos y una sola sesión por enlace. v2 lo implementa así:
   (`resolveAccountForVerifiedPhone` es su parte sin cookies, para el bot).
 - **Topes** en SQL, en la misma transacción: 10 solicitudes/15 min por IPv4 o
   por /64 de IPv6, **sin tope global** (con uno, 60 IPs dejaban a todos sin
-  Telegram), 5 enlaces/15 min y 20/día por cuenta de Telegram. v1 retirado:
+  Telegram), 5 enlaces/15 min y 20/día por cuenta de Telegram. **Un solo
+  enlace vigente por cuenta de Telegram** (120): aprobar o emitir vence los
+  demás en la misma transacción. v1 retirado:
   `telegram-verify` → 410; `telegram-link` → página «ya no sirve».
 - **Pendiente de probar en dispositivos reales:** en el teléfono el botón del
   bot se abre por defecto en el navegador interno de Telegram (cookies
   aparte): la sesión queda ahí y la pestaña original muestra «Entraste en otro
   navegador». Verificar en iPhone y Android si el deep link abre la app directo.
-- Pruebas: `tests/telegram-login.test.ts`, `scripts/telegram-login-v2-check.sql`
-  (y `telegram-login-check.sql` de 115). Detalle: README → «Login por Telegram (v2)».
+- **Perfil del bot** (comandos/descripciones): el token solo vive en Vercel, así
+  que lo sincroniza el servidor (`bot-profile.ts`) después del primer update
+  autenticado de cada versión, guardada en `app_config`
+  (`telegram_login_bot_profile_version`). A pedido:
+  `gh workflow run telegram-login-bot-profile.yml [-f force=true]`. Si cambias
+  un texto del perfil, la versión cambia sola; mantén igual el script
+  `telegram-login-set-webhook.mjs` (hay test que lo compara).
+- Pruebas: `tests/telegram-login.test.ts`, `tests/telegram-login-polish.test.ts`,
+  `scripts/telegram-login-single-link-check.sql` (120), `telegram-login-v2-check.sql`
+  (119) y `telegram-login-check.sql` (115). Detalle: README → «Login por Telegram (v2)».
 
 Files: `app/(auth)/{login,onboarding}/page.tsx`,
 `app/(auth)/login/LoginClient.tsx`, `app/(auth)/login/telegram/*`,

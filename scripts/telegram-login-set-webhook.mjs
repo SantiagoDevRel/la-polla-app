@@ -12,6 +12,8 @@
 // --texts-only (v2, 2026-09-13): actualiza SOLO comandos y descripciones del
 // bot (ya no hablan de códigos). No llama setWebhook ni necesita el secreto:
 // el webhook, su secreto y allowed_updates=["message"] quedan como están.
+// Ya no hace falta correrlo para los textos: el servidor los sincroniza solo
+// una vez por versión (lib/auth/telegram-login/bot-profile.ts).
 //
 // Variables: TELEGRAM_LOGIN_BOT_TOKEN y TELEGRAM_LOGIN_WEBHOOK_SECRET (los
 // mismos valores que en Vercel). Nunca imprime sus valores.
@@ -45,27 +47,24 @@ if (problems.length) {
   process.exit(1);
 }
 
-const textSteps = [
-  ["setMyCommands", {
-    commands: [
-      { command: "start", description: "Entrar a La Polla" },
-      { command: "login", description: "Entrar a La Polla" },
-    ],
-  }],
-  ["setMyCommands", {
-    language_code: "en",
-    commands: [
-      { command: "start", description: "Sign in to Chicken Picks" },
-      { command: "login", description: "Sign in to Chicken Picks" },
-    ],
-  }],
-  ["setMyShortDescription", {
-    short_description: "Entra a La Polla Colombiana con tu cuenta de Telegram, sin códigos.",
-  }],
-  ["setMyDescription", {
-    description: "Entra a La Polla Colombiana con tu cuenta de Telegram. La primera vez confirmas tu número con el botón Compartir mi número. Después tocas Iniciar y el botón Entrar a La Polla, un enlace que sirve una sola vez. No aceptamos números escritos a mano ni contactos de otras personas.",
-  }],
-];
+// Mismo perfil que lib/auth/telegram-login/bot-profile.ts (BOT_PROFILE_STEPS).
+// Desde 2026-09-14 el servidor lo sincroniza solo (webhook y
+// /api/cron/telegram-login-bot-profile); si cambias un texto, cámbialo allá.
+const ES_START = "Entrar a La Polla";
+const ES_ABOUT = "Entra a La Polla Colombiana con Telegram cuando el SMS no llega.";
+const EN_START = "Sign in to La Polla";
+const EN_ABOUT = "Sign in to La Polla Colombiana with Telegram when the SMS doesn't arrive.";
+
+const textSteps = [null, "es", "en"].flatMap((lang) => {
+  const start = lang === "en" ? EN_START : ES_START;
+  const about = lang === "en" ? EN_ABOUT : ES_ABOUT;
+  const language = lang ? { language_code: lang } : {};
+  return [
+    ["setMyCommands", { commands: [{ command: "start", description: start }], ...language }],
+    ["setMyDescription", { description: about, ...language }],
+    ["setMyShortDescription", { short_description: about, ...language }],
+  ];
+});
 
 const steps = textsOnly
   ? textSteps

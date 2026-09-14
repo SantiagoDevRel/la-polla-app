@@ -1,0 +1,69 @@
+# Perfil del bot de login por Telegram (comandos y descripciones), a pedido.
+#
+# Normalmente no hace falta correrlo: el webhook del bot sincroniza el perfil
+# solo, una vez por versión, después del primer update. Sirve para dejarlo al
+# día sin esperar a que alguien le escriba al bot, o para forzarlo:
+#   gh workflow run telegram-login-bot-profile.yml
+#   gh workflow run telegram-login-bot-profile.yml -f force=true
+#
+# POST a /api/cron/telegram-login-bot-profile con CRON_SECRET. El token del bot
+# vive solo en Vercel: este workflow nunca lo ve. El paso falla si la respuesta
+# no es 2xx (un 307 a /login también es fallo), si el body no trae "ok": true o
+# si curl pasa de 60 s. En el log (público) solo se imprimen status y version.
+# Sin --retry: el próximo update del bot vuelve a intentarlo solo.
+
+name: Telegram Login Bot Profile
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Volver a enviar el perfil aunque la versión ya esté guardada"
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: cron-telegram-login-bot-profile
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: POST a la API del perfil del bot
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+          FORCE: ${{ inputs.force }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${APP_URL:=https://lapollacolombiana.com}"
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET no está configurado en los secrets del repo"
+            exit 1
+          fi
+          query=""
+          if [ "${FORCE:-false}" = "true" ]; then
+            query="?force=1"
+          fi
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+          status="$(curl -sS --max-time 60 -o "$body_file" -w '%{http_code}' -X POST \
+            "$APP_URL/api/cron/telegram-login-bot-profile$query" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")"
+          echo "HTTP status: $status"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            error_code="$(jq -r '[.error, .stage] | map(select(. != null) | tostring | .[0:80]) | join(" ")' "$body_file" 2>/dev/null || true)"
+            echo "::error::La ruta respondió HTTP $status (se esperaba 2xx) ${error_code:+error=$error_code}"
+            exit 1
+          fi
+          if ! jq -e '.ok == true' "$body_file" > /dev/null 2>&1; then
+            echo "::error::La respuesta no trae \"ok\": true"
+            exit 1
+          fi
+          jq -c '{status, version}' "$body_file"

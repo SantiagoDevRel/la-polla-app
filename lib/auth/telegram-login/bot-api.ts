@@ -20,11 +20,16 @@ function apiBase(env: Record<string, string | undefined>): string {
   return DEFAULT_API;
 }
 
+/** Espera máxima por llamada. Telegram espera la respuesta del webhook. */
+export const BOT_API_TIMEOUT_MS = 8000;
+
 export function createLoginBotApi(
   botToken: string,
   env: Record<string, string | undefined> = process.env,
+  options: { timeoutMs?: number } = {},
 ): BotApiCall {
   const base = apiBase(env);
+  const timeoutMs = options.timeoutMs ?? BOT_API_TIMEOUT_MS;
   return async (method, body) => {
     try {
       const res = await fetch(`${base}/bot${botToken}/${method}`, {
@@ -32,7 +37,7 @@ export function createLoginBotApi(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
         // Telegram espera respuesta del webhook: no colgamos el request.
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       const json = (await res.json().catch(() => null)) as {
         ok?: boolean;
