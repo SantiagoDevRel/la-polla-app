@@ -13,6 +13,7 @@ import { createClient as createSbClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { needsName } from "@/lib/users/needs-name";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
+import { onboardingCookieOptions, sessionCookieOptions } from "@/lib/supabase/cookie-options";
 
 // Admin client built inline so middleware doesn't pull lib/supabase/admin
 // (which is fine, but keeps the dependency surface here explicit).
@@ -95,6 +96,7 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: sessionCookieOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -256,12 +258,7 @@ export async function updateSession(request: NextRequest) {
 
       // Onboarding completo — cachear para próximos requests (30 días).
       if (profile && !needsName(profile.display_name) && profile.avatar_url) {
-        supabaseResponse.cookies.set("lp_onb", "1", {
-          httpOnly: true,
-          sameSite: "lax",
-          maxAge: 60 * 60 * 24 * 30,
-          path: "/",
-        });
+        supabaseResponse.cookies.set("lp_onb", "1", onboardingCookieOptions());
       }
     }
   }

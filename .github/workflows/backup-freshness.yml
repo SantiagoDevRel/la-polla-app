@@ -5,6 +5,10 @@
 # no hay un backup bueno en 7 h o una verificación buena en 30 h. Como corre en
 # GitHub y no en el DGX, avisa aunque el DGX y el PC estén apagados.
 #
+# Es el SEGUNDO disparador: GitHub corre los schedule de este repo con horas de
+# retraso. El principal es pg_cron (job backup-freshness-hourly, minuto 25,
+# migración 124).
+#
 # El paso falla si: la respuesta no es 2xx (un 307 a /login también es fallo),
 # el body no trae "ok": true, o curl pasa de 90 s. En el log (público) solo se
 # imprimen stale/age_hours, nunca el body. Sin --retry: el correo no es
