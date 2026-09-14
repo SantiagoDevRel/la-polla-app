@@ -150,7 +150,7 @@ function TabItem({
         <Icon className={tab.key === "futbol" ? "h-7 w-7" : "h-6 w-6"} strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
         {showBadge && (
           <span
-            className="absolute -right-2 -top-1 min-w-[15px] border-2 border-bg-base bg-gold px-[3px] text-center text-[9px] font-bold leading-[13px] text-bg-base"
+            className="absolute -right-2 -top-1 min-w-[17px] rounded-full border-2 border-bg-base bg-red-alert px-[4px] text-center text-[10px] font-bold leading-[13px] text-white"
             aria-label={`${badge} ${badgeLabelPrefix ?? ""}`}
           >
             {badge > 9 ? "9+" : badge}

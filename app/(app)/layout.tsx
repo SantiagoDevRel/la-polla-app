@@ -20,6 +20,8 @@ import FontScaleApplier from "@/components/layout/FontScaleApplier";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { needsName } from "@/lib/users/needs-name";
+import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
+import type { CasaPollaStatus } from "@/lib/casa/types";
 
 export const dynamic = "force-dynamic";
 
@@ -59,46 +61,52 @@ async function contarPendientes(
   admin: ReturnType<typeof createAdminClient>,
   userId: string,
 ): Promise<number> {
+  // (2026-09-14) Solo cuentan inscripciones vivas (pagada, o pendiente con
+  // comprobante) y partidos que TODAVÍA se pueden pronosticar: un partido que
+  // ya empezó sin pronóstico no tiene arreglo y dejaba el aviso prendido para
+  // siempre. La regla de edición es la misma de la pantalla (canEditCasaMatch).
   const { data: entries } = await admin
     .from("casa_entries")
-    .select("id, polla_id")
+    .select("id, polla_id, status, proof_path")
     .eq("user_id", userId) // ← filtro explícito: ver el TODO de auth.uid()
     .in("status", ["pagada", "pendiente"]);
 
-  if (!entries || entries.length === 0) return 0;
+  const vivasEntries = (entries ?? []).filter((e: { status: string; proof_path: string | null }) => e.status === "pagada" || Boolean(e.proof_path)) as { id: string; polla_id: string }[];
+  if (vivasEntries.length === 0) return 0;
 
-  const pollaIds = entries.map((e: { polla_id: string }) => e.polla_id).filter((id, index, all) => all.indexOf(id) === index);
-
-  const { data: abiertas } = await admin
+  const pollaIds = [...new Set(vivasEntries.map((e) => e.polla_id))];
+  const { data: pollas } = await admin
     .from("casa_pollas")
-    .select("id")
+    .select("id, status")
     .in("id", pollaIds)
-    .eq("status", "abierta")
     .eq("kind", "partidos")
-    .is("archived_at", null)
-    .gt("closes_at", new Date().toISOString());
+    .is("archived_at", null);
+  // Un desempate pendiente solo llega con todos los partidos jugados: no deja nada por pronosticar.
+  const vivas = new Set((pollas ?? [])
+    .filter((p: { status: CasaPollaStatus }) => acceptsCasaMatchPicks(p.status)).map((p: { id: string }) => p.id));
+  const entradas = vivasEntries.filter((e) => vivas.has(e.polla_id));
+  if (entradas.length === 0) return 0;
 
-  if (!abiertas || abiertas.length === 0) return 0;
-  const vivas = new Set(abiertas.map((p: { id: string }) => p.id));
+  const [{ data: links }, { data: picks }] = await Promise.all([
+    admin.from("casa_polla_matches").select("polla_id, match_id, voided_at").in("polla_id", [...vivas]),
+    admin.from("casa_picks").select("entry_id, match_id").in("entry_id", entradas.map((e) => e.id)).not("match_id", "is", null),
+  ]);
+  const matchIds = [...new Set((links ?? []).map((l: { match_id: string }) => l.match_id))];
+  if (matchIds.length === 0) return 0;
+  const { data: matches } = await admin
+    .from("matches")
+    .select("id, status, elapsed, scheduled_at, final_verified_at")
+    .in("id", matchIds);
+  const porId = new Map((matches ?? []).map((m: { id: string }) => [m.id, m]));
+  const hechos = new Set((picks ?? []).map((p: { entry_id: string; match_id: string }) => `${p.entry_id}:${p.match_id}`));
+  const now = Date.now();
 
-  let pendientes = 0;
-  for (const entry of entries as { id: string; polla_id: string }[]) {
-    if (!vivas.has(entry.polla_id)) continue;
-
-    const [{ count: total }, { count: hechos }] = await Promise.all([
-      admin
-        .from("casa_polla_matches")
-        .select("match_id", { count: "exact", head: true })
-        .eq("polla_id", entry.polla_id),
-      admin
-        .from("casa_picks")
-        .select("id", { count: "exact", head: true })
-        .eq("entry_id", entry.id),
-    ]);
-
-    if ((total ?? 0) > (hechos ?? 0)) pendientes += 1;
-  }
-  return pendientes;
+  return entradas.filter((entry) =>
+    (links ?? []).some((l: { polla_id: string; match_id: string; voided_at: string | null }) => {
+      const match = porId.get(l.match_id) as Parameters<typeof canEditCasaMatch>[0] | undefined;
+      return l.polla_id === entry.polla_id && match && canEditCasaMatch({ ...match, voided_at: l.voided_at }, now) && !hechos.has(`${entry.id}:${l.match_id}`);
+    }),
+  ).length;
 }
 
 async function getDisplayName(): Promise<string | null | undefined> {

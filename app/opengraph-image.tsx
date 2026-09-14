@@ -7,12 +7,24 @@ import { getSiteFromHeaders } from "@/lib/seo/sites";
 
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+// El dominio principal sirve el JPEG horneado; og:image:type sigue a ese caso.
+export const contentType = "image/jpeg";
 export const alt = "La Polla Colombiana / Chicken Picks";
 
 export default async function Image() {
   const site = await getSiteFromHeaders();
   const isEs = site.locale === "es";
+  // (2026-09-14) Pedido del dueño: al compartir un link se ven los pollitos y
+  // «La Polla Colombiana», no «Crea tu polla deportiva con tus parceros».
+  // Imagen horneada (scripts/bake-og-image.cjs), 151 KB: WhatsApp descarta en
+  // silencio vistas previas de más de ~300 KB, y ImageResponse re-codifica a
+  // PNG de ~1 MB con fotos. Chicken Picks conserva la tarjeta de texto.
+  if (isEs) {
+    const jpg = await fetch(new URL("./og-la-polla-colombiana.jpg", import.meta.url)).then((r) => r.arrayBuffer());
+    return new Response(jpg, {
+      headers: { "Content-Type": "image/jpeg", "Cache-Control": "public, max-age=86400, s-maxage=604800" },
+    });
+  }
   return new ImageResponse(
     (
       <div
@@ -64,9 +76,7 @@ export default async function Image() {
               maxWidth: 980,
             }}
           >
-            {isEs
-              ? "Crea tu polla deportiva con tus parceros."
-              : "Create your football pool with friends."}
+            Create your football pool with friends.
           </div>
           <div style={{ fontSize: 30, color: "#FCD116", fontWeight: 600 }}>
             {isEs
