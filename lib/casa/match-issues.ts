@@ -1,7 +1,8 @@
 import "server-only";
 
 // lib/casa/match-issues.ts — lectura server-side de los casos de partidos
-// suspendidos, aplazados, cancelados o abandonados en pollas Casa.
+// suspendidos, aplazados, cancelados o abandonados en pollas Casa, y de los
+// que pasaron su hora de inicio sin datos del proveedor (sin_datos, 121).
 //
 // Nada se anula solo: la base registra el caso en `casa_match_issues` y el
 // administrador decide en /admin/issues (RPC `casa_decide_match_issue`). Este
@@ -16,14 +17,19 @@ import { getTournamentName } from "@/lib/tournaments";
 import { formatColombiaDateTime } from "@/lib/time/colombia";
 import { redactText } from "@/lib/log";
 import type { CasaPollaStatus } from "@/lib/casa/types";
+import {
+  describeMatchIssue,
+  formatIssueKickoff,
+  type MatchIssueDecisionValue,
+  type MatchIssueKind,
+} from "@/lib/casa/match-issue-kinds";
 
-export type MatchIssueKind = "suspendido" | "aplazado" | "cancelado" | "abandonado";
-export type MatchIssueDecisionValue = "anular" | "mantener";
+export { describeMatchIssue, type MatchIssueDecisionValue, type MatchIssueKind };
 
 const ISSUE_COLUMNS =
   "id, match_id, kind, observed_status, observed_detail, observed_elapsed, first_seen_at, last_seen_at, decision, decided_by, decided_at, note" as const;
 const ISSUE_MATCH_COLUMNS =
-  "id, home_team, away_team, tournament, scheduled_at, status, live_status_detail, elapsed, home_score, away_score, final_verified_at" as const;
+  "id, home_team, away_team, tournament, scheduled_at, scheduled_at_confirmed, status, live_status_detail, elapsed, home_score, away_score, final_verified_at" as const;
 
 /** Tope defensivo: los casos abiertos son pocos y PostgREST corta en 1000 filas. */
 const OPEN_LIMIT = 200;
@@ -50,6 +56,7 @@ interface MatchRow {
   away_team: string;
   tournament: string | null;
   scheduled_at: string | null;
+  scheduled_at_confirmed?: boolean | null;
   status: string | null;
   live_status_detail: string | null;
   elapsed: number | null;
@@ -116,26 +123,6 @@ export function formatIssueDate(iso: string): string {
   return formatColombiaDateTime(iso, DATE_OPTIONS);
 }
 
-function validMinute(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 150;
-}
-
-/** "Qué pasó" en lenguaje simple, a partir del tipo de caso y el minuto observado. */
-export function describeMatchIssue(kind: MatchIssueKind, elapsed: number | null | undefined): string {
-  switch (kind) {
-    case "suspendido":
-      return validMinute(elapsed) ? `Suspendido en el minuto ${elapsed}` : "Suspendido";
-    case "abandonado":
-      return validMinute(elapsed) ? `Abandonado en el minuto ${elapsed}` : "Abandonado";
-    case "aplazado":
-      return "Aplazado";
-    case "cancelado":
-      return "Cancelado";
-    default:
-      return "Partido con novedades";
-  }
-}
-
 const KIND_BY_CODE: Record<string, MatchIssueKind> = {
   STATUS_SUSPENDED: "suspendido", SUSPENDED: "suspendido", SUSP: "suspendido",
   STATUS_INTERRUPTED: "suspendido", INTERRUPTED: "suspendido", INT: "suspendido",
@@ -175,7 +162,14 @@ export function describeCurrentMatchState(
 }
 
 export function describeDecision(decision: MatchIssueDecisionValue): string {
-  return decision === "anular" ? "Anulado: 0 puntos para todos" : "Partido mantenido";
+  switch (decision) {
+    case "anular":
+      return "Anulado: 0 puntos para todos";
+    case "resuelto":
+      return "Resuelto";
+    default:
+      return "Partido mantenido";
+  }
 }
 
 const POLLA_STATUS_LABEL: Record<CasaPollaStatus, string> = {
@@ -249,7 +243,7 @@ async function buildViews(rows: IssueRow[]): Promise<MatchIssueView[] | null> {
       awayTeam: match?.away_team ?? "Equipo visitante",
       tournamentName: match?.tournament ? getTournamentName(match.tournament) : null,
       scheduledIso: match?.scheduled_at ?? null,
-      scheduledLabel: match?.scheduled_at ? formatIssueDate(match.scheduled_at) : null,
+      scheduledLabel: match?.scheduled_at ? formatIssueKickoff(match.scheduled_at, match.scheduled_at_confirmed) : null,
       score: match ? scoreLabel(match) : null,
       currentState: match ? describeCurrentMatchState(match, row.kind) : null,
       firstSeenIso: row.first_seen_at,

@@ -10,6 +10,11 @@
 //   2. syncApiFootballLive() — API-Football es la única fuente de vivo
 //      (2026-09-13). El vivo nunca crea fixtures: eso es del calendario.
 //   3. verifyPendingFinals() — cierre de resultados, también solo API-Football.
+//   4. casa_sweep_match_issues() — casos de /admin/issues (108 + 121): recupera
+//      registros perdidos, cierra «sin datos» que ya tienen datos y abre los
+//      partidos que pasaron su hora de inicio sin datos del proveedor.
+//   5. notifyMatchIssues() — un correo por caso nuevo (Resend), con reserva
+//      atómica en la base para no repetir avisos.
 //
 // Auth: CRON_SECRET solo (header x-cron-secret o Authorization Bearer).
 // No se expone admin session. La opción ?secret=… fue removida —
@@ -18,6 +23,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyPendingFinals } from "@/lib/matches/verify-final";
 import { syncApiFootballLive } from "@/lib/api-football/live";
+import { notifyMatchIssues } from "@/lib/casa/match-issue-notifications";
+import { casaIssueRecipients, sendCasaIssueEmail } from "@/lib/email/casa-issues";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -57,6 +64,35 @@ async function hasActiveMatchWindow(): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
+/** Tiempo máximo desde el inicio del request para enviar correos (maxDuration = 30 s). */
+const ISSUE_EMAIL_BUDGET_MS = 22_000;
+
+// Corre siempre, con o sin ventana de vivo: un partido sin datos del proveedor
+// es justamente uno que no aparece en el vivo. Un fallo acá nunca tumba el sync.
+async function sweepAndNotifyMatchIssues(started: number) {
+  let opened: number | null = null;
+  try {
+    const sweep = await createAdminClient().rpc("casa_sweep_match_issues");
+    if (sweep.error) console.error(`[sync-live] issues sweep failed code=${sweep.error.code ?? "unknown"}`);
+    else opened = typeof sweep.data === "number" ? sweep.data : null;
+  } catch {
+    console.error("[sync-live] issues sweep threw");
+  }
+  try {
+    const email = await notifyMatchIssues({
+      db: createAdminClient(),
+      send: sendCasaIssueEmail,
+      recipients: casaIssueRecipients(),
+      configured: Boolean(process.env.RESEND_API_KEY),
+      deadline: started + ISSUE_EMAIL_BUDGET_MS,
+    });
+    return { opened, email };
+  } catch {
+    console.error("[sync-live] issue e-mails threw");
+    return { opened, email: null };
+  }
+}
+
 async function runSync() {
   const started = Date.now();
 
@@ -74,6 +110,7 @@ async function runSync() {
   // siguiente tick.
   const apiFootball = inWindow ? await syncApiFootballLive() : new Set<string>();
   const verifications = await verifyPendingFinals();
+  const matchIssues = await sweepAndNotifyMatchIssues(started);
 
   return {
     ok: true,
@@ -81,6 +118,7 @@ async function runSync() {
     reason: inWindow ? undefined : "no_active_window",
     apiFootball: { covered: apiFootball.size },
     verifications,
+    matchIssues,
     ms: Date.now() - started,
   };
 }
