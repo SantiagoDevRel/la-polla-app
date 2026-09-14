@@ -526,11 +526,11 @@ cuando el user diga sí/no explícito o se haya completado.
   revisión del PR #71).** `/auth/v1/otp` acepta llamadas directas con la anon
   key pública y la captcha está apagada: los topes de `start-otp` no frenan a
   quien llama a Supabase directo, que puede gastar hasta 300 SMS/h y dejar sin
-  login a todos. Falta decidir y probar: activar la captcha de Auth (la
-  `SUPABASE_SECRET_KEY` ya funciona en producción desde el 2026-09-13; GoTrue
-  se salta la captcha con credenciales de admin), probándola primero en un
-  proyecto de prueba, o un Send SMS Hook. Plan y verificación: README → «IP
-  real en Supabase Auth».
+  login a todos. **2026-09-14: el widget Turnstile de `/login` y el paso de
+  `captchaToken` ya están en código** (Supabase ignora el token mientras la
+  captcha esté apagada). Falta la activación: agregar `chickenpicks.app` al
+  widget de Cloudflare y el PATCH de `security_captcha_*` en Auth. Pasos,
+  smoke y reversa: README → «Captcha de Auth (Turnstile)».
 <!-- Pollas combinadas multi-torneo: COMPLETADO 2026-04-30. Migración
      038 + UI de creación con multi-select + display con stack de logos
      en PollaCard y header de detail. Removido de pendings. -->
@@ -684,7 +684,15 @@ están documentadas en migration 056-057.
 
 - Login: phone (any country, E.164 via `components/ui/PhoneInput`) →
   Twilio Verify SMS OTP via Supabase Phone Auth. No password, no
-  Turnstile, no WhatsApp OTP path. The login page (`app/(auth)/login/
+  WhatsApp OTP path. Captcha (2026-09-14): `components/auth/SmsCaptcha.tsx`
+  renders a visible Managed Turnstile widget next to the SMS button (only in
+  the phone step, never for Telegram); its token goes to `start-otp` as
+  `captchaToken` and on to `signInWithOtp`. Supabase Auth verifies it
+  (`security_captcha_*`, OFF until activation) — do NOT verify the token in
+  the app too, it is single-use. A broken widget never blocks the client
+  (retry button + send without token; Supabase decides). Site key:
+  `NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY`. Activation/rollback: README →
+  «Captcha de Auth (Turnstile)». The login page (`app/(auth)/login/
   page.tsx`) calls `signInWithOtp` client-side and then verifies the
   code server-side at `/api/auth/verify-otp` so cookies stick on iOS
   Safari.
@@ -746,7 +754,8 @@ Foto completa, con rollback por pieza: README → «Estado en producción
 - **Login por Telegram: ACTIVO (v2, migración 119, PR #78).** `@LaPollaColombianaAccesoBot`,
   webhook en `/api/telegram/login`, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`.
   Ajustes del 2026-09-14 (migración 120, aditiva) en la sección de abajo.
-- **Captcha de Auth: apagada** (ver Open ideas).
+- **Captcha de Auth: apagada**; widget Turnstile y `captchaToken` listos en
+  código (ver Open ideas y «Auth model»).
 - **Backup:** runner del DGX detached en `main` 7d9ca5a + `backup_runs` +
   alerta horaria `backup-freshness.yml` (ver sección de backup).
 - **Monitoreo:** existe un monitor de uptime en Sentry (proyecto

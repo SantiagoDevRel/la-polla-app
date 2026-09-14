@@ -439,6 +439,64 @@ describe("POST /api/auth/start-otp", () => {
     expect(route.releaseGenerateAttempt).not.toHaveBeenCalled();
   });
 
+  it("captcha: pasa captchaToken a signInWithOtp tal cual", async () => {
+    const { POST } = await loadRoute();
+    const res = await POST(
+      new NextRequest("https://lapollacolombiana.com/api/auth/start-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-real-ip": "190.25.1.7" },
+        body: JSON.stringify({ phone: "+57 300 111 2233", captchaToken: " tok.en_-123 " }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(route.signInWithOtp).toHaveBeenCalledWith({
+      phone: "573001112233",
+      options: { channel: "sms", captchaToken: "tok.en_-123" },
+    });
+  });
+
+  it("captcha: sin token envía como antes (Supabase decide si la captcha está activa)", async () => {
+    const { POST } = await loadRoute();
+    const res = await POST(startRequest({ "x-real-ip": "190.25.1.7" }));
+    expect(res.status).toBe(200);
+    expect(route.signInWithOtp).toHaveBeenCalledWith({
+      phone: "573001112233",
+      options: { channel: "sms" },
+    });
+  });
+
+  it("captcha: token malformado no viaja a Supabase", async () => {
+    const { POST } = await loadRoute();
+    await POST(
+      new NextRequest("https://lapollacolombiana.com/api/auth/start-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phone: "+57 300 111 2233", captchaToken: "con espacio" }),
+      }),
+    );
+    expect(route.signInWithOtp).toHaveBeenCalledWith({
+      phone: "573001112233",
+      options: { channel: "sms" },
+    });
+  });
+
+  it("captcha rechazada por Supabase: 403 con código estable y libera el intento", async () => {
+    route.signInWithOtp.mockResolvedValue({
+      error: {
+        status: 400,
+        code: "captcha_failed",
+        message: "captcha protection: request disallowed (no captcha response (captcha_token) found in request)",
+      },
+    });
+    const { POST } = await loadRoute();
+    const res = await POST(startRequest({ "x-real-ip": "190.25.1.7" }));
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe("captcha_failed");
+    expect(body.error).not.toMatch(/captcha_token|disallowed/);
+    expect(route.releaseGenerateAttempt).toHaveBeenCalledWith("attempt-1");
+  });
+
   it("límite por teléfono bloqueado: ni Supabase ni liberación", async () => {
     route.checkAndRecordAttempt.mockResolvedValue({ blocked: true, remaining: 0 });
     const { POST } = await loadRoute();

@@ -11,10 +11,11 @@
 // (`Sb-Forwarded-For`, lib/supabase/auth-ip.ts). Sin eso, el límite por IP de
 // Supabase se repartía entre todos los usuarios detrás de las IPs de Vercel.
 //
-// NOTA: el gate Turnstile fue rolleado back temporalmente porque el
-// widget interaction-only no rendereaba en algunos browsers y bloqueaba
-// login. El vector de bill-bombing de SMS por phones rotados queda abierto
-// hasta que cablemos un widget visible probado (TaskList #8).
+// Captcha (Cloudflare Turnstile, 2026-09-14): /login manda `captchaToken` y
+// este archivo lo pasa a signInWithOtp. La verifica Supabase Auth, no este
+// servidor (el token es de un solo uso; ver lib/auth/captcha.ts). Si Supabase
+// la rechaza, responde 403 con CAPTCHA_FAILED_CODE y libera el intento.
+// Con security_captcha_enabled=false Supabase ignora el token.
 
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -25,7 +26,8 @@ import {
   releaseGenerateAttempt,
 } from "@/lib/auth/rate-limit";
 import { normalizePhone } from "@/lib/auth/phone";
-import { DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
+import { CAPTCHA_FAILED_CODE, DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
+import { isCaptchaRejection, parseCaptchaToken } from "@/lib/auth/captcha";
 import { createAuthClient, getClientIp } from "@/lib/supabase/auth-ip";
 
 export const runtime = "nodejs";
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Phone inválido" }, { status: 400 });
   }
   const phoneNormalized = phoneE164.replace(/\D/g, "");
+  const captchaToken = parseCaptchaToken(body);
 
   const ip = getClientIp(request.headers) ?? undefined;
 
@@ -127,12 +130,21 @@ export async function POST(request: NextRequest) {
   const auth = createAuthClient(ip);
   const { error } = await auth.signInWithOtp({
     phone: phoneE164,
-    options: { channel: "sms" },
+    options: captchaToken ? { channel: "sms", captchaToken } : { channel: "sms" },
   });
   if (error) {
     // Supabase lo rechazó sin mandar SMS → ese intento no gasta el cupo.
     if (limit.attemptId && otpRejectedBeforeSending(error)) {
       await releaseGenerateAttempt(limit.attemptId);
+    }
+    if (isCaptchaRejection(error)) {
+      return NextResponse.json(
+        {
+          error: "No pudimos verificar que eres una persona. Vuelve a intentarlo.",
+          code: CAPTCHA_FAILED_CODE,
+        },
+        { status: 403 },
+      );
     }
     const msg = (error.message || "").toLowerCase();
     if (msg.includes("phone signups") || msg.includes("provider")) {

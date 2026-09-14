@@ -17,10 +17,12 @@
 // code); consulta /status y, si el enlace se abrió en este mismo navegador,
 // ya tiene la sesión y sigue. Si se abrió en otro (el de Telegram), lo explica.
 //
-// NOTA Turnstile: el cableado del widget se rolleó back porque
-// interaction-only no renderaba en algunos browsers y bloqueaba login.
-// El gate anti-Twilio-bill-bombing queda en rate-limit por phone hasta
-// que volvamos con un widget visible y testeado.
+// Captcha (2026-09-14): si page.tsx recibe la site key de Turnstile, el paso
+// del teléfono muestra el widget (components/auth/SmsCaptcha.tsx) y el envío
+// del SMS lleva `captchaToken`. Quien decide es Supabase Auth
+// (security_captcha_enabled): este cliente nunca bloquea por un widget roto —
+// si Cloudflare no carga, ofrece reintentar y deja enviar sin token (Supabase
+// lo rechaza solo si la captcha está activa). Telegram no usa la captcha.
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
@@ -30,8 +32,9 @@ import { ArrowLeft, MessageSquare, Loader2, Send } from "lucide-react";
 import axios from "axios";
 import { useTranslations } from "next-intl";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
-import { DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
+import { CAPTCHA_FAILED_CODE, DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
 import { prefersSameTab } from "@/lib/auth/telegram-login/open-mode";
+import SmsCaptcha, { type SmsCaptchaHandle, type SmsCaptchaStatus } from "@/components/auth/SmsCaptcha";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
 import {
@@ -157,10 +160,18 @@ function writeTelegramPending(value: TelegramPending | null) {
   }
 }
 
-function LoginInner({ telegramBotUsername }: LoginClientProps) {
+function LoginInner({ telegramBotUsername, turnstileSiteKey }: LoginClientProps) {
   const t = useTranslations("Login");
   const searchParams = useSearchParams();
   const telegramEnabled = Boolean(telegramBotUsername);
+
+  // Captcha del SMS. El token vive en un ref (no re-renderiza el formulario).
+  const captcha = useRef<SmsCaptchaHandle>(null);
+  const captchaToken = useRef<string | null>(null);
+  const [captchaStatus, setCaptchaStatus] = useState<SmsCaptchaStatus>("loading");
+  const onCaptchaToken = useCallback((token: string | null) => {
+    captchaToken.current = token;
+  }, []);
 
   const [step, setStep] = useState<Step>("input");
   // Paso al que vuelve «Cancelar» desde la espera de Telegram.
@@ -333,6 +344,20 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
       setError(t("errInvalidPhone"));
       return;
     }
+    // Con captcha: esperar el token si el widget sigue trabajando o pide la
+    // casilla. Si el widget falló, se envía sin token y decide Supabase.
+    let token: string | null = null;
+    if (turnstileSiteKey) {
+      if (captchaStatus === "interactive") {
+        setError(t("captchaCheckbox"));
+        return;
+      }
+      token = captchaToken.current;
+      if (!token && captchaStatus !== "error") {
+        setError(t("captchaWait"));
+        return;
+      }
+    }
     setSending(true);
     try {
       // Server-side: /api/auth/start-otp decide si dispara Supabase
@@ -342,14 +367,18 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
       const res = await fetch("/api/auth/start-otp", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify(token ? { phone, captchaToken: token } : { phone }),
       });
+      // El token ya se usó (salga bien o mal): se pide uno nuevo.
+      if (token) captcha.current?.reset();
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(
           json.code === DAILY_SMS_CAP_CODE
             ? t("errDailySmsCap")
-            : json.error || t("errSendFailed"),
+            : json.code === CAPTCHA_FAILED_CODE
+              ? t("errCaptchaRejected")
+              : json.error || t("errSendFailed"),
         );
         return;
       }
@@ -741,7 +770,15 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
               </p>
             )}
 
-            <div className="grid grid-cols-1">
+            <div className="grid grid-cols-1 gap-3">
+              {turnstileSiteKey && (
+                <SmsCaptcha
+                  ref={captcha}
+                  siteKey={turnstileSiteKey}
+                  onToken={onCaptchaToken}
+                  onStatus={setCaptchaStatus}
+                />
+              )}
               <button
                 type="submit"
                 disabled={sending || cooldownRemaining > 0}
@@ -1011,12 +1048,14 @@ function LoginInner({ telegramBotUsername }: LoginClientProps) {
 interface LoginClientProps {
   /** Usuario del bot de login de Telegram; null si el canal está apagado. */
   telegramBotUsername: string | null;
+  /** Site key pública de Cloudflare Turnstile; null si la captcha no está configurada. */
+  turnstileSiteKey: string | null;
 }
 
-export default function LoginClient({ telegramBotUsername }: LoginClientProps) {
+export default function LoginClient({ telegramBotUsername, turnstileSiteKey }: LoginClientProps) {
   return (
     <Suspense fallback={<div className="min-h-screen" />}>
-      <LoginInner telegramBotUsername={telegramBotUsername} />
+      <LoginInner telegramBotUsername={telegramBotUsername} turnstileSiteKey={turnstileSiteKey} />
     </Suspense>
   );
 }
