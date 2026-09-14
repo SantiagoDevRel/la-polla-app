@@ -5,10 +5,24 @@
 // al navegador; el deep link con el nonce lo arma /api/auth/telegram/request.
 // Toda la UI vive en LoginClient.tsx. NEXT_PUBLIC_* queda incrustado en el
 // build: activar o cambiar el bot exige redeploy.
+//
+// Captcha del SMS: la site key PÚBLICA de Cloudflare Turnstile
+// (NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY). Sin ella no se monta el widget.
+// Con SMS_CAPTCHA_ENFORCED=true start-otp verifica el token con
+// CLOUDFLARE_TURNSTILE_SECRET_KEY y el cliente ya no envía sin token.
+// README → «Captcha de Auth (Turnstile)».
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
+import { isSmsCaptchaEnforced } from "@/lib/auth/captcha";
 import LoginClient from "./LoginClient";
 
 export default function LoginPage() {
   const telegram = getTelegramLoginConfig();
-  return <LoginClient telegramBotUsername={telegram?.botUsername ?? null} />;
+  const turnstileSiteKey = (process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "").trim() || null;
+  return (
+    <LoginClient
+      telegramBotUsername={telegram?.botUsername ?? null}
+      turnstileSiteKey={turnstileSiteKey}
+      smsCaptchaRequired={Boolean(turnstileSiteKey) && isSmsCaptchaEnforced()}
+    />
+  );
 }

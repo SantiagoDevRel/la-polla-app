@@ -452,7 +452,7 @@ usuario decida — no asumas que pagar está OK. Mismo principio en
 - **Supabase** (PostgreSQL + Auth + RLS) — phone+password con OTP de WhatsApp solo en el primer login
 - **Meta WhatsApp Cloud API** — bot conversacional para predecir/ver tabla, OTP de signup, recovery de clave
 - **API-Football** — única fuente de calendario, vivo y resultados (desde 2026-09-13)
-- **Cloudflare Turnstile** — anti-bot en el flujo OTP (validado server-side)
+- **Cloudflare Turnstile** — captcha del envío de SMS en `/login`; la valida Supabase Auth
 - **Tailwind CSS** + **Framer Motion** + **lucide-react**
 - **@serwist/next** — PWA instalable + service worker
 - **Vitest** — unit tests (111 cubriendo helpers críticos)
@@ -720,7 +720,7 @@ un archivo.
 | IP real en Auth (`Sb-Forwarded-For`) | **Activa.** `security_sb_forwarded_for_enabled=true` y `SUPABASE_SECRET_KEY` en Production. Los logs de Auth muestran la IP del usuario en `remote_addr` | Apagar: PATCH `{"security_sb_forwarded_for_enabled": false}`. Sin la env, `auth-ip` cae a anon sin cabecera |
 | SMS por LabsMobile (Send SMS Hook) | **Configurado y apagado.** URI `https://lapollacolombiana.com/api/auth/sms-hook` y secreto guardados en Auth; `sms_provider` sigue siendo `twilio_verify`; `sms_otp_exp=600` | Prender: PATCH `{"hook_send_sms_enabled": true}`. Rollback: PATCH `{"hook_send_sms_enabled": false}`, que vuelve a Twilio al instante sin deploy |
 | Login por Telegram | **Activo.** Bot `@LaPollaColombianaAccesoBot`, webhook en `/api/telegram/login` (`allowed_updates: ["message"]`), migración 115 aplicada, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`. **v2 (migración 119, sin códigos) pendiente de aplicar y desplegar** | Apagar: quitar una de las tres variables `TELEGRAM_LOGIN_*` en Vercel y redeploy (la opción desaparece de `/login` y el webhook responde 503) |
-| Captcha de Auth | **Apagada** (`security_captcha_enabled=false`). Pendiente, ver «IP real en Supabase Auth» | — |
+| Captcha de Auth | **Apagada** (`SMS_CAPTCHA_ENFORCED` sin definir y `security_captcha_enabled=false`). Widget Turnstile en `/login` y verificación en `start-otp` listos; activación en «Captcha de Auth (Turnstile)» | — |
 | Backup | **Activo.** Runner del DGX fijado a `main` 7d9ca5a (checkout detached): backup a las 00:10, 06:10, 12:10 y 18:10 y verify a las 03:40 (hora de Bogotá). Cada corrida escribe en `backup_runs` (migración 117). `backup-freshness.yml` está programado cada hora y manda correo si hay atraso (ojo: GitHub corre los `schedule` de este repo con horas de retraso, ver «Crons de GitHub Actions»). El PC baja los snapshots con la tarea programada `La Polla backup pull` | Detalle en `ops/backup/README.md`. Si cambian `ops/backup` o `scripts/export-backup.ts`, en el DGX hay que repetir `git fetch`, `checkout` y `npm ci` |
 | Planes | Vercel Pro, Supabase Pro compute Small, API-Football Pro (vence 2026-10-09) | — |
 | Monitoreo | **Uptime en Sentry, sin aviso conectado.** Monitor «Uptime Monitoring for https://lapollacolombiana.com» (proyecto `santi-apps`, entorno `production`): `HEAD /api/app-version` cada 5 min, timeout 10 s, abre incidente tras 3 fallos y lo cierra con 1 éxito. **No tiene ninguna alerta (workflow) conectada**, así que un incidente no le avisa a nadie: hay que abrir Sentry para verlo. No hay SDK de Sentry en el código ni integración en Vercel. Los errores de la app se revisan en los logs de Vercel y en los correos de alerta (discrepancias, backup atrasado, SMS fallido o tardío) | Conectar el aviso: en Sentry → Monitors → Alerts, crear una alerta conectada a este monitor que mande email. Apagar: botón Disable en la edición del monitor |
@@ -794,7 +794,84 @@ aparecer `[auth-ip] Supabase rechazó`. Si aparece, la key está mal.
 Verificación: en los logs de Auth, `/otp` y `/verify` pasan de mostrar IPs de
 AWS (`3.236.x`, `54.82.x`) a las IPs de los usuarios.
 
-**Pendiente antes de producción: captcha de Auth.** `/auth/v1/otp` acepta
+#### Captcha de Auth (Turnstile)
+
+Código listo desde el 2026-09-14; **la captcha sigue apagada** (en la app y en
+Supabase) hasta la activación de abajo.
+
+> **Supabase NO verifica la captcha en `start-otp`.** Esa ruta llama a
+> `signInWithOtp` con la secret key (`sb_secret_`, necesaria para
+> `Sb-Forwarded-For`). El gateway la traduce a service_role y GoTrue omite la
+> captcha con credenciales de admin (`verifyCaptcha` en
+> `internal/api/middleware.go`). Activar solo `security_captcha_enabled`
+> cierra `/auth/v1/otp` directo, pero deja `POST /api/auth/start-otp` sin
+> token enviando SMS. Por eso la app verifica el token ella misma.
+
+- `/login` monta el widget de Cloudflare Turnstile (modo Managed, siempre
+  visible, tema oscuro) junto a «Enviar código por SMS»
+  (`components/auth/SmsCaptcha.tsx`). El script
+  `challenges.cloudflare.com/turnstile/v0/api.js` solo se inyecta ahí; la CSP
+  ya permite ese origen en `script-src` y `frame-src`.
+- El token va a `/api/auth/start-otp` como `captchaToken`.
+- **Con `SMS_CAPTCHA_ENFORCED=true`** (env de servidor), `start-otp` verifica
+  el token contra `siteverify` ANTES del tope diario, del intento por teléfono
+  y de Supabase (`lib/auth/captcha.ts`): `success`, hostname
+  `lapollacolombiana.com` o `chickenpicks.app` (más
+  `SMS_CAPTCHA_EXTRA_HOSTNAMES`, separados por coma) y acción `sms-otp`. Hay
+  un reintento con la misma `idempotency_key` si Cloudflare no responde. Falla
+  cerrado: sin token, token inválido o Cloudflare caído → 403 `captcha_failed`
+  sin gastar cupo ni enviar; sin `CLOUDFLARE_TURNSTILE_SECRET_KEY` → 503. El
+  token ya usado no se reenvía a Supabase. Si no hay `SUPABASE_SECRET_KEY`
+  (llamada con anon key), GoTrue sí verifica: la ruta solo exige el token y lo
+  reenvía. En `/login` ya no se puede enviar sin token: si el widget falla,
+  se pide «Reintentar verificación» (Telegram sigue disponible).
+- **Sin la env** se conserva el comportamiento anterior: el token se reenvía a
+  `signInWithOtp` y un widget roto no bloquea (se envía sin token). Si
+  Supabase rechaza la captcha, 403 `captcha_failed` y se libera el intento.
+- Telegram no usa la captcha: `generateLink` va con credenciales de admin y
+  `/verify` no la pide.
+- Site key pública: `NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY` (ya está en
+  Vercel Production desde abril). Sin ella no se monta el widget. El secret
+  `CLOUDFLARE_TURNSTILE_SECRET_KEY` (Vercel Production) lo usa `start-otp`
+  con la env activa; es el mismo secret que se carga en Supabase.
+- Hostnames verificados del widget (2026-09-14): `lapollacolombiana.com`
+  emite tokens válidos con el secret (siteverify `success`, `hostname`
+  correcto). **`chickenpicks.app` NO está autorizado** (error 110200): antes
+  de activar, agregar ese hostname en Cloudflare → Turnstile → widget, o el
+  SMS de ese dominio queda sin captcha válida.
+- Pruebas: `npm test -- tests/sms-captcha.test.ts tests/auth-real-ip.test.ts`.
+  En local, la site key de prueba `1x00000000000000000000AA` siempre pasa el
+  widget. Con `SMS_CAPTCHA_ENFORCED=true`, el secret de prueba NO sirve:
+  Cloudflare responde `hostname=example.com` y sin `action` (verificado el
+  2026-09-14), así que `start-otp` lo rechaza. Para probar la env de punta a
+  punta usa el widget real (`SMS_CAPTCHA_EXTRA_HOSTNAMES` para un hostname
+  extra autorizado en Cloudflare).
+
+**Activación (orden):**
+
+1. Merge y deploy de este código. Sin `SMS_CAPTCHA_ENFORCED` y con la captcha
+   de Supabase apagada, el login no cambia.
+2. Agregar `chickenpicks.app` al widget en Cloudflare (o aceptar que ese
+   dominio no tenga SMS: con la env activa, sus tokens salen con error 110200).
+3. Confirmar que `CLOUDFLARE_TURNSTILE_SECRET_KEY` de Vercel Production es el
+   secret del widget de la site key. Agregar `SMS_CAPTCHA_ENFORCED=true` en
+   Vercel Production y redeploy (Vercel Git, no CLI).
+4. `PATCH /v1/projects/<ref>/config/auth` con
+   `security_captcha_provider=turnstile`, `security_captcha_secret=<secret del
+   widget>` y `security_captcha_enabled=true` (cierra `/auth/v1/otp` directo).
+5. Smoke, los cuatro:
+   - SMS real desde `lapollacolombiana.com/login`: debe llegar.
+   - `POST https://lapollacolombiana.com/api/auth/start-otp` con
+     `{"phone":"+57..."}` **sin `captchaToken`**: debe responder **403**
+     `captcha_failed` (y no llegar SMS). Con un token inventado, también 403.
+   - `POST /auth/v1/otp` directo con la anon key: debe responder
+     `captcha_failed`.
+   - Telegram sigue funcionando.
+
+**Reversa:** quitar `SMS_CAPTCHA_ENFORCED` (o ponerla en `false`) y redeploy;
+y `PATCH /config/auth` con `security_captcha_enabled=false` (sin deploy).
+
+**Antes de la captcha (histórico, 2026-09-13).** `/auth/v1/otp` acepta
 llamadas directas con la anon key pública, así que el tope diario, el de IP y
 el de teléfono de `start-otp` no frenan a quien llame a Supabase directo. Solo
 lo frenan los límites de Supabase (`rate_limit_otp` 30 cada 5 min por IP,

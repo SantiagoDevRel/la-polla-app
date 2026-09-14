@@ -439,6 +439,198 @@ describe("POST /api/auth/start-otp", () => {
     expect(route.releaseGenerateAttempt).not.toHaveBeenCalled();
   });
 
+  it("captcha: pasa captchaToken a signInWithOtp tal cual", async () => {
+    const { POST } = await loadRoute();
+    const res = await POST(
+      new NextRequest("https://lapollacolombiana.com/api/auth/start-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-real-ip": "190.25.1.7" },
+        body: JSON.stringify({ phone: "+57 300 111 2233", captchaToken: " tok.en_-123 " }),
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(route.signInWithOtp).toHaveBeenCalledWith({
+      phone: "573001112233",
+      options: { channel: "sms", captchaToken: "tok.en_-123" },
+    });
+  });
+
+  it("captcha no obligatoria: sin token envía como antes", async () => {
+    const { POST } = await loadRoute();
+    const res = await POST(startRequest({ "x-real-ip": "190.25.1.7" }));
+    expect(res.status).toBe(200);
+    expect(route.signInWithOtp).toHaveBeenCalledWith({
+      phone: "573001112233",
+      options: { channel: "sms" },
+    });
+  });
+
+  it("captcha: token malformado no viaja a Supabase", async () => {
+    const { POST } = await loadRoute();
+    await POST(
+      new NextRequest("https://lapollacolombiana.com/api/auth/start-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phone: "+57 300 111 2233", captchaToken: "con espacio" }),
+      }),
+    );
+    expect(route.signInWithOtp).toHaveBeenCalledWith({
+      phone: "573001112233",
+      options: { channel: "sms" },
+    });
+  });
+
+  it("captcha rechazada por Supabase: 403 con código estable y libera el intento", async () => {
+    route.signInWithOtp.mockResolvedValue({
+      error: {
+        status: 400,
+        code: "captcha_failed",
+        message: "captcha protection: request disallowed (no captcha response (captcha_token) found in request)",
+      },
+    });
+    const { POST } = await loadRoute();
+    const res = await POST(startRequest({ "x-real-ip": "190.25.1.7" }));
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe("captcha_failed");
+    expect(body.error).not.toMatch(/captcha_token|disallowed/);
+    expect(route.releaseGenerateAttempt).toHaveBeenCalledWith("attempt-1");
+  });
+
+  describe("captcha exigida por la app (SMS_CAPTCHA_ENFORCED=true)", () => {
+    // Con la secret key (sb_secret_) GoTrue se salta la captcha: el gateway la
+    // traduce a service_role y verifyCaptcha omite la validación con
+    // credenciales de admin. Por eso start-otp verifica el token él mismo.
+    const siteverify = vi.fn();
+
+    function tokenRequest(captchaToken?: string) {
+      return new NextRequest("https://lapollacolombiana.com/api/auth/start-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-real-ip": "190.25.1.7" },
+        body: JSON.stringify(
+          captchaToken === undefined
+            ? { phone: "+57 300 111 2233" }
+            : { phone: "+57 300 111 2233", captchaToken },
+        ),
+      });
+    }
+
+    function verdict(body: Record<string, unknown>, status = 200) {
+      return new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    const GOOD = { success: true, hostname: "lapollacolombiana.com", action: "sms-otp" };
+
+    beforeEach(() => {
+      process.env.SMS_CAPTCHA_ENFORCED = "true";
+      process.env.SUPABASE_SECRET_KEY = SECRET;
+      process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY = "turnstile-secret-test";
+      siteverify.mockReset();
+      vi.stubGlobal("fetch", siteverify);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    async function expectRejectedWithoutSupabase(res: Response) {
+      expect(res.status).toBe(403);
+      expect((await res.json()).code).toBe("captcha_failed");
+      expect(route.signInWithOtp).not.toHaveBeenCalled();
+      expect(route.createAuthClient).not.toHaveBeenCalled();
+      expect(route.checkAndRecordAttempt).not.toHaveBeenCalled();
+      expect(route.checkDailySmsCap).not.toHaveBeenCalled();
+    }
+
+    it("sin token: 403 sin tocar Supabase ni el cupo", async () => {
+      const { POST } = await loadRoute();
+      await expectRejectedWithoutSupabase(await POST(tokenRequest()));
+      expect(siteverify).not.toHaveBeenCalled();
+    });
+
+    it("token rechazado por Cloudflare: 403 sin tocar Supabase", async () => {
+      siteverify.mockResolvedValue(verdict({ success: false, "error-codes": ["invalid-input-response"] }));
+      const { POST } = await loadRoute();
+      await expectRejectedWithoutSupabase(await POST(tokenRequest("tok.en-1")));
+    });
+
+    it("token de otro hostname: 403", async () => {
+      siteverify.mockResolvedValue(verdict({ ...GOOD, hostname: "evil.example" }));
+      const { POST } = await loadRoute();
+      await expectRejectedWithoutSupabase(await POST(tokenRequest("tok.en-1")));
+    });
+
+    it("token de otra acción: 403", async () => {
+      siteverify.mockResolvedValue(verdict({ ...GOOD, action: "login" }));
+      const { POST } = await loadRoute();
+      await expectRejectedWithoutSupabase(await POST(tokenRequest("tok.en-1")));
+    });
+
+    it("Cloudflare caído: reintenta una vez con la misma idempotency_key y falla cerrado", async () => {
+      siteverify.mockResolvedValue(verdict({}, 502));
+      const { POST } = await loadRoute();
+      await expectRejectedWithoutSupabase(await POST(tokenRequest("tok.en-1")));
+      expect(siteverify).toHaveBeenCalledTimes(2);
+      const keys = siteverify.mock.calls.map(([, init]) =>
+        new URLSearchParams(String((init as RequestInit).body)).get("idempotency_key"),
+      );
+      expect(keys[0]).toBeTruthy();
+      expect(keys[1]).toBe(keys[0]);
+    });
+
+    it("sin secret de Turnstile: 503 y nunca envía", async () => {
+      delete process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY;
+      const { POST } = await loadRoute();
+      const res = await POST(tokenRequest("tok.en-1"));
+      expect(res.status).toBe(503);
+      expect(siteverify).not.toHaveBeenCalled();
+      expect(route.signInWithOtp).not.toHaveBeenCalled();
+    });
+
+    it("token válido: verifica en siteverify y envía el SMS", async () => {
+      siteverify.mockResolvedValue(verdict(GOOD));
+      const { POST } = await loadRoute();
+      const res = await POST(tokenRequest(" tok.en-1 "));
+      expect(res.status).toBe(200);
+      expect(siteverify).toHaveBeenCalledTimes(1);
+      const [url, init] = siteverify.mock.calls[0];
+      expect(String(url)).toBe("https://challenges.cloudflare.com/turnstile/v0/siteverify");
+      const form = new URLSearchParams(String((init as RequestInit).body));
+      expect(form.get("secret")).toBe("turnstile-secret-test");
+      expect(form.get("response")).toBe("tok.en-1");
+      expect(form.get("remoteip")).toBe("190.25.1.7");
+      // Supabase no verifica con la secret key: el token ya usado no viaja.
+      expect(route.signInWithOtp).toHaveBeenCalledWith({
+        phone: "573001112233",
+        options: { channel: "sms" },
+      });
+    });
+
+    it("también acepta chickenpicks.app", async () => {
+      siteverify.mockResolvedValue(verdict({ ...GOOD, hostname: "chickenpicks.app" }));
+      const { POST } = await loadRoute();
+      expect((await POST(tokenRequest("tok.en-1"))).status).toBe(200);
+    });
+
+    it("sin secret key de Supabase (anon): exige token y deja que Supabase lo verifique", async () => {
+      delete process.env.SUPABASE_SECRET_KEY;
+      const { POST } = await loadRoute();
+      await expectRejectedWithoutSupabase(await POST(tokenRequest()));
+      const res = await POST(tokenRequest("tok.en-1"));
+      expect(res.status).toBe(200);
+      expect(siteverify).not.toHaveBeenCalled();
+      expect(route.signInWithOtp).toHaveBeenCalledWith({
+        phone: "573001112233",
+        options: { channel: "sms", captchaToken: "tok.en-1" },
+      });
+    });
+  });
+
   it("límite por teléfono bloqueado: ni Supabase ni liberación", async () => {
     route.checkAndRecordAttempt.mockResolvedValue({ blocked: true, remaining: 0 });
     const { POST } = await loadRoute();
