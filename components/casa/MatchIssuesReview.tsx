@@ -18,7 +18,7 @@ function MatchHeader({ issue }: { issue: MatchIssueView }) {
     </h3>
     {issue.scheduledLabel && issue.scheduledIso && <p className="mt-1 flex items-start gap-2 text-[13px] leading-[1.5] text-text-secondary">
       <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-      <span><time dateTime={issue.scheduledIso}>{issue.scheduledLabel}</time> (hora de Colombia)</span>
+      <span><time dateTime={issue.scheduledIso}>{issue.scheduledLabel}</time></span>
     </p>}
   </>;
 }
@@ -48,10 +48,12 @@ function OpenIssueBody({ issue }: { issue: MatchIssueView }) {
       <span>{issue.summary}</span>
     </p>
     {issue.score && <p className="mt-1 text-[15px] leading-[1.45] text-text-primary">Marcador: <span className="lp-money">{issue.score}</span></p>}
+    {issue.kind === "sin_datos" && <p className="mt-1 text-[13px] leading-[1.5] text-text-secondary">Pasó la hora de inicio y el proveedor no ha enviado datos de este partido. Si llegan, el caso se cierra solo. Mientras tanto puedes poner el resultado de los 90 minutos, anularlo o esperar.</p>}
     {issue.currentState && <p className="mt-1 text-[13px] leading-[1.5] text-text-secondary">{issue.currentState}</p>}
     <p className="mt-1 text-[13px] leading-[1.5] text-text-secondary">Detectado: <time dateTime={issue.firstSeenIso}>{issue.firstSeenLabel}</time></p>
     <AffectedPollas issue={issue} />
-    <MatchIssueDecision issueId={issue.id} matchLabel={`${issue.homeTeam} vs ${issue.awayTeam}`} />
+    <MatchIssueDecision issueId={issue.id} kind={issue.kind} homeTeam={issue.homeTeam} awayTeam={issue.awayTeam}
+      matchLabel={`${issue.homeTeam} vs ${issue.awayTeam}`} />
   </>;
 }
 
@@ -69,7 +71,7 @@ export function MatchIssuesReview({ open, inactive = [], decided, openTruncated 
         <div className="lp-card mt-3 px-5 py-8 text-center">
           <ShieldCheck className="mx-auto h-8 w-8 text-text-secondary" aria-hidden="true" />
           <p className="mt-3 font-display text-[24px] font-normal uppercase leading-tight tracking-[0.04em] text-text-primary">No hay partidos con novedades</p>
-          <p className="mt-2 text-[13px] leading-[1.5] text-text-secondary">Si un partido de una polla activa se suspende, se aplaza, se cancela o se abandona, aparecerá aquí para que decidas.</p>
+          <p className="mt-2 text-[13px] leading-[1.5] text-text-secondary">Si un partido de una polla activa se suspende, se aplaza, se cancela, se abandona o pasa su hora de inicio sin datos del proveedor, aparecerá aquí para que decidas.</p>
         </div>
       ) : (
         <ul className="mt-3 space-y-4">
@@ -110,7 +112,7 @@ export function MatchIssuesReview({ open, inactive = [], decided, openTruncated 
             <span>{describeDecision(issue.decision)}</span>
           </p>}
           <p className="mt-1 text-[13px] leading-[1.5] text-text-secondary [overflow-wrap:anywhere]">
-            Por {issue.decidedByName ?? "Administrador"}{issue.decidedAtLabel && issue.decidedAtIso ? <>, <time dateTime={issue.decidedAtIso}>{issue.decidedAtLabel}</time></> : null}
+            {issue.decision === "resuelto" && !issue.decidedByName ? "Cerrado automáticamente" : `Por ${issue.decidedByName ?? "Administrador"}`}{issue.decidedAtLabel && issue.decidedAtIso ? <>, <time dateTime={issue.decidedAtIso}>{issue.decidedAtLabel}</time></> : null}
           </p>
           {issue.note && <p className="mt-1 whitespace-pre-line text-[13px] leading-[1.5] text-text-secondary [overflow-wrap:anywhere]">Nota: {issue.note}</p>}
           {issue.pollas.length > 0 && <p className="mt-1 text-[13px] leading-[1.5] text-text-secondary [overflow-wrap:anywhere]">Pollas: {issue.pollas.map((polla) => polla.name).join(", ")}</p>}

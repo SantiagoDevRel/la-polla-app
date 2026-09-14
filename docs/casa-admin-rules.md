@@ -55,6 +55,14 @@ Casa, en ningún modo; la migración no repuntúa historia ni modifica `predicti
   los abiertos que ya no afectan pollas activas van al final, en «Sin pollas
   activas»: no bloquean repartos y se pueden decidir igual.
 
+- **Sin datos del proveedor (2026-09-14, migración 121).** Un partido sin verificar
+  de una polla activa que sigue esperando su inicio 30 minutos después de la hora
+  confirmada (30 horas si es provisional) abre un caso `sin_datos`. Se cierra solo
+  con `decision='resuelto'` cuando llegan datos, se verifica o el inicio vuelve al
+  futuro. Además de anular o mantener, el administrador puede poner el resultado de
+  los 90 minutos (`casa_resolve_sin_datos_with_result`). El barrido corre también
+  cada minuto desde `/api/matches/sync-live`, que envía un correo por caso nuevo.
+
 ## Comprobantes
 
 - `/admin/pollas/recibos`: únicamente pendientes, de más reciente a más antiguo

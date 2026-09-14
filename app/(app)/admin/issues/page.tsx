@@ -1,5 +1,6 @@
 // /admin/issues — partidos suspendidos, aplazados, cancelados o abandonados en
-// pollas Casa activas. Nada se anula solo: el administrador decide cada caso.
+// pollas Casa activas, y los que pasaron su hora de inicio sin datos del
+// proveedor. Nada se anula solo: el administrador decide cada caso.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -22,7 +23,7 @@ export default async function MatchIssuesPage() {
       <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" /> Administrar pollas
     </Link>
     <h1 className="font-display text-[32px] font-normal uppercase leading-[1.1] tracking-[0.04em] text-text-primary">Issues de partidos</h1>
-    <p className="mt-2 mb-5 text-[15px] leading-[1.45] text-text-secondary">Partidos suspendidos, aplazados, cancelados o abandonados en pollas activas. Decide qué pasa con cada uno.</p>
+    <p className="mt-2 mb-5 text-[15px] leading-[1.45] text-text-secondary">Partidos suspendidos, aplazados, cancelados, abandonados o sin datos del proveedor en pollas activas. Decide qué pasa con cada uno.</p>
     {result.ok
       ? <MatchIssuesReview open={result.open} inactive={result.inactive} decided={result.decided} openTruncated={result.openTruncated} />
       : <div role="alert" className="rounded-md border border-red-alert/30 p-4">

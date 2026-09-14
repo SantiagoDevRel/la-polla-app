@@ -77,6 +77,23 @@ anuncian como datos frescos. Sudamericana y `europa_2026` están activas; Europa
 la liga 3 de API-Football.
 Pruebas y detalle del incidente: README → Horarios y torneos.
 
+### Issues sin datos del proveedor y correo (2026-09-14, migración 121)
+
+Un partido de una polla Casa activa que pasó su inicio sin datos (status
+`scheduled`, sin estado de problema ni verificación) abre un caso `sin_datos` en
+`/admin/issues`: +30 min si el horario está confirmado, +30 h si es provisional.
+Se cierra solo (`decision='resuelto'`) al llegar datos, verificarse o moverse el
+inicio al futuro. El admin pone el resultado de 90' (RPC
+`casa_resolve_sin_datos_with_result` → `finalize_verified_match_result`), anula
+o mantiene. `casa_sweep_match_issues` corre en `/admin/issues`, en el reparto y
+cada minuto en `/api/matches/sync-live`, que también envía un correo Resend por
+caso nuevo de cualquier tipo (`casa_claim_match_issue_notifications` /
+`casa_finish_match_issue_notification`, sin repetir avisos). Destinatario:
+`CASA_ISSUES_NOTIFY_EMAIL`, si no `ADMIN_ALERT_EMAIL`, si no
+`FEEDBACK_NOTIFY_EMAIL`; sin `RESEND_API_KEY` no se reserva nada. Los casos
+existentes al instalar 121 quedan marcados como avisados. Regresión:
+`scripts/casa-issues-sin-datos-check.sql` y `tests/casa-issue-notifications.test.ts`.
+
 ### Info, pagos y publicación (2026-09-13, migraciones 104–109)
 
 Ver [docs/casa-admin-rules.md](docs/casa-admin-rules.md). El pozo fijo mantiene

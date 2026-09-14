@@ -50,6 +50,9 @@ const messages: Record<string, string> = {
   ISSUE_NOT_FOUND: "No encontramos ese caso.",
   ISSUE_ALREADY_DECIDED: "Este caso ya fue decidido.",
   INVALID_DECISION: "Elige anular o mantener el partido.",
+  INVALID_SCORE: "Escribe los goles de cada equipo: números enteros entre 0 y 99.",
+  ISSUE_RESULT_NOT_ALLOWED: "Este caso no admite un resultado manual. Anula o mantén el partido.",
+  MATCH_ALREADY_VERIFIED: "Este partido ya tiene un resultado verificado. Actualiza la página para ver el estado vigente.",
   OPEN_MATCH_ISSUES: "Hay partidos con novedades sin decidir. Revísalos en Issues antes de repartir.",
 };
 

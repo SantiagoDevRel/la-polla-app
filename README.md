@@ -294,6 +294,25 @@ de desplegar. El bloqueo de la fila de la polla serializa revisiones de pagos,
 archivo y reparto, también para Telegram. No permite repartir con comprobantes
 pendientes ni cambiar inscripciones después del reparto o del archivo.
 
+### Issues sin datos del proveedor y correo (2026-09-14, migración 121)
+
+- **Detección.** Si un partido de una polla Casa activa sigue `scheduled` 30 minutos
+  después de su inicio confirmado (30 horas si la hora es provisional), se abre un
+  caso «Sin datos del proveedor» en `/admin/issues`. Se cierra solo cuando llegan
+  datos, se verifica el resultado o el inicio pasa al futuro; un inicio nuevo que
+  vuelve a vencer sin datos abre otro caso.
+- **Resolución.** En la tarjeta: «Poner resultado de los 90 minutos» (POST
+  `/api/casa/admin/match-issues/[id]/resultado`, admin validado antes de la base,
+  RPC `casa_resolve_sin_datos_with_result`), «Anular» o «Mantener y esperar los
+  datos». Mientras esté abierto, `casa_settle_polla_v2` responde `OPEN_MATCH_ISSUES`.
+- **Correo.** `/api/matches/sync-live` (pg_cron cada minuto) barre los casos y envía
+  un correo por cada caso nuevo de cualquier tipo, con reserva atómica, reintentos
+  con backoff y máximo 8 intentos. Variables en Vercel: `RESEND_API_KEY`,
+  `RESEND_FROM_EMAIL` y `CASA_ISSUES_NOTIFY_EMAIL` (cae a `ADMIN_ALERT_EMAIL` o
+  `FEEDBACK_NOTIFY_EMAIL`).
+- **Pruebas.** `scripts/casa-issues-sin-datos-check.sql` (Docker local, con ROLLBACK)
+  y `npx vitest run tests/casa-issue-notifications.test.ts`.
+
 ### Resolver y repartir sin el bot (2026-09-12)
 
 - **Polla manual:** al abrir su card en `/admin/pollas` aparecen sus preguntas.
