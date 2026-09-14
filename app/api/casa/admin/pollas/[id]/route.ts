@@ -3,8 +3,26 @@ import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { casaJson, casaError, requireCasaContract } from "@/lib/casa/operations";
+import { MAX_POLLA_MATCHES, editorErrorMessage } from "@/lib/casa/editor";
 
 export const dynamic = "force-dynamic";
+
+// Solo las claves que cambian; los límites finos y las reglas por estado
+// (inscripciones, cierre, publicación) los valida SQL.
+const nullableText = (max: number) => z.string().trim().max(max).nullable();
+const EditChangesSchema = z.object({
+  name: z.string().trim().min(3).max(80).optional(),
+  description: nullableText(400).optional(),
+  scoringMode: z.enum(["1x2", "marcador"]).optional(),
+  entryPriceCop: z.number().int().min(0).max(10_000_000).optional(),
+  houseCutPct: z.number().int().min(0).max(100).optional(),
+  potMode: z.enum(["proporcional", "fijo"]).optional(),
+  fixedPrizeCop: z.number().int().min(1).max(1_000_000_000).optional(),
+  prizeObject: z.string().trim().min(3).max(160).optional(),
+  payoutMethod: nullableText(40).optional(),
+  payoutAccount: nullableText(60).optional(),
+  payoutAccountName: nullableText(80).optional(),
+}).strict().refine((changes) => Object.keys(changes).length > 0, { message: "No hay cambios para guardar." });
 
 const BodySchema = z.discriminatedUnion("action", [
   z.object({
@@ -29,6 +47,20 @@ const BodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("numero"),
     numero: z.number().int().min(1).max(100000),
+  }),
+  // Editor administrativo (2026-09-14, migración 122). Las tres acciones van
+  // a casa_edit_polla_v2, que decide si la polla todavía se puede editar.
+  z.object({
+    action: z.literal("editar"),
+    changes: EditChangesSchema,
+  }),
+  z.object({
+    action: z.literal("agregar_partidos"),
+    matchIds: z.array(z.string().uuid()).min(1).max(MAX_POLLA_MATCHES),
+  }),
+  z.object({
+    action: z.literal("quitar_partido"),
+    matchId: z.string().uuid(),
   }),
 ]);
 
@@ -90,7 +122,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return casaJson({ error: "Polla inválida." }, 400);
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return casaJson({ error: "Acción inválida." }, 400);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return casaJson({ error: issue?.message === "No hay cambios para guardar." ? issue.message : "Acción inválida." }, 400);
+  }
   const body = parsed.data;
   const db = createAdminClient();
 
@@ -98,6 +133,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // cierre automático sigue al calendario en SQL cada vez que un partido se
   // confirma o se reprograma, así que no queda un cierre viejo al publicar.
   const args = { p_polla_id: id, p_contract: 2, p_actor_id: user.id };
+  if (body.action === "editar" || body.action === "agregar_partidos" || body.action === "quitar_partido") {
+    const edit = await db.rpc("casa_edit_polla_v2", {
+      ...args,
+      p_changes: body.action === "editar" ? body.changes : {},
+      p_add_match_ids: body.action === "agregar_partidos" ? body.matchIds : [],
+      p_remove_match_ids: body.action === "quitar_partido" ? [body.matchId] : [],
+    });
+    if (edit.error) {
+      const message = editorErrorMessage(edit.error);
+      return message ? casaJson({ error: message, code: edit.error.message }, 409) : casaError(edit.error);
+    }
+    return casaJson(edit.data);
+  }
   const result = body.action === "publicacion"
     ? await db.rpc("casa_set_publication_v2", { ...args, p_mode: body.mode, p_opens_at: body.opensAt ?? null })
     : body.action === "repartir"

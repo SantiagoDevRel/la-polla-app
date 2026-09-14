@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
 import { getPots, getHouseTotal, listAllPollas } from "@/lib/casa/queries";
 import { pollaStatusLabel } from "@/lib/casa/types";
+import { canEditPolla } from "@/lib/casa/editor";
 import { countOpenMatchIssues } from "@/lib/casa/match-issues";
 import { CasaAdminPanel } from "@/components/casa/CasaAdminPanel";
 
@@ -38,6 +39,8 @@ export default async function CasaAdminPage() {
         opens_at: polla.opens_at,
         publication_mode: polla.publication_mode,
         label: pollaStatusLabel(polla),
+        // Tuerca de edición hasta el cierre; SQL (migración 122) decide al guardar.
+        editable: canEditPolla(polla),
       }))}
       pots={pots}
       totalCasa={totalCasa}

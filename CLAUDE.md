@@ -114,6 +114,25 @@ vuelve a caer en ese estado abre un caso nuevo; uno anulado no reabre.
 Fechas visibles e inputs: `lib/time/colombia.ts`, siempre Colombia. No modificar
 `predictions` históricos ni activar modos operativos al instalar estas reglas.
 
+### Editor de pollas con la tuerca (2026-09-14, migración 122)
+
+Pedido del dueño: tuerca (lucide `Settings`) arriba a la derecha del detalle
+`/casa/[slug]` y de las tarjetas de `/casa`, solo para administradores y solo
+hasta el cierre; «Editar» también en `/admin/pollas` (borradores incluidos).
+Abre `/admin/pollas/[id]/editar`. Autoridad en SQL: `casa_polla_edit_block`,
+`casa_polla_editor_v2` y `casa_edit_polla_v2` (acciones `editar`,
+`agregar_partidos`, `quitar_partido` del PATCH de
+`/api/casa/admin/pollas/[id]`). `lib/casa/editor.ts` es solo la copia para la UI.
+Nombre y descripción, mientras no cierre; modo de puntaje, entrada, premio y
+cuenta de cobro, solo sin inscripciones (`POLLA_HAS_ENTRIES`). Agregar: sin
+empezar y a más de 5 min, tope 30. Quitar: nunca un partido con pronósticos
+(`MATCH_HAS_PICKS`); jamás se borran ni modifican `casa_picks`. Un trigger
+AFTER DELETE recalcula el cierre automático como el de 118. Después del cierre:
+«Esta polla ya cerró; no se puede editar.» El selector de partidos es un solo
+componente, `components/casa/MatchPicker.tsx`, compartido con la creación.
+Regresión local: `scripts/casa-polla-editor-check.sql` (con 118 y 122 en la
+misma transacción). Migración no aplicada a producción al abrir el PR.
+
 ### Claridad de Casa, filtros y un gotcha de Tailwind (2026-09-13)
 
 Pedido del dueño con capturas de producción. Detalle de polla: hero compacto para

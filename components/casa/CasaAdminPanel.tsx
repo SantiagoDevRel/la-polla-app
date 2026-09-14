@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, ChevronRight, Plus, RefreshCw, Ticket, Files, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Plus, RefreshCw, Ticket, Files, CheckCircle2, AlertTriangle, Settings } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { HeroFrame, Label, Tape } from "@/components/street";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -12,10 +12,13 @@ import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { ResolverPolla } from "@/components/casa/ResolverPolla";
 import { fadeUp, staggerContainer } from "@/lib/animations";
 import { formatCop, timeLeft } from "@/lib/casa/format";
+import { editorHref } from "@/lib/casa/editor";
 import type { pollaStatusLabel, CasaPolla, CasaPot } from "@/lib/casa/types";
 
 export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "prize_kind" | "prize_object" | "draw_pending"> & {
   label: ReturnType<typeof pollaStatusLabel>;
+  /** Se puede editar (antes del cierre). */
+  editable?: boolean;
 };
 
 export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
@@ -156,7 +159,10 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
                         <div className="mt-6 border-t border-border-default pt-4">
                           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <div className="min-w-0"><Label>{polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label><p className="lp-money mt-1 text-[24px] text-text-primary [overflow-wrap:anywhere]">{polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot?.prize_cop ?? 0)}</p></div>
-                            {polla.status !== "borrador" && <Link href={`/casa/${polla.slug}`} className="lp-btn lp-btn-ghost !px-3 !text-[13px]">Ver polla</Link>}
+                            <div className="flex flex-wrap gap-2">
+                              {polla.editable && <Link href={editorHref(polla.id)} className="lp-btn lp-btn-ghost !px-3 !text-[13px]"><Settings className="h-4 w-4 shrink-0" aria-hidden="true" />Editar</Link>}
+                              {polla.status !== "borrador" && <Link href={`/casa/${polla.slug}`} className="lp-btn lp-btn-ghost !px-3 !text-[13px]">Ver polla</Link>}
+                            </div>
                           </div>
                           <div className="[&_button]:!min-h-11">
                             {/* Resolver preguntas / registrar el número de la
