@@ -154,9 +154,11 @@ Torneos | Equipos; la búsqueda usa el catálogo local (`lib/teams/team-search.t
 sobre `crest-coverage.json`, armado en el server, cero cuota). La ficha de un
 equipo solo carga si tiene partidos en caché de ±7 días (`reserve_api_football_team`).
 
-**Tailwind no genera `group-*` ni `peer-*`** con el lock actual
-(`tailwindcss@3.4.19` + `postcss-selector-parser@6.1.3`), sin error visible: usa
-variantes arbitrarias, p. ej. `[[open]>summary>&]:rotate-180`. `.lp-btn` y
+**`group-*` y `peer-*` vuelven a funcionar (2026-09-14).** El override
+`postcss-selector-parser@6.1.3` los descartaba sin error (regresión upstream,
+6.1.4 es el hotfix); `package.json` ahora fija 6.1.4. Si vuelven a faltar en el
+CSS de `.next/static/css`, revisa esa versión antes de reescribir clases. Las
+variantes arbitrarias ya escritas (`[[open]>summary>&]:rotate-180`) siguen siendo válidas. `.lp-btn` y
 `.lp-input` se cargan después de las utilidades: para cambiar su padding usa
 `!px-4` / `!pl-11`. Pruebas: `tests/casa-polla-info.test.ts`,
 `tests/casa-match-weeks.test.ts`, `tests/football-team-search.test.ts`.
