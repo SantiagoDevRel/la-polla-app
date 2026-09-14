@@ -162,7 +162,7 @@ export async function updateSession(request: NextRequest) {
     // Bot PÚBLICO de login por Telegram (otro bot, otro secreto). Mismo caso:
     // llama Telegram. Auth propia: su X-Telegram-Bot-Api-Secret-Token en
     // tiempo constante antes de leer el body (app/api/telegram/login/route.ts).
-    // Sus endpoints de canje (/api/auth/telegram-*) ya son públicos vía /api/auth.
+    // Sus endpoints de solicitud y enlace (/api/auth/telegram/*) ya son públicos vía /api/auth.
     path === "/api/telegram/login" ||
     // DLR de LabsMobile. Quien llama es el proveedor, no un browser: si esto
     // cae al gate de sesión, el middleware responde 307 a /login y el acuse

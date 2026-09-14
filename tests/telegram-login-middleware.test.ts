@@ -58,10 +58,25 @@ describe("middleware: webhook de login por Telegram", () => {
     },
   );
 
-  it("los endpoints de canje siguen públicos vía /api/auth", async () => {
-    for (const path of ["/api/auth/telegram-link", "/api/auth/telegram-verify"]) {
+  it("los endpoints de solicitud y enlace siguen públicos vía /api/auth", async () => {
+    for (const path of [
+      "/api/auth/telegram/request",
+      "/api/auth/telegram/request/status",
+      "/api/auth/telegram/request/complete",
+      "/api/auth/telegram/link",
+      "/api/auth/telegram-link",
+      "/api/auth/telegram-verify",
+    ]) {
       const response = await updateSession(new NextRequest(`http://localhost${path}`));
       expect(response.status).not.toBe(307);
+    }
+  });
+
+  it("la página del enlace /login/telegram es pública sin sesión (no rebota a /login)", async () => {
+    for (const path of ["/login/telegram?t=abc", "/login/telegram?estado=gone"]) {
+      const response = await updateSession(new NextRequest(`http://localhost${path}`));
+      expect(response.status).not.toBe(307);
+      expect(response.headers.get("location")).toBeNull();
     }
   });
 });

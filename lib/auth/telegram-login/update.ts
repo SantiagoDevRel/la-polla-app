@@ -8,18 +8,23 @@
 // la propia cuenta. Un contacto de otra persona (o reenviado) no pasa.
 //
 // El contenido del mensaje es DATO: solo se compara contra comandos conocidos.
+// v2: "/start <nonce>" trae la solicitud del navegador; "/start", "/login" o
+// cualquier otro texto se atienden igual pero sin solicitud.
 
 import { toE164 } from "@/lib/auth/phone";
+import { NONCE_RE } from "./crypto";
 
 export type LoginLocale = "es" | "en";
 
 export type LoginUpdateAction =
   | { kind: "ignore" }
   | {
-      kind: "prompt";
+      kind: "message";
       chatId: number;
       telegramUserId: number;
-      /** Presente solo si el /start trajo payload de idioma. */
+      /** Nonce de la solicitud del navegador (solo desde /start <nonce>). */
+      nonce?: string;
+      /** Idioma de un deep link viejo (/start login | login_en). */
       locale?: LoginLocale;
     }
   | { kind: "foreign_contact"; chatId: number; telegramUserId: number }
@@ -85,15 +90,21 @@ export function classifyLoginUpdate(update: unknown): LoginUpdateAction {
 
   const text = typeof message.text === "string" ? message.text.trim() : "";
   const start = /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+(\S+))?\s*$/i.exec(text);
-  if (start) {
-    const payload = start[1]?.toLowerCase();
-    const locale: LoginLocale | undefined =
-      payload === "login" ? "es" : payload === "login_en" ? "en" : undefined;
-    return locale
-      ? { kind: "prompt", chatId, telegramUserId, locale }
-      : { kind: "prompt", chatId, telegramUserId };
+  const payload = start?.[1];
+  if (payload && NONCE_RE.test(payload)) {
+    // El nonce distingue mayúsculas: se conserva tal cual.
+    return { kind: "message", chatId, telegramUserId, nonce: payload };
+  }
+  const legacy = payload?.toLowerCase();
+  if (legacy === "login" || legacy === "login_en") {
+    return {
+      kind: "message",
+      chatId,
+      telegramUserId,
+      locale: legacy === "login_en" ? "en" : "es",
+    };
   }
 
-  // /login, cualquier otro texto, stickers, fotos: se vuelve a ofrecer el botón.
-  return { kind: "prompt", chatId, telegramUserId };
+  // /start sin payload, /login, cualquier texto, stickers, fotos.
+  return { kind: "message", chatId, telegramUserId };
 }

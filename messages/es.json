@@ -78,7 +78,7 @@
     "errOtpInvalid": "Código inválido o vencido",
     "btnSending": "Enviando…",
     "btnWaitSeconds": "Espera {seconds}s",
-    "btnSms": "SMS",
+    "btnSms": "Enviar código por SMS",
     "btnWhatsapp": "WhatsApp",
     "whatsappAria": "Recibir código por WhatsApp",
     "termsHint": "Al continuar, aceptas nuestros términos y condiciones",
@@ -90,21 +90,65 @@
     "otpResend": "Reenviar código o cambiar número",
     "otpDidntArrive": "¿No te llegó?",
     "otpTryWhatsapp": "Prueba con WhatsApp",
-    "tgOr": "o también",
-    "tgUseTelegram": "Recibe tu código por Telegram",
+    "tgOr": "o",
+    "tgUseTelegram": "Entrar con Telegram",
     "tgDidntArrive": "¿No te llegó el SMS?",
-    "tgTitle": "CÓDIGO POR TELEGRAM",
-    "tgFor": "Para el número",
-    "tgStep1": "Abre nuestro bot de Telegram.",
     "tgOpenBot": "Abrir Telegram",
-    "tgStep2": "Toca «Compartir mi número». Tiene que ser el mismo número que escribiste aquí.",
-    "tgStep3": "Escribe aquí el código de 6 dígitos que te envía el bot.",
-    "tgBackToSms": "Volver al código por SMS",
-    "tgUseSms": "Prefiero recibir un SMS",
-    "tgErrRateLimited": "Demasiados intentos. Espera 15 minutos e inténtalo de nuevo.",
+    "tgUseSms": "Entrar con SMS",
+    "tgErrRateLimited": "Hiciste varios intentos con Telegram. Espera 15 minutos o entra con SMS.",
     "tgErrUnavailable": "El acceso por Telegram no está disponible en este momento. Usa el SMS.",
-    "tgErrGeneric": "No pudimos verificar el código. Inténtalo de nuevo.",
-    "tgErrSmsOnly": "Por seguridad, con este número solo puedes entrar con el código por SMS."
+    "tgErrGeneric": "No pudimos preparar el ingreso con Telegram. Inténtalo de nuevo.",
+    "tgErrSmsOnly": "Por seguridad, con este número solo puedes entrar con el código por SMS.",
+    "tgWaitTitle": "SIGUE EN TELEGRAM",
+    "tgPopupBlocked": "Tu navegador no abrió Telegram. Toca Abrir Telegram para empezar.",
+    "tgOpening": "Abriendo Telegram…",
+    "tgWaiting": "Esperando…",
+    "tgOpenAgain": "Abrir Telegram otra vez",
+    "tgCancel": "Cancelar",
+    "tgExpiredTitle": "LA SOLICITUD VENCIÓ",
+    "tgExpired": "Pasaron 5 minutos sin abrir el botón del bot. Vuelve a intentarlo.",
+    "tgRetry": "Intentar de nuevo",
+    "tgSmsOnlyTitle": "ENTRA CON SMS",
+    "tgErrorTitle": "NO PUDIMOS CONTINUAR",
+    "tgStepsLabel": "Pasos en Telegram",
+    "tgStep1": "Toca Iniciar (Start) en el chat del bot.",
+    "tgStep2": "Si es tu primera vez, toca Compartir mi número.",
+    "tgStep3": "Toca el botón Entrar a La Polla que te manda el bot.",
+    "tgLinkSent": "El bot ya te mandó el botón Entrar a La Polla.",
+    "tgElsewhereTitle": "ENTRASTE EN OTRO NAVEGADOR",
+    "tgElsewhere": "El botón del bot se abrió en otro navegador (por ejemplo, el de Telegram) y la sesión quedó allá. Para entrar en este navegador, usa el SMS o vuelve a intentar con Telegram.",
+    "tgRateLimitedTitle": "ESPERA UNOS MINUTOS",
+    "tgRetryTelegram": "Intentar de nuevo con Telegram",
+    "tgLinkAutoTitle": "ENTRANDO A LA POLLA",
+    "tgLinkAutoBody": "Un momento, estamos abriendo tu sesión.",
+    "tgLinkConfirmTitle": "CONFIRMA TU INGRESO",
+    "tgLinkConfirmLead": "Vas a entrar a La Polla en este navegador con el número:",
+    "tgLinkConfirmNotYours": "Si este no es tu número, no continúes.",
+    "tgLinkOtherBrowser": "Si pediste el ingreso desde otro navegador, abre este enlace en ese navegador.",
+    "tgLinkSubmit": "Entrar",
+    "tgLinkBackToLogin": "Volver a iniciar sesión",
+    "tgLinkState": {
+      "gone": {
+        "title": "ESTE ENLACE YA NO SIRVE",
+        "body": "Ya se usó o venció. Pide uno nuevo en el bot de Telegram o entra con SMS."
+      },
+      "failed": {
+        "title": "NO PUDIMOS CONTINUAR",
+        "body": "No pudimos iniciar tu sesión. Inténtalo de nuevo."
+      },
+      "forbidden": {
+        "title": "ABRE EL ENLACE OTRA VEZ",
+        "body": "Por seguridad, vuelve a tocar el botón del bot y confirma desde la página que se abre."
+      },
+      "sms_only": {
+        "title": "ENTRA CON SMS",
+        "body": "Por seguridad, con este número solo puedes entrar con el código por SMS."
+      },
+      "unavailable": {
+        "title": "NO DISPONIBLE",
+        "body": "El acceso por Telegram no está disponible en este momento. Usa el SMS."
+      }
+    }
   },
   "Welcome": {
     "introLine": "Cada fin de semana subimos las pollas.\nEntras, pronosticas y compites por el pozo.",

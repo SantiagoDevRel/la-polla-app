@@ -454,8 +454,8 @@ describe("rutas de sesión: solo Auth con IP real, nunca el cliente de datos", (
     "app/api/auth/start-otp/route.ts",
     "app/api/auth/verify-otp/route.ts",
     "app/api/auth/wa-magic/route.ts",
-    "app/api/auth/telegram-link/route.ts",
-    "app/api/auth/telegram-verify/route.ts",
+    // Telegram v2: las rutas de solicitud y enlace abren sesión por aquí.
+    "lib/auth/telegram-login/session.ts",
     "lib/auth/phone-session.ts",
   ];
 
@@ -471,11 +471,37 @@ describe("rutas de sesión: solo Auth con IP real, nunca el cliente de datos", (
   // le pasa la IP del request para que Supabase no vea la IP de Vercel.
   it.each([
     "app/api/auth/wa-magic/route.ts",
-    "app/api/auth/telegram-link/route.ts",
-    "app/api/auth/telegram-verify/route.ts",
+    "lib/auth/telegram-login/session.ts",
   ])("%s pasa la IP real a startSessionForVerifiedPhone", (file) => {
     const source = readFileSync(join(process.cwd(), file), "utf8");
     expect(source).toMatch(/getClientIp\(request\.headers\)/);
     expect(source).toMatch(/clientIp/);
   });
+
+  // La única vía de sesión de Telegram v2 es el enlace de un solo uso.
+  it("app/api/auth/telegram/link/route.ts abre sesión solo con startTelegramSession", () => {
+    const source = readFileSync(join(process.cwd(), "app/api/auth/telegram/link/route.ts"), "utf8");
+    expect(source).toMatch(/startTelegramSession\(request,/);
+    expect(source).not.toMatch(/from "@\/lib\/supabase\/server"/);
+    expect(source).not.toMatch(/\.auth\.(verifyOtp|signInWithOtp|signOut)\(/);
+  });
+
+  // complete/ abría la sesión de quien aprobaba en Telegram en el navegador que
+  // creó la solicitud (phishing tipo device code): retirado antes de producción.
+  it.each([
+    "app/api/auth/telegram-link/route.ts",
+    "app/api/auth/telegram-verify/route.ts",
+    "app/api/auth/telegram/request/complete/route.ts",
+    "app/api/auth/telegram/request/status/route.ts",
+    "app/api/auth/telegram/request/route.ts",
+  ])(
+    "%s (retirado o sin sesión) no abre sesión",
+    (file) => {
+      const source = readFileSync(join(process.cwd(), file), "utf8");
+      expect(source).not.toMatch(/startSessionForVerifiedPhone|startTelegramSession/);
+      if (!file.includes("/request/status/") && file !== "app/api/auth/telegram/request/route.ts") {
+        expect(source).not.toMatch(/createAdminClient/);
+      }
+    },
+  );
 });

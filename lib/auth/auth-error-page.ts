@@ -2,6 +2,8 @@
 // se abren desde otra app (WhatsApp, Telegram). Un JSON crudo no le sirve a
 // quien tocó un botón: se muestra un mensaje y un botón de vuelta.
 // HTML autocontenido (sin JS ni recursos externos), nunca cacheable.
+// Hoy lo usa el enlace de WhatsApp; el de Telegram se ve en /login/telegram
+// con el sistema de diseño. Sin rutas como texto: el botón dice a dónde lleva.
 
 import { NextResponse } from "next/server";
 
@@ -14,8 +16,8 @@ function escapeHtml(s: string): string {
 }
 
 const COPY = {
-  es: { lang: "es", title: "La Polla · Error", heading: "Algo no anda bien", back: "Volver a /login" },
-  en: { lang: "en", title: "Chicken Picks · Error", heading: "Something went wrong", back: "Back to /login" },
+  es: { lang: "es", title: "La Polla · Error", heading: "No pudimos continuar", back: "Volver a iniciar sesión" },
+  en: { lang: "en", title: "Chicken Picks · Error", heading: "We could not continue", back: "Back to sign in" },
 } as const;
 
 type Locale = "es" | "en";
