@@ -11,11 +11,12 @@
 // (`Sb-Forwarded-For`, lib/supabase/auth-ip.ts). Sin eso, el límite por IP de
 // Supabase se repartía entre todos los usuarios detrás de las IPs de Vercel.
 //
-// Captcha (Cloudflare Turnstile, 2026-09-14): /login manda `captchaToken` y
-// este archivo lo pasa a signInWithOtp. La verifica Supabase Auth, no este
-// servidor (el token es de un solo uso; ver lib/auth/captcha.ts). Si Supabase
-// la rechaza, responde 403 con CAPTCHA_FAILED_CODE y libera el intento.
-// Con security_captcha_enabled=false Supabase ignora el token.
+// Captcha (Cloudflare Turnstile, 2026-09-14): /login manda `captchaToken`.
+// OJO: con la secret key GoTrue se salta la captcha (credenciales de admin),
+// así que Supabase NO la verifica aquí. Con SMS_CAPTCHA_ENFORCED=true este
+// archivo la verifica contra Cloudflare ANTES del cupo y de Supabase, y
+// responde 403 CAPTCHA_FAILED_CODE sin enviar (lib/auth/captcha.ts). Apagado,
+// el token solo se reenvía a Supabase como antes.
 
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -27,8 +28,13 @@ import {
 } from "@/lib/auth/rate-limit";
 import { normalizePhone } from "@/lib/auth/phone";
 import { CAPTCHA_FAILED_CODE, DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
-import { isCaptchaRejection, parseCaptchaToken } from "@/lib/auth/captcha";
-import { createAuthClient, getClientIp } from "@/lib/supabase/auth-ip";
+import {
+  isCaptchaRejection,
+  isSmsCaptchaEnforced,
+  parseCaptchaToken,
+  verifySmsCaptcha,
+} from "@/lib/auth/captcha";
+import { authRequestConfig, createAuthClient, getClientIp } from "@/lib/supabase/auth-ip";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +42,8 @@ export const dynamic = "force-dynamic";
 // Respuesta del tope diario. `code` lo usa /login para mostrar el texto
 // traducido (Login.errDailySmsCap) con el enlace a /soporte; `error` queda
 // para clientes viejos que solo pintan el texto.
+const CAPTCHA_FAILED_MESSAGE = "No pudimos verificar que eres una persona. Vuelve a intentarlo.";
+
 const DAILY_SMS_CAP_MESSAGE =
   "Ya enviamos los códigos por SMS permitidos hoy para este número. Inténtalo de nuevo mañana o escríbenos a soporte.";
 
@@ -92,6 +100,39 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Captcha exigida (SMS_CAPTCHA_ENFORCED). Va ANTES del cupo diario y del
+  // intento por teléfono: un token malo no gasta cupo ni llega a Supabase.
+  // Con la secret key GoTrue no verifica la captcha, así que la verifica esta
+  // ruta y el token (ya usado) no se reenvía. Con la anon key la verifica
+  // GoTrue: aquí solo se exige que venga.
+  let forwardCaptchaToken = captchaToken;
+  if (isSmsCaptchaEnforced()) {
+    const supabaseSkipsCaptcha = authRequestConfig(ip).key.startsWith("sb_secret_");
+    if (supabaseSkipsCaptcha) {
+      const verdict = await verifySmsCaptcha(captchaToken, ip);
+      if (!verdict.ok && verdict.reason === "misconfigured") {
+        console.error("[start-otp] SMS_CAPTCHA_ENFORCED sin CLOUDFLARE_TURNSTILE_SECRET_KEY: envío bloqueado");
+        return NextResponse.json(
+          { error: "No pudimos enviar el código. Inténtalo más tarde o escríbenos a soporte." },
+          { status: 503 },
+        );
+      }
+      if (!verdict.ok) {
+        console.warn(`[start-otp] captcha rechazada: ${verdict.detail}`);
+        return NextResponse.json(
+          { error: CAPTCHA_FAILED_MESSAGE, code: CAPTCHA_FAILED_CODE },
+          { status: 403 },
+        );
+      }
+      forwardCaptchaToken = null;
+    } else if (!captchaToken) {
+      return NextResponse.json(
+        { error: CAPTCHA_FAILED_MESSAGE, code: CAPTCHA_FAILED_CODE },
+        { status: 403 },
+      );
+    }
+  }
+
   // Tope DIARIO de SMS por teléfono (2/día). Acota el costo del re-login
   // crónico. Admins exentos. Va ANTES del envío. WhatsApp está apagado, así
   // que el mensaje remite a soporte, no a otro canal.
@@ -130,7 +171,9 @@ export async function POST(request: NextRequest) {
   const auth = createAuthClient(ip);
   const { error } = await auth.signInWithOtp({
     phone: phoneE164,
-    options: captchaToken ? { channel: "sms", captchaToken } : { channel: "sms" },
+    options: forwardCaptchaToken
+      ? { channel: "sms", captchaToken: forwardCaptchaToken }
+      : { channel: "sms" },
   });
   if (error) {
     // Supabase lo rechazó sin mandar SMS → ese intento no gasta el cupo.
@@ -139,10 +182,7 @@ export async function POST(request: NextRequest) {
     }
     if (isCaptchaRejection(error)) {
       return NextResponse.json(
-        {
-          error: "No pudimos verificar que eres una persona. Vuelve a intentarlo.",
-          code: CAPTCHA_FAILED_CODE,
-        },
+        { error: CAPTCHA_FAILED_MESSAGE, code: CAPTCHA_FAILED_CODE },
         { status: 403 },
       );
     }

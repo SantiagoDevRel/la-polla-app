@@ -44,10 +44,19 @@ describe("isCaptchaRejection", () => {
 });
 
 describe("contratos de la captcha", () => {
-  it("start-otp no verifica el token por su cuenta (lo quemaría antes que Supabase)", () => {
+  it("start-otp verifica el token él mismo cuando la captcha es obligatoria (GoTrue se la salta con la secret key)", () => {
     const source = read("app/api/auth/start-otp/route.ts");
-    expect(source).not.toMatch(/verifyTurnstile|siteverify/);
-    expect(source).toMatch(/captchaToken/);
+    expect(source).toContain("isSmsCaptchaEnforced()");
+    expect(source).toContain("verifySmsCaptcha(");
+    // La verificación va antes de gastar cupo y antes de Supabase.
+    expect(source.indexOf("verifySmsCaptcha(")).toBeLessThan(source.indexOf("checkDailySmsCap("));
+    expect(source.indexOf("verifySmsCaptcha(")).toBeLessThan(source.indexOf("signInWithOtp("));
+  });
+
+  it("/login no deja enviar sin token cuando la captcha es obligatoria", () => {
+    const login = read("app/(auth)/login/LoginClient.tsx");
+    expect(login).toMatch(/smsCaptchaRequired/);
+    expect(read("app/(auth)/login/page.tsx")).toContain("isSmsCaptchaEnforced()");
   });
 
   it("Telegram no depende de la captcha", () => {

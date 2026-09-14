@@ -8,9 +8,11 @@
 //
 // Captcha del SMS: la site key PÚBLICA de Cloudflare Turnstile
 // (NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY). Sin ella no se monta el widget.
-// El secret NO vive en Vercel para esto: lo guarda Supabase Auth
-// (security_captcha_secret). README → «Captcha de Auth (Turnstile)».
+// Con SMS_CAPTCHA_ENFORCED=true start-otp verifica el token con
+// CLOUDFLARE_TURNSTILE_SECRET_KEY y el cliente ya no envía sin token.
+// README → «Captcha de Auth (Turnstile)».
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
+import { isSmsCaptchaEnforced } from "@/lib/auth/captcha";
 import LoginClient from "./LoginClient";
 
 export default function LoginPage() {
@@ -20,6 +22,7 @@ export default function LoginPage() {
     <LoginClient
       telegramBotUsername={telegram?.botUsername ?? null}
       turnstileSiteKey={turnstileSiteKey}
+      smsCaptchaRequired={Boolean(turnstileSiteKey) && isSmsCaptchaEnforced()}
     />
   );
 }

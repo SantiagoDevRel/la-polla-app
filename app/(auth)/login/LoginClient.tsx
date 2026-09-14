@@ -20,9 +20,10 @@
 // Captcha (2026-09-14): si page.tsx recibe la site key de Turnstile, el paso
 // del teléfono muestra el widget (components/auth/SmsCaptcha.tsx) y el envío
 // del SMS lleva `captchaToken`. Quien decide es Supabase Auth
-// (security_captcha_enabled): este cliente nunca bloquea por un widget roto —
-// si Cloudflare no carga, ofrece reintentar y deja enviar sin token (Supabase
-// lo rechaza solo si la captcha está activa). Telegram no usa la captcha.
+// (security_captcha_enabled) o, con SMS_CAPTCHA_ENFORCED, start-otp. Con la
+// captcha obligatoria (smsCaptchaRequired) no se envía sin token: si
+// Cloudflare no carga, se ofrece reintentar. Sin ella, un widget roto no
+// bloquea y se envía sin token. Telegram no usa la captcha.
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
@@ -160,7 +161,7 @@ function writeTelegramPending(value: TelegramPending | null) {
   }
 }
 
-function LoginInner({ telegramBotUsername, turnstileSiteKey }: LoginClientProps) {
+function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
   const t = useTranslations("Login");
   const searchParams = useSearchParams();
   const telegramEnabled = Boolean(telegramBotUsername);
@@ -345,7 +346,8 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey }: LoginClientProps)
       return;
     }
     // Con captcha: esperar el token si el widget sigue trabajando o pide la
-    // casilla. Si el widget falló, se envía sin token y decide Supabase.
+    // casilla. Si el widget falló: con captcha obligatoria se pide reintentar;
+    // sin ella, se envía sin token y decide Supabase.
     let token: string | null = null;
     if (turnstileSiteKey) {
       if (captchaStatus === "interactive") {
@@ -353,6 +355,10 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey }: LoginClientProps)
         return;
       }
       token = captchaToken.current;
+      if (!token && captchaStatus === "error" && smsCaptchaRequired) {
+        setError(t("captchaFailed"));
+        return;
+      }
       if (!token && captchaStatus !== "error") {
         setError(t("captchaWait"));
         return;
@@ -1050,12 +1056,18 @@ interface LoginClientProps {
   telegramBotUsername: string | null;
   /** Site key pública de Cloudflare Turnstile; null si la captcha no está configurada. */
   turnstileSiteKey: string | null;
+  /** start-otp exige el token (SMS_CAPTCHA_ENFORCED): nunca enviar sin él. */
+  smsCaptchaRequired: boolean;
 }
 
-export default function LoginClient({ telegramBotUsername, turnstileSiteKey }: LoginClientProps) {
+export default function LoginClient({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
   return (
     <Suspense fallback={<div className="min-h-screen" />}>
-      <LoginInner telegramBotUsername={telegramBotUsername} turnstileSiteKey={turnstileSiteKey} />
+      <LoginInner
+        telegramBotUsername={telegramBotUsername}
+        turnstileSiteKey={turnstileSiteKey}
+        smsCaptchaRequired={smsCaptchaRequired}
+      />
     </Suspense>
   );
 }
