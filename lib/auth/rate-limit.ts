@@ -23,7 +23,9 @@ const LIMITS = {
 // /login ya existe y funciona. Acota el costo Twilio del re-login crónico
 // (usuarios reales pidiendo varios SMS/día por el bug de persistencia de
 // sesión) sin castigar a nadie. Bumpealo si hay quejas de gente sin WhatsApp.
-export const DAILY_SMS_CAP = 2;
+// 2026-09-15: de 2 a 4 — usuarios reales topaban el cupo al reintentar el login
+// (WhatsApp ya no existe como salida). Con LabsMobile son ~COP 8 por SMS.
+export const DAILY_SMS_CAP = 4;
 
 // IP-based generate limit — cap GENEROSO contra Twilio bill-bombing.
 // El límite por phone (5/hora) NO frena el ataque real: un bot rota
@@ -128,7 +130,7 @@ export function otpRejectedBeforeSending(error: unknown): boolean {
 
 /**
  * Devuelve el cupo de un 'generate' que Supabase rechazó sin enviar SMS: sin
- * esto un 429 de Supabase gastaba uno de los 2 SMS diarios de la persona sin
+ * esto un 429 de Supabase gastaba uno de los SMS diarios de la persona sin
  * que le llegara nada. Borra SOLO la fila que grabó este mismo request (por
  * id y tipo). No abre abuso: lo que se libera no costó un SMS, y los envíos
  * aceptados siguen contando para el tope diario, el de la hora y el de IP.
