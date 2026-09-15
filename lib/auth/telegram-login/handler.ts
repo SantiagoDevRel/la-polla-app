@@ -45,11 +45,21 @@ export interface LoginHandlerDeps {
   env?: Record<string, string | undefined>;
   /** Reloj inyectable para las pruebas. */
   now?: () => number;
+  /**
+   * Bot de jugadores (lib/telegram-player): cuando el contacto llega SIN una
+   * solicitud del navegador, la persona vino a usar el bot, no a entrar a la
+   * web. En vez de un enlace suelto, el bot sigue con su bienvenida (perfil y
+   * menú). El vínculo ya quedó creado con las mismas reglas de identity.ts.
+   */
+  onLinked?: (input: { chatId: number; telegramUserId: number; grant: LoginGrant; locale: LoginLocale }) => Promise<LoginHandlerOutcome>;
+  /** Presentación antes de pedir el número (solo sin solicitud del navegador). */
+  promptLead?: string;
 }
 
 export type LoginHandlerOutcome =
   | "ignored"
   | "approved"
+  | "linked"
   | "link_sent"
   | "prompted"
   | "foreign_contact"
@@ -340,10 +350,13 @@ async function handleMessage(
     now - chat.contactPromptedAt < PROMPT_REPEAT_MS &&
     pendingRequestId === chat.pendingRequestId;
   const prompt = recentlyPrompted ? copy.promptShort : copy.promptLong;
+  // El bot de jugadores presenta el servicio a quien llega por /start sin venir
+  // de la web: en el mismo mensaje, para que el botón no quede debajo de otro.
+  const lead = !recentlyPrompted && !action.nonce && deps.promptLead ? deps.promptLead : null;
   await sendPlain(
     send,
     chatId,
-    staleRequest ? `${copy.requestExpired}\n\n${prompt}` : prompt,
+    [staleRequest ? copy.requestExpired : null, lead, prompt].filter(Boolean).join("\n\n"),
     shareKeyboard(copy),
   );
   await saveChat(db, telegramUserId, {
@@ -399,6 +412,10 @@ async function handleOwnContact(
     );
     await answerRemovingKeyboard(deps, chatId, telegramUserId, locale, copy.failure);
     return "failed";
+  }
+
+  if (!chat.pendingRequestId && deps.onLinked) {
+    return deps.onLinked({ chatId, telegramUserId, grant: linked.grant, locale });
   }
 
   return grantAccess(deps, {

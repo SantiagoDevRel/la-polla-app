@@ -1,6 +1,8 @@
-// app/api/telegram/login/route.ts — Webhook del bot PÚBLICO de login.
+// app/api/telegram/login/route.ts — Webhook del bot PÚBLICO de Telegram: login a
+// la web y app para jugadores (inscribirse, comprobante, pronósticos, tabla).
 // Distinto del panel de admin (/api/telegram/webhook): otro bot, otro token,
-// otro secreto. Toda la lógica está en lib/auth/telegram-login/handler.ts.
+// otro secreto. La lógica está en lib/telegram-player/handler.ts (que delega el
+// login en lib/auth/telegram-login/handler.ts).
 //
 // Orden de seguridad:
 //   1. Sin configuración completa → 503, sin leer el body ni tocar la base.
@@ -10,7 +12,9 @@
 //      reintenta en bucle).
 //   4. Después de responder (after), y solo con un update autenticado: deja
 //      comandos y descripciones del bot al día, una vez por versión
-//      (lib/auth/telegram-login/bot-profile.ts). Nunca demora la respuesta.
+//      (lib/auth/telegram-login/bot-profile.ts), y confirma que el webhook
+//      recibe los toques de botones (webhook-updates.ts). Nunca demora la
+//      respuesta.
 //
 // Exento del gate de sesión en lib/supabase/middleware.ts: quien llama es
 // Telegram, no un navegador.
@@ -18,14 +22,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { secretHeaderMatches } from "@/lib/auth/telegram-login/crypto";
-import { createLoginBotApi } from "@/lib/auth/telegram-login/bot-api";
+import { createLoginBotApi, createLoginBotClient } from "@/lib/auth/telegram-login/bot-api";
 import { BOT_PROFILE_TIMEOUT_MS, ensureBotProfile } from "@/lib/auth/telegram-login/bot-profile";
-import { handleLoginUpdate } from "@/lib/auth/telegram-login/handler";
+import { ensureWebhookUpdates } from "@/lib/auth/telegram-login/webhook-updates";
+import { handleTelegramUpdate } from "@/lib/telegram-player/handler";
 import { runAfterResponse } from "@/lib/auth/telegram-login/notify";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// Recibir un comprobante baja la foto, la sube y la verifica antes de responder.
+export const maxDuration = 60;
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
@@ -55,23 +62,31 @@ export async function POST(req: NextRequest) {
   // Supabase, Telegram igual recibe su 200 y no reintenta en bucle.
   let admin: ReturnType<typeof createAdminClient> | null = null;
   const db = () => (admin ??= createAdminClient());
+  let handled = false;
   try {
-    await handleLoginUpdate(update, {
+    await handleTelegramUpdate(update, {
       config,
       db: db(),
-      send: createLoginBotApi(config.botToken),
+      bot: createLoginBotClient(config.botToken),
     });
+    handled = true;
   } catch (err) {
     console.error("[telegram-login] update falló:", (err as Error).message);
   }
 
-  runAfterResponse(() =>
-    ensureBotProfile({
+  runAfterResponse(async () => {
+    await ensureBotProfile({
       config,
       db,
       send: createLoginBotApi(config.botToken, process.env, { timeoutMs: BOT_PROFILE_TIMEOUT_MS }),
-    }),
-  );
+    });
+    // Solo si el update se pudo atender: sin base no se toca nada en Telegram.
+    if (!handled) return;
+    await ensureWebhookUpdates({
+      config,
+      call: createLoginBotClient(config.botToken, process.env, { timeoutMs: BOT_PROFILE_TIMEOUT_MS }).call,
+    });
+  });
 
   return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

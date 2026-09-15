@@ -60,6 +60,38 @@ cron `/api/matches/discover` y panel `/api/admin/sync-ligas`), vivo
   ESPN (`update_match_live_espn`, `check_and_reserve_match_sync`, etc.) siguen en
   la DB sin llamadas desde la app; no se borran sin orden del dueño.
 
+### Bot de Telegram para jugadores (2026-09-15, migración 130)
+
+El bot público `@LaPollaColombianaAccesoBot` (webhook `/api/telegram/login`)
+ya no es solo el login: es la app completa para quien no quiere usar la web.
+Crear cuenta (Compartir mi número), perfil (nombre → pollito → cuenta de
+premios), pollas abiertas, inscribirse, enviar la foto del comprobante, «Mis
+pagos», pronosticar (1X2 con botones, marcador con goles 0–9 o «2-1», preguntas)
+tabla y reglas. Código en `lib/telegram-player/*`; detalle en README → «Bot de
+Telegram para jugadores». Reglas que no se negocian:
+
+- **Una sola verdad con la web.** Pronósticos solo por `saveCasaPicks`
+  (`lib/casa/picks-save.ts`) y comprobantes solo por `lib/casa/proof-server.ts`
+  (contrato v2 de la 098). Las rutas web usan esas mismas funciones: no volver a
+  duplicar esa lógica ni escribir en `casa_*` desde el bot por otro camino.
+- **Identidad = la cuenta vinculada a `from.id`** (`telegram_login_linked_accounts`),
+  resuelta en cada update. `callback_data` es dato no confiable: ids de 22
+  caracteres (`lib/telegram-player/ids.ts`) que se vuelven a validar contra la
+  base. Sin perfil completo (nombre real + pollito) no se juega, igual que el
+  middleware de la web.
+- **`/start <nonce>` y `/login` siguen siendo el login a la web**; el contacto sin
+  solicitud del navegador sigue con la bienvenida del bot (hook `onLinked`), sin
+  enlace suelto. `/web` o «Entrar a la página web» emiten el enlace de 5 min.
+- **Sin LLM.** Todo con botones y validaciones fijas (decisión 2026-09-15: el
+  dueño ofreció Haiku; no hace falta y un modelo puede equivocarse con dinero).
+- El aviso de pago confirmado/rechazado sale por Telegram si la cuenta está
+  vinculada (`lib/casa/review-notify.ts`); WhatsApp sigue apagado.
+- `callback_query` lo agrega el propio servidor tras un update autenticado
+  (`webhook-updates.ts`): misma URL que ya tiene Telegram, secreto de la env, sin
+  `drop_pending_updates`. No hace falta rotar secretos para activarlo.
+- Estado de la conversación en `telegram_login_chats.bot_flow*` (130). El número
+  de cuenta bancaria nunca queda ahí: es la última respuesta y va a `users`.
+
 ### Precisión de horarios y torneos (2026-09-13, migración 103)
 
 `matches.scheduled_at_confirmed=false` significa fecha provisional, no medianoche
@@ -877,8 +909,9 @@ minutos y una sola sesión por enlace. v2 lo implementa así:
   con nonce). Sin vínculo → pide el número UNA vez con teclado `request_contact`
   **`is_persistent: true`**; la pista describe el control por forma y lugar
   («ícono de cuatro cuadritos junto a la carita»: en Telegram Web es ⌘, no un
-  teclado; screenshot del dueño). Nunca manda códigos. `allowed_updates` sigue
-  siendo `["message"]`.
+  teclado; screenshot del dueño). Nunca manda códigos. Desde la 130 el webhook
+  también recibe `callback_query` (bot de jugadores, ver «Bot de Telegram para
+  jugadores» arriba).
 - **Enlace** → página `/login/telegram?t=` (dentro de `(auth)`, sistema de
   diseño, `referrer: same-origin`, noindex). **Sin splash ni bienvenida encima**
   (`isLoginLinkPath`): el SplashScreen del layout raíz la tapaba ~3 s en el
