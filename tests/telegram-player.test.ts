@@ -11,12 +11,17 @@ vi.mock("server-only", () => ({}));
 const queries = vi.hoisted(() => ({
   getMyEntry: vi.fn(),
   getPollaMatches: vi.fn(),
+  getPot: vi.fn(),
+  getPayouts: vi.fn(),
 }));
 vi.mock("@/lib/casa/queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/casa/queries")>()),
   getMyEntry: queries.getMyEntry,
   getPollaMatches: queries.getPollaMatches,
+  getPot: queries.getPot,
+  getPayouts: queries.getPayouts,
 }));
+vi.mock("@/lib/casa/tournaments", () => ({ getPollaTournamentSlugs: vi.fn().mockResolvedValue({}) }));
 
 import { CALLBACK_MAX_BYTES, cb, cbNew, longId, shortId, stableUuid } from "@/lib/telegram-player/ids";
 import { redactTelegramDescription } from "@/lib/auth/telegram-login/bot-api";
@@ -25,7 +30,9 @@ import { isBareStart, isLoginIntent, MAIN_KEYBOARD, menuCommandOf } from "@/lib/
 import { ensureWebhookUpdates, resetWebhookUpdatesStateForTests } from "@/lib/auth/telegram-login/webhook-updates";
 import { notifyPlayerReviewByTelegram, reviewNoticeMessage } from "@/lib/telegram-player/notify";
 import { saveCasaPicks } from "@/lib/casa/picks-save";
-import { handleTelegramUpdate } from "@/lib/telegram-player/handler";
+import { handleTelegramUpdate, isDoubleTap } from "@/lib/telegram-player/handler";
+import { pollaDetailScreen } from "@/lib/telegram-player/pollas";
+import { cannotPickReason } from "@/lib/telegram-player/picks";
 import { generateNonce, sha256Hex } from "@/lib/auth/telegram-login/crypto";
 
 const BOT_TOKEN = "123456789:AAFakeTokenForUnitTestsOnly_abcdefghijk";
@@ -90,7 +97,7 @@ describe("callback ids — 64 bytes and untrusted input", () => {
 // ── classify ─────────────────────────────────────────────────────────────
 describe("classifyPlayerUpdate — private chats only, sender is the chat", () => {
   it("reads a callback from the owner of the chat", () => {
-    expect(classifyPlayerUpdate(callback("pg"))).toEqual({ kind: "callback", callbackId: "cb-1", chatId: TG, telegramUserId: TG, messageId: 55, data: "pg" });
+    expect(classifyPlayerUpdate(callback("pg"))).toEqual({ kind: "callback", callbackId: "cb-1", chatId: TG, telegramUserId: TG, messageId: 55, editDate: null, data: "pg" });
   });
 
   it("ignores callbacks from groups, other chats, bots and oversized data", () => {
@@ -437,5 +444,90 @@ describe("handleTelegramUpdate — who answers what", () => {
     expect(await handleTelegramUpdate(group, { config: CONFIG, db: db as never, bot: bot as never, env })).toBe("ignored");
     expect(db.rpc).not.toHaveBeenCalled();
     expect(bot.send).not.toHaveBeenCalled();
+  });
+});
+
+// ── ya inscrito: nunca ofrecer inscribirse otra vez ─────────────────────
+describe("polla detail — the join button depends on the person's entry", () => {
+  const polla = {
+    id: POLLA, slug: "fecha-8", name: "Fecha 8", kind: "partidos", tournament: null, scoring_mode: "1x2", description: null,
+    entry_price_cop: 20000, house_cut_pct: 30, prize_kind: "pozo", pot_mode: "proporcional", fixed_prize_cop: null,
+    publication_mode: "ahora", prize_object: null, prize_image_path: null, points_exact: 3, points_one_team: 1, points_result: 3,
+    status: "abierta", opens_at: "2000-01-01T00:00:00Z", closes_at: "2999-01-01T00:00:00Z", close_mode: "manual",
+    ticket_count: null, draw_method: null, drawn_number: null, settled_at: null, settle_notes: null, settlement_outcome: null,
+    payout_method: "nequi", payout_account: "3000000000", payout_account_name: null, created_by: "admin", created_at: "2026-09-01T00:00:00Z",
+  } as const;
+  const ctx = { account: { userId: "user-1", phoneE164: PHONE }, env: {}, db: {} } as never;
+  const labels = async (entry: unknown, overrides: Record<string, unknown> = {}) => {
+    queries.getPot.mockResolvedValue({ paid_entries: 3, gross_cop: 60000, prize_cop: 42000, house_cop: 18000 });
+    queries.getPayouts.mockResolvedValue([]);
+    queries.getMyEntry.mockResolvedValue(entry);
+    const screen = await pollaDetailScreen(ctx, { ...polla, ...overrides } as never);
+    return { buttons: (screen.buttons ?? []).flat().map((b) => b.text), text: screen.text };
+  };
+
+  it("not inscribed and open: offers to join", async () => {
+    const r = await labels(null);
+    expect(r.buttons).toContain("✅ Inscribirme · $20.000");
+    expect(r.buttons.some((b) => b.includes("Pronosticar"))).toBe(false);
+  });
+
+  it("proof in review: no join button, says it is in review and lets them predict", async () => {
+    const r = await labels({ id: "e1", status: "pendiente", proof_path: "casa/x.jpg", reject_reason: null });
+    expect(r.buttons.some((b) => /Inscribirme|Enviar comprobante/.test(b))).toBe(false);
+    expect(r.buttons).toContain("⚽ Pronosticar");
+    expect(r.text).toContain("Tu comprobante está en revisión");
+  });
+
+  it("paid: no join button, confirmed", async () => {
+    const r = await labels({ id: "e1", status: "pagada", proof_path: "casa/x.jpg", reject_reason: null });
+    expect(r.buttons.some((b) => /Inscribirme|Enviar comprobante/.test(b))).toBe(false);
+    expect(r.text).toContain("Estás inscrito");
+  });
+
+  it("rejected or unfinished upload: resend the proof (same entry), never a new inscription", async () => {
+    for (const entry of [
+      { id: "e1", status: "rechazada", proof_path: null, reject_reason: "Valor distinto" },
+      { id: "e1", status: "anulada", proof_path: null, reject_reason: null },
+      { id: "e1", status: "pendiente", proof_path: null, reject_reason: null },
+    ]) {
+      const r = await labels(entry);
+      expect(r.buttons).toContain("📸 Enviar comprobante");
+      expect(r.buttons.some((b) => b.includes("Inscribirme"))).toBe(false);
+    }
+  });
+
+  it("closed: no join or resend button at all", async () => {
+    const r = await labels(null, { status: "cerrada" });
+    expect(r.buttons.some((b) => /Inscribirme|Enviar comprobante/.test(b))).toBe(false);
+  });
+
+  it("explains why someone cannot predict yet, by entry state", () => {
+    expect(cannotPickReason(null, "pronosticar")).toContain("inscribirte");
+    expect(cannotPickReason({ status: "rechazada", proof_path: null }, "pronosticar")).toContain("rechazado");
+    expect(cannotPickReason({ status: "anulada", proof_path: null }, "responder")).toContain("no repitas el pago");
+  });
+});
+
+describe("double tap guard", () => {
+  it("drops a tap that lands on a screen edited in the last second, keeps normal taps", () => {
+    const now = 1_757_950_000_500;
+    const nowS = Math.floor(now / 1000);
+    expect(isDoubleTap(nowS, now)).toBe(true);
+    expect(isDoubleTap(nowS - 1, now)).toBe(true);
+    expect(isDoubleTap(nowS - 2, now)).toBe(false);
+    expect(isDoubleTap(null, now)).toBe(false);
+  });
+
+  it("a double-tapped button answers with a hint and changes nothing", async () => {
+    const db = fakeAdmin({});
+    const bot = fakeBot();
+    const now = 1_757_950_000_500;
+    const tap = callback(`x:${shortId(POLLA)}:${shortId(MATCH)}:L`);
+    (tap.callback_query.message as Record<string, unknown>).edit_date = Math.floor(now / 1000);
+    expect(await handleTelegramUpdate(tap, { config: CONFIG, db: db as never, bot: bot as never, now: () => now })).toBe("ignored");
+    expect(bot.send).toHaveBeenCalledWith("answerCallbackQuery", { callback_query_id: "cb-1", text: "La pantalla acaba de cambiar. Revisa las opciones y toca otra vez." });
+    expect(db.rpc).not.toHaveBeenCalled();
+    expect(db.writes).toHaveLength(0);
   });
 });
