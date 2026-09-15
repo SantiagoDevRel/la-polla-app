@@ -13,6 +13,7 @@ import { DEFAULT_MAX_ENTRIES_PER_USER, isLiveEntry, isPollaOpen, type CasaEntry 
 import { formatCop } from "@/lib/casa/format";
 import { HeroFrame, Label, StreetCard } from "@/components/street";
 import { PagarForm } from "@/components/casa/PagarForm";
+import { CuposForm } from "@/components/casa/CuposForm";
 import { CopiarDato } from "@/components/casa/CopiarDato";
 
 export const dynamic = "force-dynamic";
@@ -58,8 +59,8 @@ export default async function PagarPage({
       if (isAnother && counted >= maxEntries) {
         return <div className="px-4 py-6"><StreetCard className="space-y-4 p-4">
           <h1 className="lp-display text-[30px] [overflow-wrap:anywhere]">Llegaste al máximo</h1>
-          <p className="text-[15px] text-text-secondary">Puedes tener hasta {maxEntries} participaciones en {polla.name}. Si alguna fue rechazada, envía de nuevo su comprobante desde la polla.</p>
-          <Link className="lp-btn lp-btn-primary w-full" href={`/casa/${polla.slug}`}>Ver mis participaciones</Link>
+          <p className="text-[15px] text-text-secondary">Puedes tener hasta {maxEntries} cupos en {polla.name}. Si alguno fue rechazado, envía de nuevo su comprobante desde la polla.</p>
+          <Link className="lp-btn lp-btn-primary w-full" href={`/casa/${polla.slug}`}>Ver mis cupos</Link>
         </StreetCard></div>;
       }
       // Una carga fallida o rechazada sin otras participaciones se retoma en su propia fila.
@@ -112,28 +113,18 @@ export default async function PagarPage({
   return (
     <div className="pb-28">
       <HeroFrame height="min-h-[168px]">
-        <Label>{showNumber ? `Participación ${shownNumber}` : "Entrar a"}</Label>
+        <Label>{recovering && showNumber ? `Cupo ${shownNumber}` : isAnother ? "Más cupos en" : "Entrar a"}</Label>
         <h1 className="lp-display mt-1 text-[30px] [overflow-wrap:anywhere]">{polla.name}</h1>
       </HeroFrame>
 
       <div className="space-y-4 px-4 pt-5">
-        {/* Otra participación: la regla más importante del flujo, antes de la cuenta. */}
-        {isAnother && !recovering && (
-          <div className="border border-gold/30 bg-gold/10 p-3">
-            <p className="lp-label text-gold">Otra participación, otra transferencia</p>
-            <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">
-              Haz una transferencia nueva de {formatCop(polla.entry_price_cop)} y sube su propio comprobante.
-              No uses el de otra participación ni envíes un solo pago por varias: cada comprobante se aprueba por separado.
-            </p>
-          </div>
-        )}
         {rejected ? <p className="text-[15px] text-text-secondary">Tu comprobante fue rechazado. {rejectReason} Revisa el motivo y consulta con el administrador antes de hacer otra transferencia.</p>
           : recovering && <p className="text-[15px] text-text-secondary">Si ya transferiste, solo completa el comprobante. No repitas el pago.</p>}
         {/* Qué pasa con tu plata. Explícito, sin letra chica. */}
         <StreetCard className="p-4">
           <div className="flex items-end justify-between">
             <div>
-              <Label>{recovering ? "Valor de la inscripción" : "Tienes que transferir"}</Label>
+              <Label>{recovering ? "Valor del cupo" : "Valor de cada cupo"}</Label>
               <div className="lp-money mt-1 text-[34px] leading-none text-gold">
                 {formatCop(entrada)}
               </div>
@@ -203,13 +194,16 @@ export default async function PagarPage({
           </div>
         )}
 
-        <PagarForm resumeOnly={resumeOnly}
+        {polla.kind !== "rifa" && !recovering && !resumeOnly ? (
+          <CuposForm slug={polla.slug} entryPriceCop={polla.entry_price_cop}
+            available={Math.max(1, maxEntries - counted)} another={isAnother} />
+        ) : <PagarForm resumeOnly={resumeOnly}
           slug={polla.slug}
           esRifa={polla.kind === "rifa"}
           ticketCount={polla.ticket_count}
           initialTicket={boleta && /^\d+$/.test(boleta) && Number(boleta) <= (polla.ticket_count ?? 0) ? boleta : ""}
           entryNumber={polla.kind === "rifa" ? undefined : target?.entry_number ?? null}
-        />
+        />}
 
         <p className="text-center text-[11px] leading-relaxed text-text-muted">
           El administrador revisa el comprobante. Se guarda solo para verificar

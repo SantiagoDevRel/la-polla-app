@@ -51,7 +51,7 @@ import { CompartirPolla } from "@/components/casa/CompartirPolla";
 import { Participaciones } from "@/components/casa/Participaciones";
 import { acceptsCasaMatchPicks } from "@/lib/casa/match-rules";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
-import { Settings } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -119,7 +119,7 @@ export default async function PollaPage({
     ? bestEntry
     : entries.find((e) => e.entry_number === requested) ?? entries.find(isLiveEntry) ?? entries[entries.length - 1] ?? null;
   const multiple = entries.filter((e) => e.status !== "anulada").length > 1;
-  const etiqueta = multiple && entry?.entry_number ? `Participación ${entry.entry_number} · ` : "";
+  const etiqueta = multiple && entry?.entry_number ? `Cupo ${entry.entry_number} · ` : "";
   const picks = polla.kind === "rifa" || !entry ? [] : await getMyPicks(polla.id, user.id, entry.id);
   const canResumeProof = !abierta && polla.kind !== "rifa" && entry?.status === "pendiente" && !entry.proof_path
     ? (await getActiveProofs(polla.id, user.id)).some((proof) => proof.entry_id === entry.id) : false;
@@ -162,6 +162,10 @@ export default async function PollaPage({
   // Sin ninguna participación viva: el CTA es entrar (o retomar la que falta).
   const mostrarEntrar = !participa && (abierta || canResumeProof) && polla.kind !== "rifa";
   const retomar = !participa && entry && !isLiveEntry(entry) ? entry.entry_number : null;
+  // Ya participa y quedan cupos: el CTA principal es comprar otro (migración 131).
+  const maxCupos = polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER;
+  const comprarOtro = polla.kind !== "rifa" && participa && abierta
+    && entries.filter((e) => e.status !== "anulada").length < maxCupos;
 
   return (
     <div className="pb-32">
@@ -255,11 +259,17 @@ export default async function PollaPage({
               mientras esté abierta: pasar el link de una polla cerrada no le
               sirve a nadie. Si la fila no cabe (320 px o texto ampliado), se
               parte en dos y cada botón ocupa todo el ancho. */}
-        {(mostrarEntrar || abierta) && (
+        {(mostrarEntrar || comprarOtro || abierta) && (
           <div className="mt-4 flex flex-wrap gap-2 first:mt-0">
             {mostrarEntrar && (
               <Link href={`/casa/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`} className="lp-btn lp-btn-primary flex-[2_1_auto] !px-4">
                 {entry ? "Retomar comprobante" : `Entrar por ${formatCop(polla.entry_price_cop)}`}
+              </Link>
+            )}
+            {comprarOtro && (
+              <Link href={`/casa/${polla.slug}/pagar?participacion=nueva`} className="lp-btn lp-btn-primary flex-[2_1_auto] gap-2 !px-4">
+                <Plus aria-hidden="true" className="h-5 w-5 shrink-0" />
+                Comprar otro cupo · {formatCop(polla.entry_price_cop)}
               </Link>
             )}
             {abierta && (
@@ -274,7 +284,7 @@ export default async function PollaPage({
           </div>
         )}
 
-        {/* ── Tus participaciones (migración 131) ──────────────────────────────
+        {/* ── Tus cupos (migración 131) ─────────────────────────────────────────
               Aparece desde la primera: es donde se ve cada una con su estado y
               donde se suma otra, con su propia transferencia. */}
         {polla.kind !== "rifa" && entries.length > 0 && (participa || entries.length > 1) && (
@@ -295,7 +305,7 @@ export default async function PollaPage({
           <div className="mt-4 border border-turf/40 bg-turf/10 p-3">
             <p className="lp-label text-turf">{etiqueta}Estás dentro</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              Confirmamos tu pago y {multiple ? "esta participación ya compite" : "ya participas"} por el premio.
+              Confirmamos tu pago y {multiple ? "este cupo ya compite" : "ya participas"} por el premio.
               {abierta ? " Haz tus pronósticos antes del cierre." : ""}
             </p>
           </div>
@@ -320,7 +330,7 @@ export default async function PollaPage({
             </p>
             {abierta && participa && entry.entry_number && (
               <Link href={`/casa/${polla.slug}/pagar?participacion=${entry.entry_number}`} className="lp-btn lp-btn-ghost mt-3 w-full">
-                Enviar otro comprobante para esta participación
+                Enviar otro comprobante para este cupo
               </Link>
             )}
           </div>
@@ -333,12 +343,12 @@ export default async function PollaPage({
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">{etiqueta}Tu comprobante no se guardó</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              No alcanzamos a recibir la imagen, así que {participa ? "esta participación" : "tu inscripción"} no
+              No alcanzamos a recibir la imagen, así que {participa ? "este cupo" : "tu inscripción"} no
               quedó. Vuelve a subirla y sigues en carrera.
             </p>
             {participa && entry?.entry_number && (
               <Link href={`/casa/${polla.slug}/pagar?participacion=${entry.entry_number}`} className="lp-btn lp-btn-ghost mt-3 w-full">
-                Subir el comprobante de esta participación
+                Subir el comprobante de este cupo
               </Link>
             )}
           </div>
@@ -358,7 +368,7 @@ export default async function PollaPage({
         {polla.kind === "partidos" && matches.length > 0 && (
           <>
             <SectionHead
-              title={multiple && entry?.entry_number ? `Pronósticos · participación ${entry.entry_number}` : "Tus pronósticos"}
+              title={multiple && entry?.entry_number ? `Pronósticos · cupo ${entry.entry_number}` : "Tus pronósticos"}
               meta={`${matches.length} partidos`}
               className="mt-8"
             />

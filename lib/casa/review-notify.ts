@@ -24,7 +24,7 @@ export async function notifyCasaReview(entryId: string, pollaId: string, approve
       });
       const numbered = entry.entry_number != null && entry.entry_number > 1;
       await notifyPlayer({ userId: entry.user_id, aprobado: approved,
-        pollaName: numbered ? `${polla.name} (participación ${entry.entry_number})` : polla.name,
+        pollaName: numbered ? `${polla.name} (cupo ${entry.entry_number})` : polla.name,
         pollaSlug: numbered ? `${polla.slug}?p=${entry.entry_number}` : polla.slug, pozoCop: pot.prize_cop,
         prizeKind: polla.prize_kind, prizeObject: polla.prize_object, kind: polla.kind });
     }

@@ -55,11 +55,11 @@ const messages: Record<string, string> = {
   MATCH_ALREADY_VERIFIED: "Este partido ya tiene un resultado verificado. Actualiza la página para ver el estado vigente.",
   OPEN_MATCH_ISSUES: "Hay partidos con novedades sin decidir. Revísalos en Issues antes de repartir.",
   // Migración 131: varias participaciones por persona.
-  MAX_ENTRIES: "Llegaste al máximo de participaciones para esta polla.",
-  DUPLICATE_PROOF: "Ese comprobante ya lo enviaste para otra participación. Cada participación necesita su propia transferencia.",
-  ENTRY_NOT_FOUND: "Esa participación no existe. Vuelve a la polla y elige una de las tuyas.",
-  INVALID_ENTRY: "Esa participación no es válida para esta polla.",
-  INVALID_MAX_ENTRIES: "Elige entre 1 y 50 participaciones por persona.",
+  MAX_ENTRIES: "Llegaste al máximo de cupos para esta polla.",
+  DUPLICATE_PROOF: "Ese comprobante ya lo enviaste para otro cupo. Cada cupo necesita su propia transferencia.",
+  ENTRY_NOT_FOUND: "Ese cupo no existe. Vuelve a la polla y elige uno de los tuyos.",
+  INVALID_ENTRY: "Ese cupo no es válido para esta polla.",
+  INVALID_MAX_ENTRIES: "Elige entre 1 y 50 cupos por persona.",
 };
 
 /** Errores cuyo DETAIL de SQL ya viene redactado para la persona (con cifras exactas). */

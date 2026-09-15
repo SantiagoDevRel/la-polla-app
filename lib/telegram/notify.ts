@@ -68,7 +68,7 @@ export async function notifyNewProof(n: ProofNotice): Promise<void> {
     `Polla: <b>${esc(n.pollaName)}</b>`,
     n.ticketNumber != null ? `Boleta: <b>#${n.ticketNumber}</b>` : null,
     // Solo desde la segunda: con una sola participación el número no aporta.
-    n.entryNumber != null && n.entryNumber > 1 ? `Participación: <b>#${n.entryNumber}</b> (una transferencia por participación)` : null,
+    n.entryNumber != null && n.entryNumber > 1 ? `Cupo: <b>#${n.entryNumber}</b> (una transferencia por cupo)` : null,
     `Valor: <b>${formatCop(n.amountCop)}</b>`,
     ``,
     n.prizeKind === "objeto" ? `Participa por <b>${esc(n.prizeObject ?? "el premio en objeto")}</b>. No hay reparto de dinero.` : `Si lo apruebas, el pozo queda en <b>${formatCop(n.potAfterCop)}</b>.`,

@@ -205,7 +205,7 @@ export function CrearPollaForm() {
     setError(null);
     if (name.trim().length < 3) return setError("Escribe el nombre de la polla.");
     if (kind !== "rifa" && (!Number.isInteger(maxEntries) || maxEntries < 1 || maxEntries > 50))
-      return setError("Las participaciones por persona deben estar entre 1 y 50.");
+      return setError("Los cupos por persona deben estar entre 1 y 50.");
     if (kind === "partidos" && seleccion.length === 0)
       return setError("Elige al menos un partido.");
     if (kind === "manual" && preguntas.every((q) => !q.prompt.trim()))
@@ -407,10 +407,10 @@ export function CrearPollaForm() {
 
         {kind !== "rifa" && (
           <div>
-            <Label>Participaciones por persona</Label>
+            <Label>Cupos por persona</Label>
             <input
               type="number"
-              aria-label="Participaciones por persona"
+              aria-label="Cupos por persona"
               aria-describedby="crear-participaciones-ayuda"
               min={1}
               max={50}
@@ -419,7 +419,7 @@ export function CrearPollaForm() {
               className="lp-input lp-money mt-2 text-[18px]"
             />
             <p id="crear-participaciones-ayuda" className="mt-2 text-[13px] leading-relaxed text-text-secondary">
-              Una misma persona puede entrar varias veces, cada una con su propia transferencia de la entrada y su propio comprobante.
+              Cuántos cupos puede comprar una misma persona. Cada cupo es su propia transferencia de la entrada y su propio comprobante.
             </p>
           </div>
         )}

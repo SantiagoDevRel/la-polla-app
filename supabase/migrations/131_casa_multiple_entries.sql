@@ -148,7 +148,7 @@ BEGIN
     SELECT * INTO e FROM public.casa_entries
       WHERE polla_id=p.id AND user_id=p_user_id AND ticket_number IS NULL AND entry_number=p_entry_number FOR UPDATE;
     IF NOT FOUND THEN
-      RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ENTRY_NOT_FOUND',DETAIL='Esa participación no existe.';
+      RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ENTRY_NOT_FOUND',DETAIL='Ese cupo no existe.';
     END IF;
     v_found := true;
   ELSE
@@ -230,7 +230,7 @@ BEGIN
           AND (NOT v_found OR id<>e.id);
       IF v_live>=p.max_entries_per_user THEN
         RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='MAX_ENTRIES',
-          DETAIL=format('Puedes tener hasta %s participaciones en esta polla.',p.max_entries_per_user);
+          DETAIL=format('Puedes tener hasta %s cupos en esta polla.',p.max_entries_per_user);
       END IF;
     END IF;
     -- One transfer per participation: the same receipt image cannot back a
@@ -244,7 +244,7 @@ BEGIN
       ORDER BY e2.entry_number LIMIT 1;
     IF v_dup IS NOT NULL THEN
       RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='DUPLICATE_PROOF',
-        DETAIL=format('Ese comprobante ya lo enviaste para la participación %s. Cada participación necesita su propia transferencia.',v_dup);
+        DETAIL=format('Ese comprobante ya lo enviaste para el cupo %s. Cada cupo necesita su propia transferencia.',v_dup);
     END IF;
   END IF;
 

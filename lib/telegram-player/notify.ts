@@ -32,7 +32,7 @@ export interface ReviewNotice {
 export function reviewNoticeMessage(n: ReviewNotice): { text: string; buttons: Array<Array<{ text: string; callback_data: string }>> } {
   const P = shortId(n.pollaId);
   const ticket = n.ticketNumber != null ? ` (boleta ${n.ticketNumber})`
-    : n.entryNumber != null && n.entryNumber > 1 ? ` (participación ${n.entryNumber})` : "";
+    : n.entryNumber != null && n.entryNumber > 1 ? ` (cupo ${n.entryNumber})` : "";
   if (n.approved) {
     return {
       text: [

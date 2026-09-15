@@ -29,9 +29,15 @@ interface Props {
    * nueva. Sin valor en rifas (ahí manda la boleta).
    */
   entryNumber?: number | null;
+  /**
+   * Varios cupos a la vez (CuposForm): cada tarjeta es un comprobante de UN cupo.
+   * Con `slot`, al registrar no navega: avisa con `onRegistered`.
+   */
+  slot?: { index: number; total: number };
+  onRegistered?: (entryNumber: number | null) => void;
 }
 
-export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false, entryNumber }: Props) {
+export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false, entryNumber, slot, onRegistered }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   // Cada selección recibe un turno: si la persona elige otra imagen mientras
@@ -46,6 +52,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
+  const [registrado, setRegistrado] = useState<number | null>(null);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
@@ -86,7 +93,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
     try {
       const url = `/api/casa/pollas/${slug}/join`;
       // Cada participación guarda su propio intento: retomar la 2 nunca reusa el de la 3.
-      const target = esRifa ? ticket : entryNumber == null ? "nueva" : `p${entryNumber}`;
+      const target = esRifa ? ticket : entryNumber == null ? `nueva${slot ? `-${slot.index}` : ""}` : `p${entryNumber}`;
       const key = `casa-proof:${slug}:${target || "entry"}`;
       const result = await submitProof({
         sourceSha256: prepared.sourceSha256,
@@ -106,6 +113,8 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       // de devolver en silencio la participación anterior.
       try { sessionStorage.removeItem(key); } catch { /* Storage may be disabled. */ }
       setListo(true);
+      setRegistrado(result.entryNumber);
+      if (onRegistered) { onRegistered(result.entryNumber); return; }
       // Un respiro para que se lea la confirmación antes de volver.
       setTimeout(() => router.push(`/casa/${slug}${result.entryNumber ? `?p=${result.entryNumber}` : ""}`), 1600);
     } catch (cause) {
@@ -116,6 +125,17 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
     }
   }
 
+  if (listo && slot) {
+    return (
+      <StreetCard className="border-turf/40 p-4">
+        <p className="lp-label text-turf">Comprobante {slot.index} de {slot.total} enviado</p>
+        <p className="mt-1 text-[13px] text-text-secondary">
+          {registrado ? `Quedó como tu cupo #${registrado}. ` : ""}Suma puntos cuando confirmemos este pago.
+        </p>
+      </StreetCard>
+    );
+  }
+
   if (listo) {
     return (
       <StreetCard hero className="p-6 text-center">
@@ -123,7 +143,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         <p className="mt-2 text-[13px] text-text-secondary">
           {esRifa
             ? "Recibimos tu comprobante. Tu participación se activa cuando confirmemos el pago."
-            : "Recibimos tu comprobante. Ya puedes hacer los pronósticos de esta participación; suma puntos cuando confirmemos el pago."}
+            : "Recibimos tu comprobante. Ya puedes hacer los pronósticos de este cupo; suma puntos cuando confirmemos el pago."}
         </p>
       </StreetCard>
     );
@@ -134,7 +154,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       {resumeOnly && <p className="mb-4 text-[15px] text-text-secondary">La inscripción cerró. Puedes completar la carga que ya iniciaste; selecciona el mismo comprobante. No repitas la transferencia.</p>}
       {esRifa && <div className="mb-4"><SelectorBoleta slug={slug} value={ticket} onChange={setTicket} disabled={enviando || resumeOnly} revision={revision} /></div>}
 
-      <Label>Comprobante de la transferencia</Label>
+      <Label>{slot && slot.total > 1 ? `Comprobante del cupo ${slot.index} de ${slot.total}` : "Comprobante de la transferencia"}</Label>
 
       <input
         ref={inputRef}

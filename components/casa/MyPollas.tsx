@@ -82,7 +82,7 @@ export function MyPollas({ initialPollas, defaultOpen = true, pendingByPolla = {
                 <div className="flex items-start gap-3">
                   <h3 className="min-w-0 flex-1 font-display text-[22px] leading-tight tracking-wide text-text-primary [overflow-wrap:anywhere]">
                     {polla.name}
-                    {number != null && <span className="ml-2 inline-block whitespace-nowrap rounded-full border border-border-default px-2 align-middle font-sans text-[13px] font-semibold tracking-normal text-text-secondary">{en ? `Entry ${number}` : `Participación ${number}`}</span>}
+                    {number != null && <span className="ml-2 inline-block whitespace-nowrap rounded-full border border-border-default px-2 align-middle font-sans text-[13px] font-semibold tracking-normal text-text-secondary">{en ? `Entry ${number}` : `Cupo ${number}`}</span>}
                   </h3>
                   <ChevronRight aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-text-secondary" />
                 </div>

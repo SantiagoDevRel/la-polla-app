@@ -38,7 +38,7 @@ export async function GET(
   if (raw !== null) {
     const number = /^\d{1,2}$/.test(raw) ? Number(raw) : NaN;
     const entry = Number.isInteger(number) && number >= 1 ? await getMyEntryByNumber(polla.id, user.id, number) : null;
-    if (!entry) return NextResponse.json({ error: "Esa participación no existe." }, { status: 404 });
+    if (!entry) return NextResponse.json({ error: "Ese cupo no existe." }, { status: 404 });
     entryId = entry.id;
   }
   const picks = await getMyPicks(polla.id, user.id, entryId);

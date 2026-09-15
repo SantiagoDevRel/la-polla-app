@@ -9,7 +9,6 @@
 // pronósticos de la participación elegida y el botón atrás funciona.
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { StreetCard } from "@/components/street";
 import { formatCop } from "@/lib/casa/format";
 import type { CasaEntry } from "@/lib/casa/types";
@@ -24,9 +23,9 @@ export function participationState(entry: Pick<CasaEntry, "status" | "proof_path
 }
 
 const LABEL: Record<ParticipationState, string> = {
-  activa: "Activa",
+  activa: "Activo",
   revision: "En revisión",
-  rechazada: "Rechazada",
+  rechazada: "Rechazado",
   "sin-comprobante": "Sin comprobante",
 };
 
@@ -62,14 +61,14 @@ export function Participaciones({
   return (
     <StreetCard className="mt-4 p-4 first:mt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="lp-display-sm min-w-0 text-text-primary [overflow-wrap:anywhere]">Tus participaciones</h2>
+        <h2 className="lp-display-sm min-w-0 text-text-primary [overflow-wrap:anywhere]">Tus cupos</h2>
         <span className="text-[13px] tabular-nums text-text-secondary">{counted} de {maxEntries}</span>
       </div>
       <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">
-        Cada participación es una opción más de ganar, con sus propios pronósticos. Suma puntos cuando aprobamos su pago.
+        Cada cupo es una opción más de ganar, con sus propios pronósticos. Toca un cupo para ver o editar sus pronósticos; suma puntos cuando aprobamos su pago.
       </p>
 
-      <nav aria-label="Elegir participación" className="mt-3">
+      <nav aria-label="Elegir cupo" className="mt-3">
         <ul className="flex flex-wrap gap-2">
           {visible.map((entry) => {
             const state = participationState(entry);
@@ -80,7 +79,7 @@ export function Participaciones({
                   href={`/casa/${slug}?p=${entry.entry_number}`}
                   scroll={false}
                   aria-current={selected ? "true" : undefined}
-                  aria-label={`Participación ${entry.entry_number}: ${LABEL[state]}`}
+                  aria-label={`Cupo ${entry.entry_number}: ${LABEL[state]}`}
                   className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 py-2 text-[15px] font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary active:scale-[0.98] ${
                     selected
                       ? "border-text-primary bg-bg-elevated text-text-primary"
@@ -98,17 +97,11 @@ export function Participaciones({
       </nav>
 
       {canAdd ? (
-        <>
-          <Link href={`/casa/${slug}/pagar?participacion=nueva`} className="lp-btn lp-btn-ghost mt-4 w-full gap-2 !whitespace-normal text-center">
-            <Plus aria-hidden="true" className="h-5 w-5 shrink-0" />
-            Sumar otra participación por {formatCop(entryPriceCop)}
-          </Link>
-          <p className="mt-2 text-[13px] leading-relaxed text-text-muted">
-            Cada una necesita su propia transferencia de {formatCop(entryPriceCop)} y su propio comprobante.
-          </p>
-        </>
+        <p className="mt-3 text-[13px] leading-relaxed text-text-muted">
+          Para comprar otro cupo usa el botón de arriba. Cada cupo necesita su propia transferencia de {formatCop(entryPriceCop)} y su propio comprobante.
+        </p>
       ) : open ? (
-        <p className="mt-3 text-[13px] text-text-muted">Llegaste al máximo de {maxEntries} participaciones en esta polla.</p>
+        <p className="mt-3 text-[13px] text-text-muted">Llegaste al máximo de {maxEntries} cupos en esta polla.</p>
       ) : null}
     </StreetCard>
   );

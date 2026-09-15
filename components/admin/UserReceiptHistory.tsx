@@ -152,7 +152,7 @@ export default function UserReceiptHistory({ userId }: { userId: string }) {
                   ? <Link href={`/admin/pollas/${r.estado === "aprobado" ? "pagos" : "recibos"}?pollaId=${r.pollaId}`} className="text-[15px] font-semibold text-text-primary underline-offset-4 hover:underline [overflow-wrap:anywhere]">{r.polla}</Link>
                   : <p className="text-[15px] font-semibold text-text-primary [overflow-wrap:anywhere]">{r.polla}</p>}
                 {r.boleta != null && <p className="mt-1 text-[13px] text-text-secondary">Boleta #{r.boleta}</p>}
-                {r.participacion != null && <p className="mt-1 text-[13px] text-text-secondary">Participación #{r.participacion}</p>}
+                {r.participacion != null && <p className="mt-1 text-[13px] text-text-secondary">Cupo #{r.participacion}</p>}
               </div>
               {r.montoCop != null && <span className="lp-money text-[20px] text-text-primary">{formatCop(r.montoCop)}</span>}
             </div>

@@ -82,7 +82,7 @@ export async function saveCasaPicks(
       status: 403,
       error: entryNumber === undefined || !entry
         ? "Primero tienes que inscribirte a la polla."
-        : "Esta participación todavía no tiene un comprobante en revisión o aprobado.",
+        : "Este cupo todavía no tiene un comprobante en revisión o aprobado.",
     };
   }
   const entryId = entry!.id;

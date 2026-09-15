@@ -159,7 +159,7 @@ export function validateEditDraft(
   if (name.length < 3 || name.length > 80) return "El nombre debe tener entre 3 y 80 caracteres.";
   if (draft.description.trim().length > 400) return "La descripción admite hasta 400 caracteres.";
   if (!Number.isInteger(draft.maxEntriesPerUser) || draft.maxEntriesPerUser < 1 || draft.maxEntriesPerUser > 50) {
-    return "Las participaciones por persona deben estar entre 1 y 50.";
+    return "Los cupos por persona deben estar entre 1 y 50.";
   }
   if (options.hasEntries) return null;
   if (!Number.isInteger(draft.entryPriceCop) || draft.entryPriceCop < 0 || draft.entryPriceCop > 10_000_000) {
