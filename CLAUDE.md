@@ -62,8 +62,10 @@ cron `/api/matches/discover` y panel `/api/admin/sync-ligas`), vivo
 
 ### Bot de Telegram para jugadores (2026-09-15, migración 130)
 
-El bot público `@LaPollaColombianaAccesoBot` (webhook `/api/telegram/login`)
-ya no es solo el login: es la app completa para quien no quiere usar la web.
+Un solo bot público, **`@LaPollaColombianaBot`** (webhook `/api/telegram/login`),
+para TODO: login a la web y app completa para quien no quiere usar la web. Desde
+2026-09-15 reemplaza a `@LaPollaColombianaAccesoBot` (borrado a pedido del dueño:
+«nada de un bot separado pal acceso»). No volver a crear un bot aparte para login.
 Crear cuenta (Compartir mi número), perfil (nombre → pollito → cuenta de
 premios), pollas abiertas, inscribirse, enviar la foto del comprobante, «Mis
 pagos», pronosticar (1X2 con botones, marcador con goles 0–9 o «2-1», preguntas)
@@ -864,7 +866,7 @@ Foto completa, con rollback por pieza: README → «Estado en producción
   horario hábil con acuse en segundos y el vigía de silencio
   (`revisarSilencios`) conectado a un cron, porque hoy no hay cron que lo
   llame. Rollback = PATCH `hook_send_sms_enabled:false`, sin deploy.
-- **Login por Telegram: ACTIVO (v2, migración 119, PR #78).** `@LaPollaColombianaAccesoBot`,
+- **Login por Telegram: ACTIVO (v2, migración 119, PR #78).** `@LaPollaColombianaBot` (antes `@LaPollaColombianaAccesoBot`, borrado el 2026-09-15),
   webhook en `/api/telegram/login`, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`.
   Ajustes del 2026-09-14 (migración 120, aditiva) en la sección de abajo.
 - **Captcha de Auth: apagada**; widget Turnstile y verificación en `start-otp`
