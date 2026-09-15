@@ -58,6 +58,14 @@ describe("proof watchers", () => {
     expect(send.mock.calls[0][1].chat_id).toBe(6232655473);
   });
 
+  it("test copy only: skips the configured recipients", async () => {
+    const send = vi.fn().mockResolvedValue(true);
+    const client = { send, call: vi.fn(), download: vi.fn() };
+    const db = fakeDb([OTRO], [{ user_id: OTRO, telegram_user_id: 1148145974 }]);
+    expect(await notifyProofWatchers(db, notice, { env: ENV, client, extraUserIds: [OTRO], onlyExtra: true })).toBe(1);
+    expect(send.mock.calls.map((c) => c[1].chat_id)).toEqual([1148145974]);
+  });
+
   it("does nothing without recipients or without the bot configured", async () => {
     const send = vi.fn().mockResolvedValue(true);
     const client = { send, call: vi.fn(), download: vi.fn() };
