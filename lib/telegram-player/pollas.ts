@@ -268,7 +268,9 @@ export async function showInfo(ctx: PlayerCtx, polla: CasaPolla): Promise<void> 
     lines.push(`• Premio mínimo garantizado: ${formatCop(polla.fixed_prize_cop)}.`);
     if (threshold?.entriesToGrow != null && threshold.entryPrizeCop > 0) {
       const n = threshold.entriesToGrow;
-      lines.push(`• Si más de ${n} ${n === 1 ? "persona se inscribe" : "personas se inscriben"}, el pozo crece ${formatCop(threshold.entryPrizeCop)} por cada persona adicional.`);
+      lines.push(n === 0
+        ? `• El pozo crece ${formatCop(threshold.entryPrizeCop)} por cada persona que se inscribe.`
+        : `• Si más de ${n} ${n === 1 ? "persona se inscribe" : "personas se inscriben"}, el pozo crece ${formatCop(threshold.entryPrizeCop)} por cada persona adicional.`);
     }
   }
   if (polla.kind === "rifa") {

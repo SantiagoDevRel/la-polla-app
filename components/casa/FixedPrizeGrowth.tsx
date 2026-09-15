@@ -17,8 +17,10 @@ export function fixedPrizeGrows(threshold: FixedPrizeThreshold | null | undefine
 export function FixedPrizeGrowth({ threshold }: { threshold: FixedPrizeThreshold | null | undefined }) {
   if (!fixedPrizeGrows(threshold)) return null;
   const n = threshold.entriesToGrow;
+  const amount = <strong className="font-semibold text-text-primary">{formatCop(threshold.entryPrizeCop)}</strong>;
+  // (migración 126) n = entradas que no hacen crecer el pozo; 0 si una sola entrada ya pasa el doble.
+  if (n === 0) return <>El pozo crece {amount} por cada persona que se inscribe.</>;
   return <>
-    Si más de {n} {n === 1 ? "persona se inscribe" : "personas se inscriben"}, el pozo crece{" "}
-    <strong className="font-semibold text-text-primary">{formatCop(threshold.entryPrizeCop)}</strong> por cada persona adicional.
+    Si más de {n} {n === 1 ? "persona se inscribe" : "personas se inscriben"}, el pozo crece {amount} por cada persona adicional.
   </>;
 }

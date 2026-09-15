@@ -148,9 +148,45 @@ const nextConfig = {
           },
         ],
       },
-      // Security headers — all routes
+      // Mini app de Telegram para compartir el número (public/telegram/numero.html,
+      // lib/auth/telegram-login/handler.ts). Es la ÚNICA ruta que se puede
+      // enmarcar: Telegram Web la abre en un iframe de web.telegram.org (las apps
+      // de celular y computador usan su propio WebView). Carga el script oficial
+      // de telegram.org y nada más: sin conexiones, sin formularios, sin datos.
       {
-        source: "/(.*)",
+        source: "/telegram/numero.html",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), payment=()",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          { key: "Cache-Control", value: "public, max-age=300, stale-while-revalidate=86400" },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'none'",
+              "script-src 'self' https://telegram.org",
+              // El script de Telegram inserta un <style> y variables del tema.
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data:",
+              "connect-src 'none'",
+              "frame-ancestors https://web.telegram.org",
+              "base-uri 'none'",
+              "form-action 'none'",
+            ].join("; "),
+          },
+        ],
+      },
+      // Security headers — all routes (menos la mini app de arriba, que necesita
+      // otro frame-ancestors y no puede llevar X-Frame-Options: DENY).
+      {
+        source: "/((?!telegram/numero\\.html).*)",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },

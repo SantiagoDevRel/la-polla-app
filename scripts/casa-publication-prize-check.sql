@@ -125,7 +125,13 @@ BEGIN
   r:=public.casa_fixed_prize_threshold_preview_v2(10000,0,1000000,250);
   ASSERT (r->>'entry_prize')::bigint=10000 AND (r->>'entry_house')::bigint=0 AND (r->>'all_prize')::bigint=1500000;
   r:=public.casa_fixed_prize_threshold_preview_v2(30000,50,1000000,100);
-  ASSERT (r->>'entries_to_cover')::bigint=34 AND (r->>'entries_to_grow')::bigint=67, 'Entry thresholds round up';
+  -- Migration 126: entries_to_grow counts the entries that do NOT grow the pot.
+  -- 30,000 x 67 = 2,010,000 > 2F already adds 5,000, so growth starts at 67.
+  ASSERT (r->>'entries_to_cover')::bigint=34 AND (r->>'entries_to_grow')::bigint=66, 'Cover rounds up, grow rounds down';
+  ASSERT public.casa_money_prize_cop(30000::bigint*66,50,1000000)=1000000 AND public.casa_money_prize_cop(30000::bigint*67,50,1000000)=1005000;
+  r:=public.casa_fixed_prize_threshold_preview_v2(3000000,50,1000000,2);
+  ASSERT (r->>'entries_to_cover')::bigint=1 AND (r->>'entries_to_grow')::bigint=0 AND public.casa_money_prize_cop(3000000,50,1000000)=1500000,
+    'An entry above twice the prize grows the pot from the first person';
   r:=public.casa_fixed_prize_threshold_preview_v2(0,50,1000000,100);
   ASSERT r->'entries_to_cover'='null'::jsonb AND r->'entries_to_grow'='null'::jsonb
     AND (r->>'all_prize')::bigint=1000000 AND (r->>'all_balance')::bigint=-1000000;

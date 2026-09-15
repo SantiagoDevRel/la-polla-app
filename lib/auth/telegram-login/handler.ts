@@ -7,7 +7,8 @@
 //     enlace de un solo uso (5 min). Con /start <nonce> el enlace queda en la
 //     fila de esa solicitud, así abierto en el mismo navegador entra sin
 //     confirmar.
-//   - Sin vínculo: se pide el número UNA vez (teclado persistente). Al llegar
+//   - Sin vínculo: se pide el número UNA vez (botón de mini app pegado al
+//     mensaje + teclado persistente de respaldo). Al llegar
 //     el contacto propio se busca o crea la cuenta, se vincula si las reglas lo
 //     permiten (identity.ts) y se manda el enlace (ligado a la solicitud
 //     pendiente si la hay).
@@ -25,7 +26,7 @@ import type { TelegramLoginConfig } from "./config";
 import type { BotApiCall } from "./bot-api";
 import { generateLinkToken } from "./crypto";
 import { canIssueFor, linkTelegramAccountForContact, telegramIdentityStatus } from "./identity";
-import { loginLinkUrl } from "./links";
+import { loginLinkOrigin, loginLinkUrl } from "./links";
 import { loginBotCopy } from "./messages";
 import {
   approveLoginRequest,
@@ -79,6 +80,27 @@ interface ChatState {
   pendingRequestId: string | null;
   contactPromptedAt: number | null;
   keyboardOpen: boolean;
+}
+
+/** Mini app que abre la ventana nativa de Telegram para compartir el número. */
+export const SHARE_PHONE_PAGE_PATH = "/telegram/numero.html";
+
+/**
+ * URL de la mini app, o null si el origen no es https (Telegram rechaza el
+ * mensaje entero con un botón web_app sin https, p. ej. localhost).
+ */
+export function sharePhonePageUrl(
+  locale: LoginLocale,
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  const origin = loginLinkOrigin(locale, env);
+  if (!origin.startsWith("https://")) return null;
+  return `${origin}${SHARE_PHONE_PAGE_PATH}${locale === "en" ? "?lang=en" : ""}`;
+}
+
+/** Botón pegado al mensaje: a diferencia del teclado, se ve en todos los clientes. */
+function sharePhoneButton(copy: Copy, url: string) {
+  return { inline_keyboard: [[{ text: copy.shareButton, web_app: { url } }]] };
 }
 
 function shareKeyboard(copy: Copy) {
@@ -308,7 +330,10 @@ async function handleMessage(
     request = found;
   }
 
-  const locale: LoginLocale = request?.locale ?? action.locale ?? chat.locale ?? "es";
+  // (2026-09-15) Pedido del dueño: todo en español. El idioma de la app de
+  // Telegram ya no decide; solo una solicitud de chickenpicks.app (la del nonce
+  // o la que sigue pendiente en el chat) mantiene el inglés.
+  const locale: LoginLocale = request?.locale ?? (chat.pendingRequestId ? chat.locale : null) ?? "es";
   const copy = loginBotCopy(locale);
   const usable =
     request &&
@@ -353,17 +378,26 @@ async function handleMessage(
   // El bot de jugadores presenta el servicio a quien llega por /start sin venir
   // de la web: en el mismo mensaje, para que el botón no quede debajo de otro.
   const lead = !recentlyPrompted && !action.nonce && deps.promptLead ? deps.promptLead : null;
-  await sendPlain(
-    send,
-    chatId,
-    [staleRequest ? copy.requestExpired : null, lead, prompt].filter(Boolean).join("\n\n"),
-    shareKeyboard(copy),
-  );
+  const stale = staleRequest ? copy.requestExpired : null;
+  const pageUrl = sharePhonePageUrl(locale, deps.env);
+  let keyboardSent = false;
+  if (!pageUrl) {
+    keyboardSent = await sendPlain(send, chatId, [stale, lead, prompt].filter(Boolean).join("\n\n"), shareKeyboard(copy));
+  } else if (recentlyPrompted) {
+    // El teclado de respaldo ya se mandó hace menos de dos minutos.
+    await sendPlain(send, chatId, [stale, copy.promptTap].filter(Boolean).join("\n\n"), sharePhoneButton(copy, pageUrl));
+  } else {
+    // (2026-09-15) «Toca Compartir mi número y no encuentro ningún botón»: el
+    // teclado vive escondido tras un ícono en Telegram Web/Desktop. El botón
+    // va en el ÚLTIMO mensaje, pegado a él; el teclado queda en el primero.
+    keyboardSent = await sendPlain(send, chatId, [stale, lead, copy.promptIntro].filter(Boolean).join("\n\n"), shareKeyboard(copy));
+    await sendPlain(send, chatId, copy.promptTap, sharePhoneButton(copy, pageUrl));
+  }
   await saveChat(db, telegramUserId, {
     locale,
     pending_request_id: pendingRequestId,
     contact_prompted_at: new Date(now).toISOString(),
-    reply_keyboard_open: true,
+    ...(keyboardSent ? { reply_keyboard_open: true } : {}),
   });
   return "prompted";
 }
@@ -445,13 +479,12 @@ export async function handleLoginUpdate(
   if (action.kind === "foreign_contact" || action.kind === "invalid_phone") {
     const locale = chat.locale ?? "es";
     const copy = loginBotCopy(locale);
-    await sendPlain(
-      deps.send,
-      action.chatId,
-      action.kind === "foreign_contact" ? copy.foreign : copy.invalidPhone,
-      shareKeyboard(copy),
-    );
-    await saveChat(deps.db, action.telegramUserId, { locale, reply_keyboard_open: true });
+    const text = action.kind === "foreign_contact" ? copy.foreign : copy.invalidPhone;
+    const pageUrl = sharePhonePageUrl(locale, deps.env);
+    // Quien mandó un contacto ajeno suele venir del clip de adjuntos: el botón
+    // pegado al mensaje le muestra el camino correcto.
+    const sent = await sendPlain(deps.send, action.chatId, text, pageUrl ? sharePhoneButton(copy, pageUrl) : shareKeyboard(copy));
+    await saveChat(deps.db, action.telegramUserId, { locale, ...(sent && !pageUrl ? { reply_keyboard_open: true } : {}) });
     return action.kind;
   }
 

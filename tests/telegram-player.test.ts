@@ -350,16 +350,20 @@ const sentBodies = (bot: ReturnType<typeof fakeBot>) => bot.send.mock.calls.filt
 describe("handleTelegramUpdate — who answers what", () => {
   const env = { NEXT_PUBLIC_APP_URL: "https://lapollacolombiana.com" };
 
-  it("a button from a Telegram account without La Polla asks for the number, with the introduction in the same message", async () => {
+  it("a button from a Telegram account without La Polla asks for the number: introduction first, the share button stuck to the last message", async () => {
     const db = fakeAdmin({ telegram_login_linked_accounts: { data: [] } });
     const bot = fakeBot();
     const outcome = await handleTelegramUpdate(callback(`p:${shortId(POLLA)}`), { config: CONFIG, db: db as never, bot: bot as never, env });
     expect(outcome).toBe("prompted");
     expect(bot.send).toHaveBeenCalledWith("answerCallbackQuery", { callback_query_id: "cb-1" });
     const bodies = sentBodies(bot);
-    expect(bodies).toHaveLength(1);
+    expect(bodies).toHaveLength(2);
     expect(bodies[0].text).toContain("Bienvenido a La Polla Colombiana");
     expect((bodies[0].reply_markup as { keyboard: Array<Array<{ request_contact?: boolean }>> }).keyboard[0][0].request_contact).toBe(true);
+    expect(bodies[1].text).toContain("justo debajo de este mensaje");
+    expect(bodies[1].reply_markup).toEqual({
+      inline_keyboard: [[{ text: "Compartir mi número", web_app: { url: "https://lapollacolombiana.com/telegram/numero.html" } }]],
+    });
     // Solo lecturas de vínculo (la del bot y la del flujo de login): ninguna
     // cuenta, solicitud ni enlace se toca por un botón sin cuenta.
     expect(new Set(db.rpc.mock.calls.map((c) => c[0]))).toEqual(new Set(["telegram_login_linked_accounts"]));

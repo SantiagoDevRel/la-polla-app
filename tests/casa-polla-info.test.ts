@@ -36,6 +36,9 @@ describe("PollaInfo (2026-09-13: desplegables con viñetas cortas)", () => {
     expect(text(info())).not.toContain("Si más de 50 personas");
     expect(text(info({}, { entriesToCover: 1, entriesToGrow: 1, entryPrizeCop: 7_000 }))).toContain("Si más de 1 persona se inscribe, el pozo crece $7.000");
     expect(text(info())).not.toContain("% de cada nueva entrada");
+    // Migration 126: an entry above twice the prize grows the pot from the first person.
+    expect(text(info({}, { entriesToCover: 1, entriesToGrow: 0, entryPrizeCop: 1_000_000 }))).toContain("El pozo crece $1.000.000 por cada persona que se inscribe.");
+    expect(text(info({}, { entriesToCover: 1, entriesToGrow: 0, entryPrizeCop: 1_000_000 }))).not.toContain("Si más de 0");
   });
 
   it("omits the growth line when the pot cannot grow or the threshold is unknown", () => {
