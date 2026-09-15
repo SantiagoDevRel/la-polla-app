@@ -91,6 +91,16 @@ Telegram para jugadores». Reglas que no se negocian:
 - `callback_query` lo agrega el propio servidor tras un update autenticado
   (`webhook-updates.ts`): misma URL que ya tiene Telegram, secreto de la env, sin
   `drop_pending_updates`. No hace falta rotar secretos para activarlo.
+- **Todo en español (dueño, 2026-09-15):** comandos, descripción (con el enlace a
+  lapollacolombiana.com) y textos del bot, también para Telegram en inglés; solo
+  una solicitud de chickenpicks.app mantiene el inglés del login. «What can this
+  bot do?», «Menu» y «Start» son del cliente de Telegram y no se pueden cambiar.
+- **Compartir el número = botón pegado al mensaje** (web_app →
+  `public/telegram/numero.html`, `requestContact` nativo; el contacto llega al
+  chat como con el teclado). El teclado queda de respaldo: en Telegram Web y
+  computador vive detrás de un ícono y el dueño no lo encontró. Es la única ruta
+  enmarcable (`frame-ancestors https://web.telegram.org`, bloque propio en
+  `next.config.mjs`); no le agregues conexiones ni datos.
 - Estado de la conversación en `telegram_login_chats.bot_flow*` (130). El número
   de cuenta bancaria nunca queda ahí: es la última respuesta y va a `users`.
 - **Regla de pronósticos con pago pendiente (dueño, 2026-09-15; web y bot):** quien

@@ -52,34 +52,27 @@ if (problems.length) {
 // Desde 2026-09-14 el servidor lo sincroniza solo (webhook y
 // /api/cron/telegram-login-bot-profile); si cambias un texto, cámbialo allá.
 // (2026-09-15) El bot también es la app para jugadores (lib/telegram-player).
-const PROFILE = {
-  es: {
-    commands: [
-      { command: "start", description: "Menú principal" },
-      { command: "pollas", description: "Pollas abiertas para inscribirte" },
-      { command: "mispollas", description: "Mis pollas: pronosticar y ver la tabla" },
-      { command: "pagos", description: "Saber si ya confirmamos mi pago" },
-      { command: "perfil", description: "Mi nombre, pollito y cuenta de premios" },
-      { command: "ayuda", description: "Cómo funciona" },
-      { command: "web", description: "Entrar a la página web" },
-    ],
-    about: "La Polla Colombiana en Telegram: crea tu cuenta, inscríbete a las pollas, envía tu comprobante, pronostica y mira la tabla. También te deja entrar a la web cuando el SMS no llega.",
-    short: "Inscríbete, pronostica y mira la tabla de La Polla Colombiana desde Telegram.",
-  },
-  en: {
-    commands: [
-      { command: "start", description: "Main menu" },
-      { command: "pollas", description: "Open pools you can join" },
-      { command: "mispollas", description: "My pools: predictions and standings" },
-      { command: "pagos", description: "Check whether my payment was confirmed" },
-      { command: "perfil", description: "My name, chick and prize account" },
-      { command: "ayuda", description: "How it works" },
-      { command: "web", description: "Sign in to the website" },
-    ],
-    about: "La Polla Colombiana on Telegram: create your account, join pools, send your payment receipt, make predictions and check the standings. It also signs you in to the website when the SMS doesn't arrive.",
-    short: "Join pools, make predictions and check the standings of La Polla Colombiana on Telegram.",
-  },
+const SPANISH = {
+  commands: [
+    { command: "start", description: "Menú principal" },
+    { command: "pollas", description: "Pollas abiertas para inscribirte" },
+    { command: "mispollas", description: "Mis pollas: pronosticar y ver la tabla" },
+    { command: "pagos", description: "Saber si ya confirmamos mi pago" },
+    { command: "perfil", description: "Mi nombre, pollito y cuenta de premios" },
+    { command: "ayuda", description: "Cómo funciona" },
+    { command: "web", description: "Entrar a la página web" },
+  ],
+  about: [
+    "La Polla Colombiana en Telegram: crea tu cuenta, inscríbete a las pollas, envía tu comprobante de pago, pronostica y mira la tabla de posiciones. Todo con botones.",
+    "",
+    "También te deja entrar a la página web cuando el SMS no llega.",
+    "",
+    "Página web: https://lapollacolombiana.com",
+  ].join(String.fromCharCode(10)),
+  short: "Inscríbete, pronostica y mira la tabla de La Polla Colombiana. https://lapollacolombiana.com",
 };
+// Español para todos los idiomas (pedido del dueño, 2026-09-15).
+const PROFILE = { es: SPANISH, en: SPANISH };
 
 const textSteps = [null, "es", "en"].flatMap((lang) => {
   const copy = PROFILE[lang ?? "es"];

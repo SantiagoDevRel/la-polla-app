@@ -10,6 +10,11 @@
 // El control que muestra el teclado del bot no se ve igual en todos los
 // clientes (en Telegram Web es un ícono de cuatro lóbulos junto a la carita):
 // se describe por su forma y su lugar, no como «ícono de teclado».
+//
+// (2026-09-15) Aun así la persona no lo encontraba: el pedido del número ahora
+// lleva un botón pegado al mensaje que abre public/telegram/numero.html, una
+// mini app que muestra la ventana nativa de Telegram para compartir el número.
+// El teclado queda de respaldo (y es lo único que hay sin https, en desarrollo).
 
 import type { LoginLocale } from "./update";
 
@@ -21,6 +26,11 @@ const COPY = {
   es: {
     shareButton: "Compartir mi número",
     sharePlaceholder: "Toca Compartir mi número",
+    // Con el botón pegado al mensaje (mini app): dos mensajes, el primero deja
+    // el teclado de respaldo y el segundo lleva el botón que siempre se ve.
+    promptIntro: "Para entrar por primera vez con Telegram necesitamos confirmar tu número.",
+    promptTap:
+      "Toca el botón <b>Compartir mi número</b> que está justo debajo de este mensaje. Telegram te pide confirmar y listo.",
     promptLong: [
       "Para entrar por primera vez con Telegram necesitamos confirmar tu número.",
       "",
@@ -55,6 +65,9 @@ const COPY = {
   en: {
     shareButton: "Share my number",
     sharePlaceholder: "Tap Share my number",
+    promptIntro: "To sign in with Telegram for the first time we need to confirm your number.",
+    promptTap:
+      "Tap the <b>Share my number</b> button right below this message. Telegram asks you to confirm and that is it.",
     promptLong: [
       "To sign in with Telegram for the first time we need to confirm your number.",
       "",
