@@ -51,6 +51,12 @@ async function sendProof(page, label, slot = 0) {
   await page.locator("button:not([disabled])", { hasText: "Enviar el comprobante" }).first().click();
 }
 
+async function chooseCupo(page, slug, n) {
+  await page.getByLabel("Elige el cupo para ver o editar sus pronósticos", { exact: true }).selectOption(String(n));
+  await page.waitForURL(`**/casa/${slug}?p=${n}`);
+  await hydrated(page);
+}
+
 const opened = [];
 try {
   const suffix = randomUUID().slice(0, 6);
@@ -99,24 +105,26 @@ try {
   await page.getByRole("link", { name: "Ver mis cupos y pronosticar" }).click();
   await page.waitForURL(`**/casa/${slug}?p=1`, { timeout: 60000 });
   await page.getByRole("heading", { name: "Tus cupos" }).waitFor();
-  await page.getByRole("link", { name: "Cupo 1: En revisión" }).waitFor();
-  await page.getByRole("link", { name: "Cupo 2: En revisión" }).waitFor();
   await hydrated(page);
+  const cupoSelect = page.getByLabel("Elige el cupo para ver o editar sus pronósticos", { exact: true });
+  assert.deepEqual(await cupoSelect.locator("option").allInnerTexts(), ["Cupo 1 · En revisión · faltan 2", "Cupo 2 · En revisión · faltan 2"]);
+  await page.getByText("Te faltan 2 pronósticos", { exact: true }).waitFor();
+  assert.equal(await page.getByText("Pago en revisión", { exact: true }).count(), 1, "the status is not repeated in a separate box");
+  await page.getByText(/Puedes pronosticar y guardar aunque el pago esté en revisión/).waitFor();
   await page.getByLabel(`Goles de ${home}`, { exact: true }).fill("2");
   await page.getByLabel(`Goles de ${away}`, { exact: true }).fill("1");
   await page.getByRole("button", { name: /^Guardar/ }).click();
   await page.getByText(/^Guardado \d+ de \d+/).waitFor();
-  await page.getByRole("link", { name: "Cupo 2: En revisión" }).click();
-  await page.waitForURL(`**/casa/${slug}?p=2`);
+  await page.reload({ waitUntil: "networkidle" });
   await hydrated(page);
+  await page.getByText("También te faltan pronósticos en el cupo #2.", { exact: true }).waitFor();
+  await chooseCupo(page, slug, 2);
   assert.equal(await page.getByLabel(`Goles de ${home}`, { exact: true }).inputValue(), "", "cupo #2 starts with its own empty picks");
   await page.getByLabel(`Goles de ${home}`, { exact: true }).fill("0");
   await page.getByLabel(`Goles de ${away}`, { exact: true }).fill("0");
   await page.getByRole("button", { name: /^Guardar/ }).click();
   await page.getByText(/^Guardado \d+ de \d+/).waitFor();
-  await page.getByRole("link", { name: "Cupo 1: En revisión" }).click();
-  await page.waitForURL(`**/casa/${slug}?p=1`);
-  await hydrated(page);
+  await chooseCupo(page, slug, 1);
   assert.equal(await page.getByLabel(`Goles de ${home}`, { exact: true }).inputValue(), "2", "switching back shows #1 picks");
   await screen(page, "polla-dos-cupos");
   await zoom(page, "polla-dos-cupos");
@@ -154,9 +162,10 @@ try {
   await approve(2).waitFor();
 
   await page.goto(`${origin}/casa/${slug}?p=1`, { waitUntil: "networkidle" });
-  await page.getByRole("link", { name: "Cupo 1: Activo" }).waitFor();
-  await page.getByRole("link", { name: "Cupo 2: En revisión" }).waitFor();
   await hydrated(page);
+  await page.getByText("Pagado", { exact: true }).waitFor();
+  assert.deepEqual((await page.getByLabel("Elige el cupo para ver o editar sus pronósticos", { exact: true }).locator("option").allInnerTexts()).map(t => t.split(" · ").slice(0, 2).join(" · ")),
+    ["Cupo 1 · Pagado", "Cupo 2 · En revisión", "Cupo 3 · En revisión"]);
   await page.getByRole("tab", { name: "Tabla" }).click();
   const table = page.locator("table tbody tr");
   await table.first().waitFor();
@@ -176,18 +185,26 @@ try {
   await screen(page, "tabla-cupos");
   console.log("PASS two approved: two table rows, #1 and #2");
 
-  // ── 4) Mis pollas: una tarjeta por cupo.
+  // ── 4) Mis pollas: una tarjeta por polla con desplegable de cupo.
   await page.goto(`${origin}/casa`, { waitUntil: "networkidle" });
   await hydrated(page);
   const mine = page.locator("#mis-pollas");
   if (!(await mine.evaluate(el => el.open))) await mine.locator("summary").click();
-  const cards = mine.getByRole("link").filter({ hasText: pollaName });
-  await cards.first().waitFor();
-  assert.equal(await cards.count(), 3, "one card per cupo");
-  for (const n of [1, 2, 3]) assert.equal(await cards.filter({ hasText: `Cupo ${n}` }).getAttribute("href"), `/casa/${slug}?p=${n}`);
+  const card = mine.locator("li").filter({ hasText: pollaName });
+  await card.first().waitFor();
+  assert.equal(await card.count(), 1, "one card per polla");
+  const inner = card.getByLabel("Cupo", { exact: true });
+  assert.equal(await inner.locator("option").count(), 3);
+  await card.getByText("Pagado", { exact: true }).waitFor();
+  await card.getByText(/También faltan pronósticos en los cupos #2, #3/).waitFor();
+  await inner.selectOption("3");
+  await card.getByText("Pago en revisión", { exact: true }).waitFor();
+  await card.getByText("Te faltan 2 pronósticos", { exact: true }).waitFor();
+  assert.equal(await card.getByRole("link", { name: "Abrir cupo 3" }).getAttribute("href"), `/casa/${slug}?p=3`);
   await mine.scrollIntoViewIfNeeded();
   await screen(page, "mis-pollas-cupos");
-  console.log("PASS Mis pollas lists Ofigolazo · Cupo 1, 2 and 3 with deep links");
+  await zoom(page, "mis-pollas-cupos");
+  console.log("PASS Mis pollas: one Ofigolazo card, cupo dropdown, green/amber payment, red missing predictions");
   console.log(`Captures: ${output}`);
 } catch (error) {
   for (const [index, openPage] of opened.entries()) await openPage.screenshot({ path: `${output}/FALLO-${index}.png`, fullPage: true }).catch(() => {});

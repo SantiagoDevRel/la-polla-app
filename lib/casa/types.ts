@@ -100,7 +100,7 @@ export interface MyCasaPolla extends Pick<CasaPolla, "id" | "slug" | "name" | "k
    * Participaciones vivas (pagada o en revisión) en polla de partidos/preguntas,
    * ordenadas por número. Vacío en rifas: ahí manda la boleta.
    */
-  entries: Array<{ number: number; status: "pendiente" | "pagada" }>;
+  entries: Array<{ number: number; status: "pendiente" | "pagada"; /** Partidos todavía pronosticables sin pronóstico. */ pending?: number }>;
 }
 
 export interface CasaEntry {
