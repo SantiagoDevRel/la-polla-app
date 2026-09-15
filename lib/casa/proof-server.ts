@@ -13,6 +13,7 @@ import { getPot } from "./queries";
 import { verifyCasaUpload } from "./uploads";
 import type { CasaPolla } from "./types";
 import { notifyNewProof, PROOF_BUCKET } from "@/lib/telegram/notify";
+import { notifyProofWatchers } from "@/lib/telegram-player/proof-watchers";
 
 export const CASA_CONTRACT = 2;
 
@@ -138,13 +139,20 @@ async function notifyProofToAdmins(
       db.from("users").select("display_name").eq("id", userId).maybeSingle(),
       getPot(polla.id, attempt.entry_id),
     ]);
-    await notifyNewProof({
-      entryId: attempt.entry_id, attemptId: attempt.id, pollaName: polla.name, pollaSlug: polla.slug,
-      userName: profile?.display_name ?? "Sin nombre", amountCop: entry.amount_cop,
-      proofPath: attempt.proof_path, ticketNumber: entry.ticket_number, entryNumber: entry.entry_number ?? null,
-      potAfterCop: pot.projected_prize_cop ?? pot.prize_cop,
-      prizeKind: polla.prize_kind, prizeObject: polla.prize_object,
-    });
+    const userName = profile?.display_name ?? "Sin nombre";
+    await Promise.all([
+      notifyNewProof({
+        entryId: attempt.entry_id, attemptId: attempt.id, pollaName: polla.name, pollaSlug: polla.slug,
+        userName, amountCop: entry.amount_cop,
+        proofPath: attempt.proof_path, ticketNumber: entry.ticket_number, entryNumber: entry.entry_number ?? null,
+        potAfterCop: pot.projected_prize_cop ?? pot.prize_cop,
+        prizeKind: polla.prize_kind, prizeObject: polla.prize_object,
+      }),
+      notifyProofWatchers(db, {
+        pollaName: polla.name, userName, amountCop: entry.amount_cop,
+        ticketNumber: entry.ticket_number, entryNumber: entry.entry_number ?? null,
+      }),
+    ]);
   } catch { console.warn("[casa/join] Comprobante confirmado; aviso administrativo pendiente de consulta en la cola."); }
   return entryNumber;
 }
