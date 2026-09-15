@@ -828,7 +828,18 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
           </form>
 
           <p className="text-[10px] text-text-muted/70 text-center pt-1">
-            {t("termsHint")}
+            {t.rich("termsHint", {
+              link: (chunks) => (
+                <a
+                  href="/privacy#sms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-text-secondary"
+                >
+                  {chunks}
+                </a>
+              ),
+            })}
           </p>
         </div>
       )}
