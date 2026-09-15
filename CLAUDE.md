@@ -456,6 +456,15 @@ al RPC — **no lo recalcules en JS**, porque ahí empiezan las dos verdades:
 Sigue valiendo la **Regla #4**: se puntúa con el marcador de los 90
 minutos (`final_verified_at IS NOT NULL`). El alargue no suma.
 
+### Aviso de comprobantes por Telegram, solo lectura (2026-09-15)
+Cada comprobante nuevo (web o bot) avisa también por **@LaPollaColombianaBot**
+a los uuids de `CASA_PROOF_WATCHER_USER_IDS` (Vercel production; hoy: Carlos).
+Solo texto + botón URL a `/admin/pollas/recibos`: sin foto, sin teléfono, sin
+aprobar/rechazar. Cada destinatario debe seguir con `users.is_admin` y tener
+`telegram_login_identities`. Código `lib/telegram-player/proof-watchers.ts`;
+prueba manual (TEST) con `POST /api/casa/admin/aviso-comprobantes/prueba`
+desde una sesión admin.
+
 ### El bot de Telegram
 `@LaPollaColombianaAdminBot` · webhook en `app/api/telegram/webhook/route.ts`.
 - Autenticación en dos capas: el header `X-Telegram-Bot-Api-Secret-Token`
