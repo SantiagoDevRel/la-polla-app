@@ -228,20 +228,23 @@ describe("ensureBotProfile — commands and descriptions, once per version", () 
       BOT_PROFILE_STEPS.filter(([m, body]) => m === method && body.language_code === lang).map(([, body]) => body);
     const COMMANDS = ["start", "pollas", "mispollas", "pagos", "perfil", "ayuda", "web"];
 
-    for (const lang of [undefined, "es"]) {
+    // Pedido del dueño (2026-09-15): todo en español, también para quien usa
+    // Telegram en inglés, y con el enlace a la web en la descripción.
+    for (const lang of [undefined, "es", "en"]) {
       const [commands] = byLang("setMyCommands", lang) as Array<{ commands: { command: string; description: string }[] }>;
       expect(commands.commands.map((c) => c.command)).toEqual(COMMANDS);
       expect(commands.commands[0]).toEqual({ command: "start", description: "Menú principal" });
       expect(commands.commands[commands.commands.length - 1]).toEqual({ command: "web", description: "Entrar a la página web" });
-      expect(byLang("setMyDescription", lang)[0].description).toContain("inscríbete a las pollas");
-      expect(byLang("setMyDescription", lang)[0].description).toContain("cuando el SMS no llega");
+      const description = byLang("setMyDescription", lang)[0].description as string;
+      expect(description).toContain("inscríbete a las pollas");
+      expect(description).toContain("cuando el SMS no llega");
+      expect(description).toContain("https://lapollacolombiana.com");
       expect(byLang("setMyShortDescription", lang)[0].short_description).toBe(
-        "Inscríbete, pronostica y mira la tabla de La Polla Colombiana desde Telegram.",
+        "Inscríbete, pronostica y mira la tabla de La Polla Colombiana. https://lapollacolombiana.com",
       );
     }
-    const [en] = byLang("setMyCommands", "en") as Array<{ commands: { command: string; description: string }[] }>;
-    expect(en.commands.map((c) => c.command)).toEqual(COMMANDS);
-    expect(byLang("setMyDescription", "en")[0].description).toContain("when the SMS doesn't arrive");
+    const allTexts = JSON.stringify(BOT_PROFILE_STEPS);
+    expect(allTexts).not.toMatch(/\b(sign in|when the|Main menu|Help)\b/i);
     expect(BOT_PROFILE_STEPS).toHaveLength(9);
 
     const commands = BOT_PROFILE_STEPS.flatMap(([, body]) => (body.commands as { command: string }[] | undefined) ?? []);
@@ -268,13 +271,16 @@ describe("ensureBotProfile — commands and descriptions, once per version", () 
         body.short_description,
       ]).filter((t): t is string => typeof t === "string"),
     );
-    for (const text of texts) expect(script).toContain(JSON.stringify(text));
+    // La descripción larga se arma por líneas en los dos archivos.
+    for (const text of texts) {
+      for (const line of text.split("\n").filter(Boolean)) expect(script).toContain(JSON.stringify(line));
+    }
     expect(script).not.toMatch(/command: "login"|Chicken Picks|sin códigos/);
   });
 
   it("the version hashes the profile and the bot's public id, never the token", () => {
     const version = botProfileVersion(BOT_TOKEN);
-    expect(version).toMatch(/^2026-09-15-[0-9a-f]{16}$/);
+    expect(version).toMatch(/^2026-09-15b-[0-9a-f]{16}$/);
     expect(botProfileVersion(BOT_TOKEN)).toBe(version);
     expect(botProfileVersion(OTHER_BOT_TOKEN)).not.toBe(version);
     expect(botProfileVersion("123456789:AAOtherSecretPartForTheSameBot_zyxwvutsrq")).toBe(version);
@@ -451,7 +457,8 @@ describe("webhook: profile sync after an authenticated update", () => {
     expect((await webhookPOST(webhookRequest(WEBHOOK_SECRET, privateStart(2)))).status).toBe(200);
 
     const methods = telegramMethods(fetchStub);
-    expect(methods.filter((m) => m === "sendMessage")).toHaveLength(2);
+    // Dos pedidos de número, dos mensajes cada uno (teclado + botón de la mini app).
+    expect(methods.filter((m) => m === "sendMessage")).toHaveLength(4);
     expect(methods.filter((m) => m === "setMyCommands")).toHaveLength(3);
     expect(methods.filter((m) => m === "setMyDescription")).toHaveLength(3);
     expect(methods.filter((m) => m === "setMyShortDescription")).toHaveLength(3);

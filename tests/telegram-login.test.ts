@@ -39,7 +39,7 @@ import { loginLinkOrigin, loginLinkUrl, localeForHost } from "@/lib/auth/telegra
 import { loginBotCopy } from "@/lib/auth/telegram-login/messages";
 import { maskPhone } from "@/lib/auth/telegram-login/mask-phone";
 import { resetBotProfileStateForTests } from "@/lib/auth/telegram-login/bot-profile";
-import { handleLoginUpdate, PROMPT_REPEAT_MS } from "@/lib/auth/telegram-login/handler";
+import { handleLoginUpdate, PROMPT_REPEAT_MS, sharePhonePageUrl } from "@/lib/auth/telegram-login/handler";
 import * as requestsModule from "@/lib/auth/telegram-login/requests";
 import {
   consumeLoginLink,
@@ -546,7 +546,16 @@ describe("handleLoginUpdate — linked Telegram account never shares its number 
 describe("handleLoginUpdate — first time with Telegram asks for the number once", () => {
   const env = { NEXT_PUBLIC_APP_URL: "https://lapollacolombiana.com" };
 
-  it("asks with a persistent contact keyboard and remembers the pending request", async () => {
+  const SHARE_PAGE = "https://lapollacolombiana.com/telegram/numero.html";
+  const CONTACT_KEYBOARD = {
+    keyboard: [[{ text: "Compartir mi número", request_contact: true }]],
+    is_persistent: true,
+    resize_keyboard: true,
+    one_time_keyboard: true,
+    input_field_placeholder: "Toca Compartir mi número",
+  };
+
+  it("asks with a button stuck to the LAST message (mini app) plus the contact keyboard as backup, and remembers the pending request", async () => {
     const nonce = generateNonce();
     const admin = fakeAdmin({
       telegram_login_request_find: { data: [{ request_id: "req-9", status: "pending", locale: "es" }] },
@@ -554,25 +563,48 @@ describe("handleLoginUpdate — first time with Telegram asks for the number onc
     });
     const send = vi.fn().mockResolvedValue(true);
     expect(await handleLoginUpdate(privateMessage({ text: `/start ${nonce}` }), { config: CONFIG, db: admin as never, send, env, now: () => 1_000_000 })).toBe("prompted");
+    expect(send).toHaveBeenCalledTimes(2);
+    const [first, second] = [send.mock.calls[0][1], send.mock.calls[1][1]];
+    expect(first.reply_markup).toEqual(CONTACT_KEYBOARD);
+    expect(first.text).toBe("Para entrar por primera vez con Telegram necesitamos confirmar tu número.");
+    // «Toca Compartir mi número y no encuentro ningún botón» (15-sep): el botón
+    // va pegado al último mensaje y abre la ventana nativa de Telegram.
+    expect(second.reply_markup).toEqual({ inline_keyboard: [[{ text: "Compartir mi número", web_app: { url: SHARE_PAGE } }]] });
+    expect(second.text).toContain("justo debajo de este mensaje");
+    expect(rpcNames(admin.rpc)).not.toContain("telegram_login_request_approve");
+    expect(admin.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ telegram_user_id: TG, pending_request_id: "req-9", reply_keyboard_open: true, contact_prompted_at: new Date(1_000_000).toISOString() }),
+      { onConflict: "telegram_user_id" },
+    );
+  });
+
+  it("without https (local development) keeps the single keyboard message: Telegram rejects web_app buttons without https", async () => {
+    const admin = fakeAdmin({ telegram_login_linked_accounts: { data: [] } });
+    const send = vi.fn().mockResolvedValue(true);
+    const local = { NEXT_PUBLIC_APP_URL: "http://localhost:3006" };
+    expect(sharePhonePageUrl("es", local)).toBeNull();
+    expect(sharePhonePageUrl("en", env)).toBe("https://chickenpicks.app/telegram/numero.html?lang=en");
+    await handleLoginUpdate(privateMessage({ text: "hola" }), { config: CONFIG, db: admin as never, send, env: local, now: () => 1_000_000 });
+    expect(send).toHaveBeenCalledTimes(1);
     const body = send.mock.calls[0][1];
-    expect(body.reply_markup).toEqual({
-      keyboard: [[{ text: "Compartir mi número", request_contact: true }]],
-      is_persistent: true,
-      resize_keyboard: true,
-      one_time_keyboard: true,
-      input_field_placeholder: "Toca Compartir mi número",
-    });
+    expect(body.reply_markup).toEqual(CONTACT_KEYBOARD);
     expect(body.text).toContain("Para entrar por primera vez con Telegram necesitamos confirmar tu número.");
     // El control del teclado del bot se describe por forma y lugar (en Telegram
     // Web es un ícono de cuatro lóbulos junto a la carita), no como «teclado».
     expect(body.text).toContain("ícono de cuatro cuadritos");
     expect(body.text).toContain("junto a la carita");
     expect(body.text).not.toContain("ícono de teclado");
-    expect(rpcNames(admin.rpc)).not.toContain("telegram_login_request_approve");
-    expect(admin.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ telegram_user_id: TG, pending_request_id: "req-9", reply_keyboard_open: true, contact_prompted_at: new Date(1_000_000).toISOString() }),
-      { onConflict: "telegram_user_id" },
-    );
+    expect(JSON.stringify(send.mock.calls)).not.toContain("web_app");
+  });
+
+  it("answers in Spanish even when the Telegram app is in English (owner's request)", async () => {
+    const admin = fakeAdmin({ telegram_login_linked_accounts: { data: [] } });
+    const send = vi.fn().mockResolvedValue(true);
+    const english = privateMessage({ text: "/start", from: { id: TG, is_bot: false, first_name: "Ana", language_code: "en" } });
+    await handleLoginUpdate(english, { config: CONFIG, db: admin as never, send, env, now: () => 1_000_000 });
+    expect(send.mock.calls[0][1].text).toContain("necesitamos confirmar tu número");
+    expect(send.mock.calls[1][1].reply_markup.inline_keyboard[0][0].web_app.url).toBe(SHARE_PAGE);
+    expect(admin.upsert.mock.calls[0][0].locale).toBe("es");
   });
 
   it("does not repeat the long message within two minutes", async () => {
@@ -583,11 +615,12 @@ describe("handleLoginUpdate — first time with Telegram asks for the number onc
     );
     const send = vi.fn().mockResolvedValue(true);
     await handleLoginUpdate(privateMessage({ text: "hola" }), { config: CONFIG, db: admin as never, send, env, now: () => promptedAt + 30_000 });
+    expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0][1].text).toBe(
-      "Toca <b>Compartir mi número</b> abajo. Si no lo ves, toca el ícono de cuatro cuadritos junto a la carita, en la barra donde escribes.",
+      "Toca el botón <b>Compartir mi número</b> que está justo debajo de este mensaje. Telegram te pide confirmar y listo.",
     );
+    expect(send.mock.calls[0][1].reply_markup.inline_keyboard[0][0].web_app.url).toBe(SHARE_PAGE);
     expect(loginBotCopy("en").promptShort).toContain("four-squares icon next to the smiley face");
-    expect(send.mock.calls[0][1].reply_markup.is_persistent).toBe(true);
     // El texto suelto no pierde la solicitud pendiente.
     expect(admin.upsert.mock.calls[0][0].pending_request_id).toBe("req-9");
 
@@ -603,6 +636,10 @@ describe("handleLoginUpdate — first time with Telegram asks for the number onc
     expect(await handleLoginUpdate(foreign, { config: CONFIG, db: admin as never, send, env })).toBe("foreign_contact");
     expect(admin.rpc).not.toHaveBeenCalled();
     expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
+    expect(send.mock.calls[0][1].reply_markup.inline_keyboard[0][0].web_app.url).toBe(SHARE_PAGE);
+
+    send.mockClear();
+    await handleLoginUpdate(foreign, { config: CONFIG, db: admin as never, send, env: { NEXT_PUBLIC_APP_URL: "http://localhost:3006" } });
     expect(send.mock.calls[0][1].reply_markup.keyboard[0][0].request_contact).toBe(true);
     expect(send.mock.calls[0][1].reply_markup.is_persistent).toBe(true);
   });
@@ -729,7 +766,8 @@ describe("webhook route", () => {
     // Además del mensaje, después de responder se sincroniza el perfil del bot
     // (tests/telegram-login-polish.test.ts): aquí solo cuenta el sendMessage.
     const sends = fetchStub.mock.calls.filter((c) => String(c[0]).endsWith("/sendMessage"));
-    expect(sends).toHaveLength(1);
+    // Pedido del número: el teclado de respaldo y el botón de la mini app.
+    expect(sends).toHaveLength(2);
     expect(String(sends[0][0])).toMatch(/^https:\/\/api\.telegram\.org\/bot.+\/sendMessage$/);
   });
 });
