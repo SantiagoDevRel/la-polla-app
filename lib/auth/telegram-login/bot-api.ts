@@ -31,6 +31,15 @@ export interface LoginBotClient {
   download: (fileId: string, maxBytes: number) => Promise<Buffer | "too_large" | null>;
 }
 
+/**
+ * Telegram repite en sus errores la URL del botón que rechazó, y esa URL puede
+ * llevar el token de un enlace de un solo uso (`/login/telegram?t=…`): verificado
+ * en la prueba real del 2026-09-15. Nunca se loguean URLs.
+ */
+export function redactTelegramDescription(description: string): string {
+  return description.replace(/'?\b(?:https?|tg):\/\/[^\s']+'?/gi, "<url>").slice(0, 300);
+}
+
 function apiBase(env: Record<string, string | undefined>): string {
   const override = env.TELEGRAM_LOGIN_API_BASE_URL?.trim();
   if (override && env.NODE_ENV !== "production") {
@@ -53,32 +62,39 @@ export function createLoginBotClient(
   const timeoutMs = options.timeoutMs ?? BOT_API_TIMEOUT_MS;
 
   const call: BotApiResultCall = async <T,>(method: string, body: Record<string, unknown>) => {
-    try {
-      const res = await fetch(`${base}/bot${botToken}/${method}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        // Telegram espera respuesta del webhook: no colgamos el request.
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      const json = (await res.json().catch(() => null)) as {
-        ok?: boolean;
-        result?: T;
-        description?: string;
-      } | null;
-      if (!json?.ok) {
-        const description = json?.description ?? null;
-        // «message is not modified» es normal al repetir un tap: no es un fallo.
-        if (!description?.includes("message is not modified")) {
-          // La descripción de Telegram no lleva el token; la URL sí, no se loguea.
-          console.warn(`[telegram-login] ${method} falló:`, description ?? res.status);
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const res = await fetch(`${base}/bot${botToken}/${method}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          // Telegram espera respuesta del webhook: no colgamos el request.
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        const json = (await res.json().catch(() => null)) as {
+          ok?: boolean;
+          result?: T;
+          description?: string;
+        } | null;
+        if (!json?.ok) {
+          const description = json?.description ?? null;
+          // «message is not modified» es normal al repetir un tap: no es un fallo.
+          if (!description?.includes("message is not modified")) {
+            console.warn(`[telegram-login] ${method} falló:`, description ? redactTelegramDescription(description) : res.status);
+          }
+          return { ok: false, description };
         }
-        return { ok: false, description };
+        return { ok: true, result: json.result as T };
+      } catch (err) {
+        // Un error de red (TypeError de fetch, no un timeout) se reintenta una
+        // vez: en la prueba real se perdió así un aviso de pago confirmado.
+        if (attempt === 0 && (err as Error).name === "TypeError") {
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          continue;
+        }
+        console.warn(`[telegram-login] ${method} error:`, (err as Error).name);
+        return { ok: false, description: null };
       }
-      return { ok: true, result: json.result as T };
-    } catch (err) {
-      console.warn(`[telegram-login] ${method} error:`, (err as Error).name);
-      return { ok: false, description: null };
     }
   };
 

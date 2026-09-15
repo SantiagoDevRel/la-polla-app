@@ -64,9 +64,10 @@ export function kindLabel(polla: Pick<CasaPolla, "kind" | "scoring_mode">): stri
 function prizeLine(polla: CasaPolla, pot: CasaPot | undefined): string {
   if (polla.prize_kind === "objeto") return `🏆 Premio: <b>${esc(polla.prize_object)}</b>`;
   const base = `🏆 Pozo: <b>${pot ? formatCop(pot.prize_cop) : "por confirmar"}</b>`;
-  return polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number"
+  if (polla.pot_mode !== "fijo" || typeof polla.fixed_prize_cop !== "number") return base;
+  return pot && pot.prize_cop > polla.fixed_prize_cop
     ? `${base} (mínimo garantizado ${formatCop(polla.fixed_prize_cop)})`
-    : base;
+    : `${base} (garantizado)`;
 }
 
 export function backToPolla(polla: Pick<CasaPolla, "id">): Keyboard[number] {
@@ -208,8 +209,16 @@ export async function pollaDetailScreen(ctx: PlayerCtx, polla: CasaPolla, notice
   if (polla.kind !== "rifa" && open && !inscrito) {
     buttons.push([{ text: entry ? "📸 Enviar comprobante" : `✅ Inscribirme · ${formatCop(polla.entry_price_cop)}`, callback_data: cb("j", P) }]);
   }
-  if (polla.kind === "rifa") {
-    if (open) buttons.push([{ text: "🎟 Comprar una boleta", callback_data: cb("rb", P) }]);
+  if (polla.kind === "rifa" && open) {
+    // Una boleta sin pago confirmado ni comprobante en revisión (rechazada o
+    // sin comprobante) se completa primero: igual que casa_begin_entry_proof_v2.
+    const pendingTicket = tickets.find((t) => t.status !== "pagada" && !(t.status === "pendiente" && t.proof_path));
+    const inReview = tickets.some((t) => t.status === "pendiente" && t.proof_path);
+    if (pendingTicket?.ticket_number != null) {
+      buttons.push([{ text: `📸 Enviar comprobante de la boleta ${pendingTicket.ticket_number}`, callback_data: cb("rt", P, pendingTicket.ticket_number) }]);
+    } else if (!inReview) {
+      buttons.push([{ text: "🎟 Comprar una boleta", callback_data: cb("rb", P) }]);
+    }
   }
   if (polla.kind === "partidos" && inscrito) {
     if (pollaAcceptsPicks(polla)) buttons.push([{ text: "⚽ Pronosticar", callback_data: cb("pk", P) }]);

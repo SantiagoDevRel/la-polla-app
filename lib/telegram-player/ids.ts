@@ -37,6 +37,19 @@ export function cb(...parts: Array<string | number>): string {
   return data;
 }
 
+/** Marca de callback_data: la pantalla va en un mensaje NUEVO (no edita el del botón). */
+export const NEW_MESSAGE_MARK = "!";
+
+/**
+ * Igual que cb(), pero el botón abre su pantalla en un mensaje nuevo. Para
+ * botones de mensajes que la persona tiene que poder releer después
+ * («Recibimos tu comprobante», «Confirmamos tu pago»): si el toque editara ese
+ * mensaje, la confirmación desaparecería del chat.
+ */
+export function cbNew(...parts: Array<string | number>): string {
+  return cb(`${NEW_MESSAGE_MARK}${parts[0]}`, ...parts.slice(1));
+}
+
 /**
  * uuid estable a partir de un texto (sha256 con los bits de versión 4/variante):
  * el mismo comprobante reenviado o un update que Telegram reintenta vuelven al

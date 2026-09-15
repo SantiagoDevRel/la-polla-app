@@ -18,7 +18,8 @@ vi.mock("@/lib/casa/queries", async (importOriginal) => ({
   getPollaMatches: queries.getPollaMatches,
 }));
 
-import { CALLBACK_MAX_BYTES, cb, longId, shortId, stableUuid } from "@/lib/telegram-player/ids";
+import { CALLBACK_MAX_BYTES, cb, cbNew, longId, shortId, stableUuid } from "@/lib/telegram-player/ids";
+import { redactTelegramDescription } from "@/lib/auth/telegram-login/bot-api";
 import { classifyPlayerUpdate } from "@/lib/telegram-player/update";
 import { isBareStart, isLoginIntent, MAIN_KEYBOARD, menuCommandOf } from "@/lib/telegram-player/copy";
 import { ensureWebhookUpdates, resetWebhookUpdatesStateForTests } from "@/lib/auth/telegram-login/webhook-updates";
@@ -74,6 +75,8 @@ describe("callback ids — 64 bytes and untrusted input", () => {
       expect(Buffer.byteLength(data)).toBeLessThanOrEqual(CALLBACK_MAX_BYTES);
     }
     expect(() => cb("x".repeat(65))).toThrow();
+    expect(cbNew("rt", P, 100000)).toBe(`!rt:${P}:100000`);
+    expect(Buffer.byteLength(cbNew("s", P, M, 30, 30))).toBeLessThanOrEqual(CALLBACK_MAX_BYTES);
   });
 
   it("stable uuids are deterministic v4-shaped", () => {
@@ -143,6 +146,15 @@ describe("menu commands", () => {
   });
 });
 
+describe("Bot API logs", () => {
+  it("never logs the single-use link that Telegram echoes back in an error", () => {
+    const echoed = "Bad Request: inline keyboard button URL 'http://localhost:3006/login/telegram?t=_ILVhzFYdhaja-3jtRs3hLYXlDocdtAhzcGX5KKUa98' is invalid: Wrong HTTP URL";
+    const safe = redactTelegramDescription(echoed);
+    expect(safe).toBe("Bad Request: inline keyboard button URL <url> is invalid: Wrong HTTP URL");
+    expect(safe).not.toMatch(/t=|_ILVh/);
+  });
+});
+
 // ── webhook allowed_updates ──────────────────────────────────────────────
 describe("ensureWebhookUpdates — adds callback_query without moving the webhook", () => {
   const info = (result: Record<string, unknown>) => ({ ok: true as const, result });
@@ -198,15 +210,18 @@ describe("review notice by Telegram", () => {
     const m = reviewNoticeMessage({ ...base, approved: true });
     expect(m.text).toContain("Confirmamos tu pago de Fecha &lt;8&gt;");
     expect(m.text).toContain("$140.000");
-    expect(m.buttons[0][0]).toEqual({ text: "⚽ Pronosticar", callback_data: `pk:${shortId(POLLA)}` });
+    // «!»: el botón abre un mensaje nuevo y este aviso sigue en el chat.
+    expect(m.buttons[0][0]).toEqual({ text: "⚽ Pronosticar", callback_data: `!pk:${shortId(POLLA)}` });
   });
 
   it("rejected: escaped reason, never asks to pay again, button to resend the proof", () => {
     const m = reviewNoticeMessage({ ...base, approved: false, rejectReason: "Valor <incompleto>" });
     expect(m.text).toContain("Motivo: Valor &lt;incompleto&gt;");
     expect(m.text).toContain("no repitas el pago");
-    expect(m.buttons[0][0].callback_data).toBe(`j:${shortId(POLLA)}`);
-    expect(reviewNoticeMessage({ ...base, kind: "rifa", ticketNumber: 7, approved: false }).buttons[0][0].callback_data).toBe(`p:${shortId(POLLA)}`);
+    expect(m.buttons[0][0].callback_data).toBe(`!j:${shortId(POLLA)}`);
+    // Rifa rechazada: directo a reenviar el comprobante de ESA boleta.
+    const raffle = reviewNoticeMessage({ ...base, kind: "rifa", ticketNumber: 7, approved: false }).buttons[0][0];
+    expect(raffle).toEqual({ text: "📸 Enviar el comprobante de la boleta 7", callback_data: `!rt:${shortId(POLLA)}:7` });
   });
 
   it("goes only to the linked Telegram account, and not at all without the bot", async () => {

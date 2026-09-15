@@ -27,14 +27,14 @@ import { linkedAccountFor, type LoginGrant } from "@/lib/auth/telegram-login/req
 import type { LoginLocale } from "@/lib/auth/telegram-login/update";
 import { normalizePhone } from "@/lib/auth/phone";
 import { redactId } from "@/lib/log";
-import { COPY, isBareStart, isLoginIntent, MENU_LABELS, menuCommandOf } from "./copy";
+import { COPY, homeButtons, isBareStart, isLoginIntent, MENU_LABELS, menuCommandOf } from "./copy";
 import {
   answerCallback,
   clearFlow,
-  esc,
   readPlayerChat,
   sendScreen,
-  sendWithMenu,
+  sendHome,
+  sendWelcome,
   show,
   type PlayerCtx,
 } from "./context";
@@ -90,7 +90,7 @@ import {
   startPicks,
   startQuestions,
 } from "./picks";
-import { cb } from "./ids";
+import { cb, NEW_MESSAGE_MARK } from "./ids";
 
 export interface PlayerBotDeps {
   config: TelegramLoginConfig;
@@ -191,7 +191,7 @@ async function welcomeLinked(
   }, chat);
   const profile = await readProfile(ctx);
   if (await ensureProfile(ctx, profile)) {
-    await sendWithMenu(ctx, COPY.welcome(esc(profile?.display_name)));
+    await sendWelcome(ctx, profile?.display_name ?? null);
   }
   return "linked";
 }
@@ -223,18 +223,21 @@ export async function handleTelegramUpdate(update: unknown, deps: PlayerBotDeps)
     );
   }
 
+  // «!» al inicio: la pantalla va en un mensaje nuevo (ids.ts, cbNew).
+  const newMessage = action.kind === "callback" && action.data.startsWith(NEW_MESSAGE_MARK);
+  const routed = newMessage && action.kind === "callback" ? { ...action, data: action.data.slice(NEW_MESSAGE_MARK.length) } : action;
   const chat = await readPlayerChat(deps.db, action.telegramUserId, now());
   const ctx = buildCtx(deps, {
     chatId: action.chatId,
     telegramUserId: action.telegramUserId,
     userId: linked.userId,
     phoneE164: linked.phoneE164,
-    editMessageId: action.kind === "callback" ? action.messageId : null,
+    editMessageId: action.kind === "callback" && !newMessage ? action.messageId : null,
   }, chat);
 
   try {
-    if (action.kind === "callback") await routeCallback(ctx, action, loginDeps);
-    else await routeMessage(ctx, action, loginDeps);
+    if (routed.kind === "callback") await routeCallback(ctx, routed, loginDeps);
+    else await routeMessage(ctx, routed, loginDeps);
     return "player";
   } catch (err) {
     console.error("[telegram-player] update falló:", redactId(ctx.account.userId), (err as Error).message);
@@ -250,14 +253,7 @@ async function webLink(ctx: PlayerCtx, loginDeps: LoginHandlerDeps): Promise<voi
 }
 
 function homeScreen() {
-  return {
-    text: COPY.home,
-    buttons: [
-      [{ text: MENU_LABELS.abiertas, callback_data: cb("ol", 0) }, { text: MENU_LABELS.mias, callback_data: cb("ml", 0) }],
-      [{ text: MENU_LABELS.pagos, callback_data: "pg" }, { text: MENU_LABELS.perfil, callback_data: "pf" }],
-      [{ text: MENU_LABELS.ayuda, callback_data: "hp" }],
-    ],
-  };
+  return { text: COPY.home, buttons: homeButtons() };
 }
 
 async function routeMessage(ctx: PlayerCtx, message: MessageUpdate, loginDeps: LoginHandlerDeps): Promise<void> {
@@ -269,7 +265,9 @@ async function routeMessage(ctx: PlayerCtx, message: MessageUpdate, loginDeps: L
   if (command === "web") return webLink(ctx, loginDeps);
   if (command === "cancelar") {
     await clearFlow(ctx);
-    await sendWithMenu(ctx, COPY.cancelled);
+    await sendHome(ctx, `${COPY.cancelled}
+
+${COPY.home}`);
     return;
   }
   if (command) {
@@ -280,7 +278,7 @@ async function routeMessage(ctx: PlayerCtx, message: MessageUpdate, loginDeps: L
     if (!(await ensureProfile(ctx, profile))) return;
     switch (command) {
       // /start y «menú»: la bienvenida explica para qué sirve cada botón.
-      case "home": return sendWithMenu(ctx, COPY.welcome(esc(profile?.display_name)));
+      case "home": return sendWelcome(ctx, profile?.display_name ?? null);
       case "abiertas": return showOpenPollas(ctx);
       case "mias": return showMyPollas(ctx);
       case "pagos": return showPayments(ctx);
@@ -295,7 +293,7 @@ async function routeMessage(ctx: PlayerCtx, message: MessageUpdate, loginDeps: L
     return askProofPolla(ctx, message.photo);
   }
   if (message.otherMedia) {
-    await sendWithMenu(ctx, COPY.onlyImages);
+    await sendHome(ctx, COPY.onlyImages);
     return;
   }
   const text = message.text;
@@ -320,7 +318,7 @@ async function routeMessage(ctx: PlayerCtx, message: MessageUpdate, loginDeps: L
       });
       return;
   }
-  await sendWithMenu(ctx, COPY.notUnderstood);
+  await sendHome(ctx, COPY.notUnderstood);
 }
 
 /** Botones que no necesitan perfil completo (terminarlo, ayuda, web). */

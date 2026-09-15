@@ -8,7 +8,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LoginBotClient } from "@/lib/auth/telegram-login/bot-api";
 import type { TelegramLoginConfig } from "@/lib/auth/telegram-login/config";
-import { MAIN_KEYBOARD } from "./copy";
+import { COPY, homeButtons, MAIN_KEYBOARD } from "./copy";
 
 export interface Button {
   text: string;
@@ -166,6 +166,21 @@ export async function sendWithMenu(ctx: PlayerCtx, text: string): Promise<void> 
     link_preview_options: { is_disabled: true },
     reply_markup: MAIN_KEYBOARD,
   });
+}
+
+/** Mensaje nuevo con las opciones principales como botones dentro del mensaje. */
+export async function sendHome(ctx: PlayerCtx, text: string = COPY.home): Promise<void> {
+  await sendScreen(ctx, { text, buttons: homeButtons() });
+}
+
+/**
+ * Bienvenida (al terminar el perfil y con /start): deja el menú fijo abajo y,
+ * como en el computador ese menú queda escondido, repite las opciones como
+ * botones en un segundo mensaje (un mensaje admite un solo tipo de teclado).
+ */
+export async function sendWelcome(ctx: PlayerCtx, name: string | null): Promise<void> {
+  await sendWithMenu(ctx, COPY.welcome(esc(name)));
+  await sendHome(ctx);
 }
 
 export async function answerCallback(ctx: Pick<PlayerCtx, "bot">, callbackId: string, text?: string): Promise<void> {

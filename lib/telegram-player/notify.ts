@@ -11,7 +11,7 @@ import { createLoginBotClient, type LoginBotClient } from "@/lib/auth/telegram-l
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { formatCop } from "@/lib/casa/format";
 import { redactId } from "@/lib/log";
-import { cb, shortId } from "./ids";
+import { cbNew, shortId } from "./ids";
 import { esc } from "./context";
 
 export interface ReviewNotice {
@@ -40,10 +40,11 @@ export function reviewNoticeMessage(n: ReviewNotice): { text: string; buttons: A
           : `Ya participas por el premio. El pozo va en ${formatCop(n.pozoCop)}.`,
         n.kind === "partidos" ? "Haz tus pronósticos antes de que empiece cada partido." : n.kind === "manual" ? "Responde las preguntas antes del cierre." : null,
       ].filter((l) => l !== null).join("\n"),
+      // cbNew: tocar un botón no borra este aviso del chat.
       buttons: [
-        ...(n.kind === "partidos" ? [[{ text: "⚽ Pronosticar", callback_data: cb("pk", P) }]] : []),
-        ...(n.kind === "manual" ? [[{ text: "📝 Responder preguntas", callback_data: cb("q", P) }]] : []),
-        [{ text: "👉 Ver la polla", callback_data: cb("p", P) }],
+        ...(n.kind === "partidos" ? [[{ text: "⚽ Pronosticar", callback_data: cbNew("pk", P) }]] : []),
+        ...(n.kind === "manual" ? [[{ text: "📝 Responder preguntas", callback_data: cbNew("q", P) }]] : []),
+        [{ text: "👉 Ver la polla", callback_data: cbNew("p", P) }],
       ],
     };
   }
@@ -54,7 +55,13 @@ export function reviewNoticeMessage(n: ReviewNotice): { text: string; buttons: A
       "",
       "Revisa el comprobante. Si ya transferiste, no repitas el pago: envía el comprobante correcto o escríbenos en soporte.",
     ].filter((l) => l !== null).join("\n"),
-    buttons: [[{ text: n.kind === "rifa" ? "👉 Ver mis boletas" : "📸 Enviar el comprobante correcto", callback_data: cb(n.kind === "rifa" ? "p" : "j", P) }]],
+    buttons: [[
+      n.kind === "rifa"
+        ? n.ticketNumber != null
+          ? { text: `📸 Enviar el comprobante de la boleta ${n.ticketNumber}`, callback_data: cbNew("rt", P, n.ticketNumber) }
+          : { text: "👉 Ver mis boletas", callback_data: cbNew("p", P) }
+        : { text: "📸 Enviar el comprobante correcto", callback_data: cbNew("j", P) },
+    ]],
   };
 }
 

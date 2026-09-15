@@ -198,8 +198,7 @@ export async function save1x2(ctx: PlayerCtx, polla: CasaPolla, matchShort: stri
   }
   const matches = await getPollaMatches(polla.id);
   const match = matches.find((m) => m.id === matchId);
-  const label = !match ? "" : choice === "E" ? `${shortTeam(match.home_team)} vs ${shortTeam(match.away_team)} → empate`
-    : `gana ${shortTeam(choice === "L" ? match.home_team : match.away_team)}`;
+  const label = !match ? "" : `${shortTeam(match.home_team)} vs ${shortTeam(match.away_team)}: ${choice === "E" ? "empate" : `gana ${shortTeam(choice === "L" ? match.home_team : match.away_team)}`}`;
   await save(ctx, polla, { matchId, pick1x2: choice }, matchId, label);
 }
 

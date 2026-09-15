@@ -10,7 +10,7 @@ import { POLLITO_TYPES } from "@/lib/pollitos";
 import { maskPhone } from "@/lib/auth/telegram-login/mask-phone";
 import { cb } from "./ids";
 import { COPY } from "./copy";
-import { clearFlow, esc, sendScreen, sendWithMenu, setFlow, show, type PlayerCtx, type Screen } from "./context";
+import { clearFlow, esc, sendScreen, sendWelcome, setFlow, show, type PlayerCtx, type Screen } from "./context";
 
 export interface PlayerProfile {
   display_name: string | null;
@@ -92,7 +92,7 @@ export async function handleNameInput(ctx: PlayerCtx, text: string): Promise<voi
       await sendScreen(ctx, pollitoPicker(true));
       return;
     }
-    await sendWithMenu(ctx, COPY.welcome(esc(name)));
+    await sendWelcome(ctx, name);
     return;
   }
   await sendScreen(ctx, { text: `✅ Listo, ahora apareces como <b>${esc(name)}</b>.` });
@@ -118,7 +118,7 @@ export async function handlePollitoPick(ctx: PlayerCtx, pollitoId: string, onboa
   }
   if (onboarding) {
     await show(ctx, { text: `✅ Elegiste el pollito de <b>${esc(pollito.label)}</b>.` });
-    await sendWithMenu(ctx, COPY.welcome(esc(profile.display_name)));
+    await sendWelcome(ctx, profile.display_name);
     return;
   }
   await show(ctx, profileScreen(profile, ctx.account.phoneE164, `✅ Tu pollito ahora es el de <b>${esc(pollito.label)}</b>.`));

@@ -7,6 +7,7 @@
 // algunos emojis para reconocer cada botón de un vistazo (nunca gallinas).
 
 import { normalizeCommandText } from "./update";
+import { cb } from "./ids";
 
 export const MENU_LABELS = {
   abiertas: "⚽ Pollas abiertas",
@@ -27,6 +28,21 @@ export const MAIN_KEYBOARD = {
   resize_keyboard: true,
   input_field_placeholder: "Usa los botones de abajo",
 };
+
+/**
+ * Las mismas opciones como botones dentro del mensaje. En Telegram para
+ * computador (web y escritorio) el menú fijo queda escondido detrás del ícono ⌘
+ * y con las etiquetas cortadas: verificado en la prueba real del 2026-09-15.
+ * Estos botones se ven en todos los clientes.
+ */
+export function homeButtons() {
+  return [
+    [{ text: MENU_LABELS.abiertas, callback_data: cb("ol", 0) }],
+    [{ text: MENU_LABELS.mias, callback_data: cb("ml", 0) }],
+    [{ text: MENU_LABELS.pagos, callback_data: "pg" }, { text: MENU_LABELS.perfil, callback_data: "pf" }],
+    [{ text: MENU_LABELS.ayuda, callback_data: "hp" }],
+  ];
+}
 
 export type MenuCommand = "home" | "abiertas" | "mias" | "pagos" | "perfil" | "ayuda" | "web" | "cancelar";
 
@@ -102,13 +118,15 @@ export const COPY = {
     [
       `<b>¡Hola, ${name}!</b>`,
       "",
-      "Ya puedes jugar desde aquí. Usa los botones de abajo:",
+      "Ya puedes jugar desde aquí.",
       "",
       `${MENU_LABELS.abiertas}: para inscribirte.`,
       `${MENU_LABELS.mias}: para pronosticar y ver la tabla.`,
       `${MENU_LABELS.pagos}: para saber si ya confirmamos tu pago.`,
+      "",
+      "Estos botones también quedan fijos abajo. En el computador se abren con el ícono de cuatro cuadritos junto a la carita.",
     ].join("\n"),
-  home: "¿Qué quieres hacer? Usa los botones de abajo.",
+  home: "¿Qué quieres hacer? Toca una opción:",
   askName: [
     "<b>Paso 1 de 2: tu nombre</b>",
     "",
@@ -122,8 +140,8 @@ export const COPY = {
     "Elige tu pollito. Cada uno lleva la camiseta de un equipo y te acompaña en la tabla.",
   ].join("\n"),
   pollitoChange: "Elige tu pollito. Cada uno lleva la camiseta de un equipo.",
-  notUnderstood: "No entendí ese mensaje. Usa los botones de abajo para moverte.",
-  onlyImages: "Solo puedo recibir la foto del comprobante de pago. Para lo demás, usa los botones de abajo.",
+  notUnderstood: "No entendí ese mensaje. Toca una opción:",
+  onlyImages: "Solo puedo recibir la foto del comprobante de pago. Para lo demás, toca una opción:",
   failure: "No pudimos completar eso en este momento. Inténtalo de nuevo en unos minutos.",
   expiredButton: "Ese botón ya no está vigente. Te muestro la información actualizada.",
   cancelled: "Listo, cancelamos ese paso.",

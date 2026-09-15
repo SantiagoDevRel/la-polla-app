@@ -17,7 +17,7 @@ import { beginCasaProof, confirmCasaProof, failCasaProof, readOwnedProofAttempt,
 import { isPollaOpen, type CasaPolla } from "@/lib/casa/types";
 import { PROOF_BUCKET } from "@/lib/telegram/notify";
 import { redactId } from "@/lib/log";
-import { cb, longId, shortId, stableUuid } from "./ids";
+import { cb, cbNew, longId, shortId, stableUuid } from "./ids";
 import { COPY } from "./copy";
 import { buttonText, clearFlow, esc, sendScreen, setFlow, show, type Keyboard, type PlayerCtx } from "./context";
 import type { PlayerPhoto } from "./update";
@@ -403,10 +403,11 @@ async function receiveProof(ctx: PlayerCtx, polla: CasaPolla, ticket: number | n
 
     await clearFlow(ctx);
     const alreadyPaid = begun.data.entry_status === "pagada" || confirmed.data.entry_status === "pagada";
+    // Botones en mensaje nuevo: esta confirmación tiene que seguir en el chat.
     const buttons: Keyboard = [];
-    if (polla.kind === "partidos") buttons.push([{ text: alreadyPaid ? "⚽ Pronosticar" : "⚽ Pronosticar mientras tanto", callback_data: cb("pk", P) }]);
-    if (polla.kind === "manual") buttons.push([{ text: "📝 Responder preguntas", callback_data: cb("q", P) }]);
-    buttons.push(backToPolla(polla));
+    if (polla.kind === "partidos") buttons.push([{ text: alreadyPaid ? "⚽ Pronosticar" : "⚽ Pronosticar mientras tanto", callback_data: cbNew("pk", P) }]);
+    if (polla.kind === "manual") buttons.push([{ text: "📝 Responder preguntas", callback_data: cbNew("q", P) }]);
+    buttons.push([{ text: "👉 Ver la polla", callback_data: cbNew("p", P) }]);
     await sendScreen(ctx, {
       text: alreadyPaid
         ? `✅ <b>Tu pago de ${esc(polla.name)}${ticket != null ? ` (boleta ${ticket})` : ""} ya está confirmado.</b> No tienes que enviar nada más.`
@@ -415,7 +416,11 @@ async function receiveProof(ctx: PlayerCtx, polla: CasaPolla, ticket: number | n
           "",
           `Polla: ${esc(polla.name)}`,
           "Lo estamos revisando. Te avisamos por este chat apenas quede confirmado.",
-          polla.kind === "rifa" ? null : "Mientras tanto ya puedes pronosticar; tu participación cuenta cuando confirmemos el pago.",
+          polla.kind === "partidos"
+            ? "Mientras tanto ya puedes pronosticar; tu participación cuenta cuando confirmemos el pago."
+            : polla.kind === "manual"
+              ? "Mientras tanto ya puedes responder las preguntas; tu participación cuenta cuando confirmemos el pago."
+              : null,
         ].filter((l) => l !== null).join("\n"),
       buttons,
     });

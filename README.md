@@ -639,6 +639,8 @@ Pedido del dueño: que alguien que no usa apps pueda hacer TODO desde Telegram, 
 
 **Pruebas:** `npm test -- tests/telegram-player.test.ts tests/telegram-login.test.ts tests/telegram-login-polish.test.ts`. El recorrido completo (cuenta nueva, perfil, comprobante real en Storage, aprobación, pronósticos 1X2 y marcador, preguntas, rifa, tabla, reglas, cuenta de premios y `/web`) se probó contra Supabase local con un servidor falso de la Bot API (`TELEGRAM_LOGIN_API_BASE_URL`, solo fuera de producción).
 
+**Prueba con Telegram real (2026-09-15).** Con un bot de prueba (`@LaPollaColombianaBot`, reservado a la cuenta del dueño), Telegram Web y un poller local (`getUpdates` → webhook local, Supabase local): registro compartiendo el número real, perfil, comprobante como foto JPG y como archivo PNG, aprobación y rechazo desde `/api/casa/admin/entries` con el aviso llegando al chat, reenvío tras rechazo, 1X2, marcador con botones y escrito, preguntas, rifa, puntos tras cerrar un partido, tabla, reglas y cuenta de premios. 82 updates, todos 200. Lo que corrigió: en Telegram para computador el menú fijo queda escondido detrás de ⌘ (ahora las opciones también van como botones del mensaje); tocar un botón de «Recibimos tu comprobante» o «Confirmamos tu pago» borraba ese mensaje (esos botones abren uno nuevo, marca `!` en `callback_data`); la rifa rechazada ofrece reenviar la boleta; Telegram devuelve en sus errores la URL con el token del enlace (ya no se loguea) y un error de red perdió un aviso (un reintento).
+
 **Límites conocidos:** el bot habla solo español (Casa es colombiana); no manda recordatorios de partidos por jugar; en Telegram no hay «pronósticos de los demás» ni fotos de escudos.
 
 ### Pollas
