@@ -59,8 +59,9 @@ describe("personal casa pollas", () => {
       entries: [{ number: 2, status: "pagada" }] });
     expect(body.pollas[1].entries).toEqual([]);
     expect(result.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(dbFetch).toHaveBeenCalledTimes(2);
-    for (const [input] of dbFetch.mock.calls) {
+    const entryCalls = dbFetch.mock.calls.filter(([input]) => new URL(String(input)).pathname.endsWith("/casa_entries"));
+    expect(entryCalls).toHaveLength(2);
+    for (const [input] of entryCalls) {
       const params = new URL(String(input)).searchParams;
       expect(params.get("user_id")).toBe(`eq.${userId}`);
       expect(params.get("status")).toBe("in.(pagada,pendiente)");
@@ -68,7 +69,32 @@ describe("personal casa pollas", () => {
       expect(params.get("polla.archived_at")).toBe("is.null");
       expect(params.get("select")).not.toMatch(/proof|amount|account|user_id|\*/);
     }
-    expect(new URL(String(dbFetch.mock.calls[1][0])).searchParams.get("offset")).toBe("500");
+    expect(new URL(String(entryCalls[1][0])).searchParams.get("offset")).toBe("500");
+  });
+
+  it("counts per cupo the still-editable matches without a prediction (migration 131)", async () => {
+    const future = new Date(Date.now() + 3 * 3_600_000).toISOString();
+    dbFetch.mockImplementation(async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith("/casa_entries")) return response([
+        { id: "e1", status: "pagada", entry_number: 1, polla },
+        { id: "e2", status: "pendiente", entry_number: 2, polla },
+      ]);
+      if (path.endsWith("/casa_polla_matches")) return response([
+        { polla_id: "pool-a", match_id: "m1", voided_at: null },
+        { polla_id: "pool-a", match_id: "m2", voided_at: null },
+        { polla_id: "pool-a", match_id: "m3", voided_at: null },
+      ]);
+      if (path.endsWith("/casa_picks")) return response([{ entry_id: "e1", match_id: "m1" }, { entry_id: "e1", match_id: "m2" }]);
+      if (path.endsWith("/matches")) return response([
+        { id: "m1", status: "scheduled", elapsed: null, scheduled_at: future, final_verified_at: null },
+        { id: "m2", status: "scheduled", elapsed: null, scheduled_at: future, final_verified_at: null },
+        { id: "m3", status: "finished", elapsed: 90, scheduled_at: "2020-01-01T00:00:00Z", final_verified_at: "2020-01-01T02:00:00Z" },
+      ]);
+      return response([]);
+    });
+    const [item] = await listMyPollas(userId);
+    expect(item.entries).toEqual([{ number: 1, status: "pagada", pending: 0 }, { number: 2, status: "pendiente", pending: 2 }]);
   });
 
   it("does not allow an unscoped helper call", async () => {

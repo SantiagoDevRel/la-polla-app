@@ -49,7 +49,7 @@ import { MisBoletas } from "@/components/casa/Boletas";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
 import { Participaciones } from "@/components/casa/Participaciones";
-import { acceptsCasaMatchPicks } from "@/lib/casa/match-rules";
+import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { Plus, Settings } from "lucide-react";
 
@@ -120,7 +120,18 @@ export default async function PollaPage({
     : entries.find((e) => e.entry_number === requested) ?? entries.find(isLiveEntry) ?? entries[entries.length - 1] ?? null;
   const multiple = entries.filter((e) => e.status !== "anulada").length > 1;
   const etiqueta = multiple && entry?.entry_number ? `Cupo ${entry.entry_number} · ` : "";
-  const picks = polla.kind === "rifa" || !entry ? [] : await getMyPicks(polla.id, user.id, entry.id);
+  // Todos los pronósticos de la persona: los del cupo elegido van al tablero y el
+  // resto sirve para avisar qué cupos todavía tienen partidos sin pronóstico.
+  const allPicks = polla.kind === "rifa" || !entry ? [] : await getMyPicks(polla.id, user.id);
+  const picks = allPicks.filter((p) => p.entry_id === entry?.id);
+  const nowMs = Date.now();
+  const editables = polla.kind === "partidos" && acceptsCasaMatchPicks(polla.status, polla.draw_pending)
+    ? (matches as Array<Parameters<typeof canEditCasaMatch>[0] & { id: string }>).filter((m) => canEditCasaMatch(m, nowMs)).map((m) => m.id)
+    : [];
+  const pendingByNumber: Record<number, number> | null = polla.kind === "partidos"
+    ? Object.fromEntries(entries.filter((e) => e.entry_number != null).map((e) => [e.entry_number!,
+      editables.filter((id) => !allPicks.some((p) => p.entry_id === e.id && p.match_id === id)).length]))
+    : null;
   const canResumeProof = !abierta && polla.kind !== "rifa" && entry?.status === "pendiente" && !entry.proof_path
     ? (await getActiveProofs(polla.id, user.id)).some((proof) => proof.entry_id === entry.id) : false;
   const estado = pollaStatusLabel(polla);
@@ -133,6 +144,8 @@ export default async function PollaPage({
   // Cualquier participación viva deja ver los pronósticos de los demás.
   const participa = polla.kind === "rifa" ? isLiveEntry(bestEntry) : entries.some(isLiveEntry);
   const pagoPendiente = entry?.status === "pendiente" && Boolean(entry.proof_path);
+  // Con la tarjeta "Tus cupos" el estado del cupo vive ahí; no se repite en cuadros aparte.
+  const showCupos = polla.kind !== "rifa" && entries.length > 0 && (participa || entries.length > 1);
   const tournaments = resolveTournamentSlugs(polla, matches as { tournament: string | null }[]);
 
   const picksPorPartido: Record<
@@ -287,8 +300,9 @@ export default async function PollaPage({
         {/* ── Tus cupos (migración 131) ─────────────────────────────────────────
               Aparece desde la primera: es donde se ve cada una con su estado y
               donde se suma otra, con su propia transferencia. */}
-        {polla.kind !== "rifa" && entries.length > 0 && (participa || entries.length > 1) && (
+        {showCupos && (
           <Participaciones
+            pendingByNumber={pendingByNumber}
             slug={polla.slug}
             entries={entries}
             selectedNumber={entry?.entry_number ?? null}
@@ -301,7 +315,7 @@ export default async function PollaPage({
         {/* Estás dentro. Antes, cuando Tama aprobaba, simplemente DESAPARECÍA
             el aviso ámbar y no aparecía nada — la única señal de que el pago
             se confirmó era una ausencia, que nadie nota. */}
-        {entry?.status === "pagada" && polla.kind !== "rifa" && (
+        {entry?.status === "pagada" && polla.kind !== "rifa" && !showCupos && (
           <div className="mt-4 border border-turf/40 bg-turf/10 p-3">
             <p className="lp-label text-turf">{etiqueta}Estás dentro</p>
             <p className="mt-1 text-[13px] text-text-secondary">
@@ -311,7 +325,7 @@ export default async function PollaPage({
           </div>
         )}
 
-        {pagoPendiente && polla.kind !== "rifa" && (
+        {pagoPendiente && polla.kind !== "rifa" && !showCupos && (
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">{etiqueta}Pago en revisión</p>
             <p className="mt-1 text-[13px] text-text-secondary">
@@ -322,7 +336,7 @@ export default async function PollaPage({
           </div>
         )}
 
-        {entry?.status === "rechazada" && polla.kind !== "rifa" && (
+        {entry?.status === "rechazada" && polla.kind !== "rifa" && !showCupos && (
           <div className="mt-4 border border-red-alert/40 bg-red-alert/10 p-3">
             <p className="lp-label text-red-alert">{etiqueta}Pago rechazado</p>
             <p className="mt-1 text-[13px] text-text-secondary">
@@ -339,7 +353,7 @@ export default async function PollaPage({
         {/* El comprobante no llegó a guardarse (se cayó la subida). Sin este
             aviso la persona solo veía el botón de entrar otra vez, sin saber
             por qué su intento anterior no quedó. */}
-        {(entry?.status === "anulada" || (entry?.status === "pendiente" && !entry.proof_path)) && abierta && polla.kind !== "rifa" && (
+        {(entry?.status === "anulada" || (entry?.status === "pendiente" && !entry.proof_path)) && abierta && polla.kind !== "rifa" && !showCupos && (
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">{etiqueta}Tu comprobante no se guardó</p>
             <p className="mt-1 text-[13px] text-text-secondary">

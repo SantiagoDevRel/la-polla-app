@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
-import { ChevronRight, Search, Ticket } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Ticket } from "lucide-react";
 import type { MyCasaPolla } from "@/lib/casa/types";
 import { TournamentIdentity } from "./TournamentIdentity";
 import { PollaSection } from "./PollaSection";
@@ -12,26 +12,11 @@ const PAGE_SIZE = 5;
 const searchKey = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /**
- * One card per participation (migration 131): OFIGOLAZO #1, OFIGOLAZO #2… A
- * polla with a single participation keeps its single card without a number.
- * `pendingByPolla` accepts `pollaId:number` keys for a participation and
- * `pollaId` for pools without numbered participations (raffles).
+ * One card per polla. With several cupos (migration 131) a dropdown inside the
+ * card picks which cupo to open; its payment status is green (paid) or amber
+ * (in review), and a red line flags cupos that still miss predictions.
+ * `pendingByPolla` is a fallback for pools without per-cupo counts.
  */
-type Card = { key: string; polla: MyCasaPolla; number: number | null; status: MyCasaPolla["entry_status"]; href: string };
-
-function toCards(pollas: MyCasaPolla[]): Card[] {
-  return pollas.flatMap((polla): Card[] => {
-    const entries = polla.entries ?? [];
-    if (entries.length <= 1) {
-      const only = entries[0];
-      return [{ key: polla.id, polla, number: null, status: only?.status ?? polla.entry_status,
-        href: `/casa/${polla.slug}${only && only.number > 1 ? `?p=${only.number}` : ""}` }];
-    }
-    return entries.map(entry => ({ key: `${polla.id}:${entry.number}`, polla, number: entry.number, status: entry.status,
-      href: `/casa/${polla.slug}?p=${entry.number}` }));
-  });
-}
-
 export function MyPollas({ initialPollas, defaultOpen = true, pendingByPolla = {} }: { initialPollas?: MyCasaPolla[]; defaultOpen?: boolean; pendingByPolla?: Record<string, number> }) {
   const en = useLocale() === "en";
   const [loadedPollas, setPollas] = useState<MyCasaPolla[]>();
@@ -52,8 +37,8 @@ export function MyPollas({ initialPollas, defaultOpen = true, pendingByPolla = {
     return () => controller.abort();
   }, [initialPollas, attempt]);
 
-  const cards = toCards(pollas ?? []);
-  const filtered = cards.filter(card => searchKey(card.polla.name).includes(searchKey(query.trim())));
+  const [selectedCupo, setSelectedCupo] = useState<Record<string, number>>({});
+  const filtered = (pollas ?? []).filter(p => searchKey(p.name).includes(searchKey(query.trim())));
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const currentPage = Math.min(page, Math.max(0, pageCount - 1));
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
@@ -68,28 +53,54 @@ export function MyPollas({ initialPollas, defaultOpen = true, pendingByPolla = {
         <p className="text-[15px] font-semibold text-text-primary">{en ? "You haven't joined a pool yet" : "Todavía no te has inscrito en una polla"}</p>
         <Link href="/casa#pollas-abiertas" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-border-default px-4 text-[15px] text-text-primary transition-colors hover:bg-bg-elevated">{en ? "See open pools" : "Ver pollas abiertas"}<ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" /></Link>
       </div> : <>
-        {cards.length > PAGE_SIZE && <label className="block space-y-2 text-[13px] text-text-secondary">
+        {(pollas ?? []).length > PAGE_SIZE && <label className="block space-y-2 text-[13px] text-text-secondary">
           <span className="flex items-center gap-2"><Search aria-hidden="true" className="h-4 w-4" />{en ? "Search my pools" : "Buscar en mis pollas"}</span>
           <input type="search" value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} className="lp-input min-h-11 w-full text-[15px]" />
         </label>}
         <ul className="space-y-3">
-          {visible.map(({ key, polla, number, status: entryStatus, href }) => {
+          {visible.map(polla => {
+            const entries = polla.entries ?? [];
+            const chosen = entries.find(e => e.number === selectedCupo[polla.id]) ?? entries[0];
+            const several = entries.length > 1;
+            const entryStatus = chosen?.status ?? polla.entry_status;
+            const href = `/casa/${polla.slug}${chosen && (several || chosen.number > 1) ? `?p=${chosen.number}` : ""}`;
             const finished = polla.status === "resuelta" || polla.status === "anulada";
-            const status = polla.status === "anulada" ? (en ? "Cancelled" : "Anulada") : finished ? (en ? "Finished" : "Finalizada") : entryStatus === "pendiente" ? (en ? "Payment under review" : "Pago en revisión") : (en ? "You're participating" : "Estás participando");
-            const pending = number != null ? pendingByPolla[`${polla.id}:${number}`] : pendingByPolla[polla.id] ?? pendingByPolla[`${polla.id}:${polla.entries?.[0]?.number}`];
-            return <li key={key}>
-              <Link href={href} className="lp-card block space-y-3 bg-bg-elevated p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
-                <div className="flex items-start gap-3">
-                  <h3 className="min-w-0 flex-1 font-display text-[22px] leading-tight tracking-wide text-text-primary [overflow-wrap:anywhere]">
-                    {polla.name}
-                    {number != null && <span className="ml-2 inline-block whitespace-nowrap rounded-full border border-border-default px-2 align-middle font-sans text-[13px] font-semibold tracking-normal text-text-secondary">{en ? `Entry ${number}` : `Cupo ${number}`}</span>}
-                  </h3>
+            const status = polla.status === "anulada" ? (en ? "Cancelled" : "Anulada") : finished ? (en ? "Finished" : "Finalizada") : entryStatus === "pendiente" ? (en ? "Payment under review" : "Pago en revisión") : (en ? "Paid" : "Pagado");
+            const pendingOf = (n?: number) => entries.find(e => e.number === n)?.pending;
+            const pending = chosen?.pending ?? pendingByPolla[`${polla.id}:${chosen?.number}`] ?? pendingByPolla[polla.id] ?? 0;
+            const otherPending = finished ? [] : entries.filter(e => e.number !== chosen?.number && (pendingOf(e.number) ?? 0) > 0).map(e => `#${e.number}`);
+            const anyPending = !finished && (pending > 0 || otherPending.length > 0);
+            const selectId = `cupo-${polla.id}`;
+            return <li key={polla.id}>
+              <div className={`lp-card space-y-3 bg-bg-elevated p-4 ${anyPending ? "border-red-alert/50" : ""}`}>
+                <Link href={href} className="flex items-start gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+                  <h3 className="min-w-0 flex-1 font-display text-[22px] leading-tight tracking-wide text-text-primary [overflow-wrap:anywhere]">{polla.name}</h3>
+                  {several && <span className="mt-1 shrink-0 text-[13px] tabular-nums text-text-secondary">{entries.length} {en ? "entries" : "cupos"}</span>}
                   <ChevronRight aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-text-secondary" />
-                </div>
+                </Link>
                 <TournamentIdentity tournaments={polla.tournaments} kind={polla.kind} />
-                <p className={`text-[13px] ${finished ? "text-text-secondary" : entryStatus === "pendiente" ? "text-amber" : "text-turf"}`}>{status}</p>
-                {!!pending && <p className="text-[13px] text-amber">{en ? "Predictions remaining" : "Pronósticos pendientes"}: {pending}</p>}
-              </Link>
+                {several && <div>
+                  <label htmlFor={selectId} className="block text-[13px] text-text-secondary">{en ? "Entry" : "Cupo"}</label>
+                  <div className="relative mt-1">
+                    <select id={selectId} value={chosen?.number} onChange={event => setSelectedCupo(prev => ({ ...prev, [polla.id]: Number(event.target.value) }))}
+                      className="lp-input min-h-11 w-full cursor-pointer appearance-none pr-10 text-[15px] font-semibold">
+                      {entries.map(e => <option key={e.number} value={e.number}>
+                        {`${en ? "Entry" : "Cupo"} ${e.number} · ${e.status === "pagada" ? (en ? "Paid" : "Pagado") : (en ? "In review" : "En revisión")}${!finished && (e.pending ?? 0) > 0 ? ` · ${en ? "missing" : "faltan"} ${e.pending}` : ""}`}
+                      </option>)}
+                    </select>
+                    <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
+                  </div>
+                </div>}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex min-h-8 items-center rounded-full border px-3 text-[13px] font-semibold ${finished ? "border-border-default text-text-secondary" : entryStatus === "pendiente" ? "border-amber/50 bg-amber/15 text-amber" : "border-turf/50 bg-turf/15 text-turf"}`}>{status}</span>
+                  {!finished && pending > 0 && <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-red-alert/50 bg-red-alert/10 px-3 text-[13px] font-semibold text-red-alert">
+                    <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert" />
+                    {en ? `${pending} predictions missing` : pending === 1 ? "Te falta 1 pronóstico" : `Te faltan ${pending} pronósticos`}
+                  </span>}
+                </div>
+                {otherPending.length > 0 && <p className="text-[13px] text-red-alert">{en ? "Also missing predictions in" : otherPending.length === 1 ? "También faltan pronósticos en el cupo" : "También faltan pronósticos en los cupos"} {otherPending.join(", ")}</p>}
+                {several && <Link href={href} className="lp-btn lp-btn-ghost min-h-11 w-full">{en ? `Open entry ${chosen?.number}` : `Abrir cupo ${chosen?.number}`}</Link>}
+              </div>
             </li>;
           })}
         </ul>
