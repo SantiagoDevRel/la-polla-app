@@ -266,8 +266,8 @@ export async function showInfo(ctx: PlayerCtx, polla: CasaPolla): Promise<void> 
   lines.push("", "<b>Premio y ganadores</b>");
   if (money && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number") {
     lines.push(`• Premio mínimo garantizado: ${formatCop(polla.fixed_prize_cop)}.`);
-    if (threshold?.entriesToCover != null && threshold.entryPrizeCop > 0) {
-      const n = threshold.entriesToCover;
+    if (threshold?.entriesToGrow != null && threshold.entryPrizeCop > 0) {
+      const n = threshold.entriesToGrow;
       lines.push(`• Si más de ${n} ${n === 1 ? "persona se inscribe" : "personas se inscriben"}, el pozo crece ${formatCop(threshold.entryPrizeCop)} por cada persona adicional.`);
     }
   }

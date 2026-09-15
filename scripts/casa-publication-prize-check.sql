@@ -50,8 +50,9 @@ DECLARE admin_id uuid:=(SELECT id FROM pg_temp.publication_people WHERE n=0);
   q uuid; answer uuid; e uuid; uid uuid; r jsonb; config jsonb; pot record; hidden_questions uuid[];
   publication_time timestamptz:=clock_timestamp()+interval '1 hour';
 BEGIN
-  -- Migration 109: the fixed prize is a guaranteed minimum. Creating it with a
-  -- 50% house cut is valid; entries cover the minimum first, then the excess splits.
+  -- Migration 125: the fixed prize is a guaranteed minimum that grows only once
+  -- the paid gross passes TWICE the prize. Entries cover the prize, then the same
+  -- amount again goes to the house, and only then each entry splits by the cut.
   fixed_pool:=pg_temp.publication_create(pg_temp.publication_config()||jsonb_build_object('houseCutPct',50));
   ASSERT (SELECT pot_mode='fijo' AND house_cut_pct=50 AND fixed_prize_cop=1000000 FROM public.casa_pollas WHERE id=fixed_pool),
     'Fixed prize with 50% house cut must be created as configured';
@@ -62,53 +63,76 @@ BEGIN
     SELECT fixed_pool,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 1 AND 100;
   SELECT * INTO pot FROM public.casa_pot_summaries_v2(ARRAY[fixed_pool]);
   ASSERT pot.paid_entries=100 AND pot.gross_cop=1000000 AND pot.prize_cop=1000000 AND pot.house_cop=0, '100 paid: 1,000,000 / 0';
-  ASSERT pot.entry_prize_cop=5000 AND pot.projected_prize_cop=1005000, 'Entry 101 adds 5,000 to the pot';
+  ASSERT pot.entry_prize_cop=0 AND pot.projected_prize_cop=1000000, 'Entry 101 does not grow the pot: gross is below twice the prize';
   INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop)
-    SELECT fixed_pool,id,'pagada',10000 FROM pg_temp.publication_people WHERE n=101;
+    SELECT fixed_pool,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 101 AND 150;
   SELECT * INTO pot FROM public.casa_pot_summaries_v2(ARRAY[fixed_pool]);
-  ASSERT pot.paid_entries=101 AND pot.prize_cop=1005000 AND pot.house_cop=5000, '101 paid: 1,005,000 / 5,000';
+  ASSERT pot.paid_entries=150 AND pot.prize_cop=1000000 AND pot.house_cop=500000, '150 paid: 1,000,000 / 500,000';
   INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop)
-    SELECT fixed_pool,id,'pagada',10000 FROM pg_temp.publication_people WHERE n=102;
+    SELECT fixed_pool,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 151 AND 200;
   SELECT * INTO pot FROM public.casa_pot_summaries_v2(ARRAY[fixed_pool]);
-  ASSERT pot.paid_entries=102 AND pot.prize_cop=1010000 AND pot.house_cop=10000, '102 paid: 1,010,000 / 10,000';
+  ASSERT pot.paid_entries=200 AND pot.gross_cop=2000000 AND pot.prize_cop=1000000 AND pot.house_cop=1000000, '200 paid: 1,000,000 / 1,000,000';
+  ASSERT pot.entry_prize_cop=5000 AND pot.projected_prize_cop=1005000, 'Entry 201 adds 5,000 to the pot';
   INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop)
-    SELECT fixed_pool,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 103 AND 200;
+    SELECT fixed_pool,id,'pagada',10000 FROM pg_temp.publication_people WHERE n=201;
   SELECT * INTO pot FROM public.casa_pot_summaries_v2(ARRAY[fixed_pool]);
-  ASSERT pot.paid_entries=200 AND pot.gross_cop=2000000 AND pot.prize_cop=1500000 AND pot.house_cop=500000, '200 paid: 1,500,000 / 500,000';
-  ASSERT (SELECT prize_cop=1500000 AND house_cop=500000 FROM public.casa_polla_pot(fixed_pool));
+  ASSERT pot.paid_entries=201 AND pot.prize_cop=1005000 AND pot.house_cop=1005000, '201 paid: 1,005,000 / 1,005,000';
+  INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop)
+    SELECT fixed_pool,id,'pagada',10000 FROM pg_temp.publication_people WHERE n=202;
+  SELECT * INTO pot FROM public.casa_pot_summaries_v2(ARRAY[fixed_pool]);
+  ASSERT pot.paid_entries=202 AND pot.prize_cop=1010000 AND pot.house_cop=1010000, '202 paid: 1,010,000 / 1,010,000';
+  INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop)
+    SELECT fixed_pool,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 203 AND 300;
+  SELECT * INTO pot FROM public.casa_pot_summaries_v2(ARRAY[fixed_pool]);
+  ASSERT pot.paid_entries=300 AND pot.gross_cop=3000000 AND pot.prize_cop=1500000 AND pot.house_cop=1500000, '300 paid: 1,500,000 / 1,500,000';
+  ASSERT (SELECT prize_cop=1500000 AND house_cop=1500000 FROM public.casa_polla_pot(fixed_pool));
   ASSERT (SELECT (d->>'entry_prize_cop')::bigint=5000 AND (d->>'entry_house_cop')::bigint=5000 AND (d->>'projected_prize_cop')::bigint=1505000
     FROM public.casa_payment_details_v2(fixed_pool) d);
-  RAISE NOTICE 'PASS guaranteed minimum 1,000,000 at 50%%: 0/100/101/102/200 paid -> exact prize and house balance';
+  RAISE NOTICE 'PASS guaranteed minimum 1,000,000 at 50%%: 0/100/150/200/201/202/300 paid -> grows only above twice the prize';
+
+  -- Owner example (OFIGOLAZO): entry 20,000, prize 1,000,000, 50%%. Person 100 still
+  -- leaves 1,000,000; person 101 adds 10,000.
+  ASSERT public.casa_money_prize_cop(20000::bigint*50,50,1000000)=1000000;
+  ASSERT public.casa_money_prize_cop(20000::bigint*51,50,1000000)=1000000;
+  ASSERT public.casa_money_prize_cop(20000::bigint*100,50,1000000)=1000000;
+  ASSERT public.casa_money_prize_cop(20000::bigint*101,50,1000000)=1010000;
+  ASSERT public.casa_money_prize_cop(20000::bigint*102,50,1000000)=1020000;
+  r:=public.casa_fixed_prize_threshold_preview_v2(20000,50,1000000,101);
+  ASSERT (r->>'entries_to_cover')::bigint=50 AND (r->>'entries_to_grow')::bigint=100 AND (r->>'entry_prize')::bigint=10000
+    AND (r->>'all_prize')::bigint=1010000 AND (r->>'all_balance')::bigint=1010000;
+  RAISE NOTICE 'PASS owner example: 20,000 entry grows by 10,000 from person 101';
 
   p:=pg_temp.publication_create(pg_temp.publication_config()||jsonb_build_object('houseCutPct',0));
   INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop)
-    SELECT p,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 1 AND 150;
-  ASSERT (SELECT prize_cop=1500000 AND house_cop=0 FROM public.casa_pot_summaries_v2(ARRAY[p])), '0 percent, 150 paid: 1,500,000 / 0';
+    SELECT p,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 1 AND 250;
+  ASSERT (SELECT prize_cop=1500000 AND house_cop=1000000 FROM public.casa_pot_summaries_v2(ARRAY[p])), '0 percent, 250 paid: 1,500,000 / 1,000,000';
   p:=pg_temp.publication_create(pg_temp.publication_config()||jsonb_build_object('houseCutPct',100));
   INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop)
-    SELECT p,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 1 AND 150;
-  ASSERT (SELECT prize_cop=1000000 AND house_cop=500000 FROM public.casa_pot_summaries_v2(ARRAY[p])), '100 percent, 150 paid: 1,000,000 / 500,000';
+    SELECT p,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 1 AND 250;
+  ASSERT (SELECT prize_cop=1000000 AND house_cop=1500000 FROM public.casa_pot_summaries_v2(ARRAY[p])), '100 percent, 250 paid: 1,000,000 / 1,500,000';
   -- Same rounding as the proportional pot: 30% of an odd excess keeps the floor for the pot.
-  ASSERT public.casa_money_prize_cop(1000001::bigint,30,1000000)=1000000 AND public.casa_money_prize_cop(1000010::bigint,30,1000000)=1000007;
+  ASSERT public.casa_money_prize_cop(1500000::bigint,30,1000000)=1000000 AND public.casa_money_prize_cop(2000000::bigint,30,1000000)=1000000;
+  ASSERT public.casa_money_prize_cop(2000001::bigint,30,1000000)=1000000 AND public.casa_money_prize_cop(2000010::bigint,30,1000000)=1000007;
   ASSERT public.casa_money_prize_cop(30003::bigint,30,NULL)=floor(30003*0.7);
   RAISE NOTICE 'PASS guaranteed minimum with 0%% and 100%% house cut and shared rounding';
 
-  r:=public.casa_fixed_prize_threshold_preview_v2(10000,50,1000000,200);
-  ASSERT (r->>'fixed_prize')::bigint=1000000 AND (r->>'entries_to_cover')::bigint=100;
+  r:=public.casa_fixed_prize_threshold_preview_v2(10000,50,1000000,300);
+  ASSERT (r->>'fixed_prize')::bigint=1000000 AND (r->>'entries_to_cover')::bigint=100 AND (r->>'entries_to_grow')::bigint=200;
   ASSERT (r->>'entry_prize')::bigint=5000 AND (r->>'entry_house')::bigint=5000;
   ASSERT (r->>'ten_prize')::bigint=1000000 AND (r->>'ten_balance')::bigint=-900000;
-  ASSERT (r->>'all_prize')::bigint=1500000 AND (r->>'all_balance')::bigint=500000;
+  ASSERT (r->>'all_prize')::bigint=1500000 AND (r->>'all_balance')::bigint=1500000;
   ASSERT (r->>'all_prize')::bigint=(SELECT prize_cop FROM public.casa_pot_summaries_v2(ARRAY[fixed_pool])), 'Preview and summaries disagree';
-  r:=public.casa_fixed_prize_threshold_preview_v2(10000,0,1000000,150);
+  r:=public.casa_fixed_prize_threshold_preview_v2(10000,0,1000000,250);
   ASSERT (r->>'entry_prize')::bigint=10000 AND (r->>'entry_house')::bigint=0 AND (r->>'all_prize')::bigint=1500000;
   r:=public.casa_fixed_prize_threshold_preview_v2(30000,50,1000000,100);
-  ASSERT (r->>'entries_to_cover')::bigint=34, 'Entries to cover rounds up';
+  ASSERT (r->>'entries_to_cover')::bigint=34 AND (r->>'entries_to_grow')::bigint=67, 'Entry thresholds round up';
   r:=public.casa_fixed_prize_threshold_preview_v2(0,50,1000000,100);
-  ASSERT r->'entries_to_cover'='null'::jsonb AND (r->>'all_prize')::bigint=1000000 AND (r->>'all_balance')::bigint=-1000000;
-  -- The 104 three-argument preview is now the same rule with a 0% house cut.
+  ASSERT r->'entries_to_cover'='null'::jsonb AND r->'entries_to_grow'='null'::jsonb
+    AND (r->>'all_prize')::bigint=1000000 AND (r->>'all_balance')::bigint=-1000000;
+  -- The 104 three-argument preview is the same rule with a 0% house cut.
   r:=public.casa_fixed_prize_preview_v2(10000,1000000,1000);
-  ASSERT (r->>'ten_prize')::bigint=1000000 AND (r->>'all_prize')::bigint=10000000;
-  ASSERT (r->>'ten_balance')::bigint=-900000 AND (r->>'all_balance')::bigint=0;
+  ASSERT (r->>'ten_prize')::bigint=1000000 AND (r->>'all_prize')::bigint=9000000;
+  ASSERT (r->>'ten_balance')::bigint=-900000 AND (r->>'all_balance')::bigint=1000000;
   PERFORM pg_temp.publication_must_fail('SELECT public.casa_fixed_prize_preview_v2(10000,NULL,100)','INVALID_FIXED_PRIZE');
   PERFORM pg_temp.publication_must_fail('SELECT public.casa_fixed_prize_preview_v2(10000,0,100)','INVALID_FIXED_PRIZE');
   PERFORM pg_temp.publication_must_fail('SELECT public.casa_fixed_prize_threshold_preview_v2(10000,50,0,100)','INVALID_FIXED_PRIZE');
@@ -116,12 +140,12 @@ BEGIN
   PERFORM pg_temp.publication_must_fail(format('SELECT pg_temp.publication_create(%L::jsonb)',pg_temp.publication_config()||jsonb_build_object('fixedPrizeCop',0,'houseCutPct',50)),'INVALID_FIXED_PRIZE');
   RAISE NOTICE 'PASS fixed preview: entries to cover, per-entry split above the minimum, invalid amounts';
 
-  -- Settlement pays the grown pot: 102 paid at 50%% -> 1,010,000 split between two winners.
+  -- Settlement pays the grown pot: 202 paid at 50%% -> 1,010,000 split between two winners.
   p:=pg_temp.publication_create(pg_temp.publication_config()||jsonb_build_object('houseCutPct',50));
   SELECT id INTO q FROM public.casa_questions WHERE polla_id=p;
   SELECT id INTO answer FROM public.casa_options WHERE question_id=q AND order_index=0;
   INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop)
-    SELECT p,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 1 AND 102;
+    SELECT p,id,'pagada',10000 FROM pg_temp.publication_people WHERE n BETWEEN 1 AND 202;
   INSERT INTO public.casa_picks(entry_id,polla_id,user_id,question_id,option_id)
     SELECT e2.id,p,e2.user_id,q,answer FROM public.casa_entries e2
     WHERE e2.polla_id=p AND e2.user_id IN (SELECT id FROM pg_temp.publication_people WHERE n BETWEEN 1 AND 2);
@@ -130,7 +154,7 @@ BEGIN
   r:=public.casa_settle_polla_v2(p,2,admin_id,NULL);
   ASSERT r->>'outcome'='money_awarded' AND (r->>'prize_cop')::bigint=1010000;
   ASSERT (SELECT count(*)=2 AND sum(amount_cop)=1010000 AND min(amount_cop)=505000 FROM public.casa_payouts WHERE polla_id=p);
-  ASSERT (SELECT prize_cop=1010000 AND house_cop=10000 FROM public.casa_pot_summaries_v2(ARRAY[p]));
+  ASSERT (SELECT prize_cop=1010000 AND house_cop=1010000 FROM public.casa_pot_summaries_v2(ARRAY[p]));
   RAISE NOTICE 'PASS settlement of a guaranteed minimum that grew above it';
 
   -- A guaranteed prize remains exactly the prize even when collections are lower.
