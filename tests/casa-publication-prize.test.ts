@@ -86,12 +86,12 @@ describe("fixed-prize creation and preview API", () => {
   // Owner examples (entry 10.000, guaranteed 1.000.000). The numbers are SQL's
   // (scripts/casa-publication-prize-check.sql asserts them); the API relays them.
   it.each([
-    { cut: 50, tickets: 200, result: { fixed_prize: 1000000, entries_to_cover: 100, entry_prize: 5000, entry_house: 5000,
-      ten_prize: 1000000, ten_balance: -900000, all_prize: 1500000, all_balance: 500000 } },
-    { cut: 0, tickets: 150, result: { fixed_prize: 1000000, entries_to_cover: 100, entry_prize: 10000, entry_house: 0,
-      ten_prize: 1000000, ten_balance: -900000, all_prize: 1500000, all_balance: 0 } },
-    { cut: 100, tickets: 150, result: { fixed_prize: 1000000, entries_to_cover: 100, entry_prize: 0, entry_house: 10000,
-      ten_prize: 1000000, ten_balance: -900000, all_prize: 1000000, all_balance: 500000 } },
+    { cut: 50, tickets: 300, result: { fixed_prize: 1000000, entries_to_cover: 100, entries_to_grow: 200, entry_prize: 5000, entry_house: 5000,
+      ten_prize: 1000000, ten_balance: -900000, all_prize: 1500000, all_balance: 1500000 } },
+    { cut: 0, tickets: 250, result: { fixed_prize: 1000000, entries_to_cover: 100, entries_to_grow: 200, entry_prize: 10000, entry_house: 0,
+      ten_prize: 1000000, ten_balance: -900000, all_prize: 1500000, all_balance: 1000000 } },
+    { cut: 100, tickets: 250, result: { fixed_prize: 1000000, entries_to_cover: 100, entries_to_grow: 200, entry_prize: 0, entry_house: 10000,
+      ten_prize: 1000000, ten_balance: -900000, all_prize: 1000000, all_balance: 1500000 } },
   ])("relays SQL's guaranteed-minimum preview with a $cut% house cut", async ({ cut, tickets, result }) => {
     dbFetch.mockResolvedValueOnce(response(result));
     const res = await preview(previewRequest(`price=10000&cut=${cut}&tickets=${tickets}&kind=pozo&mode=fijo&fixed=1000000`));
@@ -103,7 +103,7 @@ describe("fixed-prize creation and preview API", () => {
   });
 
   it("relays a free entry: no entries cover the prize and the house covers it all", async () => {
-    const result = { fixed_prize: 1000000, entries_to_cover: null, entry_prize: 0, entry_house: 0,
+    const result = { fixed_prize: 1000000, entries_to_cover: null, entries_to_grow: null, entry_prize: 0, entry_house: 0,
       ten_prize: 1000000, ten_balance: -1000000, all_prize: 1000000, all_balance: -1000000 };
     dbFetch.mockResolvedValueOnce(response(result));
     const res = await preview(previewRequest("price=0&cut=50&tickets=100&kind=pozo&mode=fijo&fixed=1000000"));

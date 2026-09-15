@@ -141,8 +141,11 @@ existentes al instalar 121 quedan marcados como avisados. Regresión:
 
 Ver [docs/casa-admin-rules.md](docs/casa-admin-rules.md). El pozo fijo mantiene
 `prize_kind=pozo` y añade `pot_mode=fijo` + `fixed_prize_cop`: desde la migración
-109 es un **premio mínimo garantizado** con cualquier % de casa; las entradas lo
-cubren y del excedente la casa toma su % (mismo redondeo que el proporcional).
+109 es un **premio mínimo garantizado** con cualquier % de casa. Desde la 125
+(2026-09-15, regla del dueño) solo crece cuando lo recaudado pasa el **doble** del
+premio: las entradas cubren F, la casa recibe otro F y del excedente sobre 2F la
+casa toma su % (mismo redondeo que el proporcional). OFIGOLAZO: $20.000, F=$1M,
+50 % → crece $10.000 desde la persona 101. No volver al umbral simple de 109.
 Cálculo único `casa_money_prize_cop`, balance y preview en SQL; nunca en TS.
 `publication_mode` + `opens_at` filtran también en RLS y en las
 reservas. No mostrar ni admitir entradas antes de publicación. Pendientes en

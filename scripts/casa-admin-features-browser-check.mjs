@@ -55,7 +55,7 @@ try {
   assert.equal(await cut.inputValue(),"50");
   await page.getByRole("button",{name:"Pozo fijo",exact:true}).click();
   assert.equal(await cut.inputValue(),"50");
-  await page.getByText("Premio garantizado de $1.000.000. Se cubre con 100 inscritos; desde el inscrito 101, cada entrada suma $5.000 al pozo y $5.000 a la casa.",{exact:true}).waitFor();
+  await page.getByText("Premio garantizado de $1.000.000. Se cubre con 100 inscritos; hasta el inscrito 200, la casa recibe lo mismo otra vez; desde el inscrito 201, cada entrada suma $5.000 al pozo y $5.000 a la casa.",{exact:true}).waitFor();
   await page.getByPlaceholder("300 123 4567",{exact:true}).fill("3000000000");
   await page.getByPlaceholder("A nombre de...",{exact:true}).fill("Cuenta ficticia local");
   await page.getByRole("button",{name:"Fecha manual",exact:true}).last().click();
@@ -97,7 +97,7 @@ try {
   for(const actor of [oldest,newest]) {
     // networkidle: a file chosen before hydration never reaches React and the submit stays disabled.
     await actor.page.goto(`${origin}/casa/${polla.slug}/pagar`,{waitUntil:"networkidle",timeout:90000});
-    await actor.page.getByText(/con un premio mínimo garantizado de \$1\.000\.000\. Cuando las entradas superan ese mínimo, el 50% de cada nueva entrada se suma al pozo\./).waitFor();
+    await actor.page.getByText(/con un premio mínimo garantizado de \$1\.000\.000\. Si más de 200 personas se inscriben, el pozo crece \$5\.000 por cada persona adicional\./).waitFor();
     const png=await actor.page.evaluate(()=>{const c=document.createElement("canvas");c.width=500;c.height=180;const x=c.getContext("2d");x.fillStyle="white";x.fillRect(0,0,500,180);x.fillStyle="black";x.font="22px sans-serif";x.fillText("COMPROBANTE LOCAL DE PRUEBA",10,90);return c.toDataURL("image/png").split(",")[1];});
     await actor.page.locator('input[type=file]').setInputFiles({name:"prueba-local.png",mimeType:"image/png",buffer:Buffer.from(png,"base64")});
     await actor.page.getByRole("button",{name:"Enviar el comprobante",exact:true}).click();

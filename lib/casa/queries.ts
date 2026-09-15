@@ -106,14 +106,14 @@ export async function getPot(pollaId: string, projectionEntry?: string): Promise
 }
 
 /**
- * Punto de equilibrio de un premio fijo (migración 109): cuántas entradas
- * cubren el mínimo y cuánto suma al pozo cada persona adicional. Lo calcula
- * SQL con la misma función del pozo, nunca TypeScript. Si la consulta falla,
- * la pantalla omite esa línea en vez de caerse.
+ * Umbrales de un premio fijo (migraciones 109 y 125): cuántas entradas cubren
+ * el premio, desde cuántas crece el pozo (el doble del premio) y cuánto suma
+ * cada persona adicional. Lo calcula SQL con la misma función del pozo, nunca
+ * TypeScript. Si la consulta falla, la pantalla omite esa línea en vez de caerse.
  */
 export async function getFixedPrizeThreshold(
   polla: Pick<CasaPolla, "prize_kind" | "pot_mode" | "fixed_prize_cop" | "entry_price_cop" | "house_cut_pct">,
-): Promise<{ entriesToCover: number | null; entryPrizeCop: number } | null> {
+): Promise<{ entriesToCover: number | null; entriesToGrow: number | null; entryPrizeCop: number } | null> {
   if (polla.prize_kind !== "pozo" || polla.pot_mode !== "fijo" || typeof polla.fixed_prize_cop !== "number") return null;
   const { data, error } = await createAdminClient().rpc("casa_fixed_prize_threshold_preview_v2", {
     p_price: polla.entry_price_cop, p_cut: polla.house_cut_pct, p_fixed: polla.fixed_prize_cop, p_tickets: 2,
@@ -122,8 +122,9 @@ export async function getFixedPrizeThreshold(
     console.error("[casa/queries] fixed prize threshold", error?.message);
     return null;
   }
-  const preview = data as { entries_to_cover: number | null; entry_prize: number };
-  return { entriesToCover: preview.entries_to_cover, entryPrizeCop: preview.entry_prize };
+  const preview = data as { entries_to_cover: number | null; entries_to_grow?: number | null; entry_prize: number };
+  // Sin la clave (migración 125 aún no instalada) no se anuncia un umbral equivocado.
+  return { entriesToCover: preview.entries_to_cover, entriesToGrow: preview.entries_to_grow ?? null, entryPrizeCop: preview.entry_prize };
 }
 
 /** One SQL aggregate per pool; entry volume cannot truncate the monetary total. */

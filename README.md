@@ -46,7 +46,8 @@ npm test -- tests/match-schedule.test.ts tests/tournament-availability.test.ts t
 
 Info por polla, cuenta personal de pago, revisión de comprobantes, pozo fijo,
 publicación programada y fechas en Colombia: [contrato y pruebas de Casa](docs/casa-admin-rules.md)
-(migraciones 104–109; requieren Casa v2).
+(migraciones 104–109 y 125; requieren Casa v2). Desde la 125, el pozo fijo crece
+solo cuando lo recaudado supera el doble del premio garantizado.
 
 ## Fútbol: calendario, partidos y equipos (API-Football Pro)
 

@@ -16,7 +16,9 @@ const base: Rules = {
   pot_mode: "fijo", fixed_prize_cop: 1_000_000, house_cut_pct: 50,
 };
 const text = (html: string) => html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
-const info = (polla: Partial<Rules> = {}, threshold: FixedPrizeThreshold | null = { entriesToCover: 50, entryPrizeCop: 10_000 }) =>
+// OFIGOLAZO (2026-09-15, migración 125): entrada $20.000, premio $1.000.000, casa 50 %.
+// 50 personas cubren el premio; el pozo crece desde la persona 101.
+const info = (polla: Partial<Rules> = {}, threshold: FixedPrizeThreshold | null = { entriesToCover: 50, entriesToGrow: 100, entryPrizeCop: 10_000 }) =>
   renderToStaticMarkup(createElement(PollaInfo, { polla: { ...base, ...polla }, threshold }));
 
 describe("PollaInfo (2026-09-13: desplegables con viñetas cortas)", () => {
@@ -28,16 +30,19 @@ describe("PollaInfo (2026-09-13: desplegables con viñetas cortas)", () => {
     expect(html).toContain("<ul");
   });
 
-  it("explains the fixed prize by its break-even, with amounts computed in SQL", () => {
+  it("explains the fixed prize by the double threshold, with amounts computed in SQL", () => {
     expect(text(info())).toContain("Premio mínimo garantizado: $1.000.000.");
-    expect(text(info())).toContain("Si más de 50 personas se inscriben, el pozo crece $10.000 por cada persona adicional.");
-    expect(text(info({}, { entriesToCover: 1, entryPrizeCop: 7_000 }))).toContain("Si más de 1 persona se inscribe, el pozo crece $7.000");
+    expect(text(info())).toContain("Si más de 100 personas se inscriben, el pozo crece $10.000 por cada persona adicional.");
+    expect(text(info())).not.toContain("Si más de 50 personas");
+    expect(text(info({}, { entriesToCover: 1, entriesToGrow: 1, entryPrizeCop: 7_000 }))).toContain("Si más de 1 persona se inscribe, el pozo crece $7.000");
     expect(text(info())).not.toContain("% de cada nueva entrada");
   });
 
   it("omits the growth line when the pot cannot grow or the threshold is unknown", () => {
-    expect(text(info({ house_cut_pct: 100 }, { entriesToCover: 50, entryPrizeCop: 0 }))).not.toContain("Si más de");
-    expect(text(info({}, { entriesToCover: null, entryPrizeCop: 10_000 }))).not.toContain("Si más de");
+    expect(text(info({ house_cut_pct: 100 }, { entriesToCover: 50, entriesToGrow: 100, entryPrizeCop: 0 }))).not.toContain("Si más de");
+    expect(text(info({}, { entriesToCover: null, entriesToGrow: null, entryPrizeCop: 10_000 }))).not.toContain("Si más de");
+    // Without migration 125 the preview has no entries_to_grow: say nothing rather than the old threshold.
+    expect(text(info({}, { entriesToCover: 50, entriesToGrow: null, entryPrizeCop: 10_000 }))).not.toContain("Si más de");
     expect(text(info({}, null))).not.toContain("Si más de");
     expect(text(info({ pot_mode: "proporcional", fixed_prize_cop: null }))).not.toContain("Premio mínimo garantizado");
   });

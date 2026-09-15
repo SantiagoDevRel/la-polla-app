@@ -88,13 +88,20 @@ de premio, y elegir fijo no cambia el porcentaje (0 a 100). Solo **Objeto** fija
 el porcentaje en 100. El pozo fijo exige un valor positivo, en pesos enteros
 («Premio garantizado (COP)»).
 
-**Pozo fijo = premio mínimo garantizado (migración 109).** Con G = recaudado
-pagado, F = premio garantizado y c = porcentaje de la casa:
+**Pozo fijo = premio mínimo garantizado que crece pasado el doble (migraciones
+109 y 125).** Regla del dueño del 2026-09-15: primero se recoge el premio, luego
+otro tanto igual para la casa, y solo entonces el pozo empieza a subir. Con
+G = recaudado pagado, F = premio garantizado y c = porcentaje de la casa:
 
 - G ≤ F: premio = F; balance de la casa = G − F (cero o negativo: la casa pone la diferencia).
-- G > F: E = G − F. El pozo recibe `floor(E × (100 − c) / 100)`, el mismo redondeo
-  del pozo proporcional sobre lo recaudado; la casa se queda el resto de E.
-  Premio = F + esa parte; balance = E − esa parte.
+- F < G ≤ 2F: premio = F; la casa recibe todo lo que entra (balance = G − F, hasta F).
+- G > 2F: E = G − 2F. El pozo recibe `floor(E × (100 − c) / 100)`, el mismo redondeo
+  del pozo proporcional; la casa se queda el resto de E.
+  Premio = F + esa parte; balance = G − premio.
+
+Ejemplo del dueño, OFIGOLAZO (entrada $20.000, F = $1.000.000, c = 50 %): 50
+personas cubren el premio, las siguientes 50 son de la casa y desde la persona
+101 el pozo sube $10.000 por inscripción.
 
 Ejemplos con entrada de $10.000 y F = $1.000.000 (verificados en
 `scripts/casa-publication-prize-check.sql`):
@@ -103,20 +110,24 @@ Ejemplos con entrada de $10.000 y F = $1.000.000 (verificados en
 |---|---|---|---|
 | 50 % | 0 | $1.000.000 | −$1.000.000 |
 | 50 % | 100 | $1.000.000 | $0 |
-| 50 % | 101 | $1.005.000 | $5.000 |
-| 50 % | 102 | $1.010.000 | $10.000 |
-| 50 % | 200 | $1.500.000 | $500.000 |
-| 0 % | 150 | $1.500.000 | $0 |
-| 100 % | 150 | $1.000.000 | $500.000 |
+| 50 % | 150 | $1.000.000 | $500.000 |
+| 50 % | 200 | $1.000.000 | $1.000.000 |
+| 50 % | 201 | $1.005.000 | $1.005.000 |
+| 50 % | 202 | $1.010.000 | $1.010.000 |
+| 50 % | 300 | $1.500.000 | $1.500.000 |
+| 0 % | 250 | $1.500.000 | $1.000.000 |
+| 100 % | 250 | $1.000.000 | $1.500.000 |
 
 Todos los cálculos permanecen en SQL: `casa_money_prize_cop` es la única fórmula
 del premio en dinero (proporcional y fijo) y la usan `casa_pot_summaries_v2`
 (pozo, balance, pozo si entras; de ahí `casa_polla_pot`, `casa_payment_details_v2`,
 `casa_house_total_v2` y la liquidación) y el preview
 `casa_fixed_prize_threshold_preview_v2`. El preview del formulario devuelve el
-premio para N inscritos, los inscritos que cubren el mínimo (`ceil(F / entrada)`,
-nulo con entrada gratis) y cuánto va al pozo y a la casa por cada entrada por
-encima del mínimo. El preview de tres argumentos de 104 sigue disponible y
+premio para N inscritos, los inscritos que cubren el mínimo (`entries_to_cover`,
+`ceil(F / entrada)`), los inscritos a partir de los cuales crece el pozo
+(`entries_to_grow`, `ceil(2F / entrada)`; ambos nulos con entrada gratis) y cuánto
+va al pozo y a la casa por cada entrada por encima del doble. Casa, pagar e Info
+(web y bot de Telegram) dicen «Si más de `entries_to_grow` personas se inscriben…». El preview de tres argumentos de 104 sigue disponible y
 equivale al nuevo con 0 % de casa.
 
 El **balance de la casa** no se confunde con un porcentaje de comisión. Una polla
