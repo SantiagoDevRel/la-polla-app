@@ -124,10 +124,14 @@ del premio en dinero (proporcional y fijo) y la usan `casa_pot_summaries_v2`
 `casa_house_total_v2` y la liquidación) y el preview
 `casa_fixed_prize_threshold_preview_v2`. El preview del formulario devuelve el
 premio para N inscritos, los inscritos que cubren el mínimo (`entries_to_cover`,
-`ceil(F / entrada)`), los inscritos a partir de los cuales crece el pozo
-(`entries_to_grow`, `ceil(2F / entrada)`; ambos nulos con entrada gratis) y cuánto
-va al pozo y a la casa por cada entrada por encima del doble. Casa, pagar e Info
-(web y bot de Telegram) dicen «Si más de `entries_to_grow` personas se inscriben…». El preview de tres argumentos de 104 sigue disponible y
+`ceil(F / entrada)`), las entradas que todavía no hacen crecer el pozo
+(`entries_to_grow`, `floor(2F / entrada)` desde la migración 126; ambos nulos con
+entrada gratis) y cuánto va al pozo y a la casa por cada entrada por encima del
+doble. Casa, pagar e Info (web y bot de Telegram) dicen «Si más de
+`entries_to_grow` personas se inscriben…», o «El pozo crece … por cada persona
+que se inscribe» cuando vale 0. Con 2F no múltiplo de la entrada, la primera
+entrada que crece suma solo la parte que pasa el doble (entrada $30.000, F
+$1.000.000, 50 %: la 67 suma $5.000; desde la 68, $15.000). El preview de tres argumentos de 104 sigue disponible y
 equivale al nuevo con 0 % de casa.
 
 El **balance de la casa** no se confunde con un porcentaje de comisión. Una polla
