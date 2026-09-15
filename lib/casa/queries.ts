@@ -79,6 +79,19 @@ export async function getPollaBySlug(slug: string): Promise<CasaPolla | null> {
   return data && isPollaPublished(data as CasaPolla) ? (await withDrawState([data as CasaPolla]))[0] : null;
 }
 
+/** Igual que getPollaBySlug, por id (el bot de Telegram lleva ids en sus botones). */
+export async function getPollaById(id: string): Promise<CasaPolla | null> {
+  const { data, error } = await createAdminClient()
+    .from("casa_pollas")
+    .select(CASA_POLLA_COLUMNS)
+    .eq("id", id)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data && isPollaPublished(data as CasaPolla) ? (await withDrawState([data as CasaPolla]))[0] : null;
+}
+
 /**
  * Pozo de una polla. El calculo real vive en SQL (`casa_polla_pot`) para que
  * no haya dos verdades sobre la plata.

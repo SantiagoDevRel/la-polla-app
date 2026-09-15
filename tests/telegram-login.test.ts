@@ -8,6 +8,9 @@ import { NextRequest } from "next/server";
 
 const adminFactory = vi.hoisted(() => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => adminFactory);
+// El webhook ahora también es el bot de jugadores (lib/telegram-player), que
+// importa módulos de Casa marcados server-only.
+vi.mock("server-only", () => ({}));
 // Cliente de Auth con las cookies del request y la IP real (el que abre la
 // sesión). getClientIp se conserva real: las rutas la usan para la IP.
 const authIpFactory = vi.hoisted(() => ({ createAuthRouteClient: vi.fn() }));

@@ -1,0 +1,90 @@
+// lib/telegram-player/notify.ts — Aviso al jugador por Telegram cuando un
+// administrador confirma o rechaza su comprobante.
+//
+// Hasta aquí ese aviso solo salía por WhatsApp, que está apagado (el número del
+// bot es de otra app): la persona se enteraba solo si abría la web. Si su cuenta
+// de La Polla está vinculada a Telegram (telegram_login_identities), le llega en
+// el chat con el siguiente paso. Mejor esfuerzo: nunca rompe la revisión.
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createLoginBotClient, type LoginBotClient } from "@/lib/auth/telegram-login/bot-api";
+import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
+import { formatCop } from "@/lib/casa/format";
+import { redactId } from "@/lib/log";
+import { cb, shortId } from "./ids";
+import { esc } from "./context";
+
+export interface ReviewNotice {
+  userId: string;
+  pollaId: string;
+  pollaName: string;
+  kind: string;
+  approved: boolean;
+  prizeKind: "pozo" | "objeto";
+  prizeObject: string | null;
+  pozoCop: number;
+  rejectReason: string | null;
+  ticketNumber: number | null;
+}
+
+export function reviewNoticeMessage(n: ReviewNotice): { text: string; buttons: Array<Array<{ text: string; callback_data: string }>> } {
+  const P = shortId(n.pollaId);
+  const ticket = n.ticketNumber != null ? ` (boleta ${n.ticketNumber})` : "";
+  if (n.approved) {
+    return {
+      text: [
+        `✅ <b>Confirmamos tu pago de ${esc(n.pollaName)}${ticket}.</b>`,
+        "",
+        n.prizeKind === "objeto"
+          ? `Ya participas por ${esc(n.prizeObject ?? "el premio")}.`
+          : `Ya participas por el premio. El pozo va en ${formatCop(n.pozoCop)}.`,
+        n.kind === "partidos" ? "Haz tus pronósticos antes de que empiece cada partido." : n.kind === "manual" ? "Responde las preguntas antes del cierre." : null,
+      ].filter((l) => l !== null).join("\n"),
+      buttons: [
+        ...(n.kind === "partidos" ? [[{ text: "⚽ Pronosticar", callback_data: cb("pk", P) }]] : []),
+        ...(n.kind === "manual" ? [[{ text: "📝 Responder preguntas", callback_data: cb("q", P) }]] : []),
+        [{ text: "👉 Ver la polla", callback_data: cb("p", P) }],
+      ],
+    };
+  }
+  return {
+    text: [
+      `❌ <b>No pudimos confirmar tu pago de ${esc(n.pollaName)}${ticket}.</b>`,
+      n.rejectReason ? `Motivo: ${esc(n.rejectReason)}` : null,
+      "",
+      "Revisa el comprobante. Si ya transferiste, no repitas el pago: envía el comprobante correcto o escríbenos en soporte.",
+    ].filter((l) => l !== null).join("\n"),
+    buttons: [[{ text: n.kind === "rifa" ? "👉 Ver mis boletas" : "📸 Enviar el comprobante correcto", callback_data: cb(n.kind === "rifa" ? "p" : "j", P) }]],
+  };
+}
+
+/** Busca el Telegram vinculado y le manda el aviso. Devuelve si salió. */
+export async function notifyPlayerReviewByTelegram(
+  db: SupabaseClient,
+  notice: ReviewNotice,
+  client?: LoginBotClient,
+): Promise<boolean> {
+  const config = getTelegramLoginConfig();
+  if (!config) return false;
+  try {
+    const { data, error } = await db
+      .from("telegram_login_identities")
+      .select("telegram_user_id")
+      .eq("user_id", notice.userId)
+      .maybeSingle();
+    const telegramUserId = Number((data as { telegram_user_id?: unknown } | null)?.telegram_user_id);
+    if (error || !Number.isSafeInteger(telegramUserId) || telegramUserId <= 0) return false;
+    const message = reviewNoticeMessage(notice);
+    const bot = client ?? createLoginBotClient(config.botToken);
+    return await bot.send("sendMessage", {
+      chat_id: telegramUserId,
+      text: message.text,
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+      reply_markup: { inline_keyboard: message.buttons },
+    });
+  } catch (err) {
+    console.warn("[telegram-player] aviso de revisión no enviado:", redactId(notice.userId), (err as Error).name);
+    return false;
+  }
+}

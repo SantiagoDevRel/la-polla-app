@@ -15,6 +15,8 @@ import { NextRequest } from "next/server";
 
 const adminFactory = vi.hoisted(() => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => adminFactory);
+// El webhook ahora también es el bot de jugadores (módulos de Casa server-only).
+vi.mock("server-only", () => ({}));
 
 import { callingCodeOf, maskPhone } from "@/lib/auth/telegram-login/mask-phone";
 import { prefersSameTab, SAME_TAB_MEDIA_QUERY } from "@/lib/auth/telegram-login/open-mode";
@@ -221,34 +223,31 @@ describe("ensureBotProfile — commands and descriptions, once per version", () 
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("the profile: /start only, v2 texts in the default, es and en lists", () => {
+  it("the profile: player-bot commands, v2 texts in the default, es and en lists", () => {
     const byLang = (method: string, lang?: string) =>
       BOT_PROFILE_STEPS.filter(([m, body]) => m === method && body.language_code === lang).map(([, body]) => body);
+    const COMMANDS = ["start", "pollas", "mispollas", "pagos", "perfil", "ayuda", "web"];
 
     for (const lang of [undefined, "es"]) {
-      expect(byLang("setMyCommands", lang)).toEqual([
-        { commands: [{ command: "start", description: "Entrar a La Polla" }], ...(lang ? { language_code: lang } : {}) },
-      ]);
-      expect(byLang("setMyDescription", lang)).toEqual([
-        { description: "Entra a La Polla Colombiana con Telegram cuando el SMS no llega.", ...(lang ? { language_code: lang } : {}) },
-      ]);
-      expect(byLang("setMyShortDescription", lang)).toEqual([
-        { short_description: "Entra a La Polla Colombiana con Telegram cuando el SMS no llega.", ...(lang ? { language_code: lang } : {}) },
-      ]);
+      const [commands] = byLang("setMyCommands", lang) as Array<{ commands: { command: string; description: string }[] }>;
+      expect(commands.commands.map((c) => c.command)).toEqual(COMMANDS);
+      expect(commands.commands[0]).toEqual({ command: "start", description: "Menú principal" });
+      expect(commands.commands[commands.commands.length - 1]).toEqual({ command: "web", description: "Entrar a la página web" });
+      expect(byLang("setMyDescription", lang)[0].description).toContain("inscríbete a las pollas");
+      expect(byLang("setMyDescription", lang)[0].description).toContain("cuando el SMS no llega");
+      expect(byLang("setMyShortDescription", lang)[0].short_description).toBe(
+        "Inscríbete, pronostica y mira la tabla de La Polla Colombiana desde Telegram.",
+      );
     }
-    expect(byLang("setMyCommands", "en")).toEqual([
-      { commands: [{ command: "start", description: "Sign in to La Polla" }], language_code: "en" },
-    ]);
-    expect(byLang("setMyDescription", "en")[0].description).toBe(
-      "Sign in to La Polla Colombiana with Telegram when the SMS doesn't arrive.",
-    );
-    expect(byLang("setMyShortDescription", "en")[0].short_description).toBe(
-      "Sign in to La Polla Colombiana with Telegram when the SMS doesn't arrive.",
-    );
+    const [en] = byLang("setMyCommands", "en") as Array<{ commands: { command: string; description: string }[] }>;
+    expect(en.commands.map((c) => c.command)).toEqual(COMMANDS);
+    expect(byLang("setMyDescription", "en")[0].description).toContain("when the SMS doesn't arrive");
     expect(BOT_PROFILE_STEPS).toHaveLength(9);
 
     const commands = BOT_PROFILE_STEPS.flatMap(([, body]) => (body.commands as { command: string }[] | undefined) ?? []);
-    expect(commands.map((c) => c.command)).toEqual(["start", "start", "start"]);
+    expect(commands.map((c) => c.command)).toEqual([...COMMANDS, ...COMMANDS, ...COMMANDS]);
+    // Límite de la Bot API para la descripción de un comando.
+    for (const c of commands as unknown as { description: string }[]) expect(c.description.length).toBeLessThanOrEqual(256);
     const texts = JSON.stringify(
       BOT_PROFILE_STEPS.map(([, body]) => [body.commands, body.description, body.short_description]),
     );
@@ -275,7 +274,7 @@ describe("ensureBotProfile — commands and descriptions, once per version", () 
 
   it("the version hashes the profile and the bot's public id, never the token", () => {
     const version = botProfileVersion(BOT_TOKEN);
-    expect(version).toMatch(/^2026-09-14-[0-9a-f]{16}$/);
+    expect(version).toMatch(/^2026-09-15-[0-9a-f]{16}$/);
     expect(botProfileVersion(BOT_TOKEN)).toBe(version);
     expect(botProfileVersion(OTHER_BOT_TOKEN)).not.toBe(version);
     expect(botProfileVersion("123456789:AAOtherSecretPartForTheSameBot_zyxwvutsrq")).toBe(version);

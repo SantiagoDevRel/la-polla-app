@@ -11,7 +11,8 @@
 //
 // --texts-only (v2, 2026-09-13): actualiza SOLO comandos y descripciones del
 // bot (ya no hablan de códigos). No llama setWebhook ni necesita el secreto:
-// el webhook, su secreto y allowed_updates=["message"] quedan como están.
+// el webhook, su secreto y allowed_updates quedan como están. (2026-09-15: el
+// servidor agrega callback_query solo, lib/auth/telegram-login/webhook-updates.ts.)
 // Ya no hace falta correrlo para los textos: el servidor los sincroniza solo
 // una vez por versión (lib/auth/telegram-login/bot-profile.ts).
 //
@@ -50,19 +51,43 @@ if (problems.length) {
 // Mismo perfil que lib/auth/telegram-login/bot-profile.ts (BOT_PROFILE_STEPS).
 // Desde 2026-09-14 el servidor lo sincroniza solo (webhook y
 // /api/cron/telegram-login-bot-profile); si cambias un texto, cámbialo allá.
-const ES_START = "Entrar a La Polla";
-const ES_ABOUT = "Entra a La Polla Colombiana con Telegram cuando el SMS no llega.";
-const EN_START = "Sign in to La Polla";
-const EN_ABOUT = "Sign in to La Polla Colombiana with Telegram when the SMS doesn't arrive.";
+// (2026-09-15) El bot también es la app para jugadores (lib/telegram-player).
+const PROFILE = {
+  es: {
+    commands: [
+      { command: "start", description: "Menú principal" },
+      { command: "pollas", description: "Pollas abiertas para inscribirte" },
+      { command: "mispollas", description: "Mis pollas: pronosticar y ver la tabla" },
+      { command: "pagos", description: "Saber si ya confirmamos mi pago" },
+      { command: "perfil", description: "Mi nombre, pollito y cuenta de premios" },
+      { command: "ayuda", description: "Cómo funciona" },
+      { command: "web", description: "Entrar a la página web" },
+    ],
+    about: "La Polla Colombiana en Telegram: crea tu cuenta, inscríbete a las pollas, envía tu comprobante, pronostica y mira la tabla. También te deja entrar a la web cuando el SMS no llega.",
+    short: "Inscríbete, pronostica y mira la tabla de La Polla Colombiana desde Telegram.",
+  },
+  en: {
+    commands: [
+      { command: "start", description: "Main menu" },
+      { command: "pollas", description: "Open pools you can join" },
+      { command: "mispollas", description: "My pools: predictions and standings" },
+      { command: "pagos", description: "Check whether my payment was confirmed" },
+      { command: "perfil", description: "My name, chick and prize account" },
+      { command: "ayuda", description: "How it works" },
+      { command: "web", description: "Sign in to the website" },
+    ],
+    about: "La Polla Colombiana on Telegram: create your account, join pools, send your payment receipt, make predictions and check the standings. It also signs you in to the website when the SMS doesn't arrive.",
+    short: "Join pools, make predictions and check the standings of La Polla Colombiana on Telegram.",
+  },
+};
 
 const textSteps = [null, "es", "en"].flatMap((lang) => {
-  const start = lang === "en" ? EN_START : ES_START;
-  const about = lang === "en" ? EN_ABOUT : ES_ABOUT;
+  const copy = PROFILE[lang ?? "es"];
   const language = lang ? { language_code: lang } : {};
   return [
-    ["setMyCommands", { commands: [{ command: "start", description: start }], ...language }],
-    ["setMyDescription", { description: about, ...language }],
-    ["setMyShortDescription", { short_description: about, ...language }],
+    ["setMyCommands", { commands: copy.commands, ...language }],
+    ["setMyDescription", { description: copy.about, ...language }],
+    ["setMyShortDescription", { short_description: copy.short, ...language }],
   ];
 });
 
@@ -72,7 +97,7 @@ const steps = textsOnly
       ["setWebhook", {
         url,
         secret_token: secret,
-        allowed_updates: ["message"],
+        allowed_updates: ["message", "callback_query"],
         drop_pending_updates: true,
         max_connections: 20,
       }],

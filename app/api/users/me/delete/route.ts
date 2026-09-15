@@ -84,6 +84,23 @@ export async function POST() {
       }
     }
 
+    // 1b. Bot de Telegram para jugadores (migración 130): el paso a medio
+    //     escribir (p. ej. el titular de la cuenta de premios) vive en el chat
+    //     de la cuenta de Telegram vinculada, que no cae por CASCADE. Se vacía
+    //     antes de que el vínculo desaparezca con el usuario de Auth.
+    const { data: telegramLink } = await admin
+      .from("telegram_login_identities")
+      .select("telegram_user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (telegramLink?.telegram_user_id) {
+      const { error } = await admin
+        .from("telegram_login_chats")
+        .update({ bot_flow: null, bot_flow_data: null, bot_flow_at: null })
+        .eq("telegram_user_id", telegramLink.telegram_user_id);
+      if (error) console.warn("[delete-account] cleanup telegram_login_chats failed (continuing):", error.message);
+    }
+
     // 2. Borrar la fila public.users. CASCADE/SET NULL del schema hace el
     //    resto: participations/predictions caen, pollas creadas sobreviven
     //    con created_by=NULL.
