@@ -46,7 +46,8 @@ npm test -- tests/match-schedule.test.ts tests/tournament-availability.test.ts t
 
 Info por polla, cuenta personal de pago, revisión de comprobantes, pozo fijo,
 publicación programada y fechas en Colombia: [contrato y pruebas de Casa](docs/casa-admin-rules.md)
-(migraciones 104–109; requieren Casa v2).
+(migraciones 104–109 y 125; requieren Casa v2). Desde la 125, el pozo fijo crece
+solo cuando lo recaudado supera el doble del premio garantizado.
 
 ## Fútbol: calendario, partidos y equipos (API-Football Pro)
 
@@ -611,7 +612,7 @@ Activación de v2 (dueño): aplicar la migración 119 → deploy. Mismas tres va
 
 #### Bot de Telegram para jugadores (2026-09-15, migración 130)
 
-Pedido del dueño: que alguien que no usa apps pueda hacer TODO desde Telegram, sin abrir la web. Mismo bot público y mismo webhook que el login (`@LaPollaColombianaAccesoBot`, `/api/telegram/login`). Todo con botones; solo se escribe el nombre, el marcador si se prefiere («2-1»), el número de boleta, respuestas de texto y la cuenta de premios. **Sin LLM** (el dueño ofreció Claude Haiku): las acciones son botones con validaciones fijas, sin costo y sin riesgo de que un modelo interprete mal un pronóstico o un pago.
+Pedido del dueño: que alguien que no usa apps pueda hacer TODO desde Telegram, sin abrir la web. Un solo bot público para login y app: `@LaPollaColombianaBot` (webhook `/api/telegram/login`; reemplazó a `@LaPollaColombianaAccesoBot` el 2026-09-15). Todo con botones; solo se escribe el nombre, el marcador si se prefiere («2-1»), el número de boleta, respuestas de texto y la cuenta de premios. **Sin LLM** (el dueño ofreció Claude Haiku): las acciones son botones con validaciones fijas, sin costo y sin riesgo de que un modelo interprete mal un pronóstico o un pago.
 
 **Recorrido**
 
@@ -640,6 +641,8 @@ Pedido del dueño: que alguien que no usa apps pueda hacer TODO desde Telegram, 
 **Pruebas:** `npm test -- tests/telegram-player.test.ts tests/telegram-login.test.ts tests/telegram-login-polish.test.ts`. El recorrido completo (cuenta nueva, perfil, comprobante real en Storage, aprobación, pronósticos 1X2 y marcador, preguntas, rifa, tabla, reglas, cuenta de premios y `/web`) se probó contra Supabase local con un servidor falso de la Bot API (`TELEGRAM_LOGIN_API_BASE_URL`, solo fuera de producción).
 
 **Prueba con Telegram real (2026-09-15).** Con un bot de prueba (`@LaPollaColombianaBot`, reservado a la cuenta del dueño), Telegram Web y un poller local (`getUpdates` → webhook local, Supabase local): registro compartiendo el número real, perfil, comprobante como foto JPG y como archivo PNG, aprobación y rechazo desde `/api/casa/admin/entries` con el aviso llegando al chat, reenvío tras rechazo, 1X2, marcador con botones y escrito, preguntas, rifa, puntos tras cerrar un partido, tabla, reglas y cuenta de premios. 82 updates, todos 200. Lo que corrigió: en Telegram para computador el menú fijo queda escondido detrás de ⌘ (ahora las opciones también van como botones del mensaje); tocar un botón de «Recibimos tu comprobante» o «Confirmamos tu pago» borraba ese mensaje (esos botones abren uno nuevo, marca `!` en `callback_data`); la rifa rechazada ofrece reenviar la boleta; Telegram devuelve en sus errores la URL con el token del enlace (ya no se loguea) y un error de red perdió un aviso (un reintento).
+
+**Pago pendiente, doble inscripción y doble toque (2026-09-15).** Quien envía el comprobante ya pronostica; sus puntos se calculan igual (`casa_score_polla`) pero la tabla solo suma pagos aprobados (`casa_leaderboard`), así que al aprobar aparecen retroactivos. El bot y la web lo explican con el aviso de pago en revisión. `scripts/casa-pending-picks-check.sql` lo verifica (y que `casa_entries_one_per_user` impide inscribirse dos veces). Un toque que cae sobre un mensaje recién editado (≤1 s, `edit_date`) se ignora con «La pantalla acaba de cambiar…», porque el botón siguiente aparece donde estaba el tocado.
 
 **Límites conocidos:** el bot habla solo español (Casa es colombiana); no manda recordatorios de partidos por jugar; en Telegram no hay «pronósticos de los demás» ni fotos de escudos.
 
@@ -753,7 +756,7 @@ un archivo.
 |---|---|---|
 | IP real en Auth (`Sb-Forwarded-For`) | **Activa.** `security_sb_forwarded_for_enabled=true` y `SUPABASE_SECRET_KEY` en Production. Los logs de Auth muestran la IP del usuario en `remote_addr` | Apagar: PATCH `{"security_sb_forwarded_for_enabled": false}`. Sin la env, `auth-ip` cae a anon sin cabecera |
 | SMS por LabsMobile (Send SMS Hook) | **Configurado y apagado.** URI `https://lapollacolombiana.com/api/auth/sms-hook` y secreto guardados en Auth; `sms_provider` sigue siendo `twilio_verify`; `sms_otp_exp=600` | Prender: PATCH `{"hook_send_sms_enabled": true}`. Rollback: PATCH `{"hook_send_sms_enabled": false}`, que vuelve a Twilio al instante sin deploy |
-| Login por Telegram | **Activo.** Bot `@LaPollaColombianaAccesoBot`, webhook en `/api/telegram/login` (`allowed_updates: ["message"]`), migración 115 aplicada, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`. **v2 (migración 119, sin códigos) pendiente de aplicar y desplegar** | Apagar: quitar una de las tres variables `TELEGRAM_LOGIN_*` en Vercel y redeploy (la opción desaparece de `/login` y el webhook responde 503) |
+| Login por Telegram | **Activo.** Bot `@LaPollaColombianaBot` (antes `@LaPollaColombianaAccesoBot`), webhook en `/api/telegram/login` (`allowed_updates: ["message"]`), migración 115 aplicada, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`. **v2 (migración 119, sin códigos) pendiente de aplicar y desplegar** | Apagar: quitar una de las tres variables `TELEGRAM_LOGIN_*` en Vercel y redeploy (la opción desaparece de `/login` y el webhook responde 503) |
 | Captcha de Auth | **Apagada** (`SMS_CAPTCHA_ENFORCED` sin definir y `security_captcha_enabled=false`). Widget Turnstile en `/login` y verificación en `start-otp` listos; activación en «Captcha de Auth (Turnstile)» | — |
 | Backup | **Activo.** Runner del DGX fijado a `main` 7d9ca5a (checkout detached): backup a las 00:10, 06:10, 12:10 y 18:10 y verify a las 03:40 (hora de Bogotá). Cada corrida escribe en `backup_runs` (migración 117). `backup-freshness.yml` está programado cada hora y manda correo si hay atraso (ojo: GitHub corre los `schedule` de este repo con horas de retraso, ver «Crons de GitHub Actions»). El PC baja los snapshots con la tarea programada `La Polla backup pull` | Detalle en `ops/backup/README.md`. Si cambian `ops/backup` o `scripts/export-backup.ts`, en el DGX hay que repetir `git fetch`, `checkout` y `npm ci` |
 | Planes | Vercel Pro, Supabase Pro compute Small, API-Football Pro (vence 2026-10-09) | — |

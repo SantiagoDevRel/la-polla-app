@@ -48,9 +48,16 @@ async function loadPickContext(ctx: PlayerCtx, polla: CasaPolla) {
 }
 
 /** Guardas de entrada comunes: inscripción y polla que recibe pronósticos. */
+/** Por qué esta inscripción todavía no puede pronosticar, en palabras de la persona. */
+export function cannotPickReason(entry: { status: string; proof_path: string | null } | null, verb: "pronosticar" | "responder"): string {
+  if (!entry) return `Para ${verb} primero tienes que inscribirte y enviar el comprobante.`;
+  if (entry.status === "rechazada") return `Tu pago fue rechazado. Envía el comprobante correcto para volver a ${verb}; lo que ya guardaste se conserva.`;
+  return `Tu comprobante no alcanzó a guardarse. Envíalo de nuevo para ${verb}; si ya transferiste, no repitas el pago.`;
+}
+
 async function guard(ctx: PlayerCtx, polla: CasaPolla, entry: Awaited<ReturnType<typeof getMyEntry>>): Promise<boolean> {
   if (!entryCanPick(entry)) {
-    await showPollaDetail(ctx, polla, "Para pronosticar primero tienes que inscribirte y enviar el comprobante.");
+    await showPollaDetail(ctx, polla, cannotPickReason(entry, "pronosticar"));
     return false;
   }
   if (!pollaAcceptsPicks(polla)) {
@@ -278,6 +285,11 @@ export async function listPicks(ctx: PlayerCtx, polla: CasaPolla, notice?: strin
   const lines: string[] = [];
   if (notice) lines.push(notice, "");
   lines.push(`<b>Tus pronósticos · ${esc(polla.name)}</b>`, "");
+  // Regla del dueño: se pronostica desde que se envía el comprobante, pero los
+  // puntos cuentan en la tabla cuando se aprueba el pago (casa_leaderboard solo
+  // suma inscripciones pagadas; casa_score_polla puntúa todos los picks, así
+  // que al aprobar los puntos aparecen retroactivos).
+  if (entry?.status === "pendiente") lines.push(COPY.pendingPoints, "");
   const buttons: Keyboard = [];
   const acceptsPicks = pollaAcceptsPicks(polla);
   matches.slice(0, 40).forEach((m, i) => {
@@ -363,7 +375,7 @@ async function renderQuestion(ctx: PlayerCtx, polla: CasaPolla, questions: CasaQ
 async function nextQuestion(ctx: PlayerCtx, polla: CasaPolla, afterId: string | null, notice?: string): Promise<void> {
   const { entry, questions, byQuestion } = await loadQuestions(ctx, polla);
   if (!entryCanPick(entry)) {
-    await showPollaDetail(ctx, polla, "Para responder primero tienes que inscribirte y enviar el comprobante.");
+    await showPollaDetail(ctx, polla, cannotPickReason(entry, "responder"));
     return;
   }
   if (!isPollaOpen(polla)) {
@@ -457,6 +469,7 @@ export async function listAnswers(ctx: PlayerCtx, polla: CasaPolla, notice?: str
   const lines: string[] = [];
   if (notice) lines.push(notice, "");
   lines.push(`<b>Tus respuestas · ${esc(polla.name)}</b>`, "");
+  if (entry?.status === "pendiente") lines.push(COPY.pendingPoints, "");
   const buttons: Keyboard = [];
   questions.slice(0, 30).forEach((q, i) => {
     const pick = byQuestion.get(q.id);

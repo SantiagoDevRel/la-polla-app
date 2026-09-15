@@ -305,8 +305,9 @@ export default async function PollaPage({
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">{etiqueta}Pago en revisión</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              Recibimos tu comprobante. Puedes pronosticar mientras tanto, pero
-              {multiple ? " esta participación suma puntos" : " tu participación se activa"} cuando confirmemos el pago.
+              Recibimos {multiple ? "el comprobante de este cupo" : "tu comprobante"}. Puedes pronosticar mientras tanto: tus
+              pronósticos quedan guardados y sus puntos se suman en la tabla
+              apenas confirmemos el pago, también los de partidos ya jugados.
             </p>
           </div>
         )}

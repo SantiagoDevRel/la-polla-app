@@ -196,6 +196,15 @@ async function welcomeLinked(
   return "linked";
 }
 
+/** Ventana del doble toque, en segundos (edit_date de Telegram tiene resolución de 1 s). */
+export const DOUBLE_TAP_WINDOW_S = 1;
+
+export function isDoubleTap(editDate: number | null, nowMs: number): boolean {
+  if (!editDate) return false;
+  const elapsed = Math.floor(nowMs / 1000) - editDate;
+  return elapsed >= 0 && elapsed <= DOUBLE_TAP_WINDOW_S;
+}
+
 export async function handleTelegramUpdate(update: unknown, deps: PlayerBotDeps): Promise<PlayerOutcome> {
   const now = deps.now ?? Date.now;
   const loginDeps = loginDepsFor(deps);
@@ -206,7 +215,17 @@ export async function handleTelegramUpdate(update: unknown, deps: PlayerBotDeps)
     return handleLoginUpdate(update, loginDeps);
   }
 
-  if (action.kind === "callback") await answerCallback(deps, action.callbackId);
+  if (action.kind === "callback") {
+    // Doble toque: el bot reemplaza la pantalla en el MISMO mensaje y el botón
+    // siguiente queda donde estaba el que se tocó («OFIGOLAZO» → «Inscribirme»,
+    // «Gana Liverpool» → «Gana Crystal Palace»). Un toque que llega sobre un
+    // mensaje editado hace ≤1 s se descarta: visto en la prueba real (15-sep).
+    if (isDoubleTap(action.editDate, now())) {
+      await answerCallback(deps, action.callbackId, COPY.doubleTap);
+      return "ignored";
+    }
+    await answerCallback(deps, action.callbackId);
+  }
 
   const linked = await linkedAccountFor(deps.db, action.telegramUserId);
   if (linked.kind === "error") {

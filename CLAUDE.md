@@ -62,8 +62,10 @@ cron `/api/matches/discover` y panel `/api/admin/sync-ligas`), vivo
 
 ### Bot de Telegram para jugadores (2026-09-15, migración 130)
 
-El bot público `@LaPollaColombianaAccesoBot` (webhook `/api/telegram/login`)
-ya no es solo el login: es la app completa para quien no quiere usar la web.
+Un solo bot público, **`@LaPollaColombianaBot`** (webhook `/api/telegram/login`),
+para TODO: login a la web y app completa para quien no quiere usar la web. Desde
+2026-09-15 reemplaza a `@LaPollaColombianaAccesoBot` (borrado a pedido del dueño:
+«nada de un bot separado pal acceso»). No volver a crear un bot aparte para login.
 Crear cuenta (Compartir mi número), perfil (nombre → pollito → cuenta de
 premios), pollas abiertas, inscribirse, enviar la foto del comprobante, «Mis
 pagos», pronosticar (1X2 con botones, marcador con goles 0–9 o «2-1», preguntas)
@@ -91,6 +93,17 @@ Telegram para jugadores». Reglas que no se negocian:
   `drop_pending_updates`. No hace falta rotar secretos para activarlo.
 - Estado de la conversación en `telegram_login_chats.bot_flow*` (130). El número
   de cuenta bancaria nunca queda ahí: es la última respuesta y va a `users`.
+- **Regla de pronósticos con pago pendiente (dueño, 2026-09-15; web y bot):** quien
+  envía el comprobante ya pronostica y guarda; los puntos cuentan en la tabla solo
+  al aprobar el pago, y si se aprueba después de jugarse los partidos aparecen
+  retroactivos. Lo sostiene SQL: `casa_score_polla` puntúa todos los picks y
+  `casa_leaderboard` solo suma inscripciones `pagada`. No filtrar el puntaje por
+  estado de pago ni recalcular al aprobar. Regresión: `scripts/casa-pending-picks-check.sql`.
+- **Nunca doble inscripción:** `casa_entries_one_per_user` (y `casa_entries_ticket_unique`
+  en rifas). Ya inscrito (pagado o en revisión) no ve «Inscribirme»; rechazado o
+  carga sin terminar ve «Enviar comprobante» sobre la MISMA inscripción.
+- **Doble toque:** un botón tocado sobre un mensaje editado hace ≤1 s (`edit_date`)
+  se descarta con un aviso: el botón siguiente queda donde estaba el tocado.
 
 ### Precisión de horarios y torneos (2026-09-13, migración 103)
 
@@ -158,8 +171,11 @@ comprobante y solo suman en tabla/reparto cuando se aprueba.
 
 Ver [docs/casa-admin-rules.md](docs/casa-admin-rules.md). El pozo fijo mantiene
 `prize_kind=pozo` y añade `pot_mode=fijo` + `fixed_prize_cop`: desde la migración
-109 es un **premio mínimo garantizado** con cualquier % de casa; las entradas lo
-cubren y del excedente la casa toma su % (mismo redondeo que el proporcional).
+109 es un **premio mínimo garantizado** con cualquier % de casa. Desde la 125
+(2026-09-15, regla del dueño) solo crece cuando lo recaudado pasa el **doble** del
+premio: las entradas cubren F, la casa recibe otro F y del excedente sobre 2F la
+casa toma su % (mismo redondeo que el proporcional). OFIGOLAZO: $20.000, F=$1M,
+50 % → crece $10.000 desde la persona 101. No volver al umbral simple de 109.
 Cálculo único `casa_money_prize_cop`, balance y preview en SQL; nunca en TS.
 `publication_mode` + `opens_at` filtran también en RLS y en las
 reservas. No mostrar ni admitir entradas antes de publicación. Pendientes en
@@ -881,7 +897,7 @@ Foto completa, con rollback por pieza: README → «Estado en producción
   horario hábil con acuse en segundos y el vigía de silencio
   (`revisarSilencios`) conectado a un cron, porque hoy no hay cron que lo
   llame. Rollback = PATCH `hook_send_sms_enabled:false`, sin deploy.
-- **Login por Telegram: ACTIVO (v2, migración 119, PR #78).** `@LaPollaColombianaAccesoBot`,
+- **Login por Telegram: ACTIVO (v2, migración 119, PR #78).** `@LaPollaColombianaBot` (antes `@LaPollaColombianaAccesoBot`, borrado el 2026-09-15),
   webhook en `/api/telegram/login`, `TELEGRAM_LOGIN_ALLOW_EXISTING_ACCOUNTS=true`.
   Ajustes del 2026-09-14 (migración 120, aditiva) en la sección de abajo.
 - **Captcha de Auth: apagada**; widget Turnstile y verificación en `start-otp`

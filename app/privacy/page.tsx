@@ -49,6 +49,22 @@ export default async function PrivacyPage() {
           </p>
         </section>
 
+        <section id="sms" className="mb-[28px]">
+          <h2 className="mb-[8px] text-[17px] font-semibold text-gold">
+            {t("smsTitle")}
+          </h2>
+          <p className="text-[14px] leading-[1.7] text-text-secondary">
+            {t("smsBodyBefore")}
+            <a
+              href="mailto:info@lapollacolombiana.com"
+              className="text-gold underline underline-offset-2 transition-colors hover:text-amber"
+            >
+              info@lapollacolombiana.com
+            </a>
+            {t("smsBodyAfter")}
+          </p>
+        </section>
+
         <section className="mb-[28px]">
           <h2 className="mb-[8px] text-[17px] font-semibold text-gold">
             {t("section5Title")}

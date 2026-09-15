@@ -284,10 +284,10 @@ export function CrearPollaForm() {
     }
   }
 
-  // Pozo fijo = premio mínimo garantizado (migración 109). Todas las cifras,
-  // incluidos los inscritos que cubren el mínimo, salen del preview en SQL.
+  // Pozo fijo = premio mínimo garantizado que crece pasado el doble (migración 125).
+  // Todas las cifras, incluidos los inscritos de cada umbral, salen del preview en SQL.
   const [previewMoney, setPreviewMoney] = useState<{ entry_prize: number; entry_house: number; ten_prize: number; all_prize: number;
-    fixed_prize?: number; entries_to_cover?: number | null } | null>(null);
+    fixed_prize?: number; entries_to_cover?: number | null; entries_to_grow?: number | null } | null>(null);
   const [previewError, setPreviewError] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
@@ -311,12 +311,16 @@ export function CrearPollaForm() {
     if (previewMoney?.fixed_prize === undefined) return previewError ? "" : "Calculando el reparto...";
     const premio = `Premio garantizado de ${formatCop(previewMoney.fixed_prize)}.`;
     const cover = previewMoney.entries_to_cover;
+    const grow = previewMoney.entries_to_grow;
     if (cover === null || cover === undefined) return `${premio} La casa cubre el premio completo.`;
+    if (grow === null || grow === undefined) return "";
     const split = [
       previewMoney.entry_prize > 0 && `${formatCop(previewMoney.entry_prize)} al pozo`,
       previewMoney.entry_house > 0 && `${formatCop(previewMoney.entry_house)} a la casa`,
     ].filter(Boolean).join(" y ");
-    return `${premio} Se cubre con ${formatNumber(cover)} ${cover === 1 ? "inscrito" : "inscritos"}; desde el inscrito ${formatNumber(cover + 1)}, cada entrada suma ${split}.`;
+    const inscritos = (n: number) => `${formatNumber(n)} ${n === 1 ? "inscrito" : "inscritos"}`;
+    const house = grow > cover ? ` hasta el inscrito ${formatNumber(grow)}, la casa recibe lo mismo otra vez;` : "";
+    return `${premio} Se cubre con ${inscritos(cover)};${house} desde el inscrito ${formatNumber(grow + 1)}, cada entrada suma ${split}.`;
   })();
 
   return (
@@ -513,7 +517,7 @@ export function CrearPollaForm() {
         <p className="border-t border-border-subtle pt-3 text-[12px] text-text-muted">
           {previewError && <span className="block text-red-alert">No se pudo consultar el cálculo. Revisa los valores antes de publicar.</span>}
           {prizeKind === "objeto" ? <>La inscripción es para participar por el objeto anunciado. La casa recibe <b className="text-text-primary">{previewCop("entry_house")}</b> por persona y entrega el objeto; no se reparte dinero.</>
-            : potMode === "fijo" ? <>Las entradas cubren primero el premio garantizado; si no alcanzan, la casa pone la diferencia. Lo que entre por encima se reparte entre el pozo y la casa según el porcentaje que definiste.</>
+            : potMode === "fijo" ? <>Las entradas cubren primero el premio garantizado; si no alcanzan, la casa pone la diferencia. Después, la casa recibe otro tanto igual al premio. Solo lo que entre por encima del doble del premio se reparte entre el pozo y la casa según el porcentaje que definiste.</>
             : <>Por cada persona que entre: <b className="text-text-primary">{previewCop("entry_prize")}</b> al pozo y <b className="text-text-primary">{previewCop("entry_house")}</b> a la casa.</>}
         </p>
 
