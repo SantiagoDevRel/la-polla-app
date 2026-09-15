@@ -7,12 +7,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyEntry, getPollaBySlug, getPot, getActiveProofs, getOutstandingTicket, getFixedPrizeThreshold } from "@/lib/casa/queries";
+import { getMyEntries, getPollaBySlug, getPot, getActiveProofs, getOutstandingTicket, getFixedPrizeThreshold } from "@/lib/casa/queries";
 import { FixedPrizeGrowth } from "@/components/casa/FixedPrizeGrowth";
-import { isPollaOpen } from "@/lib/casa/types";
+import { DEFAULT_MAX_ENTRIES_PER_USER, isLiveEntry, isPollaOpen, type CasaEntry } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
 import { HeroFrame, Label, StreetCard } from "@/components/street";
 import { PagarForm } from "@/components/casa/PagarForm";
+import { CuposForm } from "@/components/casa/CuposForm";
 import { CopiarDato } from "@/components/casa/CopiarDato";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,8 @@ export default async function PagarPage({
   params, searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ boleta?: string }>;
+  /** `participacion`: "nueva" o el número de una participación propia (migración 131). */
+  searchParams: Promise<{ boleta?: string; participacion?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -32,29 +34,54 @@ export default async function PagarPage({
   const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador") notFound();
 
-  const [entry, pot, threshold] = await Promise.all([
-    getMyEntry(polla.id, user.id),
+  const [entries, pot, threshold] = await Promise.all([
+    polla.kind === "rifa" ? Promise.resolve([] as CasaEntry[]) : getMyEntries(polla.id, user.id),
     getPot(polla.id),
     getFixedPrizeThreshold(polla),
   ]);
+  const { boleta, participacion } = await searchParams;
 
-  // Ya entró y no fue rechazado: no tiene nada que hacer acá. `anulada` (se
-  // cayó la subida del comprobante) SÍ puede volver a intentar — el endpoint de
-  // join reusa esa fila a propósito; si esta pantalla la rebota, la persona
-  // queda sin ninguna puerta para entrar a la polla.
-  if (
-    entry &&
-    entry.status !== "rechazada" &&
-    entry.status !== "anulada" &&
-    (entry.status === "pagada" || entry.proof_path !== null) &&
-    polla.kind !== "rifa"
-  ) {
-    redirect(`/casa/${polla.slug}`);
+  // ── Qué participación se paga (migración 131) ─────────────────────────────
+  // Cada participación es su propia transferencia y su propio comprobante.
+  //   ?participacion=nueva → una participación más (tope por persona).
+  //   ?participacion=N     → completar/reintentar la N (rechazada o sin comprobante).
+  //   sin parámetro        → lo de siempre: retomar la que falte o entrar por primera vez.
+  // Una participación pagada o en revisión no tiene nada que hacer acá.
+  // `anulada` (se cayó la subida) SÍ puede volver a intentar: SQL reusa esa fila.
+  const retryable = (e: CasaEntry) => e.status === "rechazada" || e.status === "anulada" || (e.status === "pendiente" && !e.proof_path);
+  const maxEntries = polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER;
+  const counted = entries.filter((e) => e.status !== "anulada").length;
+  let target: CasaEntry | null = null;
+  let isAnother = false;
+  if (polla.kind !== "rifa") {
+    if (participacion === "nueva") {
+      isAnother = entries.some(isLiveEntry) || entries.some((e) => e.status === "rechazada");
+      if (isAnother && counted >= maxEntries) {
+        return <div className="px-4 py-6"><StreetCard className="space-y-4 p-4">
+          <h1 className="lp-display text-[30px] [overflow-wrap:anywhere]">Llegaste al máximo</h1>
+          <p className="text-[15px] text-text-secondary">Puedes tener hasta {maxEntries} cupos en {polla.name}. Si alguno fue rechazado, envía de nuevo su comprobante desde la polla.</p>
+          <Link className="lp-btn lp-btn-primary w-full" href={`/casa/${polla.slug}`}>Ver mis cupos</Link>
+        </StreetCard></div>;
+      }
+      // Una carga fallida o rechazada sin otras participaciones se retoma en su propia fila.
+      if (!isAnother) target = entries.find(retryable) ?? null;
+    } else if (participacion && /^\d{1,2}$/.test(participacion)) {
+      target = entries.find((e) => e.entry_number === Number(participacion)) ?? null;
+      if (!target) redirect(`/casa/${polla.slug}`);
+      if (isLiveEntry(target)) redirect(`/casa/${polla.slug}?p=${target.entry_number}`);
+    } else {
+      target = entries.find(retryable) ?? null;
+      if (!target && entries.some(isLiveEntry)) redirect(`/casa/${polla.slug}`);
+    }
   }
-  const boleta = (await searchParams).boleta;
-  let recovering = Boolean(entry);
-  let rejected = entry?.status === "rechazada";
-  let rejectReason = entry?.reject_reason;
+  let recovering = Boolean(target);
+  let rejected = target?.status === "rechazada";
+  let rejectReason = target?.reject_reason;
+  // Número que verá la persona: el de la fila que retoma, o el siguiente libre.
+  const shownNumber = target?.entry_number
+    ?? entries.find((e) => e.status === "anulada")?.entry_number
+    ?? (entries.reduce((max, e) => Math.max(max, e.entry_number ?? 0), 0) + 1);
+  const showNumber = polla.kind !== "rifa" && (isAnother || entries.length > 1 || shownNumber > 1);
   if (polla.kind === "rifa") {
     const outstanding = await getOutstandingTicket(polla.id, user.id);
     const number = boleta && /^\d+$/.test(boleta) && Number.isSafeInteger(Number(boleta)) ? Number(boleta) : undefined;
@@ -75,7 +102,7 @@ export default async function PagarPage({
   const resumeOnly = !isPollaOpen(polla);
   if (resumeOnly) {
     const active = await getActiveProofs(polla.id, user.id);
-    if (!active.some((proof) => polla.kind !== "rifa" || String(proof.ticket_number) === boleta)) redirect(`/casa/${polla.slug}`);
+    if (!active.some((proof) => polla.kind !== "rifa" ? proof.entry_id === target?.id : String(proof.ticket_number) === boleta)) redirect(`/casa/${polla.slug}`);
   }
 
   const entrada = polla.entry_price_cop;
@@ -86,8 +113,8 @@ export default async function PagarPage({
   return (
     <div className="pb-28">
       <HeroFrame height="min-h-[168px]">
-        <Label>Entrar a</Label>
-        <h1 className="lp-display mt-1 text-[30px]">{polla.name}</h1>
+        <Label>{recovering && showNumber ? `Cupo ${shownNumber}` : isAnother ? "Más cupos en" : "Entrar a"}</Label>
+        <h1 className="lp-display mt-1 text-[30px] [overflow-wrap:anywhere]">{polla.name}</h1>
       </HeroFrame>
 
       <div className="space-y-4 px-4 pt-5">
@@ -97,7 +124,7 @@ export default async function PagarPage({
         <StreetCard className="p-4">
           <div className="flex items-end justify-between">
             <div>
-              <Label>{recovering ? "Valor de la inscripción" : "Tienes que transferir"}</Label>
+              <Label>{recovering ? "Valor del cupo" : "Valor de cada cupo"}</Label>
               <div className="lp-money mt-1 text-[34px] leading-none text-gold">
                 {formatCop(entrada)}
               </div>
@@ -167,12 +194,16 @@ export default async function PagarPage({
           </div>
         )}
 
-        <PagarForm resumeOnly={resumeOnly}
+        {polla.kind !== "rifa" && !recovering && !resumeOnly ? (
+          <CuposForm slug={polla.slug} entryPriceCop={polla.entry_price_cop}
+            available={Math.max(1, maxEntries - counted)} another={isAnother} />
+        ) : <PagarForm resumeOnly={resumeOnly}
           slug={polla.slug}
           esRifa={polla.kind === "rifa"}
           ticketCount={polla.ticket_count}
           initialTicket={boleta && /^\d+$/.test(boleta) && Number(boleta) <= (polla.ticket_count ?? 0) ? boleta : ""}
-        />
+          entryNumber={polla.kind === "rifa" ? undefined : target?.entry_number ?? null}
+        />}
 
         <p className="text-center text-[11px] leading-relaxed text-text-muted">
           El administrador revisa el comprobante. Se guarda solo para verificar

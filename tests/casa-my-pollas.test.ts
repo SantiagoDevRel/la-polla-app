@@ -49,13 +49,15 @@ describe("personal casa pollas", () => {
   it("scopes every page to the session user, excludes invalid entries and private pools, and deduplicates raffle tickets", async () => {
     dbFetch.mockResolvedValueOnce(response(Array.from({ length: 500 }, () => ({ status: "pendiente", polla }))))
       .mockResolvedValueOnce(response([
-        { status: "pagada", polla },
+        { status: "pagada", entry_number: 2, polla },
         { status: "pagada", polla: [{ ...polla, id: "pool-b", slug: "finalizada", status: "resuelta" }] },
       ]));
     const result = await GET();
     const body = await result.json();
     expect(body.pollas).toHaveLength(2);
-    expect(body.pollas[0]).toEqual({ ...polla, entry_status: "pagada", tournaments: ["premier_2025"] });
+    expect(body.pollas[0]).toEqual({ ...polla, entry_status: "pagada", tournaments: ["premier_2025"],
+      entries: [{ number: 2, status: "pagada" }] });
+    expect(body.pollas[1].entries).toEqual([]);
     expect(result.headers.get("Cache-Control")).toBe("private, no-store");
     expect(dbFetch).toHaveBeenCalledTimes(2);
     for (const [input] of dbFetch.mock.calls) {

@@ -32,6 +32,7 @@ export interface SignedUpload {
 
 interface BeginResult {
   attempt_id: string;
+  entry_number?: number | null;
   state: string;
   upload?: SignedUpload;
 }
@@ -53,6 +54,18 @@ export interface ProofSubmitInput {
    * (INSCRIPTIONS_CLOSED): nunca se marca como fallado un intento guardado.
    */
   preserveStoredAttempt?: boolean;
+  /**
+   * Participación (migración 131): número = retomar esa, `null` = una nueva.
+   * `undefined` no manda el campo (rifas y clientes que no conocen el concepto).
+   */
+  entryNumber?: number | null;
+}
+
+export interface ProofSubmitResult {
+  attemptId: string;
+  sha256: string;
+  /** Participación en la que quedó el comprobante; null en rifas. */
+  entryNumber: number | null;
 }
 
 /** Códigos con los que vale la pena probar el siguiente candidato. */
@@ -66,7 +79,7 @@ export const CANDIDATE_FALLBACK_CODES: ReadonlySet<string> = new Set([
 
 const errorCode = (cause: unknown) => (cause as { code?: string } | null)?.code ?? "";
 
-export async function submitProof(input: ProofSubmitInput, deps: ProofSubmitDeps): Promise<{ attemptId: string; sha256: string }> {
+export async function submitProof(input: ProofSubmitInput, deps: ProofSubmitDeps): Promise<ProofSubmitResult> {
   let stored: StoredProofRecord | null = null;
   try { stored = parseStoredProofRecord(deps.readRecord()); } catch { /* Storage may be disabled. */ }
   if (stored && !storedRecordMatchesSource(stored, input.sourceSha256)) {
@@ -85,8 +98,8 @@ export async function submitProof(input: ProofSubmitInput, deps: ProofSubmitDeps
       ? { ...stored, sourceSha256: input.sourceSha256 }
       : { sourceSha256: input.sourceSha256, sha256: candidate.sha256, requestId: deps.newRequestId() };
     try {
-      const attemptId = await submitCandidate(candidate, record, input.ticketNumber, deps);
-      return { attemptId, sha256: candidate.sha256 };
+      const begun = await submitCandidate(candidate, record, input.ticketNumber, input.entryNumber, deps);
+      return { attemptId: begun.attemptId, sha256: candidate.sha256, entryNumber: begun.entryNumber };
     } catch (cause) {
       if (index < ordered.length - 1 && CANDIDATE_FALLBACK_CODES.has(errorCode(cause))) continue;
       throw cause;
@@ -99,13 +112,16 @@ async function submitCandidate(
   candidate: SubmitCandidate,
   record: StoredProofRecord,
   ticketNumber: number | null,
+  entryNumber: number | null | undefined,
   deps: ProofSubmitDeps,
-): Promise<string> {
+): Promise<{ attemptId: string; entryNumber: number | null }> {
   const save = () => { try { deps.writeRecord(JSON.stringify(record)); } catch { /* Retry within this render still works. */ } };
   const begin = async () => (await deps.post({
     action: "begin", requestId: record.requestId, ticketNumber,
     sha256: candidate.sha256, contentType: candidate.contentType, bytes: candidate.bytes,
+    ...(entryNumber === undefined ? {} : { entryNumber }),
   })) as BeginResult;
+  const done = (result: BeginResult) => ({ attemptId: result.attempt_id, entryNumber: result.entry_number ?? null });
 
   save();
   let begun: BeginResult | undefined;
@@ -121,13 +137,13 @@ async function submitCandidate(
   }
   if (!begun) throw new Error("No se pudo iniciar la carga.");
   record.attemptId = begun.attempt_id; save();
-  if (begun.state === "confirmed") return begun.attempt_id;
+  if (begun.state === "confirmed") return done(begun);
 
   if (begun.upload) await deps.upload(begun.upload, candidate.blob);
   // A timed-out upload may have succeeded. Verification resolves that ambiguity.
   try {
     await deps.post({ action: "confirm", attemptId: begun.attempt_id });
-    return begun.attempt_id;
+    return done(begun);
   } catch (cause) {
     if (errorCode(cause) !== "UPLOAD_MISMATCH") throw cause;
   }
@@ -137,5 +153,5 @@ async function submitCandidate(
   record.attemptId = replacement.attempt_id; save();
   if (replacement.upload) await deps.upload(replacement.upload, candidate.blob);
   await deps.post({ action: "confirm", attemptId: replacement.attempt_id });
-  return replacement.attempt_id;
+  return done(replacement);
 }

@@ -3,7 +3,8 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
-import { getMyEntry, getPollaBySlug, getPollaMatches } from "@/lib/casa/queries";
+import { getLeaderboard, getMyEntries, getMyEntry, getPollaBySlug, getPollaMatches } from "@/lib/casa/queries";
+import { isLiveEntry } from "@/lib/casa/types";
 import { hasCasaMatchStarted } from "@/lib/casa/match-rules";
 
 export const dynamic = "force-dynamic";
@@ -24,8 +25,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!parsed.success) return json({ error: "El partido o la página no son válidos." }, 400);
     const polla = await getPollaBySlug((await params).slug);
     if (!polla || polla.kind !== "partidos" || polla.status === "borrador" || polla.status === "anulada") return json({ error: "Esa polla no existe." }, 404);
-    const entry = await getMyEntry(polla.id, user.id);
-    const participating = entry?.status === "pagada" || (entry?.status === "pendiente" && Boolean(entry.proof_path));
+    // Cualquier participación viva de esta persona le deja ver los pronósticos (migración 131).
+    const [entry, entries] = await Promise.all([getMyEntry(polla.id, user.id), getMyEntries(polla.id, user.id)]);
+    const participating = isLiveEntry(entry) || entries.some(isLiveEntry);
     if (!participating && !(await isCurrentUserAdmin())) return json({ error: "Inscríbete para ver los pronósticos de esta polla." }, 403);
     const matches = await getPollaMatches(polla.id);
     const match = matches.find(item => item.id === parsed.data.match);
@@ -36,14 +38,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // The projection excludes user IDs, phone numbers and all payment details.
     const start = parsed.data.page * PAGE_SIZE;
     const { data, error } = await createAdminClient().from("casa_picks")
-      .select("id, pick_1x2, home_score, away_score, users!inner(display_name, avatar_url), casa_entries!inner(status)")
+      .select("id, entry_id, pick_1x2, home_score, away_score, users!inner(display_name, avatar_url), casa_entries!inner(status)")
       .eq("polla_id", polla.id).eq("match_id", match.id).eq("casa_entries.status", "pagada")
       .order("id", { ascending: true }).range(start, start + PAGE_SIZE);
     if (error) throw error;
-    const rows = (data ?? []).slice(0, PAGE_SIZE).map(row => {
+    const page = (data ?? []).slice(0, PAGE_SIZE);
+    // Migración 131: "#N" solo para quien tiene varias participaciones aprobadas.
+    // La tabla (SQL) ya trae número y conteo por participación; nada de user_id.
+    const numbers = new Map<string, number>();
+    if (page.length > 0) {
+      for (const row of await getLeaderboard(polla.id)) {
+        if ((row.user_entries ?? 1) > 1 && row.entry_number != null) numbers.set(row.entry_id, row.entry_number);
+      }
+    }
+    const rows = page.map(row => {
       const player = Array.isArray(row.users) ? row.users[0] : row.users;
       return {
         id: row.id, displayName: player?.display_name ?? "Sin nombre", avatarUrl: player?.avatar_url ?? null,
+        entryNumber: numbers.get(row.entry_id) ?? null,
         pick1x2: polla.scoring_mode === "1x2" ? row.pick_1x2 : null,
         homeScore: polla.scoring_mode === "marcador" ? row.home_score : null,
         awayScore: polla.scoring_mode === "marcador" ? row.away_score : null,

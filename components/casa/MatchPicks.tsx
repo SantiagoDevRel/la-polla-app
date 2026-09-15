@@ -5,7 +5,7 @@ import { Eye } from "lucide-react";
 import UserAvatar from "@/components/ui/UserAvatar";
 import type { Pick1x2 } from "@/lib/casa/types";
 
-interface Row { id: string; displayName: string; avatarUrl: string | null; pick1x2: Pick1x2 | null; homeScore: number | null; awayScore: number | null }
+interface Row { id: string; displayName: string; avatarUrl: string | null; pick1x2: Pick1x2 | null; homeScore: number | null; awayScore: number | null; /** Solo si esa persona tiene varias participaciones aprobadas. */ entryNumber?: number | null }
 interface Props { slug: string; matchId: string; scoringMode: "marcador" | "1x2"; home: string; away: string }
 /** `retryable` only for network failures and server errors (status >= 500). */
 interface LoadError { message: string; retryable: boolean }
@@ -70,7 +70,7 @@ export function MatchPicks({ slug, matchId, scoringMode, home, away }: Props) {
         : loading ? <div role="status"><span className="sr-only">Cargando pronósticos</span><div className="h-28 animate-pulse rounded-md bg-bg-elevated" /></div>
           : rows.length === 0 ? <p className="rounded-md bg-bg-elevated p-3 text-text-secondary">Todavía no hay pronósticos de participantes con pago aprobado.</p>
             : <ul className="divide-y divide-border-subtle">{rows.map(row => <li key={row.id} className="flex flex-wrap items-center gap-2 py-3">
-              <div className="flex min-w-0 flex-1 items-center gap-2"><UserAvatar avatarUrl={row.avatarUrl} displayName={row.displayName} size="sm" /><span className="min-w-0 [overflow-wrap:anywhere]">{row.displayName}</span></div>
+              <div className="flex min-w-0 flex-1 items-center gap-2"><UserAvatar avatarUrl={row.avatarUrl} displayName={row.displayName} size="sm" /><span className="min-w-0 [overflow-wrap:anywhere]">{row.displayName}{row.entryNumber != null && <span className="ml-1 whitespace-nowrap text-[13px] text-text-secondary">#{row.entryNumber}</span>}</span></div>
               <span className={`max-w-full text-right [overflow-wrap:anywhere] ${scoringMode === "marcador" ? "font-display text-[24px] tracking-[0.04em] tabular-nums" : "text-[15px] font-semibold"}`}>{scoringMode === "marcador" ? `${row.homeScore ?? "–"} – ${row.awayScore ?? "–"}` : row.pick1x2 === "L" ? home : row.pick1x2 === "V" ? away : row.pick1x2 === "E" ? "Empate" : "Sin pronóstico"}</span>
             </li>)}</ul>}
       {(page > 0 || hasMore) && !error && <div className="mt-3 flex flex-wrap justify-between gap-2">

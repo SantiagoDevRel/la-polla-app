@@ -15,6 +15,8 @@ import type { CasaDistribution, CasaQuestion } from "@/lib/casa/types";
 
 interface Props {
   slug: string;
+  /** Participación que se está editando (migración 131). Sin número = la principal. */
+  entryNumber?: number | null;
   questions: CasaQuestion[];
   /** respuestas actuales del usuario, por question_id */
   initialPicks: Record<string, { optionId: string | null; freeText: string | null }>;
@@ -25,6 +27,7 @@ interface Props {
 
 export function QuestionsBoard({
   slug,
+  entryNumber,
   questions,
   initialPicks,
   distribution,
@@ -80,7 +83,7 @@ export function QuestionsBoard({
       const res = await fetch(`/api/casa/pollas/${slug}/picks`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ picks: payload }),
+        body: JSON.stringify(entryNumber ? { picks: payload, entryNumber } : { picks: payload }),
       });
       const json = await res.json();
       if (!res.ok) {

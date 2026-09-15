@@ -25,11 +25,14 @@ export interface ReviewNotice {
   pozoCop: number;
   rejectReason: string | null;
   ticketNumber: number | null;
+  /** Participación en pollas de partidos/preguntas (migración 131). */
+  entryNumber?: number | null;
 }
 
 export function reviewNoticeMessage(n: ReviewNotice): { text: string; buttons: Array<Array<{ text: string; callback_data: string }>> } {
   const P = shortId(n.pollaId);
-  const ticket = n.ticketNumber != null ? ` (boleta ${n.ticketNumber})` : "";
+  const ticket = n.ticketNumber != null ? ` (boleta ${n.ticketNumber})`
+    : n.entryNumber != null && n.entryNumber > 1 ? ` (cupo ${n.entryNumber})` : "";
   if (n.approved) {
     return {
       text: [

@@ -352,13 +352,14 @@ type PaymentRow = {
   proof_path: string | null;
   reject_reason: string | null;
   ticket_number: number | null;
+  entry_number?: number | null;
   created_at: string;
   casa_pollas: { name: string; status: string; kind: string; archived_at: string | null } | Array<{ name: string; status: string; kind: string; archived_at: string | null }> | null;
 };
 
 export async function showPayments(ctx: PlayerCtx): Promise<void> {
   const { data, error } = await ctx.db.from("casa_entries")
-    .select("id, polla_id, status, proof_path, reject_reason, ticket_number, created_at, casa_pollas!inner(name, status, kind, archived_at)")
+    .select("id, polla_id, status, proof_path, reject_reason, ticket_number, entry_number, created_at, casa_pollas!inner(name, status, kind, archived_at)")
     .eq("user_id", ctx.account.userId)
     .is("casa_pollas.archived_at", null)
     .in("casa_pollas.status", ["abierta", "cerrada", "resuelta"])
@@ -383,7 +384,8 @@ export async function showPayments(ctx: PlayerCtx): Promise<void> {
   for (const row of rows) {
     const polla = Array.isArray(row.casa_pollas) ? row.casa_pollas[0] : row.casa_pollas;
     if (!polla) continue;
-    const label = `${esc(polla.name)}${row.ticket_number != null ? ` (boleta ${row.ticket_number})` : ""}`;
+    // Migración 131: varias participaciones por persona se distinguen por número.
+    const label = `${esc(polla.name)}${row.ticket_number != null ? ` (boleta ${row.ticket_number})` : row.entry_number != null && rows.some((other) => other !== row && other.polla_id === row.polla_id && other.ticket_number == null) ? ` (cupo ${row.entry_number})` : ""}`;
     let state: string;
     let actionable = false;
     if (row.status === "pagada") state = "✅ confirmado";

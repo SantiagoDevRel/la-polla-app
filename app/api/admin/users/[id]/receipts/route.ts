@@ -34,7 +34,7 @@ interface AttemptRow {
   reviewed_at: string | null;
   review_reason: string | null;
   proof_path: string;
-  casa_entries: { polla_id: string; amount_cop: number; ticket_number: number | null; current_proof_attempt_id: string | null; status: string } | null;
+  casa_entries: { polla_id: string; amount_cop: number; ticket_number: number | null; entry_number: number | null; current_proof_attempt_id: string | null; status: string } | null;
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .gte("confirmed_at", since);
 
     let listQuery = db.from("casa_entry_proof_attempts")
-      .select("id, entry_id, confirmed_at, decision, reviewed_at, review_reason, proof_path, casa_entries!casa_entry_proof_attempts_entry_id_fkey!inner(polla_id, amount_cop, ticket_number, current_proof_attempt_id, status)")
+      .select("id, entry_id, confirmed_at, decision, reviewed_at, review_reason, proof_path, casa_entries!casa_entry_proof_attempts_entry_id_fkey!inner(polla_id, amount_cop, ticket_number, entry_number, current_proof_attempt_id, status)")
       .eq("user_id", id)
       .eq("state", "confirmed")
       .gte("confirmed_at", since)
@@ -113,6 +113,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       polla: row.casa_entries ? pollaName.get(row.casa_entries.polla_id) ?? "Polla sin nombre" : "Polla sin nombre",
       montoCop: row.casa_entries?.amount_cop ?? null,
       boleta: row.casa_entries?.ticket_number ?? null,
+      participacion: row.casa_entries?.entry_number ?? null,
       enviadoEn: row.confirmed_at,
       revisadoEn: row.reviewed_at,
       motivo: row.review_reason,

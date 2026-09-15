@@ -110,7 +110,7 @@ export default async function CasaPage() {
         )}
         </PollaSection>
 
-        <MyPollas initialPollas={myPollas} defaultOpen={false} pendingByPolla={Object.fromEntries(pendientes.map(p => [p.polla.id, p.faltan]))} />
+        <MyPollas initialPollas={myPollas} defaultOpen={false} pendingByPolla={Object.fromEntries(pendientes.map(p => [p.entryNumber != null ? `${p.polla.id}:${p.entryNumber}` : p.polla.id, p.faltan]))} />
 
         <PollaSection id="pollas-cerradas" kind="closed" title="Pollas cerradas" description="Consulta los resultados de pollas anteriores." count={cerradas.length}>
             {cerradas.length > 0 ? (

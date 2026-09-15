@@ -17,7 +17,9 @@ export const maxDuration = 60;
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("begin"), requestId: z.string().uuid(), ticketNumber: z.number().int().positive().nullable(),
     sha256: z.string().regex(/^[a-f0-9]{64}$/), contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
-    bytes: z.number().int().positive().max(8 * 1024 * 1024) }),
+    bytes: z.number().int().positive().max(8 * 1024 * 1024),
+    // Migración 131: número = esa participación, null = una nueva. Ausente = cliente viejo.
+    entryNumber: z.number().int().min(1).max(50).nullable().optional() }),
   z.object({ action: z.enum(["confirm", "fail"]), attemptId: z.string().uuid() }),
 ]);
 
@@ -37,6 +39,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const { data, error } = await beginCasaProof(db, {
       pollaId: polla.id, userId: user.id, requestId: body.requestId, ticketNumber: body.ticketNumber,
       sha256: body.sha256, contentType: body.contentType, bytes: body.bytes,
+      entryNumber: polla.kind === "rifa" ? undefined : body.entryNumber,
     });
     if (error || !data) return casaError(error ?? {});
     if (data.state === "confirmed") return casaJson({ ok: true, ...data });

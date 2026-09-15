@@ -184,6 +184,24 @@ export function EditarPollaForm({ state }: { state: PollaEditorState }) {
             className="lp-input mt-2 min-h-[88px] resize-y"
           />
         </div>
+        {polla.kind !== "rifa" && (
+          <div>
+            <label htmlFor="editar-participaciones" className="block text-[15px] font-semibold text-text-primary">Cupos por persona</label>
+            <input
+              id="editar-participaciones"
+              type="number"
+              min={1}
+              max={50}
+              value={draft.maxEntriesPerUser}
+              onChange={(e) => set({ maxEntriesPerUser: Number(e.target.value) })}
+              aria-describedby="editar-participaciones-ayuda"
+              className="lp-input lp-money mt-2 text-[18px]"
+            />
+            <p id="editar-participaciones-ayuda" className="mt-2 text-[13px] leading-relaxed text-text-secondary">
+              Cuántos cupos puede comprar una misma persona. Cada cupo es una transferencia y un comprobante aparte. Bajarlo no quita cupos existentes.
+            </p>
+          </div>
+        )}
       </StreetCard>
 
       {/* ── Condiciones: solo sin inscripciones ─────────────────────────── */}

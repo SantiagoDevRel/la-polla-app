@@ -38,6 +38,8 @@ interface MatchLite {
 
 interface Props {
   slug: string;
+  /** Participación que se está editando (migración 131). Sin número = la principal. */
+  entryNumber?: number | null;
   scoringMode: "1x2" | "marcador";
   matches: MatchLite[];
   /** picks actuales del usuario, indexados por match_id */
@@ -115,6 +117,7 @@ function opcionesDe(m: { home_team: string; away_team: string }) {
 
 export function PicksBoard({
   slug,
+  entryNumber,
   scoringMode,
   matches,
   initialPicks,
@@ -230,7 +233,7 @@ export function PicksBoard({
       const res = await fetch(`/api/casa/pollas/${slug}/picks`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ picks: payload }),
+        body: JSON.stringify(entryNumber ? { picks: payload, entryNumber } : { picks: payload }),
       });
       const json = await res.json();
 

@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), server: vi.fn(), db: vi.fn(), polla: vi.fn(), entry: vi.fn(), matches: vi.fn(), admin: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), server: vi.fn(), db: vi.fn(), polla: vi.fn(), entry: vi.fn(), matches: vi.fn(), admin: vi.fn(), leaderboard: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.server }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.db }));
 vi.mock("@/lib/auth/admin", () => ({ isCurrentUserAdmin: mocks.admin }));
-vi.mock("@/lib/casa/queries", () => ({ getPollaBySlug: mocks.polla, getMyEntry: mocks.entry, getPollaMatches: mocks.matches }));
+vi.mock("@/lib/casa/queries", () => ({ getPollaBySlug: mocks.polla, getMyEntry: mocks.entry, getMyEntries: async () => [], getMyEntryByNumber: mocks.entry, getPollaMatches: mocks.matches, getLeaderboard: mocks.leaderboard }));
 import { GET } from "@/app/api/casa/pollas/[slug]/match-picks/route";
 import { PUT } from "@/app/api/casa/pollas/[slug]/picks/route";
 
@@ -23,6 +23,7 @@ beforeEach(() => {
   mocks.entry.mockResolvedValue({ status: "pagada" });
   mocks.matches.mockResolvedValue([{ id: matchId, scheduled_at: "2020-01-01T00:00:00Z", status: "live" }]);
   mocks.admin.mockResolvedValue(false);
+  mocks.leaderboard.mockResolvedValue([]);
   mocks.db.mockImplementation(() => createClient("http://localhost:54321", "test-key", {
     auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: fetchDb },
   }));
@@ -87,13 +88,29 @@ describe("Casa participant predictions privacy", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.rows).toHaveLength(20); expect(body.hasMore).toBe(true);
-    expect(body.rows[0]).toEqual({ id: "0", displayName: "Jugador", avatarUrl: "millos", homeScore: 2, awayScore: 1, pick1x2: null });
+    expect(body.rows[0]).toEqual({ id: "0", displayName: "Jugador", avatarUrl: "millos", homeScore: 2, awayScore: 1, pick1x2: null, entryNumber: null });
     const url = new URL(String(fetchDb.mock.calls[0][0]));
     expect(url.searchParams.get("polla_id")).toBe(`eq.${pollaId}`);
     expect(url.searchParams.get("match_id")).toBe(`eq.${matchId}`);
     expect(url.searchParams.get("casa_entries.status")).toBe("eq.pagada");
     expect(url.searchParams.get("offset")).toBe("20"); expect(url.searchParams.get("limit")).toBe("21");
     expect(url.searchParams.get("select")).not.toMatch(/phone|account|proof|user_id|\*/);
+  });
+  it("numbers only the participations of people with several approved entries (migration 131)", async () => {
+    const rows = [
+      { id: "a", entry_id: "e-ana-1", home_score: 1, away_score: 0, users: { display_name: "Ana", avatar_url: null }, casa_entries: { status: "pagada" } },
+      { id: "b", entry_id: "e-ana-2", home_score: 2, away_score: 2, users: { display_name: "Ana", avatar_url: null }, casa_entries: { status: "pagada" } },
+      { id: "c", entry_id: "e-beto-1", home_score: 0, away_score: 0, users: { display_name: "Beto", avatar_url: null }, casa_entries: { status: "pagada" } },
+    ];
+    fetchDb.mockResolvedValueOnce(new Response(JSON.stringify(rows), { headers: { "Content-Type": "application/json" } }));
+    mocks.leaderboard.mockResolvedValue([
+      { entry_id: "e-ana-1", entry_number: 1, user_entries: 2 },
+      { entry_id: "e-ana-2", entry_number: 2, user_entries: 2 },
+      { entry_id: "e-beto-1", entry_number: 1, user_entries: 1 },
+    ]);
+    const body = await (await call()).json();
+    expect(body.rows.map((row: { entryNumber: number | null }) => row.entryNumber)).toEqual([1, 2, null]);
+    expect(JSON.stringify(body)).not.toMatch(/entry_id|user_id|e-ana/);
   });
   it("allows an administrator to inspect started matches without an inscription", async () => {
     mocks.entry.mockResolvedValue(null); mocks.admin.mockResolvedValue(true);

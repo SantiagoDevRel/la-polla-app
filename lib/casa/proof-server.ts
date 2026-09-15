@@ -26,10 +26,17 @@ export interface BeginProofInput {
   sha256: string;
   contentType: ProofContentType;
   bytes: number;
+  /**
+   * Participación (migración 131): un número retoma esa participación y `null`
+   * abre una nueva. Sin el campo (bot de Telegram, clientes viejos) la base
+   * elige como antes con una sola inscripción por persona.
+   */
+  entryNumber?: number | null;
 }
 
 export interface BeginProofData {
   entry_id: string;
+  entry_number?: number | null;
   attempt_id: string;
   state: "uploading" | "confirmed";
   proof_path: string;
@@ -38,7 +45,7 @@ export interface BeginProofData {
 }
 
 export function beginCasaProof(db: SupabaseClient, input: BeginProofInput) {
-  return db.rpc("casa_begin_entry_proof_v2", {
+  const common = {
     p_polla_id: input.pollaId,
     p_user_id: input.userId,
     p_request_id: input.requestId,
@@ -47,7 +54,11 @@ export function beginCasaProof(db: SupabaseClient, input: BeginProofInput) {
     p_content_type: input.contentType,
     p_bytes: input.bytes,
     p_contract: CASA_CONTRACT,
-  }) as unknown as Promise<{ data: BeginProofData | null; error: { message?: string; code?: string } | null }>;
+  };
+  const call = input.entryNumber === undefined
+    ? db.rpc("casa_begin_entry_proof_v2", common)
+    : db.rpc("casa_begin_entry_proof_v3", { ...common, p_entry_number: input.entryNumber });
+  return call as unknown as Promise<{ data: BeginProofData | null; error: { message?: string; code?: string } | null }>;
 }
 
 export interface OwnedAttempt {
@@ -76,7 +87,7 @@ export function failCasaProof(db: SupabaseClient, input: { attemptId: string; us
 }
 
 export type ConfirmProofResult =
-  | { ok: true; data: { entry_id: string; attempt_id: string; state: string; changed: boolean; entry_status?: string } }
+  | { ok: true; data: { entry_id: string; entry_number?: number | null; attempt_id: string; state: string; changed: boolean; entry_status?: string } }
   | { ok: false; stage: "verify"; message: string; code?: string }
   | { ok: false; stage: "rpc"; error: { message?: string; code?: string } };
 
@@ -105,28 +116,35 @@ export async function confirmCasaProof(
   }
   const { data, error } = await db.rpc("casa_confirm_entry_proof_v2", { p_attempt_id: attempt.id, p_user_id: userId, p_contract: CASA_CONTRACT });
   if (error) return { ok: false, stage: "rpc", error };
-  if (data?.changed) await notifyProofToAdmins(db, polla, userId, attempt);
-  return { ok: true, data };
+  const entryNumber = await notifyProofToAdmins(db, polla, userId, attempt, Boolean(data?.changed));
+  return { ok: true, data: { ...data, entry_number: entryNumber } };
 }
 
+/** Avisa a los administradores (solo si la confirmación es nueva) y devuelve el número de participación. */
 async function notifyProofToAdmins(
   db: SupabaseClient,
   polla: Pick<CasaPolla, "id" | "name" | "slug" | "prize_kind" | "prize_object">,
   userId: string,
   attempt: OwnedAttempt,
-): Promise<void> {
+  changed: boolean,
+): Promise<number | null> {
+  let entryNumber: number | null = null;
   try {
-    const [{ data: profile }, { data: entry }, pot] = await Promise.all([
+    const { data: entry } = await db.from("casa_entries").select("amount_cop, ticket_number, entry_number")
+      .eq("id", attempt.entry_id).eq("user_id", userId).single();
+    entryNumber = entry?.entry_number ?? null;
+    if (!changed || !entry) return entryNumber;
+    const [{ data: profile }, pot] = await Promise.all([
       db.from("users").select("display_name").eq("id", userId).maybeSingle(),
-      db.from("casa_entries").select("amount_cop, ticket_number").eq("id", attempt.entry_id).eq("user_id", userId).single(),
       getPot(polla.id, attempt.entry_id),
     ]);
-    if (entry) await notifyNewProof({
+    await notifyNewProof({
       entryId: attempt.entry_id, attemptId: attempt.id, pollaName: polla.name, pollaSlug: polla.slug,
       userName: profile?.display_name ?? "Sin nombre", amountCop: entry.amount_cop,
-      proofPath: attempt.proof_path, ticketNumber: entry.ticket_number,
+      proofPath: attempt.proof_path, ticketNumber: entry.ticket_number, entryNumber: entry.entry_number ?? null,
       potAfterCop: pot.projected_prize_cop ?? pot.prize_cop,
       prizeKind: polla.prize_kind, prizeObject: polla.prize_object,
     });
   } catch { console.warn("[casa/join] Comprobante confirmado; aviso administrativo pendiente de consulta en la cola."); }
+  return entryNumber;
 }
