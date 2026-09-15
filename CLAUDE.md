@@ -91,6 +91,17 @@ Telegram para jugadores». Reglas que no se negocian:
   `drop_pending_updates`. No hace falta rotar secretos para activarlo.
 - Estado de la conversación en `telegram_login_chats.bot_flow*` (130). El número
   de cuenta bancaria nunca queda ahí: es la última respuesta y va a `users`.
+- **Regla de pronósticos con pago pendiente (dueño, 2026-09-15; web y bot):** quien
+  envía el comprobante ya pronostica y guarda; los puntos cuentan en la tabla solo
+  al aprobar el pago, y si se aprueba después de jugarse los partidos aparecen
+  retroactivos. Lo sostiene SQL: `casa_score_polla` puntúa todos los picks y
+  `casa_leaderboard` solo suma inscripciones `pagada`. No filtrar el puntaje por
+  estado de pago ni recalcular al aprobar. Regresión: `scripts/casa-pending-picks-check.sql`.
+- **Nunca doble inscripción:** `casa_entries_one_per_user` (y `casa_entries_ticket_unique`
+  en rifas). Ya inscrito (pagado o en revisión) no ve «Inscribirme»; rechazado o
+  carga sin terminar ve «Enviar comprobante» sobre la MISMA inscripción.
+- **Doble toque:** un botón tocado sobre un mensaje editado hace ≤1 s (`edit_date`)
+  se descarta con un aviso: el botón siguiente queda donde estaba el tocado.
 
 ### Precisión de horarios y torneos (2026-09-13, migración 103)
 

@@ -23,6 +23,8 @@ export type PlayerUpdate =
       chatId: number;
       telegramUserId: number;
       messageId: number | null;
+      /** Última edición del mensaje del botón (segundos Unix), si la hubo. */
+      editDate: number | null;
       data: string;
     }
   | {
@@ -80,7 +82,7 @@ export function classifyPlayerUpdate(update: unknown): PlayerUpdate {
     const chatId = positiveInt(chat.id);
     const telegramUserId = positiveInt(from.id);
     if (!chatId || !telegramUserId || chatId !== telegramUserId || !data) return { kind: "ignore" };
-    return { kind: "callback", callbackId, chatId, telegramUserId, messageId: positiveInt(message.message_id), data };
+    return { kind: "callback", callbackId, chatId, telegramUserId, messageId: positiveInt(message.message_id), editDate: positiveInt(message.edit_date), data };
   }
 
   const message = update.message;

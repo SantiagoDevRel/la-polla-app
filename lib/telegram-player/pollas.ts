@@ -217,7 +217,9 @@ export async function pollaDetailScreen(ctx: PlayerCtx, polla: CasaPolla, notice
     if (pendingTicket?.ticket_number != null) {
       buttons.push([{ text: `📸 Enviar comprobante de la boleta ${pendingTicket.ticket_number}`, callback_data: cb("rt", P, pendingTicket.ticket_number) }]);
     } else if (!inReview) {
-      buttons.push([{ text: "🎟 Comprar una boleta", callback_data: cb("rb", P) }]);
+      // Las rifas admiten varias boletas por persona (casa_entries_ticket_unique).
+      const hasPaid = tickets.some((t) => t.status === "pagada");
+      buttons.push([{ text: hasPaid ? "🎟 Comprar otra boleta" : "🎟 Comprar una boleta", callback_data: cb("rb", P) }]);
     }
   }
   if (polla.kind === "partidos" && inscrito) {
@@ -308,9 +310,15 @@ export async function showInfo(ctx: PlayerCtx, polla: CasaPolla): Promise<void> 
 const MEDALS: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
 export async function showTable(ctx: PlayerCtx, polla: CasaPolla): Promise<void> {
-  const rows = await getLeaderboard(polla.id);
+  const [rows, entry] = await Promise.all([
+    getLeaderboard(polla.id),
+    polla.kind === "rifa" ? Promise.resolve(null) : getMyEntry(polla.id, ctx.account.userId),
+  ]);
   const P = shortId(polla.id);
   const lines = [`<b>Tabla de posiciones · ${esc(polla.name)}</b>`];
+  // La tabla solo muestra pagos confirmados: quien está en revisión no se ve
+  // y tiene que saber por qué.
+  if (entry?.status === "pendiente" && entry.proof_path) lines.push("", COPY.pendingPoints);
   if (rows.length === 0) {
     lines.push("", "Todavía no hay inscritos con pago confirmado.");
   } else {

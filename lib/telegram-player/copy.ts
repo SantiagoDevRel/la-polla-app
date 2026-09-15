@@ -145,6 +145,9 @@ export const COPY = {
   failure: "No pudimos completar eso en este momento. Inténtalo de nuevo en unos minutos.",
   expiredButton: "Ese botón ya no está vigente. Te muestro la información actualizada.",
   cancelled: "Listo, cancelamos ese paso.",
+  doubleTap: "La pantalla acaba de cambiar. Revisa las opciones y toca otra vez.",
+  pendingPoints:
+    "⏳ Tu pago está en revisión. Tus pronósticos quedan guardados y sus puntos se suman en la tabla apenas confirmemos el pago, también los de partidos que ya se jugaron.",
 } as const;
 
 export const BACK_HOME = "⬅️ Menú";
