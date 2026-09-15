@@ -15,6 +15,7 @@ import {
   getDistribution,
   getLeaderboard,
   getMyEntry,
+  getMyEntries,
   getMyPicks,
   getPollaBySlug,
   getPollaMatches,
@@ -25,6 +26,8 @@ import {
   getFixedPrizeThreshold,
 } from "@/lib/casa/queries";
 import {
+  DEFAULT_MAX_ENTRIES_PER_USER,
+  isLiveEntry,
   isPollaOpen,
   pollaStatusLabel,
   type CasaPayout,
@@ -45,6 +48,7 @@ import { EliminarPolla } from "@/components/casa/EliminarPolla";
 import { MisBoletas } from "@/components/casa/Boletas";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
+import { Participaciones } from "@/components/casa/Participaciones";
 import { acceptsCasaMatchPicks } from "@/lib/casa/match-rules";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { Settings } from "lucide-react";
@@ -53,8 +57,11 @@ export const dynamic = "force-dynamic";
 
 export default async function PollaPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  /** `p`: número de la participación que se está viendo (migración 131). */
+  searchParams: Promise<{ p?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -85,13 +92,15 @@ export default async function PollaPage({
     );
   }
 
-  const [pot, entry, matches, questions, picks, distribution, tabla, payouts, isAdmin, threshold] =
+  const [pot, bestEntry, entries, matches, questions, distribution, tabla, payouts, isAdmin, threshold] =
     await Promise.all([
       getPot(polla.id),
+      // La inscripción "principal" (pagada > pendiente > …): rifas, premio y la tabla.
       getMyEntry(polla.id, user.id),
+      // Migración 131: todas las participaciones de la persona en esta polla.
+      polla.kind === "rifa" ? Promise.resolve([]) : getMyEntries(polla.id, user.id),
       polla.kind === "partidos" ? getPollaMatches(polla.id) : Promise.resolve([]),
       polla.kind === "manual" ? getPollaQuestions(polla.id) : Promise.resolve([]),
-      getMyPicks(polla.id, user.id),
       getDistribution(polla.id),
       getLeaderboard(polla.id),
       // Solo tiene filas cuando la polla ya se repartio.
@@ -102,6 +111,16 @@ export default async function PollaPage({
     ]);
 
   const abierta = isPollaOpen(polla);
+  // ── Qué participación se está viendo ─────────────────────────────────────
+  // ?p=N si es suya; si no, la primera viva (pagada o en revisión); si no, la última.
+  // En rifas no hay participaciones numeradas: manda la inscripción principal.
+  const requested = Number((await searchParams).p);
+  const entry = polla.kind === "rifa"
+    ? bestEntry
+    : entries.find((e) => e.entry_number === requested) ?? entries.find(isLiveEntry) ?? entries[entries.length - 1] ?? null;
+  const multiple = entries.filter((e) => e.status !== "anulada").length > 1;
+  const etiqueta = multiple && entry?.entry_number ? `Participación ${entry.entry_number} · ` : "";
+  const picks = polla.kind === "rifa" || !entry ? [] : await getMyPicks(polla.id, user.id, entry.id);
   const canResumeProof = !abierta && polla.kind !== "rifa" && entry?.status === "pendiente" && !entry.proof_path
     ? (await getActiveProofs(polla.id, user.id)).some((proof) => proof.entry_id === entry.id) : false;
   const estado = pollaStatusLabel(polla);
@@ -110,8 +129,9 @@ export default async function PollaPage({
   // justamente para que la persona pueda volver a intentar. Tratarla como
   // inscripción viva escondía el botón de entrar y /pagar la devolvía acá: un
   // pantallazo que no subió dejaba a esa persona sin forma de entrar a la polla.
-  const inscrito =
-    entry != null && (entry.status === "pagada" || (entry.status === "pendiente" && Boolean(entry.proof_path)));
+  const inscrito = isLiveEntry(entry);
+  // Cualquier participación viva deja ver los pronósticos de los demás.
+  const participa = polla.kind === "rifa" ? isLiveEntry(bestEntry) : entries.some(isLiveEntry);
   const pagoPendiente = entry?.status === "pendiente" && Boolean(entry.proof_path);
   const tournaments = resolveTournamentSlugs(polla, matches as { tournament: string | null }[]);
 
@@ -139,7 +159,9 @@ export default async function PollaPage({
   }
 
   const objeto = polla.prize_kind === "objeto";
-  const mostrarEntrar = !inscrito && (abierta || canResumeProof) && polla.kind !== "rifa";
+  // Sin ninguna participación viva: el CTA es entrar (o retomar la que falta).
+  const mostrarEntrar = !participa && (abierta || canResumeProof) && polla.kind !== "rifa";
+  const retomar = !participa && entry && !isLiveEntry(entry) ? entry.entry_number : null;
 
   return (
     <div className="pb-32">
@@ -223,7 +245,7 @@ export default async function PollaPage({
           <h2 className="lp-display-sm">Polla finalizada</h2>
           <p className="mt-2 text-[15px] text-text-secondary">Todos los participantes terminaron con cero puntos. No se adjudicaron premios.</p>
         </StreetCard>}
-        {polla.prize_kind === "objeto" && (polla.draw_pending || payouts.length > 0) && (isAdmin || entry?.status === "pagada") && <PremioObjeto slug={polla.slug} />}
+        {polla.prize_kind === "objeto" && (polla.draw_pending || payouts.length > 0) && (isAdmin || bestEntry?.status === "pagada") && <PremioObjeto slug={polla.slug} />}
 
         {polla.kind === "rifa" && <div className="mt-4 first:mt-0"><MisBoletas slug={polla.slug} open={abierta} /></div>}
 
@@ -236,7 +258,7 @@ export default async function PollaPage({
         {(mostrarEntrar || abierta) && (
           <div className="mt-4 flex flex-wrap gap-2 first:mt-0">
             {mostrarEntrar && (
-              <Link href={`/casa/${polla.slug}/pagar`} className="lp-btn lp-btn-primary flex-[2_1_auto] !px-4">
+              <Link href={`/casa/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`} className="lp-btn lp-btn-primary flex-[2_1_auto] !px-4">
                 {entry ? "Retomar comprobante" : `Entrar por ${formatCop(polla.entry_price_cop)}`}
               </Link>
             )}
@@ -252,14 +274,28 @@ export default async function PollaPage({
           </div>
         )}
 
+        {/* ── Tus participaciones (migración 131) ──────────────────────────────
+              Aparece desde la primera: es donde se ve cada una con su estado y
+              donde se suma otra, con su propia transferencia. */}
+        {polla.kind !== "rifa" && entries.length > 0 && (participa || entries.length > 1) && (
+          <Participaciones
+            slug={polla.slug}
+            entries={entries}
+            selectedNumber={entry?.entry_number ?? null}
+            maxEntries={polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER}
+            entryPriceCop={polla.entry_price_cop}
+            open={abierta}
+          />
+        )}
+
         {/* Estás dentro. Antes, cuando Tama aprobaba, simplemente DESAPARECÍA
             el aviso ámbar y no aparecía nada — la única señal de que el pago
             se confirmó era una ausencia, que nadie nota. */}
         {entry?.status === "pagada" && polla.kind !== "rifa" && (
           <div className="mt-4 border border-turf/40 bg-turf/10 p-3">
-            <p className="lp-label text-turf">Estás dentro</p>
+            <p className="lp-label text-turf">{etiqueta}Estás dentro</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              Confirmamos tu pago y ya participas por el premio.
+              Confirmamos tu pago y {multiple ? "esta participación ya compite" : "ya participas"} por el premio.
               {abierta ? " Haz tus pronósticos antes del cierre." : ""}
             </p>
           </div>
@@ -267,20 +303,25 @@ export default async function PollaPage({
 
         {pagoPendiente && polla.kind !== "rifa" && (
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
-            <p className="lp-label text-amber">Pago en revisión</p>
+            <p className="lp-label text-amber">{etiqueta}Pago en revisión</p>
             <p className="mt-1 text-[13px] text-text-secondary">
               Recibimos tu comprobante. Puedes pronosticar mientras tanto, pero
-              tu participación se activa cuando confirmemos el pago.
+              {multiple ? " esta participación suma puntos" : " tu participación se activa"} cuando confirmemos el pago.
             </p>
           </div>
         )}
 
         {entry?.status === "rechazada" && polla.kind !== "rifa" && (
           <div className="mt-4 border border-red-alert/40 bg-red-alert/10 p-3">
-            <p className="lp-label text-red-alert">Pago rechazado</p>
+            <p className="lp-label text-red-alert">{etiqueta}Pago rechazado</p>
             <p className="mt-1 text-[13px] text-text-secondary">
               {entry.reject_reason ?? "Comunícate con el administrador."}
             </p>
+            {abierta && participa && entry.entry_number && (
+              <Link href={`/casa/${polla.slug}/pagar?participacion=${entry.entry_number}`} className="lp-btn lp-btn-ghost mt-3 w-full">
+                Enviar otro comprobante para esta participación
+              </Link>
+            )}
           </div>
         )}
 
@@ -289,11 +330,16 @@ export default async function PollaPage({
             por qué su intento anterior no quedó. */}
         {(entry?.status === "anulada" || (entry?.status === "pendiente" && !entry.proof_path)) && abierta && polla.kind !== "rifa" && (
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
-            <p className="lp-label text-amber">Tu comprobante no se guardó</p>
+            <p className="lp-label text-amber">{etiqueta}Tu comprobante no se guardó</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              No alcanzamos a recibir la imagen, así que tu inscripción no
+              No alcanzamos a recibir la imagen, así que {participa ? "esta participación" : "tu inscripción"} no
               quedó. Vuelve a subirla y sigues en carrera.
             </p>
+            {participa && entry?.entry_number && (
+              <Link href={`/casa/${polla.slug}/pagar?participacion=${entry.entry_number}`} className="lp-btn lp-btn-ghost mt-3 w-full">
+                Subir el comprobante de esta participación
+              </Link>
+            )}
           </div>
         )}
 
@@ -302,7 +348,7 @@ export default async function PollaPage({
           info={<PollaInfo polla={polla} threshold={threshold} />}
           firstLabel={polla.kind === "manual" ? "Preguntas" : polla.kind === "rifa" ? "Sorteo" : "Partidos"}
           initialRows={tabla}
-          entryStatus={entry?.status ?? null}
+          entryStatus={bestEntry?.status ?? null}
           pollaStatus={polla.status}
           drawPending={polla.draw_pending}
           userId={user.id}
@@ -311,19 +357,21 @@ export default async function PollaPage({
         {polla.kind === "partidos" && matches.length > 0 && (
           <>
             <SectionHead
-              title="Tus pronósticos"
+              title={multiple && entry?.entry_number ? `Pronósticos · participación ${entry.entry_number}` : "Tus pronósticos"}
               meta={`${matches.length} partidos`}
               className="mt-8"
             />
             <div className="-mx-4">
               <PicksBoard
+                key={entry?.id ?? "sin-participacion"}
                 slug={polla.slug}
+                entryNumber={entry?.entry_number ?? null}
                 scoringMode={polla.scoring_mode ?? "1x2"}
                 matches={matches as never}
                 initialPicks={picksPorPartido}
                 distribution={distribution}
                 canEdit={inscrito && acceptsCasaMatchPicks(polla.status, polla.draw_pending)}
-                canViewOthers={inscrito || isAdmin}
+                canViewOthers={participa || isAdmin}
                 lockedReason={
                   !acceptsCasaMatchPicks(polla.status, polla.draw_pending) ? "Esta polla ya no recibe pronósticos." : !inscrito
                     ? "Inscríbete para pronosticar."
@@ -344,7 +392,9 @@ export default async function PollaPage({
             />
             <div className="-mx-4">
               <QuestionsBoard
+                key={entry?.id ?? "sin-participacion"}
                 slug={polla.slug}
+                entryNumber={entry?.entry_number ?? null}
                 questions={questions}
                 initialPicks={picksPorPregunta}
                 distribution={distribution}

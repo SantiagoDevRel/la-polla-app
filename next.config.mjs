@@ -10,8 +10,9 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 // Isolated integration tests use the local Supabase stack. This is never
 // enabled by NODE_ENV alone and cannot add arbitrary origins to production.
 const localStorageCsp = process.env.CASA_LOCAL_TEST === "1"
-  && process.env.NEXT_PUBLIC_SUPABASE_URL === "http://127.0.0.1:54321"
-  ? " http://127.0.0.1:54321" : "";
+  // Any loopback port: Windows can reserve 54321 and the stack is then reached through a local Kong proxy.
+  && /^http:\/\/127\.0\.0\.1:\d{4,5}$/.test(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "")
+  ? ` ${process.env.NEXT_PUBLIC_SUPABASE_URL}` : "";
 
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",

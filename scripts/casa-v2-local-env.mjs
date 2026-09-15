@@ -5,7 +5,9 @@ import { createHmac } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-export const localUrl = "http://127.0.0.1:54321";
+// CASA_LOCAL_SUPABASE_URL: Windows can reserve 54321 after a reboot; use the local Kong proxy instead.
+export const localUrl = process.env.CASA_LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
+if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(localUrl)) throw new Error("Local Supabase URL must be 127.0.0.1.");
 export function localCredentials() {
   const container = JSON.parse(execFileSync("docker", ["inspect", "supabase_auth_la-polla"], { encoding: "utf8" }))[0];
   const secret = container.Config.Env.find((x) => x.startsWith("GOTRUE_JWT_SECRET="))?.slice("GOTRUE_JWT_SECRET=".length);

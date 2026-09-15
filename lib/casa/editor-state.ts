@@ -34,6 +34,7 @@ export type EditorPolla = Pick<
   | "payout_account"
   | "payout_account_name"
   | "ticket_count"
+  | "max_entries_per_user"
 >;
 
 export interface EditorMatch {

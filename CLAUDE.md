@@ -126,6 +126,34 @@ caso nuevo de cualquier tipo (`casa_claim_match_issue_notifications` /
 existentes al instalar 121 quedan marcados como avisados. Regresión:
 `scripts/casa-issues-sin-datos-check.sql` y `tests/casa-issue-notifications.test.ts`.
 
+### Varias participaciones por persona (2026-09-15, migración 131)
+
+Una persona puede entrar varias veces a la misma polla de partidos o preguntas
+(tope `casa_pollas.max_entries_per_user`, 1–50, por defecto 10; editable al crear
+y en el editor aunque haya inscripciones). **Cada participación es su propia
+transferencia y su propio comprobante**: nunca un pago por varios cupos. El admin
+aprueba comprobante por comprobante. `casa_entries.entry_number` (1, 2, 3…) numera
+las participaciones; las rifas siguen con boletas. Cada participación tiene sus
+pronósticos (ya lo eran: `casa_picks.entry_id`), se llenan desde que se envía su
+comprobante y solo suman en tabla/reparto cuando se aprueba.
+
+- Web: `/casa/<slug>?p=N` elige la participación (`components/casa/Participaciones.tsx`);
+  `/casa/<slug>/pagar?participacion=nueva|N`. Mis pollas muestra una tarjeta por
+  participación (`Participación 2`) con enlace a `?p=N`. Tabla y pronósticos de
+  otros rotulan `#N` solo si esa persona tiene más de una aprobada.
+- SQL: `casa_begin_entry_proof_v3` (número o `NULL` = nueva; tope `MAX_ENTRIES`,
+  mismo comprobante en otra participación viva = `DUPLICATE_PROOF`). La v2 conserva
+  su firma para el bot y clientes viejos y elige sola la participación. Un insert
+  sin número recibe el siguiente (trigger `casa_01_entry_number`).
+- Reparto (`casa_settle_polla_v2`): el pozo se divide por participación ganadora y
+  se paga agrupado por persona (`casa_payouts` sigue UNIQUE por usuario). Empate de
+  objeto entre participaciones de una sola persona: gana sin sorteo.
+- El bot de Telegram sigue operando la participación principal; no crea una segunda.
+- Orden de despliegue: **migración 131 antes que el código** (las lecturas piden
+  `max_entries_per_user` y `entry_number`). Pruebas:
+  `scripts/casa-multi-entries-check.sql` y `scripts/casa-multi-entries-browser-check.mjs`.
+  Detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md).
+
 ### Info, pagos y publicación (2026-09-13, migraciones 104–109)
 
 Ver [docs/casa-admin-rules.md](docs/casa-admin-rules.md). El pozo fijo mantiene

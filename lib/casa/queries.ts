@@ -147,16 +147,51 @@ export async function getMyEntry(pollaId: string, userId: string): Promise<CasaE
   return data as CasaEntry | null;
 }
 
+/**
+ * Todas las participaciones de esta persona en una polla de partidos o
+ * preguntas, por número (migración 131). Las rifas usan sus boletas.
+ */
+export async function getMyEntries(pollaId: string, userId: string): Promise<CasaEntry[]> {
+  const { data, error } = await createAdminClient()
+    .from("casa_entries")
+    .select(CASA_ENTRY_COLUMNS)
+    .eq("polla_id", pollaId)
+    .eq("user_id", userId) // ← filtro explícito obligatorio
+    .is("ticket_number", null)
+    .order("entry_number", { ascending: true })
+    .limit(50);
+  if (error) throw error;
+  return (data ?? []) as CasaEntry[];
+}
+
+/** La participación número N de esta persona, o null. */
+export async function getMyEntryByNumber(pollaId: string, userId: string, entryNumber: number): Promise<CasaEntry | null> {
+  const { data, error } = await createAdminClient()
+    .from("casa_entries")
+    .select(CASA_ENTRY_COLUMNS)
+    .eq("polla_id", pollaId)
+    .eq("user_id", userId) // ← filtro explícito obligatorio
+    .is("ticket_number", null)
+    .eq("entry_number", entryNumber)
+    .maybeSingle();
+  if (error) throw error;
+  return data as CasaEntry | null;
+}
+
+/** Pronósticos de esta persona; con `entryId`, solo los de esa participación. */
 export async function getMyPicks(
   pollaId: string,
   userId: string,
+  entryId?: string,
 ): Promise<CasaPick[]> {
   const db = createAdminClient();
-  const { data, error } = await db
+  let query = db
     .from("casa_picks")
     .select(CASA_PICK_COLUMNS)
     .eq("polla_id", pollaId)
     .eq("user_id", userId); // ← filtro explicito obligatorio
+  if (entryId) query = query.eq("entry_id", entryId);
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data ?? []) as CasaPick[];
@@ -254,13 +289,13 @@ export async function getLeaderboard(
  */
 export async function listPollasConPicksPendientes(
   userId: string,
-): Promise<Array<{ polla: CasaPolla; faltan: number; total: number }>> {
+): Promise<Array<{ polla: CasaPolla; faltan: number; total: number; entryNumber: number | null }>> {
   const db = createAdminClient();
 
   // Filtro explicito por user_id ademas de RLS — ver el TODO de auth.uid().
   const { data: entries } = await db
     .from("casa_entries")
-    .select("id, polla_id")
+    .select("id, polla_id, entry_number")
     .eq("user_id", userId)
     .in("status", ["pagada", "pendiente"]);
   if (!entries || entries.length === 0) return [];
@@ -282,8 +317,8 @@ export async function listPollasConPicksPendientes(
     (pollas as CasaPolla[]).map((p) => [p.id, p]),
   );
 
-  const salida: Array<{ polla: CasaPolla; faltan: number; total: number }> = [];
-  for (const entry of entries as Array<{ id: string; polla_id: string }>) {
+  const salida: Array<{ polla: CasaPolla; faltan: number; total: number; entryNumber: number | null }> = [];
+  for (const entry of entries as Array<{ id: string; polla_id: string; entry_number: number | null }>) {
     const polla = porId.get(entry.polla_id);
     if (!polla) continue;
 
@@ -299,7 +334,7 @@ export async function listPollasConPicksPendientes(
     ]);
 
     const faltan = (total ?? 0) - (hechos ?? 0);
-    if (faltan > 0) salida.push({ polla, faltan, total: total ?? 0 });
+    if (faltan > 0) salida.push({ polla, faltan, total: total ?? 0, entryNumber: entry.entry_number });
   }
   return salida;
 }

@@ -297,6 +297,7 @@ async function sendPending(chatId: number) {
         `<b>${esc(user?.display_name ?? "Sin nombre")}</b>`,
         `Polla: ${esc(polla?.name ?? "?")}`,
         entry.ticket_number != null ? `Boleta: #${entry.ticket_number}` : null,
+        entry.entry_number != null && entry.entry_number > 1 ? `Participación: #${entry.entry_number}` : null,
         `Valor: <b>${formatCop(entry.amount_cop)}</b>`,
       ]
         .filter(Boolean)

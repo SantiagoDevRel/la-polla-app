@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
 
     let query = db
       .from("casa_entries")
-      .select("id, polla_id, user_id, amount_cop, ticket_number, proof_path, current_proof_attempt_id, proof_uploaded_at, reviewed_at, casa_pollas!inner(archived_at,status)")
+      .select("id, polla_id, user_id, amount_cop, ticket_number, entry_number, proof_path, current_proof_attempt_id, proof_uploaded_at, reviewed_at, casa_pollas!inner(archived_at,status)")
       .eq("status", status)
       .not("proof_path", "is", null)
       .order("proof_uploaded_at", { ascending: false, nullsFirst: false })
@@ -151,6 +151,19 @@ export async function GET(req: NextRequest) {
     ]);
     if (usersError || pollasError) return privateJson({ error: "No se pudieron cargar los datos de los pagos." }, 500);
 
+    // Migración 131: "Participación #N" solo para quien tiene más de una en esa
+    // polla. Mientras nadie en la página pase de la #1 no hace falta contar.
+    const participationCount = new Map<string, number>();
+    if (entries.some((e) => (e.entry_number ?? 0) > 1)) {
+      const { data: siblings, error: siblingsError } = await db.from("casa_entries").select("polla_id, user_id")
+        .in("polla_id", pollaIds).in("user_id", userIds).is("ticket_number", null).neq("status", "anulada");
+      if (siblingsError) return privateJson({ error: "No se pudieron cargar los datos de los pagos." }, 500);
+      for (const row of siblings ?? []) {
+        const key = `${row.polla_id}:${row.user_id}`;
+        participationCount.set(key, (participationCount.get(key) ?? 0) + 1);
+      }
+    }
+
     const nombre = new Map((users ?? []).map((u) => [u.id, u.display_name]));
     const polla = new Map((pollas ?? []).map((p) => [p.id, p]));
     const attemptIds = entries.map((entry) => entry.current_proof_attempt_id).filter((id): id is string => Boolean(id));
@@ -192,6 +205,7 @@ export async function GET(req: NextRequest) {
         pollaSlug: polla.get(e.polla_id)?.slug ?? "",
         montoCop: e.amount_cop,
         boleta: e.ticket_number,
+        participacion: e.entry_number != null && (participationCount.get(`${e.polla_id}:${e.user_id}`) ?? 0) > 1 ? e.entry_number : null,
         subidoEn: e.proof_uploaded_at,
         aprobadoEn: e.reviewed_at,
         // URL firmada de 1h: el bucket es privado y así se ve sin exponerlo.

@@ -22,6 +22,8 @@ const baseSchema = z.object({
   description: z.string().trim().max(400).optional(),
   entryPriceCop: z.number().int().min(0).max(10_000_000),
   houseCutPct: z.number().int().min(0).max(100).default(30),
+  // Migración 131: cuántas veces puede entrar una persona (cada vez, su propia transferencia).
+  maxEntriesPerUser: z.number().int().min(1).max(50).default(10),
   closesAt: z.string().datetime(),
   // Como se calcula el cierre (migracion 089). En "auto" el server IGNORA el
   // closesAt que mande el cliente y lo deriva del primer partido: el navegador

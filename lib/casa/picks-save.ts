@@ -16,7 +16,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getMyEntry, getPollaMatches } from "./queries";
+import { getMyEntry, getMyEntryByNumber, getPollaMatches } from "./queries";
 import { isPollaOpen, type CasaPolla } from "./types";
 import { acceptsCasaMatchPicks, canEditCasaMatch } from "./match-rules";
 
@@ -34,7 +34,11 @@ export const casaPickSchema = z
     message: "Cada pronóstico apunta a un partido O a una pregunta, no a los dos.",
   });
 
-export const casaPicksBodySchema = z.object({ picks: z.array(casaPickSchema).min(1).max(60) });
+export const casaPicksBodySchema = z.object({
+  picks: z.array(casaPickSchema).min(1).max(60),
+  /** Participación a la que van los pronósticos (migración 131). Ausente = la principal. */
+  entryNumber: z.number().int().min(1).max(50).optional(),
+});
 
 export type CasaPickInput = z.infer<typeof casaPickSchema>;
 
@@ -59,6 +63,7 @@ export async function saveCasaPicks(
   userId: string,
   picks: CasaPickInput[],
   db: SupabaseClient = createAdminClient(),
+  entryNumber?: number,
 ): Promise<SaveCasaPicksResult> {
   if (!userId) return { ok: false, status: 403, error: "Primero tienes que inscribirte a la polla." };
   if (polla.status === "borrador") return { ok: false, status: 409, error: "Esta polla ya cerró. Los pronósticos quedaron como estaban." };
@@ -66,9 +71,19 @@ export async function saveCasaPicks(
     return { ok: false, status: 409, error: "Esta polla ya cerró. Los pronósticos quedaron como estaban." };
   }
 
-  const entry = await getMyEntry(polla.id, userId);
+  // Con varias participaciones cada una guarda sus propios pronósticos. Sin
+  // número (bot de Telegram) se usa la principal, como con una sola inscripción.
+  const entry = entryNumber === undefined
+    ? await getMyEntry(polla.id, userId)
+    : await getMyEntryByNumber(polla.id, userId, entryNumber);
   if (!entryCanPick(entry)) {
-    return { ok: false, status: 403, error: "Primero tienes que inscribirte a la polla." };
+    return {
+      ok: false,
+      status: 403,
+      error: entryNumber === undefined || !entry
+        ? "Primero tienes que inscribirte a la polla."
+        : "Esta participación todavía no tiene un comprobante en revisión o aprobado.",
+    };
   }
   const entryId = entry!.id;
 

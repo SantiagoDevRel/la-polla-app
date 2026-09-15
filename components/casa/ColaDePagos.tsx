@@ -22,6 +22,8 @@ interface Pendiente {
   polla: string;
   montoCop: number;
   boleta: number | null;
+  /** Número de participación si esa persona tiene varias en la polla (migración 131). */
+  participacion?: number | null;
   comprobanteUrl: string | null;
   subidoEn: string | null;
   aprobadoEn: string | null;
@@ -196,6 +198,7 @@ export function ColaDePagos({ pollaId, onReviewed, refreshKey = 0, status = "pen
                 {p.jugador}
               </p>
               {p.boleta != null && <p className="mt-1 text-[13px] text-text-secondary">Boleta #{p.boleta}</p>}
+              {p.participacion != null && <p className="mt-1 text-[13px] text-text-secondary">Participación #{p.participacion}</p>}
               {(showPollaName ?? !pollaId) && <p className="mt-1 text-[13px] text-text-secondary [overflow-wrap:anywhere]">Polla: {p.polla}</p>}
             </div>
             <span className="lp-money text-[20px] text-text-primary">
@@ -233,7 +236,7 @@ export function ColaDePagos({ pollaId, onReviewed, refreshKey = 0, status = "pen
               type="button"
               disabled={resolviendo !== null}
               onClick={() => decidir(p.id, "rechazar")}
-              aria-label={`Rechazar el pago de ${p.jugador}`}
+              aria-label={`Rechazar el pago de ${p.jugador}${p.participacion != null ? `, participación ${p.participacion}` : ""}`}
               className="lp-btn lp-btn-ghost grow basis-24 !px-3 !text-[15px] hover:border-red-alert hover:text-red-alert"
             >
               Rechazar
@@ -242,14 +245,14 @@ export function ColaDePagos({ pollaId, onReviewed, refreshKey = 0, status = "pen
               type="button"
               disabled={resolviendo !== null}
               onClick={() => decidir(p.id, "aprobar")}
-              aria-label={`Aprobar el pago de ${p.jugador}`}
+              aria-label={`Aprobar el pago de ${p.jugador}${p.participacion != null ? `, participación ${p.participacion}` : ""}`}
               className="lp-btn lp-btn-ghost grow basis-24 !px-3 !text-[15px]"
             >
               {resolviendo === p.id ? "Guardando..." : "Aprobar"}
             </button>
           </div>}
           {paid && (p.puedeDesmarcar ? (correctionId === p.id ? (
-            <div role="group" aria-label={`Corregir pago de ${p.jugador}`} className="mt-4 space-y-3 rounded-md border border-amber/40 p-3">
+            <div role="group" aria-label={`Corregir pago de ${p.jugador}${p.participacion != null ? `, participación ${p.participacion}` : ""}`} className="mt-4 space-y-3 rounded-md border border-amber/40 p-3">
               <p className="text-[15px] leading-relaxed text-text-primary">El pago de {p.jugador} volverá a pendientes y dejará de contar como inscripción pagada hasta que lo apruebes otra vez.</p>
               <label htmlFor={`motivo-${p.id}`} className="block text-[15px] font-medium">Motivo de la corrección</label>
               <input id={`motivo-${p.id}`} value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} className="lp-input w-full min-w-0 !text-[15px]" placeholder="Por ejemplo: aprobé el comprobante equivocado" />

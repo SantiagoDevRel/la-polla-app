@@ -22,6 +22,8 @@ const EditChangesSchema = z.object({
   payoutMethod: nullableText(40).optional(),
   payoutAccount: nullableText(60).optional(),
   payoutAccountName: nullableText(80).optional(),
+  // Migración 131. No lo valida casa_edit_polla_v2: va a casa_set_max_entries_v2.
+  maxEntriesPerUser: z.number().int().min(1).max(50).optional(),
 }).strict().refine((changes) => Object.keys(changes).length > 0, { message: "No hay cambios para guardar." });
 
 const BodySchema = z.discriminatedUnion("action", [
@@ -134,9 +136,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // confirma o se reprograma, así que no queda un cierre viejo al publicar.
   const args = { p_polla_id: id, p_contract: 2, p_actor_id: user.id };
   if (body.action === "editar" || body.action === "agregar_partidos" || body.action === "quitar_partido") {
+    // El tope de participaciones se puede cambiar aunque ya haya inscripciones:
+    // no toca dinero ni participaciones existentes, solo las nuevas.
+    const { maxEntriesPerUser, ...changes } = body.action === "editar" ? body.changes : {};
+    if (maxEntriesPerUser !== undefined) {
+      const cap = await db.rpc("casa_set_max_entries_v2", { ...args, p_max: maxEntriesPerUser });
+      if (cap.error) return casaError(cap.error);
+      if (Object.keys(changes).length === 0) return casaJson({ ok: true, ...cap.data });
+    }
     const edit = await db.rpc("casa_edit_polla_v2", {
       ...args,
-      p_changes: body.action === "editar" ? body.changes : {},
+      p_changes: changes,
       p_add_match_ids: body.action === "agregar_partidos" ? body.matchIds : [],
       p_remove_match_ids: body.action === "quitar_partido" ? [body.matchId] : [],
     });

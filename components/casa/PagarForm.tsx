@@ -24,9 +24,14 @@ interface Props {
   ticketCount: number | null;
   initialTicket?: string;
   resumeOnly?: boolean;
+  /**
+   * Participación (migración 131): número = completar esa, `null` = abrir una
+   * nueva. Sin valor en rifas (ahí manda la boleta).
+   */
+  entryNumber?: number | null;
 }
 
-export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false }: Props) {
+export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false, entryNumber }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   // Cada selección recibe un turno: si la persona elige otra imagen mientras
@@ -80,12 +85,15 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
     setError(null);
     try {
       const url = `/api/casa/pollas/${slug}/join`;
-      const key = `casa-proof:${slug}:${ticket || "entry"}`;
-      await submitProof({
+      // Cada participación guarda su propio intento: retomar la 2 nunca reusa el de la 3.
+      const target = esRifa ? ticket : entryNumber == null ? "nueva" : `p${entryNumber}`;
+      const key = `casa-proof:${slug}:${target || "entry"}`;
+      const result = await submitProof({
         sourceSha256: prepared.sourceSha256,
         candidates: prepared.candidates,
         ticketNumber: esRifa ? Number(ticket) : null,
         preserveStoredAttempt: resumeOnly,
+        entryNumber: esRifa ? undefined : entryNumber ?? null,
       }, {
         post: (body) => casaPost(url, body),
         upload: (upload, blob) => uploadSignedFile(upload, blob),
@@ -93,9 +101,13 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         writeRecord: (value) => sessionStorage.setItem(key, value),
         newRequestId: () => crypto.randomUUID(),
       });
+      // Registrado: la próxima participación nueva empieza su propio intento.
+      // Si alguien vuelve a elegir el mismo comprobante, SQL lo rechaza en vez
+      // de devolver en silencio la participación anterior.
+      try { sessionStorage.removeItem(key); } catch { /* Storage may be disabled. */ }
       setListo(true);
       // Un respiro para que se lea la confirmación antes de volver.
-      setTimeout(() => router.push(`/casa/${slug}`), 1600);
+      setTimeout(() => router.push(`/casa/${slug}${result.entryNumber ? `?p=${result.entryNumber}` : ""}`), 1600);
     } catch (cause) {
       setRevision((n) => n + 1);
       setError(cause instanceof Error ? cause.message : "Error de conexión. Intenta de nuevo.");
@@ -109,7 +121,9 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       <StreetCard hero className="p-6 text-center">
         <p className="lp-display-sm text-gold">Pago registrado</p>
         <p className="mt-2 text-[13px] text-text-secondary">
-          Recibimos tu comprobante. Tu participación se activa cuando confirmemos el pago.
+          {esRifa
+            ? "Recibimos tu comprobante. Tu participación se activa cuando confirmemos el pago."
+            : "Recibimos tu comprobante. Ya puedes hacer los pronósticos de esta participación; suma puntos cuando confirmemos el pago."}
         </p>
       </StreetCard>
     );

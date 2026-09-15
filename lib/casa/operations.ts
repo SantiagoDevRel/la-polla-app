@@ -54,15 +54,25 @@ const messages: Record<string, string> = {
   ISSUE_RESULT_NOT_ALLOWED: "Este caso no admite un resultado manual. Anula o mantén el partido.",
   MATCH_ALREADY_VERIFIED: "Este partido ya tiene un resultado verificado. Actualiza la página para ver el estado vigente.",
   OPEN_MATCH_ISSUES: "Hay partidos con novedades sin decidir. Revísalos en Issues antes de repartir.",
+  // Migración 131: varias participaciones por persona.
+  MAX_ENTRIES: "Llegaste al máximo de participaciones para esta polla.",
+  DUPLICATE_PROOF: "Ese comprobante ya lo enviaste para otra participación. Cada participación necesita su propia transferencia.",
+  ENTRY_NOT_FOUND: "Esa participación no existe. Vuelve a la polla y elige una de las tuyas.",
+  INVALID_ENTRY: "Esa participación no es válida para esta polla.",
+  INVALID_MAX_ENTRIES: "Elige entre 1 y 50 participaciones por persona.",
 };
 
-export function casaErrorMessage(error: { message?: string; code?: string }): string {
+/** Errores cuyo DETAIL de SQL ya viene redactado para la persona (con cifras exactas). */
+const DETAILED = new Set(["MAX_ENTRIES", "DUPLICATE_PROOF"]);
+
+export function casaErrorMessage(error: { message?: string; code?: string; details?: string | null }): string {
   if (error.code === "55P03" || error.code === "57014" || error.code === "40P01")
     return "Hay otra operación en curso. Intenta de nuevo.";
+  if (DETAILED.has(error.message ?? "") && error.details) return error.details;
   return messages[error.message ?? ""] ?? "No se pudo completar la operación. Actualiza los datos e intenta de nuevo.";
 }
 
-export function casaError(error: { message?: string; code?: string }) {
+export function casaError(error: { message?: string; code?: string; details?: string | null }) {
   const known = Boolean(messages[error.message ?? ""]) || ["55P03", "57014", "40P01", "23505", "22023", "55000"].includes(error.code ?? "");
   return casaJson({ error: casaErrorMessage(error), code: known ? error.message : "CASA_OPERATION_FAILED" }, known ? 409 : 500);
 }

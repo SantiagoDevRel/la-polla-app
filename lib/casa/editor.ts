@@ -5,7 +5,7 @@
 // casa_edit_polla_v2): si esta copia y la base difieren, gana la base y la API
 // devuelve el mensaje correspondiente.
 
-import type { CasaPolla } from "@/lib/casa/types";
+import { DEFAULT_MAX_ENTRIES_PER_USER, type CasaPolla } from "@/lib/casa/types";
 
 export type EditBlock = "NOT_FOUND" | "ARCHIVED" | "FINAL" | "DRAW" | "CLOSED";
 
@@ -58,6 +58,8 @@ export interface EditableFields {
   payoutMethod: string;
   payoutAccount: string;
   payoutAccountName: string;
+  /** Participaciones por persona (migración 131). */
+  maxEntriesPerUser: number;
 }
 
 export type EditChanges = Partial<{
@@ -72,6 +74,7 @@ export type EditChanges = Partial<{
   payoutMethod: string | null;
   payoutAccount: string | null;
   payoutAccountName: string | null;
+  maxEntriesPerUser: number;
 }>;
 
 /** Valores del formulario a partir de la fila de la polla. */
@@ -89,7 +92,7 @@ export function editableFieldsFromPolla(
     | "payout_method"
     | "payout_account"
     | "payout_account_name"
-  >,
+  > & Partial<Pick<CasaPolla, "max_entries_per_user">>,
 ): EditableFields {
   return {
     name: polla.name,
@@ -103,6 +106,7 @@ export function editableFieldsFromPolla(
     payoutMethod: polla.payout_method ?? "",
     payoutAccount: polla.payout_account ?? "",
     payoutAccountName: polla.payout_account_name ?? "",
+    maxEntriesPerUser: polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER,
   };
 }
 
@@ -121,6 +125,10 @@ export function buildEditChanges(
   const changes: EditChanges = {};
   if (draft.name.trim() !== original.name.trim()) changes.name = draft.name.trim();
   if (draft.description.trim() !== original.description.trim()) changes.description = blankToNull(draft.description);
+  // El tope de participaciones se edita con o sin inscripciones (no en rifas).
+  if (options.kind !== "rifa" && draft.maxEntriesPerUser !== original.maxEntriesPerUser) {
+    changes.maxEntriesPerUser = draft.maxEntriesPerUser;
+  }
   if (options.hasEntries) return changes;
 
   if (options.kind === "partidos" && draft.scoringMode !== original.scoringMode) changes.scoringMode = draft.scoringMode;
@@ -150,6 +158,9 @@ export function validateEditDraft(
   const name = draft.name.trim();
   if (name.length < 3 || name.length > 80) return "El nombre debe tener entre 3 y 80 caracteres.";
   if (draft.description.trim().length > 400) return "La descripción admite hasta 400 caracteres.";
+  if (!Number.isInteger(draft.maxEntriesPerUser) || draft.maxEntriesPerUser < 1 || draft.maxEntriesPerUser > 50) {
+    return "Las participaciones por persona deben estar entre 1 y 50.";
+  }
   if (options.hasEntries) return null;
   if (!Number.isInteger(draft.entryPriceCop) || draft.entryPriceCop < 0 || draft.entryPriceCop > 10_000_000) {
     return "La entrada debe ser un valor entero entre 0 y 10.000.000.";

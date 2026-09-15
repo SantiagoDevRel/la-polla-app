@@ -143,11 +143,30 @@ describe("submitProof", () => {
   it("uploads the prepared bytes and stores the original hash", async () => {
     const h = harness((body) => body.action === "begin" ? { attempt_id: uuid(1), state: "uploading", upload } : { ok: true });
     const result = await submitProof({ sourceSha256: sha("b"), candidates: [compressed, original], ticketNumber: 7 }, h.deps);
-    expect(result).toEqual({ attemptId: uuid(1), sha256: sha("a") });
+    expect(result).toEqual({ attemptId: uuid(1), sha256: sha("a"), entryNumber: null });
+    expect(h.calls[0]).not.toHaveProperty("entryNumber");
     expect(h.calls.map((c) => c.action)).toEqual(["begin", "confirm"]);
     expect(h.calls[0]).toMatchObject({ sha256: sha("a"), contentType: "image/jpeg", bytes: 100, ticketNumber: 7 });
     expect(h.uploads).toEqual(["a"]);
     expect(h.stored()).toMatchObject({ sourceSha256: sha("b"), sha256: sha("a"), attemptId: uuid(1) });
+  });
+
+  it("sends the participation and returns the one that received the proof (migration 131)", async () => {
+    const h = harness((body) => body.action === "begin" ? { attempt_id: uuid(1), entry_number: 3, state: "uploading", upload } : { ok: true });
+    const fresh = await submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null, entryNumber: null }, h.deps);
+    expect(h.calls[0]).toMatchObject({ action: "begin", entryNumber: null });
+    expect(fresh.entryNumber).toBe(3);
+    const retry = harness((body) => body.action === "begin" ? { attempt_id: uuid(1), entry_number: 2, state: "confirmed" } : { ok: true });
+    const again = await submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null, entryNumber: 2 }, retry.deps);
+    expect(retry.calls[0]).toMatchObject({ action: "begin", entryNumber: 2 });
+    expect(again.entryNumber).toBe(2);
+  });
+
+  it("does not try another candidate when the receipt already backs another participation", async () => {
+    const h = harness((body) => { if (body.action === "begin") throw fail("DUPLICATE_PROOF"); return { ok: true }; });
+    await expect(submitProof({ sourceSha256: sha("b"), candidates: [compressed, original], ticketNumber: null, entryNumber: null }, h.deps))
+      .rejects.toMatchObject({ code: "DUPLICATE_PROOF" });
+    expect(h.calls.filter((c) => c.action === "begin")).toHaveLength(1);
   });
 
   it("falls back to the original when another tab or client is uploading other bytes", async () => {
@@ -224,6 +243,6 @@ describe("submitProof", () => {
     const h = harness((body) => body.action === "begin" ? { attempt_id: uuid(7), state: "confirmed" } : { ok: true });
     h.deps.readRecord = () => { throw new Error("denied"); };
     h.deps.writeRecord = () => { throw new Error("denied"); };
-    await expect(submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null }, h.deps)).resolves.toEqual({ attemptId: uuid(7), sha256: sha("a") });
+    await expect(submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null }, h.deps)).resolves.toEqual({ attemptId: uuid(7), sha256: sha("a"), entryNumber: null });
   });
 });

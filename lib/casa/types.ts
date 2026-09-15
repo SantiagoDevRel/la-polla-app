@@ -76,6 +76,8 @@ export interface CasaPolla {
   payout_method: string | null;
   payout_account: string | null;
   payout_account_name: string | null;
+  /** Participaciones que una persona puede tener en esta polla (migración 131). */
+  max_entries_per_user?: number;
   created_by: string;
   created_at: string;
 }
@@ -94,6 +96,11 @@ export interface CasaPot {
 export interface MyCasaPolla extends Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "tournament" | "status" | "closes_at"> {
   entry_status: "pendiente" | "pagada";
   tournaments: string[];
+  /**
+   * Participaciones vivas (pagada o en revisión) en polla de partidos/preguntas,
+   * ordenadas por número. Vacío en rifas: ahí manda la boleta.
+   */
+  entries: Array<{ number: number; status: "pendiente" | "pagada" }>;
 }
 
 export interface CasaEntry {
@@ -108,6 +115,8 @@ export interface CasaEntry {
   reviewed_at: string | null;
   reject_reason: string | null;
   ticket_number: number | null;
+  /** 1, 2, 3… en pollas de partidos/preguntas; null en rifas (migración 131). */
+  entry_number?: number | null;
   created_at: string;
 }
 
@@ -154,6 +163,10 @@ export interface CasaLeaderboardRow {
   points: number;
   aciertos: number;
   puesto: number;
+  /** Número de la participación (migración 131). */
+  entry_number?: number | null;
+  /** Cuántas participaciones aprobadas tiene esa persona en la polla. */
+  user_entries?: number;
 }
 
 /**
@@ -189,15 +202,23 @@ export interface CasaDistribution {
    Regla dura del repo: nunca `select("*")` en tablas con datos de usuario.
    Enumerar evita que una columna sensible futura se filtre sola. */
 export const CASA_POLLA_COLUMNS =
-  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_kind, pot_mode, fixed_prize_cop, publication_mode, prize_object, prize_image_path, points_exact, points_one_team, points_result, status, opens_at, closes_at, close_mode, ticket_count, draw_method, drawn_number, settled_at, settle_notes, settlement_outcome, payout_method, payout_account, payout_account_name, created_by, created_at" as const;
+  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_kind, pot_mode, fixed_prize_cop, publication_mode, prize_object, prize_image_path, points_exact, points_one_team, points_result, status, opens_at, closes_at, close_mode, ticket_count, draw_method, drawn_number, settled_at, settle_notes, settlement_outcome, payout_method, payout_account, payout_account_name, max_entries_per_user, created_by, created_at" as const;
 
 export const CASA_ENTRY_COLUMNS =
-  "id, polla_id, user_id, status, amount_cop, proof_path, current_proof_attempt_id, proof_uploaded_at, reviewed_at, reject_reason, ticket_number, created_at" as const;
+  "id, polla_id, user_id, status, amount_cop, proof_path, current_proof_attempt_id, proof_uploaded_at, reviewed_at, reject_reason, ticket_number, entry_number, created_at" as const;
 
 export const CASA_PICK_COLUMNS =
   "id, entry_id, polla_id, user_id, match_id, question_id, pick_1x2, home_score, away_score, option_id, free_text, points_earned" as const;
 
 /* ── Helpers de dominio ─────────────────────────────────────────────── */
+
+/** Tope por defecto si una lectura vieja no trae la columna (migración 131). */
+export const DEFAULT_MAX_ENTRIES_PER_USER = 10;
+
+/** Una participación cuenta como inscripción viva: pagada o con comprobante en revisión. */
+export function isLiveEntry(entry: Pick<CasaEntry, "status" | "proof_path"> | null | undefined): boolean {
+  return Boolean(entry && (entry.status === "pagada" || (entry.status === "pendiente" && entry.proof_path)));
+}
 
 /** Se puede seguir entrando / cambiando pronosticos? */
 export function isPollaPublished(polla: Pick<CasaPolla, "status"> & Partial<Pick<CasaPolla, "opens_at" | "publication_mode">>, now = new Date()): boolean {

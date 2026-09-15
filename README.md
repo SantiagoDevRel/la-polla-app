@@ -1126,6 +1126,20 @@ revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
 [docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
 de 096 arriba no es el contrato de liquidación una vez activado v2.
 
+### Varias participaciones por polla (2026-09-15, migración 131)
+
+Una persona puede entrar varias veces a una polla de partidos o preguntas, por
+ejemplo cinco veces a una de $20.000: son cinco transferencias de $20.000, cinco
+comprobantes y cinco aprobaciones separadas, cada una con sus propios pronósticos.
+Solo las participaciones aprobadas suman. Tope por polla configurable (1–50, por
+defecto 10). Reglas, SQL y despliegue en [docs/casa-admin-rules.md](docs/casa-admin-rules.md).
+
+```powershell
+# Supabase local en Docker; nunca prod
+docker exec -i supabase_db_la-polla psql -U postgres -v ON_ERROR_STOP=1 < scripts/casa-multi-entries-check.sql
+$env:CASA_ORIGIN="http://localhost:3107"; node scripts/casa-multi-entries-browser-check.mjs
+```
+
 ### Comprobantes comprimidos en el navegador (2026-09-13)
 
 `components/casa/PagarForm.tsx` prepara la imagen UNA vez al elegirla

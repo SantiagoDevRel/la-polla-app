@@ -51,6 +51,7 @@ const base: EditableFields = {
   payoutMethod: "Nequi",
   payoutAccount: "3000000000",
   payoutAccountName: "La casa",
+  maxEntriesPerUser: 10,
 };
 const moneyPool = { hasEntries: false, kind: "partidos" as const, prizeKind: "pozo" as const };
 

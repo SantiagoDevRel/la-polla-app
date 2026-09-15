@@ -1,7 +1,7 @@
 # Casa: Info, comprobantes, premio fijo y publicación
 
 Implementación del pedido del 13 de septiembre de 2026. Requiere Casa v2 activa
-y las migraciones **104, 105, 106, 107, 108 y 109**, además de sus migraciones anteriores.
+y las migraciones **104, 105, 106, 107, 108, 109 y 131**, además de sus migraciones anteriores.
 El calendario de proveedores y sus torneos se mantiene en un carril independiente.
 
 ## Info y pronósticos
@@ -145,6 +145,47 @@ y hora para que quepa en móvil; convierte esa hora a UTC al enviarla. Todos los
 instantes visibles y las agrupaciones de días usan Colombia, incluso en un
 dispositivo configurado en Europa. Las fechas civiles sin hora y las ventanas
 de cuota del proveedor conservan su significado; no se desplazan artificialmente.
+
+## Varias participaciones por persona (migración 131)
+
+**Regla del dueño:** entrar varias veces a una polla es posible, pero cada
+participación exige su propia transferencia por el valor de la entrada y su propio
+comprobante. No existe «un pago de $100.000 por cinco cupos».
+
+- **Tope.** `casa_pollas.max_entries_per_user` (1–50, por defecto 10; las pollas
+  existentes quedaron en 10). Se define al crear y se cambia en el editor aunque
+  haya inscripciones (`casa_set_max_entries_v2`): bajarlo no elimina nada, solo
+  impide nuevas. Cuentan pagadas, en revisión y rechazadas (una rechazada se
+  reintenta en su misma fila); una carga fallida (`anulada`) no cuenta y su número
+  se reutiliza. Las rifas no usan este tope: cada boleta ya es una inscripción.
+- **Numeración.** `casa_entries.entry_number` 1, 2, 3… por persona y polla
+  (índice único parcial; las inscripciones anteriores quedaron como 1).
+- **Comprobante.** `casa_begin_entry_proof_v3(…, p_entry_number, …)`: número =
+  completar o reintentar esa participación; `NULL` = una nueva. Rechaza
+  `MAX_ENTRIES`, `ENTRY_NOT_FOUND` y `DUPLICATE_PROOF` (el mismo archivo ya respalda
+  otra participación viva de esa persona; es una defensa por bytes, el admin
+  sigue revisando cada imagen). `casa_begin_entry_proof_v2` conserva firma y
+  comportamiento de una sola inscripción para el bot y clientes viejos.
+- **Revisión.** La cola de `/admin/pollas/recibos`, el historial por usuario y
+  Telegram muestran «Participación #N» (web: si la persona tiene más de una;
+  Telegram: desde la #2). Cada
+  aprobación, rechazo o corrección aplica a un comprobante (sin cambios en 105).
+- **Pronósticos.** Cada participación guarda los suyos (`casa_picks.entry_id`) y
+  puede llenarlos desde que su comprobante está en revisión. `PUT /picks` acepta
+  `entryNumber`; sin él usa la participación principal (bot).
+- **Tabla y reparto.** `casa_leaderboard` devuelve una fila por participación
+  aprobada con `entry_number` y `user_entries`. `casa_settle_polla_v2` divide el pozo
+  por participación ganadora (redondeo de a un peso por participación, en orden
+  estable) y registra un pago por persona con la suma («· 2 participaciones
+  ganadoras» en la nota). Premio en objeto: si todas las participaciones empatadas
+  arriba son de la misma persona, gana sin sorteo; si hay varias personas, el
+  sorteo tiene una boleta por persona.
+- **Pantallas.** `/casa/<slug>?p=N` con «Tus participaciones» (estado de cada una
+  y «Sumar otra participación»); `/casa/<slug>/pagar?participacion=nueva` avisa
+  «Otra participación, otra transferencia». Mis pollas: una tarjeta por
+  participación con enlace directo.
+- **Despliegue.** Aplicar 131 antes de publicar el código. La migración no toca
+  `predictions`, pronósticos, pagos ni resultados; solo numera y agrega funciones.
 
 ## Ajustes de la migración 107
 

@@ -49,6 +49,8 @@ export function CrearPollaForm() {
   const [description, setDescription] = useState("");
   const [precio, setPrecio] = useState(10000);
   const [houseCut, setHouseCut] = useState(0);
+  // Migración 131: participaciones por persona. Cada una es su propia transferencia.
+  const [maxEntries, setMaxEntries] = useState(10);
   const [closesAt, setClosesAt] = useState(proximoCierre);
 
   // ── Premio ─────────────────────────────────────────────────────────
@@ -202,6 +204,8 @@ export function CrearPollaForm() {
   async function crear(publicar: boolean) {
     setError(null);
     if (name.trim().length < 3) return setError("Escribe el nombre de la polla.");
+    if (kind !== "rifa" && (!Number.isInteger(maxEntries) || maxEntries < 1 || maxEntries > 50))
+      return setError("Las participaciones por persona deben estar entre 1 y 50.");
     if (kind === "partidos" && seleccion.length === 0)
       return setError("Elige al menos un partido.");
     if (kind === "manual" && preguntas.every((q) => !q.prompt.trim()))
@@ -220,6 +224,7 @@ export function CrearPollaForm() {
         description: description.trim() || undefined,
         entryPriceCop: precio,
         houseCutPct: prizeKind === "objeto" ? 100 : houseCut,
+        maxEntriesPerUser: kind === "rifa" ? undefined : maxEntries,
         // En modo auto el server ignora este valor y lo recalcula desde el
         // primer partido; se manda igual porque el schema lo exige.
         closesAt: colombiaDateTimeToIso(closesAt),
@@ -395,6 +400,25 @@ export function CrearPollaForm() {
             </div>
           </div>
         </div>
+
+        {kind !== "rifa" && (
+          <div>
+            <Label>Participaciones por persona</Label>
+            <input
+              type="number"
+              aria-label="Participaciones por persona"
+              aria-describedby="crear-participaciones-ayuda"
+              min={1}
+              max={50}
+              value={maxEntries}
+              onChange={(e) => setMaxEntries(Number(e.target.value))}
+              className="lp-input lp-money mt-2 text-[18px]"
+            />
+            <p id="crear-participaciones-ayuda" className="mt-2 text-[13px] leading-relaxed text-text-secondary">
+              Una misma persona puede entrar varias veces, cada una con su propia transferencia de la entrada y su propio comprobante.
+            </p>
+          </div>
+        )}
 
         {/* ── El premio ──────────────────────────────────────────────── */}
         <div>

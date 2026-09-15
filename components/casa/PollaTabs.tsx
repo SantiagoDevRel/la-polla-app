@@ -112,7 +112,7 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, entry
           </button>
         </div>
         <p className="mb-4 mt-1 text-xs leading-relaxed text-text-secondary">
-          Solo cuentan los pagos aprobados. Al confirmar tu pago, se incluyen los puntos de tus pronósticos válidos.
+          Solo cuentan los pagos aprobados. Cada participación aparece por separado y suma los puntos de sus pronósticos cuando confirmamos su pago.
         </p>
         {error && <div role="alert" className="mb-3 rounded-lg border border-red-alert/40 bg-red-alert/10 p-3 text-sm text-text-primary">
           <p>{error} Los datos anteriores se conservan.</p>
@@ -137,7 +137,7 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, entry
                   <th scope="row" className="py-3 font-medium">
                     <div className="flex items-start gap-2">
                       <UserAvatar avatarUrl={row.avatar_url} displayName={row.display_name ?? "Jugador"} size="sm" />
-                      <span className="min-w-0 self-center text-sm [overflow-wrap:anywhere]">{row.display_name ?? "Sin nombre"}{row.user_id === userId && <span className="ml-1 text-xs text-turf">(tú)</span>}</span>
+                      <span className="min-w-0 self-center text-sm [overflow-wrap:anywhere]">{row.display_name ?? "Sin nombre"}{(row.user_entries ?? 1) > 1 && row.entry_number != null && <span className="ml-1 whitespace-nowrap text-xs text-text-secondary" aria-label={`participación ${row.entry_number}`}>#{row.entry_number}</span>}{row.user_id === userId && <span className="ml-1 text-xs text-turf">(tú)</span>}</span>
                     </div>
                   </th>
                   <td className="lp-money py-3 pr-2 text-right align-top text-lg">{row.points}</td>

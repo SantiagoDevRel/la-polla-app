@@ -9,7 +9,7 @@ export async function notifyCasaReview(entryId: string, pollaId: string, approve
   try {
     const db = createAdminClient();
     const [{ data: entry }, { data: polla }, pot] = await Promise.all([
-      db.from("casa_entries").select("user_id, reject_reason, ticket_number").eq("id", entryId).eq("polla_id", pollaId).single(),
+      db.from("casa_entries").select("user_id, reject_reason, ticket_number, entry_number").eq("id", entryId).eq("polla_id", pollaId).single(),
       db.from("casa_pollas").select("name, slug, prize_kind, prize_object, kind").eq("id", pollaId).single(),
       getPot(pollaId),
     ]);
@@ -20,9 +20,12 @@ export async function notifyCasaReview(entryId: string, pollaId: string, approve
         userId: entry.user_id, pollaId, pollaName: polla.name, kind: polla.kind, approved,
         prizeKind: polla.prize_kind, prizeObject: polla.prize_object, pozoCop: pot.prize_cop,
         rejectReason: entry.reject_reason ?? null, ticketNumber: entry.ticket_number ?? null,
+        entryNumber: entry.entry_number ?? null,
       });
+      const numbered = entry.entry_number != null && entry.entry_number > 1;
       await notifyPlayer({ userId: entry.user_id, aprobado: approved,
-        pollaName: polla.name, pollaSlug: polla.slug, pozoCop: pot.prize_cop,
+        pollaName: numbered ? `${polla.name} (participación ${entry.entry_number})` : polla.name,
+        pollaSlug: numbered ? `${polla.slug}?p=${entry.entry_number}` : polla.slug, pozoCop: pot.prize_cop,
         prizeKind: polla.prize_kind, prizeObject: polla.prize_object, kind: polla.kind });
     }
   } catch { console.warn("[casa] Revisión registrada; no se pudo enviar el aviso al jugador."); }
