@@ -74,11 +74,13 @@ export async function notifyProofWatchers(
     client?: LoginBotClient;
     /** Solo la prueba: suma una copia para el admin que la pide. */
     extraUserIds?: string[];
+    /** Solo la prueba: ignora la variable y usa únicamente extraUserIds. */
+    onlyExtra?: boolean;
   } = {},
 ): Promise<number> {
   const env = options.env ?? process.env;
   const extra = (options.extraUserIds ?? []).map((s) => s.toLowerCase()).filter((s) => UUID_RE.test(s));
-  const userIds = [...new Set([...proofWatcherUserIds(env), ...extra])];
+  const userIds = [...new Set([...(options.onlyExtra ? [] : proofWatcherUserIds(env)), ...extra])];
   if (userIds.length === 0) return 0;
   const config = getTelegramLoginConfig(env);
   if (!config) return 0;
