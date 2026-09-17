@@ -1049,7 +1049,7 @@ En `/casa`, el orden es Mis pollas, Pollas disponibles y Pollas cerradas. Mis po
 (prop `activeOnly`) muestra solo pollas en juego y empieza abierta si hay alguna; las
 finalizadas pasan a Pollas cerradas marcadas «Participaste». Pollas disponibles empieza
 abierta si hay disponibles o si no hay nada en juego; cerradas empieza cerrada. Comparten título/subtítulo y contienen sus tarjetas dentro de
-`PollaSection`. En Perfil, Mis pollas permanece abierta y va debajo de «Cuenta para cobrar», que
+`PollaSection`. En Perfil, `MyPollas split` muestra Mis pollas (en juego) y Pollas cerradas (en gris) como dos desplegables compactos cerrados, debajo de «Cuenta para cobrar», que
 quedó justo bajo el celular (2026-09-17). Las inscripciones pendientes o pagadas se
 muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
 Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.

@@ -297,7 +297,9 @@ export default function PerfilPage() {
           />
         )}
 
-        <MyPollas />
+        {/* Mis pollas (en juego) y Pollas cerradas, como en /casa, pero en dos
+            desplegables compactos y cerrados para no recargar el perfil. */}
+        <MyPollas split defaultOpen={false} />
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />
