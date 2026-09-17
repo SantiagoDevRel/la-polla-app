@@ -55,7 +55,12 @@ export default async function CasaPage() {
   // paso sigue con status abierta hasta que alguien la cierre, y quedaba
   // listada como "del fin de semana" diciendo "cierra en cerrada".
   const abiertas = pollas.filter((p) => isPollaOpen(p));
-  const cerradas = pollas.filter((p) => !isPollaOpen(p));
+  // Mis pollas solo lleva las que siguen en juego: una finalizada pasa sola a
+  // Pollas cerradas (marcada "Participaste"), y una en juego no se repite abajo.
+  const joinedIds = new Set(myPollas.map(p => p.id));
+  const enJuegoMias = myPollas.filter(p => p.status !== "resuelta" && p.status !== "anulada");
+  const enJuegoIds = new Set(enJuegoMias.map(p => p.id));
+  const cerradas = pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id));
   const [pots, pendientes, tournaments, pagos] = await Promise.all([
     getPots(pollas.map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
@@ -64,8 +69,13 @@ export default async function CasaPage() {
     getPayoutProgress(cerradas.filter((p) => p.status === "resuelta").map((p) => p.id))
       .catch((): Record<string, { total: number; paid: number }> => ({})),
   ]);
-  const joinedIds = new Set(myPollas.map(p => p.id));
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
+
+  // Siempre queda al menos una sección abierta (2026-09-14/17): Mis pollas si
+  // la persona tiene pollas en juego; disponibles si hay alguna o si no tiene
+  // nada en juego. Cerradas empieza cerrada.
+  const misPollasOpen = enJuegoMias.length > 0;
+  const disponiblesOpen = disponibles.length > 0 || !misPollasOpen;
 
   // El número grande de arriba: todo lo que hay repartible ahora mismo.
   const enJuego = abiertas.reduce((sum, p) => sum + (pots[p.id]?.prize_cop ?? 0), 0);
@@ -95,7 +105,9 @@ export default async function CasaPage() {
               actualiza solo y desaparece cuando no hay nada en juego. */}
         <LiveNow initialRows={enVivo} />
 
-        <PollaSection id="pollas-abiertas" kind="open" title="Pollas abiertas" description="Elige una polla e inscríbete." count={disponibles.length}>
+        <MyPollas initialPollas={enJuegoMias} activeOnly defaultOpen={misPollasOpen} pendingByPolla={Object.fromEntries(pendientes.map(p => [p.entryNumber != null ? `${p.polla.id}:${p.entryNumber}` : p.polla.id, p.faltan]))} />
+
+        <PollaSection id="pollas-disponibles" kind="open" title="Pollas disponibles" description="Elige una polla e inscríbete." count={disponibles.length} defaultOpen={disponiblesOpen}>
         {disponibles.length === 0 ? (
           // `bg-bg-card` pisa a proposito el 80% de opacidad de .lp-card: es la
           // unica card de la app que lleva ilustracion adentro, y sobre el video
@@ -128,17 +140,15 @@ export default async function CasaPage() {
         )}
         </PollaSection>
 
-        <MyPollas initialPollas={myPollas} defaultOpen={false} pendingByPolla={Object.fromEntries(pendientes.map(p => [p.entryNumber != null ? `${p.polla.id}:${p.entryNumber}` : p.polla.id, p.faltan]))} />
-
         <PollaSection id="pollas-cerradas" kind="closed" title="Pollas cerradas" description="Consulta los resultados de pollas anteriores." count={cerradas.length}>
             {cerradas.length > 0 ? (
               <ul className="grid auto-rows-fr gap-3">
                 {cerradas.map((polla) => (
-                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} />
+                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} participated={joinedIds.has(polla.id)} closed />
                 ))}
               </ul>
             ) : (
-              <StreetCard className="p-5 text-center">
+              <StreetCard className="bg-transparent p-5 text-center">
                 <p className="lp-display-sm text-text-primary">Todavía no hay pollas cerradas</p>
                 <p className="mt-2 text-[13px] text-text-muted">Cuando una polla cierre, podrás consultarla aquí.</p>
               </StreetCard>
@@ -155,6 +165,8 @@ function PollaRow({
   tournaments,
   editable = false,
   payout,
+  participated = false,
+  closed = false,
 }: {
   polla: CasaPolla;
   pot?: { prize_cop: number; paid_entries: number };
@@ -163,9 +175,14 @@ function PollaRow({
   editable?: boolean;
   /** Premios en dinero pagados con comprobante / totales (migración 133). */
   payout?: { total: number; paid: number };
+  /** La persona tuvo inscripción en esta polla ya terminada. */
+  participated?: boolean;
+  /** Sección Pollas cerradas: tono gris translúcido. */
+  closed?: boolean;
 }) {
   const estado = pollaStatusLabel(polla);
   const abierta = isPollaOpen(polla);
+  const amountTone = closed ? "text-text-secondary" : "text-text-primary";
   const premioPagado = Boolean(payout && payout.total > 0 && payout.paid === payout.total);
 
   return (
@@ -182,11 +199,13 @@ function PollaRow({
         </Link>
       )}
       <Link href={`/casa/${polla.slug}`} className="block h-full">
-        <StreetCard className="flex h-full flex-col bg-bg-elevated p-4 transition-colors hover:border-border-strong">
+        {/* Cerrada = gris translúcido y logos desaturados: se lee como polla
+            terminada sin perder contraste de lectura. */}
+        <StreetCard className={`flex h-full flex-col p-4 transition-colors hover:border-border-strong ${closed ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : "bg-bg-elevated"}`}>
           {/* Equal-height list rows let names wrap without shifting the
               logos and amounts in neighboring cards. */}
           <div className={`flex items-start justify-between gap-3 ${editable ? "pr-12" : ""}`}>
-            <h3 className="min-w-0 flex-1 font-display text-[22px] leading-[1.2] tracking-[0.04em] text-text-primary [overflow-wrap:anywhere]">
+            <h3 className={`min-w-0 flex-1 font-display text-[22px] leading-[1.2] tracking-[0.04em] ${closed ? "text-text-secondary" : "text-text-primary"} [overflow-wrap:anywhere]`}>
               {polla.name}
             </h3>
             <Tape tone={estado.tone} className="shrink-0">{estado.text}</Tape>
@@ -208,13 +227,13 @@ function PollaRow({
           <div className="mt-4 grid grid-cols-2">
             <div className="min-w-0 border-r border-border-subtle">
               <Label>Pozo</Label>
-              <div className="lp-money mt-1 text-[28px] leading-none text-text-primary [overflow-wrap:anywhere]">
+              <div className={`lp-money mt-1 text-[28px] leading-none ${amountTone} [overflow-wrap:anywhere]`}>
                 {formatCop(pot?.prize_cop ?? 0)}
               </div>
             </div>
             <div className="min-w-0 text-right">
               <Label>Entrada</Label>
-              <div className="lp-money mt-1 text-[28px] leading-none text-text-primary [overflow-wrap:anywhere]">
+              <div className={`lp-money mt-1 text-[28px] leading-none ${amountTone} [overflow-wrap:anywhere]`}>
                 {formatCop(polla.entry_price_cop)}
               </div>
             </div>
@@ -224,6 +243,7 @@ function PollaRow({
           <div className="mt-4 grid grid-cols-2 items-start gap-3 border-t border-border-subtle pt-3 text-[12px] leading-normal">
             <span className="min-w-0 text-text-muted">
               {pot?.paid_entries ?? 0} inscritos
+              {participated && <span className="block font-semibold text-text-secondary">Participaste</span>}
             </span>
             <span
               className={`min-w-0 text-right ${abierta ? "text-gold" : "text-text-muted"}`}
