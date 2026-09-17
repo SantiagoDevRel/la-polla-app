@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getLeaderboard, getMyEntry, getPollaBySlug } from "@/lib/casa/queries";
+import { getLeaderboard, getMyEntry, getPollaBySlug, getProvisionalPrizes } from "@/lib/casa/queries";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,12 +29,16 @@ export async function GET(
       return privateJson({ error: "Esa polla no existe." }, 404);
     }
 
-    const [rows, entry] = await Promise.all([
+    // Los premios provisionales (migración 133) salen de SQL con el mismo
+    // redondeo del reparto; si esa lectura falla la tabla sale sin esa columna.
+    const [rows, entry, prizes] = await Promise.all([
       getLeaderboard(polla.id),
       getMyEntry(polla.id, user.id),
+      getProvisionalPrizes(polla.id).catch(() => []),
     ]);
     return privateJson({
       rows,
+      prizes,
       entryStatus: entry?.status ?? null,
       drawPending: polla.draw_pending ?? false,
       pollaStatus: polla.status,

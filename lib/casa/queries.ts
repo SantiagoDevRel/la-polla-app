@@ -20,6 +20,7 @@ import {
   type CasaPick,
   type CasaPolla,
   type CasaPot,
+  type CasaProvisionalPrize,
   type CasaQuestion,
   isPollaPublished,
 } from "./types";
@@ -355,7 +356,9 @@ export async function getPayouts(pollaId: string): Promise<CasaPayout[]> {
   const db = createAdminClient();
   const { data, error } = await db
     .from("casa_payouts")
-    .select("id, user_id, place, points, amount_cop, paid_at, prize_kind, prize_object, delivered_at")
+    // proof_path es una ruta del bucket privado, no una URL: se firma aparte
+    // (lib/casa/payout-proofs.ts) y solo para quien puede verla.
+    .select("id, user_id, place, points, amount_cop, paid_at, prize_kind, prize_object, delivered_at, proof_path, proof_uploaded_at, paid_reference, note")
     .eq("polla_id", pollaId)
     .order("place", { ascending: true });
   if (error) throw error;
@@ -383,6 +386,43 @@ export async function getPayouts(pollaId: string): Promise<CasaPayout[]> {
     display_name: porId.get(f.user_id)?.display_name ?? null,
     avatar_url: porId.get(f.user_id)?.avatar_url ?? null,
   }));
+}
+
+/**
+ * Cuánto se llevaría hoy cada participación que va arriba si la polla
+ * terminara con los marcadores de este momento (migración 133). La cuenta
+ * vive en SQL con el mismo redondeo del reparto real; acá solo se lee.
+ * Devuelve [] cuando no aplica (objeto, resuelta, nadie con puntos).
+ */
+export async function getProvisionalPrizes(pollaId: string): Promise<CasaProvisionalPrize[]> {
+  const { data, error } = await createAdminClient().rpc("casa_provisional_prizes_v2", { p_polla_id: pollaId });
+  if (error) throw error;
+  return ((data ?? []) as CasaProvisionalPrize[]).map((row) => ({ ...row, amount_cop: Number(row.amount_cop) }));
+}
+
+/**
+ * Avance del pago de los premios en dinero de varias pollas, para marcar en
+ * «Pollas cerradas» cuáles ya tienen su prueba de pago. Son conteos (no
+ * plata) y hay a lo sumo un par de premios por polla.
+ */
+export async function getPayoutProgress(pollaIds: string[]): Promise<Record<string, { total: number; paid: number }>> {
+  const out: Record<string, { total: number; paid: number }> = {};
+  const ids = [...new Set(pollaIds)];
+  for (let start = 0; start < ids.length; start += 200) {
+    const { data, error } = await createAdminClient()
+      .from("casa_payouts")
+      .select("polla_id, paid_at, proof_path")
+      .in("polla_id", ids.slice(start, start + 200))
+      .eq("prize_kind", "pozo")
+      .limit(1000);
+    if (error) throw error;
+    for (const row of (data ?? []) as Array<{ polla_id: string; paid_at: string | null; proof_path: string | null }>) {
+      const item = out[row.polla_id] ?? (out[row.polla_id] = { total: 0, paid: 0 });
+      item.total += 1;
+      if (row.paid_at && row.proof_path) item.paid += 1;
+    }
+  }
+  return out;
 }
 
 /**

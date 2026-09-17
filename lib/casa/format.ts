@@ -46,6 +46,24 @@ export function formatMatchTime(iso: string, confirmed = true): string {
   return `${fecha} · ${hora}`;
 }
 
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/**
+ * "16 sep 2026" o "16 sep · 3:40 p. m.", en hora de Colombia. Intl en es-CO
+ * devuelve «16 de sept de 2026», que ocupa más y no se lee igual en una
+ * fila compacta; acá el mes siempre son tres letras.
+ */
+export function formatShortDate(iso: string, opts: { year?: boolean; time?: boolean } = {}): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Bogota", day: "numeric", month: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true,
+  }).formatToParts(new Date(iso));
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  const base = `${get("day")} ${MESES_CORTOS[Number(get("month")) - 1] ?? ""}${opts.year ? ` ${get("year")}` : ""}`;
+  if (!opts.time) return base;
+  const hora = new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(iso));
+  return `${base} · ${hora}`;
+}
+
 /**
  * "cierra en 2h 14m" / "cerrada". Se usa en las tarjetas del inicio, donde el
  * apuro es la mitad del gancho.

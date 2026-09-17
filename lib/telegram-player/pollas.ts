@@ -255,8 +255,12 @@ export async function showInfo(ctx: PlayerCtx, polla: CasaPolla): Promise<void> 
 
   if (polla.kind === "partidos") {
     lines.push("", "<b>Cómo sumas puntos</b>");
-    if (polla.scoring_mode === "marcador") {
+    if (polla.scoring_mode === "marcador" && polla.points_one_team > 0) {
+      // Pollas creadas antes de la migración 132: conservan su punto por un solo equipo.
       lines.push(`• Marcador exacto: ${pts(polla.points_exact)}.`, `• Goles de un solo equipo: ${pts(polla.points_one_team)}.`, "• No se suman entre sí. Sin aciertos, 0 puntos.");
+    } else if (polla.scoring_mode === "marcador") {
+      // Regla desde el 2026-09-16: solo el marcador exacto suma.
+      lines.push(`• Solo el marcador exacto suma: ${pts(polla.points_exact)}.`, "• Cualquier otro resultado: 0 puntos, aunque aciertes los goles de un equipo o quién gana.");
     } else {
       lines.push("• Eliges si gana el local, hay empate o gana el visitante.", `• Si aciertas: ${pts(polla.points_result)}. Si no, 0 puntos.`);
     }

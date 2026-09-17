@@ -246,7 +246,7 @@ export function EditarPollaForm({ state }: { state: PollaEditorState }) {
               <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
                 {draft.scoringMode === "1x2"
                   ? "Local, empate o visitante. Acertar suma 3 puntos."
-                  : "Marcador exacto suma 3 puntos. Acertar los goles de un solo equipo suma 1 punto."}
+                  : "Solo el marcador exacto suma: 3 puntos; cualquier otro resultado, 0. Las pollas creadas antes del 16 de septiembre de 2026 conservan 1 punto por acertar los goles de un solo equipo (Info muestra la regla de cada polla)."}
               </p>
             </div>
           )}

@@ -2,24 +2,35 @@
 
 // components/casa/PicksBoard.tsx — donde la gente marca.
 //
-// Modo 1X2: tres botones cuadrados por partido (LOCAL / EMPATE / VISITANTE),
-// que es lo unico que pidio el owner. Modo marcador: dos inputs de goles.
+// (2026-09-16) Rediseño pedido por el dueño: volver a lo que teníamos en la
+// polla vieja, «más minimalista, más pequeño pero funcional». Una tarjeta por
+// partido, compacta: escudos y marcador en la MISMA fila, nombres debajo, y
+// todo lo demás bajo demanda.
+//   · Finalizados: desplegable cerrado, del más reciente al más viejo.
+//   · En vivo: se están jugando (o cierran ya): se miran, no se editan.
+//   · Próximos: por día, cada día abierto; acá se pronostica.
+//   · «Ver pronósticos de otros»: cerrado por defecto y con scroll propio.
 //
-// Bajo cada opcion va la barra con el porcentaje de la gente que eligio eso.
-// Ese dato es la mitad de la gracia del producto ("¿cuántos pusieron 2-1?"),
-// asi que se muestra SIEMPRE que haya al menos un pronostico cargado.
+// Modo 1X2 antes del inicio conserva los tres botones que pidió el dueño el
+// 2026-09-14 (escudo + nombre ES el botón, «Empate» en el medio). Modo marcador:
+// dos casillas de goles entre los escudos, con auto-salto.
+//
+// Bajo cada opción 1X2 va la barra con el porcentaje de la gente que eligió
+// eso; en marcador, «cuántos pusieron 2-1» vive dentro del desplegable.
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronDown, ChevronRight, Clock3, Lock } from "lucide-react";
 import { TeamCrest } from "@/components/match/TeamCrest";
-import { Label, PctBar } from "@/components/street";
-import { formatMatchTime } from "@/lib/casa/format";
+import { PctBar } from "@/components/street";
+import { hasPick, liveMinuteLabel, pickLabel, pickOnTrack, shortTeam } from "@/lib/casa/live-status";
+import { dayLabel, partitionCasaMatches, type SectionMatch } from "@/lib/casa/picks-sections";
 import type { CasaDistribution, Pick1x2 } from "@/lib/casa/types";
 import { canEditCasaMatch, hasCasaMatchStarted } from "@/lib/casa/match-rules";
 import { MatchPicks } from "./MatchPicks";
 
-interface MatchLite {
+interface MatchLite extends SectionMatch {
   id: string;
   home_team: string;
   away_team: string;
@@ -36,6 +47,14 @@ interface MatchLite {
   voided_at?: string | null;
 }
 
+export interface BoardPick {
+  pick1x2: Pick1x2 | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  /** Puntos ya calculados en SQL para ese pronóstico (0 hasta que se verifique). */
+  pointsEarned?: number | null;
+}
+
 interface Props {
   slug: string;
   /** Participación que se está editando (migración 131). Sin número = la principal. */
@@ -43,10 +62,7 @@ interface Props {
   scoringMode: "1x2" | "marcador";
   matches: MatchLite[];
   /** picks actuales del usuario, indexados por match_id */
-  initialPicks: Record<
-    string,
-    { pick1x2: Pick1x2 | null; homeScore: number | null; awayScore: number | null }
-  >;
+  initialPicks: Record<string, BoardPick>;
   distribution: CasaDistribution;
   /** false = ya cerro, o el usuario todavia no se inscribio */
   canEdit: boolean;
@@ -90,17 +106,6 @@ export function msUntilNextRefreshWindow(matches: RefreshTiming[], now: number):
   return next === null ? null : next - now;
 }
 
-/** Nombre corto: "Manchester City FC" no entra en un boton de 110px. */
-function corto(nombre: string): string {
-  return nombre
-    // Solo sufijos/prefijos societarios. "United" y "Club" NO se tocan:
-    // sacarle el United a "Manchester United" lo deja como "Manchester",
-    // que es exactamente el mismo nombre que el City abreviado.
-    .replace(/\s+(FC|CF|AFC|SC|AC|SAD)$/i, "")
-    .replace(/^(FC|CF|AFC|SC|AC)\s+/i, "")
-    .trim();
-}
-
 /**
  * Las tres opciones de un partido. El label sale del EQUIPO, no de
  * "local/visitante": con los escudos chicos y dos nombres que uno no
@@ -109,10 +114,16 @@ function corto(nombre: string): string {
  */
 function opcionesDe(m: { home_team: string; away_team: string }) {
   return [
-    { key: "L" as Pick1x2, label: corto(m.home_team) },
+    { key: "L" as Pick1x2, label: shortTeam(m.home_team) },
     { key: "E" as Pick1x2, label: "Empate" },
-    { key: "V" as Pick1x2, label: corto(m.away_team) },
+    { key: "V" as Pick1x2, label: shortTeam(m.away_team) },
   ];
+}
+
+/** Solo la hora: el día ya lo dice el encabezado del grupo. */
+function horaDe(m: MatchLite): string {
+  if (m.scheduled_at_confirmed === false) return "Hora por confirmar";
+  return new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(m.scheduled_at));
 }
 
 export function PicksBoard({
@@ -170,15 +181,14 @@ export function PicksBoard({
     };
   }, [matches, router]);
 
+  const sections = useMemo(() => partitionCasaMatches(matches, now), [matches, now]);
+  // Con todo terminado (polla resuelta) no tiene sentido esconder la única lista.
+  const [finishedOpen, setFinishedOpen] = useState(() => sections.live.length + sections.upcoming.length === 0);
+  const [closedDays, setClosedDays] = useState<Set<string>>(() => new Set());
+  const upcomingOrder = useMemo(() => sections.upcoming.flatMap((group) => group.matches), [sections]);
+
   const marcados = useMemo(
-    () =>
-      matches.filter((m) => {
-        const p = picks[m.id];
-        if (!p) return false;
-        return scoringMode === "1x2"
-          ? p.pick1x2 != null
-          : p.homeScore != null && p.awayScore != null;
-      }).length,
+    () => matches.filter((m) => hasPick(scoringMode, picks[m.id])).length,
     [picks, matches, scoringMode],
   );
 
@@ -211,10 +221,18 @@ export function PicksBoard({
       inputs.current.get(`${matchId}:away`)?.focus();
       return;
     }
-    const idx = matches.findIndex((m) => m.id === matchId);
-    const siguiente = matches.slice(idx + 1).map((m) => inputs.current.get(`${m.id}:home`)).find((el) => el && !el.disabled);
+    const idx = upcomingOrder.findIndex((m) => m.id === matchId);
+    const siguiente = upcomingOrder.slice(idx + 1).map((m) => inputs.current.get(`${m.id}:home`)).find((el) => el && !el.disabled);
     if (siguiente) siguiente.focus();
     else inputs.current.get(`${matchId}:away`)?.blur();
+  }
+
+  function toggleDay(key: string) {
+    setClosedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   }
 
   async function guardar() {
@@ -260,154 +278,90 @@ export function PicksBoard({
     }
   }
 
+  const renderCard = (m: MatchLite, showDay: boolean) => (
+    <MatchCard
+      key={m.id}
+      m={m}
+      now={now}
+      slug={slug}
+      scoringMode={scoringMode}
+      mine={picks[m.id]}
+      distribution={distribution}
+      canEdit={canEdit}
+      canViewOthers={canViewOthers}
+      showDay={showDay}
+      inputs={inputs}
+      onPick1x2={set1x2}
+      onScore={setScore}
+      onJump={saltarDesde}
+    />
+  );
+
   return (
-    <div data-app-update-blocked={dirty || saving}>
-      <ul className="space-y-px">
-        {matches.map((m) => {
-          const cerrado = !canEditCasaMatch(m, now);
-          const started = hasCasaMatchStarted(m, now);
-          const editable = canEdit && !cerrado;
-          const dist = started ? distribution.resultado?.[m.id] : undefined;
-          const total = dist?.total ?? 0;
-          const mine = picks[m.id];
+    <div data-app-update-blocked={dirty || saving} className="space-y-4">
+      {/* ── Finalizados — cerrado por defecto ─────────────────────────── */}
+      {sections.finished.length > 0 && (
+        <section>
+          <button
+            type="button"
+            onClick={() => setFinishedOpen((value) => !value)}
+            aria-expanded={finishedOpen}
+            className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 px-1 text-left"
+          >
+            <span className="lp-label flex items-center gap-2 !text-[12px] text-text-secondary">
+              <Lock aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+              Finalizados · {sections.finished.length}
+            </span>
+            <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 ${finishedOpen ? "rotate-180" : ""}`} />
+          </button>
+          {finishedOpen && <div className="mt-1 space-y-2">{sections.finished.map((m) => renderCard(m, true))}</div>}
+        </section>
+      )}
 
-          return (
-            <li key={m.id} className="bg-bg-card p-4">
-              {/* Encabezado del partido: hora + estado */}
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <Label>{formatMatchTime(m.scheduled_at, m.scheduled_at_confirmed)}</Label>
-                {m.voided_at ? <span className="text-[13px] text-text-secondary">Anulado · 0 puntos</span> : m.final_verified_at ? (
-                  <span className="lp-money text-[13px] text-text-primary">
-                    {m.home_score}–{m.away_score}
+      {/* ── En vivo — se mira, no se edita ────────────────────────────── */}
+      {sections.live.length > 0 && (
+        <section>
+          <h3 className="lp-label flex min-h-11 items-center gap-2 px-1 !text-[12px] text-text-secondary">
+            <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert motion-safe:animate-pulse" />
+            En vivo · {sections.live.length}
+          </h3>
+          <div className="mt-1 space-y-2">{sections.live.map((m) => renderCard(m, true))}</div>
+        </section>
+      )}
+
+      {/* ── Próximos — por día, abiertos ──────────────────────────────── */}
+      {upcomingOrder.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="lp-label flex min-h-11 items-center gap-2 px-1 !text-[12px] text-text-secondary">
+            <Clock3 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-gold" />
+            Próximos · {upcomingOrder.length}
+          </h3>
+          {sections.upcoming.map((group) => {
+            const open = !closedDays.has(group.key);
+            return (
+              <div key={group.key}>
+                <button
+                  type="button"
+                  onClick={() => toggleDay(group.key)}
+                  aria-expanded={open}
+                  className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 px-1 text-left"
+                >
+                  <span className="text-[13px] font-semibold text-text-primary">
+                    {group.label}
+                    <span className="ml-1.5 font-normal text-text-muted">· {group.matches.length}</span>
                   </span>
-                ) : cerrado ? (
-                  <span className="lp-label text-red-alert">cerrado</span>
-                ) : null}
+                  <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                </button>
+                {open && <div className="mt-1 space-y-2">{group.matches.map((m) => renderCard(m, false))}</div>}
               </div>
-
-              {scoringMode === "1x2" ? (
-                /* (2026-09-14) Pedido del dueño: más compacto. El escudo con el
-                   nombre debajo ES el botón de cada equipo y «Empate» ocupa el
-                   lugar del «vs»; ya no hay una segunda fila de botones. La ficha
-                   del equipo sigue a un toque desde «Ver partido y alineaciones».
-                   Columnas con minmax(0,1fr): con texto ampliado el nombre baja
-                   de línea en vez de desaparecer. */
-                <div role="group" aria-label={`Tu pronóstico: ${m.home_team} contra ${m.away_team}`} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2">
-                  {opcionesDe(m).map((op) => {
-                    const elegido = mine?.pick1x2 === op.key;
-                    const n = dist?.conteo?.[op.key] ?? 0;
-                    const pct = total > 0 ? (n / total) * 100 : 0;
-                    const equipo = op.key === "L" ? { name: m.home_team, flag: m.home_team_flag } : op.key === "V" ? { name: m.away_team, flag: m.away_team_flag } : null;
-                    return (
-                      <div key={op.key} className="flex min-w-0 flex-col">
-                        <button
-                          type="button"
-                          disabled={!editable}
-                          onClick={() => set1x2(m.id, op.key)}
-                          aria-pressed={elegido}
-                          aria-label={equipo ? `Gana ${equipo.name}` : "Empate"}
-                          className={[
-                            "flex min-h-[88px] flex-1 flex-col items-center justify-center gap-1.5 rounded-md border px-1.5 py-2 text-center transition-colors",
-                            equipo ? "" : "px-3",
-                            elegido
-                              ? "border-gold bg-gold/15 text-gold"
-                              : editable
-                                ? "border-border-default bg-bg-elevated text-text-primary hover:border-gold/30"
-                                : "border-border-subtle text-text-primary",
-                            editable ? "cursor-pointer" : "cursor-default",
-                          ].join(" ")}
-                        >
-                          {equipo ? (
-                            <>
-                              <TeamCrest team={equipo.name} src={equipo.flag} className="h-9 w-9" />
-                              <span className="w-full text-[14px] font-semibold leading-tight [overflow-wrap:anywhere]">{op.label}</span>
-                            </>
-                          ) : (
-                            <span className="text-[14px] font-semibold">Empate</span>
-                          )}
-                        </button>
-                        {total > 0 && (
-                          <PctBar pct={pct} showValue={false} className="mt-1.5" />
-                        )}
-                        {total > 0 && (
-                          <span className="lp-money mt-1 block text-center text-[11px] text-text-muted">
-                            {Math.round(pct)}%
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                /* Equipos. Escudos y nombres en su propia fila para que el
-                   text-zoom de accesibilidad no los aplaste (regla del repo). */
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <Link href={`/futbol/equipos/home.${m.id}`} aria-label={`Ver equipo: ${m.home_team}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-bg-elevated"><TeamCrest team={m.home_team} src={m.home_team_flag} /></Link>
-                    <span className="lp-label">vs</span>
-                    <Link href={`/futbol/equipos/away.${m.id}`} aria-label={`Ver equipo: ${m.away_team}`} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-bg-elevated"><TeamCrest team={m.away_team} src={m.away_team_flag} /></Link>
-                  </div>
-                  <div className="mt-1.5 grid grid-cols-2 gap-3 text-[14px] font-semibold text-text-primary">
-                    <span className="min-w-0 [overflow-wrap:anywhere]">{m.home_team}</span>
-                    <span className="min-w-0 text-right [overflow-wrap:anywhere]">{m.away_team}</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-center gap-3">
-                    {(["home", "away"] as const).map((side, i) => (
-                      <Fragment key={side}>
-                        {i === 1 && <span className="h-[2px] w-3 bg-border-strong" aria-hidden />}
-                        <input
-                          ref={(el) => { inputs.current.set(`${m.id}:${side}`, el); }}
-                          type="number"
-                          inputMode="numeric"
-                          enterKeyHint="next"
-                          min={0}
-                          max={30}
-                          disabled={!editable}
-                          value={(side === "home" ? mine?.homeScore : mine?.awayScore) ?? ""}
-                          onFocus={(e) => e.currentTarget.select()}
-                          onChange={(e) => {
-                            setScore(m.id, side, e.target.value);
-                            // Un dígito completa la casilla: salta a la siguiente.
-                            // Para 10 o más, se vuelve a tocar la casilla y se agrega el segundo.
-                            if (e.target.value.length === 1) saltarDesde(m.id, side);
-                          }}
-                          aria-label={`Goles de ${side === "home" ? m.home_team : m.away_team}`}
-                          className="lp-input lp-money h-[52px] !w-[64px] text-center text-[22px]"
-                        />
-                      </Fragment>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <Link href={`/futbol/partidos/${m.id}`} className="mt-3 flex min-h-11 items-center justify-center rounded-full border border-border-subtle px-3 text-[13px] font-medium text-text-secondary transition-colors hover:bg-bg-elevated">Ver partido y alineaciones</Link>
-
-              {/* "cuántos pusieron este marcador" — solo en modo marcador */}
-              {started && scoringMode === "marcador" &&
-                mine?.homeScore != null &&
-                mine?.awayScore != null &&
-                (() => {
-                  const d = distribution.marcador?.[m.id];
-                  const clave = `${mine.homeScore}-${mine.awayScore}`;
-                  const n = d?.conteo?.[clave] ?? 0;
-                  if (!d?.total) return null;
-                  return (
-                    <p className="mt-3 text-center text-[11px] text-text-muted">
-                      {n === 0
-                        ? `Nadie más eligió ${clave}.`
-                        : `${n} de ${d.total} eligieron ${clave} (${Math.round((n / d.total) * 100)}%)`}
-                    </p>
-                  );
-                })()}
-              {started && canViewOthers && <MatchPicks slug={slug} matchId={m.id} scoringMode={scoringMode} home={m.home_team} away={m.away_team} />}
-            </li>
-          );
-        })}
-      </ul>
+            );
+          })}
+        </section>
+      )}
 
       {/* Barra de guardado: pegada abajo, encima del nav. */}
       {canEdit && (
-        <div className="sticky bottom-[88px] z-20 mt-4 border-t border-border-default bg-bg-base px-4 pb-3 pt-3">
+        <div className="sticky bottom-[88px] z-20 -mx-4 border-t border-border-default bg-bg-base px-4 pb-3 pt-3">
           {msg && (
             <p
               className={`mb-2 border p-2 text-center text-[12px] ${
@@ -435,10 +389,222 @@ export function PicksBoard({
       )}
 
       {!canEdit && lockedReason && (
-        <p className="mt-4 border border-border-default bg-bg-elevated p-3 text-center text-[12px] text-text-secondary">
+        <p className="border border-border-default bg-bg-elevated p-3 text-center text-[12px] text-text-secondary">
           {lockedReason}
         </p>
       )}
     </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+   MatchCard — una tarjeta compacta por partido.
+   Fila 1: hora/estado a la izquierda, «Ver partido» a la derecha.
+   Fila 2: escudo · marcador (o casillas) · escudo. Solo anchos fijos, para
+           que el texto ampliado no aplaste nada.
+   Fila 3: nombres, mitad y mitad, sin recorte.
+   Fila 4 (desde el inicio): «Tu marcador» y el desplegable de los demás.
+   ──────────────────────────────────────────────────────────────────────── */
+function MatchCard({
+  m, now, slug, scoringMode, mine, distribution, canEdit, canViewOthers, showDay, inputs, onPick1x2, onScore, onJump,
+}: {
+  m: MatchLite;
+  now: number;
+  slug: string;
+  scoringMode: "1x2" | "marcador";
+  mine: BoardPick | undefined;
+  distribution: CasaDistribution;
+  canEdit: boolean;
+  canViewOthers: boolean;
+  /** En Finalizados y En vivo no hay encabezado de día: la tarjeta lo dice. */
+  showDay: boolean;
+  inputs: React.MutableRefObject<Map<string, HTMLInputElement | null>>;
+  onPick1x2: (matchId: string, value: Pick1x2) => void;
+  onScore: (matchId: string, side: "home" | "away", raw: string) => void;
+  onJump: (matchId: string, side: "home" | "away") => void;
+}) {
+  const cerrado = !canEditCasaMatch(m, now);
+  const started = hasCasaMatchStarted(m, now);
+  const editable = canEdit && !cerrado;
+  const live = m.status === "live";
+  const voided = Boolean(m.voided_at);
+  const scored = Boolean(m.final_verified_at) || voided;
+  const finished = scored || m.status === "finished";
+  // 1X2 reparte por L/E/V; marcador, por «2-1». El total es cuántos pronosticaron.
+  const dist = started && scoringMode === "1x2" ? distribution.resultado?.[m.id] : undefined;
+  const total = (started ? (scoringMode === "1x2" ? dist?.total : distribution.marcador?.[m.id]?.total) : 0) ?? 0;
+  const tengoPick = hasPick(scoringMode, mine);
+  const label = pickLabel(scoringMode, mine, m.home_team, m.away_team);
+  const points = scored ? mine?.pointsEarned ?? 0 : null;
+  const onTrack = live ? pickOnTrack(scoringMode, mine, { home: m.home_score, away: m.away_score }) : null;
+  const marcadorDist = scoringMode === "marcador" && started && tengoPick ? distribution.marcador?.[m.id] : undefined;
+  const clave = `${mine?.homeScore}-${mine?.awayScore}`;
+  const summary = marcadorDist?.total
+    ? (marcadorDist.conteo?.[clave] ?? 0) === 0
+      ? `Nadie más puso ${clave}.`
+      : `${marcadorDist.conteo?.[clave]} de ${marcadorDist.total} pusieron ${clave} (${Math.round(((marcadorDist.conteo?.[clave] ?? 0) / marcadorDist.total) * 100)}%).`
+    : null;
+  const minute = live ? liveMinuteLabel(m) : "";
+  const showButtons1x2 = scoringMode === "1x2" && !started && !finished;
+
+  const estado = voided ? (
+    <span className="text-text-muted">Anulado · 0 puntos</span>
+  ) : live ? (
+    <span className="flex items-center gap-1.5 text-red-alert">
+      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-alert motion-safe:animate-pulse" />
+      Vivo{minute ? ` · ${minute}` : ""}
+    </span>
+  ) : finished ? (
+    <span className="text-text-muted">Final{!scored ? " · verificando" : ""}{showDay ? ` · ${dayLabel(m.scheduled_at, now)}` : ""}</span>
+  ) : (
+    <span className="text-text-muted">{showDay ? `${dayLabel(m.scheduled_at, now)} · ${horaDe(m)}` : horaDe(m)}</span>
+  );
+
+  const cell = (value: number | null) => (
+    <span className={`lp-money grid h-11 w-11 shrink-0 place-items-center overflow-hidden text-[28px] [-webkit-text-size-adjust:none] ${live ? "text-gold" : "text-text-primary"}`}>
+      {started || finished ? value ?? "–" : "–"}
+    </span>
+  );
+
+  return (
+    <article className={`lp-card p-3 ${voided ? "opacity-70" : ""}`} aria-label={`${m.home_team} contra ${m.away_team}`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-semibold uppercase tracking-[0.08em]">
+          {estado}
+          {editable && !tengoPick && (
+            <span className="rounded-md border border-red-alert/40 bg-red-alert/15 px-1.5 py-0.5 text-[10px] text-red-alert">Falta</span>
+          )}
+          {cerrado && !started && !finished && !voided && <span className="text-red-alert">Cerrado</span>}
+        </span>
+        <Link href={`/futbol/partidos/${m.id}`} className="flex min-h-8 shrink-0 items-center gap-0.5 text-[12px] font-semibold text-text-secondary transition-colors hover:text-text-primary">
+          Ver partido <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
+      {showButtons1x2 ? (
+        /* (2026-09-14) Pedido del dueño: el escudo con el nombre debajo ES el
+           botón de cada equipo y «Empate» ocupa el lugar del «vs». Columnas con
+           minmax(0,1fr): con texto ampliado el nombre baja de línea. */
+        <div role="group" aria-label={`Tu pronóstico: ${m.home_team} contra ${m.away_team}`} className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2">
+          {opcionesDe(m).map((op) => {
+            const elegido = mine?.pick1x2 === op.key;
+            const equipo = op.key === "L" ? { name: m.home_team, flag: m.home_team_flag } : op.key === "V" ? { name: m.away_team, flag: m.away_team_flag } : null;
+            return (
+              <button
+                key={op.key}
+                type="button"
+                disabled={!editable}
+                onClick={() => onPick1x2(m.id, op.key)}
+                aria-pressed={elegido}
+                aria-label={equipo ? `Gana ${equipo.name}` : "Empate"}
+                className={[
+                  "flex min-h-[80px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-md border px-1.5 py-2 text-center transition-colors",
+                  equipo ? "" : "px-3",
+                  elegido
+                    ? "border-gold bg-gold/15 text-gold"
+                    : editable
+                      ? "border-border-default bg-bg-elevated text-text-primary hover:border-gold/30"
+                      : "border-border-subtle text-text-primary",
+                  editable ? "cursor-pointer" : "cursor-default",
+                ].join(" ")}
+              >
+                {equipo ? (
+                  <>
+                    <TeamCrest team={equipo.name} src={equipo.flag} className="h-8 w-8" />
+                    <span className="w-full text-[13px] font-semibold leading-tight [overflow-wrap:anywhere]">{op.label}</span>
+                  </>
+                ) : (
+                  <span className="text-[13px] font-semibold">Empate</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <>
+          <div className="mt-2 flex items-center justify-center gap-2">
+            <Link href={`/futbol/equipos/home.${m.id}`} aria-label={`Ver equipo: ${m.home_team}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-bg-elevated">
+              <TeamCrest team={m.home_team} src={m.home_team_flag} className="h-8 w-8" />
+            </Link>
+            {editable && scoringMode === "marcador" ? (
+              (["home", "away"] as const).map((side, i) => (
+                <Fragment key={side}>
+                  {i === 1 && <span className="h-[2px] w-3 shrink-0 bg-border-strong" aria-hidden />}
+                  <input
+                    ref={(el) => { inputs.current.set(`${m.id}:${side}`, el); }}
+                    type="number"
+                    inputMode="numeric"
+                    enterKeyHint="next"
+                    min={0}
+                    max={30}
+                    value={(side === "home" ? mine?.homeScore : mine?.awayScore) ?? ""}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onChange={(e) => {
+                      onScore(m.id, side, e.target.value);
+                      // Un dígito completa la casilla: salta a la siguiente.
+                      // Para 10 o más, se vuelve a tocar la casilla y se agrega el segundo.
+                      if (e.target.value.length === 1) onJump(m.id, side);
+                    }}
+                    aria-label={`Goles de ${side === "home" ? m.home_team : m.away_team}`}
+                    className={`lp-input lp-money h-12 !w-12 shrink-0 !px-0 text-center text-[22px] [-webkit-text-size-adjust:none] ${!tengoPick ? "!border-red-alert/60" : ""}`}
+                  />
+                </Fragment>
+              ))
+            ) : (
+              <>
+                {cell(m.home_score)}
+                <span aria-hidden="true" className="h-[2px] w-3 shrink-0 bg-border-strong" />
+                {cell(m.away_score)}
+              </>
+            )}
+            <Link href={`/futbol/equipos/away.${m.id}`} aria-label={`Ver equipo: ${m.away_team}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-bg-elevated">
+              <TeamCrest team={m.away_team} src={m.away_team_flag} className="h-8 w-8" />
+            </Link>
+          </div>
+          {/* Sin recorte a propósito: con texto ampliado un nombre largo parte en dos líneas. */}
+          <div className="mt-1 grid grid-cols-2 gap-x-3 text-center text-[12px] font-semibold leading-tight text-text-primary">
+            <span className="min-w-0 [overflow-wrap:anywhere]">{m.home_team}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere]">{m.away_team}</span>
+          </div>
+        </>
+      )}
+
+      {/* Porcentajes 1X2 una vez empezado: una barra por opción, sin repetir botones. */}
+      {scoringMode === "1x2" && started && total > 0 && (
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {opcionesDe(m).map((op) => {
+            const n = dist?.conteo?.[op.key] ?? 0;
+            const pct = total > 0 ? (n / total) * 100 : 0;
+            return (
+              <div key={op.key} className="min-w-0">
+                <PctBar pct={pct} showValue={false} />
+                <span className="mt-0.5 block text-center text-[11px] leading-tight text-text-muted [overflow-wrap:anywhere]">
+                  <span className="lp-money">{Math.round(pct)}%</span> {op.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Tu pronóstico y sus puntos, desde que el partido cierra. */}
+      {(started || cerrado || finished) && !showButtons1x2 && (
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
+          <span className="text-text-secondary">{scoringMode === "marcador" ? "Tu marcador:" : "Tu pronóstico:"}</span>
+          <span className={`font-semibold ${!tengoPick ? "text-text-muted" : onTrack || (points ?? 0) > 0 ? "text-turf" : "text-text-primary"}`}>
+            {label ?? "sin pronóstico"}
+          </span>
+          {points != null && tengoPick && (
+            <span className={`lp-money text-[15px] ${points > 0 ? "text-turf" : "text-text-muted"}`}>
+              {points > 0 ? `+${points}` : "0"} pts
+            </span>
+          )}
+        </p>
+      )}
+
+      {started && canViewOthers && (
+        <MatchPicks slug={slug} matchId={m.id} scoringMode={scoringMode} home={m.home_team} away={m.away_team} count={total || null} summary={summary} />
+      )}
+    </article>
   );
 }

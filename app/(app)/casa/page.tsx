@@ -6,17 +6,20 @@
 
 import Link from "next/link";
 import { MyPollas } from "@/components/casa/MyPollas";
+import { LiveNow } from "@/components/casa/LiveNow";
 import { listMyPollas } from "@/lib/casa/my-pollas";
+import { listMyLiveMatches } from "@/lib/casa/live";
 import Image from "next/image";
 import { PollaSection } from "@/components/casa/PollaSection";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
-import { Settings } from "lucide-react";
+import { CheckCircle2, Settings } from "lucide-react";
 import {
   listPublicPollas,
   getPots,
+  getPayoutProgress,
   listPollasConPicksPendientes,
 } from "@/lib/casa/queries";
 import { isPollaOpen, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
@@ -40,18 +43,27 @@ export default async function CasaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?returnTo=/casa");
 
-  const [pollas, myPollas, isAdmin] = await Promise.all([listPublicPollas(), listMyPollas(user.id), isCurrentUserAdmin()]);
-  const [pots, pendientes, tournaments] = await Promise.all([
-    getPots(pollas.map((p) => p.id)),
-    listPollasConPicksPendientes(user.id),
-    getPollaTournamentSlugs(pollas),
+  const [pollas, myPollas, isAdmin, enVivo] = await Promise.all([
+    listPublicPollas(),
+    listMyPollas(user.id),
+    isCurrentUserAdmin(),
+    // Partidos en juego de MIS pollas, con mi pronóstico. Si falla, la
+    // pantalla sale sin la franja en vez de caerse.
+    listMyLiveMatches(user.id).catch(() => []),
   ]);
-
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
   // paso sigue con status abierta hasta que alguien la cierre, y quedaba
   // listada como "del fin de semana" diciendo "cierra en cerrada".
   const abiertas = pollas.filter((p) => isPollaOpen(p));
   const cerradas = pollas.filter((p) => !isPollaOpen(p));
+  const [pots, pendientes, tournaments, pagos] = await Promise.all([
+    getPots(pollas.map((p) => p.id)),
+    listPollasConPicksPendientes(user.id),
+    getPollaTournamentSlugs(pollas),
+    // Prueba de pago (migración 133): qué pollas cerradas ya pagaron su premio.
+    getPayoutProgress(cerradas.filter((p) => p.status === "resuelta").map((p) => p.id))
+      .catch((): Record<string, { total: number; paid: number }> => ({})),
+  ]);
   const joinedIds = new Set(myPollas.map(p => p.id));
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
 
@@ -77,6 +89,12 @@ export default async function CasaPage() {
       </HeroFrame>
 
       <div className="space-y-4 px-4 pt-6">
+        {/* ── En vivo (2026-09-16) ──────────────────────────────────────
+              Arriba de todo: los partidos que se están jugando en las pollas
+              donde participo, con «Tu marcador» al lado del parcial. Se
+              actualiza solo y desaparece cuando no hay nada en juego. */}
+        <LiveNow initialRows={enVivo} />
+
         <PollaSection id="pollas-abiertas" kind="open" title="Pollas abiertas" description="Elige una polla e inscríbete." count={disponibles.length}>
         {disponibles.length === 0 ? (
           // `bg-bg-card` pisa a proposito el 80% de opacidad de .lp-card: es la
@@ -116,7 +134,7 @@ export default async function CasaPage() {
             {cerradas.length > 0 ? (
               <ul className="grid auto-rows-fr gap-3">
                 {cerradas.map((polla) => (
-                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} />
+                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} />
                 ))}
               </ul>
             ) : (
@@ -136,15 +154,19 @@ function PollaRow({
   pot,
   tournaments,
   editable = false,
+  payout,
 }: {
   polla: CasaPolla;
   pot?: { prize_cop: number; paid_entries: number };
   tournaments: string[];
   /** Solo administradores y solo hasta el cierre (2026-09-14). */
   editable?: boolean;
+  /** Premios en dinero pagados con comprobante / totales (migración 133). */
+  payout?: { total: number; paid: number };
 }) {
   const estado = pollaStatusLabel(polla);
   const abierta = isPollaOpen(polla);
+  const premioPagado = Boolean(payout && payout.total > 0 && payout.paid === payout.total);
 
   return (
     <li className="relative">
@@ -209,6 +231,16 @@ function PollaRow({
               {abierta ? `Cierra en ${timeLeft(polla.closes_at)}` : estado.text}
             </span>
           </div>
+          {/* Prueba de pago (2026-09-16): la polla cerrada muestra que el premio
+              ya se pagó; el comprobante se ve adentro, en el resultado. */}
+          {payout && payout.total > 0 && (
+            <p className={`mt-2 flex items-center gap-1.5 text-[12px] font-semibold ${premioPagado ? "text-turf" : "text-text-secondary"}`}>
+              <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+              {premioPagado
+                ? `${payout.total === 1 ? "Premio pagado" : "Premios pagados"} · comprobante en la polla`
+                : `Pago del premio en curso · ${payout.paid} de ${payout.total}`}
+            </p>
+          )}
         </StreetCard>
       </Link>
     </li>

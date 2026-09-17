@@ -1129,6 +1129,72 @@ revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
 [docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
 de 096 arriba no es el contrato de liquidación una vez activado v2.
 
+### Casa: en vivo, tarjetas compactas y prueba de pago (2026-09-16, migraciones 132–133)
+
+Pedidos del dueño del 16 de septiembre de 2026. Nada de esto toca pollas
+abiertas ni pronósticos existentes: las migraciones agregan columnas y
+funciones, y solo cambian lo que se crea desde ahora.
+
+- **Solo marcador exacto (132).** Las pollas de marcador nuevas nacen con
+  `points_one_team = 0` (DEFAULT de la columna y constante de
+  `casa_create_polla_v2`): el marcador exacto suma 3 puntos y cualquier otro
+  resultado 0. `casa_score_polla` sigue igual; las pollas creadas antes
+  conservan su 1 punto por acertar los goles de un solo equipo y no se
+  repuntúan. Info, el editor y el bot describen los puntos reales de cada
+  polla. Regresión local: `scripts/casa-exact-score-check.sql`.
+- **En vivo en POLLAS.** `/casa` muestra arriba de todo los partidos que se
+  están jugando (y los recién terminados, hasta 4 h después del saque) de las
+  pollas donde la persona participa, con el parcial y «Tu marcador» por cupo
+  (verde si coincide). Datos: `lib/casa/live.ts`; refresco cada 30 s con la
+  pestaña visible por `GET /api/casa/en-vivo` (`private, no-store`).
+- **Tarjetas de partido compactas.** `components/casa/PicksBoard.tsx` ordena
+  con `lib/casa/picks-sections.ts`: **Finalizados** (desplegable cerrado, del
+  más reciente al más viejo; abierto solo si no hay nada más), **En vivo** y
+  **Próximos** por día (Hoy, Mañana, «mar 22 sep»; abiertos). Cada tarjeta:
+  hora o estado + «Ver partido»; escudos y marcador (o casillas de goles) en
+  una sola fila; nombres debajo; «Tu marcador: 2-0 · +3 pts» desde el cierre.
+  «Ver pronósticos de otros» es un desplegable cerrado con alto fijo y scroll
+  propio: al bajar trae la página siguiente sin mover la pantalla, marca la
+  fila propia «(tú)» (por los ids de cupo de quien mira, nunca user_id) y
+  muestra los puntos de cada uno cuando el partido está verificado. El modo 1X2
+  antes del inicio conserva los tres botones; después muestra los porcentajes.
+- **Partidos / Tabla / Info arriba de Tus cupos.** La tarjeta de cupos vive
+  dentro de la pestaña Partidos, encima de los partidos que controla.
+- **Premio provisional en la Tabla (133).** `casa_provisional_prizes_v2`
+  reparte en SQL el pozo vigente entre las participaciones empatadas arriba,
+  con el mismo redondeo que `casa_settle_polla_v2`; la Tabla muestra «Ganaría
+  $…» bajo cada líder y lo refresca con el sondeo de 30 s. Sin filas para
+  objetos, pollas resueltas o sin puntos.
+- **Prueba de pago a los ganadores (133).** Con la polla resuelta en dinero,
+  `/admin/pollas` muestra **Pago a ganadores**: cada premio con la cuenta
+  registrada por el ganador (método, número con botón de copiar, titular),
+  subida del pantallazo de la transferencia (comprimido en el navegador, un
+  request a `POST /api/casa/admin/payouts/[id]/proof`) y referencia opcional.
+  `casa_mark_payout_paid_v2` marca `paid_at` y guarda `proof_path` en el bucket
+  privado `payout-proofs` bajo `casa/<polla>/<premio>/`; volver a subir
+  reemplaza el archivo y conserva la fecha. La polla muestra «Prueba de pago»
+  (a ganadores y participantes, URL firmada por una hora, comprobante bajo un
+  `<details>` cerrado) con el reparto («Pozo $X · N ganadores · $Y cada uno»),
+  y «Pollas cerradas» marca «Premio pagado · comprobante en la polla». El cron
+  `cleanup-payout-proofs` solo borra archivos referenciados por `polla_payouts`
+  (P2P): estos quedan como historial. `casa_v2_write_guard` permite escribir
+  únicamente esas columnas; el importe del premio sigue inmutable.
+
+Verificación local (Docker `supabase_db_la-polla`, nunca producción):
+
+```powershell
+Get-Content -Raw -Encoding UTF8 scripts/casa-exact-score-check.sql | docker exec -i supabase_db_la-polla psql -X -U postgres -d postgres
+Get-Content -Raw -Encoding UTF8 scripts/casa-payout-proofs-check.sql | docker exec -i supabase_db_la-polla psql -X -U postgres -d postgres
+node scripts/casa-v2-local-env.mjs dev 3191
+node scripts/casa-live-payouts-browser-check.mjs
+npm.cmd test -- tests/casa-live-status.test.ts tests/casa-picks-sections.test.ts tests/casa-polla-info.test.ts tests/casa-match-picks.test.ts tests/casa-leaderboard.test.ts
+```
+
+El recorrido en navegador crea sus fixtures (`e2e-vivo-%`), sube un
+comprobante real al storage local y deja las capturas (320/390/768 y texto al
+200 %) en `Downloads/la-polla-casa-vivo-shots`. Despliegue: aplicar 132 y 133
+antes de publicar el build.
+
 ### Varias participaciones por polla (2026-09-15, migración 131)
 
 Una persona puede entrar varias veces a una polla de partidos o preguntas, por
