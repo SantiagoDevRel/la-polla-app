@@ -163,8 +163,8 @@ export function MatchPicks({ slug, matchId, scoringMode, home, away, count = nul
                       {pickText(row, scoringMode, home, away)}
                     </span>
                     {row.pointsEarned != null && (
-                      <span className={`lp-money w-9 shrink-0 text-right text-[13px] ${row.pointsEarned > 0 ? "text-turf" : "text-text-muted"}`}>
-                        {row.pointsEarned > 0 ? `+${row.pointsEarned}` : "0"}
+                      <span className={`lp-money min-w-12 shrink-0 text-right text-[13px] ${row.pointsEarned > 0 ? "text-turf" : "text-amber"}`}>
+                        {row.pointsEarned > 0 ? `+${row.pointsEarned} pts` : "0 pts"}
                       </span>
                     )}
                   </li>

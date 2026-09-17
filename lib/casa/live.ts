@@ -12,8 +12,10 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isLiveEntry, type CasaLiveMatch, type CasaScoringMode, type Pick1x2 } from "./types";
 
-/** Un partido terminado sigue arriba hasta 4 h después del saque (≈2 h tras el pitazo). */
+/** Un partido terminado (o sin datos) sigue arriba hasta 4 h después del saque. */
 const FINISHED_WINDOW_MS = 4 * 60 * 60_000;
+/** Un partido en juego se muestra aunque haya empezado hace más (suspensiones largas). */
+const LIVE_WINDOW_MS = 8 * 60 * 60_000;
 
 interface EntryRow { id: string; polla_id: string; entry_number: number | null; status: "pendiente" | "pagada" | "rechazada" | "anulada"; proof_path: string | null }
 interface PollaRow { id: string; slug: string; name: string; scoring_mode: CasaScoringMode | null; status: string }
@@ -67,10 +69,15 @@ export async function listMyLiveMatches(userId: string, now = Date.now()): Promi
     .from("matches")
     .select("id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, home_score, away_score, status, elapsed, live_status_detail, final_verified_at")
     .in("id", matchIds)
-    .in("status", ["live", "finished"])
-    .gte("scheduled_at", new Date(now - FINISHED_WINDOW_MS).toISOString());
+    .in("status", ["live", "finished", "scheduled"])
+    .gte("scheduled_at", new Date(now - LIVE_WINDOW_MS).toISOString())
+    .lte("scheduled_at", new Date(now).toISOString());
   if (matchesError) throw matchesError;
-  const matches = ((matchRows ?? []) as MatchRow[]).filter((m) => m.status === "live" || m.status === "finished");
+  // En juego: siempre. Terminados y «sin datos todavía» (programado con la hora
+  // de inicio ya pasada): solo las primeras 4 h, para no llenar la franja.
+  const recent = (m: MatchRow) => Date.parse(m.scheduled_at) >= now - FINISHED_WINDOW_MS;
+  const matches = ((matchRows ?? []) as MatchRow[]).filter((m) => m.status === "live"
+    || ((m.status === "finished" || (m.status === "scheduled" && !m.final_verified_at)) && recent(m)));
   if (matches.length === 0) return [];
 
   const entryIds = entries.map((e) => e.id);
@@ -102,16 +109,17 @@ export async function listMyLiveMatches(userId: string, now = Date.now()): Promi
         scoringMode: polla.scoring_mode ?? "1x2",
         homeTeam: match.home_team, awayTeam: match.away_team, homeFlag: match.home_team_flag, awayFlag: match.away_team_flag,
         homeScore: match.home_score, awayScore: match.away_score,
-        status: match.status === "live" ? "live" : "finished",
+        status: match.status === "live" ? "live" : match.status === "finished" ? "finished" : "waiting",
         elapsed: match.elapsed, liveStatusDetail: match.live_status_detail,
         scheduledAt: match.scheduled_at, finalVerifiedAt: match.final_verified_at,
         picks: myPicks,
       });
     }
   }
-  // En juego primero (por hora de saque), después los recién terminados.
+  // En juego primero (por hora de saque), luego los que esperan datos y al final los terminados.
+  const order = { live: 0, waiting: 1, finished: 2 } as const;
   return rows.sort((a, b) =>
-    (a.status === b.status ? 0 : a.status === "live" ? -1 : 1)
+    order[a.status] - order[b.status]
     || a.scheduledAt.localeCompare(b.scheduledAt)
     || a.pollaName.localeCompare(b.pollaName));
 }

@@ -6,6 +6,41 @@
 
 ## READ THIS FIRST
 
+### Carrusel en vivo, reparto al terminar y marcadores demorados (2026-09-17, migración 134)
+
+- **Franja «En vivo» de /casa:** carrusel horizontal (`lp-hscroll`, snap) que se
+  pliega (abierto por defecto); cada tarjeta es un enlace a
+  `/futbol/partidos/[id]`. Incluye partidos cuya hora ya pasó sin datos de la
+  fuente («Esperando datos»), nunca guiones sueltos. En la polla, la sección
+  En vivo también se pliega y esas tarjetas dicen «Esperando datos · hora».
+- **Colores de puntos:** en partidos verificados, `+N pts` en verde (turf) y
+  `0 pts` en amarillo (amber), también en «Ver pronósticos de otros».
+- **Sin letreros del proveedor:** la ficha del partido y el calendario ya no
+  muestran «API-Football · hora» ni «Última consulta»; solo avisan si no se pudo
+  actualizar. No vuelvas a mostrar el nombre del proveedor a usuarios ni admins.
+- **Reparto al terminar (134):** `casa_settlement_readiness_v2(ids)` dice, con las
+  mismas condiciones de `casa_settle_polla_v2`, si una polla de pozo ya se puede
+  repartir; `casa_provisional_payouts_v2(polla)` da el reparto por PERSONA que
+  haría hoy el reparto (verificado peso a peso contra el real). `/admin/pollas`
+  muestra el aviso «N pollas listas para repartir», la etiqueta en la polla y,
+  dentro, «Ganadores calculados» con montos y cuentas registradas; «Confirmar
+  ganadores y repartir» cierra primero las inscripciones si su hora ya pasó (una
+  llamada `cerrar` desde el cliente; la ruta `repartir` sigue haciendo UNA sola
+  llamada a SQL, lo exige `tests/casa-lifecycle.test.ts`) y luego reparte. Después
+  queda el pago uno a uno con comprobante. El reparto sigue siendo manual (no se
+  puede deshacer). El jugador ve «Todos los partidos terminaron» y la Tabla dice
+  «Se lleva $…».
+- **Issues «sin datos»:** ahora se llama «Marcador demorado» y la decisión
+  automática «Caso cerrado» (no «Resuelto»): el caso se cerró porque llegaron
+  datos, no porque el partido terminara. Las notas automáticas de la 121 se
+  muestran en claro y el estado/marcador que se ve es el ACTUAL.
+- **Atraso del proveedor (17-sep-2026):** API-Football dejó LDU–Palmeiras y
+  Atlético MG–Santos (Libertadores/Sudamericana) en «NS» horas después de
+  jugarse, confirmado consultando `/fixtures?id=`. No es la conexión: el vivo
+  corre cada minuto y la verificación reintenta 7 días (espaciada cada 15 min
+  tras 5 intentos) y los cierra sola cuando la fuente se ponga al día. Si no se
+  quiere esperar, `/admin/issues` permite poner el marcador de 90'.
+
 ### Solo marcador exacto, En vivo, tarjetas compactas y prueba de pago (2026-09-16, migraciones 132–133)
 
 Pedidos del dueño del 16 de septiembre; detalle en README → «Casa: en vivo,

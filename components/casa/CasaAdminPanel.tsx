@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, ChevronRight, Plus, RefreshCw, Ticket, Files, CheckCircle2, AlertTriangle, Settings } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, Plus, RefreshCw, Ticket, Files, CheckCircle2, AlertTriangle, Settings, Trophy } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { HeroFrame, Label, Tape } from "@/components/street";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -14,7 +14,7 @@ import { ResolverPolla } from "@/components/casa/ResolverPolla";
 import { fadeUp, staggerContainer } from "@/lib/animations";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import { editorHref } from "@/lib/casa/editor";
-import type { pollaStatusLabel, CasaPolla, CasaPot } from "@/lib/casa/types";
+import type { pollaStatusLabel, CasaPolla, CasaPot, CasaSettlementReadiness } from "@/lib/casa/types";
 
 export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "prize_kind" | "prize_object" | "draw_pending" | "settlement_outcome"> & {
   label: ReturnType<typeof pollaStatusLabel>;
@@ -22,10 +22,17 @@ export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "stat
   editable?: boolean;
 };
 
-export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
+/** Pozo en dinero de partidos o preguntas: el reparto se confirma en «Pago a ganadores». */
+function settleInline(polla: Pick<AdminPolla, "prize_kind" | "kind">) {
+  return polla.prize_kind === "pozo" && (polla.kind === "partidos" || polla.kind === "manual");
+}
+
+export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, readiness = {} }: {
   pollas: AdminPolla[];
   pots: Record<string, CasaPot>;
   totalCasa: number;
+  /** Pollas de pozo en juego o terminadas: si ya se pueden repartir (migración 134). */
+  readiness?: Record<string, CasaSettlementReadiness>;
   /** Casos de partidos sin decidir; `null` si no se pudo leer el conteo. */
   openIssues?: number | null;
 }) {
@@ -65,6 +72,12 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
   }, [revision]);
 
   const totalPendientes = counts ? Object.values(counts).reduce((total, count) => total + count, 0) : null;
+  // (2026-09-17) Pollas con todos los partidos verificados y nada pendiente: toca repartir y pagar.
+  const listas = pollas.filter((polla) => readiness[polla.id]?.ready);
+  function abrirPolla(id: string) {
+    setOpenId(id);
+    requestAnimationFrame(() => document.getElementById(`polla-toggle-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
 
   return (
     <div className="pb-28">
@@ -101,6 +114,17 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
         </nav>
         <p className="mb-5 text-[13px] leading-relaxed text-text-secondary">Revisa todos los recibos pendientes o abre una polla para ver solo los suyos. Los pagos aprobados quedan en su historial.</p>
         {error && <div role="alert" className="mb-4 rounded-md border border-red-alert/30 p-3 text-[13px] text-red-alert">No se pudieron actualizar los conteos. Puedes abrir una polla para revisar sus pagos o intentar actualizar otra vez.</div>}
+        {listas.length > 0 && (
+          <button type="button" onClick={() => abrirPolla(listas[0].id)}
+            className="mb-3 flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-md border border-turf/50 bg-turf/10 px-4 py-3 text-left transition-colors duration-200 hover:bg-turf/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold">
+            <Trophy className="h-5 w-5 shrink-0 text-turf" aria-hidden="true" />
+            <span className="min-w-0 grow">
+              <span className="block text-[15px] font-semibold leading-[1.45] text-text-primary">{listas.length === 1 ? "1 polla lista para repartir" : `${listas.length} pollas listas para repartir`}</span>
+              <span className="block text-[13px] leading-[1.5] text-text-secondary [overflow-wrap:anywhere]">Todos sus resultados están verificados. Revisa los ganadores, confirma y paga: {listas.map((polla) => polla.name).join(", ")}</span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-text-secondary" aria-hidden="true" />
+          </button>
+        )}
         <Link href="/admin/issues"
           className={`mb-5 flex min-h-14 items-center gap-3 rounded-md border px-4 py-3 transition-colors duration-200 hover:bg-bg-elevated/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold ${openIssues !== null && openIssues > 0 ? "border-amber/60 bg-amber/10" : "border-border-default"}`}>
           <AlertTriangle className={`h-5 w-5 shrink-0 ${openIssues !== null && openIssues > 0 ? "text-amber" : "text-text-secondary"}`} aria-hidden="true" />
@@ -147,6 +171,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
                       </span>
                       <span className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                         <Tape tone={status.tone === "cal" ? "mute" : status.tone}>{status.text}</Tape>
+                        {readiness[polla.id]?.ready && <Tape tone="live">Lista para repartir</Tape>}
                         <span className="text-[12px] text-text-secondary">{pot?.paid_entries ?? 0} inscritos</span>
                         {polla.status === "abierta" && <span className="text-[12px] text-text-secondary">Cierra en {timeLeft(polla.closes_at)}</span>}
                       </span>
@@ -157,8 +182,8 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
                       <div className="border-t border-border-default p-4">
                         {/* (2026-09-16) Con la polla resuelta, lo primero es pagar
                             a los ganadores y dejar la prueba de pago. */}
-                        {polla.status === "resuelta" && polla.prize_kind === "pozo" && polla.settlement_outcome === "money_awarded" && (
-                          <PagosGanadores pollaId={polla.id} />
+                        {settleInline(polla) && (polla.status === "resuelta" || readiness[polla.id]?.inscriptionsClosed) && (
+                          <PagosGanadores pollaId={polla.id} pollaName={polla.name} kind={polla.kind === "manual" ? "manual" : "partidos"} />
                         )}
                         <ColaDePagos key={polla.id} pollaId={polla.id} refreshKey={revision} onReviewed={() => setRevision((value) => value + 1)} />
                         <Link href={`/admin/pollas/pagos?pollaId=${polla.id}`} className="lp-btn lp-btn-ghost mt-4 w-full !text-[15px]">Ver pagos aprobados</Link>
@@ -179,7 +204,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
                                 <ResolverPolla id={polla.id} kind={polla.kind} />
                               )}
                             {polla.prize_kind === "objeto" && (polla.draw_pending || polla.status === "resuelta") && <PremioObjeto slug={polla.slug} />}
-                            <AccionesPolla id={polla.id} status={polla.status} nombre={polla.name} prizeKind={polla.prize_kind} drawPending={polla.draw_pending} opensAt={polla.opens_at} />
+                            <AccionesPolla id={polla.id} status={polla.status} nombre={polla.name} prizeKind={polla.prize_kind} drawPending={polla.draw_pending} opensAt={polla.opens_at} settleInline={settleInline(polla)} />
                           </div>
                         </div>
                       </div>

@@ -201,6 +201,32 @@ export interface CasaPayout {
   avatar_url: string | null;
 }
 
+/**
+ * ¿La polla ya se puede repartir? (migración 134). Mismas condiciones que
+ * casa_settle_polla_v2: todos los partidos (o preguntas) cerrados, sin casos
+ * abiertos, sin comprobantes por revisar, con inscripciones pagadas y cerrada.
+ */
+export interface CasaSettlementReadiness {
+  pollaId: string;
+  totalItems: number;
+  doneItems: number;
+  openIssues: number;
+  pendingProofs: number;
+  paidEntries: number;
+  inscriptionsClosed: boolean;
+  ready: boolean;
+}
+
+/** Reparto por persona que haría hoy casa_settle_polla_v2 (migración 134). */
+export interface CasaProvisionalPayout {
+  user_id: string;
+  amount_cop: number;
+  winning_entries: number;
+}
+
+/** En qué punto está el pago de una polla, visto desde el panel. */
+export type AdminPayoutStage = "en_curso" | "lista" | "repartida" | "sin_ganador" | "no_aplica";
+
 /** Un premio en dinero visto desde el panel del administrador: a quién, cuánto, a qué cuenta y si ya se pagó. */
 export interface AdminPayoutRow {
   id: string;
@@ -252,7 +278,8 @@ export interface CasaLiveMatch {
   awayFlag: string | null;
   homeScore: number | null;
   awayScore: number | null;
-  status: "live" | "finished";
+  /** waiting = ya pasó la hora de inicio y todavía no llegan datos del partido. */
+  status: "live" | "finished" | "waiting";
   elapsed: number | null;
   liveStatusDetail: string | null;
   scheduledAt: string;

@@ -236,6 +236,23 @@ comprobante. No existe «un pago de $100.000 por cinco cupos».
   `scripts/casa-payout-proofs-check.sql` (ROLLBACK) y
   `scripts/casa-live-payouts-browser-check.mjs` (navegador, con dev server local).
 
+## Listas para repartir (2026-09-17, migración 134)
+
+- `casa_settlement_readiness_v2(ids)` (solo lectura): por polla de pozo en
+  dinero de partidos o preguntas, `total_items`/`done_items` (partidos no anulados
+  verificados o preguntas resueltas), `open_issues`, `pending_proofs` (mismo
+  criterio que `PENDING_PROOFS`, incluidas cargas en curso), `paid_entries`,
+  `inscriptions_closed` (cerrada o `closes_at` vencido) y `ready`. Excluye rifas,
+  objetos, desempates, resueltas y archivadas. El barrido de casos
+  (`casa_sweep_match_issues`) no corre acá porque escribe; lo hace el reparto.
+- `casa_provisional_payouts_v2(polla)`: lo que haría el reparto por persona
+  (suma de sus participaciones ganadoras) con el redondeo de la 131/133.
+- El panel confirma el reparto: si la polla sigue `abierta` con el cierre
+  vencido, el cliente llama primero `cerrar` (si otro admin ya la cerró, SQL
+  responde `INVALID_TRANSITION` y se sigue) y luego `repartir`. La ruta
+  `repartir` hace una sola llamada a SQL. Regresión:
+  `scripts/casa-settlement-readiness-check.sql`.
+
 ## Ajustes de la migración 107
 
 Corrige hallazgos de revisión sobre 104 y 106. No cambia filas existentes,

@@ -1129,6 +1129,40 @@ revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
 [docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
 de 096 arriba no es el contrato de liquidación una vez activado v2.
 
+### Casa: carrusel en vivo, reparto al terminar y marcadores demorados (2026-09-17, migración 134)
+
+- **En vivo en /casa como carrusel.** Los partidos de mis pollas se deslizan de
+  lado bajo el título «En vivo» (la sección se pliega; empieza abierta). Cada
+  tarjeta abre la ficha del partido (`/futbol/partidos/[id]`). Un partido cuya
+  hora ya pasó y del que la fuente no reporta nada aparece como «Esperando
+  datos». En la polla, «En vivo» también se pliega.
+- **Puntos legibles.** En partidos verificados, `+3 pts` en verde y `0 pts` en
+  amarillo, en la tarjeta y en «Ver pronósticos de otros».
+- **Sin letreros del proveedor.** La ficha del partido y el calendario dejaron de
+  mostrar «API-Football · hora» y «Última consulta»; solo avisan si no se pudo
+  actualizar.
+- **Del último partido al pago.** Cuando la última verificación llega (y no hay
+  casos abiertos ni comprobantes de inscripción por revisar),
+  `casa_settlement_readiness_v2` marca la polla como lista. `/admin/pollas`
+  avisa «N pollas listas para repartir» y la polla muestra «Ganadores
+  calculados»: montos por persona (`casa_provisional_payouts_v2`, el mismo
+  cálculo y redondeo del reparto real) y la cuenta de pago de cada ganador con
+  botón de copiar. «Confirmar ganadores y repartir» cierra las inscripciones si
+  su hora ya pasó y registra el reparto; enseguida aparece el pago uno a uno con
+  el pantallazo de cada transferencia (prueba de pago de la polla). Mientras
+  tanto, el jugador ve «Todos los partidos terminaron» y la Tabla dice «Se lleva
+  $…». Regresión local: `scripts/casa-settlement-readiness-check.sql`.
+- **Issues más claros.** «Sin datos del proveedor» pasó a «Marcador demorado»; un
+  caso cerrado solo dice «Caso cerrado» con el motivo en claro («ya llegaron el
+  marcador y el minuto del partido»), y el estado y marcador que se muestran son
+  los actuales.
+- **Qué pasa si la fuente se atrasa.** El vivo consulta cada minuto el feed del
+  día y la verificación reintenta durante 7 días (espaciada cada 15 minutos tras
+  5 intentos): cuando API-Football publique el resultado, el partido se cierra y
+  puntúa solo. El 17-sep-2026 LDU–Palmeiras y Atlético MG–Santos quedaron en
+  «no iniciado» en la fuente horas después de jugarse (comprobado por ID); para
+  no esperar, `/admin/issues` permite poner el marcador de los 90 minutos.
+
 ### Casa: en vivo, tarjetas compactas y prueba de pago (2026-09-16, migraciones 132–133)
 
 Pedidos del dueño del 16 de septiembre de 2026. Nada de esto toca pollas

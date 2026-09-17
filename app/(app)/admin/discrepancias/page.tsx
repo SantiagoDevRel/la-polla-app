@@ -308,7 +308,7 @@ export default function AdminDiscrepanciasPage() {
                       </p>
                     </div>
                     <div className="rounded-xl p-3 bg-bg-elevated border border-border-subtle">
-                      <p className="text-[10px] uppercase tracking-wide text-text-muted">API-Football · 90&apos;</p>
+                      <p className="text-[10px] uppercase tracking-wide text-text-muted">Resultado recibido · 90&apos;</p>
                       <p className="font-display text-[28px] text-text-primary tabular-nums" style={{ fontFeatureSettings: '"tnum"' }}>
                         {af.h ?? "—"} - {af.a ?? "—"}
                       </p>
@@ -328,7 +328,7 @@ export default function AdminDiscrepanciasPage() {
                         type="button"
                         onClick={() => {
                           if (!afFinal) {
-                            showToast("API-Football no tiene un resultado final guardado", "error");
+                            showToast("Todavía no llega un resultado final de este partido", "error");
                             return;
                           }
                           resolve(m, "api-football");
@@ -343,7 +343,7 @@ export default function AdminDiscrepanciasPage() {
 
                   {matches ? (
                     <p className="text-[11px] text-turf">
-                      La base y API-Football coinciden ahora.
+                      La base y el resultado recibido coinciden ahora.
                     </p>
                   ) : null}
 

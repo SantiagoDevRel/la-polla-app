@@ -25,7 +25,7 @@ type Accion = "publicar" | "cerrar" | "repartir";
 export function AccionesPolla({
   id,
   status,
-  nombre, prizeKind = "pozo", drawPending = false, opensAt,
+  nombre, prizeKind = "pozo", drawPending = false, opensAt, settleInline = false,
 }: {
   id: string;
   status: CasaPollaStatus;
@@ -33,6 +33,8 @@ export function AccionesPolla({
   prizeKind?: "pozo" | "objeto";
   drawPending?: boolean;
   opensAt?: string;
+  /** El reparto se confirma en «Pago a ganadores» (pozo de partidos o preguntas). */
+  settleInline?: boolean;
 }) {
   const router = useRouter();
   const [enviando, setEnviando] = useState<Accion | null>(null);
@@ -83,7 +85,7 @@ export function AccionesPolla({
         </button>
       )}
 
-      {status === "cerrada" && !drawPending &&
+      {status === "cerrada" && !drawPending && !settleInline &&
         (confirmando ? (
           <div className="border border-red-alert/40 bg-red-alert/10 p-3">
             <p className="text-[13px] leading-relaxed text-text-primary">

@@ -18,7 +18,7 @@
 // Bajo cada opción 1X2 va la barra con el porcentaje de la gente que eligió
 // eso; en marcador, «cuántos pusieron 2-1» vive dentro del desplegable.
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Clock3, Lock } from "lucide-react";
@@ -184,6 +184,9 @@ export function PicksBoard({
   const sections = useMemo(() => partitionCasaMatches(matches, now), [matches, now]);
   // Con todo terminado (polla resuelta) no tiene sentido esconder la única lista.
   const [finishedOpen, setFinishedOpen] = useState(() => sections.live.length + sections.upcoming.length === 0);
+  // (2026-09-17) «En vivo» también se pliega; empieza abierta.
+  const [liveOpen, setLiveOpen] = useState(true);
+  const baseId = useId();
   const [closedDays, setClosedDays] = useState<Set<string>>(() => new Set());
   const upcomingOrder = useMemo(() => sections.upcoming.flatMap((group) => group.matches), [sections]);
 
@@ -306,6 +309,7 @@ export function PicksBoard({
             type="button"
             onClick={() => setFinishedOpen((value) => !value)}
             aria-expanded={finishedOpen}
+            aria-controls={`${baseId}-finalizados`}
             className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 px-1 text-left"
           >
             <span className="lp-label flex items-center gap-2 !text-[12px] text-text-secondary">
@@ -314,18 +318,27 @@ export function PicksBoard({
             </span>
             <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 ${finishedOpen ? "rotate-180" : ""}`} />
           </button>
-          {finishedOpen && <div className="mt-1 space-y-2">{sections.finished.map((m) => renderCard(m, true))}</div>}
+          {finishedOpen && <div id={`${baseId}-finalizados`} className="mt-1 space-y-2">{sections.finished.map((m) => renderCard(m, true))}</div>}
         </section>
       )}
 
-      {/* ── En vivo — se mira, no se edita ────────────────────────────── */}
+      {/* ── En vivo — se mira, no se edita. Abierto por defecto, se pliega. ── */}
       {sections.live.length > 0 && (
         <section>
-          <h3 className="lp-label flex min-h-11 items-center gap-2 px-1 !text-[12px] text-text-secondary">
-            <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert motion-safe:animate-pulse" />
-            En vivo · {sections.live.length}
-          </h3>
-          <div className="mt-1 space-y-2">{sections.live.map((m) => renderCard(m, true))}</div>
+          <button
+            type="button"
+            onClick={() => setLiveOpen((value) => !value)}
+            aria-expanded={liveOpen}
+            aria-controls={`${baseId}-envivo`}
+            className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 px-1 text-left"
+          >
+            <span className="lp-label flex items-center gap-2 !text-[12px] text-text-secondary">
+              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert motion-safe:animate-pulse" />
+              En vivo · {sections.live.length}
+            </span>
+            <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 ${liveOpen ? "rotate-180" : ""}`} />
+          </button>
+          {liveOpen && <div id={`${baseId}-envivo`} className="mt-1 space-y-2">{sections.live.map((m) => renderCard(m, true))}</div>}
         </section>
       )}
 
@@ -344,6 +357,7 @@ export function PicksBoard({
                   type="button"
                   onClick={() => toggleDay(group.key)}
                   aria-expanded={open}
+                  aria-controls={`${baseId}-dia-${group.key}`}
                   className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 px-1 text-left"
                 >
                   <span className="text-[13px] font-semibold text-text-primary">
@@ -352,7 +366,7 @@ export function PicksBoard({
                   </span>
                   <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
                 </button>
-                {open && <div className="mt-1 space-y-2">{group.matches.map((m) => renderCard(m, false))}</div>}
+                {open && <div id={`${baseId}-dia-${group.key}`} className="mt-1 space-y-2">{group.matches.map((m) => renderCard(m, false))}</div>}
               </div>
             );
           })}
@@ -445,6 +459,8 @@ function MatchCard({
       : `${marcadorDist.conteo?.[clave]} de ${marcadorDist.total} pusieron ${clave} (${Math.round(((marcadorDist.conteo?.[clave] ?? 0) / marcadorDist.total) * 100)}%).`
     : null;
   const minute = live ? liveMinuteLabel(m) : "";
+  // Pasó la hora de inicio y la fuente todavía no reporta el partido: se dice, no se muestran guiones sueltos.
+  const waiting = !started && !finished && !voided && Date.parse(m.scheduled_at) <= now;
   const showButtons1x2 = scoringMode === "1x2" && !started && !finished;
 
   const estado = voided ? (
@@ -456,6 +472,8 @@ function MatchCard({
     </span>
   ) : finished ? (
     <span className="text-text-muted">Final{!scored ? " · verificando" : ""}{showDay ? ` · ${dayLabel(m.scheduled_at, now)}` : ""}</span>
+  ) : waiting ? (
+    <span className="text-amber">Esperando datos · {horaDe(m)}</span>
   ) : (
     <span className="text-text-muted">{showDay ? `${dayLabel(m.scheduled_at, now)} · ${horaDe(m)}` : horaDe(m)}</span>
   );
@@ -474,7 +492,7 @@ function MatchCard({
           {editable && !tengoPick && (
             <span className="rounded-md border border-red-alert/40 bg-red-alert/15 px-1.5 py-0.5 text-[10px] text-red-alert">Falta</span>
           )}
-          {cerrado && !started && !finished && !voided && <span className="text-red-alert">Cerrado</span>}
+          {cerrado && !started && !finished && !voided && !waiting && <span className="text-red-alert">Cerrado</span>}
         </span>
         <Link href={`/futbol/partidos/${m.id}`} className="flex min-h-8 shrink-0 items-center gap-0.5 text-[12px] font-semibold text-text-secondary transition-colors hover:text-text-primary">
           Ver partido <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
@@ -595,7 +613,8 @@ function MatchCard({
             {label ?? "sin pronóstico"}
           </span>
           {points != null && tengoPick && (
-            <span className={`lp-money text-[15px] ${points > 0 ? "text-turf" : "text-text-muted"}`}>
+            // (2026-09-17) Los aciertos en verde y los 0 pts en amarillo, fáciles de leer.
+            <span className={`lp-money text-[15px] ${points > 0 ? "text-turf" : "text-amber"}`}>
               {points > 0 ? `+${points}` : "0"} pts
             </span>
           )}

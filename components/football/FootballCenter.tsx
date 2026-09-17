@@ -104,9 +104,7 @@ export default function FootballCenter({teams}:{teams:readonly CatalogTeam[]}) {
      {group.map(m=><FootballMatchCard key={m.id} match={m}/>)}
     </section>;
    })}
-  {data&&<p className={`text-center text-[13px] leading-relaxed ${error||data.stale?'text-amber':'text-text-muted'}`}>
-   {error?(en?'Unable to refresh. ':'No pudimos actualizar. '):''}
-   {en?'Last checked':'Última consulta'}: {new Intl.DateTimeFormat(en?'en-US':'es-CO',{hour:'numeric',minute:'2-digit',timeZone:'America/Bogota'}).format(new Date(data.fetchedAt))} · {en?'Colombia time':'Hora de Colombia'}
-  </p>}
+  {/* (2026-09-17) Sin letrero de hora de consulta: solo avisamos si no se pudo actualizar. */}
+  {data&&(error||data.stale)&&<p className="text-center text-[13px] leading-relaxed text-amber">{error?(en?'Unable to refresh. Showing the last available information.':'No pudimos actualizar. Mostramos la última información disponible.'):(en?'Waiting for an update.':'Esperando una actualización.')}</p>}
  </main>;
 }

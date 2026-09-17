@@ -72,7 +72,7 @@ export function buildMatchIssueEmail(claim: MatchIssueNotificationClaim): { subj
   lines.push(`Tipo: ${label}`);
   if (summary !== label) lines.push(`Qué pasó: ${summary}`);
   if (claim.kind === "sin_datos") {
-    lines.push("Qué pasó: pasó la hora de inicio y el proveedor no ha enviado datos de este partido.");
+    lines.push("Qué pasó: pasaron 30 minutos desde la hora de inicio y todavía no llegan el marcador ni el minuto de este partido.");
   }
   lines.push(`Inicio: ${claim.scheduled_at ? formatIssueKickoff(claim.scheduled_at, claim.scheduled_at_confirmed) : "sin fecha registrada"}`);
   lines.push(`Detectado: ${formatColombiaDateTime(claim.first_seen_at, DETECTED_OPTIONS)} (hora de Colombia)`);

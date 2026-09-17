@@ -119,9 +119,7 @@ export default function FootballMatchDetail({id,initialLineup=false,initialSide=
    </>}
   </section>}
   </div>
-  <p className={`text-center text-[13px] leading-relaxed ${error||data.stale?'text-amber':'text-text-muted'}`}>
-   {error||data.stale?(en?'Waiting for an update. ':'Esperando una actualización. '):''}
-   API-Football · {new Intl.DateTimeFormat(en?'en-US':'es-CO',{hour:'numeric',minute:'2-digit',timeZone:'America/Bogota'}).format(new Date(data.fetchedAt))}
-  </p>
+  {/* (2026-09-17) Sin letrero de proveedor ni hora de consulta: solo avisamos si falta actualizar. */}
+  {(error||data.stale)&&<p className="text-center text-[13px] leading-relaxed text-amber">{en?'Waiting for an update.':'Esperando una actualización.'}</p>}
  </main>;
 }

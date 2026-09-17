@@ -18,13 +18,15 @@ interface Props {
    * Sale de SQL con el redondeo del reparto real; vacío cuando no aplica.
    */
   initialPrizes?: CasaProvisionalPrize[];
+  /** Todos los partidos tienen resultado verificado y falta confirmar el reparto. */
+  finished?: boolean;
   entryStatus: CasaEntryStatus | null;
   pollaStatus: CasaPollaStatus;
   drawPending?: boolean;
   userId: string;
 }
 
-export function PollaTabs({ slug, firstLabel, children, info, initialRows, initialPrizes = [], entryStatus, pollaStatus, userId, drawPending = false }: Props) {
+export function PollaTabs({ slug, firstLabel, children, info, initialRows, initialPrizes = [], finished = false, entryStatus, pollaStatus, userId, drawPending = false }: Props) {
   const [tab, setTab] = useState(0);
   const [rows, setRows] = useState(initialRows);
   const [prizes, setPrizes] = useState(initialPrizes);
@@ -127,7 +129,9 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
             <>
               {" "}
               <span className="text-text-primary">
-                Si la polla terminara ahora, el pozo se reparte entre {prizes.length === 1 ? "quien va de primero" : `los ${prizes.length} que van de primeros`}: lo que ganaría cada uno va debajo de su nombre.
+                {finished
+                  ? <>La polla terminó: el pozo es para {prizes.length === 1 ? "quien quedó de primero" : `los ${prizes.length} que quedaron de primeros`} (lo que se lleva cada uno va debajo de su nombre). Falta que la casa confirme el reparto y el pago.</>
+                  : <>Si la polla terminara ahora, el pozo se reparte entre {prizes.length === 1 ? "quien va de primero" : `los ${prizes.length} que van de primeros`}: lo que ganaría cada uno va debajo de su nombre.</>}
               </span>
             </>
           )}
@@ -160,7 +164,7 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
                         {/* Premio provisional (migración 133): oro porque es señal de premio, no adorno. */}
                         {prizeByEntry.has(row.entry_id) && (
                           <span className="mt-0.5 block text-xs font-semibold text-gold">
-                            Ganaría <span className="lp-money text-[14px]">{formatCop(prizeByEntry.get(row.entry_id)!)}</span>
+                            {finished ? "Se lleva" : "Ganaría"} <span className="lp-money text-[14px]">{formatCop(prizeByEntry.get(row.entry_id)!)}</span>
                           </span>
                         )}
                       </span>
