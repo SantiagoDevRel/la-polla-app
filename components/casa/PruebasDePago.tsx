@@ -31,7 +31,9 @@ export function PruebasDePago({
 }) {
   const money = payouts.filter((p) => (p.prize_kind ?? "pozo") === "pozo");
   if (money.length === 0) return null;
-  const pagados = money.filter((p) => p.paid_at && p.id && proofUrls[p.id]).length;
+  // El hecho (pagado y cuándo) lo ve todo el mundo; la imagen solo llega en
+  // `proofUrls` para administradores, ganadores y participantes de la polla.
+  const pagados = money.filter((p) => p.paid_at).length;
 
   return (
     <section aria-labelledby="pruebas-pago-titulo" className="mt-3 border-t border-border-subtle pt-3">

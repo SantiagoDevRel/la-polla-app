@@ -258,6 +258,15 @@ try {
   await page.goto(`${origin}/casa`, { waitUntil: "networkidle" });
   ok("/casa: la polla cerrada refleja el pago en curso", (await page.locator("#pollas-cerradas").evaluate((el) => el.textContent ?? "")).includes("Pago del premio en curso · 1 de 2"));
 
+  // ── 7. Alguien que no participó ve el hecho, no el pantallazo ───────────
+  const otro = await createLocalBrowserActor(browser, { name: "Otro E2E", origin });
+  await otro.page.goto(`${origin}/casa/e2e-vivo-resuelta`, { waitUntil: "networkidle" });
+  await otro.page.getByRole("heading", { name: "Prueba de pago" }).waitFor({ timeout: 20_000 });
+  const otroText = await otro.page.locator("body").innerText();
+  ok("otro: ve Pagado · fecha y el avance", /Pagado · \d+ \w+ 2026/.test(otroText) && otroText.includes("1 de 2 pagados"));
+  ok("otro: no recibe la imagen del comprobante", !otroText.includes("Ver comprobante de pago") && (await otro.page.locator("img[alt^='Comprobante del pago a']").count()) === 0);
+  await otro.context.close();
+
   await jugador.context.close();
   await admin.context.close();
 } finally {

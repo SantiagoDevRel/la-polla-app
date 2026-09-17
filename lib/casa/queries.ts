@@ -408,18 +408,22 @@ export async function getProvisionalPrizes(pollaId: string): Promise<CasaProvisi
 export async function getPayoutProgress(pollaIds: string[]): Promise<Record<string, { total: number; paid: number }>> {
   const out: Record<string, { total: number; paid: number }> = {};
   const ids = [...new Set(pollaIds)];
-  for (let start = 0; start < ids.length; start += 200) {
+  // Lotes de 50 pollas: con el tope de 1000 filas de PostgREST quedan 20 premios
+  // por polla de margen, muy por encima de cualquier empate real.
+  for (let start = 0; start < ids.length; start += 50) {
     const { data, error } = await createAdminClient()
       .from("casa_payouts")
       .select("polla_id, paid_at, proof_path")
-      .in("polla_id", ids.slice(start, start + 200))
+      .in("polla_id", ids.slice(start, start + 50))
       .eq("prize_kind", "pozo")
       .limit(1000);
     if (error) throw error;
     for (const row of (data ?? []) as Array<{ polla_id: string; paid_at: string | null; proof_path: string | null }>) {
       const item = out[row.polla_id] ?? (out[row.polla_id] = { total: 0, paid: 0 });
       item.total += 1;
-      if (row.paid_at && row.proof_path) item.paid += 1;
+      // Mismo criterio que el detalle de la polla: pagado = paid_at (el RPC
+      // siempre escribe paid_at y proof_path juntos).
+      if (row.paid_at) item.paid += 1;
     }
   }
   return out;

@@ -49,70 +49,21 @@ COMMENT ON COLUMN public.casa_payouts.proof_path IS
   'Pantallazo de la transferencia al ganador, en el bucket privado payout-proofs (casa/<polla>/<payout>/…). Lo ven el ganador y los participantes como prueba de pago.';
 
 -- ── 2. Guard: las columnas del pago también se pueden escribir ──────────────
--- Idéntica a la 100 salvo la lista de columnas mutables de casa_payouts.
-CREATE OR REPLACE FUNCTION public.casa_v2_write_guard() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
-DECLARE m text; p_id uuid; p public.casa_pollas;
+-- Se parchea SOLO la rama de casa_payouts sobre la definición VIGENTE (igual que
+-- hizo la 105 con la rama de casa_entries): así no se pisa ningún cambio
+-- posterior a la 100. Si el fragmento esperado no está, la migración se detiene.
+DO $$ DECLARE definition text; needle text; replacement text;
 BEGIN
-  SELECT mode INTO m FROM public.casa_operation_control WHERE singleton FOR SHARE;
-  IF m='legacy' THEN RETURN NEW; END IF;
-  IF m='paused' THEN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='OPERATIONS_PAUSED'; END IF;
-  IF current_setting('app.casa_contract',true) IS DISTINCT FROM '2' THEN
-    RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='UPDATE_REQUIRED';
-  END IF;
-  IF TG_TABLE_NAME='casa_pollas' THEN
-    IF TG_OP='UPDATE' THEN
-      IF OLD.status IN ('resuelta','anulada') AND (
-        (to_jsonb(NEW)-ARRAY['archived_at','archived_by','updated_at']) IS DISTINCT FROM
-        (to_jsonb(OLD)-ARRAY['archived_at','archived_by','updated_at'])
-      ) THEN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='POLLA_FINAL'; END IF;
-      IF EXISTS(SELECT 1 FROM public.casa_object_draws WHERE polla_id=OLD.id AND state='pending') THEN
-        RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='DRAW_PENDING';
-      END IF;
-    END IF;
-    RETURN NEW;
-  ELSIF TG_TABLE_NAME='casa_entries' THEN p_id:=NEW.polla_id;
-  ELSIF TG_TABLE_NAME='casa_questions' THEN p_id:=NEW.polla_id;
-  ELSIF TG_TABLE_NAME='casa_polla_matches' THEN p_id:=NEW.polla_id;
-  ELSIF TG_TABLE_NAME='casa_options' THEN
-    SELECT polla_id INTO p_id FROM public.casa_questions WHERE id=NEW.question_id;
-  ELSIF TG_TABLE_NAME='casa_payouts' THEN
-    IF TG_OP='UPDATE' THEN
-      -- Migración 133: el pago (paid_at + comprobante) y la entrega del objeto
+  SELECT pg_get_functiondef('public.casa_v2_write_guard()'::regprocedure) INTO definition;
+  definition:=replace(definition,chr(13),'');
+  needle := $needle$IF (to_jsonb(NEW)-ARRAY['paid_at','delivered_at','delivered_by','delivery_reference']) IS DISTINCT FROM
+        (to_jsonb(OLD)-ARRAY['paid_at','delivered_at','delivered_by','delivery_reference']) THEN$needle$;
+  replacement := $replacement$-- Migración 133: el pago (paid_at + comprobante) y la entrega del objeto
       -- son lo único que cambia después de repartir; el premio es inmutable.
       IF (to_jsonb(NEW)-ARRAY['paid_at','delivered_at','delivered_by','delivery_reference','proof_path','proof_uploaded_at','paid_by','paid_reference']) IS DISTINCT FROM
-        (to_jsonb(OLD)-ARRAY['paid_at','delivered_at','delivered_by','delivery_reference','proof_path','proof_uploaded_at','paid_by','paid_reference']) THEN
-        RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='AWARD_IMMUTABLE';
-      END IF;
-      IF OLD.delivered_at IS NOT NULL AND NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='DELIVERY_RECORDED';
-      END IF;
-    END IF;
-    RETURN NEW;
-  ELSE RETURN NEW;
-  END IF;
-  -- New RPCs hold parent before child. A legacy/direct child writer must fail
-  -- rather than deadlock against the parent->child order used by settlement.
-  SELECT * INTO p FROM public.casa_pollas WHERE id=p_id FOR UPDATE NOWAIT;
-  IF NOT FOUND OR p.archived_at IS NOT NULL OR p.status IN ('resuelta','anulada') THEN
-    RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='POLLA_FINAL';
-  END IF;
-  IF EXISTS(SELECT 1 FROM public.casa_object_draws WHERE polla_id=p_id) THEN
-    RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='DRAW_PENDING';
-  END IF;
-  IF TG_TABLE_NAME='casa_entries' THEN
-    IF NEW.current_proof_attempt_id IS NOT NULL AND NOT EXISTS(
-      SELECT 1 FROM public.casa_entry_proof_attempts a
-      WHERE a.id=NEW.current_proof_attempt_id AND a.entry_id=NEW.id AND a.user_id=NEW.user_id
-        AND (NEW.proof_path IS NULL OR (a.state='confirmed' AND a.proof_path=NEW.proof_path))
-    ) THEN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='PROOF_ATTEMPT_MISMATCH'; END IF;
-    IF TG_OP='UPDATE' THEN
-      IF OLD.status='pagada' AND NEW IS DISTINCT FROM OLD THEN
-        RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ALREADY_PAID';
-      END IF;
-    END IF;
-  END IF;
-  RETURN NEW;
+        (to_jsonb(OLD)-ARRAY['paid_at','delivered_at','delivered_by','delivery_reference','proof_path','proof_uploaded_at','paid_by','paid_reference']) THEN$replacement$;
+  IF position(needle IN definition)=0 THEN RAISE EXCEPTION 'Payout guard differs; inspect before applying 133'; END IF;
+  EXECUTE replace(definition,needle,replacement);
 END $$;
 
 -- ── 3. Registrar el pago de un premio con su comprobante ────────────────────

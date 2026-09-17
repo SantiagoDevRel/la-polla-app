@@ -39,10 +39,13 @@ tarjetas compactas y prueba de pago» y [docs/casa-admin-rules.md](docs/casa-adm
   registra el pago con el pantallazo (bucket privado `payout-proofs`, prefijo
   `casa/<polla>/<premio>/`, que el cron de limpieza P2P no toca). El admin paga
   uno a uno desde `/admin/pollas` (`PagosGanadores`, con la cuenta del ganador y
-  botón de copiar); el ganador y los participantes ven el comprobante en la polla
-  (`PruebasDePago`, URL firmada 1 h, `<details>` cerrado) y «Pollas cerradas»
-  marca «Premio pagado». `casa_v2_write_guard` admite solo esas columnas nuevas:
-  el premio sigue inmutable. Regresión: `scripts/casa-exact-score-check.sql`,
+  botón de copiar). En la polla, `PruebasDePago` muestra «Pagado · fecha» a
+  cualquier sesión, pero la imagen (URL firmada 1 h, `<details>` cerrado) solo se
+  firma para admin, ganadores y participantes de esa polla: el pantallazo puede
+  traer la cuenta del ganador. «Pollas cerradas» marca «Premio pagado». La 133
+  parchea `casa_v2_write_guard` con needle/replacement sobre la definición VIVA
+  (como la 105): nunca redefinas ese guard entero, prod ya no es la 100. El
+  premio sigue inmutable. Regresión: `scripts/casa-exact-score-check.sql`,
   `scripts/casa-payout-proofs-check.sql`, `scripts/casa-live-payouts-browser-check.mjs`.
 
 ### Pronosticar y compartir (2026-09-14)

@@ -115,9 +115,6 @@ export default async function PollaPage({
       // 133). Si la lectura falla, la tabla sale sin esa línea.
       polla.kind === "rifa" ? Promise.resolve([]) : getProvisionalPrizes(polla.id).catch(() => []),
     ]);
-  // Prueba de pago (migración 133): URL firmadas por una hora, solo con sesión.
-  const proofUrls = payouts.length > 0 ? await signPayoutProofs(payouts) : {};
-
   const abierta = isPollaOpen(polla);
   // ── Qué participación se está viendo ─────────────────────────────────────
   // ?p=N si es suya; si no, la primera viva (pagada o en revisión); si no, la última.
@@ -151,6 +148,12 @@ export default async function PollaPage({
   const inscrito = isLiveEntry(entry);
   // Cualquier participación viva deja ver los pronósticos de los demás.
   const participa = polla.kind === "rifa" ? isLiveEntry(bestEntry) : entries.some(isLiveEntry);
+  // Prueba de pago (migración 133): el pantallazo de la transferencia puede
+  // traer el número de cuenta del ganador, así que la imagen se firma (1 h)
+  // solo para administradores, ganadores y quienes participaron en la polla.
+  // El resto ve igual el hecho: «Pagado · fecha».
+  const puedeVerComprobantes = isAdmin || participa || payouts.some((p) => p.user_id === user.id);
+  const proofUrls = puedeVerComprobantes && payouts.length > 0 ? await signPayoutProofs(payouts) : {};
   const pagoPendiente = entry?.status === "pendiente" && Boolean(entry.proof_path);
   // Con la tarjeta "Tus cupos" el estado del cupo vive ahí; no se repite en cuadros aparte.
   const showCupos = polla.kind !== "rifa" && entries.length > 0 && (participa || entries.length > 1);
@@ -562,9 +565,11 @@ function ResultadoPolla({
   const miPremio = payouts.find((p) => p.user_id === miUserId);
   const objeto = payouts[0]?.prize_kind === "objeto";
   // Cómo se distribuye la plata (2026-09-16): el pozo, entre cuántos y cuánto
-  // le toca a cada uno. Las cifras salen del reparto en SQL (casa_payouts).
+  // le toca a cada uno. Las cifras salen del reparto en SQL (casa_payouts); si
+  // el sobrante del redondeo dejó montos distintos por $1, no se dice «cada uno».
+  const parejo = payouts.every((p) => p.amount_cop === payouts[0].amount_cop);
   const reparto = !objeto && payouts.length > 1
-    ? `Pozo ${formatCop(totalCop)} · ${payouts.length} ganadores · ${formatCop(payouts[0].amount_cop)} cada uno`
+    ? `Pozo ${formatCop(totalCop)} · ${payouts.length} ganadores${parejo ? ` · ${formatCop(payouts[0].amount_cop)} cada uno` : ""}`
     : !objeto ? `Pozo ${formatCop(totalCop)} · un solo ganador` : null;
   const pruebas = !objeto && <PruebasDePago payouts={payouts} proofUrls={proofUrls} miUserId={miUserId} />;
 

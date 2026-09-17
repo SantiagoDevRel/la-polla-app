@@ -35,6 +35,8 @@ export function PagosGanadores({ pollaId }: { pollaId: string }) {
   const router = useRouter();
   const [rows, setRows] = useState<AdminPayoutRow[] | null>(null);
   const [payable, setPayable] = useState(true);
+  // Pozo repartido según SQL (settlement_prize_cop): acá no se suma nada.
+  const [prizeCop, setPrizeCop] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
 
@@ -46,6 +48,7 @@ export function PagosGanadores({ pollaId }: { pollaId: string }) {
       if (signal?.aborted) return;
       setRows(data.rows);
       setPayable(data.payable !== false);
+      setPrizeCop(typeof data.prizeCop === "number" ? data.prizeCop : 0);
       setError(null);
     } catch (cause) {
       if (signal?.aborted) return;
@@ -61,7 +64,8 @@ export function PagosGanadores({ pollaId }: { pollaId: string }) {
 
   const total = rows?.length ?? 0;
   const pagados = rows?.filter((r) => r.paidAt).length ?? 0;
-  const pozo = rows?.reduce((sum, r) => sum + r.amountCop, 0) ?? 0;
+  // Con sobrante de redondeo los montos difieren por $1: entonces no se dice «cada uno».
+  const parejo = (rows ?? []).every((r) => r.amountCop === rows?.[0]?.amountCop);
 
   return (
     <section aria-labelledby={`pagos-${pollaId}`} className="mb-4 border-b border-border-default pb-4">
@@ -73,9 +77,8 @@ export function PagosGanadores({ pollaId }: { pollaId: string }) {
       </div>
       {rows && total > 0 && (
         <p className="mb-3 text-[13px] leading-relaxed text-text-secondary">
-          {/* Las cifras salen del reparto en SQL; acá solo se suman para la frase. */}
-          Pozo {formatCop(pozo)} · {total === 1 ? "1 ganador" : `${total} ganadores`}
-          {total > 1 && ` · ${formatCop(rows[0].amountCop)} cada uno`} · <span className={pagados === total ? "font-semibold text-turf" : "font-semibold text-amber"}>{pagados} de {total} pagados</span>
+          Pozo {formatCop(prizeCop)} · {total === 1 ? "1 ganador" : `${total} ganadores`}
+          {total > 1 && parejo && ` · ${formatCop(rows[0].amountCop)} cada uno`} · <span className={pagados === total ? "font-semibold text-turf" : "font-semibold text-amber"}>{pagados} de {total} pagados</span>
         </p>
       )}
       {error && <p role="alert" className="mb-3 rounded-md border border-red-alert/30 p-3 text-[13px] text-red-alert">{error}</p>}

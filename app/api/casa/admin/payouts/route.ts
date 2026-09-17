@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
   const db = createAdminClient();
   const { data: polla, error: pollaError } = await db
     .from("casa_pollas")
-    .select("id, status, settlement_outcome, prize_kind, archived_at")
+    // settlement_prize_cop lo escribió el reparto en SQL: es el pozo repartido.
+    .select("id, status, settlement_outcome, prize_kind, archived_at, settlement_prize_cop")
     .eq("id", pollaId)
     .maybeSingle();
   if (pollaError) return privateJson({ error: "No se pudo leer la polla." }, 500);
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
   });
   return privateJson({
     payable: polla.status === "resuelta" && polla.settlement_outcome === "money_awarded",
+    prizeCop: Number(polla.settlement_prize_cop ?? 0),
     rows,
     paidCount: rows.filter((r) => r.paidAt).length,
     totalCount: rows.length,

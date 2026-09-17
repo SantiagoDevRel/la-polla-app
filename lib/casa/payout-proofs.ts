@@ -5,8 +5,10 @@
 // El cron cleanup-payout-proofs borra únicamente lo que referencia
 // `polla_payouts` (modelo P2P), así que estos archivos quedan como historial.
 //
-// Las URL se firman acá, por una hora, y solo para quien puede verlas:
-// administradores, el ganador y los participantes de esa polla.
+// Las URL se firman acá, por una hora. Quién las recibe lo decide la página
+// de la polla: administradores, ganadores y participantes de esa polla (el
+// pantallazo puede traer el número de cuenta del ganador); el resto solo ve
+// «Pagado · fecha».
 
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";

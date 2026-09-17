@@ -1173,9 +1173,12 @@ funciones, y solo cambian lo que se crea desde ahora.
   `casa_mark_payout_paid_v2` marca `paid_at` y guarda `proof_path` en el bucket
   privado `payout-proofs` bajo `casa/<polla>/<premio>/`; volver a subir
   reemplaza el archivo y conserva la fecha. La polla muestra «Prueba de pago»
-  (a ganadores y participantes, URL firmada por una hora, comprobante bajo un
-  `<details>` cerrado) con el reparto («Pozo $X · N ganadores · $Y cada uno»),
-  y «Pollas cerradas» marca «Premio pagado · comprobante en la polla». El cron
+  con el reparto («Pozo $X · N ganadores · $Y cada uno», sin «cada uno» si el
+  redondeo dejó montos distintos) y «Pagado · fecha» por premio para cualquier
+  sesión; la imagen (URL firmada por una hora, bajo un `<details>` cerrado) solo
+  llega a administradores, ganadores y participantes de esa polla, porque el
+  pantallazo puede traer el número de cuenta del ganador. «Pollas cerradas»
+  marca «Premio pagado · comprobante en la polla». El cron
   `cleanup-payout-proofs` solo borra archivos referenciados por `polla_payouts`
   (P2P): estos quedan como historial. `casa_v2_write_guard` permite escribir
   únicamente esas columnas; el importe del premio sigue inmutable.

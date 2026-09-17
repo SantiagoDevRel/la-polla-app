@@ -225,10 +225,13 @@ comprobante. No existe «un pago de $100.000 por cinco cupos».
   (`INVALID_PROOF_PATH`), pollas archivadas o no resueltas (`PAYOUT_NOT_PAYABLE`)
   y premios en objeto (`PAYOUT_NOT_FOUND`). El guard de `casa_payouts` sigue
   impidiendo cualquier otro cambio (`AWARD_IMMUTABLE`).
-- **Quién ve el comprobante.** Cualquier persona con sesión que abre la polla
-  (misma audiencia que ya veía nombres y montos de los ganadores), por URL
-  firmada de una hora; nunca pública. El panel recuerda recortar el número de
-  cuenta del ganador antes de subir el pantallazo.
+- **Quién ve el comprobante.** El hecho («Pagado · fecha», referencia y el
+  avance «N de M pagados») lo ve cualquier persona con sesión que abre la
+  polla, igual que los nombres y montos de los ganadores. La **imagen** se
+  firma (URL de una hora, nunca pública) solo para administradores, ganadores
+  y quienes participaron en esa polla: el pantallazo de Nequi/Bancolombia
+  suele traer el número de cuenta del ganador. El panel recuerda recortarlo
+  antes de subirlo. (Revisión de muse, 2026-09-16.)
 - **Regresión local:** `scripts/casa-exact-score-check.sql`,
   `scripts/casa-payout-proofs-check.sql` (ROLLBACK) y
   `scripts/casa-live-payouts-browser-check.mjs` (navegador, con dev server local).
