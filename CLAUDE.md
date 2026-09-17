@@ -2367,7 +2367,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
 En `/casa`, el orden es Pollas abiertas, Mis pollas y Pollas cerradas. Las tres
 empiezan cerradas, comparten título/subtítulo y contienen sus tarjetas dentro de
-`PollaSection`. En Perfil, Mis pollas permanece abierta. Las inscripciones pendientes o pagadas se
+`PollaSection`. En Perfil, Mis pollas permanece abierta y va debajo de «Cuenta para cobrar», que
+quedó justo bajo el celular (2026-09-17, pedido del dueño). Las inscripciones pendientes o pagadas se
 muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
 Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.
 El historial finalizado se conserva después de las participaciones actuales.
