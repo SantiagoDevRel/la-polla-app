@@ -27,6 +27,7 @@ import {
   isProofUploadType,
   proofTargetDimensions,
   shouldKeepOriginal,
+  sniffProofType,
   type ProofSizeRules,
   type ProofUploadType,
 } from "./proof-image";
@@ -104,7 +105,10 @@ export async function prepareImageUpload(
   }
   const heic = isHeicLike(file.type, file.name);
   const acceptedType = isProofUploadType(file.type);
-  if (!acceptedType && !heic) {
+  // El original se declara con el tipo de sus bytes, no el de su extensión.
+  // Si los bytes no son JPG/PNG/WEBP, solo sirve la versión re-codificada.
+  const realType = sniffProofType(new Uint8Array(await file.slice(0, 12).arrayBuffer()));
+  if (!acceptedType && !heic && !realType) {
     throw new ImagePreparationError(
       "Usa una imagen JPG, PNG o WEBP. En iPhone puedes tomar una captura de la transferencia.",
       "unsupported",
@@ -113,8 +117,8 @@ export async function prepareImageUpload(
 
   const sourceSha256 = await fileDigest(file);
   const original: ImageCandidate | null =
-    acceptedType && file.size <= options.uploadMaxBytes
-      ? { blob: file, sha256: sourceSha256, contentType: file.type as ProofUploadType, bytes: file.size, prepared: false }
+    realType && file.size <= options.uploadMaxBytes
+      ? { blob: file, sha256: sourceSha256, contentType: realType, bytes: file.size, prepared: false }
       : null;
   if (original && file.size <= options.skipBytes) {
     return { sourceSha256, sourceBytes: file.size, candidates: [original] };
@@ -142,7 +146,9 @@ export async function prepareImageUpload(
     );
   }
   throw new ImagePreparationError(
-    `No pudimos preparar esta imagen y supera los ${megabytes(options.uploadMaxBytes)} MB. Toma una captura de pantalla y sube esa imagen.`,
+    file.size > options.uploadMaxBytes
+      ? `No pudimos preparar esta imagen y supera los ${megabytes(options.uploadMaxBytes)} MB. Toma una captura de pantalla y sube esa imagen.`
+      : "No pudimos leer esta imagen. Toma una captura de pantalla y sube esa imagen.",
     "unreadable",
   );
 }

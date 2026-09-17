@@ -8,6 +8,7 @@ import {
   parseStoredProofRecord,
   proofTargetDimensions,
   shouldKeepOriginal,
+  sniffProofType,
   storedRecordMatchesSource,
 } from "@/lib/casa/proof-image";
 import { submitProof, type ProofSubmitDeps, type SubmitCandidate } from "@/lib/casa/proof-submit";
@@ -244,5 +245,24 @@ describe("submitProof", () => {
     h.deps.readRecord = () => { throw new Error("denied"); };
     h.deps.writeRecord = () => { throw new Error("denied"); };
     await expect(submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null }, h.deps)).resolves.toEqual({ attemptId: uuid(7), sha256: sha("a"), entryNumber: null });
+  });
+});
+
+describe("sniffProofType", () => {
+  const bytes = (...values: number[]) => new Uint8Array(values);
+  const ascii = (text: string) => Array.from(text, (c) => c.charCodeAt(0));
+
+  it("reads the real type from the first bytes", () => {
+    expect(sniffProofType(bytes(0xff, 0xd8, 0xff, 0xe0, 0, 0x10))).toBe("image/jpeg");
+    // PNG guardado con nombre .jpg: el caso real del 17-sep-2026 en POLLAGOL.
+    expect(sniffProofType(bytes(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d))).toBe("image/png");
+    expect(sniffProofType(bytes(...ascii("RIFF"), 1, 2, 3, 4, ...ascii("WEBP")))).toBe("image/webp");
+  });
+
+  it("returns null for other or truncated content", () => {
+    expect(sniffProofType(bytes(0, 0, 0, 0x18, ...ascii("ftypheic")))).toBeNull();
+    expect(sniffProofType(bytes(0x89, 0x50, 0x4e))).toBeNull();
+    expect(sniffProofType(bytes(...ascii("GIF89a")))).toBeNull();
+    expect(sniffProofType(bytes())).toBeNull();
   });
 });
