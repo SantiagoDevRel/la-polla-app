@@ -52,10 +52,19 @@ describe("PollaInfo (2026-09-13: desplegables con viñetas cortas)", () => {
 
   it("describes only the configured scoring mode", () => {
     expect(text(info())).toContain("Si aciertas: 3 puntos.");
+    // Pollas creadas antes de la migración 132 conservan su punto por un solo equipo.
     const marcador = text(info({ scoring_mode: "marcador" }));
     expect(marcador).toContain("Marcador exacto: 3 puntos.");
     expect(marcador).toContain("Goles de un solo equipo: 1 punto.");
     expect(marcador).not.toContain("Si aciertas");
+  });
+
+  it("explains the exact-score-only rule for pollas created since 2026-09-16 (migration 132)", () => {
+    const exacto = text(info({ scoring_mode: "marcador", points_one_team: 0 }));
+    expect(exacto).toContain("Solo el marcador exacto suma: 3 puntos.");
+    expect(exacto).toContain("Cualquier otro resultado: 0 puntos");
+    expect(exacto).not.toContain("Goles de un solo equipo");
+    expect(exacto).not.toContain("No se suman entre sí");
   });
 });
 

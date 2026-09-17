@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   getPollaBySlug: vi.fn(),
   getLeaderboard: vi.fn(),
   getMyEntry: vi.fn(),
+  // Migración 133: premio provisional por líder; la ruta lo pasa tal cual.
+  getProvisionalPrizes: vi.fn(async () => []),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
@@ -14,6 +16,7 @@ vi.mock("@/lib/casa/queries", () => ({
   getPollaBySlug: mocks.getPollaBySlug,
   getLeaderboard: mocks.getLeaderboard,
   getMyEntry: mocks.getMyEntry,
+  getProvisionalPrizes: mocks.getProvisionalPrizes,
 }));
 
 import { GET } from "@/app/api/casa/pollas/[slug]/leaderboard/route";
@@ -34,6 +37,7 @@ beforeEach(() => {
   mocks.getPollaBySlug.mockResolvedValue({ id: pollaId, status: "abierta" });
   mocks.getLeaderboard.mockResolvedValue([]);
   mocks.getMyEntry.mockResolvedValue(null);
+  mocks.getProvisionalPrizes.mockResolvedValue([]);
 });
 
 describe("GET casa leaderboard", () => {
@@ -69,7 +73,7 @@ describe("GET casa leaderboard", () => {
     const result = await request();
     expect(result.status).toBe(200);
     expect(result.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(await result.json()).toEqual({ rows, entryStatus: "pagada", pollaStatus: "abierta", drawPending: false });
+    expect(await result.json()).toEqual({ rows, prizes: [], entryStatus: "pagada", pollaStatus: "abierta", drawPending: false });
     expect(mocks.getPollaBySlug).toHaveBeenCalledWith("prueba");
     expect(mocks.getLeaderboard).toHaveBeenCalledWith(pollaId);
     expect(mocks.getMyEntry).toHaveBeenCalledWith(pollaId, userId);
@@ -79,7 +83,7 @@ describe("GET casa leaderboard", () => {
     mocks.getPollaBySlug.mockResolvedValue({ id: pollaId, status });
     const result = await request();
     expect(result.status).toBe(200);
-    expect(await result.json()).toEqual({ rows: [], entryStatus: null, pollaStatus: status, drawPending: false });
+    expect(await result.json()).toEqual({ rows: [], prizes: [], entryStatus: null, pollaStatus: status, drawPending: false });
   });
 
   it.each(["getUser", "getPollaBySlug", "getLeaderboard", "getMyEntry"] as const)("returns a private generic error if %s fails", async (method) => {

@@ -202,6 +202,40 @@ comprobante. No existe «un pago de $100.000 por cinco cupos».
 - **Despliegue.** Aplicar 131 antes de publicar el código. La migración no toca
   `predictions`, pronósticos, pagos ni resultados; solo numera y agrega funciones.
 
+## Solo marcador exacto, premio provisional y prueba de pago (2026-09-16, migraciones 132–133)
+
+- **Puntaje de las pollas nuevas.** Desde la migración 132 una polla de
+  marcador nace con `points_one_team = 0`: solo el marcador exacto suma
+  (`points_exact`, 3). Las creadas antes conservan 1 punto por acertar los
+  goles de un solo equipo; no se repuntúan. La regla de cada polla se lee de
+  sus columnas (Info web, editor y bot): no se describe con texto fijo.
+- **Premio provisional.** `casa_provisional_prizes_v2(polla)` devuelve, por
+  participación empatada arriba, lo que se llevaría si la polla terminara
+  ahora: pozo vigente de `casa_pot_summaries_v2` dividido por participaciones
+  ganadoras, sobrante de a un peso en orden `(user_id, entry_number)`, igual que
+  `casa_settle_polla_v2`. Solo pozo en dinero, solo `abierta`/`cerrada`, solo si
+  el máximo es mayor a 0. Tabla web: «Ganaría $…».
+- **Pago a ganadores.** Con la polla `resuelta` y `money_awarded`, el panel
+  muestra cada premio con la cuenta del ganador (`users.default_payout_*`, solo
+  para administradores) y el formulario del comprobante. `casa_mark_payout_paid_v2`
+  (admin + contrato v2) exige una ruta `casa/<polla>/<premio>/…`, marca
+  `paid_at` (una sola vez), `paid_by`, `proof_path`, `proof_uploaded_at` y
+  `paid_reference` (≤ 200), y devuelve el avance `paid_count/total_count` y el
+  comprobante anterior para borrarlo. Rechaza rutas ajenas
+  (`INVALID_PROOF_PATH`), pollas archivadas o no resueltas (`PAYOUT_NOT_PAYABLE`)
+  y premios en objeto (`PAYOUT_NOT_FOUND`). El guard de `casa_payouts` sigue
+  impidiendo cualquier otro cambio (`AWARD_IMMUTABLE`).
+- **Quién ve el comprobante.** El hecho («Pagado · fecha», referencia y el
+  avance «N de M pagados») lo ve cualquier persona con sesión que abre la
+  polla, igual que los nombres y montos de los ganadores. La **imagen** se
+  firma (URL de una hora, nunca pública) solo para administradores, ganadores
+  y quienes participaron en esa polla: el pantallazo de Nequi/Bancolombia
+  suele traer el número de cuenta del ganador. El panel recuerda recortarlo
+  antes de subirlo. (Revisión de muse, 2026-09-16.)
+- **Regresión local:** `scripts/casa-exact-score-check.sql`,
+  `scripts/casa-payout-proofs-check.sql` (ROLLBACK) y
+  `scripts/casa-live-payouts-browser-check.mjs` (navegador, con dev server local).
+
 ## Ajustes de la migración 107
 
 Corrige hallazgos de revisión sobre 104 y 106. No cambia filas existentes,

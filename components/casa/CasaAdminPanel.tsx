@@ -8,6 +8,7 @@ import { HeroFrame, Label, Tape } from "@/components/street";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { AccionesPolla } from "@/components/casa/AccionesPolla";
 import { ColaDePagos } from "@/components/casa/ColaDePagos";
+import { PagosGanadores } from "@/components/casa/PagosGanadores";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { ResolverPolla } from "@/components/casa/ResolverPolla";
 import { fadeUp, staggerContainer } from "@/lib/animations";
@@ -15,7 +16,7 @@ import { formatCop, timeLeft } from "@/lib/casa/format";
 import { editorHref } from "@/lib/casa/editor";
 import type { pollaStatusLabel, CasaPolla, CasaPot } from "@/lib/casa/types";
 
-export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "prize_kind" | "prize_object" | "draw_pending"> & {
+export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "prize_kind" | "prize_object" | "draw_pending" | "settlement_outcome"> & {
   label: ReturnType<typeof pollaStatusLabel>;
   /** Se puede editar (antes del cierre). */
   editable?: boolean;
@@ -154,6 +155,11 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null }: {
                   <div id={`polla-panel-${polla.id}`} role="region" aria-labelledby={`polla-toggle-${polla.id}`} hidden={!expanded}>
                     {expanded && (
                       <div className="border-t border-border-default p-4">
+                        {/* (2026-09-16) Con la polla resuelta, lo primero es pagar
+                            a los ganadores y dejar la prueba de pago. */}
+                        {polla.status === "resuelta" && polla.prize_kind === "pozo" && polla.settlement_outcome === "money_awarded" && (
+                          <PagosGanadores pollaId={polla.id} />
+                        )}
                         <ColaDePagos key={polla.id} pollaId={polla.id} refreshKey={revision} onReviewed={() => setRevision((value) => value + 1)} />
                         <Link href={`/admin/pollas/pagos?pollaId=${polla.id}`} className="lp-btn lp-btn-ghost mt-4 w-full !text-[15px]">Ver pagos aprobados</Link>
                         <div className="mt-6 border-t border-border-default pt-4">

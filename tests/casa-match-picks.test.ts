@@ -88,7 +88,8 @@ describe("Casa participant predictions privacy", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.rows).toHaveLength(20); expect(body.hasMore).toBe(true);
-    expect(body.rows[0]).toEqual({ id: "0", displayName: "Jugador", avatarUrl: "millos", homeScore: 2, awayScore: 1, pick1x2: null, entryNumber: null });
+    // `mine` comes from the caller's own entry ids; `pointsEarned` only once the match is verified.
+    expect(body.rows[0]).toEqual({ id: "0", displayName: "Jugador", avatarUrl: "millos", homeScore: 2, awayScore: 1, pick1x2: null, entryNumber: null, mine: false, pointsEarned: null });
     const url = new URL(String(fetchDb.mock.calls[0][0]));
     expect(url.searchParams.get("polla_id")).toBe(`eq.${pollaId}`);
     expect(url.searchParams.get("match_id")).toBe(`eq.${matchId}`);

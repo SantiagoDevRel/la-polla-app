@@ -24,7 +24,10 @@ import {
   getPayouts,
   getActiveProofs,
   getFixedPrizeThreshold,
+  getProvisionalPrizes,
 } from "@/lib/casa/queries";
+import { signPayoutProofs } from "@/lib/casa/payout-proofs";
+import { PruebasDePago } from "@/components/casa/PruebasDePago";
 import {
   DEFAULT_MAX_ENTRIES_PER_USER,
   isLiveEntry,
@@ -92,7 +95,7 @@ export default async function PollaPage({
     );
   }
 
-  const [pot, bestEntry, entries, matches, questions, distribution, tabla, payouts, isAdmin, threshold] =
+  const [pot, bestEntry, entries, matches, questions, distribution, tabla, payouts, isAdmin, threshold, prizes] =
     await Promise.all([
       getPot(polla.id),
       // La inscripción "principal" (pagada > pendiente > …): rifas, premio y la tabla.
@@ -108,8 +111,10 @@ export default async function PollaPage({
       isCurrentUserAdmin(),
       // Punto de equilibrio del premio fijo para Info, calculado en SQL.
       getFixedPrizeThreshold(polla),
+      // Lo que ganaría hoy cada líder si la polla terminara ahora (migración
+      // 133). Si la lectura falla, la tabla sale sin esa línea.
+      polla.kind === "rifa" ? Promise.resolve([]) : getProvisionalPrizes(polla.id).catch(() => []),
     ]);
-
   const abierta = isPollaOpen(polla);
   // ── Qué participación se está viendo ─────────────────────────────────────
   // ?p=N si es suya; si no, la primera viva (pagada o en revisión); si no, la última.
@@ -143,6 +148,12 @@ export default async function PollaPage({
   const inscrito = isLiveEntry(entry);
   // Cualquier participación viva deja ver los pronósticos de los demás.
   const participa = polla.kind === "rifa" ? isLiveEntry(bestEntry) : entries.some(isLiveEntry);
+  // Prueba de pago (migración 133): el pantallazo de la transferencia puede
+  // traer el número de cuenta del ganador, así que la imagen se firma (1 h)
+  // solo para administradores, ganadores y quienes participaron en la polla.
+  // El resto ve igual el hecho: «Pagado · fecha».
+  const puedeVerComprobantes = isAdmin || participa || payouts.some((p) => p.user_id === user.id);
+  const proofUrls = puedeVerComprobantes && payouts.length > 0 ? await signPayoutProofs(payouts) : {};
   const pagoPendiente = entry?.status === "pendiente" && Boolean(entry.proof_path);
   // Con la tarjeta "Tus cupos" el estado del cupo vive ahí; no se repite en cuadros aparte.
   const showCupos = polla.kind !== "rifa" && entries.length > 0 && (participa || entries.length > 1);
@@ -150,7 +161,7 @@ export default async function PollaPage({
 
   const picksPorPartido: Record<
     string,
-    { pick1x2: Pick1x2 | null; homeScore: number | null; awayScore: number | null }
+    { pick1x2: Pick1x2 | null; homeScore: number | null; awayScore: number | null; pointsEarned: number | null }
   > = {};
   const picksPorPregunta: Record<
     string,
@@ -162,6 +173,8 @@ export default async function PollaPage({
         pick1x2: p.pick_1x2,
         homeScore: p.home_score,
         awayScore: p.away_score,
+        // Calculado en SQL; la tarjeta lo muestra solo con el partido verificado.
+        pointsEarned: p.points_earned,
       };
     } else if (p.question_id) {
       picksPorPregunta[p.question_id] = {
@@ -255,7 +268,7 @@ export default async function PollaPage({
               Va primero a propósito — cuando una polla ya terminó, el
               resultado es lo único que importa de esa pantalla. */}
         {payouts.length > 0 && (
-          <ResultadoPolla payouts={payouts} miUserId={user.id} totalCop={pot.prize_cop} />
+          <ResultadoPolla payouts={payouts} miUserId={user.id} totalCop={pot.prize_cop} proofUrls={proofUrls} />
         )}
 
         {polla.settlement_outcome === "house_retained_zero_points" && <StreetCard className="mb-4 p-4">
@@ -295,21 +308,6 @@ export default async function PollaPage({
               />
             )}
           </div>
-        )}
-
-        {/* ── Tus cupos (migración 131) ─────────────────────────────────────────
-              Aparece desde la primera: es donde se ve cada una con su estado y
-              donde se suma otra, con su propia transferencia. */}
-        {showCupos && (
-          <Participaciones
-            pendingByNumber={pendingByNumber}
-            slug={polla.slug}
-            entries={entries}
-            selectedNumber={entry?.entry_number ?? null}
-            maxEntries={polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER}
-            entryPriceCop={polla.entry_price_cop}
-            open={abierta}
-          />
         )}
 
         {/* Estás dentro. Antes, cuando Tama aprobaba, simplemente DESAPARECÍA
@@ -373,38 +371,51 @@ export default async function PollaPage({
           info={<PollaInfo polla={polla} threshold={threshold} />}
           firstLabel={polla.kind === "manual" ? "Preguntas" : polla.kind === "rifa" ? "Sorteo" : "Partidos"}
           initialRows={tabla}
+          initialPrizes={prizes}
           entryStatus={bestEntry?.status ?? null}
           pollaStatus={polla.status}
           drawPending={polla.draw_pending}
           userId={user.id}
         >
+        {/* ── Tus cupos (migración 131) ─────────────────────────────────────────
+              (2026-09-16) Pedido del dueño: las pestañas Partidos / Tabla / Info
+              van ARRIBA de «Tus cupos». La tarjeta vive dentro de la pestaña
+              donde manda: elige qué cupo se pronostica justo encima de los
+              partidos, y ahí se ve cada uno con su estado y se suma otro. */}
+        {showCupos && (
+          <div className="pt-4">
+            <Participaciones
+              pendingByNumber={pendingByNumber}
+              slug={polla.slug}
+              entries={entries}
+              selectedNumber={entry?.entry_number ?? null}
+              maxEntries={polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER}
+              entryPriceCop={polla.entry_price_cop}
+              open={abierta}
+            />
+          </div>
+        )}
+
         {/* ── Los partidos ─────────────────────────────────────────────── */}
         {polla.kind === "partidos" && matches.length > 0 && (
-          <>
-            <SectionHead
-              title={multiple && entry?.entry_number ? `Pronósticos · cupo ${entry.entry_number}` : "Tus pronósticos"}
-              meta={`${matches.length} partidos`}
-              className="mt-8"
+          <div className="pt-4">
+            <PicksBoard
+              key={entry?.id ?? "sin-participacion"}
+              slug={polla.slug}
+              entryNumber={entry?.entry_number ?? null}
+              scoringMode={polla.scoring_mode ?? "1x2"}
+              matches={matches as never}
+              initialPicks={picksPorPartido}
+              distribution={distribution}
+              canEdit={inscrito && acceptsCasaMatchPicks(polla.status, polla.draw_pending)}
+              canViewOthers={participa || isAdmin}
+              lockedReason={
+                !acceptsCasaMatchPicks(polla.status, polla.draw_pending) ? "Esta polla ya no recibe pronósticos." : !inscrito
+                  ? "Inscríbete para pronosticar."
+                  : "Esta polla ya cerró."
+              }
             />
-            <div className="-mx-4">
-              <PicksBoard
-                key={entry?.id ?? "sin-participacion"}
-                slug={polla.slug}
-                entryNumber={entry?.entry_number ?? null}
-                scoringMode={polla.scoring_mode ?? "1x2"}
-                matches={matches as never}
-                initialPicks={picksPorPartido}
-                distribution={distribution}
-                canEdit={inscrito && acceptsCasaMatchPicks(polla.status, polla.draw_pending)}
-                canViewOthers={participa || isAdmin}
-                lockedReason={
-                  !acceptsCasaMatchPicks(polla.status, polla.draw_pending) ? "Esta polla ya no recibe pronósticos." : !inscrito
-                    ? "Inscríbete para pronosticar."
-                    : "Esta polla ya cerró."
-                }
-              />
-            </div>
-          </>
+          </div>
         )}
 
         {/* ── Las preguntas manuales ───────────────────────────────────── */}
@@ -543,14 +554,24 @@ function PollaPublica({
    ──────────────────────────────────────────────────────────────────────── */
 function ResultadoPolla({
   payouts,
-  miUserId, totalCop,
+  miUserId, totalCop, proofUrls,
 }: {
   payouts: CasaPayout[];
   miUserId: string;
   totalCop: number;
+  /** id del premio → URL firmada del comprobante de pago (migración 133). */
+  proofUrls: Record<string, string>;
 }) {
   const miPremio = payouts.find((p) => p.user_id === miUserId);
   const objeto = payouts[0]?.prize_kind === "objeto";
+  // Cómo se distribuye la plata (2026-09-16): el pozo, entre cuántos y cuánto
+  // le toca a cada uno. Las cifras salen del reparto en SQL (casa_payouts); si
+  // el sobrante del redondeo dejó montos distintos por $1, no se dice «cada uno».
+  const parejo = payouts.every((p) => p.amount_cop === payouts[0].amount_cop);
+  const reparto = !objeto && payouts.length > 1
+    ? `Pozo ${formatCop(totalCop)} · ${payouts.length} ganadores${parejo ? ` · ${formatCop(payouts[0].amount_cop)} cada uno` : ""}`
+    : !objeto ? `Pozo ${formatCop(totalCop)} · un solo ganador` : null;
+  const pruebas = !objeto && <PruebasDePago payouts={payouts} proofUrls={proofUrls} miUserId={miUserId} />;
 
   return (
     <div className="mb-5">
@@ -579,9 +600,10 @@ function ResultadoPolla({
               {payouts.length > 1 && ` · empataste con ${payouts.length - 1} más`}
             </p>
           )}
+          {reparto && <p className="mt-1 text-[13px] text-text-secondary">{reparto}</p>}
           <p className="mt-4 border-t border-border-subtle pt-4 text-[12px] leading-relaxed text-text-muted">
             {objeto ? (miPremio.delivered_at ? "La entrega de tu premio ya está registrada." : "La casa coordinará contigo la entrega de tu premio.") : miPremio.paid_at
-              ? "Ya te transferimos. Si no te llegó, escríbenos."
+              ? "Ya te transferimos: el comprobante está abajo, en Prueba de pago. Si no te llegó, escríbenos."
               : "La casa te transfiere a la cuenta que tengas registrada en tu perfil. Revísala para que el pago no se demore."}
           </p>
           {!objeto && !miPremio.paid_at && (
@@ -589,6 +611,7 @@ function ResultadoPolla({
               Revisar mi cuenta de pago
             </Link>
           )}
+          <div className="text-left">{pruebas}</div>
         </StreetCard>
       ) : (
         <StreetCard className="bg-bg-card p-4">
@@ -600,6 +623,7 @@ function ResultadoPolla({
               {objeto ? payouts[0]?.prize_object : formatCop(totalCop)}
             </span>
           </div>
+          {reparto && <p className="mt-1 text-[13px] text-text-secondary">{reparto}</p>}
           <ul className="mt-3 space-y-2">
             {payouts.map((p) => (
               <li key={p.user_id} className="flex items-center gap-3">
@@ -625,6 +649,7 @@ function ResultadoPolla({
               </li>
             ))}
           </ul>
+          {pruebas}
         </StreetCard>
       )}
     </div>

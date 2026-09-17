@@ -34,6 +34,8 @@ export default async function CasaAdminPage() {
         prize_kind: polla.prize_kind,
         prize_object: polla.prize_object,
         draw_pending: polla.draw_pending,
+        // Con premio en dinero adjudicado, el panel muestra el pago a ganadores.
+        settlement_outcome: polla.settlement_outcome ?? null,
         status: polla.status,
         closes_at: polla.closes_at,
         opens_at: polla.opens_at,

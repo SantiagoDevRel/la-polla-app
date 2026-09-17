@@ -6,6 +6,48 @@
 
 ## READ THIS FIRST
 
+### Solo marcador exacto, En vivo, tarjetas compactas y prueba de pago (2026-09-16, migraciones 132–133)
+
+Pedidos del dueño del 16 de septiembre; detalle en README → «Casa: en vivo,
+tarjetas compactas y prueba de pago» y [docs/casa-admin-rules.md](docs/casa-admin-rules.md).
+
+- **Puntaje (132):** en las pollas de marcador creadas desde ahora **solo el
+  marcador exacto suma (3)**; cualquier otro resultado da 0. Se logra con
+  `points_one_team = 0` (DEFAULT de la columna y constante de
+  `casa_create_polla_v2`); `casa_score_polla` no cambia. Las pollas anteriores
+  conservan su 1 punto y no se repuntúan. Info, el editor y el bot leen los
+  puntos reales de cada polla: no escribas la regla como texto fijo.
+- **En vivo en /casa:** `lib/casa/live.ts` + `components/casa/LiveNow.tsx`
+  muestran arriba de todo los partidos en juego (y recién terminados, 4 h) de
+  las pollas donde la persona participa, con «Tu marcador» por cupo y el parcial;
+  se actualiza cada 30 s por `/api/casa/en-vivo`. Sin partidos, no se pinta nada.
+- **Tarjetas de partido:** `PicksBoard` ordena en Finalizados (cerrado, más
+  reciente primero) · En vivo · Próximos por día (abiertos), con
+  `lib/casa/picks-sections.ts`. Escudos y marcador/casillas en UNA fila, nombres
+  debajo, «Tu marcador» y puntos desde el cierre. «Ver pronósticos de otros»
+  (`MatchPicks`) es un desplegable cerrado con alto fijo y scroll propio que
+  pagina al bajar; el endpoint agrega `mine` (por ids de cupo propios, nunca
+  user_id) y `pointsEarned` solo con partido verificado. El modo 1X2 antes del
+  inicio conserva los tres botones del 2026-09-14.
+- **Pestañas arriba de Tus cupos:** `Participaciones` vive dentro de la
+  pestaña Partidos, encima de los partidos; no volver a ponerla sobre las pestañas.
+- **Premio provisional (133):** `casa_provisional_prizes_v2` calcula en SQL,
+  con el redondeo del reparto real, cuánto se llevaría hoy cada participación
+  que va arriba; la Tabla lo muestra como «Ganaría $…» (oro). Nunca en TS.
+- **Prueba de pago (133):** `casa_payouts` gana `proof_path`,
+  `proof_uploaded_at`, `paid_by`, `paid_reference`; `casa_mark_payout_paid_v2`
+  registra el pago con el pantallazo (bucket privado `payout-proofs`, prefijo
+  `casa/<polla>/<premio>/`, que el cron de limpieza P2P no toca). El admin paga
+  uno a uno desde `/admin/pollas` (`PagosGanadores`, con la cuenta del ganador y
+  botón de copiar). En la polla, `PruebasDePago` muestra «Pagado · fecha» a
+  cualquier sesión, pero la imagen (URL firmada 1 h, `<details>` cerrado) solo se
+  firma para admin, ganadores y participantes de esa polla: el pantallazo puede
+  traer la cuenta del ganador. «Pollas cerradas» marca «Premio pagado». La 133
+  parchea `casa_v2_write_guard` con needle/replacement sobre la definición VIVA
+  (como la 105): nunca redefinas ese guard entero, prod ya no es la 100. El
+  premio sigue inmutable. Regresión: `scripts/casa-exact-score-check.sql`,
+  `scripts/casa-payout-proofs-check.sql`, `scripts/casa-live-payouts-browser-check.mjs`.
+
 ### Pronosticar y compartir (2026-09-14)
 
 Acierta ganador: el escudo con el nombre debajo es el botón de cada equipo y

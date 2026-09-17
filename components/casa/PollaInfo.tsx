@@ -48,11 +48,16 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
     {polla.description && <p className="whitespace-pre-line text-[15px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]">{polla.description}</p>}
 
     {polla.kind === "partidos" && <Rule icon={<Target size={20} />} title="Cómo sumas puntos">
-      {polla.scoring_mode === "marcador" ? <>
+      {polla.scoring_mode === "marcador" ? (polla.points_one_team > 0 ? <>
+        {/* Pollas creadas antes de la migración 132: conservan su punto por un solo equipo. */}
         <li><Strong>Marcador exacto:</Strong> {points(polla.points_exact)}.</li>
         <li><Strong>Goles de un solo equipo:</Strong> {points(polla.points_one_team)}.</li>
         <li>No se suman entre sí. Sin aciertos, 0 puntos.</li>
       </> : <>
+        {/* Regla desde el 2026-09-16: solo el marcador exacto. */}
+        <li><Strong>Solo el marcador exacto suma:</Strong> {points(polla.points_exact)}.</li>
+        <li><Strong>Cualquier otro resultado:</Strong> 0 puntos, aunque aciertes los goles de un equipo o quién gana.</li>
+      </>) : <>
         <li>Eliges si gana el local, hay empate o gana el visitante.</li>
         <li><Strong>Si aciertas:</Strong> {points(polla.points_result)}. Si no, 0 puntos.</li>
       </>}

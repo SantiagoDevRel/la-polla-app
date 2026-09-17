@@ -187,8 +187,77 @@ export interface CasaPayout {
   points: number | null;
   amount_cop: number;
   paid_at: string | null;
+  /**
+   * Prueba de pago (migración 133): pantallazo de la transferencia en el
+   * bucket privado `payout-proofs`. Nunca es una URL pública: se firma en el
+   * servidor y se muestra al ganador y a los participantes de la polla.
+   */
+  proof_path?: string | null;
+  proof_uploaded_at?: string | null;
+  paid_reference?: string | null;
+  /** Nota del reparto («Empate en 6 puntos · 2 participaciones ganadoras»). */
+  note?: string | null;
   display_name: string | null;
   avatar_url: string | null;
+}
+
+/** Un premio en dinero visto desde el panel del administrador: a quién, cuánto, a qué cuenta y si ya se pagó. */
+export interface AdminPayoutRow {
+  id: string;
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  amountCop: number;
+  points: number | null;
+  note: string | null;
+  paidAt: string | null;
+  paidReference: string | null;
+  /** URL firmada (1 h) del comprobante, o null si todavía no se pagó. */
+  proofUrl: string | null;
+  account: { method: string | null; number: string | null; holder: string | null; type: string | null } | null;
+}
+
+/**
+ * Lo que se llevaría hoy cada participación que va arriba, si la polla
+ * terminara con los marcadores de este momento (migración 133). Sale de
+ * `casa_provisional_prizes_v2`, con el mismo redondeo que el reparto real.
+ */
+export interface CasaProvisionalPrize {
+  entry_id: string;
+  user_id: string;
+  amount_cop: number;
+}
+
+/** Un pronóstico de la persona para un partido en vivo, por cupo. */
+export interface CasaLiveMatchPick {
+  entryNumber: number | null;
+  pick1x2: Pick1x2 | null;
+  homeScore: number | null;
+  awayScore: number | null;
+}
+
+/**
+ * Partido en juego (o recién terminado) de una polla donde la persona
+ * participa: lo que se muestra arriba en POLLAS con «Tu marcador».
+ */
+export interface CasaLiveMatch {
+  matchId: string;
+  pollaId: string;
+  pollaSlug: string;
+  pollaName: string;
+  scoringMode: CasaScoringMode;
+  homeTeam: string;
+  awayTeam: string;
+  homeFlag: string | null;
+  awayFlag: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  status: "live" | "finished";
+  elapsed: number | null;
+  liveStatusDetail: string | null;
+  scheduledAt: string;
+  finalVerifiedAt: string | null;
+  picks: CasaLiveMatchPick[];
 }
 
 /** Lo que devuelve casa_pick_distribution: conteos crudos por clave. */

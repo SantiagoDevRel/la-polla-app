@@ -36,13 +36,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // This deliberate group read is authorized above for this polla's members.
     // The projection excludes user IDs, phone numbers and all payment details.
+    // The caller's own rows (`mine`) are recognised by their own entry ids,
+    // already read above, so no user_id ever leaves the database for this.
     const start = parsed.data.page * PAGE_SIZE;
     const { data, error } = await createAdminClient().from("casa_picks")
-      .select("id, entry_id, pick_1x2, home_score, away_score, users!inner(display_name, avatar_url), casa_entries!inner(status)")
+      .select("id, entry_id, pick_1x2, home_score, away_score, points_earned, users!inner(display_name, avatar_url), casa_entries!inner(status)")
       .eq("polla_id", polla.id).eq("match_id", match.id).eq("casa_entries.status", "pagada")
       .order("id", { ascending: true }).range(start, start + PAGE_SIZE);
     if (error) throw error;
     const page = (data ?? []).slice(0, PAGE_SIZE);
+    const myEntryIds = new Set([entry?.id, ...entries.map((item) => item.id)].filter((id): id is string => Boolean(id)));
     // Migración 131: "#N" solo para quien tiene varias participaciones aprobadas.
     // La tabla (SQL) ya trae número y conteo por participación; nada de user_id.
     const numbers = new Map<string, number>();
@@ -51,11 +54,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         if ((row.user_entries ?? 1) > 1 && row.entry_number != null) numbers.set(row.entry_id, row.entry_number);
       }
     }
+    // Los puntos solo cuando el resultado ya está verificado: antes, un 0 se
+    // leería como «fallaste» cuando en realidad todavía no se puntuó.
+    const scored = Boolean(match.final_verified_at);
     const rows = page.map(row => {
       const player = Array.isArray(row.users) ? row.users[0] : row.users;
       return {
         id: row.id, displayName: player?.display_name ?? "Sin nombre", avatarUrl: player?.avatar_url ?? null,
         entryNumber: numbers.get(row.entry_id) ?? null,
+        mine: myEntryIds.has(row.entry_id),
+        pointsEarned: scored ? row.points_earned ?? 0 : null,
         pick1x2: polla.scoring_mode === "1x2" ? row.pick_1x2 : null,
         homeScore: polla.scoring_mode === "marcador" ? row.home_score : null,
         awayScore: polla.scoring_mode === "marcador" ? row.away_score : null,

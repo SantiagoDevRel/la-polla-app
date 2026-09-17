@@ -4,7 +4,8 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Trophy } from "lucide-react";
 import UserAvatar from "@/components/ui/UserAvatar";
-import type { CasaEntryStatus, CasaLeaderboardRow, CasaPollaStatus } from "@/lib/casa/types";
+import { formatCop } from "@/lib/casa/format";
+import type { CasaEntryStatus, CasaLeaderboardRow, CasaPollaStatus, CasaProvisionalPrize } from "@/lib/casa/types";
 
 interface Props {
   slug: string;
@@ -12,15 +13,21 @@ interface Props {
   children: ReactNode;
   info?: ReactNode;
   initialRows: CasaLeaderboardRow[];
+  /**
+   * Lo que se llevaría hoy cada participación que va arriba (migración 133).
+   * Sale de SQL con el redondeo del reparto real; vacío cuando no aplica.
+   */
+  initialPrizes?: CasaProvisionalPrize[];
   entryStatus: CasaEntryStatus | null;
   pollaStatus: CasaPollaStatus;
   drawPending?: boolean;
   userId: string;
 }
 
-export function PollaTabs({ slug, firstLabel, children, info, initialRows, entryStatus, pollaStatus, userId, drawPending = false }: Props) {
+export function PollaTabs({ slug, firstLabel, children, info, initialRows, initialPrizes = [], entryStatus, pollaStatus, userId, drawPending = false }: Props) {
   const [tab, setTab] = useState(0);
   const [rows, setRows] = useState(initialRows);
+  const [prizes, setPrizes] = useState(initialPrizes);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -28,8 +35,10 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, entry
   const id = useId();
   const router = useRouter();
   const labels = [firstLabel, "Tabla", ...(info ? ["Info"] : [])];
+  const prizeByEntry = new Map(prizes.map((prize) => [prize.entry_id, prize.amount_cop]));
 
   useEffect(() => { setRows(initialRows); }, [initialRows]);
+  useEffect(() => { setPrizes(initialPrizes); }, [initialPrizes]);
 
   // Poll only while the table is visible. Keep drafts mounted in the other
   // panel; opening the table must never discard an unsaved prediction.
@@ -51,6 +60,7 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, entry
         if (!response.ok) throw new Error(data.error ?? "No se pudo actualizar la tabla.");
         if (!active) return;
         setRows(data.rows);
+        setPrizes(Array.isArray(data.prizes) ? data.prizes : []);
         setError(null);
         if (data.entryStatus !== entryStatus || data.pollaStatus !== pollaStatus || Boolean(data.drawPending) !== drawPending) router.refresh();
       } catch (cause) {
@@ -113,6 +123,14 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, entry
         </div>
         <p className="mb-4 mt-1 text-xs leading-relaxed text-text-secondary">
           Solo cuentan los pagos aprobados. Cada cupo aparece por separado y suma los puntos de sus pronósticos cuando confirmamos su pago.
+          {prizes.length > 0 && (
+            <>
+              {" "}
+              <span className="text-text-primary">
+                Si la polla terminara ahora, el pozo se reparte entre {prizes.length === 1 ? "quien va de primero" : `los ${prizes.length} que van de primeros`}: lo que ganaría cada uno va debajo de su nombre.
+              </span>
+            </>
+          )}
         </p>
         {error && <div role="alert" className="mb-3 rounded-lg border border-red-alert/40 bg-red-alert/10 p-3 text-sm text-text-primary">
           <p>{error} Los datos anteriores se conservan.</p>
@@ -137,7 +155,15 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, entry
                   <th scope="row" className="py-3 font-medium">
                     <div className="flex items-start gap-2">
                       <UserAvatar avatarUrl={row.avatar_url} displayName={row.display_name ?? "Jugador"} size="sm" />
-                      <span className="min-w-0 self-center text-sm [overflow-wrap:anywhere]">{row.display_name ?? "Sin nombre"}{(row.user_entries ?? 1) > 1 && row.entry_number != null && <span className="ml-1 whitespace-nowrap text-xs text-text-secondary" aria-label={`cupo ${row.entry_number}`}>#{row.entry_number}</span>}{row.user_id === userId && <span className="ml-1 text-xs text-turf">(tú)</span>}</span>
+                      <span className="min-w-0 self-center text-sm [overflow-wrap:anywhere]">
+                        {row.display_name ?? "Sin nombre"}{(row.user_entries ?? 1) > 1 && row.entry_number != null && <span className="ml-1 whitespace-nowrap text-xs text-text-secondary" aria-label={`cupo ${row.entry_number}`}>#{row.entry_number}</span>}{row.user_id === userId && <span className="ml-1 text-xs text-turf">(tú)</span>}
+                        {/* Premio provisional (migración 133): oro porque es señal de premio, no adorno. */}
+                        {prizeByEntry.has(row.entry_id) && (
+                          <span className="mt-0.5 block text-xs font-semibold text-gold">
+                            Ganaría <span className="lp-money text-[14px]">{formatCop(prizeByEntry.get(row.entry_id)!)}</span>
+                          </span>
+                        )}
+                      </span>
                     </div>
                   </th>
                   <td className="lp-money py-3 pr-2 text-right align-top text-lg">{row.points}</td>
