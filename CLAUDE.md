@@ -765,10 +765,6 @@ cuando el user diga sí/no explícito o se haya completado.
   panel muestra ganadores, montos y cuentas, pero el reparto (irreversible) lo
   confirma un administrador con un clic. Falta decidir si se registra SOLO, sin
   clic, apenas se verifica el último partido (el cron ya corre cada minuto).
-- **LDU–Palmeiras y Atlético MG–Santos (17-sep-2026).** API-Football los tenía
-  en «NS» horas después de jugarse (3-2 y 4-2 según la prensa). Se cierran solos
-  cuando la fuente los actualice; si el dueño no quiere esperar, se pone el
-  marcador de 90' en `/admin/issues`. Decisión del dueño: esperar o cargarlos.
 
 - **Captcha de Supabase Auth antes de producción (2026-09-13, hallazgo de
   revisión del PR #71).** `/auth/v1/otp` acepta llamadas directas con la anon
