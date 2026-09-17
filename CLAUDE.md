@@ -54,8 +54,10 @@ la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
 - **Alcance.** Solo partidos/preguntas con entrada > $0; pollas creadas desde la 135
   (`referral_every` DEFAULT 5) y borradores nunca publicados. **Migración 136:** el
   interruptor del editor PRENDE también en una polla abierta con inscritos (así se
-  activó POLLAGOL el 17-sep); apagarlo sigue exigiendo cero inscripciones. Nada es
-  retroactivo: quien ya pagó no es «persona nueva». El bot de jugadores todavía no tiene
+  activó POLLAGOL el 17-sep); apagarlo o cambiar el divisor sigue exigiendo cero
+  inscripciones. **Migración 137:** `casa_pollas.referral_since` guarda desde cuándo
+  cuenta y un invitado solo ancla si su cupo se creó desde entonces, así que desmarcar
+  y reaprobar un pago viejo tampoco es retroactivo. El bot de jugadores todavía no tiene
   enlace ni código propio (segundo PR); sí avisa el cupo ganado y «Mis pagos» marca el
   regalo activo como regalo y oculta el pausado (nunca pide comprobante por él).
 - **Textos mínimos** (pedido del dueño): la regla es una frase y la única letra menuda

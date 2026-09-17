@@ -1149,7 +1149,8 @@ hacer nada.
 - **Invitar.** Compartir agrega `?ref=CODIGO` al enlace y el mensaje dice el
   código. Junto a Compartir, «Invita y gana» muestra la regla en una frase, el
   avance (`Llevas 3 de 5`), el código para copiar y una sola letra menuda
-  («*Solo aplica para usuarios nuevos, 1 polla por usuario.»); en Perfil está el
+  («*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código,
+  1 polla por usuario.»); en Perfil está el
   código con un enlace general.
 - **Aviso al entrar.** Mientras haya una polla abierta con invitaciones, /casa y
   esa polla muestran una vez «Por 5 invitados, te damos un cupo en la POLLAGOL»
@@ -1176,8 +1177,9 @@ hacer nada.
   «Invitado por». En Telegram, «Mis pagos» marca el regalo y no pide comprobante.
 - **Alcance.** Pollas de partidos o preguntas con entrada, creadas desde la 135,
   más los borradores que nunca se publicaron; las rifas nunca. El editor lo prende
-  también en una polla abierta con inscritos (migración 136, así se activó POLLAGOL);
-  apagarlo sigue siendo solo sin inscripciones.
+  también en una polla abierta con inscritos (migraciones 136 y 137, así se activó
+  POLLAGOL); apagarlo sigue siendo solo sin inscripciones, y lo que ya se había
+  pagado antes de prenderlo no cuenta como invitación.
 - **Pruebas.** `scripts/casa-referrals-check.sql` (Supabase local, ROLLBACK),
   `npm test -- tests/casa-referrals.test.ts tests/telegram-player.test.ts` y
   `CASA_ORIGIN=http://localhost:3137 node scripts/casa-referrals-browser-check.mjs`

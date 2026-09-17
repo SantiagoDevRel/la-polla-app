@@ -91,11 +91,21 @@ export interface ReferralPromo {
 type PromoPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "entry_price_cop" | "prize_kind" | "prize_object"> & {
   referral_every?: number | null;
   pot_mode?: CasaPolla["pot_mode"];
+  closes_at?: string;
 };
 
 /** ¿Esta polla es la del aviso? La lista ya viene filtrada a pollas abiertas. */
 export function isPromoPolla(polla: PromoPolla): boolean {
   return referralEvery(polla) !== null;
+}
+
+/**
+ * La polla del aviso entre las abiertas: la que cierra primero y, si dos cierran a
+ * la misma hora, la de id menor — para que el aviso no cambie entre dos cargas.
+ */
+export function pickPromoPolla<T extends PromoPolla>(abiertas: T[]): T | undefined {
+  return abiertas.filter(isPromoPolla).sort((a, b) =>
+    (a.closes_at ?? "").localeCompare(b.closes_at ?? "") || a.id.localeCompare(b.id))[0];
 }
 
 /**

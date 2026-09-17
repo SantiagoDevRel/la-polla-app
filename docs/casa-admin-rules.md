@@ -269,10 +269,11 @@ primera polla; el conteo se renueva en cada polla. El regalo no suma al pozo.
   después del reparto (`POLLA_FINAL`/`ALREADY_SETTLED`, la misma regla de desmarcar
   un pago). La cola de pagos muestra «Invitado por».
   El editor prende el programa aunque la polla ya tenga inscritos, mientras no haya
-  terminado (migración 136: así se activó POLLAGOL el 17-sep); apagarlo exige cero
-  inscripciones (`casa_set_referral_every_v1`; rifas nunca). Prenderlo no es
-  retroactivo: quien ya pagó no es persona nueva y nadie gana regalos por
-  inscripciones anteriores.
+  terminado ni repartido (migración 136: así se activó POLLAGOL el 17-sep); apagarlo
+  o cambiar el divisor exige cero inscripciones (`casa_set_referral_every_v1`; rifas
+  nunca). Prenderlo no es retroactivo: `casa_pollas.referral_since` (migración 137)
+  guarda el momento y un invitado solo ancla ahí si su cupo se creó desde entonces,
+  así que desmarcar y volver a aprobar un pago anterior tampoco lo cuenta.
 - **Avisos.** Tras una aprobación, `casa_referral_claim_gift_notices_v1` reclama los
   regalos nuevos y el bot de jugadores avisa por Telegram con un botón al cupo en la
   web. En «Mis pagos» del bot, un regalo activo sale como regalo y uno en pausa o

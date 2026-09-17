@@ -10,6 +10,7 @@ import {
   REFERRAL_FINE_PRINT,
   isGiftEntry,
   isPromoPolla,
+  pickPromoPolla,
   normalizeReferralCode,
   referralErrorMessage,
   referralEvery,
@@ -115,6 +116,16 @@ describe("aviso de invitaciones al entrar", () => {
       pollaId: "p1", slug: "ofigolazo-1", name: "OFIGOLAZO", every: 5, code: "JUANPE4821",
       entryPriceCop: 20000, premio: { cop: 1000000 },
     });
+  });
+
+  it("entre varias abiertas elige la que cierra primero, con desempate estable", () => {
+    const a = { ...polla, id: "a", closes_at: "2026-09-20T10:25:00Z" };
+    const b = { ...polla, id: "b", closes_at: "2026-09-21T10:25:00Z" };
+    const c = { ...polla, id: "c", closes_at: "2026-09-20T10:25:00Z" };
+    expect(pickPromoPolla([b, c, a])?.id).toBe("a");
+    expect(pickPromoPolla([c, a])?.id).toBe("a");
+    expect(pickPromoPolla([{ ...b, referral_every: null }])).toBeUndefined();
+    expect(pickPromoPolla([])).toBeUndefined();
   });
 
   it("no sale sin programa, sin código o sin cupos libres", () => {
