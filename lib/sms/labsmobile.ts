@@ -38,7 +38,20 @@ export interface SmsResult {
   error?: string;
 }
 
-function creds(): { user: string; token: string } | null {
+// Alfabeto GSM 03.38 (tabla básica + extensión). Todo lo demás exige UCS-2.
+const GSM7 =
+  "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?" +
+  "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà" +
+  "^{}\\[~]|€\f";
+
+export function necesitaUnicode(texto: string): boolean {
+  for (const ch of texto) {
+    if (!GSM7.includes(ch)) return true;
+  }
+  return false;
+}
+
+function creds():{ user: string; token: string } | null {
   const user = process.env.LABSMOBILE_USERNAME;
   const token = process.env.LABSMOBILE_TOKEN;
   if (!user || !token) return null;
@@ -73,6 +86,10 @@ export async function sendSms(
     message,
     recipient: [{ msisdn: phone }],
   };
+  // Sin `ucs2` LabsMobile manda GSM-7 y descarta lo que no entra: el 🐥 del
+  // código de acceso no llegaba (2026-09-17). Solo se activa cuando hace
+  // falta, porque Unicode baja el segmento de 160 a 70 caracteres.
+  if (necesitaUnicode(message)) body.ucs2 = "1";
   // Cuando lo generamos nosotros podemos registrar la fila ANTES del fetch y
   // cerrar la carrera con un DLR ultrarrápido. LabsMobile admite máximo 20.
   if (options.subid) {
