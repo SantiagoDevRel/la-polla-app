@@ -39,11 +39,11 @@ la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
   que ninguno en pausa lo reemplaza; «Restaurar» lo devuelve si sigue ganado. Ninguno
   de los dos después del reparto (`ALREADY_SETTLED`).
 - **Aviso al entrar** (`PromoInvitados`): «Por 5 invitados, te damos un cupo en la
-  OFIGOLAZO» con el código para copiar y Compartir, en /casa y en esa polla, una vez
-  por persona y polla (`localStorage`). Sale para la polla abierta cuyo nombre empieza
-  por `REFERRAL_PROMO_POLLA` y tiene el programa; nunca sin código, sin cupos libres
-  ni en la app de iOS (ahí tampoco se muestran las demás piezas de invitaciones, y
-  Compartir manda el enlace sin código).
+  POLLAGOL» con el código para copiar y Compartir, en /casa y en esa polla, una vez
+  por persona y polla (`localStorage`). Sale para la polla ABIERTA con invitaciones que
+  cierra primero (sin mirar el nombre); nunca sin código, sin cupos libres ni en la app
+  de iOS (ahí tampoco se muestran las demás piezas de invitaciones, y Compartir manda
+  el enlace sin código).
 - **Cookie `lp_ref`:** se borra cuando SQL da un resultado final; con
   `REFERRAL_RATE_LIMITED` o un error de base se conserva para el siguiente intento.
 - **Blindaje.** Tablas nuevas de solo lectura para service_role; un regalo solo se
@@ -52,14 +52,17 @@ la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
   reusan un regalo ni le aceptan comprobante (`GIFT_ENTRY`). `getMyEntries` oculta
   los regalos en pausa: `anulada` en compra significa «reintentar», en regalo no.
 - **Alcance.** Solo partidos/preguntas con entrada > $0; pollas creadas desde la 135
-  (`referral_every` DEFAULT 5) y borradores nunca publicados sin inscripciones; las
-  publicadas que ya existían quedan NULL. Interruptor en el editor solo sin
-  inscripciones (`casa_set_referral_every_v1`). El bot de jugadores todavía no tiene
+  (`referral_every` DEFAULT 5) y borradores nunca publicados. **Migración 136:** el
+  interruptor del editor PRENDE también en una polla abierta con inscritos (así se
+  activó POLLAGOL el 17-sep); apagarlo o cambiar el divisor sigue exigiendo cero
+  inscripciones. **Migración 137:** `casa_pollas.referral_since` guarda desde cuándo
+  cuenta y un invitado solo ancla si su cupo se creó desde entonces, así que desmarcar
+  y reaprobar un pago viejo tampoco es retroactivo. El bot de jugadores todavía no tiene
   enlace ni código propio (segundo PR); sí avisa el cupo ganado y «Mis pagos» marca el
   regalo activo como regalo y oculta el pausado (nunca pide comprobante por él).
 - **Textos mínimos** (pedido del dueño): la regla es una frase y la única letra menuda
-  es «*Solo aplica para usuarios nuevos, 1 polla por usuario.» (`REFERRAL_FINE_PRINT`).
-  Nada de listas de condiciones.
+  es «*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código, 1
+  polla por usuario.» (`REFERRAL_FINE_PRINT`). Nada de listas de condiciones.
 - **Orden de despliegue:** migración 135 antes del código (el código lee
   `casa_entries.origin` y `casa_pollas.referral_every`: al revés, Casa entera falla).
   Aplicarla en UNA transacción. Regresión: `scripts/casa-referrals-check.sql`

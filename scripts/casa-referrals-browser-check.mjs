@@ -53,9 +53,12 @@ async function zoom(page, name) {
 }
 // El aviso es fijo, así que zoom() no lo revisa: al 200 % la tarjeta cabe y nada se sale por el lado.
 async function zoomDialog(page, name) {
+  const dialog = page.locator('[role="dialog"]');
   await page.setViewportSize({ width: 320, height: 640 });
+  await dialog.waitFor();
   await page.evaluate(() => { for (const [el, size] of [...document.querySelectorAll('[role="dialog"], [role="dialog"] *')].map(el => [el, parseFloat(getComputedStyle(el).fontSize)])) el.style.setProperty("font-size", `${size * 2}px`, "important"); });
   await page.waitForTimeout(250);
+  await dialog.waitFor();
   await page.screenshot({ path: `${output}/${name}-zoom200.png` });
   const report = await page.evaluate(() => {
     const dialog = document.querySelector('[role="dialog"]');
@@ -142,12 +145,13 @@ try {
   const at = `now()+interval '${45 + Math.floor(Math.random() * 300)} days'+interval '${Math.floor(Math.random() * 1400)} minutes'`;
   const m1 = one(`SELECT public.upsert_match_safe('lpref-1-${suffix}','premier_2025',1,'league','Arsenal','Chelsea',NULL,NULL,${at},NULL,NULL,NULL,'scheduled',NULL,NULL,NULL);`);
   const m2 = one(`SELECT public.upsert_match_safe('lpref-2-${suffix}','premier_2025',1,'league','Liverpool','Manchester City',NULL,NULL,${at}+interval '3 hours',NULL,NULL,NULL,'scheduled',NULL,NULL,NULL);`);
-  // Se llama OFIGOLAZO para ver el aviso de invitaciones. Las de corridas anteriores
+  // El aviso no mira el nombre (migración 136): esta se llama POLLAGOL. Las de corridas anteriores
   // (mismo prefijo de slug, solo datos de este script) se archivan para que el inicio
   // de Casa muestre la de esta corrida.
-  const pollaName = "OFIGOLAZO", slug = `ofigolazo-invitaciones-${suffix}`;
+  const pollaName = "POLLAGOL", slug = `ofigolazo-invitaciones-${suffix}`;
   localSql(`BEGIN; SELECT public.casa_v2_context(2);
-    UPDATE public.casa_pollas SET archived_at=now() WHERE slug LIKE 'ofigolazo-invitaciones-%' AND archived_at IS NULL; COMMIT;`);
+    UPDATE public.casa_pollas SET archived_at=now()
+      WHERE (slug LIKE 'ofigolazo-invitaciones-%' OR slug LIKE 'sin-inscritos-%') AND archived_at IS NULL; COMMIT;`);
   const pollaId = one(`BEGIN; SELECT public.casa_v2_context(2);
     INSERT INTO public.casa_pollas(slug,name,kind,tournament,scoring_mode,status,closes_at,created_by,entry_price_cop,house_cut_pct,
       payout_method,payout_account,payout_account_name,max_entries_per_user,publication_mode,opens_at)
@@ -187,14 +191,14 @@ try {
   // ── 0) Aviso al entrar: «Por 5 invitados, te damos un cupo en la OFIGOLAZO», con el código.
   await juan.page.goto(`${origin}/casa`);
   await hydrated(juan.page);
-  const promo = juan.page.getByRole(PROMO, { name: "Por 5 invitados, te damos un cupo en la OFIGOLAZO" });
+  const promo = juan.page.getByRole(PROMO, { name: "Por 5 invitados, te damos un cupo en la POLLAGOL" });
   await promo.waitFor();
   assert.equal(await promo.locator("#copiar-codigo-promo").textContent(), codeJuan);
   const focused = () => juan.page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.getAttribute("role") ?? document.activeElement?.textContent);
   assert.equal(await focused(), "dialog", "focus moves into the notice");
   assert.equal(await promo.getByText("Invita y gana").count(), 0, "one title, no eyebrow");
   assert.equal(await promo.getByRole("link", { name: "Ver la polla" }).getAttribute("href"), `/casa/${slug}`);
-  await shot(promo, "00-aviso-ofigolazo", "Al entrar: el aviso de la OFIGOLAZO con tu código para copiar y el botón para compartir.");
+  await shot(promo, "00-aviso-ofigolazo", "Al entrar: el aviso de la polla abierta, con tu código para copiar y el botón para compartir.");
   for (const [width, height] of [[320, 640], [390, 844], [768, 1024], [1440, 900]]) {
     await juan.page.setViewportSize({ width, height });
     await juan.page.waitForTimeout(300);
@@ -213,7 +217,7 @@ try {
   await (await ready(promo.getByRole("button", { name: "Copiar tu código" }))).click();
   await promo.getByText("Copiado", { exact: true }).waitFor();
   assert.equal(await juan.page.evaluate(() => navigator.clipboard.readText()), codeJuan);
-  await (await ready(promo.getByRole("button", { name: /^Compartir OFIGOLAZO/ }))).click();
+  await (await ready(promo.getByRole("button", { name: /^Compartir POLLAGOL/ }))).click();
   await promo.getByText("Mensaje copiado").waitFor();
   const promoClip = await juan.page.evaluate(() => navigator.clipboard.readText());
   assert.ok(promoClip.includes(`/casa/${slug}?ref=${codeJuan}`) && promoClip.includes(`Usa mi código ${codeJuan}`), promoClip);
@@ -279,7 +283,7 @@ try {
   await juan.page.goto(`${origin}/casa/${slug}`);
   await hydrated(juan.page);
   await noPromo(juan.page);
-  const share = juan.page.getByRole("button", { name: /^Compartir OFIGOLAZO/ });
+  const share = juan.page.getByRole("button", { name: /^Compartir POLLAGOL/ });
   assert.equal(await share.getAttribute("title"), "Por cada 5 invitados, te damos un cupo en esta polla.");
   await (await ready(share)).click();
   await juan.page.getByText("Mensaje copiado").waitFor();
@@ -291,7 +295,7 @@ try {
   await shot(invite, "04-juan-regla-compartir", "Junto a Compartir: la regla en una frase y el avance. Pasar el cursor por Compartir dice lo mismo.");
   await invite.locator("summary").click();
   await invite.getByText("Tu cupo de regalo ya está en Tus cupos.").waitFor();
-  await invite.getByText("*Solo aplica para usuarios nuevos, 1 polla por usuario.").waitFor();
+  await invite.getByText("*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código, 1 polla por usuario.").waitFor();
   await shot(invite, "05-juan-detalle", "Desplegado: avance, el cupo ya activo, el código para copiar y una sola letra menuda.");
   await screen(juan.page, "juan-polla");
   await zoom(juan.page, "juan-polla");
@@ -307,7 +311,7 @@ try {
   const rule = juan.page.locator("details", { hasText: "Invita y gana cupos" }).first();
   await rule.locator("summary").click();
   await rule.getByText("Por cada 5 invitados, te damos un cupo en esta polla.").waitFor();
-  await rule.getByText("*Solo aplica para usuarios nuevos, 1 polla por usuario.").waitFor();
+  await rule.getByText("*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código, 1 polla por usuario.").waitFor();
   assert.equal(await rule.locator("li").count(), 0, "one sentence, no bullet list");
   await shot(rule, "07-info-regla", "Info: una frase y la letra menuda, sin lista de condiciones.");
   await juan.page.goto(`${origin}/perfil`);

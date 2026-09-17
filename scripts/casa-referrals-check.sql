@@ -93,7 +93,7 @@ DO $$
 DECLARE admin_id uuid; juan uuid; ana uuid; old_user uuid; sin_perfil uuid; spam uuid;
   inv uuid[]:='{}'; i integer; p uuid; q uuid; r2 uuid; off_p uuid; rifa_p uuid; free_p uuid;
   code_juan text; code_ana text; res jsonb; view jsonb; gift uuid; e5 uuid; juan_e uuid; x uuid; y uuid; mid uuid;
-  settle jsonb; s uuid; sv uuid[]:='{}'; g1 uuid; g2 uuid; t1 uuid; t2 uuid; u uuid; code_x text;
+  settle jsonb; s uuid; sv uuid[]:='{}'; g1 uuid; g2 uuid; t1 uuid; t2 uuid; u uuid; code_x text; z uuid;
 BEGIN
   admin_id:=pg_temp.ref_user('Admin ref local');
   UPDATE public.users SET is_admin=true WHERE id=admin_id;
@@ -338,8 +338,14 @@ BEGIN
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_remove_gift_v1(%L,''x'',%L,2)',gift,admin_id),'POLLA_FINAL');
   RAISE NOTICE 'PASS a gift can win; the prize comes only from real money';
 
-  -- 13) Interruptor por polla: solo sin inscripciones.
+  -- 13) Interruptor por polla: prender se puede con inscritos (migración 136),
+  --     apagar no. Prenderlo no cuenta a quienes ya pagaron.
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,NULL,%L,2)',q,admin_id),'POLLA_HAS_ENTRIES');
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=off_p)>0, 'the pool without the program already has entries';
+  ASSERT (public.casa_set_referral_every_v1(off_p,5,admin_id,2)->>'changed')::boolean, 'turning it on works with entries';
+  ASSERT (SELECT referral_every FROM public.casa_pollas WHERE id=off_p)=5;
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=off_p AND origin='invitacion'), 'nothing retroactive';
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,NULL,%L,2)',off_p,admin_id),'POLLA_HAS_ENTRIES');
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,7,%L,2)',rifa_p,admin_id),'INVALID_POLLA_KIND');
   x:=pg_temp.ref_polla(admin_id,'Vacía ref');
   ASSERT (public.casa_set_referral_every_v1(x,NULL,admin_id,2)->>'changed')::boolean;
@@ -501,5 +507,38 @@ BEGIN
   ASSERT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=t2 AND user_id=juan AND origin='invitacion' AND status='pagada'),
     'the other pool is recounted at once';
   RAISE NOTICE 'PASS a reversed anchor moves or is released';
+
+  -- 19) Prender el programa con inscripciones (136/137): cuenta desde ese momento.
+  z:=pg_temp.ref_polla(admin_id,'Prender ref',NULL);
+  ASSERT public.casa_referral_every((SELECT c FROM public.casa_pollas c WHERE c.id=z)) IS NULL;
+  x:=pg_temp.ref_user('Antes de prender');
+  ASSERT (public.casa_set_referrer_v1(x,code_ana,'enlace')->>'ok')::boolean;
+  y:=pg_temp.ref_pay(z,x,admin_id,'7');
+  PERFORM pg_temp.ref_pay(z,ana,admin_id,'8');
+  ASSERT (SELECT counted_polla_id IS NULL FROM public.casa_referrals WHERE referred_user_id=x);
+  -- Toda la prueba corre en una transacción, así que created_at es el mismo para
+  -- todos: se fuerza la fecha del cupo viejo y el momento de encendido para tener
+  -- un antes y un después reales.
+  ALTER TABLE public.casa_entries DISABLE TRIGGER casa_00_contract;
+  UPDATE public.casa_entries SET created_at=clock_timestamp()-interval '1 day' WHERE id=y;
+  ALTER TABLE public.casa_entries ENABLE TRIGGER casa_00_contract;
+  ASSERT (public.casa_set_referral_every_v1(z,5,admin_id,2)->>'changed')::boolean, 'turning it on works with entries';
+  ASSERT (SELECT referral_since IS NOT NULL FROM public.casa_pollas WHERE id=z), 'it records since when';
+  UPDATE public.casa_pollas SET referral_since=clock_timestamp()-interval '1 hour' WHERE id=z;
+  -- Desmarcar y volver a aprobar un pago anterior NO lo vuelve retroactivo.
+  PERFORM pg_temp.ref_unpay(y,admin_id);
+  PERFORM pg_temp.ref_review(y,admin_id);
+  ASSERT (SELECT counted_polla_id IS NULL FROM public.casa_referrals WHERE referred_user_id=x),
+    'an entry from before the program never counts';
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=z AND origin='invitacion');
+  -- Quien paga después sí cuenta.
+  u:=pg_temp.ref_user('Después de prender');
+  ASSERT (public.casa_set_referrer_v1(u,code_ana,'enlace')->>'ok')::boolean;
+  PERFORM pg_temp.ref_pay(z,u,admin_id,'9');
+  ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=z, 'from then on it counts';
+  -- Con inscripciones no se cambia el divisor ni se apaga.
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,1,%L,2)',z,admin_id),'POLLA_HAS_ENTRIES');
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,NULL,%L,2)',z,admin_id),'POLLA_HAS_ENTRIES');
+  RAISE NOTICE 'PASS turning it on mid-pool only counts from then on';
 END $$;
 ROLLBACK;
