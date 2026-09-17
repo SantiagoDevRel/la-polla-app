@@ -48,14 +48,17 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # que /api/cron/backup-freshness pueda avisar si el backup se atrasa.
 # Usar SIEMPRE la forma --opción=valor. Imprime una palabra (ok, dry_run,
 # skipped_*, failed_*) y devuelve 0 siempre: registrar nunca cambia el código
-# de salida del backup. Tope de 40 s aunque la red se cuelgue.
+# de salida del backup. Tope de 90 s aunque la red se cuelgue. Con BACKUP_HOME,
+# lo que no se pudo enviar queda en $BACKUP_HOME/status/pending-runs y se
+# reenvía en la próxima corrida.
 record_run() {
-  local out=""
+  local out="" spool="${RECORD_RUN_SPOOL_DIR:-}"
+  if [[ -z "$spool" && -n "${BACKUP_HOME:-}" ]]; then spool="$BACKUP_HOME/status/pending-runs"; fi
   if ! command -v node >/dev/null 2>&1; then printf 'skipped_no_node'; return 0; fi
   if command -v timeout >/dev/null 2>&1; then
-    out="$(timeout 40 node "$LIB_DIR/record-run.mjs" "$@" </dev/null)" || true
+    out="$(RECORD_RUN_SPOOL_DIR="$spool" timeout 90 node "$LIB_DIR/record-run.mjs" "$@" </dev/null)" || true
   else
-    out="$(node "$LIB_DIR/record-run.mjs" "$@" </dev/null)" || true
+    out="$(RECORD_RUN_SPOOL_DIR="$spool" node "$LIB_DIR/record-run.mjs" "$@" </dev/null)" || true
   fi
   out="${out//[^a-zA-Z0-9_]/}"
   printf '%s' "${out:-failed_timeout}"

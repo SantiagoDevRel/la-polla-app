@@ -139,8 +139,12 @@ Las alertas de arriba necesitan que el DGX o el PC estén prendidos. Esta no.
 1. Al terminar, bien o mal, `run-backup.sh` (`kind=backup`) y
    `verify-snapshots.sh` (`kind=verify`) llaman a `record_run`, que ejecuta
    `record-run.mjs`: un `POST /rest/v1/backup_runs` con la secret key del env
-   (`Prefer: return=minimal`, 10 s de timeout, un reintento solo ante red caída
-   o 5xx, tope total de 40 s). La llave va por entorno, nunca por argv; la URL
+   (`Prefer: return=minimal`, 10 s de timeout, cuatro intentos con esperas de
+   2/5/15 s solo ante red caída o 5xx, tope total de 90 s). La fila se guarda
+   antes en `status/pending-runs/` y se borra al confirmarse: si la red sigue
+   caída (o el tope mata el proceso), la próxima corrida la reenvía con sus
+   fechas reales. Sin esto, un corte de red de ~20 s al final de un backup
+   bueno disparó la alerta de «atrasado» en falso (17-sep-2026). La llave va por entorno, nunca por argv; la URL
    debe ser `https` (o `http` a 127.0.0.1 para pruebas).
 2. La fila lleva solo `status` (`ok`/`failed`), fechas, nombre del snapshot,
    bytes, tablas, filas, cuentas, objetos de Storage, commit del runner y el
