@@ -13,8 +13,9 @@
 --     invitado a quien sí lo trajo.
 --   · Cada invitado cuenta UNA sola vez: en la primera polla con invitaciones
 --     donde se le aprueba un pago. Aunque después juegue cien pollas, no vuelve
---     a contar. Si ese pago se desmarca y no le queda otro cupo pagado ahí,
---     cuenta en la próxima polla donde se le apruebe uno.
+--     a contar. Desmarcar ese pago no la mueve (vuelve a revisión); si se
+--     rechaza y no le queda otro cupo pagado ahí, cuenta en su primer cupo pagado
+--     de otra polla con invitaciones o, si no tiene, en la próxima donde pague.
 --   · El conteo es por invitador y POR POLLA: cada `referral_every` (5) invitados
 --     con pago aprobado en esa polla dan un cupo de regalo en esa misma polla. En
 --     otra polla el conteo empieza de cero.
@@ -379,7 +380,7 @@ END $$;
 -- lo ancla en la primera polla con invitaciones y recuenta a los afectados.
 CREATE FUNCTION public.casa_referral_after_entry() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
-DECLARE r public.casa_referrals; p public.casa_pollas; v_other uuid;
+DECLARE r public.casa_referrals; p public.casa_pollas; v_other uuid; v_other_polla uuid;
 BEGIN
   IF NEW.origin<>'compra' THEN RETURN NULL; END IF;
   IF TG_OP='UPDATE' AND NEW.status IS NOT DISTINCT FROM OLD.status
@@ -401,21 +402,32 @@ BEGIN
         r.counted_polla_id:=NEW.polla_id;
       END IF;
     END IF;
-  ELSIF r.referred_user_id IS NOT NULL AND r.counted_entry_id=NEW.id THEN
-    -- Se revirtió el pago que anclaba el conteo. Si le queda otro cupo pagado en
-    -- esa polla, sigue contando ahí; si no, cuenta en la próxima polla donde se le
-    -- apruebe un pago. El recuento de abajo usa la polla anterior (r).
-    SELECT e.id INTO v_other FROM public.casa_entries e
-      WHERE e.polla_id=NEW.polla_id AND e.user_id=NEW.user_id AND e.id<>NEW.id AND e.origin='compra'
+  ELSIF r.referred_user_id IS NOT NULL AND r.counted_entry_id=NEW.id AND NEW.status IN ('rechazada','anulada') THEN
+    -- Se rechazó el pago que anclaba el conteo. Desmarcar no llega aquí: vuelve a
+    -- revisión y lo normal es aprobarlo otra vez, así que el ancla se queda (sin
+    -- pago aprobado no cuenta). Con el rechazo, sigue contando con otro cupo pagado
+    -- de esa polla; si no tiene, con su primer cupo pagado en otra polla con
+    -- invitaciones (y se recuenta allá ya mismo); si tampoco, cuenta en la próxima
+    -- polla donde se le apruebe un pago. El recuento de abajo usa la polla anterior (r).
+    -- Recontar otra polla la bloquea también: dos rechazos cruzados al mismo tiempo
+    -- pueden chocar (Postgres aborta uno y el administrador reintenta).
+    SELECT e.id, e.polla_id INTO v_other, v_other_polla FROM public.casa_entries e
+      JOIN public.casa_pollas q ON q.id=e.polla_id
+      WHERE e.user_id=NEW.user_id AND e.id<>NEW.id AND e.origin='compra'
         AND e.status='pagada' AND e.amount_cop>0 AND e.ticket_number IS NULL
-      ORDER BY e.entry_number LIMIT 1;
-    UPDATE public.casa_referrals SET counted_entry_id=v_other,
-      counted_polla_id=CASE WHEN v_other IS NULL THEN NULL ELSE counted_polla_id END,
-      counted_at=CASE WHEN v_other IS NULL THEN NULL ELSE counted_at END,
+        AND (e.polla_id=NEW.polla_id OR public.casa_referral_every(q) IS NOT NULL)
+      ORDER BY (e.polla_id<>NEW.polla_id), e.reviewed_at NULLS LAST, e.created_at, e.id
+      LIMIT 1;
+    UPDATE public.casa_referrals SET counted_entry_id=v_other, counted_polla_id=v_other_polla,
+      counted_at=CASE WHEN v_other IS NULL THEN NULL WHEN v_other_polla=NEW.polla_id THEN counted_at
+        ELSE clock_timestamp() END,
       updated_at=clock_timestamp() WHERE referred_user_id=NEW.user_id;
-    IF v_other IS NULL THEN
-      PERFORM public.casa_referral_log('conteo',NEW.polla_id,r.referrer_user_id,NEW.user_id,NEW.id,NULL,
-        jsonb_build_object('liberado',true));
+    IF v_other_polla IS DISTINCT FROM NEW.polla_id THEN
+      PERFORM public.casa_referral_log('conteo',coalesce(v_other_polla,NEW.polla_id),r.referrer_user_id,NEW.user_id,
+        coalesce(v_other,NEW.id),NULL,jsonb_build_object('desde',NEW.polla_id,'liberado',v_other IS NULL));
+    END IF;
+    IF v_other_polla IS NOT NULL AND v_other_polla<>NEW.polla_id THEN
+      PERFORM public.casa_referral_sync(v_other_polla,r.referrer_user_id);
     END IF;
   END IF;
   -- Quien invitó a esta persona, solo en la polla donde ella cuenta.

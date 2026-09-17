@@ -67,6 +67,16 @@ BEGIN
   PERFORM public.casa_unpay_attempt_v2(a,rev,'Corrección de prueba',2,p_admin);
 END $$;
 
+-- Desmarcar y rechazar: la decisión definitiva que mueve el ancla de un invitado.
+CREATE FUNCTION pg_temp.ref_reject(p_entry uuid, p_admin uuid) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE a uuid; rev integer;
+BEGIN
+  PERFORM pg_temp.ref_unpay(p_entry,p_admin);
+  SELECT e.current_proof_attempt_id,x.review_revision INTO a,rev FROM public.casa_entries e
+    JOIN public.casa_entry_proof_attempts x ON x.id=e.current_proof_attempt_id WHERE e.id=p_entry;
+  PERFORM public.casa_review_attempt_v3(a,rev,'rechazada','Comprobante de prueba no válido',2,p_admin);
+END $$;
+
 -- Comprobante + aprobación de una participación nueva (o de la boleta p_ticket).
 CREATE FUNCTION pg_temp.ref_pay(p_polla uuid, p_user uuid, p_admin uuid, p_sha text, p_ticket integer DEFAULT NULL)
 RETURNS uuid LANGUAGE plpgsql AS $$
@@ -369,8 +379,9 @@ BEGIN
   PERFORM pg_temp.ref_unpay(sv[1],admin_id);
   ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada', 'removing #3 then losing an invitee keeps #2';
   ASSERT (SELECT status FROM public.casa_entries WHERE id=g2)='anulada';
-  ASSERT (SELECT counted_polla_id IS NULL AND locked_at IS NOT NULL FROM public.casa_referrals
-    WHERE referred_user_id=(SELECT user_id FROM public.casa_entries WHERE id=sv[1])), 'the unpaid invitee is released';
+  ASSERT (SELECT counted_polla_id=s AND locked_at IS NOT NULL FROM public.casa_referrals
+    WHERE referred_user_id=(SELECT user_id FROM public.casa_entries WHERE id=sv[1])),
+    'an unmarked payment keeps its pool: it can be approved again';
   -- b) Restaurar con un solo regalo ganado lo deja en pausa; vuelve con el pago.
   res:=public.casa_referral_restore_gift_v1(g2,admin_id,2);
   ASSERT (res->>'changed')::boolean AND NOT (res->>'active')::boolean, res::text;
@@ -454,13 +465,41 @@ BEGIN
   y:=pg_temp.ref_pay(t1,u,admin_id,'f');
   ASSERT (SELECT counted_polla_id=t1 AND counted_entry_id=x FROM public.casa_referrals WHERE referred_user_id=u);
   PERFORM pg_temp.ref_unpay(x,admin_id);
+  ASSERT (SELECT counted_polla_id=t1 AND counted_entry_id=x FROM public.casa_referrals WHERE referred_user_id=u),
+    'unmarking alone keeps the anchor';
+  PERFORM public.casa_review_attempt_v3((SELECT current_proof_attempt_id FROM public.casa_entries WHERE id=x),
+    (SELECT a.review_revision FROM public.casa_entry_proof_attempts a JOIN public.casa_entries e ON e.current_proof_attempt_id=a.id WHERE e.id=x),
+    'rechazada','Comprobante de prueba no válido',2,admin_id);
   ASSERT (SELECT counted_polla_id=t1 AND counted_entry_id=y FROM public.casa_referrals WHERE referred_user_id=u),
-    'the anchor moves to the other paid cupo';
-  PERFORM pg_temp.ref_unpay(y,admin_id);
+    'a rejected payment moves the anchor to the other paid cupo';
+  PERFORM pg_temp.ref_reject(y,admin_id);
   ASSERT (SELECT counted_polla_id IS NULL AND counted_entry_id IS NULL AND locked_at IS NOT NULL
     FROM public.casa_referrals WHERE referred_user_id=u), 'released, the referrer stays fixed';
   PERFORM pg_temp.ref_pay(t2,u,admin_id,'0');
   ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=t2, 'counts in the next paid pool';
+  -- Con un pago ya aprobado en otra polla, el ancla pasa ahí de una vez y el
+  -- conteo de allá se rehace: Juan completa 5 en t2 y su regalo aparece.
+  PERFORM pg_temp.ref_pay(t2,juan,admin_id,'3');
+  FOR i IN 1..3 LOOP
+    x:=pg_temp.ref_user('Ancla '||i);
+    ASSERT (public.casa_set_referrer_v1(x,code_juan,'enlace')->>'ok')::boolean;
+    PERFORM pg_temp.ref_pay(t2,x,admin_id,'4');
+  END LOOP;
+  u:=pg_temp.ref_user('Helena');
+  ASSERT (public.casa_set_referrer_v1(u,code_juan,'enlace')->>'ok')::boolean;
+  x:=pg_temp.ref_pay(t1,u,admin_id,'5');
+  PERFORM pg_temp.ref_pay(t2,u,admin_id,'6');
+  ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=t1;
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=t2 AND user_id=juan AND origin='invitacion'), 'four count in t2';
+  PERFORM pg_temp.ref_unpay(x,admin_id);
+  ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=t1, 'still t1 while in review';
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=t2 AND user_id=juan AND origin='invitacion');
+  PERFORM public.casa_review_attempt_v3((SELECT current_proof_attempt_id FROM public.casa_entries WHERE id=x),
+    (SELECT a.review_revision FROM public.casa_entry_proof_attempts a JOIN public.casa_entries e ON e.current_proof_attempt_id=a.id WHERE e.id=x),
+    'rechazada','Comprobante de prueba no válido',2,admin_id);
+  ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=t2, 'moves to the paid cupo in another pool';
+  ASSERT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=t2 AND user_id=juan AND origin='invitacion' AND status='pagada'),
+    'the other pool is recounted at once';
   RAISE NOTICE 'PASS a reversed anchor moves or is released';
 END $$;
 ROLLBACK;

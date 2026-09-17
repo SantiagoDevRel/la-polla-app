@@ -31,7 +31,7 @@ import { ensureWebhookUpdates, resetWebhookUpdatesStateForTests } from "@/lib/au
 import { notifyPlayerReviewByTelegram, reviewNoticeMessage } from "@/lib/telegram-player/notify";
 import { saveCasaPicks } from "@/lib/casa/picks-save";
 import { handleTelegramUpdate, isDoubleTap } from "@/lib/telegram-player/handler";
-import { paymentLine, pollaDetailScreen } from "@/lib/telegram-player/pollas";
+import { paymentLine, pollaDetailScreen, showPayments } from "@/lib/telegram-player/pollas";
 import { cannotPickReason } from "@/lib/telegram-player/picks";
 import { generateNonce, sha256Hex } from "@/lib/auth/telegram-login/crypto";
 
@@ -550,5 +550,25 @@ describe("Mis pagos: cupos de regalo por invitar (migración 135)", () => {
     expect(paymentLine({ ...compra, status: "rechazada", reject_reason: "<b>" })).toEqual({ state: "❌ rechazado: &lt;b&gt;", actionable: true });
     expect(paymentLine({ ...compra, status: "anulada", proof_path: null })).toEqual({ state: "⚠️ falta el comprobante", actionable: true });
     expect(paymentLine({ ...compra, origin: null, status: "anulada", proof_path: null })?.actionable).toBe(true);
+  });
+
+  it("la consulta deja fuera los regalos en pausa antes del límite de 15", async () => {
+    const calls: Array<[string, unknown[]]> = [];
+    const chain: Record<string, (...args: unknown[]) => unknown> = {};
+    for (const method of ["select", "eq", "or", "is", "in", "order"]) {
+      chain[method] = (...args: unknown[]) => { calls.push([method, args]); return chain; };
+    }
+    const polla = { name: "OFIGOLAZO", status: "abierta", kind: "partidos", archived_at: null };
+    chain.limit = () => Promise.resolve({ data: [
+      { id: "e1", polla_id: POLLA, status: "pendiente", proof_path: "p", reject_reason: null, ticket_number: null, entry_number: 1, origin: "compra", created_at: "2026-09-17T00:00:00Z", casa_pollas: polla },
+      { id: "e2", polla_id: POLLA, status: "pagada", proof_path: null, reject_reason: null, ticket_number: null, entry_number: 2, origin: "invitacion", created_at: "2026-09-17T00:00:00Z", casa_pollas: polla },
+    ], error: null });
+    const send = vi.fn().mockResolvedValue(undefined);
+    await showPayments({ db: { from: () => chain }, bot: { send }, account: { userId: "u1" }, chatId: TG, editMessageId: null, env: {} } as never);
+    expect(calls).toContainEqual(["or", ["origin.eq.compra,status.eq.pagada"]]);
+    const text = (send.mock.calls[0][1] as { text: string }).text;
+    expect(text).toContain("⏳ en revisión");
+    expect(text).toContain("🎁 regalo por invitar");
+    expect(text).not.toContain("falta el comprobante");
   });
 });

@@ -379,6 +379,8 @@ export async function showPayments(ctx: PlayerCtx): Promise<void> {
   const { data, error } = await ctx.db.from("casa_entries")
     .select("id, polla_id, status, proof_path, reject_reason, ticket_number, entry_number, origin, created_at, casa_pollas!inner(name, status, kind, archived_at)")
     .eq("user_id", ctx.account.userId)
+    // Un regalo en pausa o removido no es un pago: fuera antes del límite.
+    .or("origin.eq.compra,status.eq.pagada")
     .is("casa_pollas.archived_at", null)
     .in("casa_pollas.status", ["abierta", "cerrada", "resuelta"])
     .order("created_at", { ascending: false })

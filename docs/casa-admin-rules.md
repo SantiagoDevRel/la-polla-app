@@ -235,9 +235,13 @@ primera polla; el conteo se renueva en cada polla. El regalo no suma al pozo.
   (no sobre los regalos) y repite las mismas preguntas: una aprobación simultánea
   termina primero y fija el vínculo.
 - **Ancla** (`counted_polla_id`): la fija el primer pago con monto aprobado en una
-  polla con programa. Si se revierte el pago del ancla, pasa a otro cupo pagado de
-  esa polla o, si no queda, se libera y el invitado cuenta en la próxima polla donde
-  se le apruebe un pago. El vínculo sigue fijo.
+  polla con programa. Desmarcar ese pago no la mueve: vuelve a revisión y, mientras
+  no esté aprobado, el invitado no cuenta. Si se rechaza (o se anula), el ancla pasa
+  a otro cupo pagado de esa polla; si no hay, a su primer cupo pagado en otra polla
+  con programa, y esa polla se recuenta en la misma transacción; si tampoco, se
+  libera y cuenta en la próxima polla donde se le apruebe un pago. El vínculo sigue
+  fijo. Recontar la otra polla también la bloquea: dos rechazos cruzados simultáneos
+  pueden abortar uno (se reintenta).
 - **Conteo** (`casa_referral_sync`, disparado por cada cambio de estado o monto de un
   cupo comprado y por cambios de `max_entries_per_user`): invitados anclados en la
   polla con un cupo comprado aprobado ahí; `ganados = contados / cada` solo si el
@@ -278,7 +282,10 @@ primera polla; el conteo se renueva en cada polla. El regalo no suma al pozo.
   ese invitador en la polla. El bot de jugadores todavía no captura códigos ni
   pronostica con el cupo de regalo (segundo PR).
   Si el tope llega al número 50 (muchos regalos removidos), no se crean más regalos
-  sin aviso. «N inscritos» cuenta cupos, también los de regalo; el dinero sale solo
+  sin aviso. Un aviso de regalo por Telegram se da por enviado al reclamarlo: si el
+  cupo se pausa antes de enviarse, ese mensaje no sale (el cupo sí aparece en la web).
+  El aviso de invitaciones sale para cualquier polla abierta cuyo nombre empiece por
+  OFIGOLAZO: no publicar pollas de prueba con ese nombre. «N inscritos» cuenta cupos, también los de regalo; el dinero sale solo
   de `amount_cop`.
 - **Despliegue.** 135 antes del código y en una sola transacción; verificación
   read-only al final de la migración. Regresión: `scripts/casa-referrals-check.sql`.

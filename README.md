@@ -1163,9 +1163,10 @@ hacer nada.
   Perfil). Se puede corregir hasta que se apruebe el primer pago.
 - **Quién cuenta.** Solo cuentas de acceso creadas desde la migración 135 que
   nunca han pagado; una persona tiene un solo invitador y cuenta una sola vez, en
-  su primera polla con invitaciones (si ese pago se desmarca, cuenta en la
-  siguiente). El conteo es por polla. Los administradores no invitan ni ganan
-  regalos.
+  su primera polla con invitaciones (si ese pago se rechaza, cuenta en su
+  siguiente polla pagada; desmarcarlo solo lo devuelve a revisión). El conteo es
+  por polla. Los administradores no invitan ni ganan regalos, y en la app de iOS
+  no hay invitaciones.
 - **El cupo de regalo.** Aparece solo cuando quien invita tiene su propio cupo
   pagado en esa polla (antes o después). Vale $0: no suma al pozo, compite como
   cualquier cupo y cuenta en el máximo por persona. Si se desmarca el pago de un

@@ -61,14 +61,16 @@ export async function setReferrer(
   return data as SetReferrerResult;
 }
 
-/** Respuestas con las que el código del enlace ya no le sirve a esta persona. */
+/**
+ * Respuestas con las que el código del enlace ya no le sirve a esta persona.
+ * REFERRAL_RATE_LIMITED no está: pasada la hora, el enlace válido todavía vincula.
+ */
 const FINAL_RESULTS = new Set([
   "REFERRAL_CODE_NOT_FOUND",
   "SELF_REFERRAL",
   "REFERRAL_EXISTS",
   "REFERRAL_LOCKED",
   "NOT_NEW_USER",
-  "REFERRAL_RATE_LIMITED",
 ]);
 
 /**

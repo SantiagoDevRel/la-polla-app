@@ -23,8 +23,10 @@ la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
   dueño puede editar) es desde la 135 (`casa_referral_settings.accounts_since`), sin
   ningún pago con monto aprobado (ni corregido). Un invitador por persona (PK). Cada
   invitado cuenta UNA vez: en la primera polla con invitaciones donde se le aprueba un
-  pago (`counted_polla_id`); si ese pago se desmarca y no le queda otro ahí, el ancla
-  se libera. Conteo por invitador y por polla; en otra polla empieza de cero.
+  pago (`counted_polla_id`). Desmarcar ese pago no mueve el ancla (vuelve a revisión);
+  si se rechaza, pasa a otro cupo pagado de esa polla, a su primer cupo pagado en otra
+  polla con invitaciones (y se recuenta allá) o se libera. Conteo por invitador y por
+  polla; en otra polla empieza de cero.
 - **Administradores fuera** (`casa_referral_can_refer`): sin código, sus códigos no
   vinculan ni sugieren, y no ganan regalos. Así la casa no se lleva cupos pagados por
   los jugadores ni sus enlaces le quitan el invitado a nadie.
@@ -40,7 +42,10 @@ la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
   OFIGOLAZO» con el código para copiar y Compartir, en /casa y en esa polla, una vez
   por persona y polla (`localStorage`). Sale para la polla abierta cuyo nombre empieza
   por `REFERRAL_PROMO_POLLA` y tiene el programa; nunca sin código, sin cupos libres
-  ni en la app de iOS (ahí tampoco se muestran las demás piezas de invitaciones).
+  ni en la app de iOS (ahí tampoco se muestran las demás piezas de invitaciones, y
+  Compartir manda el enlace sin código).
+- **Cookie `lp_ref`:** se borra cuando SQL da un resultado final; con
+  `REFERRAL_RATE_LIMITED` o un error de base se conserva para el siguiente intento.
 - **Blindaje.** Tablas nuevas de solo lectura para service_role; un regalo solo se
   escribe con su evento en `casa_referral_events` en la misma transacción
   (`casa_02_referral_guard` + parche needle de `casa_v2_write_guard`). v2/v3 nunca

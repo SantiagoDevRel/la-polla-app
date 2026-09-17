@@ -17,6 +17,7 @@ import { useState } from "react";
 import { Share2, Check } from "lucide-react";
 import { textoCompartir, type PremioCompartir } from "@/lib/casa/share-text";
 import { referralLink } from "@/lib/casa/referrals-shared";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
 export function CompartirPolla({
   slug,
@@ -43,6 +44,10 @@ export function CompartirPolla({
   className?: string;
 }) {
   const [copiado, setCopiado] = useState(false);
+  // En la app de iOS no hay invitaciones (como en Perfil): el enlace va sin código.
+  const isIOSApp = useIsIOSApp();
+  const code = isIOSApp ? null : codigo;
+  const tip = isIOSApp ? undefined : ayuda;
 
   function textoYUrl() {
     // Compartimos el dominio público, incluso desde localhost o un preview.
@@ -53,8 +58,8 @@ export function CompartirPolla({
     const origin = english
       ? "https://chickenpicks.app"
       : "https://lapollacolombiana.com";
-    const url = referralLink(origin, slug, codigo);
-    const texto = textoCompartir({ nombre, entradaCop, premio, codigo, english });
+    const url = referralLink(origin, slug, code);
+    const texto = textoCompartir({ nombre, entradaCop, premio, codigo: code, english });
     return { url, texto };
   }
 
@@ -85,9 +90,9 @@ export function CompartirPolla({
     <button
       type="button"
       onClick={compartir}
-      title={ayuda}
+      title={tip}
       className={`lp-btn ${variant === "primary" ? "lp-btn-primary" : "lp-btn-ghost"} !px-4 ${className}`}
-      aria-label={`Compartir ${nombre}${ayuda ? `. ${ayuda}` : ""}`}
+      aria-label={`Compartir ${nombre}${tip ? `. ${tip}` : ""}`}
     >
       {copiado ? (
         <>
