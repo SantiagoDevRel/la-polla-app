@@ -280,11 +280,10 @@ export default function PerfilPage() {
           </p>
         </div>
 
-        <MyPollas />
-
-        {/* Cuenta de pago — debajo del pollito + nombre. Edit / clear /
-            cambiar de banco. Pre-llena el WinnerPayoutModal cuando ganan
-            una polla, así no tienen que re-tipear cada vez.
+        {/* Cuenta de pago — justo debajo del celular (2026-09-17, pedido del
+            dueño: que se encuentre apenas se abre /perfil, sin bajar por
+            «Mis pollas»). Edit / clear / cambiar de banco. Es la cuenta a la
+            que la casa transfiere los premios.
             iOS: oculto por compliance 5.1.1(ix) — sin recolección de
             data financiera sensible (cuenta bancaria) en el iOS app. */}
         {!isIOSApp && (
@@ -297,6 +296,8 @@ export default function PerfilPage() {
             onClear={handlePayoutClear}
           />
         )}
+
+        <MyPollas />
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />
