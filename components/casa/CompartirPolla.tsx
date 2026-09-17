@@ -8,17 +8,25 @@
 // Va de la mano del cambio en lib/supabase/middleware.ts que deja /casa/<slug>
 // abierta sin sesion: sin eso el link que se pega en el grupo manda a /login y
 // el que no tiene cuenta no ve ni de que se trata.
+//
+// (2026-09-17, migración 135) Con `codigo`, el enlace y el mensaje llevan el
+// código de invitación de quien comparte: así cuentan sus invitados.
 "use client";
 
 import { useState } from "react";
 import { Share2, Check } from "lucide-react";
 import { textoCompartir, type PremioCompartir } from "@/lib/casa/share-text";
+import { referralLink } from "@/lib/casa/referrals-shared";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 
 export function CompartirPolla({
   slug,
   nombre,
   entradaCop,
   premio = null,
+  codigo = null,
+  ayuda,
+  variant = "ghost",
   className = "w-full",
 }: {
   slug: string;
@@ -26,10 +34,20 @@ export function CompartirPolla({
   entradaCop: number;
   /** Premio fijo u objeto; null en pozo proporcional (solo se anuncia la entrada). */
   premio?: PremioCompartir;
+  /** Código de invitación de quien comparte; null = enlace sin código. */
+  codigo?: string | null;
+  /** Explicación al pasar el cursor (la regla de invitaciones). */
+  ayuda?: string;
+  /** Principal solo donde compartir es la acción de la pantalla (el aviso de invitaciones). */
+  variant?: "ghost" | "primary";
   /** Ancho/flex según dónde va: sola ocupa toda la fila; junto al CTA se reparte. */
   className?: string;
 }) {
   const [copiado, setCopiado] = useState(false);
+  // En la app de iOS no hay invitaciones (como en Perfil): el enlace va sin código.
+  const isIOSApp = useIsIOSApp();
+  const code = isIOSApp ? null : codigo;
+  const tip = isIOSApp ? undefined : ayuda;
 
   function textoYUrl() {
     // Compartimos el dominio público, incluso desde localhost o un preview.
@@ -40,8 +58,8 @@ export function CompartirPolla({
     const origin = english
       ? "https://chickenpicks.app"
       : "https://lapollacolombiana.com";
-    const url = `${origin}/casa/${slug}`;
-    const texto = textoCompartir({ nombre, entradaCop, premio, english });
+    const url = referralLink(origin, slug, code);
+    const texto = textoCompartir({ nombre, entradaCop, premio, codigo: code, english });
     return { url, texto };
   }
 
@@ -72,8 +90,9 @@ export function CompartirPolla({
     <button
       type="button"
       onClick={compartir}
-      className={`lp-btn lp-btn-ghost !px-4 ${className}`}
-      aria-label={`Compartir ${nombre}`}
+      title={tip}
+      className={`lp-btn ${variant === "primary" ? "lp-btn-primary" : "lp-btn-ghost"} !px-4 ${className}`}
+      aria-label={`Compartir ${nombre}${tip ? `. ${tip}` : ""}`}
     >
       {copiado ? (
         <>

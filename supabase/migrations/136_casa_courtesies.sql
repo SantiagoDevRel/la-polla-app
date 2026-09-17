@@ -81,6 +81,10 @@ ALTER TABLE public.casa_courtesies ENABLE ROW LEVEL SECURITY;
 -- Security Advisor (misma forma que el resto de las tablas casa_*).
 CREATE POLICY casa_courtesies_service_only ON public.casa_courtesies
   FOR ALL TO authenticated USING (false) WITH CHECK (false);
+-- Supabase otorga TODOS los privilegios a anon/authenticated en cada tabla nueva
+-- de `public`: hay que quitarlos explícito, igual que con las funciones en las
+-- migraciones 079/080. RLS ya niega todo; esto es la segunda capa.
+REVOKE ALL ON public.casa_courtesies FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.casa_courtesies TO service_role;
 
 -- ── 2. Reglas internas ──────────────────────────────────────────────────────

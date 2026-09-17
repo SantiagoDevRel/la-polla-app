@@ -27,11 +27,13 @@ import {
   COURTESY_COOKIE,
   courtesyLabel,
   courtesyLink,
+  isCourtesyEntry,
   isCourtesyLive,
   normalizeCourtesyCode,
   validCourtesyCode,
   type MyCourtesy,
 } from "@/lib/casa/courtesies-shared";
+import { participationState } from "@/components/casa/Participaciones";
 
 const userId = "00000000-0000-4000-8000-000000000001";
 const code = "ABCDEFGHJK";
@@ -96,6 +98,29 @@ describe("estado de una cortesía", () => {
   it("dice quién la usó cuando ya se redimió", () => {
     expect(courtesyLabel(courtesy({ status: "redimida", redeemed_name: "Ana" })).text).toBe("La usó Ana");
     expect(courtesyLabel(courtesy({ status: "revocada" })).text).toBe("Retirada");
+  });
+});
+
+describe("qué cupo entró con cortesía", () => {
+  // La cortesía y el regalo por invitar (migración 135) tienen la MISMA forma:
+  // pagado, sin comprobante y sin monto. Lo único que los separa es `origin`, y
+  // confundirlos le pondría «Cortesía» al cupo que alguien se ganó invitando.
+  it("reconoce el cupo de cortesía", () => {
+    const cupo = { status: "pagada" as const, proof_path: null, amount_cop: 0, origin: "compra" as const };
+    expect(isCourtesyEntry(cupo)).toBe(true);
+    expect(participationState(cupo)).toBe("cortesia");
+  });
+
+  it("nunca confunde un regalo por invitar con una cortesía", () => {
+    const regalo = { status: "pagada" as const, proof_path: null, amount_cop: 0, origin: "invitacion" as const };
+    expect(isCourtesyEntry(regalo)).toBe(false);
+    expect(participationState(regalo)).toBe("regalo");
+  });
+
+  it("un cupo pagado de verdad sigue siendo pagado", () => {
+    const pagado = { status: "pagada" as const, proof_path: "casa/x.jpg", amount_cop: 20000, origin: "compra" as const };
+    expect(isCourtesyEntry(pagado)).toBe(false);
+    expect(participationState(pagado)).toBe("activa");
   });
 });
 

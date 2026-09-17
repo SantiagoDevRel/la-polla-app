@@ -34,6 +34,15 @@ const cursorSchema = z.object({
   status: z.enum(["pendiente", "pagada"]).default("pendiente"),
 }).strict();
 
+type Named = { display_name?: string | null };
+type UserWithReferral = { id: string; invitacion?: { referrer?: Named | Named[] | null } | Array<{ referrer?: Named | Named[] | null }> | null };
+
+/** Invitaciones (migración 135): nombre de quien invitó a cada jugador, si lo hay. */
+function referrersByUser(users: UserWithReferral[]): Map<string, string | null> {
+  const first = <T,>(value: T | T[] | null | undefined) => (Array.isArray(value) ? value[0] : value) ?? null;
+  return new Map(users.map((user) => [user.id, first(first(user.invitacion)?.referrer)?.display_name ?? null]));
+}
+
 function privateJson(body: unknown, status = 200) {
   return NextResponse.json(body, {
     status,
@@ -146,7 +155,8 @@ export async function GET(req: NextRequest) {
       .filter((v, i, a) => a.indexOf(v) === i);
 
     const [{ data: users, error: usersError }, { data: pollas, error: pollasError }] = await Promise.all([
-      db.from("users").select("id, display_name").in("id", userIds),
+      // Con quién lo invitó (migración 135), para comparar con el nombre del comprobante.
+      db.from("users").select("id, display_name, invitacion:casa_referrals!casa_referrals_referred_user_id_fkey(referrer:users!casa_referrals_referrer_user_id_fkey(display_name))").in("id", userIds),
       db.from("casa_pollas").select("id, name, slug, status, archived_at, settled_at, settlement_outcome, casa_object_draws(id), casa_payouts(id)").in("id", pollaIds),
     ]);
     if (usersError || pollasError) return privateJson({ error: "No se pudieron cargar los datos de los pagos." }, 500);
@@ -172,6 +182,7 @@ export async function GET(req: NextRequest) {
       : { data: [], error: null };
     if (attemptsResult.error) return privateJson({ error: "No se pudo verificar la revisión de los comprobantes." }, 500);
     const revisions = new Map((attemptsResult.data ?? []).map((attempt) => [attempt.id, attempt.review_revision]));
+    const invitadoPor = referrersByUser(users ?? []);
 
     const pendientes = await Promise.all(
       entries.map(async (e) => {
@@ -201,6 +212,7 @@ export async function GET(req: NextRequest) {
         puedeDesmarcar: status === "pagada" && !frozen && Boolean(attemptId),
         pollaId: e.polla_id,
         jugador: nombre.get(e.user_id) ?? "Sin nombre",
+        invitadoPor: invitadoPor.get(e.user_id) ?? null,
         polla: polla.get(e.polla_id)?.name ?? "?",
         pollaSlug: polla.get(e.polla_id)?.slug ?? "",
         montoCop: e.amount_cop,

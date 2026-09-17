@@ -15,8 +15,9 @@
 // haciendo que próximas visitas a chickenpicks.app vieran ES en vez de EN.
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
-import { courtesyCookieOptions } from "@/lib/supabase/cookie-options";
+import { courtesyCookieOptions, referralCookieOptions } from "@/lib/supabase/cookie-options";
 import { COURTESY_COOKIE, COURTESY_PARAM, validCourtesyCode } from "@/lib/casa/courtesies-shared";
+import { REFERRAL_COOKIE, REFERRAL_PARAM, validReferralCode } from "@/lib/casa/referrals-shared";
 
 type Locale = "es" | "en";
 
@@ -43,22 +44,36 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // ── Enlace de cortesía (migración 136) ─────────────────────────────────
-  // /casa/<slug>?cortesia=CODIGO guarda el código en una cookie httpOnly y deja
-  // la URL limpia: quien copie la barra de direcciones no reparte el cupo de
-  // otra persona, y el código sobrevive al login y al onboarding. Manda el
-  // ÚLTIMO enlace abierto (30 días): si el primero ya lo usó alguien, el nuevo
-  // reemplaza al viejo. Solo en una navegación: una imagen o un fetch de otro
-  // sitio no deja cookie. La cookie no decide nada — SQL exige cuenta nueva,
-  // una sola vez y esa polla.
+  // ── Enlaces con código: invitación (135) y cortesía (136) ──────────────
+  // `?ref=` y `?cortesia=` guardan su código en una cookie httpOnly y dejan la
+  // URL limpia: quien copie la barra de direcciones no reparte el código ajeno,
+  // y el código sobrevive al login y al onboarding. Se atienden en el MISMO
+  // paso porque cada uno redirige, y un enlace que trajera los dos perdería el
+  // segundo. Solo en una navegación: una imagen o un fetch de otro sitio no
+  // deja cookie. Ninguna cookie decide nada — SQL exige persona nueva, un solo
+  // invitador y, en la cortesía, un solo canje en esa polla.
+  //
+  // La diferencia entre las dos es a propósito: en invitaciones manda el PRIMER
+  // enlace abierto (no se le quita el invitado a quien lo trajo); en cortesías
+  // manda el ÚLTIMO, porque si el primero ya lo usó alguien el nuevo lo
+  // reemplaza.
+  const referral = request.nextUrl.searchParams.get(REFERRAL_PARAM);
   const courtesy = request.nextUrl.searchParams.get(COURTESY_PARAM);
-  if (courtesy !== null && request.method === "GET" && !request.nextUrl.pathname.startsWith("/api/")) {
+  if ((referral !== null || courtesy !== null) && request.method === "GET"
+    && !request.nextUrl.pathname.startsWith("/api/")) {
     const clean = request.nextUrl.clone();
+    clean.searchParams.delete(REFERRAL_PARAM);
     clean.searchParams.delete(COURTESY_PARAM);
     const response = NextResponse.redirect(clean, 307);
-    const code = validCourtesyCode(courtesy);
     const navigation = (request.headers.get("sec-fetch-dest") ?? "document") === "document";
-    if (code && navigation) response.cookies.set(COURTESY_COOKIE, code, courtesyCookieOptions());
+    if (navigation) {
+      const refCode = validReferralCode(referral);
+      if (refCode && !request.cookies.get(REFERRAL_COOKIE)) {
+        response.cookies.set(REFERRAL_COOKIE, refCode, referralCookieOptions());
+      }
+      const courtesyCode = validCourtesyCode(courtesy);
+      if (courtesyCode) response.cookies.set(COURTESY_COOKIE, courtesyCode, courtesyCookieOptions());
+    }
     return response;
   }
 

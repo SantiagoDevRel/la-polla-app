@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { MyPollas } from "@/components/casa/MyPollas";
+import { InvitacionesPerfil } from "@/components/casa/InvitacionesPerfil";
 import { MisCortesias } from "@/components/casa/MisCortesias";
 
 import { useState, useEffect } from "react";
@@ -302,9 +303,13 @@ export default function PerfilPage() {
             desplegables compactos y cerrados para no recargar el perfil. */}
         <MyPollas split defaultOpen={false} />
 
-        {/* Cortesías para regalar (migración 136). Solo aparece si la casa le
-            dio cupos; si no tiene, el componente no dibuja nada. */}
-        <MisCortesias />
+        {/* Invitaciones (migración 135). iOS: fuera, como el resto de promociones con premio. */}
+        {!isIOSApp && <InvitacionesPerfil />}
+
+        {/* Cortesías para regalar (migración 136). Solo aparece si la casa le dio
+            cupos; si no tiene, el componente no dibuja nada. Fuera de iOS por el
+            mismo criterio que las invitaciones. */}
+        {!isIOSApp && <MisCortesias />}
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />

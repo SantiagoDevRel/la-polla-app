@@ -6,6 +6,7 @@
 // devuelve el mensaje correspondiente.
 
 import { DEFAULT_MAX_ENTRIES_PER_USER, type CasaPolla } from "@/lib/casa/types";
+import { DEFAULT_REFERRAL_EVERY } from "@/lib/casa/referrals-shared";
 
 export type EditBlock = "NOT_FOUND" | "ARCHIVED" | "FINAL" | "DRAW" | "CLOSED";
 
@@ -60,9 +61,13 @@ export interface EditableFields {
   payoutAccountName: string;
   /** Participaciones por persona (migración 131). */
   maxEntriesPerUser: number;
+  /** Cupo de regalo por invitar (migración 135); solo sin inscripciones y nunca en rifas. */
+  referralOn?: boolean;
 }
 
 export type EditChanges = Partial<{
+  /** Migración 135: número de invitados por regalo o null (apagado). Va a casa_set_referral_every_v1. */
+  referralEvery: number | null;
   name: string;
   description: string | null;
   scoringMode: "1x2" | "marcador";
@@ -92,7 +97,7 @@ export function editableFieldsFromPolla(
     | "payout_method"
     | "payout_account"
     | "payout_account_name"
-  > & Partial<Pick<CasaPolla, "max_entries_per_user">>,
+  > & Partial<Pick<CasaPolla, "max_entries_per_user" | "referral_every">>,
 ): EditableFields {
   return {
     name: polla.name,
@@ -107,6 +112,7 @@ export function editableFieldsFromPolla(
     payoutAccount: polla.payout_account ?? "",
     payoutAccountName: polla.payout_account_name ?? "",
     maxEntriesPerUser: polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER,
+    referralOn: polla.referral_every != null,
   };
 }
 
@@ -131,6 +137,10 @@ export function buildEditChanges(
   }
   if (options.hasEntries) return changes;
 
+  // Invitaciones: como el resto de condiciones, solo mientras nadie se inscriba.
+  if (options.kind !== "rifa" && (draft.referralOn ?? false) !== (original.referralOn ?? false)) {
+    changes.referralEvery = draft.referralOn ? DEFAULT_REFERRAL_EVERY : null;
+  }
   if (options.kind === "partidos" && draft.scoringMode !== original.scoringMode) changes.scoringMode = draft.scoringMode;
   if (draft.entryPriceCop !== original.entryPriceCop) changes.entryPriceCop = draft.entryPriceCop;
   if (options.prizeKind === "objeto") {
@@ -203,6 +213,8 @@ const EDITOR_ERRORS: Record<string, string> = {
   OBJECT_REQUIRED: "Describe el premio en objeto.",
   PAYMENT_ACCOUNT_REQUIRED: "Una polla abierta con entrada necesita la cuenta de cobro.",
   INVALID_PUBLICATION_DATE: "El primer partido empezaría antes de la publicación programada. Cambia la publicación o los partidos.",
+  INVALID_REFERRAL_EVERY: "Revisa el número de invitados por cupo de regalo.",
+  INVALID_POLLA_KIND: "Las rifas no tienen cupos de regalo por invitar.",
 };
 
 /**

@@ -46,6 +46,13 @@ export function onboardingCookieOptions(
   };
 }
 
+/** lp_ref: código del primer enlace de invitación (migración 135), 30 días, solo servidor. */
+export function referralCookieOptions(
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+) {
+  return onboardingCookieOptions(nodeEnv);
+}
+
 /** lp_cortesia: código del enlace de cortesía (migración 136), 30 días, solo servidor. */
 export function courtesyCookieOptions(
   nodeEnv: string | undefined = process.env.NODE_ENV,

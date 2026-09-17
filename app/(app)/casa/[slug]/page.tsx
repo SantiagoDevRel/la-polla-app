@@ -60,6 +60,12 @@ import { courtesyPreview, listMyCourtesies } from "@/lib/casa/courtesies";
 import { COURTESY_COOKIE, COURTESY_FINE_PRINT, isCourtesyEntry, validCourtesyCode, type CourtesyPreview } from "@/lib/casa/courtesies-shared";
 import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
+import { getReferralInvitee, getReferralPollaView } from "@/lib/casa/referrals";
+import { REFERRAL_COOKIE, referralEvery, referralPromo, referralRule, validReferralCode } from "@/lib/casa/referrals-shared";
+import { premioCompartir } from "@/lib/casa/share-text";
+import { InvitaYGana } from "@/components/casa/InvitaYGana";
+import { PromoInvitados } from "@/components/casa/PromoInvitados";
+import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
 import { Plus, Settings, Ticket } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -112,7 +118,10 @@ export default async function PollaPage({
     );
   }
 
-  const [pot, bestEntry, entries, matches, questions, distribution, tabla, payouts, isAdmin, threshold, prizes] =
+  // Invitaciones (migración 135): el código propio para Compartir y, si la
+  // persona llegó por un enlace y todavía puede elegir, quién la invitó.
+  const referralHint = validReferralCode((await cookies()).get(REFERRAL_COOKIE)?.value);
+  const [pot, bestEntry, entries, matches, questions, distribution, tabla, payouts, isAdmin, threshold, prizes, referral, invitee] =
     await Promise.all([
       getPot(polla.id),
       // La inscripción "principal" (pagada > pendiente > …): rifas, premio y la tabla.
@@ -131,8 +140,11 @@ export default async function PollaPage({
       // Lo que ganaría hoy cada líder si la polla terminara ahora (migración
       // 133). Si la lectura falla, la tabla sale sin esa línea.
       polla.kind === "rifa" ? Promise.resolve([]) : getProvisionalPrizes(polla.id).catch(() => []),
+      getReferralPollaView(user.id, polla.id),
+      referralHint ? getReferralInvitee(user.id, referralHint) : Promise.resolve(null),
     ]);
   const abierta = isPollaOpen(polla);
+  const every = referralEvery(polla);
   // ── Qué participación se está viendo ─────────────────────────────────────
   // ?p=N si es suya; si no, la primera viva (pagada o en revisión); si no, la última.
   // En rifas no hay participaciones numeradas: manda la inscripción principal.
@@ -219,6 +231,9 @@ export default async function PollaPage({
   const activarCortesia = Boolean(cortesiaDeEstaPolla?.redeemable) && !participa;
   const comprarOtro = polla.kind !== "rifa" && participa && abierta
     && entries.filter((e) => e.status !== "anulada").length < maxCupos;
+  // Invitaciones: sin código (administradores) no hay regla que ofrecer ni avance.
+  const codigo = referral?.code ?? null;
+  const promo = abierta ? referralPromo(polla, referral, pot.prize_cop) : null;
 
   return (
     <div className="pb-32">
@@ -313,6 +328,11 @@ export default async function PollaPage({
           <ActivarCortesia polla={polla.name} holder={cortesiaDeEstaPolla!.holder} />
         )}
 
+        {/* Llegó por el enlace de alguien y todavía puede elegir (migración 135). */}
+        {invitee?.hint && invitee.can_set_referrer && abierta && (
+          <div className="mt-4 first:mt-0"><QuienTeInvito initial={invitee} variant="casa" /></div>
+        )}
+
         {/* ── Entrar y compartir, en una fila ───────────────────────────────
               (2026-09-13) Antes eran dos filas más la tarjeta de entrada, y las
               pestañas quedaban debajo del primer pantallazo. Compartir solo
@@ -340,11 +360,19 @@ export default async function PollaPage({
                 slug={polla.slug}
                 nombre={polla.name}
                 entradaCop={polla.entry_price_cop}
-                premio={objeto && polla.prize_object ? { objeto: polla.prize_object } : !objeto && polla.pot_mode === "fijo" ? { cop: pot.prize_cop } : null}
+                premio={premioCompartir(polla, pot.prize_cop)}
+                codigo={codigo}
+                ayuda={every && codigo ? referralRule(every) : undefined}
                 className="flex-[1_0_auto]"
               />
             )}
           </div>
+        )}
+        {/* (2026-09-17) Pedido del dueño: la regla de invitaciones, pequeña, junto a Compartir.
+              Para quien ya juega aquí o ya tiene invitados; a quien todavía no entra le basta
+              con entrar (la regla sigue en el cursor de Compartir y en Info). */}
+        {abierta && every && codigo && referral && (participa || referral.counted > 0 || referral.in_review > 0) && (
+          <InvitaYGana view={referral} every={every} />
         )}
 
         {/* Estás dentro. Antes, cuando Tama aprobaba, simplemente DESAPARECÍA
@@ -516,6 +544,8 @@ export default async function PollaPage({
         </PollaTabs>
         {isAdmin && !polla.draw_pending && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/casa" />}
       </div>
+      {/* Aviso de invitaciones (2026-09-17): solo en la polla del aviso. */}
+      {promo && <PromoInvitados promo={promo} />}
     </div>
   );
 }

@@ -11,7 +11,13 @@ import { Check, Copy } from "lucide-react";
  * número, que es lo que aceptan Nequi y Bancolombia, y confirma en pantalla y
  * para lectores de pantalla.
  */
-export function CopiarDato({ valor, etiqueta }: { valor: string; etiqueta: string }) {
+export function CopiarDato({ valor, etiqueta, nombre }: {
+  valor: string;
+  /** Sufijo del id del texto que se selecciona si no hay portapapeles. */
+  etiqueta: string;
+  /** Lo que se copia, para lectores de pantalla (por defecto, la etiqueta). */
+  nombre?: string;
+}) {
   const [copiado, setCopiado] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
@@ -41,7 +47,7 @@ export function CopiarDato({ valor, etiqueta }: { valor: string; etiqueta: strin
     <button
       type="button"
       onClick={copiar}
-      aria-label={`Copiar ${etiqueta}`}
+      aria-label={`Copiar ${nombre ?? etiqueta}`}
       className="lp-btn lp-btn-ghost min-h-11 shrink-0 gap-2 !px-4 text-[15px]"
     >
       {copiado ? <Check aria-hidden="true" className="h-4 w-4 text-turf" /> : <Copy aria-hidden="true" className="h-4 w-4" />}

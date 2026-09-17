@@ -59,13 +59,21 @@ export function courtesyErrorMessage(code: string | null | undefined): string {
 /**
  * ¿Este cupo entró con una cortesía? Es la forma que garantiza
  * casa_redeem_courtesy_v1 y NADA más la produce: una inscripción aprobada
- * siempre tiene comprobante y un monto mayor a cero. Solo para mostrar: ningún
- * cálculo de dinero ni de puntaje depende de esto.
+ * siempre tiene comprobante y un monto mayor a cero.
+ *
+ * El cupo de cortesía NO lleva `origin` propio a propósito: el guard de las
+ * invitaciones (migración 135, `casa_referral_entry_guard`) rechaza cualquier
+ * inscripción cuyo origen no sea 'compra' si no viene con su evento de
+ * referido. Por eso acá se excluye explícitamente el regalo por invitar, que
+ * tiene la misma forma pero sí marca su origen.
+ *
+ * Solo para mostrar: ningún cálculo de dinero ni de puntaje depende de esto.
  */
 export function isCourtesyEntry(
-  entry: { status: string; proof_path?: string | null; amount_cop?: number | null },
+  entry: { status: string; proof_path?: string | null; amount_cop?: number | null; origin?: string | null },
 ): boolean {
-  return entry.status === "pagada" && !entry.proof_path && entry.amount_cop === 0;
+  return entry.status === "pagada" && !entry.proof_path && entry.amount_cop === 0
+    && entry.origin !== "invitacion";
 }
 
 export type CourtesyStatus = "disponible" | "redimida" | "revocada";

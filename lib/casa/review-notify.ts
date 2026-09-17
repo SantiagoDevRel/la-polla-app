@@ -3,6 +3,7 @@ import { getPot } from "@/lib/casa/queries";
 import { formatCop } from "@/lib/casa/format";
 import { sendTextMessage } from "@/lib/whatsapp/bot";
 import { notifyPlayerReviewByTelegram } from "@/lib/telegram-player/notify";
+import { notifyReferralGifts } from "@/lib/casa/referrals";
 
 /** Both admin channels send the same best-effort notice after a new decision. */
 export async function notifyCasaReview(entryId: string, pollaId: string, approved: boolean) {
@@ -28,6 +29,9 @@ export async function notifyCasaReview(entryId: string, pollaId: string, approve
         pollaSlug: numbered ? `${polla.slug}?p=${entry.entry_number}` : polla.slug, pozoCop: pot.prize_cop,
         prizeKind: polla.prize_kind, prizeObject: polla.prize_object, kind: polla.kind });
     }
+    // Una aprobación puede completar los invitados de alguien (migración 135):
+    // SQL ya creó el cupo de regalo; aquí solo se avisa.
+    if (approved) await notifyReferralGifts(db);
   } catch { console.warn("[casa] Revisión registrada; no se pudo enviar el aviso al jugador."); }
 }
 

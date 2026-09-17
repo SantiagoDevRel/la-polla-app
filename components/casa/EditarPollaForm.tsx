@@ -26,6 +26,7 @@ import {
   type EditableFields,
 } from "@/lib/casa/editor";
 import type { PollaEditorState } from "@/lib/casa/editor-state";
+import { DEFAULT_REFERRAL_EVERY } from "@/lib/casa/referrals-shared";
 
 type Aviso = { tone: "ok" | "error"; text: string } | null;
 
@@ -249,6 +250,26 @@ export function EditarPollaForm({ state }: { state: PollaEditorState }) {
                   : "Solo el marcador exacto suma: 3 puntos; cualquier otro resultado, 0. Las pollas anteriores a esta regla conservan 1 punto por acertar los goles de un solo equipo (Info muestra la regla de cada polla)."}
               </p>
             </div>
+          )}
+
+          {/* Invitaciones (migración 135). Nunca en rifas; con entrada $0 no aplica. */}
+          {polla.kind !== "rifa" && (
+            <label htmlFor="editar-invitaciones" className="flex min-h-11 cursor-pointer items-start gap-3">
+              <input
+                id="editar-invitaciones"
+                type="checkbox"
+                checked={draft.referralOn ?? false}
+                onChange={(e) => set({ referralOn: e.target.checked })}
+                aria-describedby="editar-invitaciones-ayuda"
+                className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-turf"
+              />
+              <span className="min-w-0">
+                <span className="block text-[15px] font-semibold text-text-primary">Cupo de regalo por invitar</span>
+                <span id="editar-invitaciones-ayuda" className="mt-1 block text-[13px] text-text-secondary">
+                  1 cupo gratis por cada {polla.referral_every ?? DEFAULT_REFERRAL_EVERY} invitados nuevos que paguen. Automático y sin sumar al pozo.{draft.entryPriceCop <= 0 ? " No aplica con entrada gratis." : ""}
+                </span>
+              </span>
+            </label>
           )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

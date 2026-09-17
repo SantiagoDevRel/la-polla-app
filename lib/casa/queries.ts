@@ -151,6 +151,9 @@ export async function getMyEntry(pollaId: string, userId: string): Promise<CasaE
   return data as CasaEntry | null;
 }
 
+/** Compras en cualquier estado y regalos por invitar solo mientras están activos. */
+const ACTIVE_ENTRY_FILTER = "origin.eq.compra,status.eq.pagada";
+
 /**
  * Todas las participaciones de esta persona en una polla de partidos o
  * preguntas, por número (migración 131). Las rifas usan sus boletas.
@@ -162,6 +165,9 @@ export async function getMyEntries(pollaId: string, userId: string): Promise<Cas
     .eq("polla_id", pollaId)
     .eq("user_id", userId) // ← filtro explícito obligatorio
     .is("ticket_number", null)
+    // Un cupo de regalo en pausa o removido (migración 135) no es un cupo:
+    // `anulada` aquí significaría "reintenta el comprobante", y no lo tiene.
+    .or(ACTIVE_ENTRY_FILTER)
     .order("entry_number", { ascending: true })
     .limit(50);
   if (error) throw error;
@@ -177,6 +183,7 @@ export async function getMyEntryByNumber(pollaId: string, userId: string, entryN
     .eq("user_id", userId) // ← filtro explícito obligatorio
     .is("ticket_number", null)
     .eq("entry_number", entryNumber)
+    .or(ACTIVE_ENTRY_FILTER)
     .maybeSingle();
   if (error) throw error;
   return data as CasaEntry | null;

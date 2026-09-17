@@ -93,7 +93,7 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
             const entryStatus = chosen?.status ?? polla.entry_status;
             const href = `/casa/${polla.slug}${chosen && (several || chosen.number > 1) ? `?p=${chosen.number}` : ""}`;
             const finished = polla.status === "resuelta" || polla.status === "anulada";
-            const status = polla.status === "anulada" ? (en ? "Cancelled" : "Anulada") : finished ? (en ? "Finished" : "Finalizada") : entryStatus === "pendiente" ? (en ? "Payment under review" : "Pago en revisión") : (en ? "Paid" : "Pagado");
+            const status = polla.status === "anulada" ? (en ? "Cancelled" : "Anulada") : finished ? (en ? "Finished" : "Finalizada") : entryStatus === "pendiente" ? (en ? "Payment under review" : "Pago en revisión") : chosen?.gift ? (en ? "Referral gift" : "Regalo por invitar") : (en ? "Paid" : "Pagado");
             const pendingOf = (n?: number) => entries.find(e => e.number === n)?.pending;
             const pending = chosen?.pending ?? pendingByPolla[`${polla.id}:${chosen?.number}`] ?? pendingByPolla[polla.id] ?? 0;
             const otherPending = finished ? [] : entries.filter(e => e.number !== chosen?.number && (pendingOf(e.number) ?? 0) > 0).map(e => `#${e.number}`);
@@ -114,7 +114,7 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
                     <select id={selectId} value={chosen?.number} onChange={event => setSelectedCupo(prev => ({ ...prev, [polla.id]: Number(event.target.value) }))}
                       className="lp-input min-h-11 w-full cursor-pointer appearance-none pr-10 text-[15px] font-semibold">
                       {entries.map(e => <option key={e.number} value={e.number}>
-                        {`${en ? "Entry" : "Cupo"} ${e.number} · ${e.status === "pagada" ? (en ? "Paid" : "Pagado") : (en ? "In review" : "En revisión")}${!finished && (e.pending ?? 0) > 0 ? ` · ${en ? "missing" : "faltan"} ${e.pending}` : ""}`}
+                        {`${en ? "Entry" : "Cupo"} ${e.number} · ${e.gift ? (en ? "Gift" : "Regalo") : e.status === "pagada" ? (en ? "Paid" : "Pagado") : (en ? "In review" : "En revisión")}${!finished && (e.pending ?? 0) > 0 ? ` · ${en ? "missing" : "faltan"} ${e.pending}` : ""}`}
                       </option>)}
                     </select>
                     <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
