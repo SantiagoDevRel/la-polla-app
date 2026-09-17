@@ -6,6 +6,67 @@
 
 ## READ THIS FIRST
 
+### Invitaciones y cupos de regalo (2026-09-17, migración 135)
+
+Pedido del dueño: por cada 5 invitados NUEVOS con pago aprobado en una polla, quien
+invitó recibe un cupo gratis en esa polla, sin intervención del admin. Reglas (SQL es
+la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
+
+- **Código y enlace.** `casa_referral_code_v1` (letras del nombre + 4 dígitos, fijo).
+  Compartir agrega `?ref=CODIGO`; `proxy.ts` lo guarda en la cookie httpOnly `lp_ref`
+  (primer enlace, 30 días, solo navegaciones) y limpia la URL. Se vincula al
+  completar el perfil (`PATCH /api/users/me`) o al enviar el comprobante (`join`), y a
+  mano con el código (`/api/casa/referidos`, tarjetas `QuienTeInvito` en /casa,
+  /pagar y Perfil). Un enlace nunca reemplaza a un invitador ya guardado
+  (`REFERRAL_EXISTS`); escribir el código sí, hasta el primer pago aprobado.
+- **Quién cuenta.** Solo cuentas cuya fila de `auth.users` (no `public.users`, que su
+  dueño puede editar) es desde la 135 (`casa_referral_settings.accounts_since`), sin
+  ningún pago con monto aprobado (ni corregido). Un invitador por persona (PK). Cada
+  invitado cuenta UNA vez: en la primera polla con invitaciones donde se le aprueba un
+  pago (`counted_polla_id`). Desmarcar ese pago no mueve el ancla (vuelve a revisión);
+  si se rechaza, pasa a otro cupo pagado de esa polla, a su primer cupo pagado en otra
+  polla con invitaciones (y se recuenta allá) o se libera. Conteo por invitador y por
+  polla; en otra polla empieza de cero.
+- **Administradores fuera** (`casa_referral_can_refer`): sin código, sus códigos no
+  vinculan ni sugieren, y no ganan regalos. Así la casa no se lleva cupos pagados por
+  los jugadores ni sus enlaces le quitan el invitado a nadie.
+- **El regalo.** `casa_referral_sync` (trigger AFTER en `casa_entries`) crea una fila
+  `origin='invitacion'`, `pagada`, `amount_cop=0` cuando el invitador tiene su propio
+  cupo pagado ahí (en cualquier orden). No suma al pozo, compite normal y cuenta en
+  `max_entries_per_user`. Los regalos van en fila por `entry_number`: el k-ésimo está
+  activo si hay k ganados; desmarcar un pago pausa los últimos (`anulada`, conserva
+  pronósticos). «Remover cupo» (con motivo) anula ESE regalo y conserva su puesto, así
+  que ninguno en pausa lo reemplaza; «Restaurar» lo devuelve si sigue ganado. Ninguno
+  de los dos después del reparto (`ALREADY_SETTLED`).
+- **Aviso al entrar** (`PromoInvitados`): «Por 5 invitados, te damos un cupo en la
+  OFIGOLAZO» con el código para copiar y Compartir, en /casa y en esa polla, una vez
+  por persona y polla (`localStorage`). Sale para la polla abierta cuyo nombre empieza
+  por `REFERRAL_PROMO_POLLA` y tiene el programa; nunca sin código, sin cupos libres
+  ni en la app de iOS (ahí tampoco se muestran las demás piezas de invitaciones, y
+  Compartir manda el enlace sin código).
+- **Cookie `lp_ref`:** se borra cuando SQL da un resultado final; con
+  `REFERRAL_RATE_LIMITED` o un error de base se conserva para el siguiente intento.
+- **Blindaje.** Tablas nuevas de solo lectura para service_role; un regalo solo se
+  escribe con su evento en `casa_referral_events` en la misma transacción
+  (`casa_02_referral_guard` + parche needle de `casa_v2_write_guard`). v2/v3 nunca
+  reusan un regalo ni le aceptan comprobante (`GIFT_ENTRY`). `getMyEntries` oculta
+  los regalos en pausa: `anulada` en compra significa «reintentar», en regalo no.
+- **Alcance.** Solo partidos/preguntas con entrada > $0; pollas creadas desde la 135
+  (`referral_every` DEFAULT 5) y borradores nunca publicados sin inscripciones; las
+  publicadas que ya existían quedan NULL. Interruptor en el editor solo sin
+  inscripciones (`casa_set_referral_every_v1`). El bot de jugadores todavía no tiene
+  enlace ni código propio (segundo PR); sí avisa el cupo ganado y «Mis pagos» marca el
+  regalo activo como regalo y oculta el pausado (nunca pide comprobante por él).
+- **Textos mínimos** (pedido del dueño): la regla es una frase y la única letra menuda
+  es «*Solo aplica para usuarios nuevos, 1 polla por usuario.» (`REFERRAL_FINE_PRINT`).
+  Nada de listas de condiciones.
+- **Orden de despliegue:** migración 135 antes del código (el código lee
+  `casa_entries.origin` y `casa_pollas.referral_every`: al revés, Casa entera falla).
+  Aplicarla en UNA transacción. Regresión: `scripts/casa-referrals-check.sql`
+  (ROLLBACK, 18 bloques), `tests/casa-referrals.test.ts`,
+  `tests/telegram-player.test.ts` y `scripts/casa-referrals-browser-check.mjs`
+  (dev server local).
+
 ### Carrusel en vivo, reparto al terminar y marcadores demorados (2026-09-17, migración 134)
 
 - **Franja «En vivo» de /casa:** carrusel horizontal (`lp-hscroll`, snap) que se
@@ -328,7 +389,9 @@ variantes arbitrarias ya escritas (`[[open]>summary>&]:rotate-180`) siguen siend
 
 ### Navegación y actualización de la app (2026-09-09)
 
-Casa (2026-09-17): En vivo → Mis pollas → Pollas disponibles → Pollas cerradas.
+Casa (2026-09-17): En vivo → «¿Alguien te invitó?» (solo personas nuevas, migración
+135) → Mis pollas → Pollas disponibles → Pollas cerradas; el aviso de OFIGOLAZO
+flota encima una sola vez.
 Mis pollas lleva solo pollas en juego; al finalizar (resuelta/anulada) la polla pasa
 sola a Pollas cerradas con la marca «Participaste», y una en juego no se repite allí.
 Siempre hay una abierta al cargar: Mis pollas si hay pollas en juego; disponibles si

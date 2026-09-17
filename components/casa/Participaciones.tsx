@@ -18,9 +18,11 @@ import { StreetCard } from "@/components/street";
 import { formatCop } from "@/lib/casa/format";
 import type { CasaEntry } from "@/lib/casa/types";
 
-export type ParticipationState = "activa" | "revision" | "rechazada" | "sin-comprobante";
+export type ParticipationState = "activa" | "regalo" | "revision" | "rechazada" | "sin-comprobante";
 
-export function participationState(entry: Pick<CasaEntry, "status" | "proof_path">): ParticipationState {
+export function participationState(entry: Pick<CasaEntry, "status" | "proof_path"> & Partial<Pick<CasaEntry, "origin">>): ParticipationState {
+  // Cupo de regalo por invitar (migración 135): activo, sin comprobante.
+  if (entry.origin === "invitacion") return "regalo";
   if (entry.status === "pagada") return "activa";
   if (entry.status === "pendiente" && entry.proof_path) return "revision";
   if (entry.status === "rechazada") return "rechazada";
@@ -29,14 +31,16 @@ export function participationState(entry: Pick<CasaEntry, "status" | "proof_path
 
 const LABEL: Record<ParticipationState, string> = {
   activa: "Pagado",
+  regalo: "Regalo por invitar",
   revision: "Pago en revisión",
   rechazada: "Pago rechazado",
   "sin-comprobante": "Falta el comprobante",
 };
 
-/** Color del estado de pago: verde pagado, amarillo en revisión. */
+/** Color del estado de pago: verde pagado (y regalo), amarillo en revisión. */
 const PILL: Record<ParticipationState, string> = {
   activa: "border-turf/50 bg-turf/15 text-turf",
+  regalo: "border-turf/50 bg-turf/15 text-turf",
   revision: "border-amber/50 bg-amber/15 text-amber",
   rechazada: "border-red-alert/50 bg-red-alert/15 text-red-alert",
   "sin-comprobante": "border-amber/50 bg-amber/15 text-amber",
@@ -47,6 +51,7 @@ const faltanTexto = (n: number) => (n === 1 ? "falta 1 pronóstico" : `faltan ${
 /** Texto corto para el desplegable: cabe a 320 px; el detalle va en las etiquetas de color. */
 const OPTION: Record<ParticipationState, string> = {
   activa: "Pagado",
+  regalo: "Regalo",
   revision: "En revisión",
   rechazada: "Rechazado",
   "sin-comprobante": "Sin comprobante",
@@ -62,8 +67,8 @@ export function Participaciones({
   pendingByNumber,
 }: {
   slug: string;
-  /** Cupos de la persona, por número. */
-  entries: Array<Pick<CasaEntry, "entry_number" | "status" | "proof_path" | "reject_reason">>;
+  /** Cupos de la persona, por número (los de regalo en pausa ya vienen filtrados). */
+  entries: Array<Pick<CasaEntry, "entry_number" | "status" | "proof_path" | "reject_reason"> & Partial<Pick<CasaEntry, "origin">>>;
   selectedNumber: number | null;
   maxEntries: number;
   entryPriceCop: number;

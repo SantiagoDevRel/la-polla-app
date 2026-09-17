@@ -78,6 +78,12 @@ export interface CasaPolla {
   payout_account_name: string | null;
   /** Participaciones que una persona puede tener en esta polla (migración 131). */
   max_entries_per_user?: number;
+  /**
+   * Invitaciones (migración 135): cada cuántos invitados nuevos con pago
+   * aprobado hay un cupo de regalo. NULL = la polla no participa. Para saber si
+   * aplica, usar referralEvery() (rifas y entradas gratis nunca participan).
+   */
+  referral_every?: number | null;
   created_by: string;
   created_at: string;
 }
@@ -100,7 +106,14 @@ export interface MyCasaPolla extends Pick<CasaPolla, "id" | "slug" | "name" | "k
    * Participaciones vivas (pagada o en revisión) en polla de partidos/preguntas,
    * ordenadas por número. Vacío en rifas: ahí manda la boleta.
    */
-  entries: Array<{ number: number; status: "pendiente" | "pagada"; /** Partidos todavía pronosticables sin pronóstico. */ pending?: number }>;
+  entries: Array<{
+    number: number;
+    status: "pendiente" | "pagada";
+    /** Partidos todavía pronosticables sin pronóstico. */
+    pending?: number;
+    /** Cupo de regalo por invitar (migración 135). */
+    gift?: boolean;
+  }>;
 }
 
 export interface CasaEntry {
@@ -117,7 +130,62 @@ export interface CasaEntry {
   ticket_number: number | null;
   /** 1, 2, 3… en pollas de partidos/preguntas; null en rifas (migración 131). */
   entry_number?: number | null;
+  /**
+   * `compra` (transferencia + comprobante) o `invitacion` (cupo de regalo por
+   * invitar, sin comprobante ni monto; migración 135).
+   */
+  origin?: "compra" | "invitacion";
   created_at: string;
+}
+
+/** Quien invitó, tal como se muestra (sin ids internos). */
+export interface ReferralPerson {
+  name: string | null;
+  avatar: string | null;
+  code: string | null;
+}
+
+/** casa_referral_polla_view_v1: la polla vista por una persona. */
+export interface ReferralPollaView {
+  code: string | null;
+  /** null = esta polla no tiene invitaciones. */
+  every: number | null;
+  /** Invitados que cuentan aquí con un cupo pagado aquí. */
+  counted: number;
+  /** Invitados con comprobante en revisión aquí (todavía no cuentan). */
+  in_review: number;
+  earned: number;
+  /** Ganados que valen: sin los que el administrador removió. */
+  gifts: number;
+  /** Ganados que todavía no están activos (falta tu pago o espacio). */
+  waiting_gifts: number;
+  active_gifts: number;
+  removed_gifts: number;
+  owner_paid: boolean;
+  slots_left: number;
+  referrer: ReferralPerson | null;
+  referrer_locked: boolean;
+  can_set_referrer: boolean;
+}
+
+/** casa_referral_invitee_v1: quién invitó a esta persona y qué ofrece el enlace. */
+export interface ReferralInviteeState {
+  can_set_referrer: boolean;
+  referrer: ReferralPerson | null;
+  referrer_locked: boolean;
+  /** Invitador del enlace abierto, si todavía se puede elegir y es otro. */
+  hint: ReferralPerson | null;
+}
+
+/** casa_referral_profile_v1 */
+export interface ReferralProfile {
+  code: string | null;
+  invited: number;
+  counted: number;
+  gifts: number;
+  referrer: ReferralPerson | null;
+  referrer_locked: boolean;
+  can_set_referrer: boolean;
 }
 
 export interface CasaPick {
@@ -298,10 +366,10 @@ export interface CasaDistribution {
    Regla dura del repo: nunca `select("*")` en tablas con datos de usuario.
    Enumerar evita que una columna sensible futura se filtre sola. */
 export const CASA_POLLA_COLUMNS =
-  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_kind, pot_mode, fixed_prize_cop, publication_mode, prize_object, prize_image_path, points_exact, points_one_team, points_result, status, opens_at, closes_at, close_mode, ticket_count, draw_method, drawn_number, settled_at, settle_notes, settlement_outcome, payout_method, payout_account, payout_account_name, max_entries_per_user, created_by, created_at" as const;
+  "id, slug, name, kind, tournament, scoring_mode, description, entry_price_cop, house_cut_pct, prize_kind, pot_mode, fixed_prize_cop, publication_mode, prize_object, prize_image_path, points_exact, points_one_team, points_result, status, opens_at, closes_at, close_mode, ticket_count, draw_method, drawn_number, settled_at, settle_notes, settlement_outcome, payout_method, payout_account, payout_account_name, max_entries_per_user, referral_every, created_by, created_at" as const;
 
 export const CASA_ENTRY_COLUMNS =
-  "id, polla_id, user_id, status, amount_cop, proof_path, current_proof_attempt_id, proof_uploaded_at, reviewed_at, reject_reason, ticket_number, entry_number, created_at" as const;
+  "id, polla_id, user_id, status, amount_cop, proof_path, current_proof_attempt_id, proof_uploaded_at, reviewed_at, reject_reason, ticket_number, entry_number, origin, created_at" as const;
 
 export const CASA_PICK_COLUMNS =
   "id, entry_id, polla_id, user_id, match_id, question_id, pick_1x2, home_score, away_score, option_id, free_text, points_earned" as const;

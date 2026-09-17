@@ -68,11 +68,15 @@ export function reviewNoticeMessage(n: ReviewNotice): { text: string; buttons: A
   };
 }
 
-/** Busca el Telegram vinculado y le manda el aviso. Devuelve si salió. */
-export async function notifyPlayerReviewByTelegram(
+type NoticeButton = { text: string; callback_data: string } | { text: string; url: string };
+
+/** Busca el Telegram vinculado y le manda el mensaje. Devuelve si salió. */
+async function sendToLinkedTelegram(
   db: SupabaseClient,
-  notice: ReviewNotice,
-  client?: LoginBotClient,
+  userId: string,
+  message: { text: string; buttons: NoticeButton[][] },
+  client: LoginBotClient | undefined,
+  label: string,
 ): Promise<boolean> {
   const config = getTelegramLoginConfig();
   if (!config) return false;
@@ -80,11 +84,10 @@ export async function notifyPlayerReviewByTelegram(
     const { data, error } = await db
       .from("telegram_login_identities")
       .select("telegram_user_id")
-      .eq("user_id", notice.userId)
+      .eq("user_id", userId)
       .maybeSingle();
     const telegramUserId = Number((data as { telegram_user_id?: unknown } | null)?.telegram_user_id);
     if (error || !Number.isSafeInteger(telegramUserId) || telegramUserId <= 0) return false;
-    const message = reviewNoticeMessage(notice);
     const bot = client ?? createLoginBotClient(config.botToken);
     return await bot.send("sendMessage", {
       chat_id: telegramUserId,
@@ -94,7 +97,51 @@ export async function notifyPlayerReviewByTelegram(
       reply_markup: { inline_keyboard: message.buttons },
     });
   } catch (err) {
-    console.warn("[telegram-player] aviso de revisión no enviado:", redactId(notice.userId), (err as Error).name);
+    console.warn(`[telegram-player] aviso de ${label} no enviado:`, redactId(userId), (err as Error).name);
     return false;
   }
+}
+
+export function notifyPlayerReviewByTelegram(
+  db: SupabaseClient,
+  notice: ReviewNotice,
+  client?: LoginBotClient,
+): Promise<boolean> {
+  return sendToLinkedTelegram(db, notice.userId, reviewNoticeMessage(notice), client, "revisión");
+}
+
+export interface ReferralGiftNotice {
+  userId: string;
+  pollaName: string;
+  pollaSlug: string;
+  entryNumber: number;
+  /** Invitados que ya cuentan en esa polla. */
+  invited: number;
+}
+
+/**
+ * Cupo de regalo por invitar (migración 135). El bot todavía pronostica solo
+ * con el cupo principal, así que el botón abre ese cupo en la web.
+ */
+export function referralGiftMessage(n: ReferralGiftNotice): { text: string; buttons: NoticeButton[][] } {
+  const url = `https://lapollacolombiana.com/casa/${encodeURIComponent(n.pollaSlug)}?p=${n.entryNumber}`;
+  return {
+    text: [
+      `🎁 <b>¡Ganaste un cupo de regalo en ${esc(n.pollaName)}!</b>`,
+      "",
+      n.invited > 0
+        ? `${n.invited} ${n.invited === 1 ? "persona que invitaste ya pagó" : "personas que invitaste ya pagaron"} esta polla.`
+        : "Las personas que invitaste ya pagaron esta polla.",
+      `Tu cupo ${n.entryNumber} ya está activo y compite por el premio.`,
+    ].join("\n"),
+    buttons: [[{ text: `👉 Pronosticar con el cupo ${n.entryNumber}`, url }]],
+  };
+}
+
+export function notifyReferralGiftByTelegram(
+  db: SupabaseClient,
+  notice: ReferralGiftNotice,
+  client?: LoginBotClient,
+): Promise<boolean> {
+  return sendToLinkedTelegram(db, notice.userId, referralGiftMessage(notice), client, "cupo de regalo");
 }

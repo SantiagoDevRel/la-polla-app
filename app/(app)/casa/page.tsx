@@ -16,6 +16,17 @@ import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { CheckCircle2, Settings } from "lucide-react";
+import { cookies } from "next/headers";
+import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
+import { PromoInvitados } from "@/components/casa/PromoInvitados";
+import { getReferralInvitee, getReferralPollaView } from "@/lib/casa/referrals";
+import {
+  REFERRAL_COOKIE,
+  REFERRAL_DISMISS_COOKIE,
+  isPromoPolla,
+  referralPromo,
+  validReferralCode,
+} from "@/lib/casa/referrals-shared";
 import {
   listPublicPollas,
   getPots,
@@ -43,14 +54,20 @@ export default async function CasaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?returnTo=/casa");
 
-  const [pollas, myPollas, isAdmin, enVivo] = await Promise.all([
+  const cookieStore = await cookies();
+  const referralHint = validReferralCode(cookieStore.get(REFERRAL_COOKIE)?.value);
+  const [pollas, myPollas, isAdmin, enVivo, invitee] = await Promise.all([
     listPublicPollas(),
     listMyPollas(user.id),
     isCurrentUserAdmin(),
     // Partidos en juego de MIS pollas, con mi pronóstico. Si falla, la
     // pantalla sale sin la franja en vez de caerse.
     listMyLiveMatches(user.id).catch(() => []),
+    // Invitaciones (migración 135): personas nuevas que todavía pueden decir quién las invitó.
+    getReferralInvitee(user.id, referralHint),
   ]);
+  const verInvitacion = Boolean(invitee?.can_set_referrer && !invitee.referrer
+    && (invitee.hint || cookieStore.get(REFERRAL_DISMISS_COOKIE)?.value !== "1"));
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
   // paso sigue con status abierta hasta que alguien la cierre, y quedaba
   // listada como "del fin de semana" diciendo "cierra en cerrada".
@@ -64,14 +81,18 @@ export default async function CasaPage() {
   // para quien participó.
   const cerradas = pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id)
     && (isPublicClosedPolla(p) || joinedIds.has(p.id)));
-  const [pots, pendientes, tournaments, pagos] = await Promise.all([
+  // Aviso de invitaciones (2026-09-17): la OFIGOLAZO abierta que cierra primero.
+  const promoPolla = abiertas.find(isPromoPolla);
+  const [pots, pendientes, tournaments, pagos, promoView] = await Promise.all([
     getPots(pollas.map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
     getPollaTournamentSlugs(pollas),
     // Prueba de pago (migración 133): qué pollas cerradas ya pagaron su premio.
     getPayoutProgress(cerradas.filter((p) => p.status === "resuelta").map((p) => p.id))
       .catch((): Record<string, { total: number; paid: number }> => ({})),
+    promoPolla ? getReferralPollaView(user.id, promoPolla.id) : Promise.resolve(null),
   ]);
+  const promo = promoPolla ? referralPromo(promoPolla, promoView, pots[promoPolla.id]?.prize_cop ?? 0) : null;
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
 
   // Siempre queda al menos una sección abierta (2026-09-14/17): Mis pollas si
@@ -107,6 +128,9 @@ export default async function CasaPage() {
               donde participo, con «Tu marcador» al lado del parcial. Se
               actualiza solo y desaparece cuando no hay nada en juego. */}
         <LiveNow initialRows={enVivo} />
+
+        {/* Punto 3 del dueño (2026-09-17): quien entró sin el enlace también puede decir quién lo invitó. */}
+        {verInvitacion && invitee && <QuienTeInvito initial={invitee} variant="casa" />}
 
         <MyPollas initialPollas={enJuegoMias} activeOnly defaultOpen={misPollasOpen} pendingByPolla={Object.fromEntries(pendientes.map(p => [p.entryNumber != null ? `${p.polla.id}:${p.entryNumber}` : p.polla.id, p.faltan]))} />
 
@@ -158,6 +182,7 @@ export default async function CasaPage() {
             )}
         </PollaSection>
       </div>
+      {promo && <PromoInvitados promo={promo} verPolla />}
     </div>
   );
 }

@@ -19,6 +19,8 @@ interface Pendiente {
   revision: number;
   id: string;
   jugador: string;
+  /** Quien lo invitó (migración 135), para comparar con el nombre del comprobante. */
+  invitadoPor?: string | null;
   polla: string;
   montoCop: number;
   boleta: number | null;
@@ -199,6 +201,7 @@ export function ColaDePagos({ pollaId, onReviewed, refreshKey = 0, status = "pen
               </p>
               {p.boleta != null && <p className="mt-1 text-[13px] text-text-secondary">Boleta #{p.boleta}</p>}
               {p.participacion != null && <p className="mt-1 text-[13px] text-text-secondary">Cupo #{p.participacion}</p>}
+              {p.invitadoPor && <p className="mt-1 text-[13px] text-text-secondary [overflow-wrap:anywhere]">Invitado por {p.invitadoPor}</p>}
               {(showPollaName ?? !pollaId) && <p className="mt-1 text-[13px] text-text-secondary [overflow-wrap:anywhere]">Polla: {p.polla}</p>}
             </div>
             <span className="lp-money text-[20px] text-text-primary">

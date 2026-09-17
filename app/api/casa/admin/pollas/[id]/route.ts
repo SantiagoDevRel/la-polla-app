@@ -24,6 +24,8 @@ const EditChangesSchema = z.object({
   payoutAccountName: nullableText(80).optional(),
   // Migración 131. No lo valida casa_edit_polla_v2: va a casa_set_max_entries_v2.
   maxEntriesPerUser: z.number().int().min(1).max(50).optional(),
+  // Migración 135: invitados por cupo de regalo, o null para apagarlo. Va a casa_set_referral_every_v1.
+  referralEvery: z.number().int().min(1).max(50).nullable().optional(),
 }).strict().refine((changes) => Object.keys(changes).length > 0, { message: "No hay cambios para guardar." });
 
 const BodySchema = z.discriminatedUnion("action", [
@@ -138,11 +140,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.action === "editar" || body.action === "agregar_partidos" || body.action === "quitar_partido") {
     // El tope de participaciones se puede cambiar aunque ya haya inscripciones:
     // no toca dinero ni participaciones existentes, solo las nuevas.
-    const { maxEntriesPerUser, ...changes } = body.action === "editar" ? body.changes : {};
+    const { maxEntriesPerUser, referralEvery, ...changes } = body.action === "editar" ? body.changes : {};
     if (maxEntriesPerUser !== undefined) {
       const cap = await db.rpc("casa_set_max_entries_v2", { ...args, p_max: maxEntriesPerUser });
       if (cap.error) return casaError(cap.error);
-      if (Object.keys(changes).length === 0) return casaJson({ ok: true, ...cap.data });
+      if (Object.keys(changes).length === 0 && referralEvery === undefined) return casaJson({ ok: true, ...cap.data });
+    }
+    // Invitaciones: SQL solo lo acepta sin inscripciones y nunca en rifas.
+    if (referralEvery !== undefined) {
+      const referral = await db.rpc("casa_set_referral_every_v1", { ...args, p_every: referralEvery });
+      if (referral.error) {
+        const message = editorErrorMessage(referral.error);
+        return message ? casaJson({ error: message, code: referral.error.message }, 409) : casaError(referral.error);
+      }
+      if (Object.keys(changes).length === 0) return casaJson({ ok: true, ...referral.data });
     }
     const edit = await db.rpc("casa_edit_polla_v2", {
       ...args,

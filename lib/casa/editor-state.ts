@@ -35,6 +35,7 @@ export type EditorPolla = Pick<
   | "payout_account_name"
   | "ticket_count"
   | "max_entries_per_user"
+  | "referral_every"
 >;
 
 export interface EditorMatch {
@@ -84,9 +85,13 @@ export async function getPollaEditorState(pollaId: string, actorId: string): Pro
     : { data: [], error: null };
   if (matchesError) throw matchesError;
   const byId = new Map((rows ?? []).map((row) => [row.id as string, row]));
+  // Migración 135: casa_polla_editor_v2 no trae el programa de invitaciones.
+  const { data: referral, error: referralError } = await db
+    .from("casa_pollas").select("referral_every").eq("id", pollaId).maybeSingle();
+  if (referralError) throw referralError;
 
   return {
-    polla: state.polla,
+    polla: { ...state.polla, referral_every: referral?.referral_every ?? null },
     block: state.block ?? null,
     entries: Number(state.entries ?? 0),
     operationMode: state.operation_mode ?? null,

@@ -357,14 +357,30 @@ type PaymentRow = {
   reject_reason: string | null;
   ticket_number: number | null;
   entry_number?: number | null;
+  origin?: "compra" | "invitacion" | null;
   created_at: string;
   casa_pollas: { name: string; status: string; kind: string; archived_at: string | null } | Array<{ name: string; status: string; kind: string; archived_at: string | null }> | null;
 };
 
+/**
+ * Estado de una participación en «Mis pagos». Un cupo de regalo (migración 135)
+ * no es un pago: activo se marca como regalo y en pausa o removido no aparece,
+ * para que nadie transfiera dinero por él. null = no se muestra.
+ */
+export function paymentLine(row: Pick<PaymentRow, "status" | "proof_path" | "reject_reason" | "origin">): { state: string; actionable: boolean } | null {
+  if (row.origin === "invitacion") return row.status === "pagada" ? { state: "🎁 regalo por invitar", actionable: false } : null;
+  if (row.status === "pagada") return { state: "✅ confirmado", actionable: false };
+  if (row.status === "pendiente" && row.proof_path) return { state: "⏳ en revisión", actionable: false };
+  if (row.status === "rechazada") return { state: `❌ rechazado${row.reject_reason ? `: ${esc(row.reject_reason)}` : ""}`, actionable: true };
+  return { state: "⚠️ falta el comprobante", actionable: true };
+}
+
 export async function showPayments(ctx: PlayerCtx): Promise<void> {
   const { data, error } = await ctx.db.from("casa_entries")
-    .select("id, polla_id, status, proof_path, reject_reason, ticket_number, entry_number, created_at, casa_pollas!inner(name, status, kind, archived_at)")
+    .select("id, polla_id, status, proof_path, reject_reason, ticket_number, entry_number, origin, created_at, casa_pollas!inner(name, status, kind, archived_at)")
     .eq("user_id", ctx.account.userId)
+    // Un regalo en pausa o removido no es un pago: fuera antes del límite.
+    .or("origin.eq.compra,status.eq.pagada")
     .is("casa_pollas.archived_at", null)
     .in("casa_pollas.status", ["abierta", "cerrada", "resuelta"])
     .order("created_at", { ascending: false })
@@ -374,7 +390,7 @@ export async function showPayments(ctx: PlayerCtx): Promise<void> {
     await show(ctx, { text: COPY.failure });
     return;
   }
-  const rows = (data ?? []) as PaymentRow[];
+  const rows = ((data ?? []) as PaymentRow[]).filter((row) => paymentLine(row) !== null);
   if (rows.length === 0) {
     await show(ctx, {
       text: "<b>Mis pagos</b>\n\nTodavía no has enviado comprobantes. Cuando te inscribas a una polla, aquí ves si ya confirmamos tu pago.",
@@ -390,12 +406,7 @@ export async function showPayments(ctx: PlayerCtx): Promise<void> {
     if (!polla) continue;
     // Migración 131: varias participaciones por persona se distinguen por número.
     const label = `${esc(polla.name)}${row.ticket_number != null ? ` (boleta ${row.ticket_number})` : row.entry_number != null && rows.some((other) => other !== row && other.polla_id === row.polla_id && other.ticket_number == null) ? ` (cupo ${row.entry_number})` : ""}`;
-    let state: string;
-    let actionable = false;
-    if (row.status === "pagada") state = "✅ confirmado";
-    else if (row.status === "pendiente" && row.proof_path) state = "⏳ en revisión";
-    else if (row.status === "rechazada") { state = `❌ rechazado${row.reject_reason ? `: ${esc(row.reject_reason)}` : ""}`; actionable = true; }
-    else { state = "⚠️ falta el comprobante"; actionable = true; }
+    const { state, actionable } = paymentLine(row)!;
     lines.push(`• ${label}\n   ${state}`);
     if (!seen.has(row.polla_id)) {
       seen.add(row.polla_id);

@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { MyPollas } from "@/components/casa/MyPollas";
+import { InvitacionesPerfil } from "@/components/casa/InvitacionesPerfil";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -300,6 +301,9 @@ export default function PerfilPage() {
         {/* Mis pollas (en juego) y Pollas cerradas, como en /casa, pero en dos
             desplegables compactos y cerrados para no recargar el perfil. */}
         <MyPollas split defaultOpen={false} />
+
+        {/* Invitaciones (migración 135). iOS: fuera, como el resto de promociones con premio. */}
+        {!isIOSApp && <InvitacionesPerfil />}
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />
