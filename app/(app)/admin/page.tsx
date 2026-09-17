@@ -34,6 +34,7 @@ import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { HeroFrame, Label, SectionHead } from "@/components/street";
 import { useToast } from "@/components/ui/Toast";
 import UserDirectory from "@/components/admin/UserDirectory";
+import SmsSaldoCard from "@/components/admin/SmsSaldoCard";
 
 interface Metricas {
   usuarios: number;
@@ -172,6 +173,8 @@ export default function AdminPage() {
             Administrar pollas
           </Link>
         </div>
+
+        <SmsSaldoCard />
 
         <SectionHead title="Resumen" />
         <ul className="mb-9 space-y-px">
