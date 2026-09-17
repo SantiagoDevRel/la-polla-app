@@ -37,6 +37,20 @@ export function isProofUploadType(type: string): type is ProofUploadType {
   return (PROOF_UPLOAD_TYPES as readonly string[]).includes(type);
 }
 
+/**
+ * Tipo real según los primeros bytes. `File.type` sale de la EXTENSIÓN: un PNG
+ * guardado como .jpg (pasa con comprobantes compartidos desde Nequi en Android)
+ * se declaraba image/jpeg y el servidor, que verifica la firma, lo rechazaba.
+ */
+export function sniffProofType(head: Uint8Array): ProofUploadType | null {
+  if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return "image/jpeg";
+  const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (head.length >= 8 && png.every((byte, i) => head[i] === byte)) return "image/png";
+  const ascii = (from: number, to: number) => String.fromCharCode(...head.subarray(from, to));
+  if (head.length >= 12 && ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "image/webp";
+  return null;
+}
+
 export function isHeicLike(type: string, name = ""): boolean {
   return /hei[cf]/i.test(type) || /\.hei[cf]$/i.test(name);
 }

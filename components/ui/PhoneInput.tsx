@@ -15,9 +15,11 @@ import { useLocale, useTranslations } from "next-intl";
 
 interface PhoneInputProps {
   onChange: (value: string) => void;
+  /** Si se pasa, el selector solo ofrece estos países (el primero es el inicial). */
+  countries?: readonly CountryCode[];
 }
 
-export default function PhoneInput({ onChange }: PhoneInputProps) {
+export default function PhoneInput({ onChange, countries: allowed }: PhoneInputProps) {
   const t = useTranslations("Phone");
   const locale = useLocale();
   const intlTag = locale === "en" ? "en-US" : "es-CO";
@@ -43,7 +45,7 @@ export default function PhoneInput({ onChange }: PhoneInputProps) {
     return <FlagComponent title={getCountryName(country)} {...(className ? { className } : {})} />;
   }
 
-  const [country, setCountry] = useState<CountryCode>("CO");
+  const [country, setCountry] = useState<CountryCode>(allowed?.[0] ?? "CO");
   const [localNumber, setLocalNumber] = useState("");
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -84,7 +86,7 @@ export default function PhoneInput({ onChange }: PhoneInputProps) {
 
   // Lista filtrada y ordenada de países
   const countries = useMemo(() => {
-    const all = getCountries();
+    const all = allowed ? [...allowed] : getCountries();
     const q = search.toLowerCase().trim();
 
     const filtered = q
@@ -102,7 +104,7 @@ export default function PhoneInput({ onChange }: PhoneInputProps) {
       return getCountryName(a).localeCompare(getCountryName(b), intlTag);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, intlTag, displayNames]);
+  }, [search, intlTag, displayNames, allowed]);
 
   const handleSelect = (c: CountryCode) => {
     setCountry(c);
