@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { MyPollas } from "@/components/casa/MyPollas";
+import { MisCortesias } from "@/components/casa/MisCortesias";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -300,6 +301,10 @@ export default function PerfilPage() {
         {/* Mis pollas (en juego) y Pollas cerradas, como en /casa, pero en dos
             desplegables compactos y cerrados para no recargar el perfil. */}
         <MyPollas split defaultOpen={false} />
+
+        {/* Cortesías para regalar (migración 136). Solo aparece si la casa le
+            dio cupos; si no tiene, el componente no dibuja nada. */}
+        <MisCortesias />
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />

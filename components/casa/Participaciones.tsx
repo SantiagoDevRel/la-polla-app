@@ -16,11 +16,15 @@ import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { StreetCard } from "@/components/street";
 import { formatCop } from "@/lib/casa/format";
+import { isCourtesyEntry } from "@/lib/casa/courtesies-shared";
 import type { CasaEntry } from "@/lib/casa/types";
 
-export type ParticipationState = "activa" | "revision" | "rechazada" | "sin-comprobante";
+export type ParticipationState = "activa" | "cortesia" | "revision" | "rechazada" | "sin-comprobante";
 
-export function participationState(entry: Pick<CasaEntry, "status" | "proof_path">): ParticipationState {
+export function participationState(entry: Pick<CasaEntry, "status" | "proof_path"> & Partial<Pick<CasaEntry, "amount_cop">>): ParticipationState {
+  // Un cupo de cortesía (migración 136) está activo, pero decir "Pagado" sería
+  // falso: nadie pagó nada por él.
+  if (isCourtesyEntry(entry)) return "cortesia";
   if (entry.status === "pagada") return "activa";
   if (entry.status === "pendiente" && entry.proof_path) return "revision";
   if (entry.status === "rechazada") return "rechazada";
@@ -29,6 +33,7 @@ export function participationState(entry: Pick<CasaEntry, "status" | "proof_path
 
 const LABEL: Record<ParticipationState, string> = {
   activa: "Pagado",
+  cortesia: "Cortesía",
   revision: "Pago en revisión",
   rechazada: "Pago rechazado",
   "sin-comprobante": "Falta el comprobante",
@@ -37,6 +42,8 @@ const LABEL: Record<ParticipationState, string> = {
 /** Color del estado de pago: verde pagado, amarillo en revisión. */
 const PILL: Record<ParticipationState, string> = {
   activa: "border-turf/50 bg-turf/15 text-turf",
+  // Verde como cualquier cupo activo: el dorado de esta pantalla es del pozo.
+  cortesia: "border-turf/50 bg-turf/15 text-turf",
   revision: "border-amber/50 bg-amber/15 text-amber",
   rechazada: "border-red-alert/50 bg-red-alert/15 text-red-alert",
   "sin-comprobante": "border-amber/50 bg-amber/15 text-amber",
@@ -47,6 +54,7 @@ const faltanTexto = (n: number) => (n === 1 ? "falta 1 pronóstico" : `faltan ${
 /** Texto corto para el desplegable: cabe a 320 px; el detalle va en las etiquetas de color. */
 const OPTION: Record<ParticipationState, string> = {
   activa: "Pagado",
+  cortesia: "Cortesía",
   revision: "En revisión",
   rechazada: "Rechazado",
   "sin-comprobante": "Sin comprobante",
@@ -63,7 +71,7 @@ export function Participaciones({
 }: {
   slug: string;
   /** Cupos de la persona, por número. */
-  entries: Array<Pick<CasaEntry, "entry_number" | "status" | "proof_path" | "reject_reason">>;
+  entries: Array<Pick<CasaEntry, "entry_number" | "status" | "proof_path" | "reject_reason" | "amount_cop">>;
   selectedNumber: number | null;
   maxEntries: number;
   entryPriceCop: number;

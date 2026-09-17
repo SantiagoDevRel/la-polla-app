@@ -362,6 +362,45 @@ pendientes ni cambiar inscripciones después del reparto o del archivo.
 - Antes de desplegar: aplicar `supabase/migrations/122_casa_polla_editor.sql`
   (requiere 118). Regresión local con `scripts/casa-polla-editor-check.sql`.
 
+### Cortesías: cupos gratis que reparte una persona (2026-09-17, migración 136)
+
+Solo el administrador las crea. Desde `/admin/cortesias` busca a una persona,
+elige una polla y le da de 1 a 20 cortesías. Cada una es un **enlace único**
+(`/casa/<slug>?cortesia=CODIGO`) que esa persona le pasa a alguien y que sirve
+**una sola vez**.
+
+- **Solo para cuentas nuevas.** Redime quien creó su cuenta *después* de que se
+  creó la cortesía y nunca ha tenido una inscripción en La Polla. Ni el
+  administrador ni quien la reparte pueden usarla.
+- **Una por persona en la vida.** Un índice único sobre `redeemed_by` lo
+  garantiza: si alguien ya redimió una, no le sirve otra cortesía, tampoco en
+  otra polla.
+- **Solo en esa polla**, y **vence con ella**: si nadie la usa antes del cierre
+  de inscripciones no se traslada a ninguna otra (no hay cron; lo verifica el
+  canje). El administrador puede retirar una sin usar; una ya redimida nunca,
+  porque es la inscripción de alguien.
+- **El cupo vale $0.** Compite en la tabla y cuenta en «inscritos», pero no
+  entra al pozo ni a la parte de la casa (`casa_pot_summaries_v2` suma
+  `amount_cop`). Quien entró con cortesía puede comprar los cupos que quiera.
+- No aplica a rifas (se juegan con boletas numeradas) ni a pollas sin entrada.
+
+Dónde se ve: `/admin/cortesias` (dar, listar y retirar), la polla y el Perfil de
+quien las reparte («Cortesías para regalar», con Regalar/Copiar por enlace), y
+la propia polla para quien llega por el enlace (tarjeta «Activar mi cupo
+gratis»; sin sesión, «te regaló un cupo gratis» + crear cuenta). El código viaja
+en la cookie httpOnly `lp_cortesia` que pone `proxy.ts`, así sobrevive al login
+y al onboarding; la URL queda limpia para que nadie reparta el cupo ajeno.
+
+La autoridad es SQL (`casa_grant_courtesies_v1`, `casa_redeem_courtesy_v1`,
+`casa_revoke_courtesy_v1`), con contrato v2, la polla bloqueada y `service_role`
+como único rol con EXECUTE. Antes de desplegar: aplicar
+`supabase/migrations/136_casa_courtesies.sql`. Regresión local (ocho casos con
+`ASSERT`, arma y borra sus propios datos):
+
+```bash
+docker exec -i supabase_db_la-polla psql -U postgres -d postgres < scripts/casa-courtesies-check.sql
+```
+
 ### Reparto del pozo: solo el ganador (migración 096)
 
 `supabase/migrations/096_casa_pozo_solo_ganador.sql` deja el reparto en una

@@ -15,6 +15,8 @@
 // haciendo que próximas visitas a chickenpicks.app vieran ES en vez de EN.
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import { courtesyCookieOptions } from "@/lib/supabase/cookie-options";
+import { COURTESY_COOKIE, COURTESY_PARAM, validCourtesyCode } from "@/lib/casa/courtesies-shared";
 
 type Locale = "es" | "en";
 
@@ -39,6 +41,25 @@ export async function proxy(request: NextRequest) {
   if (host.startsWith("www.")) {
     const url = new URL(request.nextUrl.pathname + request.nextUrl.search, `https://${host.slice(4)}`);
     return NextResponse.redirect(url, 308);
+  }
+
+  // ── Enlace de cortesía (migración 136) ─────────────────────────────────
+  // /casa/<slug>?cortesia=CODIGO guarda el código en una cookie httpOnly y deja
+  // la URL limpia: quien copie la barra de direcciones no reparte el cupo de
+  // otra persona, y el código sobrevive al login y al onboarding. Manda el
+  // ÚLTIMO enlace abierto (30 días): si el primero ya lo usó alguien, el nuevo
+  // reemplaza al viejo. Solo en una navegación: una imagen o un fetch de otro
+  // sitio no deja cookie. La cookie no decide nada — SQL exige cuenta nueva,
+  // una sola vez y esa polla.
+  const courtesy = request.nextUrl.searchParams.get(COURTESY_PARAM);
+  if (courtesy !== null && request.method === "GET" && !request.nextUrl.pathname.startsWith("/api/")) {
+    const clean = request.nextUrl.clone();
+    clean.searchParams.delete(COURTESY_PARAM);
+    const response = NextResponse.redirect(clean, 307);
+    const code = validCourtesyCode(courtesy);
+    const navigation = (request.headers.get("sec-fetch-dest") ?? "document") === "document";
+    if (code && navigation) response.cookies.set(COURTESY_COOKIE, code, courtesyCookieOptions());
+    return response;
   }
 
   // ── Rutas retiradas con el pivote a la casa (2026-08-25) ───────────────
