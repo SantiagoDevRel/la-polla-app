@@ -338,8 +338,14 @@ BEGIN
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_remove_gift_v1(%L,''x'',%L,2)',gift,admin_id),'POLLA_FINAL');
   RAISE NOTICE 'PASS a gift can win; the prize comes only from real money';
 
-  -- 13) Interruptor por polla: solo sin inscripciones.
+  -- 13) Interruptor por polla: prender se puede con inscritos (migración 136),
+  --     apagar no. Prenderlo no cuenta a quienes ya pagaron.
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,NULL,%L,2)',q,admin_id),'POLLA_HAS_ENTRIES');
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=off_p)>0, 'the pool without the program already has entries';
+  ASSERT (public.casa_set_referral_every_v1(off_p,5,admin_id,2)->>'changed')::boolean, 'turning it on works with entries';
+  ASSERT (SELECT referral_every FROM public.casa_pollas WHERE id=off_p)=5;
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=off_p AND origin='invitacion'), 'nothing retroactive';
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,NULL,%L,2)',off_p,admin_id),'POLLA_HAS_ENTRIES');
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,7,%L,2)',rifa_p,admin_id),'INVALID_POLLA_KIND');
   x:=pg_temp.ref_polla(admin_id,'Vacía ref');
   ASSERT (public.casa_set_referral_every_v1(x,NULL,admin_id,2)->>'changed')::boolean;

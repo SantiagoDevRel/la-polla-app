@@ -70,15 +70,14 @@ export function referralRule(every: number): string {
 }
 
 /** Letra menuda única (pedido del dueño: nada de listas de condiciones). */
-export const REFERRAL_FINE_PRINT = "*Solo aplica para usuarios nuevos, 1 polla por usuario.";
+export const REFERRAL_FINE_PRINT =
+  "*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código, 1 polla por usuario.";
 
 /**
  * Aviso al entrar (pedido del dueño, 2026-09-17): «Por 5 invitados, te damos un
- * cupo en la OFIGOLAZO». Sale para la OFIGOLAZO abierta que cierra primero,
- * mientras tenga invitaciones. Cambiar de polla es cambiar este nombre.
+ * cupo en la POLLAGOL». Sale para la polla ABIERTA con invitaciones que cierra
+ * primero — la de este fin de semana —, sea cual sea su nombre.
  */
-export const REFERRAL_PROMO_POLLA = "OFIGOLAZO";
-
 export interface ReferralPromo {
   pollaId: string;
   slug: string;
@@ -96,7 +95,7 @@ type PromoPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "entry_price
 
 /** ¿Esta polla es la del aviso? La lista ya viene filtrada a pollas abiertas. */
 export function isPromoPolla(polla: PromoPolla): boolean {
-  return polla.name.trim().toUpperCase().startsWith(REFERRAL_PROMO_POLLA) && referralEvery(polla) !== null;
+  return referralEvery(polla) !== null;
 }
 
 /**

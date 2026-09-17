@@ -1151,11 +1151,11 @@ hacer nada.
   avance (`Llevas 3 de 5`), el código para copiar y una sola letra menuda
   («*Solo aplica para usuarios nuevos, 1 polla por usuario.»); en Perfil está el
   código con un enlace general.
-- **Aviso al entrar.** Mientras haya una OFIGOLAZO abierta con invitaciones, /casa
-  y esa polla muestran una vez «Por 5 invitados, te damos un cupo en la OFIGOLAZO»
+- **Aviso al entrar.** Mientras haya una polla abierta con invitaciones, /casa y
+  esa polla muestran una vez «Por 5 invitados, te damos un cupo en la POLLAGOL»
   con el código para copiar y Compartir (`components/casa/PromoInvitados.tsx`;
-  la polla se elige por `REFERRAL_PROMO_POLLA`). No sale a administradores, a
-  quien no tiene cupos libres ni en la app de iOS.
+  es la polla abierta con programa que cierra primero). No sale a administradores,
+  a quien no tiene cupos libres ni en la app de iOS.
 - **Llegar invitado.** El enlace deja el código en una cookie y la URL queda
   limpia. La polla y /pagar preguntan «¿Te invitó esta persona?»; se guarda al
   completar el perfil o al enviar el comprobante, y «No es así» lo descarta. Quien
@@ -1175,8 +1175,9 @@ hacer nada.
   justo ese regalo) y «Restaurar», hasta el reparto; la cola de pagos muestra
   «Invitado por». En Telegram, «Mis pagos» marca el regalo y no pide comprobante.
 - **Alcance.** Pollas de partidos o preguntas con entrada, creadas desde la 135,
-  más los borradores que nunca se publicaron; las rifas nunca. El editor apaga o
-  prende el programa mientras nadie se inscriba.
+  más los borradores que nunca se publicaron; las rifas nunca. El editor lo prende
+  también en una polla abierta con inscritos (migración 136, así se activó POLLAGOL);
+  apagarlo sigue siendo solo sin inscripciones.
 - **Pruebas.** `scripts/casa-referrals-check.sql` (Supabase local, ROLLBACK),
   `npm test -- tests/casa-referrals.test.ts tests/telegram-player.test.ts` y
   `CASA_ORIGIN=http://localhost:3137 node scripts/casa-referrals-browser-check.mjs`
