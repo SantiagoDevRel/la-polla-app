@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { getLeaderboard, getMyEntries, getMyEntry, getPollaBySlug, getPollaMatches } from "@/lib/casa/queries";
-import { isLiveEntry } from "@/lib/casa/types";
+import { isLiveEntry, isPublicClosedPolla } from "@/lib/casa/types";
 import { hasCasaMatchStarted } from "@/lib/casa/match-rules";
 
 export const dynamic = "force-dynamic";
@@ -26,15 +26,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const polla = await getPollaBySlug((await params).slug);
     if (!polla || polla.kind !== "partidos" || polla.status === "borrador" || polla.status === "anulada") return json({ error: "Esa polla no existe." }, 404);
     // Cualquier participación viva de esta persona le deja ver los pronósticos (migración 131).
+    // Una polla cerrada desde el 16-sep es pública para cualquier usuario con sesión.
     const [entry, entries] = await Promise.all([getMyEntry(polla.id, user.id), getMyEntries(polla.id, user.id)]);
     const participating = isLiveEntry(entry) || entries.some(isLiveEntry);
-    if (!participating && !(await isCurrentUserAdmin())) return json({ error: "Inscríbete para ver los pronósticos de esta polla." }, 403);
+    if (!participating && !isPublicClosedPolla(polla) && !(await isCurrentUserAdmin())) return json({ error: "Inscríbete para ver los pronósticos de esta polla." }, 403);
     const matches = await getPollaMatches(polla.id);
     const match = matches.find(item => item.id === parsed.data.match);
     if (!match) return json({ error: "Ese partido no pertenece a la polla." }, 404);
     if (!hasCasaMatchStarted(match)) return json({ error: "Los pronósticos estarán disponibles cuando empiece el partido." }, 409);
 
-    // This deliberate group read is authorized above for this polla's members.
+    // This deliberate group read is authorized above for this polla's members
+    // (or for anyone signed in once the polla is a public closed one).
     // The projection excludes user IDs, phone numbers and all payment details.
     // The caller's own rows (`mine`) are recognised by their own entry ids,
     // already read above, so no user_id ever leaves the database for this.

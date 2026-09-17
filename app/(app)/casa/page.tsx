@@ -22,7 +22,7 @@ import {
   getPayoutProgress,
   listPollasConPicksPendientes,
 } from "@/lib/casa/queries";
-import { isPollaOpen, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
+import { isPollaOpen, isPublicClosedPolla, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
@@ -60,7 +60,10 @@ export default async function CasaPage() {
   const joinedIds = new Set(myPollas.map(p => p.id));
   const enJuegoMias = myPollas.filter(p => p.status !== "resuelta" && p.status !== "anulada");
   const enJuegoIds = new Set(enJuegoMias.map(p => p.id));
-  const cerradas = pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id));
+  // Cerradas: las públicas (desde el 16-sep) para todos; las anteriores, solo
+  // para quien participó.
+  const cerradas = pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id)
+    && (isPublicClosedPolla(p) || joinedIds.has(p.id)));
   const [pots, pendientes, tournaments, pagos] = await Promise.all([
     getPots(pollas.map((p) => p.id)),
     listPollasConPicksPendientes(user.id),

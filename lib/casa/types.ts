@@ -326,6 +326,21 @@ export function isPollaOpen(polla: Pick<CasaPolla, "status" | "closes_at"> & Par
   return isPollaPublished(polla) && polla.status === "abierta" && new Date(polla.closes_at) > new Date();
 }
 
+/**
+ * (2026-09-17, decisión del dueño) Las pollas cerradas desde el 16-sep-2026
+ * (Ofigolazo en adelante, hora de Colombia) son públicas: cualquier usuario con
+ * sesión las ve en Pollas cerradas y ve los pronósticos de los partidos ya
+ * empezados, aunque no se haya inscrito. Las anteriores siguen siendo solo de
+ * sus participantes. Los comprobantes de pago NO entran acá: pueden mostrar la
+ * cuenta del ganador.
+ */
+export const PUBLIC_CLOSED_SINCE = "2026-09-16T00:00:00-05:00";
+
+export function isPublicClosedPolla(polla: Pick<CasaPolla, "status" | "closes_at"> & Partial<Pick<CasaPolla, "opens_at" | "publication_mode">>): boolean {
+  return isPollaPublished(polla) && polla.status !== "anulada" && !isPollaOpen(polla)
+    && new Date(polla.closes_at) >= new Date(PUBLIC_CLOSED_SINCE);
+}
+
 /** Etiqueta corta de estado, en el idioma de la app. */
 export function pollaStatusLabel(polla: CasaPolla): {
   text: string;

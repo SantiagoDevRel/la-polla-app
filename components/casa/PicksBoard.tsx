@@ -66,8 +66,10 @@ interface Props {
   distribution: CasaDistribution;
   /** false = ya cerro, o el usuario todavia no se inscribio */
   canEdit: boolean;
-  /** Participants and admins only; the group picks endpoint answers 403 to anyone else. */
+  /** Participants, admins and public closed pollas; the group picks endpoint answers 403 to anyone else. */
   canViewOthers: boolean;
+  /** false = espectador de una polla cerrada pública: sin la línea «Tu pronóstico». */
+  showMine?: boolean;
   lockedReason?: string;
 }
 
@@ -135,6 +137,7 @@ export function PicksBoard({
   distribution,
   canEdit,
   canViewOthers,
+  showMine = true,
   lockedReason,
 }: Props) {
   const [picks, setPicks] = useState(initialPicks);
@@ -292,6 +295,7 @@ export function PicksBoard({
       distribution={distribution}
       canEdit={canEdit}
       canViewOthers={canViewOthers}
+      showMine={showMine}
       showDay={showDay}
       inputs={inputs}
       onPick1x2={set1x2}
@@ -420,7 +424,7 @@ export function PicksBoard({
    Fila 4 (desde el inicio): «Tu marcador» y el desplegable de los demás.
    ──────────────────────────────────────────────────────────────────────── */
 function MatchCard({
-  m, now, slug, scoringMode, mine, distribution, canEdit, canViewOthers, showDay, inputs, onPick1x2, onScore, onJump,
+  m, now, slug, scoringMode, mine, distribution, canEdit, canViewOthers, showMine, showDay, inputs, onPick1x2, onScore, onJump,
 }: {
   m: MatchLite;
   now: number;
@@ -430,6 +434,7 @@ function MatchCard({
   distribution: CasaDistribution;
   canEdit: boolean;
   canViewOthers: boolean;
+  showMine: boolean;
   /** En Finalizados y En vivo no hay encabezado de día: la tarjeta lo dice. */
   showDay: boolean;
   inputs: React.MutableRefObject<Map<string, HTMLInputElement | null>>;
@@ -606,7 +611,7 @@ function MatchCard({
       )}
 
       {/* Tu pronóstico y sus puntos, desde que el partido cierra. */}
-      {(started || cerrado || finished) && !showButtons1x2 && (
+      {showMine && (started || cerrado || finished) && !showButtons1x2 && (
         <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
           <span className="text-text-secondary">{scoringMode === "marcador" ? "Tu marcador:" : "Tu pronóstico:"}</span>
           <span className={`font-semibold ${!tengoPick ? "text-text-muted" : onTrack || (points ?? 0) > 0 ? "text-turf" : "text-text-primary"}`}>
