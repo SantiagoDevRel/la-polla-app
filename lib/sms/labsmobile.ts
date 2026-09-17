@@ -24,6 +24,8 @@
 //
 // Docs: https://www.labsmobile.com/es/api-sms/versiones-api/http-rest-post-json
 
+import { CREDITOS_POR_SMS_CO } from "./saldo";
+
 const API_URL = "https://api.labsmobile.com/json/send";
 const BALANCE_URL = "https://api.labsmobile.com/json/balance";
 
@@ -177,12 +179,17 @@ export async function getBalance(): Promise<{
       signal: AbortSignal.timeout(8000),
       cache: "no-store",
     });
+    // Usuario o token mal puestos responden 401 con JSON válido pero sin
+    // `credits`; se reporta aparte para que el panel no lo confunda con saldo 0.
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, error: "credenciales_invalidas" };
+    }
     const json: { code?: number; credits?: string } = await res.json();
     const credits = Number(json.credits);
-    if (!Number.isFinite(credits)) return { ok: false, error: "balance_ilegible" };
-    // 0,043046 créditos por SMS estándar a Colombia (medido el 2026-08-09
-    // restando el saldo antes/después de un envío real).
-    return { ok: true, credits, smsColombia: Math.floor(credits / 0.043046) };
+    if (json.credits == null || !Number.isFinite(credits)) {
+      return { ok: false, error: "balance_ilegible" };
+    }
+    return { ok: true, credits, smsColombia: Math.floor(credits / CREDITOS_POR_SMS_CO) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "fetch_fallo" };
   }
