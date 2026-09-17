@@ -24,6 +24,7 @@
 //
 // Docs: https://www.labsmobile.com/es/api-sms/versiones-api/http-rest-post-json
 
+import { paisSmsPermitido } from "./paises";
 import { CREDITOS_POR_SMS_CO } from "./saldo";
 
 const API_URL = "https://api.labsmobile.com/json/send";
@@ -76,6 +77,8 @@ export async function sendSms(
 ): Promise<SmsResult> {
   const c = creds();
   if (!c) return { ok: false, error: "labsmobile_no_configurado" };
+  // Última barrera: ningún SMS sale a un país fuera de lib/sms/paises.ts.
+  if (!paisSmsPermitido(phone)) return { ok: false, error: "pais_no_permitido" };
 
   // Igual que un dry-run de WhatsApp: permite probar la cadena completa
   // (Supabase → hook → proveedor) sin gastar créditos ni molestar a nadie.

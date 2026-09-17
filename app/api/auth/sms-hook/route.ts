@@ -36,6 +36,7 @@
 import { NextResponse } from "next/server";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { sendSms } from "@/lib/sms/labsmobile";
+import { paisSmsPermitido } from "@/lib/sms/paises";
 import {
   registrarEnvio,
   registrarFalloEnvio,
@@ -143,14 +144,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "payload incompleto" }, { status: 400 });
   }
 
-  // ⚠️ RIESGO DE COSTO ABIERTO. los-del-sur filtra a teléfonos colombianos
-  // (`isColombianLoginPhone`). La Polla NO: PhoneInput llama getCountries()
-  // sin filtro y el login acepta cualquier país. LabsMobile cobra distinto
-  // por destino — un SMS a US/EU sale mucho más caro que los ~COP 8,28 de
-  // Colombia. No cerramos a 57 por nuestra cuenta: el producto es
-  // internacional. Antes de decidir un filtro hay que medir cuántos
-  // `auth.users.phone` NO empiezan por 57. Hasta entonces este hook manda
-  // a cualquier E.164 válido.
+  // Solo países de lib/sms/paises.ts (decisión del dueño, 2026-09-17): el SMS
+  // a otros destinos cuesta hasta 49 veces uno a Colombia. start-otp ya los
+  // frena; esto cubre cualquier otro camino que haga pedir un código a Supabase.
+  // Se revisa antes de registrar la fila para no dejar un envío "pendiente".
+  if (!paisSmsPermitido(phone)) {
+    console.warn(`[sms-hook] país no permitido tel=***${phone.slice(-4)}`);
+    return NextResponse.json({ error: "país no disponible" }, { status: 400 });
+  }
 
   // Texto pedido por el dueño (2026-09-17), sin la advertencia de "no lo
   // compartas". Sin 🐥: la cuenta LabsMobile de La Polla borra los emojis
