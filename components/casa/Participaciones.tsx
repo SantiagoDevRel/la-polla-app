@@ -16,13 +16,19 @@ import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { StreetCard } from "@/components/street";
 import { formatCop } from "@/lib/casa/format";
+import { isCourtesyEntry } from "@/lib/casa/courtesies-shared";
 import type { CasaEntry } from "@/lib/casa/types";
 
-export type ParticipationState = "activa" | "regalo" | "revision" | "rechazada" | "sin-comprobante";
+export type ParticipationState = "activa" | "regalo" | "cortesia" | "revision" | "rechazada" | "sin-comprobante";
 
-export function participationState(entry: Pick<CasaEntry, "status" | "proof_path"> & Partial<Pick<CasaEntry, "origin">>): ParticipationState {
+export function participationState(
+  entry: Pick<CasaEntry, "status" | "proof_path"> & Partial<Pick<CasaEntry, "origin" | "amount_cop">>,
+): ParticipationState {
   // Cupo de regalo por invitar (migración 135): activo, sin comprobante.
   if (entry.origin === "invitacion") return "regalo";
+  // Cupo de cortesía (migración 138): también activo, pero decir "Pagado" sería
+  // falso — nadie pagó nada por él.
+  if (isCourtesyEntry(entry)) return "cortesia";
   if (entry.status === "pagada") return "activa";
   if (entry.status === "pendiente" && entry.proof_path) return "revision";
   if (entry.status === "rechazada") return "rechazada";
@@ -32,6 +38,7 @@ export function participationState(entry: Pick<CasaEntry, "status" | "proof_path
 const LABEL: Record<ParticipationState, string> = {
   activa: "Pagado",
   regalo: "Regalo por invitar",
+  cortesia: "Cortesía",
   revision: "Pago en revisión",
   rechazada: "Pago rechazado",
   "sin-comprobante": "Falta el comprobante",
@@ -41,6 +48,8 @@ const LABEL: Record<ParticipationState, string> = {
 const PILL: Record<ParticipationState, string> = {
   activa: "border-turf/50 bg-turf/15 text-turf",
   regalo: "border-turf/50 bg-turf/15 text-turf",
+  // Verde como cualquier cupo activo: el dorado de esta pantalla es del pozo.
+  cortesia: "border-turf/50 bg-turf/15 text-turf",
   revision: "border-amber/50 bg-amber/15 text-amber",
   rechazada: "border-red-alert/50 bg-red-alert/15 text-red-alert",
   "sin-comprobante": "border-amber/50 bg-amber/15 text-amber",
@@ -52,6 +61,7 @@ const faltanTexto = (n: number) => (n === 1 ? "falta 1 pronóstico" : `faltan ${
 const OPTION: Record<ParticipationState, string> = {
   activa: "Pagado",
   regalo: "Regalo",
+  cortesia: "Cortesía",
   revision: "En revisión",
   rechazada: "Rechazado",
   "sin-comprobante": "Sin comprobante",
@@ -68,7 +78,8 @@ export function Participaciones({
 }: {
   slug: string;
   /** Cupos de la persona, por número (los de regalo en pausa ya vienen filtrados). */
-  entries: Array<Pick<CasaEntry, "entry_number" | "status" | "proof_path" | "reject_reason"> & Partial<Pick<CasaEntry, "origin">>>;
+  entries: Array<Pick<CasaEntry, "entry_number" | "status" | "proof_path" | "reject_reason">
+    & Partial<Pick<CasaEntry, "origin" | "amount_cop">>>;
   selectedNumber: number | null;
   maxEntries: number;
   entryPriceCop: number;

@@ -390,6 +390,28 @@ variantes arbitrarias ya escritas (`[[open]>summary>&]:rotate-180`) siguen siend
 `!px-4` / `!pl-11`. Pruebas: `tests/casa-polla-info.test.ts`,
 `tests/casa-match-weeks.test.ts`, `tests/football-team-search.test.ts`.
 
+### Cortesías: cupos gratis para usuarios nuevos (2026-09-17, migraciones 138-139)
+
+Solo el administrador las crea, desde `/admin/cortesias`: busca una persona,
+elige UNA polla y le da N cortesías. Cada una es un enlace único
+(`?cortesia=CODIGO` → cookie httpOnly `lp_cortesia` que pone `proxy.ts`) que
+sirve UNA vez. Las redime solo una cuenta creada DESPUÉS de la cortesía y sin
+inscripciones previas; una persona redime una sola en su vida (índice único
+sobre `redeemed_by`), y solo en esa polla. Vencen con la polla: no se trasladan
+ni hay cron. El cupo vale $0 — compite y cuenta en «inscritos», pero no infla
+el pozo ni la parte de la casa — y quien entró así puede comprar más cupos.
+Retirar sirve antes y después de usarse (137): quitar una usada anula ese cupo,
+la deja en `retirada` y NO libera a esa cuenta para otra cortesía; con la polla
+repartida no se puede. Esa es la única forma de sacar un cupo gratis: las rutas
+de pagos exigen un comprobante que la cortesía nunca tuvo.
+Nada de rifas ni de pollas sin entrada. Escribe SQL, nunca TS:
+`casa_grant_courtesies_v1`, `casa_redeem_courtesy_v1`, `casa_revoke_courtesy_v1`
+(contrato v2, polla bloqueada, EXECUTE solo para service_role). `casa_entries`
+no cambió de forma: la cortesía se reconoce por su fila en `casa_courtesies`.
+No mezclar esto con el sistema de referidos (rama aparte, migración 135): son
+features distintas. Detalle y regresión: README → Cortesías;
+`scripts/casa-courtesies-check.sql`.
+
 ### Navegación y actualización de la app (2026-09-09)
 
 Casa (2026-09-17): En vivo → «¿Alguien te invitó?» (solo personas nuevas, migración

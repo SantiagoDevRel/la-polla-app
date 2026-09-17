@@ -8,6 +8,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
@@ -53,6 +54,10 @@ import { MisBoletas } from "@/components/casa/Boletas";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
 import { Participaciones } from "@/components/casa/Participaciones";
+import { ActivarCortesia } from "@/components/casa/ActivarCortesia";
+import { MisCortesias } from "@/components/casa/MisCortesias";
+import { courtesyPreview, listMyCourtesies } from "@/lib/casa/courtesies";
+import { COURTESY_COOKIE, COURTESY_FINE_PRINT, isCourtesyEntry, validCourtesyCode, type CourtesyPreview } from "@/lib/casa/courtesies-shared";
 import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { getReferralInvitee, getReferralPollaView } from "@/lib/casa/referrals";
@@ -61,8 +66,7 @@ import { premioCompartir } from "@/lib/casa/share-text";
 import { InvitaYGana } from "@/components/casa/InvitaYGana";
 import { PromoInvitados } from "@/components/casa/PromoInvitados";
 import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
-import { cookies } from "next/headers";
-import { Plus, Settings } from "lucide-react";
+import { Plus, Settings, Ticket } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +86,16 @@ export default async function PollaPage({
   const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador" || polla.status === "anulada") notFound();
 
+  // ── Enlace de cortesía (migración 138) ──────────────────────────────────
+  // El código lo guardó proxy.ts en una cookie httpOnly al abrir el enlace, así
+  // que sigue acá después del login y del onboarding. Solo se lee: SQL decide
+  // si esta persona lo puede usar (cuenta nueva, una vez, en esta polla).
+  const courtesyCode = validCourtesyCode((await cookies()).get(COURTESY_COOKIE)?.value);
+  const cortesia: CourtesyPreview | null = courtesyCode
+    ? await courtesyPreview(courtesyCode, user?.id ?? null).catch(() => null)
+    : null;
+  const cortesiaDeEstaPolla = cortesia && cortesia.slug === polla.slug ? cortesia : null;
+
   // ── Visitante sin sesión ────────────────────────────────────────────────
   // (2026-09-02) Antes esto era un `redirect` a /login. Como el link de la
   // polla es justamente lo que se pega en el grupo de WhatsApp, el resultado
@@ -99,7 +113,8 @@ export default async function PollaPage({
       getPollaTournamentSlugs([polla]),
     ]);
     return (
-      <PollaPublica polla={polla} pot={potPublico} slug={(await params).slug} tournaments={tournaments[polla.id] ?? []} />
+      <PollaPublica polla={polla} pot={potPublico} slug={(await params).slug} tournaments={tournaments[polla.id] ?? []}
+        cortesia={cortesiaDeEstaPolla} />
     );
   }
 
@@ -151,6 +166,10 @@ export default async function PollaPage({
     ? Object.fromEntries(entries.filter((e) => e.entry_number != null).map((e) => [e.entry_number!,
       editables.filter((id) => !allPicks.some((p) => p.entry_id === e.id && p.match_id === id)).length]))
     : null;
+  // Cortesías que esta persona tiene para regalar en esta polla (migración 138).
+  // Casi nadie tiene: la lista vuelve vacía y no se dibuja nada.
+  const misCortesias = (await listMyCourtesies(user.id).catch(() => []))
+    .filter((cortesia) => cortesia.slug === polla.slug);
   const canResumeProof = !abierta && polla.kind !== "rifa" && entry?.status === "pendiente" && !entry.proof_path
     ? (await getActiveProofs(polla.id, user.id)).some((proof) => proof.entry_id === entry.id) : false;
   const estado = pollaStatusLabel(polla);
@@ -208,6 +227,8 @@ export default async function PollaPage({
   const retomar = !participa && entry && !isLiveEntry(entry) ? entry.entry_number : null;
   // Ya participa y quedan cupos: el CTA principal es comprar otro (migración 131).
   const maxCupos = polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER;
+  // Llegó por un enlace de cortesía y todavía no está inscrito (migración 138).
+  const activarCortesia = Boolean(cortesiaDeEstaPolla?.redeemable) && !participa;
   const comprarOtro = polla.kind !== "rifa" && participa && abierta
     && entries.filter((e) => e.status !== "anulada").length < maxCupos;
   // Invitaciones: sin código (administradores) no hay regla que ofrecer ni avance.
@@ -300,6 +321,13 @@ export default async function PollaPage({
 
         {polla.kind === "rifa" && <div className="mt-4 first:mt-0"><MisBoletas slug={polla.slug} open={abierta} /></div>}
 
+        {/* Llegó por un enlace de cortesía y todavía no está inscrito: activar el
+            cupo gratis es LO que tiene que hacer, así que va antes del CTA de
+            pagar. SQL ya dijo que esta persona sí lo puede usar. */}
+        {activarCortesia && (
+          <ActivarCortesia polla={polla.name} holder={cortesiaDeEstaPolla!.holder} />
+        )}
+
         {/* Llegó por el enlace de alguien y todavía puede elegir (migración 135). */}
         {invitee?.hint && invitee.can_set_referrer && abierta && (
           <div className="mt-4 first:mt-0"><QuienTeInvito initial={invitee} variant="casa" /></div>
@@ -314,7 +342,10 @@ export default async function PollaPage({
         {(mostrarEntrar || comprarOtro || abierta) && (
           <div className="mt-4 flex flex-wrap gap-2 first:mt-0">
             {mostrarEntrar && (
-              <Link href={`/casa/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`} className="lp-btn lp-btn-primary flex-[2_1_auto] !px-4">
+              // Con una cortesía por activar, pagar es la opción secundaria: el
+              // dorado se queda en el cupo gratis (y en el pozo), no en dos CTA.
+              <Link href={`/casa/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
+                className={`lp-btn flex-[2_1_auto] !px-4 ${activarCortesia ? "lp-btn-ghost" : "lp-btn-primary"}`}>
                 {entry ? "Retomar comprobante" : `Entrar por ${formatCop(polla.entry_price_cop)}`}
               </Link>
             )}
@@ -351,7 +382,10 @@ export default async function PollaPage({
           <div className="mt-4 border border-turf/40 bg-turf/10 p-3">
             <p className="lp-label text-turf">{etiqueta}Estás dentro</p>
             <p className="mt-1 text-[13px] text-text-secondary">
-              Confirmamos tu pago y {multiple ? "este cupo ya compite" : "ya participas"} por el premio.
+              {/* Con una cortesía nadie pagó nada: decir «confirmamos tu pago» sería falso. */}
+              {isCourtesyEntry(entry)
+                ? `Activaste tu cortesía y ${multiple ? "este cupo ya compite" : "ya participas"} por el premio.`
+                : `Confirmamos tu pago y ${multiple ? "este cupo ya compite" : "ya participas"} por el premio.`}
               {abierta ? " Haz tus pronósticos antes del cierre." : ""}
             </p>
           </div>
@@ -407,6 +441,10 @@ export default async function PollaPage({
               Estamos confirmando a los ganadores y el pago. En la Tabla ves cuánto se lleva cada uno; cuando paguemos, el comprobante aparece aquí.
             </p>
           </StreetCard>
+        )}
+
+        {misCortesias.length > 0 && (
+          <MisCortesias initial={misCortesias} mostrarPolla={false} />
         )}
 
         <PollaTabs
@@ -525,14 +563,20 @@ function PollaPublica({
   pot,
   slug,
   tournaments,
+  cortesia = null,
 }: {
   polla: CasaPolla;
   pot: { prize_cop: number };
   slug: string;
   tournaments: string[];
+  /** Cortesía del enlace que abrió (migración 138), si es de esta polla. */
+  cortesia?: CourtesyPreview | null;
 }) {
   const abierta = isPollaOpen(polla);
   const entrar = `/login?returnTo=${encodeURIComponent(`/casa/${slug}`)}`;
+  // Le regalaron un cupo: eso manda sobre el precio de la entrada. El cupo se
+  // activa DESPUÉS de crear la cuenta, porque solo es para personas nuevas.
+  const regalo = cortesia?.usable ? cortesia : null;
 
   return (
     <div className="pb-32">
@@ -554,6 +598,19 @@ function PollaPublica({
       </HeroFrame>
 
       <div className="px-4 pt-6">
+        {regalo && (
+          <StreetCard hero className="mb-4 bg-bg-card p-5">
+            <p className="flex items-start gap-2 text-[17px] font-semibold leading-snug text-text-primary">
+              <Ticket className="mt-1 h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
+              <span>{regalo.holder ? `${regalo.holder} te regaló un cupo gratis` : "Tienes un cupo gratis"}</span>
+            </p>
+            <p className="mt-2 text-[15px] leading-relaxed text-text-secondary">
+              Crea tu cuenta y activas el cupo en esta polla. No pagas nada.
+            </p>
+            <Link href={entrar} className="lp-btn lp-btn-primary mt-4 w-full">Crear mi cuenta</Link>
+            <p className="mt-3 text-[12px] leading-snug text-text-muted">{COURTESY_FINE_PRINT}</p>
+          </StreetCard>
+        )}
         <StreetCard className="bg-bg-card p-5">
           <div className="flex items-end justify-between gap-4">
             <div>
@@ -574,8 +631,8 @@ function PollaPublica({
             {polla.prize_kind === "objeto" ? `Participas por ${polla.prize_object}. El premio no se divide ni se convierte en dinero.` : polla.kind === "rifa" ? "Participas con tu boleta en el sorteo anunciado." : "El pozo se reparte entre quienes obtienen el mayor puntaje."}
           </p>
 
-          <Link href={entrar} className="lp-btn lp-btn-primary mt-5 w-full">
-            {abierta ? "Entrar a esta polla" : "Ver la app"}
+          <Link href={entrar} className={`lp-btn mt-5 w-full ${regalo ? "lp-btn-ghost" : "lp-btn-primary"}`}>
+            {regalo ? "Ver la app" : abierta ? "Entrar a esta polla" : "Ver la app"}
           </Link>
           <p className="mt-3 text-center text-[11px] text-text-muted">
             Necesitas tu número de celular. No pedimos datos bancarios.
