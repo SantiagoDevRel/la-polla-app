@@ -13,7 +13,9 @@ export const MATCH_ISSUE_KIND_LABEL: Record<MatchIssueKind, string> = {
   aplazado: "Aplazado",
   cancelado: "Cancelado",
   abandonado: "Abandonado",
-  sin_datos: "Sin datos del proveedor",
+  // (2026-09-17) «Sin datos del proveedor» se leía como «el partido no existe»:
+  // el caso es que a la media hora del inicio todavía no llegaba el marcador.
+  sin_datos: "Marcador demorado",
 };
 
 export function matchIssueKindLabel(kind: string): string {
@@ -36,7 +38,7 @@ export function describeMatchIssue(kind: MatchIssueKind, elapsed: number | null 
     case "cancelado":
       return "Cancelado";
     case "sin_datos":
-      return "Sin datos del proveedor";
+      return "Marcador demorado: 30 minutos después del inicio aún no llegaban datos del partido";
     default:
       return "Partido con novedades";
   }

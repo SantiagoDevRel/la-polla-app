@@ -158,6 +158,10 @@ export default async function PollaPage({
   // Con la tarjeta "Tus cupos" el estado del cupo vive ahí; no se repite en cuadros aparte.
   const showCupos = polla.kind !== "rifa" && entries.length > 0 && (participa || entries.length > 1);
   const tournaments = resolveTournamentSlugs(polla, matches as { tournament: string | null }[]);
+  // (2026-09-17) Todos los partidos con resultado verificado (o anulados) y la casa
+  // todavía no confirma el reparto: se avisa para que nadie piense que se olvidó.
+  const partidosTerminados = polla.kind === "partidos" && matches.length > 0 && polla.status !== "resuelta"
+    && (matches as Array<{ final_verified_at: string | null; voided_at?: string | null }>).every((m) => Boolean(m.final_verified_at || m.voided_at));
 
   const picksPorPartido: Record<
     string,
@@ -366,8 +370,18 @@ export default async function PollaPage({
           </div>
         )}
 
+        {partidosTerminados && payouts.length === 0 && (
+          <StreetCard className="mt-4 border-turf/40 p-4 first:mt-0">
+            <p className="lp-label !text-turf">Todos los partidos terminaron</p>
+            <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">
+              Estamos confirmando a los ganadores y el pago. En la Tabla ves cuánto se lleva cada uno; cuando paguemos, el comprobante aparece aquí.
+            </p>
+          </StreetCard>
+        )}
+
         <PollaTabs
           slug={polla.slug}
+          finished={partidosTerminados}
           info={<PollaInfo polla={polla} threshold={threshold} />}
           firstLabel={polla.kind === "manual" ? "Preguntas" : polla.kind === "rifa" ? "Sorteo" : "Partidos"}
           initialRows={tabla}

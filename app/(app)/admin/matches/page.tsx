@@ -49,8 +49,8 @@ export default function AdminMatchesPage() {
 
       <main className="max-w-lg mx-auto p-4 space-y-4">
         <p className="text-sm text-text-secondary">
-          Los partidos se actualizan solos desde API-Football: el calendario cada
-          6 horas y el vivo y los resultados cada minuto.
+          Los partidos se actualizan solos: el calendario cada 6 horas y el vivo
+          y los resultados cada minuto.
         </p>
 
         {/* Purgar partidos antiguos */}

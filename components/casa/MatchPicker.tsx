@@ -225,7 +225,7 @@ export function MatchPicker({
           ? `Listo: ${traidos.length} partidos.`
           : j.nextMatch
             ? null
-            : "Los proveedores de datos todavía no publican partidos próximos de este torneo.",
+            : "Todavía no hay partidos próximos publicados para este torneo.",
       );
     } catch {
       if (!controller.signal.aborted) setSyncMsg("Se cayó la conexión.");

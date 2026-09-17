@@ -55,8 +55,8 @@ function claim(overrides: Partial<MatchIssueNotificationClaim> = {}): MatchIssue
 
 describe("textos de los casos", () => {
   it("nombra el caso sin datos y la decisión resuelto", () => {
-    expect(describeMatchIssue("sin_datos", null)).toBe("Sin datos del proveedor");
-    expect(describeDecision("resuelto")).toBe("Resuelto");
+    expect(describeMatchIssue("sin_datos", null)).toBe("Marcador demorado: 30 minutos después del inicio aún no llegaban datos del partido");
+    expect(describeDecision("resuelto")).toBe("Caso cerrado");
   });
 
   it("muestra la hora de Colombia o solo la fecha si la hora es provisional", () => {
@@ -69,9 +69,9 @@ describe("textos de los casos", () => {
 describe("buildMatchIssueEmail", () => {
   it("arma asunto y cuerpo en español neutro con pollas, hora de Colombia y enlace", () => {
     const { subject, text } = buildMatchIssueEmail(claim());
-    expect(subject).toBe("Issue en La Polla: Millonarios vs Nacional (Sin datos del proveedor)");
+    expect(subject).toBe("Issue en La Polla: Millonarios vs Nacional (Marcador demorado)");
     expect(text).toContain("Partido: Millonarios vs Nacional");
-    expect(text).toContain("Tipo: Sin datos del proveedor");
+    expect(text).toContain("Tipo: Marcador demorado");
     expect(text).toMatch(/Inicio: .*14 de septiembre.*3:00.*\(hora de Colombia\)/);
     expect(text).toContain("Pollas afectadas (2):\n- Clásico del domingo\n- Fecha 10");
     expect(text).toContain("resultado de los 90 minutos");
@@ -90,7 +90,7 @@ describe("buildMatchIssueEmail", () => {
 
   it("no deja saltos de línea de los nombres en el asunto", () => {
     const { subject } = buildMatchIssueEmail(claim({ home_team: "Equipo\r\nBcc: x@y.com", away_team: null }));
-    expect(subject).toBe("Issue en La Polla: Equipo Bcc: x@y.com vs Equipo visitante (Sin datos del proveedor)");
+    expect(subject).toBe("Issue en La Polla: Equipo Bcc: x@y.com vs Equipo visitante (Marcador demorado)");
     expect(subject).not.toMatch(/[\r\n]/);
   });
 });
@@ -171,7 +171,7 @@ describe("notifyMatchIssues", () => {
     expect(result).toEqual({ claimed: 2, sent: 1, failed: 1, released: 0 });
     expect(calls[0]).toEqual({ fn: "casa_claim_match_issue_notifications", args: { p_limit: 10 } });
     expect(send).toHaveBeenCalledTimes(2);
-    expect(send.mock.calls[0][0]).toMatchObject({ to: ["a@x.co"], subject: "Issue en La Polla: Millonarios vs Nacional (Sin datos del proveedor)" });
+    expect(send.mock.calls[0][0]).toMatchObject({ to: ["a@x.co"], subject: "Issue en La Polla: Millonarios vs Nacional (Marcador demorado)" });
     expect(send.mock.calls[1][0].subject).toContain("(Aplazado)");
     expect(calls.slice(1)).toEqual([
       { fn: "casa_finish_match_issue_notification", args: { p_issue: issueId, p_claim_token: claim().claim_token, p_outcome: "sent", p_error: null } },

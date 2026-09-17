@@ -3,7 +3,7 @@
 
 import { redirect } from "next/navigation";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
-import { getPots, getHouseTotal, listAllPollas } from "@/lib/casa/queries";
+import { getPots, getHouseTotal, getSettlementReadiness, listAllPollas } from "@/lib/casa/queries";
 import { pollaStatusLabel } from "@/lib/casa/types";
 import { canEditPolla } from "@/lib/casa/editor";
 import { countOpenMatchIssues } from "@/lib/casa/match-issues";
@@ -21,6 +21,11 @@ export default async function CasaAdminPage() {
   const totalCasa = await getHouseTotal(pollas.map((polla) => polla.id));
   // Partidos suspendidos/aplazados/cancelados/abandonados sin decidir.
   const openIssues = await countOpenMatchIssues();
+  // (2026-09-17) Pollas de pozo en juego: cuáles ya se pueden repartir (SQL, migración 134).
+  // Si la lectura falla, el panel sigue igual sin el aviso.
+  const readiness = await getSettlementReadiness(
+    pollas.filter((polla) => polla.status === "abierta" || polla.status === "cerrada").map((polla) => polla.id),
+  ).catch(() => ({}));
 
   return (
     <CasaAdminPanel
@@ -47,6 +52,7 @@ export default async function CasaAdminPage() {
       pots={pots}
       totalCasa={totalCasa}
       openIssues={openIssues}
+      readiness={readiness}
     />
   );
 }

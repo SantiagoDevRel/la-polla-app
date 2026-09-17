@@ -35,7 +35,7 @@ const CONFIRM_COPY: Record<"anular" | "mantener", Copy> = {
 
 const SIN_DATOS_KEEP_COPY: Copy = {
   ...CONFIRM_COPY.mantener,
-  body: "El partido sigue en las pollas y esperamos los datos del proveedor. Sus puntos se calculan cuando se verifique el resultado. Si la hora de inicio cambia y vuelve a pasar sin datos, se abrirá un caso nuevo.",
+  body: "El partido sigue en las pollas y esperamos su marcador. Sus puntos se calculan cuando se verifique el resultado. Si la hora de inicio cambia y vuelve a pasar sin datos, se abrirá un caso nuevo.",
 };
 
 function parseGoals(value: string): number | null {

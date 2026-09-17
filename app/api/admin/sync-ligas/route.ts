@@ -86,14 +86,14 @@ export async function POST(req: NextRequest) {
   const { tournament } = parsed.data;
 
   if (!afLeagueIdForTournament(tournament)) {
-    return NextResponse.json({ error: "API-Football no tiene esa liga." }, { status: 400 });
+    return NextResponse.json({ error: "No encontramos esa liga en la fuente de partidos." }, { status: 400 });
   }
   try {
     const r = await refreshTournamentScheduleDetailed(tournament);
     if (!r.refreshed) {
       const error = r.state === "pending"
         ? "Ya hay una actualización de este calendario en curso. Intenta de nuevo en unos minutos."
-        : "No pude actualizar el calendario desde API-Football. Intenta de nuevo en unos minutos.";
+        : "No pude actualizar el calendario. Intenta de nuevo en unos minutos.";
       return NextResponse.json({ error, estado: r.state }, { status: r.state === "pending" ? 409 : 502 });
     }
     return NextResponse.json({
@@ -109,6 +109,6 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     // Nunca el objeto de error completo: un error de Axios lleva la clave del proveedor.
     console.error("[sync-ligas] Error:", error instanceof Error ? error.message : "desconocido");
-    return NextResponse.json({ error: "No pude actualizar el calendario desde API-Football. Intenta de nuevo en unos minutos." }, { status: 500 });
+    return NextResponse.json({ error: "No pude actualizar el calendario. Intenta de nuevo en unos minutos." }, { status: 500 });
   }
 }

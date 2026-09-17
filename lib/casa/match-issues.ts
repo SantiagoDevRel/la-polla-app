@@ -166,7 +166,9 @@ export function describeDecision(decision: MatchIssueDecisionValue): string {
     case "anular":
       return "Anulado: 0 puntos para todos";
     case "resuelto":
-      return "Resuelto";
+      // El CASO se cerró (llegaron datos, se verificó o se puso el resultado); no
+      // quiere decir que el partido haya terminado.
+      return "Caso cerrado";
     default:
       return "Partido mantenido";
   }

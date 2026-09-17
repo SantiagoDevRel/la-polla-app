@@ -103,13 +103,13 @@ export async function POST(
     const final = observation ? readFinalResult(observation.fixture) : null;
     if (!observation || !final) {
       return NextResponse.json(
-        { error: "API-Football no tiene guardado un resultado final de este partido. Ingresa manualmente el marcador de los 90 minutos." },
+        { error: "Todavía no llega un resultado final de este partido. Ingresa manualmente el marcador de los 90 minutos." },
         { status: 409 },
       );
     }
     if (isKnockout && (!final.fulltime || (observation.fixture.fixture.status.short === "PEN" && !final.penalty))) {
       return NextResponse.json(
-        { error: "API-Football no trae el marcador completo o los penales. Ingresa manualmente el marcador de los 90 minutos." },
+        { error: "El resultado recibido no trae el marcador completo o los penales. Ingresa manualmente el marcador de los 90 minutos." },
         { status: 409 },
       );
     }

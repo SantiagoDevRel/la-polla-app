@@ -20,8 +20,10 @@ import {
   type CasaPick,
   type CasaPolla,
   type CasaPot,
+  type CasaProvisionalPayout,
   type CasaProvisionalPrize,
   type CasaQuestion,
+  type CasaSettlementReadiness,
   isPollaPublished,
 } from "./types";
 
@@ -398,6 +400,38 @@ export async function getProvisionalPrizes(pollaId: string): Promise<CasaProvisi
   const { data, error } = await createAdminClient().rpc("casa_provisional_prizes_v2", { p_polla_id: pollaId });
   if (error) throw error;
   return ((data ?? []) as CasaProvisionalPrize[]).map((row) => ({ ...row, amount_cop: Number(row.amount_cop) }));
+}
+
+/**
+ * Qué pollas de pozo ya se pueden repartir (migración 134). Las condiciones
+ * viven en SQL, iguales a las de casa_settle_polla_v2. Pollas que no aplican
+ * (rifas, objetos, resueltas, archivadas) no aparecen en el resultado.
+ */
+export async function getSettlementReadiness(pollaIds: string[]): Promise<Record<string, CasaSettlementReadiness>> {
+  const out: Record<string, CasaSettlementReadiness> = {};
+  const ids = [...new Set(pollaIds)];
+  for (let start = 0; start < ids.length; start += 200) {
+    const { data, error } = await createAdminClient().rpc("casa_settlement_readiness_v2", { p_ids: ids.slice(start, start + 200) });
+    if (error) throw error;
+    for (const row of (data ?? []) as Array<{
+      polla_id: string; total_items: number; done_items: number; open_issues: number;
+      pending_proofs: number; paid_entries: number; inscriptions_closed: boolean; ready: boolean;
+    }>) {
+      out[row.polla_id] = {
+        pollaId: row.polla_id, totalItems: row.total_items, doneItems: row.done_items, openIssues: row.open_issues,
+        pendingProofs: row.pending_proofs, paidEntries: row.paid_entries,
+        inscriptionsClosed: row.inscriptions_closed, ready: row.ready,
+      };
+    }
+  }
+  return out;
+}
+
+/** A quién le pagaría hoy el reparto y cuánto, por persona (migración 134). */
+export async function getProvisionalPayouts(pollaId: string): Promise<CasaProvisionalPayout[]> {
+  const { data, error } = await createAdminClient().rpc("casa_provisional_payouts_v2", { p_polla_id: pollaId });
+  if (error) throw error;
+  return ((data ?? []) as CasaProvisionalPayout[]).map((row) => ({ ...row, amount_cop: Number(row.amount_cop) }));
 }
 
 /**
