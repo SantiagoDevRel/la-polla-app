@@ -1043,6 +1043,14 @@ Construido con ☕ en Medellín / Lisboa por [@SantiagoDevRel](https://github.co
 
 ### Mis pollas en Casa y Perfil (2026-09-09)
 
+**Pollas cerradas públicas (2026-09-17, pedido del dueño).** Desde el 16-sep
+(Ofigolazo en adelante, `PUBLIC_CLOSED_SINCE` en `lib/casa/types.ts`) una polla
+cerrada es pública para cualquier usuario con sesión: sale en Pollas cerradas y
+`/api/casa/pollas/[slug]/match-picks` deja ver los pronósticos de los partidos ya
+empezados aunque no se haya inscrito (sin «Tu pronóstico»). Las cerradas anteriores
+solo las ven sus participantes. Los comprobantes de pago siguen privados (pueden
+mostrar la cuenta del ganador). La tabla ya era visible con sesión.
+
 `components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
 En `/casa`, el orden es Mis pollas, Pollas disponibles y Pollas cerradas. Mis pollas
