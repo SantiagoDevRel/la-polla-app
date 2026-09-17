@@ -1,4 +1,4 @@
--- scripts/casa-courtesies-check.sql — regresión de las cortesías (migración 136).
+-- scripts/casa-courtesies-check.sql — regresión de las cortesías (migración 138).
 --
 --   docker exec -i supabase_db_la-polla psql -U postgres -d postgres < scripts/casa-courtesies-check.sql
 --
@@ -190,7 +190,7 @@ BEGIN
   v_result := public.casa_revoke_courtesy_v1(v_id, '55555555-5555-4555-8555-000000000000', 2);
   ASSERT (v_result->>'ok')::boolean AND NOT (v_result->>'changed')::boolean, 'H3: retirar dos veces no es idempotente';
 
-  -- Una cortesía YA USADA también se retira (migración 137): el cupo gratis
+  -- Una cortesía YA USADA también se retira (migración 139): el cupo gratis
   -- queda anulado, la cortesía guarda a quién se la dio y esa cuenta tampoco
   -- puede ir a buscar otra.
   SELECT id, entry_id, redeemed_by INTO v_usada, v_entry, v_persona

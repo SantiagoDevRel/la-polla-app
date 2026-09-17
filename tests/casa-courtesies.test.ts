@@ -1,4 +1,4 @@
-// tests/casa-courtesies.test.ts — cortesías (migración 136).
+// tests/casa-courtesies.test.ts — cortesías (migración 138).
 //
 // Lo que se protege acá: el formato del código que viaja en el enlace, cuándo
 // una cortesía todavía sirve, y que el canje NUNCA decida por su cuenta — la

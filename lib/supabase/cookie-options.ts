@@ -53,7 +53,7 @@ export function referralCookieOptions(
   return onboardingCookieOptions(nodeEnv);
 }
 
-/** lp_cortesia: código del enlace de cortesía (migración 136), 30 días, solo servidor. */
+/** lp_cortesia: código del enlace de cortesía (migración 138), 30 días, solo servidor. */
 export function courtesyCookieOptions(
   nodeEnv: string | undefined = process.env.NODE_ENV,
 ) {

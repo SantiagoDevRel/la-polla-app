@@ -362,7 +362,7 @@ pendientes ni cambiar inscripciones después del reparto o del archivo.
 - Antes de desplegar: aplicar `supabase/migrations/122_casa_polla_editor.sql`
   (requiere 118). Regresión local con `scripts/casa-polla-editor-check.sql`.
 
-### Cortesías: cupos gratis que reparte una persona (2026-09-17, migración 136)
+### Cortesías: cupos gratis que reparte una persona (2026-09-17, migración 138)
 
 Solo el administrador las crea. Desde `/admin/cortesias` busca a una persona,
 elige una polla y le da de 1 a 20 cortesías. Cada una es un **enlace único**
@@ -377,7 +377,7 @@ elige una polla y le da de 1 a 20 cortesías. Cada una es un **enlace único**
   otra polla.
 - **Solo en esa polla**, y **vence con ella**: si nadie la usa antes del cierre
   de inscripciones no se traslada a ninguna otra (no hay cron; lo verifica el
-  canje). El administrador puede retirar una sin usar y, desde la migración 137,
+  canje). El administrador puede retirar una sin usar y, desde la migración 139,
   también **quitar un cupo ya usado**: la inscripción gratis queda `anulada`, la
   cortesía pasa a `retirada` y conserva a quién se la dio, así que esa cuenta
   tampoco puede ir a buscar otra. Con la polla repartida ya no se puede
@@ -397,7 +397,7 @@ y al onboarding; la URL queda limpia para que nadie reparta el cupo ajeno.
 La autoridad es SQL (`casa_grant_courtesies_v1`, `casa_redeem_courtesy_v1`,
 `casa_revoke_courtesy_v1`), con contrato v2, la polla bloqueada y `service_role`
 como único rol con EXECUTE. Antes de desplegar: aplicar
-`supabase/migrations/136_casa_courtesies.sql` y `137_casa_courtesy_withdraw.sql`.
+`supabase/migrations/138_casa_courtesies.sql` y `139_casa_courtesy_withdraw.sql`.
 La 137 parchea **in place** la rama de `casa_entries` de `casa_v2_write_guard`
 (como la 105 y la 133, sobre la definición vigente): sin esa puerta, anular un
 cupo de cortesía choca con `ALREADY_PAID`, porque un cupo gratis no tiene

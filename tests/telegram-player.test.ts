@@ -552,7 +552,7 @@ describe("Mis pagos: cupos de regalo por invitar (migración 135)", () => {
     expect(paymentLine({ ...compra, origin: null, status: "anulada", proof_path: null })?.actionable).toBe(true);
   });
 
-  it("una cortesía no se anuncia como pago confirmado (migración 136)", () => {
+  it("una cortesía no se anuncia como pago confirmado (migración 138)", () => {
     // El cupo de cortesía es $0 y sin comprobante: decir «confirmado» hacía
     // creer que alguien transfirió y que la casa lo revisó.
     const cortesia = { ...compra, proof_path: null, amount_cop: 0 };

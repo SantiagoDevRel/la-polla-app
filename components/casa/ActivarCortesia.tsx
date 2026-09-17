@@ -1,7 +1,7 @@
 "use client";
 
 // components/casa/ActivarCortesia.tsx — el botón de quien llegó por un enlace
-// de cortesía (migración 136).
+// de cortesía (migración 138).
 //
 // El código viaja en una cookie que puso proxy.ts, así que sobrevive al login y
 // al onboarding: cuando la persona vuelve a la polla ya con cuenta, esto es lo

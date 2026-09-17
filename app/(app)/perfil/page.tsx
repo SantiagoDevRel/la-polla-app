@@ -306,7 +306,7 @@ export default function PerfilPage() {
         {/* Invitaciones (migración 135). iOS: fuera, como el resto de promociones con premio. */}
         {!isIOSApp && <InvitacionesPerfil />}
 
-        {/* Cortesías para regalar (migración 136). Solo aparece si la casa le dio
+        {/* Cortesías para regalar (migración 138). Solo aparece si la casa le dio
             cupos; si no tiene, el componente no dibuja nada. Fuera de iOS por el
             mismo criterio que las invitaciones. */}
         {!isIOSApp && <MisCortesias />}

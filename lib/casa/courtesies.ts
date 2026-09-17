@@ -1,4 +1,4 @@
-// lib/casa/courtesies.ts — lecturas y escrituras de las cortesías (migración 136).
+// lib/casa/courtesies.ts — lecturas y escrituras de las cortesías (migración 138).
 //
 // Todo pasa por createAdminClient() como el resto de Casa (auth.uid() no
 // propaga a PostgREST, ver el TODO de CLAUDE.md). Acá nunca se escribe con

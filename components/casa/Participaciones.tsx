@@ -26,7 +26,7 @@ export function participationState(
 ): ParticipationState {
   // Cupo de regalo por invitar (migración 135): activo, sin comprobante.
   if (entry.origin === "invitacion") return "regalo";
-  // Cupo de cortesía (migración 136): también activo, pero decir "Pagado" sería
+  // Cupo de cortesía (migración 138): también activo, pero decir "Pagado" sería
   // falso — nadie pagó nada por él.
   if (isCourtesyEntry(entry)) return "cortesia";
   if (entry.status === "pagada") return "activa";

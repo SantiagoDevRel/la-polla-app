@@ -1,4 +1,4 @@
--- 136_casa_courtesies.sql — Cortesías: cupos de regalo que reparte una persona.
+-- 138_casa_courtesies.sql — Cortesías: cupos de regalo que reparte una persona.
 --
 -- Pedido del dueño (2026-09-17):
 --   · SOLO el administrador crea cortesías. Busca a una persona (Carlos, Sofía),
@@ -70,7 +70,7 @@ CREATE INDEX casa_courtesies_polla_status ON public.casa_courtesies(polla_id,sta
 CREATE INDEX casa_courtesies_holder ON public.casa_courtesies(holder_user_id,polla_id);
 
 COMMENT ON TABLE public.casa_courtesies IS
-  'Cupos de cortesía (migración 136): el administrador se los da a una persona para UNA polla y ella reparte un enlace único por cada uno. Solo los redimen cuentas nuevas, una vez en la vida.';
+  'Cupos de cortesía (migración 138): el administrador se los da a una persona para UNA polla y ella reparte un enlace único por cada uno. Solo los redimen cuentas nuevas, una vez en la vida.';
 
 CREATE TRIGGER set_casa_courtesies_updated_at BEFORE UPDATE ON public.casa_courtesies
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();

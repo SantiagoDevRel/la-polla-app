@@ -1,6 +1,6 @@
 "use client";
 
-// components/admin/CortesiasAdmin.tsx — dar cortesías desde el panel (migración 136).
+// components/admin/CortesiasAdmin.tsx — dar cortesías desde el panel (migración 138).
 //
 // El recorrido es el del pedido del dueño: busco a la persona, elijo la polla,
 // elijo cuántas cortesías y listo. Debajo queda la lista de lo dado, con el

@@ -1,4 +1,4 @@
-// app/api/casa/admin/cortesias/route.ts — cortesías del panel (migración 136).
+// app/api/casa/admin/cortesias/route.ts — cortesías del panel (migración 138).
 //
 //   GET  ?pollaId=… | ?holderId=…  → la lista (quién, qué polla, si ya se usó).
 //   POST { accion:"dar", pollaId, userId, cantidad }   → crea N enlaces únicos.

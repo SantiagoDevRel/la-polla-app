@@ -390,7 +390,7 @@ variantes arbitrarias ya escritas (`[[open]>summary>&]:rotate-180`) siguen siend
 `!px-4` / `!pl-11`. Pruebas: `tests/casa-polla-info.test.ts`,
 `tests/casa-match-weeks.test.ts`, `tests/football-team-search.test.ts`.
 
-### Cortesías: cupos gratis para usuarios nuevos (2026-09-17, migraciones 136-137)
+### Cortesías: cupos gratis para usuarios nuevos (2026-09-17, migraciones 138-139)
 
 Solo el administrador las crea, desde `/admin/cortesias`: busca una persona,
 elige UNA polla y le da N cortesías. Cada una es un enlace único

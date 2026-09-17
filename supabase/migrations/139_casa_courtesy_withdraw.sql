@@ -1,4 +1,4 @@
--- 137_casa_courtesy_withdraw.sql — Quitar un cupo de cortesía ya usado.
+-- 139_casa_courtesy_withdraw.sql — Quitar un cupo de cortesía ya usado.
 --
 -- Lo que faltaba (auditoría del 2026-09-17): una cortesía redimida era
 -- definitiva. Si alguien conseguía el enlace de otro, o una cuenta entraba a la
@@ -63,7 +63,7 @@ BEGIN
               AND c.id::text=current_setting('app.casa_courtesy_withdraw',true))
         THEN RETURN NEW; END IF;$replacement$;
   IF position(needle IN definition)=0 THEN
-    RAISE EXCEPTION 'El guard de casa_entries cambió: revisar antes de aplicar la 137';
+    RAISE EXCEPTION 'El guard de casa_entries cambió: revisar antes de aplicar la 139';
   END IF;
   EXECUTE replace(definition,needle,replacement);
 END $$;

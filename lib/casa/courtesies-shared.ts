@@ -1,4 +1,4 @@
-// lib/casa/courtesies-shared.ts — lo que la UI necesita de las cortesías (migración 136).
+// lib/casa/courtesies-shared.ts — lo que la UI necesita de las cortesías (migración 138).
 //
 // Solo formato y lectura. La autoridad es SQL: casa_grant_courtesies_v1 decide
 // quién puede dar cortesías y casa_redeem_courtesy_v1 quién puede usarlas (una

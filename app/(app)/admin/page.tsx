@@ -172,7 +172,7 @@ export default function AdminPage() {
           <Link href="/admin/pollas" className="lp-btn lp-btn-ghost mt-2 w-full">
             Administrar pollas
           </Link>
-          {/* Cupos de cortesía (migración 136): se buscan personas y se les dan
+          {/* Cupos de cortesía (migración 138): se buscan personas y se les dan
               enlaces gratis para una polla. Solo desde acá. */}
           <Link href="/admin/cortesias" className="lp-btn lp-btn-ghost mt-2 w-full">
             Dar cortesías

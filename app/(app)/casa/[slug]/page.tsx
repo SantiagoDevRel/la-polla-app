@@ -86,7 +86,7 @@ export default async function PollaPage({
   const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador" || polla.status === "anulada") notFound();
 
-  // ── Enlace de cortesía (migración 136) ──────────────────────────────────
+  // ── Enlace de cortesía (migración 138) ──────────────────────────────────
   // El código lo guardó proxy.ts en una cookie httpOnly al abrir el enlace, así
   // que sigue acá después del login y del onboarding. Solo se lee: SQL decide
   // si esta persona lo puede usar (cuenta nueva, una vez, en esta polla).
@@ -166,7 +166,7 @@ export default async function PollaPage({
     ? Object.fromEntries(entries.filter((e) => e.entry_number != null).map((e) => [e.entry_number!,
       editables.filter((id) => !allPicks.some((p) => p.entry_id === e.id && p.match_id === id)).length]))
     : null;
-  // Cortesías que esta persona tiene para regalar en esta polla (migración 136).
+  // Cortesías que esta persona tiene para regalar en esta polla (migración 138).
   // Casi nadie tiene: la lista vuelve vacía y no se dibuja nada.
   const misCortesias = (await listMyCourtesies(user.id).catch(() => []))
     .filter((cortesia) => cortesia.slug === polla.slug);
@@ -227,7 +227,7 @@ export default async function PollaPage({
   const retomar = !participa && entry && !isLiveEntry(entry) ? entry.entry_number : null;
   // Ya participa y quedan cupos: el CTA principal es comprar otro (migración 131).
   const maxCupos = polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER;
-  // Llegó por un enlace de cortesía y todavía no está inscrito (migración 136).
+  // Llegó por un enlace de cortesía y todavía no está inscrito (migración 138).
   const activarCortesia = Boolean(cortesiaDeEstaPolla?.redeemable) && !participa;
   const comprarOtro = polla.kind !== "rifa" && participa && abierta
     && entries.filter((e) => e.status !== "anulada").length < maxCupos;
@@ -569,7 +569,7 @@ function PollaPublica({
   pot: { prize_cop: number };
   slug: string;
   tournaments: string[];
-  /** Cortesía del enlace que abrió (migración 136), si es de esta polla. */
+  /** Cortesía del enlace que abrió (migración 138), si es de esta polla. */
   cortesia?: CourtesyPreview | null;
 }) {
   const abierta = isPollaOpen(polla);

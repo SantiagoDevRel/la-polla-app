@@ -371,7 +371,7 @@ type PaymentRow = {
  */
 export function paymentLine(row: Pick<PaymentRow, "status" | "proof_path" | "reject_reason" | "origin" | "amount_cop">): { state: string; actionable: boolean } | null {
   if (row.origin === "invitacion") return row.status === "pagada" ? { state: "🎁 regalo por invitar", actionable: false } : null;
-  // Una cortesía (migración 136) tampoco es un pago: decir «confirmado» sugería
+  // Una cortesía (migración 138) tampoco es un pago: decir «confirmado» sugería
   // que alguien transfirió y que la casa lo revisó, y no pasó ninguna de las dos.
   if (isCourtesyEntry(row)) return { state: "🎟 cortesía", actionable: false };
   if (row.status === "pagada") return { state: "✅ confirmado", actionable: false };
