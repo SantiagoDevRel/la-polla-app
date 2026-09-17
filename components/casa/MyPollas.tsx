@@ -11,7 +11,9 @@ import { PollaSection } from "./PollaSection";
 const PAGE_SIZE = 5;
 const searchKey = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-export function MyPollas({ initialPollas, defaultOpen = true, pendingByPolla = {} }: { initialPollas?: MyCasaPolla[]; defaultOpen?: boolean; pendingByPolla?: Record<string, number> }) {
+// activeOnly: en /casa la página ya filtró las finalizadas (viven en Pollas
+// cerradas), así que la sección solo habla de pollas en juego.
+export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, pendingByPolla = {} }: { initialPollas?: MyCasaPolla[]; defaultOpen?: boolean; activeOnly?: boolean; pendingByPolla?: Record<string, number> }) {
   const en = useLocale() === "en";
   const [loadedPollas, setPollas] = useState<MyCasaPolla[]>();
   const pollas = initialPollas ?? loadedPollas;
@@ -36,15 +38,15 @@ export function MyPollas({ initialPollas, defaultOpen = true, pendingByPolla = {
   const currentPage = Math.min(page, Math.max(0, pageCount - 1));
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
-  return <PollaSection id="mis-pollas" kind="mine" title={en ? "My pools" : "Mis pollas"} description={en ? "Pools you have joined" : "Pollas a las que te has unido"} count={pollas ? pollas.length : "—"} defaultOpen={defaultOpen}>
+  return <PollaSection id="mis-pollas" kind="mine" title={en ? "My pools" : "Mis pollas"} description={activeOnly ? (en ? "Your pools still in play" : "Tus pollas en juego") : (en ? "Pools you have joined" : "Pollas a las que te has unido")} count={pollas ? pollas.length : "—"} defaultOpen={defaultOpen}>
       {error ? <div className="lp-card p-4 text-[15px] text-text-secondary" role="alert">
         <p>{en ? "Unable to load your pools." : "No pudimos cargar tus pollas."}</p>
         <button onClick={() => setAttempt(n => n + 1)} className="mt-2 min-h-11 cursor-pointer rounded-full border border-border-default px-4 text-text-primary transition-colors hover:bg-bg-elevated">{en ? "Try again" : "Intentar de nuevo"}</button>
       </div> : !pollas ? <div className="lp-card h-28 animate-pulse" role="status" aria-label={en ? "Loading your pools" : "Cargando tus pollas"} /> : pollas.length === 0 ?
       <div className="lp-card p-5 text-center">
         <Ticket aria-hidden="true" className="mx-auto mb-2 h-7 w-7 text-text-secondary" />
-        <p className="text-[15px] font-semibold text-text-primary">{en ? "You haven't joined a pool yet" : "Todavía no te has inscrito en una polla"}</p>
-        <Link href="/casa#pollas-abiertas" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-border-default px-4 text-[15px] text-text-primary transition-colors hover:bg-bg-elevated">{en ? "See open pools" : "Ver pollas abiertas"}<ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" /></Link>
+        <p className="text-[15px] font-semibold text-text-primary">{activeOnly ? (en ? "You have no pools in play" : "No tienes pollas en juego") : (en ? "You haven't joined a pool yet" : "Todavía no te has inscrito en una polla")}</p>
+        <Link href="/casa#pollas-disponibles" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-border-default px-4 text-[15px] text-text-primary transition-colors hover:bg-bg-elevated">{en ? "See available pools" : "Ver pollas disponibles"}<ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" /></Link>
       </div> : <>
         {pollas.length > PAGE_SIZE && <label className="block space-y-2 text-[13px] text-text-secondary">
           <span className="flex items-center gap-2"><Search aria-hidden="true" className="h-4 w-4" />{en ? "Search my pools" : "Buscar en mis pollas"}</span>

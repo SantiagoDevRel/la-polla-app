@@ -44,10 +44,12 @@ Fechas visibles e inputs: `lib/time/colombia.ts`, siempre Colombia. No modificar
 
 ### Navegación y actualización de la app (2026-09-09)
 
-Casa: Pollas abiertas → Mis pollas → Pollas cerradas. Siempre hay una abierta al
-cargar (2026-09-14): Pollas abiertas si hay disponibles o si la persona no está
-inscrita en ninguna; Mis pollas si está inscrita; Pollas cerradas siempre cerrada,
-con contenedores `PollaSection` y subtítulos consistentes. Perfil conserva Mis pollas
+Casa (2026-09-17): Mis pollas → Pollas disponibles → Pollas cerradas. Mis pollas
+lleva solo pollas en juego; al finalizar (resuelta/anulada) la polla pasa sola a
+Pollas cerradas con la marca «Participaste», y una en juego no se repite allí.
+Siempre hay una abierta al cargar: Mis pollas si hay pollas en juego; disponibles
+si hay alguna o si no hay nada en juego; cerradas siempre cerrada, en gris
+translúcido (sección `bg-bg-base/45`, logos desaturados). Contenedores `PollaSection`. Perfil conserva Mis pollas
 abierta. Eliminar polla requiere rol admin y un clic de confirmación; no pedir nombre.
 Equipo: Próximos (default) / Pasados / Plantel / Club. Partido: equipos clickeables
 con nombre/escudo centrados y «Ver equipo», marcador central, categorías de estadísticas
@@ -1794,9 +1796,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 `components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
-En `/casa`, el orden es Pollas abiertas, Mis pollas y Pollas cerradas. Pollas
-abiertas empieza abierta si hay disponibles o si la persona no tiene inscripciones;
-Mis pollas empieza abierta si tiene inscripciones; cerradas empieza cerrada. Comparten título/subtítulo y contienen sus tarjetas dentro de
+En `/casa`, el orden es Mis pollas, Pollas disponibles y Pollas cerradas. Mis pollas
+(prop `activeOnly`) muestra solo pollas en juego y empieza abierta si hay alguna; las
+finalizadas pasan a Pollas cerradas marcadas «Participaste». Pollas disponibles empieza
+abierta si hay disponibles o si no hay nada en juego; cerradas empieza cerrada. Comparten título/subtítulo y contienen sus tarjetas dentro de
 `PollaSection`. En Perfil, Mis pollas permanece abierta. Las inscripciones pendientes o pagadas se
 muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
 Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.
