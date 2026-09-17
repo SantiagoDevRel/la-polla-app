@@ -17,14 +17,18 @@ const searchKey = (value: string) => value.normalize("NFD").replace(/[\u0300-\u0
  * (in review), and a red line flags cupos that still miss predictions.
  * `pendingByPolla` is a fallback for pools without per-cupo counts.
  */
-export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, pendingByPolla = {} }: { initialPollas?: MyCasaPolla[]; defaultOpen?: boolean; /** /casa: la página ya filtró las finalizadas (viven en Pollas cerradas). */ activeOnly?: boolean; pendingByPolla?: Record<string, number> }) {
-  const en = useLocale() === "en";
+export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, split = false, pendingByPolla = {} }: {
+  initialPollas?: MyCasaPolla[]; defaultOpen?: boolean;
+  /** /casa: la página ya filtró las finalizadas (viven en Pollas cerradas). */
+  activeOnly?: boolean;
+  /** Perfil (2026-09-17): en juego y cerradas en dos desplegables compactos. */
+  split?: boolean;
+  pendingByPolla?: Record<string, number>;
+}) {
   const [loadedPollas, setPollas] = useState<MyCasaPolla[]>();
   const pollas = initialPollas ?? loadedPollas;
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(0);
 
   useEffect(() => {
     if (initialPollas) return;
@@ -37,17 +41,41 @@ export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false
     return () => controller.abort();
   }, [initialPollas, attempt]);
 
+  const retry = () => setAttempt(n => n + 1);
+  if (!split) return <MyPollasSection id="mis-pollas" kind="mine" pollas={pollas} error={error} retry={retry} defaultOpen={defaultOpen} activeOnly={activeOnly} pendingByPolla={pendingByPolla} />;
+  return <div className="space-y-3">
+    <MyPollasSection id="mis-pollas" kind="mine" compact activeOnly pollas={pollas?.filter(p => !isFinished(p))} error={error} retry={retry} defaultOpen={defaultOpen} pendingByPolla={pendingByPolla} />
+    <MyPollasSection id="mis-pollas-cerradas" kind="closed" compact pollas={pollas?.filter(isFinished)} error={error} retry={retry} defaultOpen={false} pendingByPolla={pendingByPolla} />
+  </div>;
+}
+
+const isFinished = (p: MyCasaPolla) => p.status === "resuelta" || p.status === "anulada";
+
+function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOnly = false, compact = false, pendingByPolla }: {
+  id: string; kind: "mine" | "closed"; pollas?: MyCasaPolla[]; error: boolean; retry: () => void;
+  defaultOpen: boolean; activeOnly?: boolean; compact?: boolean; pendingByPolla: Record<string, number>;
+}) {
+  const en = useLocale() === "en";
+  const closedList = kind === "closed";
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const title = closedList ? (en ? "Closed pools" : "Pollas cerradas") : (en ? "My pools" : "Mis pollas");
+  const description = closedList
+    ? (en ? "Finished pools you took part in" : "Pollas finalizadas en las que participaste")
+    : activeOnly ? (en ? "Your pools still in play" : "Tus pollas en juego") : (en ? "Pools you have joined" : "Pollas a las que te has unido");
+
   const [selectedCupo, setSelectedCupo] = useState<Record<string, number>>({});
   const filtered = (pollas ?? []).filter(p => searchKey(p.name).includes(searchKey(query.trim())));
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const currentPage = Math.min(page, Math.max(0, pageCount - 1));
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
-  return <PollaSection id="mis-pollas" kind="mine" title={en ? "My pools" : "Mis pollas"} description={activeOnly ? (en ? "Your pools still in play" : "Tus pollas en juego") : (en ? "Pools you have joined" : "Pollas a las que te has unido")} count={pollas ? pollas.length : "—"} defaultOpen={defaultOpen}>
+  return <PollaSection id={id} kind={kind} compact={compact} title={title} description={description} count={pollas ? pollas.length : "—"} defaultOpen={defaultOpen}>
       {error ? <div className="lp-card p-4 text-[15px] text-text-secondary" role="alert">
         <p>{en ? "Unable to load your pools." : "No pudimos cargar tus pollas."}</p>
-        <button onClick={() => setAttempt(n => n + 1)} className="mt-2 min-h-11 cursor-pointer rounded-full border border-border-default px-4 text-text-primary transition-colors hover:bg-bg-elevated">{en ? "Try again" : "Intentar de nuevo"}</button>
+        <button onClick={retry} className="mt-2 min-h-11 cursor-pointer rounded-full border border-border-default px-4 text-text-primary transition-colors hover:bg-bg-elevated">{en ? "Try again" : "Intentar de nuevo"}</button>
       </div> : !pollas ? <div className="lp-card h-28 animate-pulse" role="status" aria-label={en ? "Loading your pools" : "Cargando tus pollas"} /> : pollas.length === 0 ?
+      closedList ? <p className="px-1 py-2 text-[15px] text-text-secondary">{en ? "You have no finished pools yet." : "Todavía no tienes pollas finalizadas."}</p> :
       <div className="lp-card p-5 text-center">
         <Ticket aria-hidden="true" className="mx-auto mb-2 h-7 w-7 text-text-secondary" />
         <p className="text-[15px] font-semibold text-text-primary">{activeOnly ? (en ? "You have no pools in play" : "No tienes pollas en juego") : (en ? "You haven't joined a pool yet" : "Todavía no te has inscrito en una polla")}</p>
@@ -72,9 +100,10 @@ export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false
             const anyPending = !finished && (pending > 0 || otherPending.length > 0);
             const selectId = `cupo-${polla.id}`;
             return <li key={polla.id}>
-              <div className={`lp-card space-y-3 bg-bg-elevated p-4 ${anyPending ? "border-red-alert/50" : ""}`}>
+              {/* Finalizada = gris translúcido y logos desaturados, como en /casa. */}
+              <div className={`lp-card space-y-3 p-4 ${finished ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : "bg-bg-elevated"} ${anyPending ? "border-red-alert/50" : ""}`}>
                 <Link href={href} className="flex items-start gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
-                  <h3 className="min-w-0 flex-1 font-display text-[22px] leading-tight tracking-wide text-text-primary [overflow-wrap:anywhere]">{polla.name}</h3>
+                  <h3 className={`min-w-0 flex-1 font-display text-[22px] leading-tight tracking-wide ${finished ? "text-text-secondary" : "text-text-primary"} [overflow-wrap:anywhere]`}>{polla.name}</h3>
                   {several && <span className="mt-1 shrink-0 text-[13px] tabular-nums text-text-secondary">{entries.length} {en ? "entries" : "cupos"}</span>}
                   <ChevronRight aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-text-secondary" />
                 </Link>
