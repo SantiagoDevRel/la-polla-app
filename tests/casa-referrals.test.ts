@@ -10,6 +10,7 @@ import {
   REFERRAL_FINE_PRINT,
   isGiftEntry,
   isPromoPolla,
+  pickPromoPolla,
   normalizeReferralCode,
   referralErrorMessage,
   referralEvery,
@@ -62,7 +63,7 @@ describe("reglas de la polla", () => {
   it("la regla es una frase con el número de la polla y una sola letra menuda", () => {
     expect(referralRule(5)).toBe("Por cada 5 invitados, te damos un cupo en esta polla.");
     expect(referralRule(1)).toBe("Por cada invitado, te damos un cupo en esta polla.");
-    expect(REFERRAL_FINE_PRINT).toBe("*Solo aplica para usuarios nuevos, 1 polla por usuario.");
+    expect(REFERRAL_FINE_PRINT).toBe("*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código, 1 polla por usuario.");
     expect(referralMissing(0, 5)).toBe(5);
     expect(referralMissing(3, 5)).toBe(2);
     expect(referralMissing(5, 5)).toBe(5);
@@ -108,18 +109,28 @@ describe("aviso de invitaciones al entrar", () => {
   };
   const view = { code: "JUANPE4821", every: 5, slots_left: 9 };
 
-  it("sale en la OFIGOLAZO con invitaciones, con el código de la persona", () => {
+  it("sale en la polla abierta con invitaciones, se llame como se llame", () => {
     expect(isPromoPolla(polla)).toBe(true);
-    expect(isPromoPolla({ ...polla, name: "  ofigolazo fecha 12" })).toBe(true);
+    expect(isPromoPolla({ ...polla, name: "POLLAGOL" })).toBe(true);
     expect(referralPromo(polla, view, 1000000)).toEqual({
       pollaId: "p1", slug: "ofigolazo-1", name: "OFIGOLAZO", every: 5, code: "JUANPE4821",
       entryPriceCop: 20000, premio: { cop: 1000000 },
     });
   });
 
-  it("no sale en otras pollas, sin programa, sin código o sin cupos libres", () => {
-    expect(isPromoPolla({ ...polla, name: "POLLAGOL" })).toBe(false);
+  it("entre varias abiertas elige la que cierra primero, con desempate estable", () => {
+    const a = { ...polla, id: "a", closes_at: "2026-09-20T10:25:00Z" };
+    const b = { ...polla, id: "b", closes_at: "2026-09-21T10:25:00Z" };
+    const c = { ...polla, id: "c", closes_at: "2026-09-20T10:25:00Z" };
+    expect(pickPromoPolla([b, c, a])?.id).toBe("a");
+    expect(pickPromoPolla([c, a])?.id).toBe("a");
+    expect(pickPromoPolla([{ ...b, referral_every: null }])).toBeUndefined();
+    expect(pickPromoPolla([])).toBeUndefined();
+  });
+
+  it("no sale sin programa, sin código o sin cupos libres", () => {
     expect(isPromoPolla({ ...polla, referral_every: null })).toBe(false);
+    expect(isPromoPolla({ ...polla, entry_price_cop: 0 })).toBe(false);
     expect(isPromoPolla({ ...polla, kind: "rifa" })).toBe(false);
     expect(referralPromo(polla, { ...view, code: null }, 0)).toBeNull();
     expect(referralPromo(polla, { ...view, slots_left: 0 }, 0)).toBeNull();
@@ -183,6 +194,8 @@ describe("editor: interruptor de invitaciones", () => {
     expect(buildEditChanges(base, { ...base, referralOn: false }, pool)).toEqual({ referralEvery: null });
     expect(buildEditChanges({ ...base, referralOn: false }, base, pool)).toEqual({ referralEvery: 5 });
     expect(buildEditChanges(base, { ...base, referralOn: false }, { ...pool, hasEntries: true })).toEqual({});
+    // Prender sí se puede con inscripciones (POLLAGOL, 2026-09-17).
+    expect(buildEditChanges({ ...base, referralOn: false }, base, { ...pool, hasEntries: true })).toEqual({ referralEvery: 5 });
     expect(buildEditChanges(base, { ...base, referralOn: false }, { ...pool, kind: "rifa" })).toEqual({});
   });
 });

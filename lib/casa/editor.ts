@@ -135,12 +135,14 @@ export function buildEditChanges(
   if (options.kind !== "rifa" && draft.maxEntriesPerUser !== original.maxEntriesPerUser) {
     changes.maxEntriesPerUser = draft.maxEntriesPerUser;
   }
-  if (options.hasEntries) return changes;
-
-  // Invitaciones: como el resto de condiciones, solo mientras nadie se inscriba.
-  if (options.kind !== "rifa" && (draft.referralOn ?? false) !== (original.referralOn ?? false)) {
+  // Invitaciones (2026-09-17): PRENDER se puede aunque ya haya inscritos — así se
+  // activó POLLAGOL a mitad de semana. APAGAR sigue siendo solo sin inscripciones:
+  // quitarlo después dejaría cupos de regalo sin regla que los explique.
+  if (options.kind !== "rifa" && (draft.referralOn ?? false) !== (original.referralOn ?? false)
+    && (draft.referralOn || !options.hasEntries)) {
     changes.referralEvery = draft.referralOn ? DEFAULT_REFERRAL_EVERY : null;
   }
+  if (options.hasEntries) return changes;
   if (options.kind === "partidos" && draft.scoringMode !== original.scoringMode) changes.scoringMode = draft.scoringMode;
   if (draft.entryPriceCop !== original.entryPriceCop) changes.entryPriceCop = draft.entryPriceCop;
   if (options.prizeKind === "objeto") {

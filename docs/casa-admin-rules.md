@@ -268,15 +268,19 @@ primera polla; el conteo se renueva en cada polla. El regalo no suma al pozo.
   reemplaza) y «Restaurar» (vuelve si sigue ganado y cabe). Ninguno de los dos
   después del reparto (`POLLA_FINAL`/`ALREADY_SETTLED`, la misma regla de desmarcar
   un pago). La cola de pagos muestra «Invitado por».
-  El editor prende o apaga el programa sin inscripciones
-  (`casa_set_referral_every_v1`; rifas nunca).
+  El editor prende el programa aunque la polla ya tenga inscritos, mientras no haya
+  terminado ni repartido (migración 136: así se activó POLLAGOL el 17-sep); apagarlo
+  o cambiar el divisor exige cero inscripciones (`casa_set_referral_every_v1`; rifas
+  nunca). Prenderlo no es retroactivo: `casa_pollas.referral_since` (migración 137)
+  guarda el momento y un invitado solo ancla ahí si su cupo se creó desde entonces,
+  así que desmarcar y volver a aprobar un pago anterior tampoco lo cuenta.
 - **Avisos.** Tras una aprobación, `casa_referral_claim_gift_notices_v1` reclama los
   regalos nuevos y el bot de jugadores avisa por Telegram con un botón al cupo en la
   web. En «Mis pagos» del bot, un regalo activo sale como regalo y uno en pausa o
   removido no sale (no se pide comprobante por un regalo).
-- **Aviso al entrar.** «Por 5 invitados, te damos un cupo en la OFIGOLAZO»: la polla
-  abierta cuyo nombre empieza por `REFERRAL_PROMO_POLLA`, con programa, cuando la
-  persona tiene código y cupos libres (`referralPromo`). Una vez por persona y polla.
+- **Aviso al entrar.** «Por 5 invitados, te damos un cupo en la POLLAGOL»: la polla
+  abierta con programa que cierra primero, cuando la persona tiene código y cupos
+  libres (`referralPromo`). Una vez por persona y polla.
 - **Límites conocidos.** Si un invitado borra su cuenta, su vínculo desaparece con
   ella, pero el regalo ya creado no se recalcula hasta el siguiente cambio de pago de
   ese invitador en la polla. El bot de jugadores todavía no captura códigos ni
@@ -284,8 +288,8 @@ primera polla; el conteo se renueva en cada polla. El regalo no suma al pozo.
   Si el tope llega al número 50 (muchos regalos removidos), no se crean más regalos
   sin aviso. Un aviso de regalo por Telegram se da por enviado al reclamarlo: si el
   cupo se pausa antes de enviarse, ese mensaje no sale (el cupo sí aparece en la web).
-  El aviso de invitaciones sale para cualquier polla abierta cuyo nombre empiece por
-  OFIGOLAZO: no publicar pollas de prueba con ese nombre. «N inscritos» cuenta cupos, también los de regalo; el dinero sale solo
+  El aviso sale para la polla abierta con programa que cierra primero: si hay dos
+  abiertas con invitaciones, el inicio de Casa anuncia solo esa. «N inscritos» cuenta cupos, también los de regalo; el dinero sale solo
   de `amount_cop`.
 - **Despliegue.** 135 antes del código y en una sola transacción; verificación
   read-only al final de la migración. Regresión: `scripts/casa-referrals-check.sql`.

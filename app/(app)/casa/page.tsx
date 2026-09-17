@@ -23,7 +23,7 @@ import { getReferralInvitee, getReferralPollaView } from "@/lib/casa/referrals";
 import {
   REFERRAL_COOKIE,
   REFERRAL_DISMISS_COOKIE,
-  isPromoPolla,
+  pickPromoPolla,
   referralPromo,
   validReferralCode,
 } from "@/lib/casa/referrals-shared";
@@ -81,8 +81,9 @@ export default async function CasaPage() {
   // para quien participó.
   const cerradas = pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id)
     && (isPublicClosedPolla(p) || joinedIds.has(p.id)));
-  // Aviso de invitaciones (2026-09-17): la OFIGOLAZO abierta que cierra primero.
-  const promoPolla = abiertas.find(isPromoPolla);
+  // Aviso de invitaciones (2026-09-17): la polla abierta con invitaciones que cierra
+  // primero, con desempate estable por id si dos cierran a la misma hora.
+  const promoPolla = pickPromoPolla(abiertas);
   const [pots, pendientes, tournaments, pagos, promoView] = await Promise.all([
     getPots(pollas.map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
