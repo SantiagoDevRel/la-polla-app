@@ -759,6 +759,17 @@ lista y no se vuelve a preguntar.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
+- **Reparto automático al verificarse el último partido (2026-09-17).** El
+  dueño pidió que al terminar la polla «calcules bien los ganadores y muestres
+  las cuentas para pagarles». Quedó así: la 134 detecta la polla lista y el
+  panel muestra ganadores, montos y cuentas, pero el reparto (irreversible) lo
+  confirma un administrador con un clic. Falta decidir si se registra SOLO, sin
+  clic, apenas se verifica el último partido (el cron ya corre cada minuto).
+- **LDU–Palmeiras y Atlético MG–Santos (17-sep-2026).** API-Football los tenía
+  en «NS» horas después de jugarse (3-2 y 4-2 según la prensa). Se cierran solos
+  cuando la fuente los actualice; si el dueño no quiere esperar, se pone el
+  marcador de 90' en `/admin/issues`. Decisión del dueño: esperar o cargarlos.
+
 - **Captcha de Supabase Auth antes de producción (2026-09-13, hallazgo de
   revisión del PR #71).** `/auth/v1/otp` acepta llamadas directas con la anon
   key pública y la captcha está apagada: los topes de `start-otp` no frenan a
