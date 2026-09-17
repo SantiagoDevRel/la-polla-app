@@ -19,6 +19,7 @@ import {
 import { listMyPollas } from "@/lib/casa/my-pollas";
 import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
 import { formatCop, timeLeft } from "@/lib/casa/format";
+import { isCourtesyEntry } from "@/lib/casa/courtesies-shared";
 import { entryCanPick, pollaAcceptsPicks } from "@/lib/casa/picks-save";
 import { isPollaOpen, LOCK_MINUTES, pollaStatusLabel, type CasaEntry, type CasaPolla, type CasaPot } from "@/lib/casa/types";
 import { formatColombiaDateTime } from "@/lib/time/colombia";
@@ -358,6 +359,7 @@ type PaymentRow = {
   ticket_number: number | null;
   entry_number?: number | null;
   origin?: "compra" | "invitacion" | null;
+  amount_cop?: number | null;
   created_at: string;
   casa_pollas: { name: string; status: string; kind: string; archived_at: string | null } | Array<{ name: string; status: string; kind: string; archived_at: string | null }> | null;
 };
@@ -367,8 +369,11 @@ type PaymentRow = {
  * no es un pago: activo se marca como regalo y en pausa o removido no aparece,
  * para que nadie transfiera dinero por él. null = no se muestra.
  */
-export function paymentLine(row: Pick<PaymentRow, "status" | "proof_path" | "reject_reason" | "origin">): { state: string; actionable: boolean } | null {
+export function paymentLine(row: Pick<PaymentRow, "status" | "proof_path" | "reject_reason" | "origin" | "amount_cop">): { state: string; actionable: boolean } | null {
   if (row.origin === "invitacion") return row.status === "pagada" ? { state: "🎁 regalo por invitar", actionable: false } : null;
+  // Una cortesía (migración 136) tampoco es un pago: decir «confirmado» sugería
+  // que alguien transfirió y que la casa lo revisó, y no pasó ninguna de las dos.
+  if (isCourtesyEntry(row)) return { state: "🎟 cortesía", actionable: false };
   if (row.status === "pagada") return { state: "✅ confirmado", actionable: false };
   if (row.status === "pendiente" && row.proof_path) return { state: "⏳ en revisión", actionable: false };
   if (row.status === "rechazada") return { state: `❌ rechazado${row.reject_reason ? `: ${esc(row.reject_reason)}` : ""}`, actionable: true };
@@ -377,7 +382,7 @@ export function paymentLine(row: Pick<PaymentRow, "status" | "proof_path" | "rej
 
 export async function showPayments(ctx: PlayerCtx): Promise<void> {
   const { data, error } = await ctx.db.from("casa_entries")
-    .select("id, polla_id, status, proof_path, reject_reason, ticket_number, entry_number, origin, created_at, casa_pollas!inner(name, status, kind, archived_at)")
+    .select("id, polla_id, status, proof_path, reject_reason, ticket_number, entry_number, origin, amount_cop, created_at, casa_pollas!inner(name, status, kind, archived_at)")
     .eq("user_id", ctx.account.userId)
     // Un regalo en pausa o removido no es un pago: fuera antes del límite.
     .or("origin.eq.compra,status.eq.pagada")

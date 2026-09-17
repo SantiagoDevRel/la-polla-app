@@ -377,8 +377,11 @@ elige una polla y le da de 1 a 20 cortesías. Cada una es un **enlace único**
   otra polla.
 - **Solo en esa polla**, y **vence con ella**: si nadie la usa antes del cierre
   de inscripciones no se traslada a ninguna otra (no hay cron; lo verifica el
-  canje). El administrador puede retirar una sin usar; una ya redimida nunca,
-  porque es la inscripción de alguien.
+  canje). El administrador puede retirar una sin usar y, desde la migración 137,
+  también **quitar un cupo ya usado**: la inscripción gratis queda `anulada`, la
+  cortesía pasa a `retirada` y conserva a quién se la dio, así que esa cuenta
+  tampoco puede ir a buscar otra. Con la polla repartida ya no se puede
+  (`ALREADY_SETTLED`), y el panel ni siquiera ofrece el botón.
 - **El cupo vale $0.** Compite en la tabla y cuenta en «inscritos», pero no
   entra al pozo ni a la parte de la casa (`casa_pot_summaries_v2` suma
   `amount_cop`). Quien entró con cortesía puede comprar los cupos que quiera.
@@ -394,8 +397,13 @@ y al onboarding; la URL queda limpia para que nadie reparta el cupo ajeno.
 La autoridad es SQL (`casa_grant_courtesies_v1`, `casa_redeem_courtesy_v1`,
 `casa_revoke_courtesy_v1`), con contrato v2, la polla bloqueada y `service_role`
 como único rol con EXECUTE. Antes de desplegar: aplicar
-`supabase/migrations/136_casa_courtesies.sql`. Regresión local (ocho casos con
-`ASSERT`, arma y borra sus propios datos):
+`supabase/migrations/136_casa_courtesies.sql` y `137_casa_courtesy_withdraw.sql`.
+La 137 parchea **in place** la rama de `casa_entries` de `casa_v2_write_guard`
+(como la 105 y la 133, sobre la definición vigente): sin esa puerta, anular un
+cupo de cortesía choca con `ALREADY_PAID`, porque un cupo gratis no tiene
+comprobante que corregir. La puerta solo se abre con el testigo que pone
+`casa_revoke_courtesy_v1` en su misma transacción. Regresión local (once casos
+con `ASSERT`, arma y borra sus propios datos):
 
 ```bash
 docker exec -i supabase_db_la-polla psql -U postgres -d postgres < scripts/casa-courtesies-check.sql

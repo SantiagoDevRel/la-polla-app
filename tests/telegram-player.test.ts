@@ -552,6 +552,18 @@ describe("Mis pagos: cupos de regalo por invitar (migración 135)", () => {
     expect(paymentLine({ ...compra, origin: null, status: "anulada", proof_path: null })?.actionable).toBe(true);
   });
 
+  it("una cortesía no se anuncia como pago confirmado (migración 136)", () => {
+    // El cupo de cortesía es $0 y sin comprobante: decir «confirmado» hacía
+    // creer que alguien transfirió y que la casa lo revisó.
+    const cortesia = { ...compra, proof_path: null, amount_cop: 0 };
+    expect(paymentLine(cortesia)).toEqual({ state: "🎟 cortesía", actionable: false });
+    // Un cupo comprado de verdad no se disfraza de cortesía.
+    expect(paymentLine({ ...compra, amount_cop: 20000 })).toEqual({ state: "✅ confirmado", actionable: false });
+    // Y el regalo por invitar conserva el suyo.
+    expect(paymentLine({ ...compra, origin: "invitacion", proof_path: null, amount_cop: 0 }))
+      .toEqual({ state: "🎁 regalo por invitar", actionable: false });
+  });
+
   it("la consulta deja fuera los regalos en pausa antes del límite de 15", async () => {
     const calls: Array<[string, unknown[]]> = [];
     const chain: Record<string, (...args: unknown[]) => unknown> = {};

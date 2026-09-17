@@ -46,6 +46,7 @@ export function CortesiasAdmin({ pollas }: { pollas: CortesiaPolla[] }) {
   const [cortesias, setCortesias] = useState<AdminCourtesy[] | null>(null);
   const [listaError, setListaError] = useState(false);
   const [retirando, setRetirando] = useState<string | null>(null);
+  const [confirmar, setConfirmar] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setListaError(false);
@@ -119,7 +120,15 @@ export function CortesiasAdmin({ pollas }: { pollas: CortesiaPolla[] }) {
     }
   }
 
+  // Quitar una cortesía YA USADA saca a esa persona de la polla (migración
+  // 137), así que esa pide un clic de confirmación. La que nadie ha usado no:
+  // no le quita nada a nadie.
   async function retirar(cortesia: AdminCourtesy) {
+    if (cortesia.status === "redimida" && confirmar !== cortesia.id) {
+      setConfirmar(cortesia.id);
+      return;
+    }
+    setConfirmar(null);
     setRetirando(cortesia.id);
     try {
       const response = await fetch("/api/casa/admin/cortesias", {
@@ -132,7 +141,12 @@ export function CortesiasAdmin({ pollas }: { pollas: CortesiaPolla[] }) {
         showToast(data.error ?? "No se pudo retirar la cortesía.", "error");
         return;
       }
-      showToast("Cortesía retirada.", "success");
+      showToast(
+        cortesia.status === "redimida"
+          ? `Cupo retirado: ${cortesia.redeemed_name || "esa persona"} sale de la polla.`
+          : "Cortesía retirada.",
+        "success",
+      );
       await cargar();
     } catch {
       showToast("Se cayó la conexión. Intenta otra vez.", "error");
@@ -325,14 +339,21 @@ export function CortesiasAdmin({ pollas }: { pollas: CortesiaPolla[] }) {
                   </span>
                   <span className="flex shrink-0 flex-wrap items-center gap-2">
                     <Tape tone={estado.tone}>{estado.text}</Tape>
-                    {cortesia.status === "disponible" && (
+                    {/* Con la polla repartida o anulada ya no se puede: SQL lo
+                        rechaza y mostrar el botón sería prometer de más. */}
+                    {(cortesia.status === "disponible" || cortesia.status === "redimida")
+                      && (cortesia.polla_status === "abierta" || cortesia.polla_status === "cerrada") && (
                       <button
                         type="button"
                         onClick={() => retirar(cortesia)}
                         disabled={retirando !== null}
                         className="lp-btn lp-btn-ghost !px-3 !text-[13px]"
                       >
-                        {retirando === cortesia.id ? "Retirando..." : "Retirar"}
+                        {retirando === cortesia.id
+                          ? "Retirando..."
+                          : confirmar === cortesia.id
+                            ? "Confirmar"
+                            : cortesia.status === "redimida" ? "Quitar el cupo" : "Retirar"}
                       </button>
                     )}
                   </span>

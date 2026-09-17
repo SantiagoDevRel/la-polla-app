@@ -178,7 +178,7 @@ END $$;
 -- ════════════════════════════════════════════════════════════════════════
 -- H · retirar una sin usar, jamás una redimida
 -- ════════════════════════════════════════════════════════════════════════
-DO $$ DECLARE v_id uuid; v_usada uuid; v_result jsonb;
+DO $$ DECLARE v_id uuid; v_usada uuid; v_entry uuid; v_persona uuid; v_libre text; v_result jsonb;
 BEGIN
   SELECT id INTO v_id FROM public.casa_courtesies
     WHERE polla_id='66666666-6666-4666-8666-00000000000a' AND status='disponible' LIMIT 1;
@@ -190,12 +190,25 @@ BEGIN
   v_result := public.casa_revoke_courtesy_v1(v_id, '55555555-5555-4555-8555-000000000000', 2);
   ASSERT (v_result->>'ok')::boolean AND NOT (v_result->>'changed')::boolean, 'H3: retirar dos veces no es idempotente';
 
-  SELECT id INTO v_usada FROM public.casa_courtesies WHERE status='redimida'
+  -- Una cortesía YA USADA también se retira (migración 137): el cupo gratis
+  -- queda anulado, la cortesía guarda a quién se la dio y esa cuenta tampoco
+  -- puede ir a buscar otra.
+  SELECT id, entry_id, redeemed_by INTO v_usada, v_entry, v_persona
+    FROM public.casa_courtesies WHERE status='redimida'
     AND polla_id='66666666-6666-4666-8666-00000000000a' LIMIT 1;
-  BEGIN
-    PERFORM public.casa_revoke_courtesy_v1(v_usada, '55555555-5555-4555-8555-000000000000', 2);
-    RAISE EXCEPTION 'H4: se retiró una cortesía que alguien ya había usado';
-  EXCEPTION WHEN sqlstate '55000' THEN NULL; END;
+  v_result := public.casa_revoke_courtesy_v1(v_usada, '55555555-5555-4555-8555-000000000000', 2);
+  ASSERT (v_result->>'ok')::boolean AND v_result->>'status'='retirada',
+    format('H4: no se pudo quitar un cupo de cortesía ya usado: %s', v_result);
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=v_entry)='anulada',
+    'H4b: el cupo gratis siguió en pie después de retirar la cortesía';
+  ASSERT (SELECT redeemed_by FROM public.casa_courtesies WHERE id=v_usada)=v_persona,
+    'H4c: se perdió el rastro de quién había usado la cortesía';
+
+  SELECT code INTO v_libre FROM public.casa_courtesies
+    WHERE polla_id='66666666-6666-4666-8666-00000000000b' AND status='disponible' LIMIT 1;
+  v_result := public.casa_redeem_courtesy_v1(v_libre, v_persona, 2);
+  ASSERT NOT (v_result->>'ok')::boolean AND v_result->>'error'='COURTESY_ALREADY_REDEEMED',
+    format('H4d: a quien le quitaron el cupo pudo tomar otra cortesía: %s', v_result);
 
   -- Y un jugador no puede retirar nada.
   BEGIN
@@ -207,14 +220,18 @@ END $$;
 -- ── lecturas de pantalla ─────────────────────────────────────────────────
 DO $$ DECLARE v_preview jsonb; v_code text;
 BEGIN
-  SELECT code INTO v_code FROM public.casa_courtesies WHERE status='redimida'
+  -- La que alguien usó (y que el administrador ya retiró en H) no se ofrece.
+  SELECT code INTO v_code FROM public.casa_courtesies WHERE status IN ('redimida','retirada')
     AND polla_id='66666666-6666-4666-8666-00000000000a' LIMIT 1;
   v_preview := public.casa_courtesy_preview_v1(v_code, '55555555-5555-4555-8555-000000000003');
   ASSERT NOT (v_preview->>'redeemable')::boolean, 'I1: se ofrece activar una cortesía ya usada';
+  ASSERT NOT (v_preview->>'usable')::boolean, 'I1b: una cortesía usada sigue marcada como disponible';
   ASSERT v_preview->>'slug'='test-cortesia-a', 'I2: la vista previa apunta a otra polla';
 
-  ASSERT (SELECT count(*) FROM public.casa_my_courtesies_v1('55555555-5555-4555-8555-000000000001'))=2,
-    'I3: la lista de quien reparte no muestra sus cortesías vivas (las retiradas no cuentan)';
+  -- A Carlos le dieron 3: una la usaron y el administrador la quitó (H), otra la
+  -- retiró sin usar, así que en su lista queda la de la polla B.
+  ASSERT (SELECT count(*) FROM public.casa_my_courtesies_v1('55555555-5555-4555-8555-000000000001'))=1,
+    'I3: la lista de quien reparte no coincide (una retirada no debe aparecer)';
   ASSERT (SELECT count(*) FROM public.casa_courtesies_admin_v1('55555555-5555-4555-8555-000000000000',
     '66666666-6666-4666-8666-00000000000a', NULL))=2, 'I4: el panel no lista las cortesías de la polla';
 END $$;

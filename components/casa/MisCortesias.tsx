@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Share2, Ticket } from "lucide-react";
 import { SectionHead, Tape } from "@/components/street";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { Skeleton } from "@/components/ui/Skeleton";
 import {
   COURTESY_FINE_PRINT,
@@ -99,9 +100,14 @@ export function MisCortesias({
 }) {
   const [cortesias, setCortesias] = useState<MyCourtesy[] | null>(initial);
   const [error, setError] = useState(false);
+  // En la app de iOS no se reparten cupos, igual que las invitaciones
+  // (migración 135): allí no se muestra ninguna pieza que ofrezca compartir a
+  // cambio de algo. Activar una cortesía que YA te dieron sí sigue disponible:
+  // esconderlo dejaría sin entrada a quien llega con su enlace.
+  const isIOSApp = useIsIOSApp();
 
   useEffect(() => {
-    if (initial !== null) return;
+    if (initial !== null || isIOSApp) return;
     let vivo = true;
     (async () => {
       try {
@@ -114,8 +120,9 @@ export function MisCortesias({
       }
     })();
     return () => { vivo = false; };
-  }, [initial]);
+  }, [initial, isIOSApp]);
 
+  if (isIOSApp) return null;
   if (error) return null;
   if (cortesias !== null && cortesias.length === 0) return null;
 

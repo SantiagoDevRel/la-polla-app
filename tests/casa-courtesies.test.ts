@@ -98,6 +98,10 @@ describe("estado de una cortesía", () => {
   it("dice quién la usó cuando ya se redimió", () => {
     expect(courtesyLabel(courtesy({ status: "redimida", redeemed_name: "Ana" })).text).toBe("La usó Ana");
     expect(courtesyLabel(courtesy({ status: "revocada" })).text).toBe("Retirada");
+    // Migración 137: la que el administrador quitó DESPUÉS de usarse.
+    expect(courtesyLabel(courtesy({ status: "retirada", redeemed_name: "Ana" })).text).toBe("Retirada");
+    expect(courtesyLabel(courtesy({ status: "retirada" })).tone).toBe("mute");
+    expect(isCourtesyLive(courtesy({ status: "retirada" }))).toBe(false);
   });
 });
 

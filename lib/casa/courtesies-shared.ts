@@ -76,7 +76,13 @@ export function isCourtesyEntry(
     && entry.origin !== "invitacion";
 }
 
-export type CourtesyStatus = "disponible" | "redimida" | "revocada";
+/**
+ * `revocada` es la que el administrador retiró ANTES de que alguien la usara;
+ * `retirada` es la que ya se había usado y el administrador deshizo (migración
+ * 137): el cupo gratis queda anulado y la cuenta que la usó tampoco puede ir a
+ * buscar otra, porque la cortesía conserva a su nombre.
+ */
+export type CourtesyStatus = "disponible" | "redimida" | "revocada" | "retirada";
 
 /** Una cortesía de quien la reparte (casa_my_courtesies_v1). */
 export interface MyCourtesy {
@@ -132,6 +138,8 @@ export function courtesyLabel(courtesy: MyCourtesy): { text: string; tone: "live
   if (courtesy.status === "redimida") {
     return { text: courtesy.redeemed_name ? `La usó ${courtesy.redeemed_name}` : "Usada", tone: "mute" };
   }
-  if (courtesy.status === "revocada") return { text: "Retirada", tone: "mute" };
+  if (courtesy.status === "revocada" || courtesy.status === "retirada") {
+    return { text: "Retirada", tone: "mute" };
+  }
   return isCourtesyLive(courtesy) ? { text: "Sin usar", tone: "live" } : { text: "Vencida", tone: "mute" };
 }
