@@ -1,13 +1,15 @@
-import { Ban, ChevronDown, Clock3, Eye, Target, Timer, Trophy, Wallet } from "lucide-react";
+import { Ban, ChevronDown, Clock3, Eye, Gift, Target, Timer, Trophy, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 import { LOCK_MINUTES, type CasaPolla } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
+import { referralEvery } from "@/lib/casa/referrals-shared";
 import { PayoutAccountButton } from "./PayoutAccountButton";
 import { FixedPrizeGrowth, fixedPrizeGrows, type FixedPrizeThreshold } from "./FixedPrizeGrowth";
 
 export type { FixedPrizeThreshold };
 
-type Rules = Pick<CasaPolla, "kind" | "scoring_mode" | "points_exact" | "points_one_team" | "points_result" | "prize_kind" | "prize_object" | "description" | "draw_method" | "pot_mode" | "fixed_prize_cop" | "house_cut_pct">;
+type Rules = Pick<CasaPolla, "kind" | "scoring_mode" | "points_exact" | "points_one_team" | "points_result" | "prize_kind" | "prize_object" | "description" | "draw_method" | "pot_mode" | "fixed_prize_cop" | "house_cut_pct">
+  & Partial<Pick<CasaPolla, "entry_price_cop" | "referral_every" | "max_entries_per_user">>;
 
 /**
  * Una regla = un desplegable cerrado con viñetas cortas.
@@ -42,6 +44,8 @@ function Strong({ children }: { children: ReactNode }) {
 export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold?: FixedPrizeThreshold | null }) {
   const money = polla.prize_kind !== "objeto";
   const minimo = money && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" ? polla.fixed_prize_cop : null;
+  // Invitaciones (migración 135): la regla sale del número guardado en la polla.
+  const cadaInvitados = referralEvery({ kind: polla.kind, entry_price_cop: polla.entry_price_cop ?? 0, referral_every: polla.referral_every });
 
   return <div className="space-y-3 pt-5">
     <h2 className="font-display text-[24px] leading-tight tracking-[0.04em]">Info de esta polla</h2>
@@ -103,6 +107,15 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
         <li>Antes del inicio son privados.</li>
       </Rule>
     </>}
+
+    {cadaInvitados !== null && <Rule icon={<Gift size={20} />} title="Invita y gana cupos">
+      <li><Strong>Por cada {cadaInvitados} {cadaInvitados === 1 ? "persona nueva" : "personas nuevas"}</Strong> que invites y paguen esta polla, te regalamos un cupo en esta polla.</li>
+      <li>Cuentan quienes crean su cuenta con tu enlace o tu código y pagan esta polla como su primera polla. Cada persona cuenta una sola vez.</li>
+      <li>El conteo es solo de esta polla: en otra empieza de cero.</li>
+      <li>Necesitas un cupo pagado aquí. El de regalo aparece solo y compite como cualquier cupo.</li>
+      <li>El cupo de regalo no suma dinero al pozo y cuenta dentro del máximo{typeof polla.max_entries_per_user === "number" ? ` de ${polla.max_entries_per_user} cupos` : " de cupos"} por persona.</li>
+      <li>Si se corrige el pago de un invitado, el cupo de regalo se pausa hasta que vuelva a quedar confirmado.</li>
+    </Rule>}
 
     {money
       ? <Rule icon={<Wallet size={20} />} title="¿Cómo me pagan?" extra={<PayoutAccountButton />}>

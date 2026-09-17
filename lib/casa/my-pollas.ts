@@ -9,6 +9,7 @@ type Membership = {
   id: string;
   status: "pendiente" | "pagada";
   entry_number: number | null;
+  origin: "compra" | "invitacion" | null;
   polla: PollaSummary | PollaSummary[] | null;
 };
 
@@ -21,7 +22,7 @@ export async function listMyPollas(userId: string): Promise<MyCasaPolla[]> {
   const pageSize = 500;
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await db.from("casa_entries")
-      .select("id, status, entry_number, polla:casa_pollas!inner(id, slug, name, kind, tournament, status, closes_at)")
+      .select("id, status, entry_number, origin, polla:casa_pollas!inner(id, slug, name, kind, tournament, status, closes_at)")
       .eq("user_id", userId)
       .in("status", ["pagada", "pendiente"])
       .in("polla.status", ["abierta", "cerrada", "resuelta"])
@@ -39,7 +40,8 @@ export async function listMyPollas(userId: string): Promise<MyCasaPolla[]> {
       const item = existing ?? { ...polla, entry_status: row.status, tournaments: [], entries: [] };
       if (existing && row.status === "pagada") item.entry_status = "pagada";
       if (row.entry_number != null) {
-        item.entries.push({ number: row.entry_number, status: row.status });
+        // Un regalo en pausa es `anulada` y ya quedó fuera del filtro de estado.
+        item.entries.push({ number: row.entry_number, status: row.status, ...(row.origin === "invitacion" ? { gift: true } : {}) });
         if (row.id) entryIds.set(row.id, { pollaId: polla.id, number: row.entry_number });
       }
       byId.set(polla.id, item);

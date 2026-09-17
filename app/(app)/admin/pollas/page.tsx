@@ -38,6 +38,9 @@ export default async function CasaAdminPage() {
         kind: polla.kind,
         prize_kind: polla.prize_kind,
         prize_object: polla.prize_object,
+        // Invitaciones (migración 135): la lista de cupos de regalo solo donde aplica.
+        entry_price_cop: polla.entry_price_cop,
+        referral_every: polla.referral_every ?? null,
         draw_pending: polla.draw_pending,
         // Con premio en dinero adjudicado, el panel muestra el pago a ganadores.
         settlement_outcome: polla.settlement_outcome ?? null,

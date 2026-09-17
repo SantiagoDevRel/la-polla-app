@@ -15,6 +15,10 @@ import { HeroFrame, Label, StreetCard } from "@/components/street";
 import { PagarForm } from "@/components/casa/PagarForm";
 import { CuposForm } from "@/components/casa/CuposForm";
 import { CopiarDato } from "@/components/casa/CopiarDato";
+import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
+import { getReferralInvitee } from "@/lib/casa/referrals";
+import { REFERRAL_COOKIE, validReferralCode } from "@/lib/casa/referrals-shared";
+import { cookies } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +38,12 @@ export default async function PagarPage({
   const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador") notFound();
 
-  const [entries, pot, threshold] = await Promise.all([
+  const [entries, pot, threshold, invitee] = await Promise.all([
     polla.kind === "rifa" ? Promise.resolve([] as CasaEntry[]) : getMyEntries(polla.id, user.id),
     getPot(polla.id),
     getFixedPrizeThreshold(polla),
+    // Invitaciones (migración 135): solo personas nuevas, antes del primer pago aprobado.
+    getReferralInvitee(user.id, validReferralCode((await cookies()).get(REFERRAL_COOKIE)?.value)),
   ]);
   const { boleta, participacion } = await searchParams;
 
@@ -193,6 +199,8 @@ export default async function PagarPage({
             </p>
           </div>
         )}
+
+        {invitee?.can_set_referrer && !resumeOnly && <QuienTeInvito initial={invitee} variant="pagar" />}
 
         {polla.kind !== "rifa" && !recovering && !resumeOnly ? (
           <CuposForm slug={polla.slug} entryPriceCop={polla.entry_price_cop}

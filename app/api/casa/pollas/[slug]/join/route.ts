@@ -1,8 +1,11 @@
 // Proof upload uses an immutable attempt and goes directly to private Storage.
 // The server steps (begin / confirm / fail) live in lib/casa/proof-server.ts,
 // shared with the Telegram player bot.
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { linkReferralFromCookie } from "@/lib/casa/referrals";
+import { REFERRAL_COOKIE } from "@/lib/casa/referrals-shared";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPollaBySlug } from "@/lib/casa/queries";
 import { casaJson, casaError, requireCasaContract } from "@/lib/casa/operations";
@@ -36,15 +39,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   if (!polla || polla.status === "borrador") return casaJson({ error: "Esa polla no existe." }, 404);
   const db = createAdminClient();
   if (body.action === "begin") {
+    // Invitaciones (migración 135): quien llegó por un enlace y todavía no
+    // tiene invitador queda vinculado antes de su primer pago. "No es así" en
+    // /pagar borra la cookie. Mejor esfuerzo: nunca frena el comprobante.
+    const referral = await linkReferralFromCookie(user.id, (await cookies()).get(REFERRAL_COOKIE)?.value);
     const { data, error } = await beginCasaProof(db, {
       pollaId: polla.id, userId: user.id, requestId: body.requestId, ticketNumber: body.ticketNumber,
       sha256: body.sha256, contentType: body.contentType, bytes: body.bytes,
       entryNumber: polla.kind === "rifa" ? undefined : body.entryNumber,
     });
-    if (error || !data) return casaError(error ?? {});
-    if (data.state === "confirmed") return casaJson({ ok: true, ...data });
-    try { return casaJson({ ok: true, ...data, upload: await signedCasaUpload(PROOF_BUCKET, data.proof_path) }); }
-    catch { return casaJson({ error: "No se pudo preparar la carga. Reintenta con el mismo comprobante." }, 503); }
+    const response = error || !data ? casaError(error ?? {})
+      : data.state === "confirmed" ? casaJson({ ok: true, ...data })
+      : await signedCasaUpload(PROOF_BUCKET, data.proof_path)
+        .then((upload) => casaJson({ ok: true, ...data, upload }))
+        .catch(() => casaJson({ error: "No se pudo preparar la carga. Reintenta con el mismo comprobante." }, 503));
+    if (referral.clearCookie) response.cookies.delete(REFERRAL_COOKIE);
+    return response;
   }
   const { data: attempt, error: readError } = await readOwnedProofAttempt(db, { pollaId: polla.id, userId: user.id, attemptId: body.attemptId });
   if (readError) return casaError(readError);

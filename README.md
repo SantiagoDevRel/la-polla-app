@@ -1130,6 +1130,37 @@ revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
 [docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
 de 096 arriba no es el contrato de liquidación una vez activado v2.
 
+### Casa: invitaciones y cupos de regalo (2026-09-17, migración 135)
+
+Por cada 5 personas nuevas que alguien invita y pagan una polla, esa persona
+recibe un cupo gratis en la misma polla. Nadie en la administración tiene que
+hacer nada.
+
+- **Invitar.** Compartir agrega `?ref=CODIGO` al enlace y el mensaje dice el
+  código. Junto a Compartir, «Invita y gana» muestra el avance (`Llevas 3 de 5`),
+  el código para copiar y las condiciones; en Perfil está el código con un enlace
+  general.
+- **Llegar invitado.** El enlace deja el código en una cookie y la URL queda
+  limpia. La polla y /pagar preguntan «¿Te invitó esta persona?»; se guarda al
+  completar el perfil o al enviar el comprobante, y «No es así» lo descarta. Quien
+  entra directo escribe el código en «¿Alguien te invitó?» (/casa, /pagar,
+  Perfil). Se puede corregir hasta que se apruebe el primer pago.
+- **Quién cuenta.** Solo cuentas creadas desde la migración 135 que nunca han
+  pagado; una persona tiene un solo invitador y cuenta una sola vez, en su primera
+  polla con invitaciones. El conteo es por polla.
+- **El cupo de regalo.** Aparece solo cuando quien invita tiene su propio cupo
+  pagado en esa polla (antes o después). Vale $0: no suma al pozo, compite como
+  cualquier cupo y cuenta en el máximo por persona. Si se desmarca el pago de un
+  invitado, se pausa (con sus pronósticos) y vuelve al aprobarlo. El panel de
+  cada polla lista los regalos con «Remover cupo» (con motivo) y «Restaurar»; la
+  cola de pagos muestra «Invitado por».
+- **Alcance.** Pollas de partidos o preguntas con entrada, creadas desde la 135;
+  las rifas nunca. El editor apaga o prende el programa mientras nadie se inscriba.
+- **Pruebas.** `scripts/casa-referrals-check.sql` (Supabase local, ROLLBACK),
+  `npm test -- tests/casa-referrals.test.ts` y
+  `CASA_ORIGIN=http://localhost:3137 node scripts/casa-referrals-browser-check.mjs`
+  con `node scripts/casa-v2-local-env.mjs dev 3137`.
+
 ### Casa: carrusel en vivo, reparto al terminar y marcadores demorados (2026-09-17, migración 134)
 
 - **En vivo en /casa como carrusel.** Los partidos de mis pollas se deslizan de

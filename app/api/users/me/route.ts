@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { onboardingCookieOptions } from "@/lib/supabase/cookie-options";
+import { linkReferralFromCookie } from "@/lib/casa/referrals";
+import { REFERRAL_COOKIE } from "@/lib/casa/referrals-shared";
 import { z } from "zod";
 import {
   DISPLAY_NAME_MAX,
@@ -202,6 +204,10 @@ export async function PATCH(request: NextRequest) {
     const response = NextResponse.json({ success: true });
     if (fresh && !needsName(fresh.display_name) && fresh.avatar_url) {
       response.cookies.set("lp_onb", "1", onboardingCookieOptions());
+      // Invitaciones (migración 135): con el perfil completo, quien llegó por
+      // un enlace queda vinculado aunque pague otro día desde otro navegador.
+      const referral = await linkReferralFromCookie(user.id, request.cookies.get(REFERRAL_COOKIE)?.value);
+      if (referral.clearCookie) response.cookies.delete(REFERRAL_COOKIE);
     } else {
       // Defense-in-depth: si por alguna razón el row quedó con perfil
       // incompleto post-update (ej. user borró avatar via otro flow),

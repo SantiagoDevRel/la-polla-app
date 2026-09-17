@@ -45,3 +45,10 @@ export function onboardingCookieOptions(
     maxAge: 60 * 60 * 24 * 30,
   };
 }
+
+/** lp_ref: código del primer enlace de invitación (migración 135), 30 días, solo servidor. */
+export function referralCookieOptions(
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+) {
+  return onboardingCookieOptions(nodeEnv);
+}

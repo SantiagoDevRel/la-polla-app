@@ -6,6 +6,43 @@
 
 ## READ THIS FIRST
 
+### Invitaciones y cupos de regalo (2026-09-17, migración 135)
+
+Pedido del dueño: por cada 5 invitados NUEVOS con pago aprobado en una polla, quien
+invitó recibe un cupo gratis en esa polla, sin intervención del admin. Reglas (SQL es
+la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
+
+- **Código y enlace.** `casa_referral_code_v1` (letras del nombre + 4 dígitos, fijo).
+  Compartir agrega `?ref=CODIGO`; `proxy.ts` lo guarda en la cookie httpOnly `lp_ref`
+  (primer enlace, 30 días, solo navegaciones) y limpia la URL. Se vincula al
+  completar el perfil (`PATCH /api/users/me`) o al enviar el comprobante (`join`), y a
+  mano con el código (`/api/casa/referidos`, tarjetas `QuienTeInvito` en /casa,
+  /pagar y Perfil). Un enlace nunca reemplaza a un invitador ya guardado
+  (`REFERRAL_EXISTS`); escribir el código sí, hasta el primer pago aprobado.
+- **Quién cuenta.** Solo cuentas creadas desde la 135
+  (`casa_referral_settings.accounts_since`) sin ningún pago aprobado (ni corregido).
+  Un invitador por persona (PK). Cada invitado cuenta UNA vez: en la primera polla
+  con invitaciones donde se le aprueba un pago (`counted_polla_id`). Conteo por
+  invitador y por polla; en otra polla empieza de cero.
+- **El regalo.** `casa_referral_sync` (trigger AFTER en `casa_entries`) crea una fila
+  `origin='invitacion'`, `pagada`, `amount_cop=0` cuando el invitador tiene su propio
+  cupo pagado ahí (en cualquier orden). No suma al pozo, compite normal y cuenta en
+  `max_entries_per_user`. Desmarcar un pago lo pausa (`anulada`, conserva
+  pronósticos) y aprobarlo de nuevo lo reactiva. «Remover cupo»/«Restaurar» en
+  `/admin/pollas` (`casa_referral_remove_gift_v1`, con motivo).
+- **Blindaje.** Tablas nuevas de solo lectura para service_role; un regalo solo se
+  escribe con su evento en `casa_referral_events` en la misma transacción
+  (`casa_02_referral_guard` + parche needle de `casa_v2_write_guard`). v2/v3 nunca
+  reusan un regalo ni le aceptan comprobante (`GIFT_ENTRY`). `getMyEntries` oculta
+  los regalos en pausa: `anulada` en compra significa «reintentar», en regalo no.
+- **Alcance.** Solo partidos/preguntas con entrada > $0; pollas creadas desde la 135
+  (`referral_every` DEFAULT 5; las existentes quedan NULL). Interruptor en el editor
+  solo sin inscripciones (`casa_set_referral_every_v1`). El bot de jugadores todavía
+  no tiene enlace ni código propio (segundo PR); sí avisa el cupo ganado por Telegram.
+- **Orden de despliegue:** migración 135 antes del código. Regresión:
+  `scripts/casa-referrals-check.sql` (ROLLBACK), `tests/casa-referrals.test.ts` y
+  `scripts/casa-referrals-browser-check.mjs` (dev server local).
+
 ### Carrusel en vivo, reparto al terminar y marcadores demorados (2026-09-17, migración 134)
 
 - **Franja «En vivo» de /casa:** carrusel horizontal (`lp-hscroll`, snap) que se

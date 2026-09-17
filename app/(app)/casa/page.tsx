@@ -16,6 +16,10 @@ import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { CheckCircle2, Settings } from "lucide-react";
+import { cookies } from "next/headers";
+import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
+import { getReferralInvitee } from "@/lib/casa/referrals";
+import { REFERRAL_COOKIE, REFERRAL_DISMISS_COOKIE, validReferralCode } from "@/lib/casa/referrals-shared";
 import {
   listPublicPollas,
   getPots,
@@ -43,14 +47,20 @@ export default async function CasaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?returnTo=/casa");
 
-  const [pollas, myPollas, isAdmin, enVivo] = await Promise.all([
+  const cookieStore = await cookies();
+  const referralHint = validReferralCode(cookieStore.get(REFERRAL_COOKIE)?.value);
+  const [pollas, myPollas, isAdmin, enVivo, invitee] = await Promise.all([
     listPublicPollas(),
     listMyPollas(user.id),
     isCurrentUserAdmin(),
     // Partidos en juego de MIS pollas, con mi pronóstico. Si falla, la
     // pantalla sale sin la franja en vez de caerse.
     listMyLiveMatches(user.id).catch(() => []),
+    // Invitaciones (migración 135): personas nuevas que todavía pueden decir quién las invitó.
+    getReferralInvitee(user.id, referralHint),
   ]);
+  const verInvitacion = Boolean(invitee?.can_set_referrer && !invitee.referrer
+    && (invitee.hint || cookieStore.get(REFERRAL_DISMISS_COOKIE)?.value !== "1"));
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
   // paso sigue con status abierta hasta que alguien la cierre, y quedaba
   // listada como "del fin de semana" diciendo "cierra en cerrada".
@@ -94,6 +104,9 @@ export default async function CasaPage() {
               donde participo, con «Tu marcador» al lado del parcial. Se
               actualiza solo y desaparece cuando no hay nada en juego. */}
         <LiveNow initialRows={enVivo} />
+
+        {/* Punto 3 del dueño (2026-09-17): quien entró sin el enlace también puede decir quién lo invitó. */}
+        {verInvitacion && invitee && <QuienTeInvito initial={invitee} variant="casa" />}
 
         <PollaSection id="pollas-abiertas" kind="open" title="Pollas abiertas" description="Elige una polla e inscríbete." count={disponibles.length}>
         {disponibles.length === 0 ? (

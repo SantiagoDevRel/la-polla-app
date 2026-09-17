@@ -14,9 +14,11 @@ import { ResolverPolla } from "@/components/casa/ResolverPolla";
 import { fadeUp, staggerContainer } from "@/lib/animations";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import { editorHref } from "@/lib/casa/editor";
+import { referralEvery } from "@/lib/casa/referrals-shared";
+import { RegalosPolla } from "@/components/casa/RegalosPolla";
 import type { pollaStatusLabel, CasaPolla, CasaPot, CasaSettlementReadiness } from "@/lib/casa/types";
 
-export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "prize_kind" | "prize_object" | "draw_pending" | "settlement_outcome"> & {
+export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "prize_kind" | "prize_object" | "draw_pending" | "settlement_outcome" | "entry_price_cop" | "referral_every"> & {
   label: ReturnType<typeof pollaStatusLabel>;
   /** Se puede editar (antes del cierre). */
   editable?: boolean;
@@ -187,6 +189,11 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, rea
                         )}
                         <ColaDePagos key={polla.id} pollaId={polla.id} refreshKey={revision} onReviewed={() => setRevision((value) => value + 1)} />
                         <Link href={`/admin/pollas/pagos?pollaId=${polla.id}`} className="lp-btn lp-btn-ghost mt-4 w-full !text-[15px]">Ver pagos aprobados</Link>
+                        {/* Invitaciones (migración 135): los regalos se crean solos; remover es opcional. */}
+                        {referralEvery(polla) !== null && (
+                          <RegalosPolla key={`regalos-${polla.id}`} pollaId={polla.id} every={referralEvery(polla)!} refreshKey={revision}
+                            editable={polla.status === "abierta" || polla.status === "cerrada"} />
+                        )}
                         <div className="mt-6 border-t border-border-default pt-4">
                           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <div className="min-w-0"><Label>{polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label><p className="lp-money mt-1 text-[24px] text-text-primary [overflow-wrap:anywhere]">{polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot?.prize_cop ?? 0)}</p></div>

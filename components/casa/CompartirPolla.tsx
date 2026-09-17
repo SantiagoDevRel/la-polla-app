@@ -8,17 +8,23 @@
 // Va de la mano del cambio en lib/supabase/middleware.ts que deja /casa/<slug>
 // abierta sin sesion: sin eso el link que se pega en el grupo manda a /login y
 // el que no tiene cuenta no ve ni de que se trata.
+//
+// (2026-09-17, migración 135) Con `codigo`, el enlace y el mensaje llevan el
+// código de invitación de quien comparte: así cuentan sus invitados.
 "use client";
 
 import { useState } from "react";
 import { Share2, Check } from "lucide-react";
 import { textoCompartir, type PremioCompartir } from "@/lib/casa/share-text";
+import { referralLink } from "@/lib/casa/referrals-shared";
 
 export function CompartirPolla({
   slug,
   nombre,
   entradaCop,
   premio = null,
+  codigo = null,
+  ayuda,
   className = "w-full",
 }: {
   slug: string;
@@ -26,6 +32,10 @@ export function CompartirPolla({
   entradaCop: number;
   /** Premio fijo u objeto; null en pozo proporcional (solo se anuncia la entrada). */
   premio?: PremioCompartir;
+  /** Código de invitación de quien comparte; null = enlace sin código. */
+  codigo?: string | null;
+  /** Explicación al pasar el cursor (la regla de invitaciones). */
+  ayuda?: string;
   /** Ancho/flex según dónde va: sola ocupa toda la fila; junto al CTA se reparte. */
   className?: string;
 }) {
@@ -40,8 +50,8 @@ export function CompartirPolla({
     const origin = english
       ? "https://chickenpicks.app"
       : "https://lapollacolombiana.com";
-    const url = `${origin}/casa/${slug}`;
-    const texto = textoCompartir({ nombre, entradaCop, premio, english });
+    const url = referralLink(origin, slug, codigo);
+    const texto = textoCompartir({ nombre, entradaCop, premio, codigo, english });
     return { url, texto };
   }
 
@@ -72,8 +82,9 @@ export function CompartirPolla({
     <button
       type="button"
       onClick={compartir}
+      title={ayuda}
       className={`lp-btn lp-btn-ghost !px-4 ${className}`}
-      aria-label={`Compartir ${nombre}`}
+      aria-label={`Compartir ${nombre}${ayuda ? `. ${ayuda}` : ""}`}
     >
       {copiado ? (
         <>
