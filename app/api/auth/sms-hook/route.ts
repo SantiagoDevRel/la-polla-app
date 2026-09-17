@@ -152,10 +152,11 @@ export async function POST(request: Request) {
   // `auth.users.phone` NO empiezan por 57. Hasta entonces este hook manda
   // a cualquier E.164 válido.
 
-  // Texto pedido por el dueño (2026-09-17): tilde y pollito, sin la
-  // advertencia de "no lo compartas". Con emoji el SMS va en UCS-2 (70
-  // unidades por segmento, 🐥 ocupa 2): son 47 → sigue siendo UN segmento.
-  // Si se alarga, contar en UCS-2: pasar de 70 duplica el costo.
+  // Texto pedido por el dueño (2026-09-17), sin la advertencia de "no lo
+  // compartas". Sin 🐥: la cuenta LabsMobile de La Polla borra los emojis
+  // en la ruta a Colombia (probado con ucs2, tpoa 22435 y desde el panel).
+  // La "ó" lo manda en UCS-2 (70 unidades por segmento): son 44 → UN
+  // segmento. Si se alarga, contar en UCS-2: pasar de 70 duplica el costo.
   //
   // SIN DOMINIO, a propósito:
   //
@@ -178,7 +179,7 @@ export async function POST(request: Request) {
   //
   // No se anuncia una duración concreta: quien decide cuánto vive el código
   // es Supabase (SMS_OTP_EXP), no este archivo.
-  const texto = `Tu código es ${otp} para La Polla Colombiana 🐥`;
+  const texto = `Tu código es ${otp} para La Polla Colombiana`;
 
   // LabsMobile admite un subid propio de hasta 20 caracteres. Lo generamos y
   // registramos ANTES del fetch: así el callback nunca puede adelantarse a la
