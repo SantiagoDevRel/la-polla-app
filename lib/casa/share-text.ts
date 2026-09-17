@@ -7,6 +7,15 @@ import { formatCop } from "@/lib/casa/format";
  */
 export type PremioCompartir = { cop: number } | { objeto: string } | null;
 
+/** El premio anunciable de una polla; `prizeCop` sale de casa_polla_pot. */
+export function premioCompartir(
+  polla: { prize_kind?: string | null; prize_object?: string | null; pot_mode?: string | null },
+  prizeCop: number,
+): PremioCompartir {
+  if (polla.prize_kind === "objeto") return polla.prize_object ? { objeto: polla.prize_object } : null;
+  return polla.pot_mode === "fijo" ? { cop: prizeCop } : null;
+}
+
 /**
  * (2026-09-14) Pedido del dueño: «Únete, entrada 20 mil, premio 1 millón».
  * (2026-09-17) Con `codigo`, el mensaje lleva el código de invitación: si la

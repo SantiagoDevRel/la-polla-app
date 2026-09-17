@@ -4,12 +4,17 @@
 --   · Cada persona tiene un código (p. ej. JUAN4821) y el enlace de Compartir lo
 --     lleva. La persona invitada tiene UN solo invitador y puede corregirlo hasta
 --     que se apruebe su primer pago; desde ahí queda fijo.
---   · Solo cuentan personas NUEVAS: cuentas creadas desde que se instala esta
---     migración (casa_referral_settings.accounts_since) que no han pagado ninguna
---     polla. Las cuentas que ya existían no cuentan.
+--   · Solo cuentan personas NUEVAS: cuentas de acceso (auth.users, que nadie
+--     edita desde la app) creadas desde que se instala esta migración
+--     (casa_referral_settings.accounts_since) y que no han pagado ninguna polla
+--     con entrada. Las cuentas que ya existían no cuentan.
+--   · Los administradores no tienen código ni ganan regalos: la casa no se
+--     queda con cupos que pagan los jugadores, y sus enlaces no le quitan el
+--     invitado a quien sí lo trajo.
 --   · Cada invitado cuenta UNA sola vez: en la primera polla con invitaciones
 --     donde se le aprueba un pago. Aunque después juegue cien pollas, no vuelve
---     a contar.
+--     a contar. Si ese pago se desmarca y no le queda otro cupo pagado ahí,
+--     cuenta en la próxima polla donde se le apruebe uno.
 --   · El conteo es por invitador y POR POLLA: cada `referral_every` (5) invitados
 --     con pago aprobado en esa polla dan un cupo de regalo en esa misma polla. En
 --     otra polla el conteo empieza de cero.
@@ -17,11 +22,15 @@
 --     un cupo pagado en esa polla; el orden no importa.
 --   · El cupo de regalo vale $0 (el pozo solo suma lo que entró), compite como
 --     cualquier cupo y cuenta dentro de max_entries_per_user.
---   · Si un pago se desmarca y el conteo baja, el regalo queda en pausa (conserva
---     sus pronósticos) y vuelve si ese pago se aprueba otra vez. El administrador
---     puede removerlo y restaurarlo.
+--   · Los regalos se numeran en orden: el k-ésimo está activo mientras haya k
+--     ganados. Si un pago se desmarca y el conteo baja, los últimos quedan en
+--     pausa (conservan sus pronósticos) y vuelven si se aprueba otra vez.
+--   · "Remover cupo" (administrador) anula ese regalo y le descuenta ese puesto
+--     a la persona; no lo reemplaza otro. Restaurar lo devuelve si sigue ganado.
+--     Ninguno de los dos se puede después del reparto.
 --   · Solo pollas de partidos o preguntas con entrada mayor a $0 creadas desde
---     esta migración (DEFAULT 5). Las pollas que ya existen quedan sin el programa.
+--     esta migración (DEFAULT 5), más los borradores nunca publicados y sin
+--     inscripciones. Las pollas publicadas que ya existen quedan sin el programa.
 --
 -- Seguridad: las tablas nuevas son de solo lectura para service_role y toda
 -- escritura pasa por funciones SECURITY DEFINER. Un cupo de regalo solo se crea o
@@ -162,16 +171,26 @@ LANGUAGE sql VOLATILE SET search_path=public,pg_temp AS $$
     THEN current_setting('app.casa_referral_sync',true)::uuid END;
 $$;
 
--- Persona nueva: cuenta creada desde el inicio del programa, sin ningún pago
--- aprobado (ni uno que después se haya desmarcado).
+-- Persona nueva: cuenta de acceso creada desde el inicio del programa, sin ningún
+-- pago aprobado (ni uno que después se haya desmarcado). La fecha sale de
+-- auth.users: public.users.created_at lo puede reescribir su dueño por la API.
+-- Las pollas gratis no son un pago.
 CREATE FUNCTION public.casa_referral_is_new_user(p_user_id uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
-  SELECT EXISTS(SELECT 1 FROM public.users u CROSS JOIN public.casa_referral_settings s
-      WHERE u.id=p_user_id AND u.created_at>=s.accounts_since)
+  SELECT EXISTS(SELECT 1 FROM auth.users a JOIN public.users u ON u.id=a.id
+      CROSS JOIN public.casa_referral_settings s
+      WHERE a.id=p_user_id AND a.created_at>=s.accounts_since)
     AND NOT EXISTS(SELECT 1 FROM public.casa_entries e
       WHERE e.user_id=p_user_id AND e.origin='compra' AND e.status='pagada' AND e.amount_cop>0)
     AND NOT EXISTS(SELECT 1 FROM public.casa_payment_corrections c
-      JOIN public.casa_entries e ON e.id=c.entry_id WHERE e.user_id=p_user_id);
+      JOIN public.casa_entries e ON e.id=c.entry_id
+      WHERE e.user_id=p_user_id AND e.origin='compra' AND e.amount_cop>0);
+$$;
+
+-- Quién puede invitar: cualquier cuenta menos los administradores.
+CREATE FUNCTION public.casa_referral_can_refer(p_user_id uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
+  SELECT EXISTS(SELECT 1 FROM public.users u WHERE u.id=p_user_id AND u.is_admin IS NOT TRUE);
 $$;
 
 CREATE FUNCTION public.casa_referral_log(p_kind text, p_polla uuid, p_referrer uuid, p_referred uuid,
@@ -190,10 +209,14 @@ $$;
 
 -- ── 4. Código personal ──────────────────────────────────────────────────────
 -- Letras del nombre (máximo 6, sin tildes) + 4 dígitos. Se crea una vez y no cambia.
+-- Los administradores no tienen código (tampoco uno creado antes de serlo).
 CREATE FUNCTION public.casa_referral_code_v1(p_user_id uuid) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE v_code text; v_name text; v_prefix text; i integer;
 BEGIN
+  IF NOT public.casa_referral_can_refer(p_user_id) THEN
+    RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='REFERRAL_NOT_AVAILABLE';
+  END IF;
   SELECT code INTO v_code FROM public.casa_referral_codes WHERE user_id=p_user_id;
   IF FOUND THEN RETURN v_code; END IF;
   SELECT display_name INTO v_name FROM public.users
@@ -217,7 +240,7 @@ END $$;
 -- códigos inválidos (tope: 10 por hora por persona).
 CREATE FUNCTION public.casa_set_referrer_v1(p_user_id uuid, p_code text, p_via text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
-DECLARE v_code text; v_referrer uuid; r public.casa_referrals; v_exists boolean; v_fails integer;
+DECLARE v_code text; v_referrer uuid; r public.casa_referrals; v_exists boolean; v_fails integer; v_pass integer;
 BEGIN
   IF p_user_id IS NULL OR p_via IS NULL OR p_via NOT IN ('enlace','codigo','telegram') THEN
     RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='INVALID_REFERRAL';
@@ -230,32 +253,42 @@ BEGIN
     WHERE referred_user_id=p_user_id AND kind='codigo_invalido' AND created_at>clock_timestamp()-interval '1 hour';
   IF v_fails>=10 THEN RETURN jsonb_build_object('ok',false,'error','REFERRAL_RATE_LIMITED'); END IF;
   v_code:=public.casa_referral_normalize_code(p_code);
-  SELECT user_id INTO v_referrer FROM public.casa_referral_codes WHERE code=v_code;
+  -- El código de un administrador no invita (ver casa_referral_can_refer).
+  SELECT c.user_id INTO v_referrer FROM public.casa_referral_codes c
+    WHERE c.code=v_code AND public.casa_referral_can_refer(c.user_id);
   IF v_referrer IS NULL THEN
     PERFORM public.casa_referral_log('codigo_invalido',NULL,NULL,p_user_id,NULL,p_user_id,
       jsonb_build_object('via',p_via,'length',length(coalesce(v_code,''))));
     RETURN jsonb_build_object('ok',false,'error','REFERRAL_CODE_NOT_FOUND');
   END IF;
   IF v_referrer=p_user_id THEN RETURN jsonb_build_object('ok',false,'error','SELF_REFERRAL'); END IF;
-  -- Orden de bloqueo: pagos de la persona → su vínculo (el mismo de una aprobación).
-  -- Una aprobación en curso termina primero y, si fue su primer pago, lo bloquea.
-  PERFORM 1 FROM public.casa_entries WHERE user_id=p_user_id FOR SHARE;
-  SELECT * INTO r FROM public.casa_referrals WHERE referred_user_id=p_user_id FOR UPDATE;
-  v_exists:=FOUND;
-  IF v_exists AND r.referrer_user_id=v_referrer THEN
-    RETURN jsonb_build_object('ok',true,'changed',false,'locked',r.locked_at IS NOT NULL,
-      'referrer',public.casa_referral_person(v_referrer));
-  END IF;
-  -- Abrir otro enlace nunca reemplaza a quien ya quedó; cambiarlo es escribir el código.
-  IF v_exists AND p_via='enlace' THEN
-    RETURN jsonb_build_object('ok',false,'error','REFERRAL_EXISTS','referrer',public.casa_referral_person(r.referrer_user_id));
-  END IF;
-  IF v_exists AND r.locked_at IS NOT NULL THEN
-    RETURN jsonb_build_object('ok',false,'error','REFERRAL_LOCKED','referrer',public.casa_referral_person(r.referrer_user_id));
-  END IF;
-  IF NOT public.casa_referral_is_new_user(p_user_id) THEN
-    RETURN jsonb_build_object('ok',false,'error','NOT_NEW_USER');
-  END IF;
+  -- Primera vuelta sin bloquear: los rechazos no esperan a nadie. La segunda
+  -- bloquea en el orden de una aprobación (cupos comprados → vínculo) y repite
+  -- las mismas preguntas. Los regalos no se bloquean: una aprobación puede
+  -- pausarlos o reactivarlos mientras tanto.
+  FOR v_pass IN 1..2 LOOP
+    IF v_pass=1 THEN
+      SELECT * INTO r FROM public.casa_referrals WHERE referred_user_id=p_user_id;
+    ELSE
+      PERFORM 1 FROM public.casa_entries WHERE user_id=p_user_id AND origin='compra' FOR SHARE;
+      SELECT * INTO r FROM public.casa_referrals WHERE referred_user_id=p_user_id FOR UPDATE;
+    END IF;
+    v_exists:=FOUND;
+    IF v_exists AND r.referrer_user_id=v_referrer THEN
+      RETURN jsonb_build_object('ok',true,'changed',false,'locked',r.locked_at IS NOT NULL,
+        'referrer',public.casa_referral_person(v_referrer));
+    END IF;
+    -- Abrir otro enlace nunca reemplaza a quien ya quedó; cambiarlo es escribir el código.
+    IF v_exists AND p_via='enlace' THEN
+      RETURN jsonb_build_object('ok',false,'error','REFERRAL_EXISTS','referrer',public.casa_referral_person(r.referrer_user_id));
+    END IF;
+    IF v_exists AND r.locked_at IS NOT NULL THEN
+      RETURN jsonb_build_object('ok',false,'error','REFERRAL_LOCKED','referrer',public.casa_referral_person(r.referrer_user_id));
+    END IF;
+    IF NOT public.casa_referral_is_new_user(p_user_id) THEN
+      RETURN jsonb_build_object('ok',false,'error','NOT_NEW_USER');
+    END IF;
+  END LOOP;
   IF v_exists THEN
     UPDATE public.casa_referrals SET referrer_user_id=v_referrer,code=v_code,via=p_via,updated_at=clock_timestamp()
       WHERE referred_user_id=p_user_id;
@@ -272,11 +305,15 @@ END $$;
 -- ── 6. Conteo por polla y cupos de regalo ───────────────────────────────────
 -- Idempotente. Todos los llamadores ya tienen bloqueada la polla (guards de
 -- casa_entries, casa_v2_lock_polla o el UPDATE de casa_pollas).
+--
+-- Los regalos de una persona en una polla se ordenan por número: el k-ésimo
+-- está activo si k <= ganados, no está removido y cabe en el tope. Uno removido
+-- conserva su puesto (así descuenta justo ese regalo, y si el conteo baja es el
+-- primero en dejar de estar ganado); los que pasan de lo ganado quedan en pausa.
 CREATE FUNCTION public.casa_referral_sync(p_polla_id uuid, p_referrer uuid) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE p public.casa_pollas; v_every integer; v_counted integer; v_owner boolean; v_earned integer;
-  v_removed integer; v_allowed integer; v_active integer; v_live integer; v_need integer;
-  v_number integer; v_entry uuid; v_event uuid; g record; v_detail jsonb;
+  v_removed integer; v_slot integer:=0; v_number integer; v_entry uuid; v_event uuid; g record; v_detail jsonb;
 BEGIN
   IF p_polla_id IS NULL OR p_referrer IS NULL THEN RETURN; END IF;
   SELECT * INTO p FROM public.casa_pollas WHERE id=p_polla_id FOR UPDATE;
@@ -289,46 +326,42 @@ BEGIN
       AND EXISTS(SELECT 1 FROM public.casa_entries e WHERE e.polla_id=p.id AND e.user_id=r.referred_user_id
         AND e.origin='compra' AND e.status='pagada' AND e.amount_cop>0);
   -- "Un cupo más": el invitador necesita su propio cupo pagado en esta polla.
-  v_owner:=EXISTS(SELECT 1 FROM public.casa_entries e WHERE e.polla_id=p.id AND e.user_id=p_referrer
-    AND e.origin='compra' AND e.status='pagada' AND e.amount_cop>0 AND e.ticket_number IS NULL);
+  v_owner:=public.casa_referral_can_refer(p_referrer)
+    AND EXISTS(SELECT 1 FROM public.casa_entries e WHERE e.polla_id=p.id AND e.user_id=p_referrer
+      AND e.origin='compra' AND e.status='pagada' AND e.amount_cop>0 AND e.ticket_number IS NULL);
   v_earned:=CASE WHEN v_every IS NULL OR NOT v_owner THEN 0 ELSE v_counted/v_every END;
   SELECT count(*) INTO v_removed FROM public.casa_referral_gift_removals x
     WHERE x.polla_id=p.id AND x.user_id=p_referrer AND x.restored_at IS NULL;
-  v_allowed:=greatest(v_earned-v_removed,0);
-  SELECT count(*) INTO v_active FROM public.casa_entries e
-    WHERE e.polla_id=p.id AND e.user_id=p_referrer AND e.origin='invitacion' AND e.status='pagada';
   v_detail:=jsonb_build_object('invitados',v_counted,'cada',v_every,'cupo_pagado',v_owner,'removidos',v_removed);
 
-  -- Sobran regalos (se desmarcó un pago): quedan en pausa, los más recientes primero.
-  FOR g IN SELECT e.id FROM public.casa_entries e
-      WHERE e.polla_id=p.id AND e.user_id=p_referrer AND e.origin='invitacion' AND e.status='pagada'
-      ORDER BY e.entry_number DESC LIMIT greatest(v_active-v_allowed,0) LOOP
-    v_event:=public.casa_referral_log('regalo_pausado',p.id,p_referrer,NULL,g.id,NULL,v_detail);
-    PERFORM set_config('app.casa_referral_sync',v_event::text,true);
-    UPDATE public.casa_entries SET status='anulada',reviewed_at=NULL,
-      reject_reason='Cupo de regalo en pausa: cambió el conteo de invitados.' WHERE id=g.id;
-    PERFORM set_config('app.casa_referral_sync','',true);
+  FOR g IN SELECT e.id, e.status,
+        EXISTS(SELECT 1 FROM public.casa_referral_gift_removals x WHERE x.entry_id=e.id AND x.restored_at IS NULL) AS removed
+      FROM public.casa_entries e
+      WHERE e.polla_id=p.id AND e.user_id=p_referrer AND e.origin='invitacion'
+      ORDER BY e.entry_number FOR UPDATE OF e LOOP
+    v_slot:=v_slot+1;
+    IF g.status='pagada' AND (g.removed OR v_slot>v_earned) THEN
+      -- Ya no está ganado (se desmarcó un pago): en pausa, con sus pronósticos.
+      v_event:=public.casa_referral_log('regalo_pausado',p.id,p_referrer,NULL,g.id,NULL,v_detail);
+      PERFORM set_config('app.casa_referral_sync',v_event::text,true);
+      UPDATE public.casa_entries SET status='anulada',reviewed_at=NULL,
+        reject_reason='Cupo de regalo en pausa: cambió el conteo de invitados.' WHERE id=g.id;
+      PERFORM set_config('app.casa_referral_sync','',true);
+    ELSIF g.status<>'pagada' AND NOT g.removed AND v_slot<=v_earned
+      -- Tope por persona: cuentan todos sus cupos vivos, también los de regalo.
+      AND (SELECT count(*) FROM public.casa_entries e WHERE e.polla_id=p.id AND e.user_id=p_referrer
+        AND e.ticket_number IS NULL AND e.status<>'anulada')<p.max_entries_per_user THEN
+      v_event:=public.casa_referral_log('regalo_reactivado',p.id,p_referrer,NULL,g.id,NULL,v_detail);
+      PERFORM set_config('app.casa_referral_sync',v_event::text,true);
+      UPDATE public.casa_entries SET status='pagada',reviewed_at=clock_timestamp(),reject_reason=NULL WHERE id=g.id;
+      PERFORM set_config('app.casa_referral_sync','',true);
+    END IF;
   END LOOP;
 
-  v_need:=v_allowed-least(v_active,v_allowed);
-  IF v_need>0 THEN
-    -- Tope por persona: cuentan todos sus cupos vivos, también los de regalo.
-    SELECT count(*) INTO v_live FROM public.casa_entries e
-      WHERE e.polla_id=p.id AND e.user_id=p_referrer AND e.ticket_number IS NULL AND e.status<>'anulada';
-    v_need:=least(v_need,greatest(p.max_entries_per_user-v_live,0));
-  END IF;
-  -- Primero vuelven los regalos en pausa (con sus pronósticos); nunca uno removido.
-  FOR g IN SELECT e.id FROM public.casa_entries e
-      WHERE e.polla_id=p.id AND e.user_id=p_referrer AND e.origin='invitacion' AND e.status='anulada'
-        AND NOT EXISTS(SELECT 1 FROM public.casa_referral_gift_removals x WHERE x.entry_id=e.id AND x.restored_at IS NULL)
-      ORDER BY e.entry_number LIMIT greatest(v_need,0) LOOP
-    v_event:=public.casa_referral_log('regalo_reactivado',p.id,p_referrer,NULL,g.id,NULL,v_detail);
-    PERFORM set_config('app.casa_referral_sync',v_event::text,true);
-    UPDATE public.casa_entries SET status='pagada',reviewed_at=clock_timestamp(),reject_reason=NULL WHERE id=g.id;
-    PERFORM set_config('app.casa_referral_sync','',true);
-    v_need:=v_need-1;
-  END LOOP;
-  WHILE v_need>0 LOOP
+  -- Ganados que todavía no tienen fila: se crean mientras quepan en el tope.
+  WHILE v_slot<v_earned LOOP
+    EXIT WHEN (SELECT count(*) FROM public.casa_entries e WHERE e.polla_id=p.id AND e.user_id=p_referrer
+      AND e.ticket_number IS NULL AND e.status<>'anulada')>=p.max_entries_per_user;
     SELECT coalesce(max(entry_number),0)+1 INTO v_number FROM public.casa_entries
       WHERE polla_id=p.id AND user_id=p_referrer AND ticket_number IS NULL;
     EXIT WHEN v_number>50;
@@ -338,7 +371,7 @@ BEGIN
     INSERT INTO public.casa_entries(id,polla_id,user_id,status,amount_cop,entry_number,origin,reviewed_at)
       VALUES(v_entry,p.id,p_referrer,'pagada',0,v_number,'invitacion',clock_timestamp());
     PERFORM set_config('app.casa_referral_sync','',true);
-    v_need:=v_need-1;
+    v_slot:=v_slot+1;
   END LOOP;
 END $$;
 
@@ -346,7 +379,7 @@ END $$;
 -- lo ancla en la primera polla con invitaciones y recuenta a los afectados.
 CREATE FUNCTION public.casa_referral_after_entry() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
-DECLARE r public.casa_referrals; p public.casa_pollas;
+DECLARE r public.casa_referrals; p public.casa_pollas; v_other uuid;
 BEGIN
   IF NEW.origin<>'compra' THEN RETURN NULL; END IF;
   IF TG_OP='UPDATE' AND NEW.status IS NOT DISTINCT FROM OLD.status
@@ -367,6 +400,22 @@ BEGIN
         PERFORM public.casa_referral_log('conteo',NEW.polla_id,r.referrer_user_id,NEW.user_id,NEW.id,NULL,'{}'::jsonb);
         r.counted_polla_id:=NEW.polla_id;
       END IF;
+    END IF;
+  ELSIF r.referred_user_id IS NOT NULL AND r.counted_entry_id=NEW.id THEN
+    -- Se revirtió el pago que anclaba el conteo. Si le queda otro cupo pagado en
+    -- esa polla, sigue contando ahí; si no, cuenta en la próxima polla donde se le
+    -- apruebe un pago. El recuento de abajo usa la polla anterior (r).
+    SELECT e.id INTO v_other FROM public.casa_entries e
+      WHERE e.polla_id=NEW.polla_id AND e.user_id=NEW.user_id AND e.id<>NEW.id AND e.origin='compra'
+        AND e.status='pagada' AND e.amount_cop>0 AND e.ticket_number IS NULL
+      ORDER BY e.entry_number LIMIT 1;
+    UPDATE public.casa_referrals SET counted_entry_id=v_other,
+      counted_polla_id=CASE WHEN v_other IS NULL THEN NULL ELSE counted_polla_id END,
+      counted_at=CASE WHEN v_other IS NULL THEN NULL ELSE counted_at END,
+      updated_at=clock_timestamp() WHERE referred_user_id=NEW.user_id;
+    IF v_other IS NULL THEN
+      PERFORM public.casa_referral_log('conteo',NEW.polla_id,r.referrer_user_id,NEW.user_id,NEW.id,NULL,
+        jsonb_build_object('liberado',true));
     END IF;
   END IF;
   -- Quien invitó a esta persona, solo en la polla donde ella cuenta.
@@ -423,6 +472,21 @@ CREATE TRIGGER casa_02_referral_guard BEFORE INSERT OR UPDATE ON public.casa_ent
   FOR EACH ROW EXECUTE FUNCTION public.casa_referral_entry_guard();
 
 -- ── 7. Administración ───────────────────────────────────────────────────────
+-- Remover o restaurar un regalo cambia la tabla: igual que desmarcar un pago
+-- (casa_unpay_attempt_v2), no se permite después del reparto.
+CREATE FUNCTION public.casa_referral_lock_unsettled(p_polla_id uuid) RETURNS public.casa_pollas
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE p public.casa_pollas;
+BEGIN
+  p:=public.casa_v2_lock_polla(p_polla_id);
+  IF p.status NOT IN ('abierta','cerrada') THEN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='POLLA_FINAL'; END IF;
+  IF p.settled_at IS NOT NULL OR p.settlement_outcome IS NOT NULL
+    OR EXISTS(SELECT 1 FROM public.casa_payouts WHERE polla_id=p.id) THEN
+    RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='ALREADY_SETTLED';
+  END IF;
+  RETURN p;
+END $$;
+
 CREATE FUNCTION public.casa_referral_remove_gift_v1(p_entry_id uuid, p_reason text, p_actor_id uuid, p_contract integer)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE e public.casa_entries; p public.casa_pollas; v_event uuid;
@@ -434,7 +498,7 @@ BEGIN
   END IF;
   SELECT * INTO e FROM public.casa_entries WHERE id=p_entry_id;
   IF NOT FOUND OR e.origin<>'invitacion' THEN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='GIFT_NOT_FOUND'; END IF;
-  p:=public.casa_v2_lock_polla(e.polla_id);
+  p:=public.casa_referral_lock_unsettled(e.polla_id);
   SELECT * INTO e FROM public.casa_entries WHERE id=p_entry_id FOR UPDATE;
   IF EXISTS(SELECT 1 FROM public.casa_referral_gift_removals WHERE entry_id=e.id AND restored_at IS NULL) THEN
     RETURN jsonb_build_object('ok',true,'changed',false,'entry_id',e.id,'polla_id',e.polla_id);
@@ -463,7 +527,7 @@ BEGIN
   PERFORM public.casa_v2_admin(p_actor_id,NULL);
   SELECT * INTO e FROM public.casa_entries WHERE id=p_entry_id;
   IF NOT FOUND OR e.origin<>'invitacion' THEN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='GIFT_NOT_FOUND'; END IF;
-  p:=public.casa_v2_lock_polla(e.polla_id);
+  p:=public.casa_referral_lock_unsettled(e.polla_id);
   UPDATE public.casa_referral_gift_removals SET restored_at=clock_timestamp(),restored_by=p_actor_id
     WHERE entry_id=e.id AND restored_at IS NULL;
   IF NOT FOUND THEN
@@ -509,9 +573,12 @@ BEGIN
       (SELECT count(*) FROM public.casa_referrals r WHERE r.referrer_user_id=e.user_id AND r.counted_polla_id=e.polla_id
         AND EXISTS(SELECT 1 FROM public.casa_entries i WHERE i.polla_id=e.polla_id AND i.user_id=r.referred_user_id
           AND i.origin='compra' AND i.status='pagada' AND i.amount_cop>0))::integer AS invitados,
+      -- Los mismos invitados que el número de arriba.
       (SELECT coalesce(jsonb_agg(v.display_name ORDER BY r.counted_at),'[]'::jsonb) FROM public.casa_referrals r
         JOIN public.users v ON v.id=r.referred_user_id
-        WHERE r.referrer_user_id=e.user_id AND r.counted_polla_id=e.polla_id) AS nombres
+        WHERE r.referrer_user_id=e.user_id AND r.counted_polla_id=e.polla_id
+          AND EXISTS(SELECT 1 FROM public.casa_entries i WHERE i.polla_id=e.polla_id AND i.user_id=r.referred_user_id
+            AND i.origin='compra' AND i.status='pagada' AND i.amount_cop>0)) AS nombres
     FROM public.casa_entries e
     JOIN public.users u ON u.id=e.user_id
     LEFT JOIN public.casa_referral_gift_removals x ON x.entry_id=e.id
@@ -535,7 +602,8 @@ $$;
 CREATE FUNCTION public.casa_referral_polla_view_v1(p_user_id uuid, p_polla_id uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 DECLARE p public.casa_pollas; v_every integer; v_code text; v_counted integer:=0; v_review integer:=0;
-  v_owner boolean:=false; v_active integer:=0; v_removed integer:=0; v_live integer:=0; r public.casa_referrals;
+  v_owner boolean:=false; v_active integer:=0; v_removed integer:=0; v_removed_in integer:=0; v_live integer:=0;
+  v_earned integer:=0; r public.casa_referrals;
 BEGIN
   IF p_user_id IS NULL THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='USER_REQUIRED'; END IF;
   SELECT * INTO p FROM public.casa_pollas WHERE id=p_polla_id;
@@ -561,6 +629,12 @@ BEGIN
       WHERE x.polla_id=p.id AND x.user_id=p_user_id AND x.restored_at IS NULL;
     SELECT count(*) INTO v_live FROM public.casa_entries e
       WHERE e.polla_id=p.id AND e.user_id=p_user_id AND e.ticket_number IS NULL AND e.status<>'anulada';
+    v_earned:=v_counted/v_every;
+    -- Removidos dentro de los puestos ganados: esos regalos ya no valen (casa_referral_sync).
+    SELECT count(*) INTO v_removed_in FROM (SELECT e.id FROM public.casa_entries e
+        WHERE e.polla_id=p.id AND e.user_id=p_user_id AND e.origin='invitacion'
+        ORDER BY e.entry_number LIMIT v_earned) z
+      WHERE EXISTS(SELECT 1 FROM public.casa_referral_gift_removals x WHERE x.entry_id=z.id AND x.restored_at IS NULL);
   END IF;
   SELECT * INTO r FROM public.casa_referrals WHERE referred_user_id=p_user_id;
   RETURN jsonb_build_object(
@@ -568,7 +642,10 @@ BEGIN
     'every',v_every,
     'counted',v_counted,
     'in_review',v_review,
-    'earned',CASE WHEN v_every IS NULL THEN 0 ELSE v_counted/v_every END,
+    'earned',v_earned,
+    -- Ganados que valen (sin los removidos) y los que esperan tu pago o espacio.
+    'gifts',greatest(v_earned-v_removed_in,0),
+    'waiting_gifts',greatest(v_earned-v_removed_in-v_active,0),
     'active_gifts',v_active,
     'removed_gifts',v_removed,
     'owner_paid',v_owner,
@@ -589,7 +666,8 @@ BEGIN
   v_can:=r.locked_at IS NULL AND public.casa_referral_is_new_user(p_user_id);
   IF v_can AND p_hint IS NOT NULL THEN
     SELECT c.user_id INTO v_hint FROM public.casa_referral_codes c
-      WHERE c.code=public.casa_referral_normalize_code(p_hint) AND c.user_id<>p_user_id;
+      WHERE c.code=public.casa_referral_normalize_code(p_hint) AND c.user_id<>p_user_id
+        AND public.casa_referral_can_refer(c.user_id);
   END IF;
   RETURN jsonb_build_object(
     'can_set_referrer',v_can,
@@ -695,12 +773,32 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_tem
     (origin<>'compra'),entry_number NULLS LAST,created_at DESC,id LIMIT 1;
 $$;
 
--- ── 10. Permisos ────────────────────────────────────────────────────────────
+-- ── 10. Borradores ──────────────────────────────────────────────────────────
+-- Un borrador que nunca se publicó no tiene jugadores ni reglas en curso: queda
+-- con el programa, como una polla nueva (la próxima OFIGOLAZO puede salir de uno).
+DO $$ DECLARE m text;
+BEGIN
+  SELECT mode INTO m FROM public.casa_operation_control WHERE singleton;
+  IF m='paused' THEN
+    RAISE NOTICE 'Casa en pausa: los borradores quedan sin invitaciones (actívalas desde el editor)';
+    RETURN;
+  END IF;
+  IF m='v2' THEN PERFORM set_config('app.casa_contract','2',true); END IF;
+  UPDATE public.casa_pollas p SET referral_every=5
+    WHERE p.status='borrador' AND p.archived_at IS NULL AND p.referral_every IS NULL
+      AND p.kind<>'rifa' AND p.entry_price_cop>0
+      AND NOT EXISTS(SELECT 1 FROM public.casa_entries e WHERE e.polla_id=p.id);
+  PERFORM set_config('app.casa_contract','',true);
+END $$;
+
+-- ── 11. Permisos ────────────────────────────────────────────────────────────
 -- Internas: solo el dueño (las ejecutan triggers y funciones SECURITY DEFINER).
 REVOKE ALL ON FUNCTION public.casa_referral_every(public.casa_pollas),
   public.casa_referral_normalize_code(text),
   public.casa_referral_sync_event(),
   public.casa_referral_is_new_user(uuid),
+  public.casa_referral_can_refer(uuid),
+  public.casa_referral_lock_unsettled(uuid),
   public.casa_referral_log(text,uuid,uuid,uuid,uuid,uuid,jsonb),
   public.casa_referral_person(uuid),
   public.casa_referral_sync(uuid,uuid),
@@ -747,7 +845,8 @@ GRANT EXECUTE ON FUNCTION public.casa_v2_write_guard(),
 
 -- Verificación (solo lectura) después de aplicar:
 --   SELECT count(*) FROM public.casa_entries WHERE origin<>'compra';                  -- 0
---   SELECT count(*) FROM public.casa_pollas WHERE referral_every IS NOT NULL;         -- 0
+--   SELECT count(*) FROM public.casa_pollas WHERE referral_every IS NOT NULL
+--     AND status<>'borrador';                                                        -- 0
 --   SELECT proname, proacl FROM pg_proc WHERE proname LIKE 'casa_referral%'
 --     OR proname IN ('casa_set_referrer_v1','casa_set_referral_every_v1');           -- sin anon/authenticated
 --   SELECT relname, relacl FROM pg_class WHERE relname LIKE 'casa_referral%';          -- service_role solo r

@@ -21,14 +21,19 @@ BEGIN
   RAISE EXCEPTION 'Expected failure %, but operation succeeded',expected;
 END $$;
 
--- Cuenta local. p_old = creada antes de que empezara el programa.
+-- Cuenta local con su cuenta de acceso, como en producción (la regla de persona
+-- nueva mira auth.users). p_old = creada antes de que empezara el programa.
 CREATE FUNCTION pg_temp.ref_user(p_name text, p_old boolean DEFAULT false) RETURNS uuid LANGUAGE plpgsql AS $$
-DECLARE v uuid:=gen_random_uuid();
+DECLARE v uuid:=gen_random_uuid(); t timestamptz; phone text:='1777'||lpad(floor(random()*1e10)::bigint::text,10,'0');
 BEGIN
-  INSERT INTO public.users(id,whatsapp_number,display_name,avatar_url,created_at)
-    VALUES(v,'+1777'||substr(replace(v::text,'-',''),1,10),p_name,'millos',
-      CASE WHEN p_old THEN (SELECT accounts_since FROM public.casa_referral_settings)-interval '1 day'
-        ELSE clock_timestamp() END);
+  t:=CASE WHEN p_old THEN (SELECT accounts_since FROM public.casa_referral_settings)-interval '1 day'
+    ELSE clock_timestamp() END;
+  INSERT INTO auth.users(id,phone,created_at,updated_at) VALUES(v,phone,t,t);
+  -- on_auth_user_created ya creó la fila pública.
+  UPDATE public.users SET display_name=p_name,avatar_url='millos',created_at=t WHERE id=v;
+  IF NOT FOUND THEN
+    INSERT INTO public.users(id,whatsapp_number,display_name,avatar_url,created_at) VALUES(v,phone,p_name,'millos',t);
+  END IF;
   RETURN v;
 END $$;
 
@@ -78,7 +83,7 @@ DO $$
 DECLARE admin_id uuid; juan uuid; ana uuid; old_user uuid; sin_perfil uuid; spam uuid;
   inv uuid[]:='{}'; i integer; p uuid; q uuid; r2 uuid; off_p uuid; rifa_p uuid; free_p uuid;
   code_juan text; code_ana text; res jsonb; view jsonb; gift uuid; e5 uuid; juan_e uuid; x uuid; y uuid; mid uuid;
-  settle jsonb;
+  settle jsonb; s uuid; sv uuid[]:='{}'; g1 uuid; g2 uuid; t1 uuid; t2 uuid; u uuid; code_x text;
 BEGIN
   admin_id:=pg_temp.ref_user('Admin ref local');
   UPDATE public.users SET is_admin=true WHERE id=admin_id;
@@ -213,7 +218,8 @@ BEGIN
   PERFORM pg_temp.ref_review(e5,admin_id);
   ASSERT (SELECT status FROM public.casa_entries WHERE id=gift)='anulada', 'the gift waits: the person is at the cap';
   view:=public.casa_referral_polla_view_v1(juan,p);
-  ASSERT (view->>'earned')::integer=1 AND (view->>'active_gifts')::integer=0 AND (view->>'slots_left')::integer=0, view::text;
+  ASSERT (view->>'earned')::integer=1 AND (view->>'active_gifts')::integer=0 AND (view->>'slots_left')::integer=0
+    AND (view->>'gifts')::integer=1 AND (view->>'waiting_gifts')::integer=1, view::text;
   PERFORM public.casa_set_max_entries_v2(p,3,admin_id,2);
   ASSERT (SELECT status FROM public.casa_entries WHERE id=gift)='pagada', 'raising the cap releases the gift';
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_begin_entry_proof_v3(%L,%L,%L,NULL,NULL,%L,''image/png'',100,2)',
@@ -281,6 +287,8 @@ BEGIN
   PERFORM pg_temp.ref_pay(free_p,y,admin_id,'4');
   ASSERT (SELECT locked_at IS NULL FROM public.casa_referrals WHERE referred_user_id=y), 'a free entry is not a payment';
   ASSERT (public.casa_set_referrer_v1(y,code_ana,'codigo')->>'changed')::boolean;
+  PERFORM pg_temp.ref_unpay((SELECT id FROM public.casa_entries WHERE polla_id=free_p AND user_id=y),admin_id);
+  ASSERT public.casa_referral_is_new_user(y), 'correcting a free entry keeps the person new';
   RAISE NOTICE 'PASS first eligible pool anchors; raffles, free pools and pools without the program never grant';
 
   -- 10) Un pago aprobado (aunque luego se desmarque) quita la condición de persona nueva.
@@ -334,6 +342,9 @@ BEGIN
   ASSERT NOT has_function_privilege('anon','public.casa_referral_polla_view_v1(uuid,uuid)','EXECUTE');
   ASSERT has_function_privilege('service_role','public.casa_set_referrer_v1(uuid,text,text)','EXECUTE');
   ASSERT NOT has_function_privilege('service_role','public.casa_referral_sync(uuid,uuid)','EXECUTE');
+  ASSERT NOT has_function_privilege('service_role','public.casa_referral_can_refer(uuid)','EXECUTE');
+  ASSERT NOT has_function_privilege('service_role','public.casa_referral_lock_unsettled(uuid)','EXECUTE');
+  ASSERT NOT has_function_privilege('authenticated','public.casa_referral_is_new_user(uuid)','EXECUTE');
   ASSERT NOT has_function_privilege('service_role','public.casa_referral_log(text,uuid,uuid,uuid,uuid,uuid,jsonb)','EXECUTE');
   ASSERT has_table_privilege('service_role','public.casa_referrals','SELECT');
   ASSERT NOT has_table_privilege('service_role','public.casa_referrals','INSERT');
@@ -341,5 +352,115 @@ BEGIN
   ASSERT NOT has_table_privilege('service_role','public.casa_referral_gift_removals','UPDATE');
   ASSERT NOT has_table_privilege('authenticated','public.casa_referral_codes','SELECT');
   RAISE NOTICE 'PASS server-only permissions';
+
+  -- 15) Los regalos van en fila por número: remover descuenta justo ese regalo.
+  s:=pg_temp.ref_polla(admin_id,'Fila ref');
+  PERFORM pg_temp.ref_pay(s,ana,admin_id,'b');
+  FOR i IN 1..10 LOOP
+    x:=pg_temp.ref_user('Fila '||i);
+    ASSERT (public.casa_set_referrer_v1(x,code_ana,'enlace')->>'ok')::boolean;
+    sv:=sv||pg_temp.ref_pay(s,x,admin_id,'c');
+  END LOOP;
+  SELECT id INTO g1 FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion' AND entry_number=2;
+  SELECT id INTO g2 FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion' AND entry_number=3;
+  ASSERT g1 IS NOT NULL AND g2 IS NOT NULL, 'ten invitees, two gifts';
+  -- a) Remover el #3 y después desmarcar a un invitado: el #2 sigue activo.
+  PERFORM public.casa_referral_remove_gift_v1(g2,'Pago mal aprobado',admin_id,2);
+  PERFORM pg_temp.ref_unpay(sv[1],admin_id);
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada', 'removing #3 then losing an invitee keeps #2';
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g2)='anulada';
+  ASSERT (SELECT counted_polla_id IS NULL AND locked_at IS NOT NULL FROM public.casa_referrals
+    WHERE referred_user_id=(SELECT user_id FROM public.casa_entries WHERE id=sv[1])), 'the unpaid invitee is released';
+  -- b) Restaurar con un solo regalo ganado lo deja en pausa; vuelve con el pago.
+  res:=public.casa_referral_restore_gift_v1(g2,admin_id,2);
+  ASSERT (res->>'changed')::boolean AND NOT (res->>'active')::boolean, res::text;
+  PERFORM pg_temp.ref_review(sv[1],admin_id);
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g2)='pagada', 'the restored gift returns once earned';
+  -- c) Remover el activo mientras otro está en pausa: nadie ocupa su lugar.
+  PERFORM pg_temp.ref_unpay(sv[1],admin_id);
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada' AND (SELECT status FROM public.casa_entries WHERE id=g2)='anulada',
+    'losing an invitee pauses the last gift';
+  PERFORM public.casa_referral_remove_gift_v1(g1,'Varias cuentas',admin_id,2);
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion' AND status='pagada'),
+    'a paused gift never takes the place of a removed one';
+  view:=public.casa_referral_polla_view_v1(ana,s);
+  ASSERT (view->>'earned')::integer=1 AND (view->>'gifts')::integer=0 AND (view->>'waiting_gifts')::integer=0, view::text;
+  -- d) Remover uno en pausa no toca a los demás.
+  PERFORM public.casa_referral_remove_gift_v1(g2,'Otra razón',admin_id,2);
+  PERFORM public.casa_referral_restore_gift_v1(g1,admin_id,2);
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada' AND (SELECT status FROM public.casa_entries WHERE id=g2)='anulada';
+  -- e) Con el conteo completo, el removido sigue descontando; cinco más crean otro.
+  PERFORM pg_temp.ref_review(sv[1],admin_id);
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion')=2
+    AND (SELECT status FROM public.casa_entries WHERE id=g2)='anulada', 'a removed gift is not replaced';
+  FOR i IN 11..15 LOOP
+    x:=pg_temp.ref_user('Fila '||i);
+    ASSERT (public.casa_set_referrer_v1(x,code_ana,'enlace')->>'ok')::boolean;
+    PERFORM pg_temp.ref_pay(s,x,admin_id,'d');
+  END LOOP;
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion' AND status='pagada')=2
+    AND EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion'
+      AND entry_number=4 AND status='pagada'), 'fifteen invitees with one removal: two active gifts';
+  view:=public.casa_referral_polla_view_v1(ana,s);
+  ASSERT (view->>'earned')::integer=3 AND (view->>'gifts')::integer=2 AND (view->>'waiting_gifts')::integer=0
+    AND (view->>'removed_gifts')::integer=1, view::text;
+  ASSERT (SELECT bool_and(jsonb_array_length(g->'nombres')=(g->>'invitados')::integer)
+    FROM jsonb_array_elements(public.casa_referral_gifts_admin_v1(s,admin_id)) g), 'the names match the count';
+  -- f) Después del reparto no se remueve ni se restaura.
+  PERFORM public.casa_change_status_v2(s,'cerrar',2,admin_id,NULL);
+  UPDATE public.casa_pollas SET settled_at=clock_timestamp() WHERE id=s;
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_restore_gift_v1(%L,%L,2)',g2,admin_id),'ALREADY_SETTLED');
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_remove_gift_v1(%L,''x'',%L,2)',g1,admin_id),'ALREADY_SETTLED');
+  UPDATE public.casa_pollas SET settled_at=NULL WHERE id=s;
+  RAISE NOTICE 'PASS removing a gift discounts exactly that gift';
+
+  -- 16) Persona nueva según su cuenta de acceso: reescribir public.users.created_at no sirve.
+  x:=pg_temp.ref_user('Cuenta vieja 2',true);
+  UPDATE public.users SET created_at=clock_timestamp() WHERE id=x;
+  res:=public.casa_set_referrer_v1(x,code_juan,'codigo');
+  ASSERT res->>'error'='NOT_NEW_USER', res::text;
+  y:=gen_random_uuid();
+  INSERT INTO public.users(id,whatsapp_number,display_name,avatar_url)
+    VALUES(y,'1666'||lpad(floor(random()*1e10)::bigint::text,10,'0'),'Sin cuenta de acceso','millos');
+  ASSERT NOT public.casa_referral_is_new_user(y), 'without an auth account nobody is new';
+  RAISE NOTICE 'PASS new people are decided by the auth account';
+
+  -- 17) Administradores: sin código; uno de antes deja de invitar y de sumar regalos.
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_code_v1(%L)',admin_id),'REFERRAL_NOT_AVAILABLE');
+  ASSERT public.casa_referral_profile_v1(admin_id)->'code'='null'::jsonb;
+  ASSERT public.casa_referral_polla_view_v1(admin_id,q)->'code'='null'::jsonb;
+  x:=pg_temp.ref_user('Futura admin');
+  code_x:=public.casa_referral_code_v1(x);
+  UPDATE public.users SET is_admin=true WHERE id=x;
+  y:=pg_temp.ref_user('Invitada de admin');
+  ASSERT public.casa_referral_invitee_v1(y,code_x)->'hint'='null'::jsonb;
+  res:=public.casa_set_referrer_v1(y,code_x,'enlace');
+  ASSERT res->>'error'='REFERRAL_CODE_NOT_FOUND', res::text;
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=r2 AND user_id=ana AND origin='invitacion' AND status='pagada')=2;
+  UPDATE public.users SET is_admin=true WHERE id=ana;
+  PERFORM public.casa_set_max_entries_v2(r2,9,admin_id,2);
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=r2 AND user_id=ana AND origin='invitacion' AND status='pagada'),
+    'an admin keeps no gifts';
+  UPDATE public.users SET is_admin=false WHERE id=ana;
+  RAISE NOTICE 'PASS admins neither invite nor collect gifts';
+
+  -- 18) Si se desmarca el pago que ancla a un invitado, cuenta con su otro cupo pagado
+  --     ahí o, si no le queda ninguno, en la próxima polla donde pague.
+  t1:=pg_temp.ref_polla(admin_id,'Ancla 1 ref');
+  t2:=pg_temp.ref_polla(admin_id,'Ancla 2 ref');
+  u:=pg_temp.ref_user('Gabriela');
+  ASSERT (public.casa_set_referrer_v1(u,code_juan,'enlace')->>'ok')::boolean;
+  x:=pg_temp.ref_pay(t1,u,admin_id,'e');
+  y:=pg_temp.ref_pay(t1,u,admin_id,'f');
+  ASSERT (SELECT counted_polla_id=t1 AND counted_entry_id=x FROM public.casa_referrals WHERE referred_user_id=u);
+  PERFORM pg_temp.ref_unpay(x,admin_id);
+  ASSERT (SELECT counted_polla_id=t1 AND counted_entry_id=y FROM public.casa_referrals WHERE referred_user_id=u),
+    'the anchor moves to the other paid cupo';
+  PERFORM pg_temp.ref_unpay(y,admin_id);
+  ASSERT (SELECT counted_polla_id IS NULL AND counted_entry_id IS NULL AND locked_at IS NOT NULL
+    FROM public.casa_referrals WHERE referred_user_id=u), 'released, the referrer stays fixed';
+  PERFORM pg_temp.ref_pay(t2,u,admin_id,'0');
+  ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=t2, 'counts in the next paid pool';
+  RAISE NOTICE 'PASS a reversed anchor moves or is released';
 END $$;
 ROLLBACK;

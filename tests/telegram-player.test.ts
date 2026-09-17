@@ -31,7 +31,7 @@ import { ensureWebhookUpdates, resetWebhookUpdatesStateForTests } from "@/lib/au
 import { notifyPlayerReviewByTelegram, reviewNoticeMessage } from "@/lib/telegram-player/notify";
 import { saveCasaPicks } from "@/lib/casa/picks-save";
 import { handleTelegramUpdate, isDoubleTap } from "@/lib/telegram-player/handler";
-import { pollaDetailScreen } from "@/lib/telegram-player/pollas";
+import { paymentLine, pollaDetailScreen } from "@/lib/telegram-player/pollas";
 import { cannotPickReason } from "@/lib/telegram-player/picks";
 import { generateNonce, sha256Hex } from "@/lib/auth/telegram-login/crypto";
 
@@ -533,5 +533,22 @@ describe("double tap guard", () => {
     expect(bot.send).toHaveBeenCalledWith("answerCallbackQuery", { callback_query_id: "cb-1", text: "La pantalla acaba de cambiar. Revisa las opciones y toca otra vez." });
     expect(db.rpc).not.toHaveBeenCalled();
     expect(db.writes).toHaveLength(0);
+  });
+});
+
+describe("Mis pagos: cupos de regalo por invitar (migración 135)", () => {
+  const compra = { status: "pagada", proof_path: "x", reject_reason: null, origin: "compra" as const };
+
+  it("un regalo activo no es un pago y uno en pausa no aparece", () => {
+    expect(paymentLine({ ...compra, origin: "invitacion", proof_path: null })).toEqual({ state: "🎁 regalo por invitar", actionable: false });
+    expect(paymentLine({ ...compra, origin: "invitacion", proof_path: null, status: "anulada" })).toBeNull();
+  });
+
+  it("los cupos comprados conservan sus estados", () => {
+    expect(paymentLine(compra)).toEqual({ state: "✅ confirmado", actionable: false });
+    expect(paymentLine({ ...compra, status: "pendiente" })).toEqual({ state: "⏳ en revisión", actionable: false });
+    expect(paymentLine({ ...compra, status: "rechazada", reject_reason: "<b>" })).toEqual({ state: "❌ rechazado: &lt;b&gt;", actionable: true });
+    expect(paymentLine({ ...compra, status: "anulada", proof_path: null })).toEqual({ state: "⚠️ falta el comprobante", actionable: true });
+    expect(paymentLine({ ...compra, origin: null, status: "anulada", proof_path: null })?.actionable).toBe(true);
   });
 });

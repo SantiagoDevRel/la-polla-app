@@ -78,8 +78,8 @@ export function RegalosPolla({ pollaId, every, editable, refreshKey = 0 }: {
         <Gift aria-hidden="true" className="h-5 w-5 shrink-0 text-turf" />
         Cupos de regalo por invitar
       </h3>
-      <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">
-        Se crean solos: un cupo por cada {every} invitados nuevos con pago aprobado en esta polla. No suman dinero al pozo. Puedes remover uno si algo no cuadra.
+      <p className="mt-1 text-[13px] text-text-secondary">
+        Se crean solos: 1 cupo por cada {every} invitados nuevos con pago aprobado. No suman al pozo.
       </p>
 
       {error && <p role="alert" className="mt-3 rounded-md border border-red-alert/30 p-3 text-[13px] text-red-alert">{error}</p>}
@@ -111,9 +111,7 @@ export function RegalosPolla({ pollaId, every, editable, refreshKey = 0 }: {
                   <p className="mt-1 text-[13px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]">Motivo: {regalo.removed_reason}</p>
                 )}
                 {!removido && regalo.status !== "pagada" && (
-                  <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">
-                    En pausa: se corrigió un pago de sus invitados o llegó al máximo de cupos. Vuelve solo cuando se cumpla otra vez.
-                  </p>
+                  <p className="mt-1 text-[13px] text-text-secondary">En pausa: se corrigió un pago o llegó al máximo de cupos.</p>
                 )}
                 {editable && (removido ? (
                   <button type="button" disabled={enviando} onClick={() => enviar({ accion: "restaurar", entryId: regalo.entry_id })}

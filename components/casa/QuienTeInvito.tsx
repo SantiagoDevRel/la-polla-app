@@ -6,13 +6,14 @@
 // sin el enlace, igual puede escribir el código de quien lo invitó. Si llegó por
 // un enlace, ve quién es; se guarda al enviar su comprobante y «No es así» lo
 // descarta. Se puede corregir hasta que se apruebe su primer pago: SQL lo vuelve
-// a exigir (persona nueva, un solo invitador, tope de intentos).
+// a exigir (persona nueva, un solo invitador, tope de intentos). Textos mínimos.
 
 import { useState, type FormEvent } from "react";
 import { Check, UserPlus } from "lucide-react";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { casaPost } from "@/lib/casa/upload-client";
 import { REFERRAL_DISMISS_COOKIE, normalizeReferralCode } from "@/lib/casa/referrals-shared";
+import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import type { ReferralInviteeState, ReferralPerson } from "@/lib/casa/types";
 
 type Variant = "pagar" | "casa" | "perfil";
@@ -34,9 +35,11 @@ export function QuienTeInvito({ initial, variant }: { initial: ReferralInviteeSt
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const isIOSApp = useIsIOSApp();
 
   const { can_set_referrer: canSet, referrer, hint } = state;
-  if (!canSet && !(variant === "perfil" && referrer)) return null;
+  // En la app de iOS las invitaciones no se muestran (igual que en Perfil).
+  if (isIOSApp || (!canSet && !(variant === "perfil" && referrer))) return null;
 
   async function vincular(value: string) {
     const normalized = normalizeReferralCode(value);
@@ -87,30 +90,8 @@ export function QuienTeInvito({ initial, variant }: { initial: ReferralInviteeSt
   // En Casa, quien dijo que nadie lo invitó y no llegó por un enlace no vuelve a verlo.
   if (variant === "casa" && dismissed && !hint && !referrer) return null;
 
-  const form = (
-    <form onSubmit={submit} className="mt-3 space-y-2">
-      <label htmlFor={`codigo-invitacion-${variant}`} className="block text-[13px] text-text-secondary">
-        Código de la persona que te invitó
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <input
-          id={`codigo-invitacion-${variant}`}
-          value={code}
-          onChange={(event) => { setCode(event.target.value.toUpperCase()); setError(null); }}
-          autoCapitalize="characters"
-          autoComplete="off"
-          spellCheck={false}
-          maxLength={14}
-          placeholder="Ej. JUAN4821"
-          className="lp-input min-h-11 min-w-0 flex-[1_1_10rem] text-[15px] uppercase tracking-[0.06em]"
-        />
-        {/* Botones secundarios: el principal de la pantalla es entrar o pagar (un solo dorado). */}
-        <button type="submit" disabled={sending || !code.trim()} className="lp-btn lp-btn-ghost min-h-11 flex-[1_0_auto] !px-4 text-[15px]">
-          {sending ? "Guardando…" : "Guardar"}
-        </button>
-      </div>
-    </form>
-  );
+  // Botones secundarios: el principal de la pantalla es entrar o pagar (un solo dorado).
+  const secondary = "lp-btn lp-btn-ghost min-h-11 flex-[1_0_auto] !px-4 text-[15px]";
 
   return (
     <section aria-labelledby={`quien-invito-${variant}`} className="lp-card p-4">
@@ -124,35 +105,24 @@ export function QuienTeInvito({ initial, variant }: { initial: ReferralInviteeSt
           {referrer && (
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
               <Persona person={referrer} />
-              {!editing && (
-                <button type="button" onClick={() => { setEditing(true); setSaved(false); }} className="min-h-11 cursor-pointer rounded-full px-3 text-[13px] font-semibold text-text-secondary underline underline-offset-4 transition-colors hover:text-text-primary">
+              {saved && <span role="status" className="flex items-center gap-1 text-[13px] font-semibold text-turf"><Check aria-hidden="true" className="h-4 w-4" /> Guardado</span>}
+              {!editing && !saved && (
+                <button type="button" onClick={() => setEditing(true)} className="min-h-11 cursor-pointer rounded-full px-3 text-[13px] font-semibold text-text-secondary underline underline-offset-4 transition-colors hover:text-text-primary">
                   Cambiar
                 </button>
               )}
             </div>
           )}
-          {saved && referrer && (
-            <p role="status" className="mt-2 flex items-center gap-1.5 text-[13px] text-turf">
-              <Check aria-hidden="true" className="h-4 w-4 shrink-0" /> Guardado. Puedes cambiarlo hasta que confirmemos tu primer pago.
-            </p>
-          )}
 
           {hint && (
-            <div className="mt-2 space-y-2">
-              {referrer && <p className="text-[13px] text-text-secondary">Abriste el enlace de otra persona:</p>}
+            <div className="mt-2 space-y-3">
               <Persona person={hint} />
-              <p className="text-[13px] leading-relaxed text-text-secondary">
-                {referrer
-                  ? "Si esa persona fue quien te invitó, cámbialo aquí."
-                  : variant === "pagar"
-                    ? "Lo guardamos cuando envíes tu comprobante. Así esa persona suma para su cupo de regalo."
-                    : "Así esa persona suma para su cupo de regalo."}
-              </p>
+              {variant === "pagar" && !referrer && <p className="text-[13px] text-text-secondary">Se guarda al enviar tu comprobante.</p>}
               <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={sending} onClick={() => hint.code && vincular(hint.code)} className="lp-btn lp-btn-ghost min-h-11 flex-[1_0_auto] !px-4 text-[15px]">
+                <button type="button" disabled={sending} onClick={() => hint.code && vincular(hint.code)} className={secondary}>
                   {referrer ? `Cambiar a ${hint.name ?? "esta persona"}` : "Sí, me invitó"}
                 </button>
-                <button type="button" disabled={sending} onClick={descartarEnlace} className="lp-btn lp-btn-ghost min-h-11 flex-[1_0_auto] !px-4 text-[15px]">
+                <button type="button" disabled={sending} onClick={descartarEnlace} className={secondary}>
                   No es así
                 </button>
               </div>
@@ -161,11 +131,9 @@ export function QuienTeInvito({ initial, variant }: { initial: ReferralInviteeSt
 
           {!referrer && !hint && !editing && (
             <>
-              <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">
-                Si una persona te recomendó La Polla, escribe su código. Es opcional y le ayuda a ganar un cupo de regalo.
-              </p>
+              <p className="mt-1 text-[13px] text-text-secondary">Escribe su código (opcional).</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => setEditing(true)} className="lp-btn lp-btn-ghost min-h-11 flex-[1_0_auto] !px-4 text-[15px]">
+                <button type="button" onClick={() => setEditing(true)} className={secondary}>
                   Escribir código
                 </button>
                 {variant === "casa" && (
@@ -177,8 +145,26 @@ export function QuienTeInvito({ initial, variant }: { initial: ReferralInviteeSt
             </>
           )}
 
-          {editing && form}
-          {error && <p role="alert" className="mt-2 text-[13px] leading-relaxed text-red-alert">{error}</p>}
+          {editing && (
+            <form onSubmit={submit} className="mt-3 flex flex-wrap gap-2">
+              <label htmlFor={`codigo-invitacion-${variant}`} className="sr-only">Código de la persona que te invitó</label>
+              <input
+                id={`codigo-invitacion-${variant}`}
+                value={code}
+                onChange={(event) => { setCode(event.target.value.toUpperCase()); setError(null); }}
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                maxLength={14}
+                placeholder="Código, ej. JUAN4821"
+                className="lp-input min-h-11 min-w-0 flex-[1_1_10rem] text-[15px] uppercase tracking-[0.06em]"
+              />
+              <button type="submit" disabled={sending || !code.trim()} className={secondary}>
+                {sending ? "Guardando…" : "Guardar"}
+              </button>
+            </form>
+          )}
+          {error && <p role="alert" className="mt-2 text-[13px] text-red-alert">{error}</p>}
         </div>
       </div>
     </section>

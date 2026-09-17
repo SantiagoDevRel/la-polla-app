@@ -1137,27 +1137,37 @@ recibe un cupo gratis en la misma polla. Nadie en la administración tiene que
 hacer nada.
 
 - **Invitar.** Compartir agrega `?ref=CODIGO` al enlace y el mensaje dice el
-  código. Junto a Compartir, «Invita y gana» muestra el avance (`Llevas 3 de 5`),
-  el código para copiar y las condiciones; en Perfil está el código con un enlace
-  general.
+  código. Junto a Compartir, «Invita y gana» muestra la regla en una frase, el
+  avance (`Llevas 3 de 5`), el código para copiar y una sola letra menuda
+  («*Solo aplica para usuarios nuevos, 1 polla por usuario.»); en Perfil está el
+  código con un enlace general.
+- **Aviso al entrar.** Mientras haya una OFIGOLAZO abierta con invitaciones, /casa
+  y esa polla muestran una vez «Por 5 invitados, te damos un cupo en la OFIGOLAZO»
+  con el código para copiar y Compartir (`components/casa/PromoInvitados.tsx`;
+  la polla se elige por `REFERRAL_PROMO_POLLA`). No sale a administradores, a
+  quien no tiene cupos libres ni en la app de iOS.
 - **Llegar invitado.** El enlace deja el código en una cookie y la URL queda
   limpia. La polla y /pagar preguntan «¿Te invitó esta persona?»; se guarda al
   completar el perfil o al enviar el comprobante, y «No es así» lo descarta. Quien
   entra directo escribe el código en «¿Alguien te invitó?» (/casa, /pagar,
   Perfil). Se puede corregir hasta que se apruebe el primer pago.
-- **Quién cuenta.** Solo cuentas creadas desde la migración 135 que nunca han
-  pagado; una persona tiene un solo invitador y cuenta una sola vez, en su primera
-  polla con invitaciones. El conteo es por polla.
+- **Quién cuenta.** Solo cuentas de acceso creadas desde la migración 135 que
+  nunca han pagado; una persona tiene un solo invitador y cuenta una sola vez, en
+  su primera polla con invitaciones (si ese pago se desmarca, cuenta en la
+  siguiente). El conteo es por polla. Los administradores no invitan ni ganan
+  regalos.
 - **El cupo de regalo.** Aparece solo cuando quien invita tiene su propio cupo
   pagado en esa polla (antes o después). Vale $0: no suma al pozo, compite como
   cualquier cupo y cuenta en el máximo por persona. Si se desmarca el pago de un
-  invitado, se pausa (con sus pronósticos) y vuelve al aprobarlo. El panel de
-  cada polla lista los regalos con «Remover cupo» (con motivo) y «Restaurar»; la
-  cola de pagos muestra «Invitado por».
-- **Alcance.** Pollas de partidos o preguntas con entrada, creadas desde la 135;
-  las rifas nunca. El editor apaga o prende el programa mientras nadie se inscriba.
+  invitado, el último regalo se pausa (con sus pronósticos) y vuelve al aprobarlo.
+  El panel de cada polla lista los regalos con «Remover cupo» (con motivo: descuenta
+  justo ese regalo) y «Restaurar», hasta el reparto; la cola de pagos muestra
+  «Invitado por». En Telegram, «Mis pagos» marca el regalo y no pide comprobante.
+- **Alcance.** Pollas de partidos o preguntas con entrada, creadas desde la 135,
+  más los borradores que nunca se publicaron; las rifas nunca. El editor apaga o
+  prende el programa mientras nadie se inscriba.
 - **Pruebas.** `scripts/casa-referrals-check.sql` (Supabase local, ROLLBACK),
-  `npm test -- tests/casa-referrals.test.ts` y
+  `npm test -- tests/casa-referrals.test.ts tests/telegram-player.test.ts` y
   `CASA_ORIGIN=http://localhost:3137 node scripts/casa-referrals-browser-check.mjs`
   con `node scripts/casa-v2-local-env.mjs dev 3137`.
 

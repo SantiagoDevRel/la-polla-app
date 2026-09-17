@@ -7,16 +7,19 @@ import { proxy } from "@/proxy";
 import { updateSession } from "@/lib/supabase/middleware";
 import {
   REFERRAL_COOKIE,
+  REFERRAL_FINE_PRINT,
   isGiftEntry,
+  isPromoPolla,
   normalizeReferralCode,
   referralErrorMessage,
   referralEvery,
   referralLink,
   referralMissing,
+  referralPromo,
   referralRule,
   validReferralCode,
 } from "@/lib/casa/referrals-shared";
-import { textoCompartir } from "@/lib/casa/share-text";
+import { premioCompartir, textoCompartir } from "@/lib/casa/share-text";
 import { buildEditChanges, editableFieldsFromPolla, type EditableFields } from "@/lib/casa/editor";
 import { referralGiftMessage } from "@/lib/telegram-player/notify";
 import { participationState } from "@/components/casa/Participaciones";
@@ -56,9 +59,10 @@ describe("reglas de la polla", () => {
     expect(referralEvery({ kind: "partidos", entry_price_cop: 20000 })).toBeNull();
   });
 
-  it("la regla usa el número de la polla y cuenta lo que falta", () => {
-    expect(referralRule(5)).toBe("Por cada 5 personas nuevas que invites y paguen esta polla, te regalamos un cupo.");
-    expect(referralRule(1)).toMatch(/Por cada persona nueva/);
+  it("la regla es una frase con el número de la polla y una sola letra menuda", () => {
+    expect(referralRule(5)).toBe("Por cada 5 invitados, te damos un cupo en esta polla.");
+    expect(referralRule(1)).toBe("Por cada invitado, te damos un cupo en esta polla.");
+    expect(REFERRAL_FINE_PRINT).toBe("*Solo aplica para usuarios nuevos, 1 polla por usuario.");
     expect(referralMissing(0, 5)).toBe(5);
     expect(referralMissing(3, 5)).toBe(2);
     expect(referralMissing(5, 5)).toBe(5);
@@ -87,6 +91,39 @@ describe("compartir con código", () => {
     expect(textoCompartir({ nombre: "X", entradaCop: 20000, premio: null, codigo: "ANA0001", english: true }))
       .toMatch(/\nUse my code ANA0001 when you join\.$/);
     expect(textoCompartir({ nombre: "X", entradaCop: 20000, premio: null })).not.toMatch(/código/);
+  });
+
+  it("solo anuncia el premio que ya se conoce", () => {
+    expect(premioCompartir({ prize_kind: "pozo", pot_mode: "fijo" }, 500000)).toEqual({ cop: 500000 });
+    expect(premioCompartir({ prize_kind: "pozo", pot_mode: "proporcional" }, 500000)).toBeNull();
+    expect(premioCompartir({ prize_kind: "objeto", prize_object: "Camiseta" }, 0)).toEqual({ objeto: "Camiseta" });
+    expect(premioCompartir({ prize_kind: "objeto", prize_object: null }, 0)).toBeNull();
+  });
+});
+
+describe("aviso de invitaciones al entrar", () => {
+  const polla = {
+    id: "p1", slug: "ofigolazo-1", name: "OFIGOLAZO", kind: "partidos" as const, entry_price_cop: 20000,
+    prize_kind: "pozo" as const, prize_object: null, pot_mode: "fijo" as const, referral_every: 5,
+  };
+  const view = { code: "JUANPE4821", every: 5, slots_left: 9 };
+
+  it("sale en la OFIGOLAZO con invitaciones, con el código de la persona", () => {
+    expect(isPromoPolla(polla)).toBe(true);
+    expect(isPromoPolla({ ...polla, name: "  ofigolazo fecha 12" })).toBe(true);
+    expect(referralPromo(polla, view, 1000000)).toEqual({
+      pollaId: "p1", slug: "ofigolazo-1", name: "OFIGOLAZO", every: 5, code: "JUANPE4821",
+      entryPriceCop: 20000, premio: { cop: 1000000 },
+    });
+  });
+
+  it("no sale en otras pollas, sin programa, sin código o sin cupos libres", () => {
+    expect(isPromoPolla({ ...polla, name: "POLLAGOL" })).toBe(false);
+    expect(isPromoPolla({ ...polla, referral_every: null })).toBe(false);
+    expect(isPromoPolla({ ...polla, kind: "rifa" })).toBe(false);
+    expect(referralPromo(polla, { ...view, code: null }, 0)).toBeNull();
+    expect(referralPromo(polla, { ...view, slots_left: 0 }, 0)).toBeNull();
+    expect(referralPromo(polla, null, 0)).toBeNull();
   });
 });
 
@@ -155,7 +192,8 @@ describe("aviso de cupo de regalo por Telegram", () => {
     const message = referralGiftMessage({ userId: "u", pollaName: "OFI <b>", pollaSlug: "ofi golazo", entryNumber: 3, invited: 5 });
     expect(message.text).toContain("OFI &lt;b&gt;");
     expect(message.text).toContain("5 personas que invitaste ya pagaron esta polla.");
-    expect(message.text).toContain("Tu cupo 3 ya está activo");
+    expect(message.text).toContain("Tu cupo 3 ya está activo y compite por el premio.");
+    expect(message.text).not.toContain("partido");
     expect(message.buttons[0][0]).toEqual({ text: "👉 Pronosticar con el cupo 3", url: "https://lapollacolombiana.com/casa/ofi%20golazo?p=3" });
   });
 });

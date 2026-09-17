@@ -265,8 +265,8 @@ export function EditarPollaForm({ state }: { state: PollaEditorState }) {
               />
               <span className="min-w-0">
                 <span className="block text-[15px] font-semibold text-text-primary">Cupo de regalo por invitar</span>
-                <span id="editar-invitaciones-ayuda" className="mt-1 block text-[13px] leading-relaxed text-text-secondary">
-                  Por cada {polla.referral_every ?? DEFAULT_REFERRAL_EVERY} personas nuevas que alguien invite y paguen esta polla, esa persona recibe un cupo gratis, sin que tengas que hacer nada. No suma dinero al pozo.{draft.entryPriceCop <= 0 ? " Con entrada gratis no aplica." : ""}
+                <span id="editar-invitaciones-ayuda" className="mt-1 block text-[13px] text-text-secondary">
+                  1 cupo gratis por cada {polla.referral_every ?? DEFAULT_REFERRAL_EVERY} invitados nuevos que paguen. Automático y sin sumar al pozo.{draft.entryPriceCop <= 0 ? " No aplica con entrada gratis." : ""}
                 </span>
               </span>
             </label>

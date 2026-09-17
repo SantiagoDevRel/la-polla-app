@@ -5,7 +5,8 @@
 // casa_referral_sync cuántos cupos de regalo hay. Aquí no se decide nada que
 // cambie cupos ni dinero.
 
-import type { CasaEntry, CasaPolla } from "./types";
+import type { CasaEntry, CasaPolla, ReferralPollaView } from "./types";
+import { premioCompartir, type PremioCompartir } from "./share-text";
 
 /** Cookie con el código del primer enlace de invitación que abrió la persona. */
 export const REFERRAL_COOKIE = "lp_ref";
@@ -64,8 +65,55 @@ export function referralLink(origin: string, slug: string | null, code: string |
 /** La regla en una frase, con el número de la polla (nunca un 5 escrito a mano). */
 export function referralRule(every: number): string {
   return every === 1
-    ? "Por cada persona nueva que invites y pague esta polla, te regalamos un cupo."
-    : `Por cada ${every} personas nuevas que invites y paguen esta polla, te regalamos un cupo.`;
+    ? "Por cada invitado, te damos un cupo en esta polla."
+    : `Por cada ${every} invitados, te damos un cupo en esta polla.`;
+}
+
+/** Letra menuda única (pedido del dueño: nada de listas de condiciones). */
+export const REFERRAL_FINE_PRINT = "*Solo aplica para usuarios nuevos, 1 polla por usuario.";
+
+/**
+ * Aviso al entrar (pedido del dueño, 2026-09-17): «Por 5 invitados, te damos un
+ * cupo en la OFIGOLAZO». Sale para la OFIGOLAZO abierta que cierra primero,
+ * mientras tenga invitaciones. Cambiar de polla es cambiar este nombre.
+ */
+export const REFERRAL_PROMO_POLLA = "OFIGOLAZO";
+
+export interface ReferralPromo {
+  pollaId: string;
+  slug: string;
+  name: string;
+  every: number;
+  code: string;
+  entryPriceCop: number;
+  premio: PremioCompartir;
+}
+
+type PromoPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "entry_price_cop" | "prize_kind" | "prize_object"> & {
+  referral_every?: number | null;
+  pot_mode?: CasaPolla["pot_mode"];
+};
+
+/** ¿Esta polla es la del aviso? La lista ya viene filtrada a pollas abiertas. */
+export function isPromoPolla(polla: PromoPolla): boolean {
+  return polla.name.trim().toUpperCase().startsWith(REFERRAL_PROMO_POLLA) && referralEvery(polla) !== null;
+}
+
+/**
+ * El aviso para esta persona, o null: sin código (administradores), sin
+ * programa o sin cupos libres (el regalo no tendría dónde entrar).
+ */
+export function referralPromo(polla: PromoPolla, view: Pick<ReferralPollaView, "code" | "every" | "slots_left"> | null, prizeCop: number): ReferralPromo | null {
+  if (!isPromoPolla(polla) || !view?.code || !view.every || view.slots_left <= 0) return null;
+  return {
+    pollaId: polla.id,
+    slug: polla.slug,
+    name: polla.name,
+    every: view.every,
+    code: view.code,
+    entryPriceCop: polla.entry_price_cop,
+    premio: premioCompartir(polla, prizeCop),
+  };
 }
 
 /** Cuántos invitados faltan para el próximo cupo de regalo. */

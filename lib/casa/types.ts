@@ -155,6 +155,10 @@ export interface ReferralPollaView {
   /** Invitados con comprobante en revisión aquí (todavía no cuentan). */
   in_review: number;
   earned: number;
+  /** Ganados que valen: sin los que el administrador removió. */
+  gifts: number;
+  /** Ganados que todavía no están activos (falta tu pago o espacio). */
+  waiting_gifts: number;
   active_gifts: number;
   removed_gifts: number;
   owner_paid: boolean;

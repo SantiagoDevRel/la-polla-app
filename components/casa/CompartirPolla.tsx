@@ -25,6 +25,7 @@ export function CompartirPolla({
   premio = null,
   codigo = null,
   ayuda,
+  variant = "ghost",
   className = "w-full",
 }: {
   slug: string;
@@ -36,6 +37,8 @@ export function CompartirPolla({
   codigo?: string | null;
   /** Explicación al pasar el cursor (la regla de invitaciones). */
   ayuda?: string;
+  /** Principal solo donde compartir es la acción de la pantalla (el aviso de invitaciones). */
+  variant?: "ghost" | "primary";
   /** Ancho/flex según dónde va: sola ocupa toda la fila; junto al CTA se reparte. */
   className?: string;
 }) {
@@ -83,7 +86,7 @@ export function CompartirPolla({
       type="button"
       onClick={compartir}
       title={ayuda}
-      className={`lp-btn lp-btn-ghost !px-4 ${className}`}
+      className={`lp-btn ${variant === "primary" ? "lp-btn-primary" : "lp-btn-ghost"} !px-4 ${className}`}
       aria-label={`Compartir ${nombre}${ayuda ? `. ${ayuda}` : ""}`}
     >
       {copiado ? (

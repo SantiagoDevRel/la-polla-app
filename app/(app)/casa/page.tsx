@@ -18,8 +18,15 @@ import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { CheckCircle2, Settings } from "lucide-react";
 import { cookies } from "next/headers";
 import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
-import { getReferralInvitee } from "@/lib/casa/referrals";
-import { REFERRAL_COOKIE, REFERRAL_DISMISS_COOKIE, validReferralCode } from "@/lib/casa/referrals-shared";
+import { PromoInvitados } from "@/components/casa/PromoInvitados";
+import { getReferralInvitee, getReferralPollaView } from "@/lib/casa/referrals";
+import {
+  REFERRAL_COOKIE,
+  REFERRAL_DISMISS_COOKIE,
+  isPromoPolla,
+  referralPromo,
+  validReferralCode,
+} from "@/lib/casa/referrals-shared";
 import {
   listPublicPollas,
   getPots,
@@ -66,14 +73,18 @@ export default async function CasaPage() {
   // listada como "del fin de semana" diciendo "cierra en cerrada".
   const abiertas = pollas.filter((p) => isPollaOpen(p));
   const cerradas = pollas.filter((p) => !isPollaOpen(p));
-  const [pots, pendientes, tournaments, pagos] = await Promise.all([
+  // Aviso de invitaciones (2026-09-17): la OFIGOLAZO abierta que cierra primero.
+  const promoPolla = abiertas.find(isPromoPolla);
+  const [pots, pendientes, tournaments, pagos, promoView] = await Promise.all([
     getPots(pollas.map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
     getPollaTournamentSlugs(pollas),
     // Prueba de pago (migración 133): qué pollas cerradas ya pagaron su premio.
     getPayoutProgress(cerradas.filter((p) => p.status === "resuelta").map((p) => p.id))
       .catch((): Record<string, { total: number; paid: number }> => ({})),
+    promoPolla ? getReferralPollaView(user.id, promoPolla.id) : Promise.resolve(null),
   ]);
+  const promo = promoPolla ? referralPromo(promoPolla, promoView, pots[promoPolla.id]?.prize_cop ?? 0) : null;
   const joinedIds = new Set(myPollas.map(p => p.id));
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
 
@@ -158,6 +169,7 @@ export default async function CasaPage() {
             )}
         </PollaSection>
       </div>
+      {promo && <PromoInvitados promo={promo} verPolla />}
     </div>
   );
 }

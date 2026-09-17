@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { Gift, Share2 } from "lucide-react";
-import { referralLink } from "@/lib/casa/referrals-shared";
+import { DEFAULT_REFERRAL_EVERY, REFERRAL_FINE_PRINT, referralLink } from "@/lib/casa/referrals-shared";
 import type { ReferralInviteeState, ReferralProfile } from "@/lib/casa/types";
 import { CopiarDato } from "./CopiarDato";
 import { QuienTeInvito } from "./QuienTeInvito";
@@ -55,9 +55,7 @@ export function InvitacionesPerfil() {
           <Gift aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-turf" />
           <div className="min-w-0">
             <h2 id="perfil-invitaciones" className="text-[15px] font-semibold text-text-primary">Invita y gana cupos</h2>
-            <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">
-              Cuando personas nuevas que invitaste pagan una polla, sumas para un cupo de regalo en esa polla (normalmente uno por cada 5). La regla de cada polla está en su pestaña Info.
-            </p>
+            <p className="mt-1 text-[13px] text-text-secondary">Por cada {DEFAULT_REFERRAL_EVERY} invitados en una polla, te damos un cupo en esa polla.*</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-md border border-border-default px-3 py-2">
@@ -65,18 +63,17 @@ export function InvitacionesPerfil() {
             <span className="lp-label">Tu código</span>
             <span id="copiar-codigo" className="lp-money mt-0.5 block select-all text-[22px] leading-none text-text-primary [overflow-wrap:anywhere]">{code}</span>
           </div>
-          <CopiarDato valor={code} etiqueta="codigo" />
+          <CopiarDato valor={code} etiqueta="codigo" nombre="tu código" />
         </div>
         <button type="button" onClick={compartir} className="lp-btn lp-btn-ghost min-h-11 w-full gap-2 text-[15px]">
           <Share2 aria-hidden="true" className="h-4 w-4 shrink-0" />
           <span aria-live="polite">{copiado ? "Mensaje copiado" : "Compartir mi invitación"}</span>
         </button>
-        <p className="text-[13px] leading-relaxed text-text-secondary">
-          {profile.invited === 0
-            ? "Todavía nadie se ha registrado con tu código."
-            : `${profile.invited} ${profile.invited === 1 ? "persona se registró" : "personas se registraron"} con tu código · ${profile.counted} ya ${profile.counted === 1 ? "jugó" : "jugaron"} su primera polla.`}
-          {profile.gifts > 0 && ` Tienes ${profile.gifts} ${profile.gifts === 1 ? "cupo de regalo activo" : "cupos de regalo activos"}.`}
+        {/* Invitados que ya pagaron (los que cuentan), no los que solo se registraron. */}
+        <p className="text-[13px] text-text-secondary">
+          {`${profile.counted} ${profile.counted === 1 ? "invitado con pago" : "invitados con pago"} · ${profile.gifts} ${profile.gifts === 1 ? "cupo de regalo" : "cupos de regalo"}`}
         </p>
+        <p className="text-[13px] italic text-text-muted">{REFERRAL_FINE_PRINT}</p>
       </section>
       <QuienTeInvito initial={invitee} variant="perfil" />
     </div>

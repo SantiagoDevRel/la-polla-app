@@ -132,7 +132,7 @@ export function referralGiftMessage(n: ReferralGiftNotice): { text: string; butt
       n.invited > 0
         ? `${n.invited} ${n.invited === 1 ? "persona que invitaste ya pagó" : "personas que invitaste ya pagaron"} esta polla.`
         : "Las personas que invitaste ya pagaron esta polla.",
-      `Tu cupo ${n.entryNumber} ya está activo y compite por el premio. Haz sus pronósticos antes de que empiece cada partido.`,
+      `Tu cupo ${n.entryNumber} ya está activo y compite por el premio.`,
     ].join("\n"),
     buttons: [[{ text: `👉 Pronosticar con el cupo ${n.entryNumber}`, url }]],
   };

@@ -55,8 +55,10 @@ import { Participaciones } from "@/components/casa/Participaciones";
 import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { getReferralInvitee, getReferralPollaView } from "@/lib/casa/referrals";
-import { REFERRAL_COOKIE, referralEvery, referralRule, validReferralCode } from "@/lib/casa/referrals-shared";
+import { REFERRAL_COOKIE, referralEvery, referralPromo, referralRule, validReferralCode } from "@/lib/casa/referrals-shared";
+import { premioCompartir } from "@/lib/casa/share-text";
 import { InvitaYGana } from "@/components/casa/InvitaYGana";
+import { PromoInvitados } from "@/components/casa/PromoInvitados";
 import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
 import { cookies } from "next/headers";
 import { Plus, Settings } from "lucide-react";
@@ -207,6 +209,9 @@ export default async function PollaPage({
   const maxCupos = polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER;
   const comprarOtro = polla.kind !== "rifa" && participa && abierta
     && entries.filter((e) => e.status !== "anulada").length < maxCupos;
+  // Invitaciones: sin código (administradores) no hay regla que ofrecer ni avance.
+  const codigo = referral?.code ?? null;
+  const promo = abierta ? referralPromo(polla, referral, pot.prize_cop) : null;
 
   return (
     <div className="pb-32">
@@ -323,9 +328,9 @@ export default async function PollaPage({
                 slug={polla.slug}
                 nombre={polla.name}
                 entradaCop={polla.entry_price_cop}
-                premio={objeto && polla.prize_object ? { objeto: polla.prize_object } : !objeto && polla.pot_mode === "fijo" ? { cop: pot.prize_cop } : null}
-                codigo={referral?.code ?? null}
-                ayuda={every ? referralRule(every) : undefined}
+                premio={premioCompartir(polla, pot.prize_cop)}
+                codigo={codigo}
+                ayuda={every && codigo ? referralRule(every) : undefined}
                 className="flex-[1_0_auto]"
               />
             )}
@@ -334,7 +339,7 @@ export default async function PollaPage({
         {/* (2026-09-17) Pedido del dueño: la regla de invitaciones, pequeña, junto a Compartir.
               Para quien ya juega aquí o ya tiene invitados; a quien todavía no entra le basta
               con entrar (la regla sigue en el cursor de Compartir y en Info). */}
-        {abierta && every && referral && (participa || referral.counted > 0 || referral.in_review > 0) && (
+        {abierta && every && codigo && referral && (participa || referral.counted > 0 || referral.in_review > 0) && (
           <InvitaYGana view={referral} every={every} />
         )}
 
@@ -499,6 +504,8 @@ export default async function PollaPage({
         </PollaTabs>
         {isAdmin && !polla.draw_pending && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/casa" />}
       </div>
+      {/* Aviso de invitaciones (2026-09-17): solo en la polla del aviso. */}
+      {promo && <PromoInvitados promo={promo} />}
     </div>
   );
 }

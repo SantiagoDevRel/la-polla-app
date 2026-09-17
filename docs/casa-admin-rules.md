@@ -216,23 +216,39 @@ primera polla; el conteo se renueva en cada polla. El regalo no suma al pozo.
   `casa_referral_events` (historial; también el permiso para escribir un regalo) y
   `casa_referral_gift_removals`. Columnas: `casa_entries.origin`
   (`compra` | `invitacion`, inmutable) y `casa_pollas.referral_every`
-  (DEFAULT 5 solo para filas nuevas; NULL = sin programa).
-- **Persona nueva** (`casa_referral_is_new_user`): cuenta creada desde
-  `accounts_since`, sin cupos comprados aprobados con monto y sin correcciones de
-  pago. Una entrada gratis no cuenta como pago.
+  (DEFAULT 5 para filas nuevas; la migración también lo pone en los borradores
+  nunca publicados y sin inscripciones; NULL = sin programa).
+- **Persona nueva** (`casa_referral_is_new_user`): cuenta de acceso
+  (`auth.users.created_at`, que nadie edita desde la app; `public.users.created_at`
+  sí lo puede reescribir su dueño) desde `accounts_since`, sin cupos comprados
+  aprobados con monto y sin correcciones de pagos con monto. Una entrada gratis no
+  cuenta como pago, ni aprobada ni corregida.
+- **Administradores** (`casa_referral_can_refer`): no tienen código
+  (`REFERRAL_NOT_AVAILABLE`), un código suyo anterior no vincula ni se sugiere y
+  el conteo les da cero regalos.
 - **Vincular** (`casa_set_referrer_v1(usuario, código, via)`): código normalizado;
   errores como resultado (`REFERRAL_CODE_NOT_FOUND`, `SELF_REFERRAL`,
   `REFERRAL_EXISTS` para un enlace sobre un invitador ya guardado,
   `REFERRAL_LOCKED`, `NOT_NEW_USER`, `REFERRAL_RATE_LIMITED` tras 10 códigos
-  inválidos en una hora). Bloqueo por persona (advisory) y `FOR SHARE` sobre sus
-  inscripciones: una aprobación simultánea termina primero y fija el vínculo.
+  inválidos en una hora). Bloqueo por persona (advisory). Primero responde los
+  rechazos sin bloquear nada; después toma `FOR SHARE` sobre sus cupos comprados
+  (no sobre los regalos) y repite las mismas preguntas: una aprobación simultánea
+  termina primero y fija el vínculo.
+- **Ancla** (`counted_polla_id`): la fija el primer pago con monto aprobado en una
+  polla con programa. Si se revierte el pago del ancla, pasa a otro cupo pagado de
+  esa polla o, si no queda, se libera y el invitado cuenta en la próxima polla donde
+  se le apruebe un pago. El vínculo sigue fijo.
 - **Conteo** (`casa_referral_sync`, disparado por cada cambio de estado o monto de un
   cupo comprado y por cambios de `max_entries_per_user`): invitados anclados en la
   polla con un cupo comprado aprobado ahí; `ganados = contados / cada` solo si el
-  invitador tiene su propio cupo pagado; menos los removidos. Si sobran, pausa los
-  más recientes (`anulada`); si faltan, reactiva los pausados no removidos y luego
-  crea filas nuevas, dentro del tope por persona y del número 50. Cada escritura
-  lleva un evento propio (`regalo_otorgado`, `regalo_pausado`, `regalo_reactivado`).
+  invitador tiene su propio cupo pagado (y no es administrador). Los regalos van en
+  fila por `entry_number`: el k-ésimo está activo si k ≤ ganados, no está removido y
+  cabe en el tope; los que pasan de lo ganado se pausan (`anulada`); los ganados sin
+  fila se crean dentro del tope por persona y del número 50. Un removido conserva su
+  puesto: descuenta justo ese regalo y, si el conteo baja, es el primero en dejar de
+  estar ganado. Cada escritura lleva un evento propio (`regalo_otorgado`,
+  `regalo_pausado`, `regalo_reactivado`). La vista de la polla devuelve `gifts`
+  (ganados sin removidos) y `waiting_gifts` (ganados sin activar).
 - **Guardas.** `casa_02_referral_guard` exige ese evento para insertar o cambiar un
   regalo (solo estado, fecha y motivo) y prohíbe cambiar `origin`;
   `casa_v2_write_guard` (parche needle sobre la definición viva, como 105/133) deja
@@ -243,20 +259,29 @@ primera polla; el conteo se renueva en cada polla. El regalo no suma al pozo.
 - **Dinero.** El pozo suma `amount_cop` (0 en regalos). Tabla, premio provisional y
   reparto tratan el regalo como cualquier participación pagada.
 - **Administración.** `/admin/pollas` → «Cupos de regalo por invitar»
-  (`casa_referral_gifts_admin_v1`): estado, invitados que cuentan, «Remover cupo»
-  (motivo obligatorio; no vuelve solo y descuenta uno ganado) y «Restaurar». No
-  cambia nada después del reparto. La cola de pagos muestra «Invitado por».
+  (`casa_referral_gifts_admin_v1`): estado, invitados que cuentan (con sus nombres),
+  «Remover cupo» (motivo obligatorio; anula ese regalo, no vuelve solo y ninguno lo
+  reemplaza) y «Restaurar» (vuelve si sigue ganado y cabe). Ninguno de los dos
+  después del reparto (`POLLA_FINAL`/`ALREADY_SETTLED`, la misma regla de desmarcar
+  un pago). La cola de pagos muestra «Invitado por».
   El editor prende o apaga el programa sin inscripciones
   (`casa_set_referral_every_v1`; rifas nunca).
 - **Avisos.** Tras una aprobación, `casa_referral_claim_gift_notices_v1` reclama los
   regalos nuevos y el bot de jugadores avisa por Telegram con un botón al cupo en la
-  web.
+  web. En «Mis pagos» del bot, un regalo activo sale como regalo y uno en pausa o
+  removido no sale (no se pide comprobante por un regalo).
+- **Aviso al entrar.** «Por 5 invitados, te damos un cupo en la OFIGOLAZO»: la polla
+  abierta cuyo nombre empieza por `REFERRAL_PROMO_POLLA`, con programa, cuando la
+  persona tiene código y cupos libres (`referralPromo`). Una vez por persona y polla.
 - **Límites conocidos.** Si un invitado borra su cuenta, su vínculo desaparece con
   ella, pero el regalo ya creado no se recalcula hasta el siguiente cambio de pago de
   ese invitador en la polla. El bot de jugadores todavía no captura códigos ni
   pronostica con el cupo de regalo (segundo PR).
-- **Despliegue.** 135 antes del código; verificación read-only al final de la
-  migración. Regresión: `scripts/casa-referrals-check.sql`.
+  Si el tope llega al número 50 (muchos regalos removidos), no se crean más regalos
+  sin aviso. «N inscritos» cuenta cupos, también los de regalo; el dinero sale solo
+  de `amount_cop`.
+- **Despliegue.** 135 antes del código y en una sola transacción; verificación
+  read-only al final de la migración. Regresión: `scripts/casa-referrals-check.sql`.
 
 ## Solo marcador exacto, premio provisional y prueba de pago (2026-09-16, migraciones 132–133)
 

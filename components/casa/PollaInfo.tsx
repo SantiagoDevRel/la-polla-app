@@ -2,14 +2,14 @@ import { Ban, ChevronDown, Clock3, Eye, Gift, Target, Timer, Trophy, Wallet } fr
 import type { ReactNode } from "react";
 import { LOCK_MINUTES, type CasaPolla } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
-import { referralEvery } from "@/lib/casa/referrals-shared";
+import { REFERRAL_FINE_PRINT, referralEvery } from "@/lib/casa/referrals-shared";
 import { PayoutAccountButton } from "./PayoutAccountButton";
 import { FixedPrizeGrowth, fixedPrizeGrows, type FixedPrizeThreshold } from "./FixedPrizeGrowth";
 
 export type { FixedPrizeThreshold };
 
 type Rules = Pick<CasaPolla, "kind" | "scoring_mode" | "points_exact" | "points_one_team" | "points_result" | "prize_kind" | "prize_object" | "description" | "draw_method" | "pot_mode" | "fixed_prize_cop" | "house_cut_pct">
-  & Partial<Pick<CasaPolla, "entry_price_cop" | "referral_every" | "max_entries_per_user">>;
+  & Partial<Pick<CasaPolla, "entry_price_cop" | "referral_every">>;
 
 /**
  * Una regla = un desplegable cerrado con viñetas cortas.
@@ -19,7 +19,7 @@ type Rules = Pick<CasaPolla, "kind" | "scoring_mode" | "points_exact" | "points_
  * cortas y abrir solo la que uno quiere ver. `<details>` funciona sin
  * JavaScript, con teclado y con lector de pantalla.
  */
-function Rule({ icon, title, children, extra }: { icon: ReactNode; title: string; children: ReactNode; extra?: ReactNode }) {
+function Rule({ icon, title, children, extra, plain = false }: { icon: ReactNode; title: string; children: ReactNode; extra?: ReactNode; plain?: boolean }) {
   return <details className="lp-card overflow-hidden">
     <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 text-text-primary transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold [&::-webkit-details-marker]:hidden">
       <span className="shrink-0 text-text-secondary" aria-hidden>{icon}</span>
@@ -28,7 +28,10 @@ function Rule({ icon, title, children, extra }: { icon: ReactNode; title: string
       <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-text-secondary transition-transform duration-200 [[open]>summary>&]:rotate-180" />
     </summary>
     <div className="border-t border-border-subtle px-4 pb-4 pt-3">
-      <ul className="list-disc space-y-2 pl-5 text-[15px] font-normal leading-relaxed text-text-secondary marker:text-text-muted [overflow-wrap:anywhere]">{children}</ul>
+      {/* `plain`: una frase sin viñetas (invitaciones, pedido del dueño 2026-09-17). */}
+      {plain
+        ? <div className="space-y-2 text-[15px] font-normal leading-relaxed text-text-secondary [overflow-wrap:anywhere]">{children}</div>
+        : <ul className="list-disc space-y-2 pl-5 text-[15px] font-normal leading-relaxed text-text-secondary marker:text-text-muted [overflow-wrap:anywhere]">{children}</ul>}
       {extra}
     </div>
   </details>;
@@ -108,13 +111,9 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
       </Rule>
     </>}
 
-    {cadaInvitados !== null && <Rule icon={<Gift size={20} />} title="Invita y gana cupos">
-      <li><Strong>Por cada {cadaInvitados} {cadaInvitados === 1 ? "persona nueva" : "personas nuevas"}</Strong> que invites y paguen esta polla, te regalamos un cupo en esta polla.</li>
-      <li>Cuentan quienes crean su cuenta con tu enlace o tu código y pagan esta polla como su primera polla. Cada persona cuenta una sola vez.</li>
-      <li>El conteo es solo de esta polla: en otra empieza de cero.</li>
-      <li>Necesitas un cupo pagado aquí. El de regalo aparece solo y compite como cualquier cupo.</li>
-      <li>El cupo de regalo no suma dinero al pozo y cuenta dentro del máximo{typeof polla.max_entries_per_user === "number" ? ` de ${polla.max_entries_per_user} cupos` : " de cupos"} por persona.</li>
-      <li>Si se corrige el pago de un invitado, el cupo de regalo se pausa hasta que vuelva a quedar confirmado.</li>
+    {cadaInvitados !== null && <Rule icon={<Gift size={20} />} title="Invita y gana cupos" plain>
+      <p><Strong>{cadaInvitados === 1 ? "Por cada invitado" : `Por cada ${cadaInvitados} invitados`}, te damos un cupo en esta polla.</Strong></p>
+      <p className="text-[13px] italic text-text-muted">{REFERRAL_FINE_PRINT}</p>
     </Rule>}
 
     {money
