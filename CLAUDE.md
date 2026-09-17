@@ -932,7 +932,9 @@ están documentadas en migration 056-057.
 
 ## Auth model (current — 2026-04)
 
-- Login: phone (any country, E.164 via `components/ui/PhoneInput`) →
+- Login: phone (solo 9 países: CO, US, PA, AR, PE, CL, BR, EC, ES — lista única en
+  `lib/sms/paises.ts`, aplicada en el selector, start-otp, sms-hook y sendSms;
+  decisión del dueño 2026-09-17 por costo por destino; E.164 via `components/ui/PhoneInput`) →
   Twilio Verify SMS OTP via Supabase Phone Auth. No password, no
   WhatsApp OTP path. Captcha (2026-09-14): `components/auth/SmsCaptcha.tsx`
   renders a visible Managed Turnstile widget next to the SMS button (only in

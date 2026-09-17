@@ -10,5 +10,8 @@ export const DAILY_SMS_CAP_CODE = "daily_sms_cap";
  */
 export const CAPTCHA_FAILED_CODE = "captcha_failed";
 
+/** El número es de un país al que no enviamos SMS (lib/sms/paises.ts). */
+export const COUNTRY_NOT_ALLOWED_CODE = "country_not_allowed";
+
 /** Página pública de ayuda a la que remite ese error. */
 export const SUPPORT_PATH = "/soporte";

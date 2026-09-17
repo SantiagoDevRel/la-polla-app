@@ -33,11 +33,17 @@ import { ArrowLeft, MessageSquare, Loader2, Send } from "lucide-react";
 import axios from "axios";
 import { useTranslations } from "next-intl";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
-import { CAPTCHA_FAILED_CODE, DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
+import {
+  CAPTCHA_FAILED_CODE,
+  COUNTRY_NOT_ALLOWED_CODE,
+  DAILY_SMS_CAP_CODE,
+  SUPPORT_PATH,
+} from "@/lib/auth/otp-codes";
 import { prefersSameTab } from "@/lib/auth/telegram-login/open-mode";
 import SmsCaptcha, { type SmsCaptchaHandle, type SmsCaptchaStatus } from "@/components/auth/SmsCaptcha";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
+import { PAISES_SMS } from "@/lib/sms/paises";
 import {
   GHOST_BTN,
   LOGIN_CARD,
@@ -384,7 +390,9 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
             ? t("errDailySmsCap")
             : json.code === CAPTCHA_FAILED_CODE
               ? t("errCaptchaRejected")
-              : json.error || t("errSendFailed"),
+              : json.code === COUNTRY_NOT_ALLOWED_CODE
+                ? t("errCountryNotAllowed")
+                : json.error || t("errSendFailed"),
         );
         return;
       }
@@ -758,7 +766,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
               >
                 {t("phoneLabel")}
               </label>
-              <PhoneInput onChange={setPhoneE164} />
+              <PhoneInput onChange={setPhoneE164} countries={PAISES_SMS} />
             </div>
 
             {error && (

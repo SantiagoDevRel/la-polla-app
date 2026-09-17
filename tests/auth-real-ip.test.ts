@@ -392,6 +392,22 @@ describe("POST /api/auth/start-otp", () => {
     route.createAuthClient.mockReturnValue({ signInWithOtp: route.signInWithOtp });
   });
 
+  it("país fuera de la lista: 400 con código estable, sin límites ni Supabase", async () => {
+    const { POST } = await loadRoute();
+    const res = await POST(
+      new NextRequest("https://lapollacolombiana.com/api/auth/start-otp", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-real-ip": "190.25.1.7" },
+        body: JSON.stringify({ phone: "+58 412 123 4567" }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("country_not_allowed");
+    expect(route.checkIpRateLimit).not.toHaveBeenCalled();
+    expect(route.checkAndRecordAttempt).not.toHaveBeenCalled();
+    expect(route.signInWithOtp).not.toHaveBeenCalled();
+  });
+
   it("tope diario: 429 con código estable, enlace a soporte y sin WhatsApp", async () => {
     route.checkDailySmsCap.mockResolvedValue({ blocked: true, remaining: 0 });
     const { POST } = await loadRoute();

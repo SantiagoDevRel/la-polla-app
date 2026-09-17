@@ -27,7 +27,13 @@ import {
   releaseGenerateAttempt,
 } from "@/lib/auth/rate-limit";
 import { normalizePhone } from "@/lib/auth/phone";
-import { CAPTCHA_FAILED_CODE, DAILY_SMS_CAP_CODE, SUPPORT_PATH } from "@/lib/auth/otp-codes";
+import {
+  CAPTCHA_FAILED_CODE,
+  COUNTRY_NOT_ALLOWED_CODE,
+  DAILY_SMS_CAP_CODE,
+  SUPPORT_PATH,
+} from "@/lib/auth/otp-codes";
+import { paisSmsPermitido } from "@/lib/sms/paises";
 import {
   isCaptchaRejection,
   isSmsCaptchaEnforced,
@@ -79,6 +85,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Phone inválido" }, { status: 400 });
   }
   const phoneNormalized = phoneE164.replace(/\D/g, "");
+  // Antes de rate limits y de Supabase: un país fuera de la lista no genera
+  // código ni gasta un intento.
+  if (!paisSmsPermitido(phoneNormalized)) {
+    return NextResponse.json(
+      { error: "País no disponible", code: COUNTRY_NOT_ALLOWED_CODE },
+      { status: 400 },
+    );
+  }
   const captchaToken = parseCaptchaToken(body);
 
   const ip = getClientIp(request.headers) ?? undefined;
