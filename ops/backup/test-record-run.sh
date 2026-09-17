@@ -25,7 +25,7 @@ source "$SCRIPT_DIR/lib.sh"
 unset NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY RECORD_RUN_DRY || true
 
 T="$(mktemp -d)"
-trap 'rm -rf -- "$T"' EXIT
+trap 'kill "${fake_pid:-}" 2>/dev/null; rm -rf -- "$T"' EXIT
 pass=0; failn=0
 check() { if eval "$2"; then pass=$((pass+1)); else failn=$((failn+1)); echo "FALLA: $1"; fi; }
 jget() { node -e 'const o=JSON.parse(require("fs").readFileSync(0,"utf8")); const v=o[process.argv[1]]; process.stdout.write(v===null?"null":String(v));' "$1"; }
@@ -73,6 +73,46 @@ t0=$(date +%s)
 out="$(NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:9 SUPABASE_SERVICE_ROLE_KEY=k record_run --kind=backup --exit-code=0)"
 check "red caída → failed_network" '[[ "$out" == "failed_network" ]]'
 check "red caída → rápido (< 40 s)" '(( $(date +%s) - t0 < 40 ))'
+
+# Cola en disco: lo que no se pudo enviar se reenvía en la próxima corrida.
+SP="$T/spool"
+out="$(NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:9 SUPABASE_SERVICE_ROLE_KEY=k RECORD_RUN_SPOOL_DIR="$SP" \
+  record_run --kind=backup --exit-code=0 --rows=111)"
+check "cola: red caída → failed_network" '[[ "$out" == "failed_network" ]]'
+check "cola: la fila queda pendiente" '(( $(ls "$SP" | wc -l) == 1 ))'
+
+# Servidor falso en 127.0.0.1: responde con el status de $T/fake-status y
+# anota cada cuerpo recibido.
+cat >"$T/fake-server.mjs" <<'EOF2'
+import { createServer } from "node:http";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+const [dir] = process.argv.slice(2);
+const srv = createServer((req, res) => {
+  let b = "";
+  req.on("data", (c) => (b += c));
+  req.on("end", () => {
+    appendFileSync(`${dir}/fake-bodies`, `${b}\n`);
+    res.writeHead(Number(readFileSync(`${dir}/fake-status`, "utf8")), { "Content-Type": "application/json" });
+    res.end("{}");
+  });
+});
+srv.listen(0, "127.0.0.1", () => writeFileSync(`${dir}/fake-port`, String(srv.address().port)));
+EOF2
+echo 201 >"$T/fake-status"
+node "$T/fake-server.mjs" "$T" & fake_pid=$!
+for _ in $(seq 50); do [[ -s "$T/fake-port" ]] && break; sleep 0.1; done
+FAKE_URL="http://127.0.0.1:$(cat "$T/fake-port")"
+out="$(NEXT_PUBLIC_SUPABASE_URL="$FAKE_URL" SUPABASE_SERVICE_ROLE_KEY=k RECORD_RUN_SPOOL_DIR="$SP" \
+  record_run --kind=backup --exit-code=0 --rows=222)"
+check "cola: con red vuelve ok" '[[ "$out" == "ok" ]]'
+check "cola: se reenvió la pendiente y luego la nueva" \
+  '[[ "$(wc -l <"$T/fake-bodies")" -eq 2 && "$(sed -n 1p "$T/fake-bodies" | jget rows)" == "111" && "$(sed -n 2p "$T/fake-bodies" | jget rows)" == "222" ]]'
+check "cola: queda vacía" '(( $(ls "$SP" | wc -l) == 0 ))'
+echo 400 >"$T/fake-status"
+out="$(NEXT_PUBLIC_SUPABASE_URL="$FAKE_URL" SUPABASE_SERVICE_ROLE_KEY=k RECORD_RUN_SPOOL_DIR="$SP" \
+  record_run --kind=backup --exit-code=0)"
+check "cola: 4xx no se reintenta ni se encola" '[[ "$out" == "failed_http_400" && "$(wc -l <"$T/fake-bodies")" -eq 3 && $(ls "$SP" | wc -l) -eq 0 ]]'
+kill "$fake_pid" 2>/dev/null || true
 
 # El trap conserva el código de salida aunque registrar falle.
 cat >"$T/fake-job.sh" <<EOF

@@ -404,7 +404,9 @@ try {
   // ── 8) Mis pollas (Perfil de Juan): el cupo de regalo en el selector.
   await juan.page.goto(`${origin}/perfil`);
   await hydrated(juan.page);
-  const mine = juan.page.locator("li", { hasText: pollaName }).first();
+  // Perfil muestra Mis pollas cerrado (2026-09-17): se abre primero.
+  await (await ready(juan.page.locator("#mis-pollas > summary"))).click();
+  const mine = juan.page.locator("#mis-pollas li", { hasText: pollaName }).first();
   await mine.getByText("2 cupos").waitFor();
   assert.ok((await mine.locator("option").allTextContents()).some((t) => t.startsWith("Cupo 2 · Regalo")));
 

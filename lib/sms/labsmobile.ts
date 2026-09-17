@@ -24,6 +24,8 @@
 //
 // Docs: https://www.labsmobile.com/es/api-sms/versiones-api/http-rest-post-json
 
+import { CREDITOS_POR_SMS_CO } from "./saldo";
+
 const API_URL = "https://api.labsmobile.com/json/send";
 const BALANCE_URL = "https://api.labsmobile.com/json/balance";
 
@@ -36,7 +38,20 @@ export interface SmsResult {
   error?: string;
 }
 
-function creds(): { user: string; token: string } | null {
+// Alfabeto GSM 03.38 (tabla básica + extensión). Todo lo demás exige UCS-2.
+const GSM7 =
+  "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?" +
+  "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà" +
+  "^{}\\[~]|€\f";
+
+export function necesitaUnicode(texto: string): boolean {
+  for (const ch of texto) {
+    if (!GSM7.includes(ch)) return true;
+  }
+  return false;
+}
+
+function creds():{ user: string; token: string } | null {
   const user = process.env.LABSMOBILE_USERNAME;
   const token = process.env.LABSMOBILE_TOKEN;
   if (!user || !token) return null;
@@ -71,6 +86,10 @@ export async function sendSms(
     message,
     recipient: [{ msisdn: phone }],
   };
+  // Sin `ucs2` LabsMobile manda GSM-7 y descarta lo que no entra: el 🐥 del
+  // código de acceso no llegaba (2026-09-17). Solo se activa cuando hace
+  // falta, porque Unicode baja el segmento de 160 a 70 caracteres.
+  if (necesitaUnicode(message)) body.ucs2 = "1";
   // Cuando lo generamos nosotros podemos registrar la fila ANTES del fetch y
   // cerrar la carrera con un DLR ultrarrápido. LabsMobile admite máximo 20.
   if (options.subid) {
@@ -177,12 +196,17 @@ export async function getBalance(): Promise<{
       signal: AbortSignal.timeout(8000),
       cache: "no-store",
     });
+    // Usuario o token mal puestos responden 401 con JSON válido pero sin
+    // `credits`; se reporta aparte para que el panel no lo confunda con saldo 0.
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, error: "credenciales_invalidas" };
+    }
     const json: { code?: number; credits?: string } = await res.json();
     const credits = Number(json.credits);
-    if (!Number.isFinite(credits)) return { ok: false, error: "balance_ilegible" };
-    // 0,043046 créditos por SMS estándar a Colombia (medido el 2026-08-09
-    // restando el saldo antes/después de un envío real).
-    return { ok: true, credits, smsColombia: Math.floor(credits / 0.043046) };
+    if (json.credits == null || !Number.isFinite(credits)) {
+      return { ok: false, error: "balance_ilegible" };
+    }
+    return { ok: true, credits, smsColombia: Math.floor(credits / CREDITOS_POR_SMS_CO) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "fetch_fallo" };
   }

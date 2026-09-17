@@ -1043,11 +1043,21 @@ Construido con ☕ en Medellín / Lisboa por [@SantiagoDevRel](https://github.co
 
 ### Mis pollas en Casa y Perfil (2026-09-09)
 
+**Pollas cerradas públicas (2026-09-17, pedido del dueño).** Desde el 16-sep
+(Ofigolazo en adelante, `PUBLIC_CLOSED_SINCE` en `lib/casa/types.ts`) una polla
+cerrada es pública para cualquier usuario con sesión: sale en Pollas cerradas y
+`/api/casa/pollas/[slug]/match-picks` deja ver los pronósticos de los partidos ya
+empezados aunque no se haya inscrito (sin «Tu pronóstico»). Las cerradas anteriores
+solo las ven sus participantes. Los comprobantes de pago siguen privados (pueden
+mostrar la cuenta del ganador). La tabla ya era visible con sesión.
+
 `components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
-En `/casa`, el orden es Pollas abiertas, Mis pollas y Pollas cerradas. Las tres
-empiezan cerradas, comparten título/subtítulo y contienen sus tarjetas dentro de
-`PollaSection`. En Perfil, Mis pollas permanece abierta y va debajo de «Cuenta para cobrar», que
+En `/casa`, el orden es Mis pollas, Pollas disponibles y Pollas cerradas. Mis pollas
+(prop `activeOnly`) muestra solo pollas en juego y empieza abierta si hay alguna; las
+finalizadas pasan a Pollas cerradas marcadas «Participaste». Pollas disponibles empieza
+abierta si hay disponibles o si no hay nada en juego; cerradas empieza cerrada. Comparten título/subtítulo y contienen sus tarjetas dentro de
+`PollaSection`. En Perfil, `MyPollas split` muestra Mis pollas (en juego) y Pollas cerradas (en gris) como dos desplegables compactos cerrados, debajo de «Cuenta para cobrar», que
 quedó justo bajo el celular (2026-09-17). Las inscripciones pendientes o pagadas se
 muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
 Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.

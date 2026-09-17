@@ -73,6 +73,26 @@ describe("Casa participant predictions privacy", () => {
     mocks.polla.mockResolvedValue(polla);
     expect((await call()).status).toBe(404); expect(mocks.db).not.toHaveBeenCalled();
   });
+  it.each([
+    { status: "resuelta", closes_at: "2026-09-16T16:55:00Z" },
+    { status: "cerrada", closes_at: "2026-09-16T05:00:00Z" },
+    { status: "abierta", closes_at: "2026-09-17T12:00:00Z" },
+  ])("opens a public closed polla (since 2026-09-16) to non-participants: %j", async closed => {
+    mocks.polla.mockResolvedValue({ id: pollaId, kind: "partidos", scoring_mode: "marcador", publication_mode: "ahora", opens_at: "2026-09-13T00:00:00Z", ...closed });
+    mocks.entry.mockResolvedValue(null);
+    expect((await call()).status).toBe(200);
+    expect(mocks.db).toHaveBeenCalled();
+  });
+  it.each([
+    { status: "resuelta", closes_at: "2026-09-16T04:59:00Z" },
+    { status: "resuelta", closes_at: "2026-09-10T18:00:00Z" },
+    { status: "abierta", closes_at: "2099-01-01T00:00:00Z" },
+    { status: "resuelta", closes_at: "2026-09-16T16:55:00Z", publication_mode: "oculta" },
+  ])("keeps other pollas private to non-participants: %j", async polla => {
+    mocks.polla.mockResolvedValue({ id: pollaId, kind: "partidos", scoring_mode: "marcador", ...polla });
+    mocks.entry.mockResolvedValue(null);
+    expect((await call()).status).toBe(403); expect(mocks.db).not.toHaveBeenCalled();
+  });
   it("does not expose another polla's match", async () => {
     mocks.matches.mockResolvedValue([]);
     expect((await call()).status).toBe(404); expect(mocks.db).not.toHaveBeenCalled();

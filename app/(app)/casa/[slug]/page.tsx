@@ -32,6 +32,7 @@ import {
   DEFAULT_MAX_ENTRIES_PER_USER,
   isLiveEntry,
   isPollaOpen,
+  isPublicClosedPolla,
   pollaStatusLabel,
   type CasaPayout,
   type CasaPolla,
@@ -451,7 +452,8 @@ export default async function PollaPage({
               initialPicks={picksPorPartido}
               distribution={distribution}
               canEdit={inscrito && acceptsCasaMatchPicks(polla.status, polla.draw_pending)}
-              canViewOthers={participa || isAdmin}
+              canViewOthers={participa || isAdmin || isPublicClosedPolla(polla)}
+              showMine={participa}
               lockedReason={
                 !acceptsCasaMatchPicks(polla.status, polla.draw_pending) ? "Esta polla ya no recibe pronósticos." : !inscrito
                   ? "Inscríbete para pronosticar."
