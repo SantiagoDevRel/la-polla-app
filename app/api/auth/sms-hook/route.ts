@@ -152,12 +152,13 @@ export async function POST(request: Request) {
   // `auth.users.phone` NO empiezan por 57. Hasta entonces este hook manda
   // a cualquier E.164 válido.
 
-  // Sin tildes, sin ñ, sin emoji y SIN DOMINIO, a propósito:
+  // Texto pedido por el dueño (2026-09-17): tilde y pollito, sin la
+  // advertencia de "no lo compartas". Con emoji el SMS va en UCS-2 (70
+  // unidades por segmento, 🐥 ocupa 2): son 47 → sigue siendo UN segmento.
+  // Si se alarga, contar en UCS-2: pasar de 70 duplica el costo.
   //
-  // · Un acento saca el mensaje de GSM-7 (160 chars/segmento) y lo pasa a
-  //   UCS-2 (70) → el mismo SMS cuesta el doble.
-  // · Un emoji (la regla 🐥 del CLAUDE.md es del bot de WhatsApp, NO del SMS)
-  //   hace lo mismo.
+  // SIN DOMINIO, a propósito:
+  //
   // · Un dominio dispara el filtro de seguridad de LabsMobile: retienen el
   //   SMS para revisión manual. Confirmado POR ELLOS en un ticket (2026-08-11):
   //   con un `@dominio #codigo` (WebOTP) dos códigos quedaron trabados 2h35m
@@ -175,10 +176,9 @@ export async function POST(request: Request) {
   // de NEXT_PUBLIC_APP_URL, y mandar UN SMS de prueba EN HORARIO HÁBIL — así,
   // si el filtro lo retiene, la revisión cae con alguien despierto.
   //
-  // 61 caracteres con un OTP de 6 dígitos → un solo segmento GSM-7.
   // No se anuncia una duración concreta: quien decide cuánto vive el código
   // es Supabase (SMS_OTP_EXP), no este archivo.
-  const texto = `Tu codigo es ${otp} para La Polla. No lo compartas con nadie.`;
+  const texto = `Tu código es ${otp} para La Polla Colombiana 🐥`;
 
   // LabsMobile admite un subid propio de hasta 20 caracteres. Lo generamos y
   // registramos ANTES del fetch: así el callback nunca puede adelantarse a la
