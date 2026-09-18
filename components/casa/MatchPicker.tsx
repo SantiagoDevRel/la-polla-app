@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Search, SearchX, X } from "lucide-react";
 import { Label, SectionHead, StreetCard } from "@/components/street";
 import { formatMatchTime } from "@/lib/casa/format";
-import { CREATABLE_TOURNAMENTS, getTournamentLogo, getTournamentLogoClassName } from "@/lib/tournaments";
+import { CREATABLE_TOURNAMENTS, TOURNAMENT_GROUPS, getTournamentLogo, getTournamentLogoClassName } from "@/lib/tournaments";
 import { TeamCrest } from "@/components/match/TeamCrest";
 import { colombiaDateKey, formatColombiaDateTime } from "@/lib/time/colombia";
 import {
@@ -268,9 +268,19 @@ export function MatchPicker({
           <p className="mt-1 text-[12px] text-text-secondary">
             Puedes combinar ligas. Los partidos elegidos se conservan al cambiar de torneo.
           </p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {CREATABLE_TOURNAMENTS.map((t) => {
+          {TOURNAMENT_GROUPS.map((group) => (
+          <div key={group.label} className="mt-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{group.label}</p>
+            {/* Una columna hasta 360 px: con dos, al nombre le quedaban ~44 px
+                y «Champions League» se partía en «Champion / s League». Desde
+                ahí entran dos y el nombre se lee entero. */}
+            <div className="mt-1.5 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+            {group.slugs.map((slug, index) => {
+              const t = CREATABLE_TOURNAMENTS.find((c) => c.slug === slug)!;
               const selectedCount = selected.filter((m) => m.tournament === t.slug).length;
+              // Grupo impar: el último va a lo ancho, para que la última fila
+              // se lea como decisión y no como un hueco.
+              const wide = group.slugs.length % 2 === 1 && index === group.slugs.length - 1;
               return (
                 <button
                   key={t.slug}
@@ -279,6 +289,8 @@ export function MatchPicker({
                   title={t.name}
                   aria-pressed={tournament === t.slug}
                   className={`flex min-h-[64px] min-w-0 cursor-pointer items-center gap-2 rounded-md border p-2 text-left transition-all duration-200 hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-[0.98] ${
+                    wide ? "min-[360px]:col-span-2" : ""
+                  } ${
                     tournament === t.slug
                       ? "border-gold bg-gold/10"
                       : "border-border-subtle bg-bg-elevated"
@@ -295,7 +307,12 @@ export function MatchPicker({
                       className={`h-8 w-8 max-w-none object-contain ${getTournamentLogoClassName(t.slug)}`}
                     />
                   </span>
-                  <span className="min-w-0 text-[12px] font-medium leading-snug text-text-primary [overflow-wrap:anywhere]">
+                  {/* `break-words` y no `anywhere`: con nombres largos
+                      («Champions League», «Conference League») anywhere partía
+                      la palabra aunque entrara entera. Rompe dentro de una
+                      palabra solo cuando sola no cabe, así que el texto
+                      ampliado sigue sin desbordar. */}
+                  <span className="min-w-0 break-words text-[12px] font-medium leading-snug text-text-primary">
                     {t.name}
                     {selectedCount > 0 && (
                       <span className="mt-1 block text-[11px] text-turf">
@@ -306,7 +323,9 @@ export function MatchPicker({
                 </button>
               );
             })}
+            </div>
           </div>
+          ))}
         </div>
         {tournamentExtra}
       </StreetCard>

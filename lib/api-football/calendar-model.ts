@@ -39,6 +39,8 @@ export interface CalendarFixture {
   score: { fulltime: ScorePair; extratime: ScorePair; penalty: ScorePair };
 }
 
+import { AF_LEAGUE_COPA_COLOMBIA, AF_LEAGUE_NATIONS } from './leagues';
+
 const record = (v: unknown): Record<string, unknown> | null =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 const id = (v: unknown): number | null =>
@@ -111,8 +113,8 @@ export function trimFixture(raw: unknown): CalendarFixture | null {
  * stage PLAYOFFS no está en el mapa de sync.ts); lo canónico es `playoff`.
  */
 export type CalendarPhase =
-  | 'regular_season' | 'league_stage' | 'group_stage' | 'playoff' | 'round_of_32'
-  | 'round_of_16' | 'quarter_finals' | 'semi_finals' | 'third_place' | 'final';
+  | 'regular_season' | 'league_stage' | 'group_stage' | 'playoff' | 'round_of_64'
+  | 'round_of_32' | 'round_of_16' | 'quarter_finals' | 'semi_finals' | 'third_place' | 'final';
 
 export interface RoundPhase {
   phase: CalendarPhase;
@@ -124,11 +126,19 @@ export interface RoundPhase {
 
 export type RoundClass =
   | ({ kind: 'phase' } & RoundPhase)
-  | { kind: 'excluded'; reason: 'qualifying' | 'ambiguous' }
+  | { kind: 'excluded'; reason: 'qualifying' | 'ambiguous' | 'early_cup_round' }
   | { kind: 'unknown' };
 
 const KNOCKOUTS: Record<string, CalendarPhase> = {
   'Knockout Round Play-offs': 'playoff',
+  // Conference League: su playoff de febrero se llama así, no como el de la UCL.
+  'Playoff round': 'playoff',
+  // Liga MX: el Play-In reparte los últimos dos cupos de la Liguilla.
+  'Play-In Semi-finals': 'playoff',
+  'Play-In Final': 'playoff',
+  // La Liga Argentina 2025 llamaba «8th Finals» a los octavos (1/8).
+  '8th Finals': 'round_of_16',
+  'Round of 64': 'round_of_64',
   'Round of 32': 'round_of_32',
   'Round of 16': 'round_of_16',
   'Quarter-finals': 'quarter_finals',
@@ -136,6 +146,16 @@ const KNOCKOUTS: Record<string, CalendarPhase> = {
   '3rd Place Final': 'third_place',
   'Final': 'final',
 };
+
+/**
+ * Rondas tempranas de copa nacional, con equipos de divisiones de ascenso y
+ * una nomenclatura que el proveedor cambia de una temporada a otra (la Copa do
+ * Brasil 2026 emitió «Round of 128», «1/128-finals» y «1/256-finals» a la vez).
+ * Son conocidas y NO se guardan: quedan fuera sin alertar al administrador.
+ */
+const EARLY_CUP_ROUNDS = new Set([
+  '1st Round', '2nd Round', '3rd Round', 'Round of 128', '1/128-finals', '1/256-finals',
+]);
 
 /**
  * Clasifica la ronda con coincidencias EXACTAS (solo se colapsan espacios).
@@ -149,35 +169,64 @@ const KNOCKOUTS: Record<string, CalendarPhase> = {
  *   "Knockout Round Play-offs". Si algún día reusaran el nombre, queda
  *   bloqueado igual y FD/ESPN lo cubren.
  */
-export function classifyRound(round: string): RoundClass {
+/**
+ * Los dos torneos cortos de una misma temporada. La Liga Argentina los llamó
+ * «1st Phase»/«2nd Phase» en 2025 y «Apertura»/«Clausura» en 2026: son el mismo
+ * par, y sin distinguirlos las jornadas de los dos torneos chocarían.
+ */
+function segmentOf(prefix: string | undefined): 'apertura' | 'clausura' | null {
+  if (prefix === 'Apertura' || prefix === '1st Phase') return 'apertura';
+  if (prefix === 'Clausura' || prefix === '2nd Phase') return 'clausura';
+  return null;
+}
+
+export function classifyRound(round: string, leagueId?: number): RoundClass {
   const r = round.replace(/\s+/g, ' ').trim();
-  let m = r.match(/^(Regular Season|Apertura|Clausura) - ([1-9]\d?)$/);
+  let m = r.match(/^(Regular Season|Apertura|Clausura|1st Phase|2nd Phase) - ([1-9]\d?)$/);
   if (m) {
-    const segment = m[1] === 'Apertura' ? 'apertura' : m[1] === 'Clausura' ? 'clausura' : null;
-    return { kind: 'phase', phase: 'regular_season', matchDay: Number(m[2]), segment };
+    return { kind: 'phase', phase: 'regular_season', matchDay: Number(m[2]), segment: segmentOf(m[1]) };
   }
-  m = r.match(/^(League Stage|Group Stage|Group [A-L]) - ([1-9]\d?)$/);
+  // «League A - 3» es la Nations League; «1st Round - 3» es la fase de grupos
+  // de la Copa Colombia, que el proveedor no llama «Group Stage».
+  m = r.match(/^(League Stage|League [A-D]|Group Stage|Group [A-L]|1st Round) - ([1-9]\d?)$/);
   if (m) {
-    return { kind: 'phase', phase: m[1] === 'League Stage' ? 'league_stage' : 'group_stage',
+    const league = m[1] === 'League Stage' || m[1].startsWith('League ');
+    return { kind: 'phase', phase: league ? 'league_stage' : 'group_stage',
       matchDay: Number(m[2]), segment: null };
   }
-  m = r.match(/^(?:(Apertura|Clausura) - )?(.+)$/);
+  // La Nations League 2026 numera sus seis jornadas a secas. Un «3» pelado solo
+  // es una jornada en esa liga: en cualquier otra queda desconocido a propósito.
+  if (leagueId === AF_LEAGUE_NATIONS && /^([1-9]|1\d)$/.test(r)) {
+    return { kind: 'phase', phase: 'league_stage', matchDay: Number(r), segment: null };
+  }
+  // Nations League: las llaves de ascenso/descenso entre divisiones.
+  if (/^Play-offs [A-D]\/[A-D]$/.test(r)) {
+    return { kind: 'phase', phase: 'playoff', matchDay: null, segment: null };
+  }
+  m = r.match(/^(?:(Apertura|Clausura|1st Phase|2nd Phase) - )?(.+)$/);
   // hasOwnProperty: "constructor"/"toString" no pueden colarse como fase.
   const knockout = m && Object.prototype.hasOwnProperty.call(KNOCKOUTS, m[2]) ? KNOCKOUTS[m[2]] : undefined;
   if (m && knockout) {
-    const segment = m[1] === 'Apertura' ? 'apertura' : m[1] === 'Clausura' ? 'clausura' : null;
-    return { kind: 'phase', phase: knockout, matchDay: null, segment };
+    return { kind: 'phase', phase: knockout, matchDay: null, segment: segmentOf(m[1]) };
   }
   if (/^(1st|2nd|3rd) Qualifying Round$/.test(r) || /^Qualification Round [1-9]$/.test(r)) {
     return { kind: 'excluded', reason: 'qualifying' };
   }
-  if (r === 'Play-offs') return { kind: 'excluded', reason: 'ambiguous' };
+  // En la Copa Colombia «Play-offs» es la ronda previa a los octavos, ida y
+  // vuelta, con equipos de primera. En la UEFA es la previa de agosto que no
+  // guardamos, así que sin saber la liga se mantiene excluida.
+  if (r === 'Play-offs') {
+    return leagueId === AF_LEAGUE_COPA_COLOMBIA
+      ? { kind: 'phase', phase: 'round_of_32', matchDay: null, segment: null }
+      : { kind: 'excluded', reason: 'ambiguous' };
+  }
+  if (EARLY_CUP_ROUNDS.has(r)) return { kind: 'excluded', reason: 'early_cup_round' };
   return { kind: 'unknown' };
 }
 
 /** Fase + jornada, o null (desconocida o excluida) = no se inserta. */
-export function roundToPhase(round: string): RoundPhase | null {
-  const c = classifyRound(round);
+export function roundToPhase(round: string, leagueId?: number): RoundPhase | null {
+  const c = classifyRound(round, leagueId);
   return c.kind === 'phase' ? { phase: c.phase, matchDay: c.matchDay, segment: c.segment } : null;
 }
 

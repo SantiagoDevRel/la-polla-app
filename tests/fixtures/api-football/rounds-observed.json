@@ -1,0 +1,586 @@
+{
+ "source": "GET /fixtures?league=<id>&season=<year>",
+ "observedAt": "2026-09-18T15:05:00Z",
+ "note": "Nombres DISTINTOS de league.round que API-Football emitió de verdad para cada torneo agregado el 2026-09-18, en la temporada vigente y en la anterior (el ciclo completo, con sus fases finales). Solo las etiquetas: ningún dato de partido. Sirve para que classifyRound no dependa de suposiciones.",
+ "leagues": [
+  {
+   "id": 241,
+   "slug": "copacolombia_2026",
+   "seasons": [
+    {
+     "year": 2025,
+     "rounds": [
+      "1st Round - 1",
+      "1st Round - 2",
+      "1st Round - 3",
+      "1st Round - 4",
+      "1st Round - 5",
+      "Final",
+      "Play-offs",
+      "Quarter-finals",
+      "Round of 16",
+      "Semi-finals"
+     ]
+    },
+    {
+     "year": 2026,
+     "rounds": [
+      "Group Stage - 1",
+      "Group Stage - 2",
+      "Group Stage - 3",
+      "Group Stage - 4",
+      "Group Stage - 5",
+      "Play-offs",
+      "Round of 16"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 71,
+   "slug": "brasileirao_2026",
+   "seasons": [
+    {
+     "year": 2026,
+     "rounds": [
+      "Regular Season - 1",
+      "Regular Season - 10",
+      "Regular Season - 11",
+      "Regular Season - 12",
+      "Regular Season - 13",
+      "Regular Season - 14",
+      "Regular Season - 15",
+      "Regular Season - 16",
+      "Regular Season - 17",
+      "Regular Season - 18",
+      "Regular Season - 19",
+      "Regular Season - 2",
+      "Regular Season - 20",
+      "Regular Season - 21",
+      "Regular Season - 22",
+      "Regular Season - 23",
+      "Regular Season - 24",
+      "Regular Season - 25",
+      "Regular Season - 26",
+      "Regular Season - 27",
+      "Regular Season - 28",
+      "Regular Season - 29",
+      "Regular Season - 3",
+      "Regular Season - 30",
+      "Regular Season - 31",
+      "Regular Season - 32",
+      "Regular Season - 33",
+      "Regular Season - 34",
+      "Regular Season - 35",
+      "Regular Season - 36",
+      "Regular Season - 37",
+      "Regular Season - 38",
+      "Regular Season - 4",
+      "Regular Season - 5",
+      "Regular Season - 6",
+      "Regular Season - 7",
+      "Regular Season - 8",
+      "Regular Season - 9"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 262,
+   "slug": "ligamx_2026",
+   "seasons": [
+    {
+     "year": 2025,
+     "rounds": [
+      "Apertura - 1",
+      "Apertura - 10",
+      "Apertura - 11",
+      "Apertura - 12",
+      "Apertura - 13",
+      "Apertura - 14",
+      "Apertura - 15",
+      "Apertura - 16",
+      "Apertura - 17",
+      "Apertura - 2",
+      "Apertura - 3",
+      "Apertura - 4",
+      "Apertura - 5",
+      "Apertura - 6",
+      "Apertura - 7",
+      "Apertura - 8",
+      "Apertura - 9",
+      "Apertura - Final",
+      "Apertura - Play-In Final",
+      "Apertura - Play-In Semi-finals",
+      "Apertura - Quarter-finals",
+      "Apertura - Semi-finals",
+      "Clausura - 1",
+      "Clausura - 10",
+      "Clausura - 11",
+      "Clausura - 12",
+      "Clausura - 13",
+      "Clausura - 14",
+      "Clausura - 15",
+      "Clausura - 16",
+      "Clausura - 17",
+      "Clausura - 2",
+      "Clausura - 3",
+      "Clausura - 4",
+      "Clausura - 5",
+      "Clausura - 6",
+      "Clausura - 7",
+      "Clausura - 8",
+      "Clausura - 9",
+      "Clausura - Final",
+      "Clausura - Quarter-finals",
+      "Clausura - Semi-finals"
+     ]
+    },
+    {
+     "year": 2026,
+     "rounds": [
+      "Apertura - 1",
+      "Apertura - 10",
+      "Apertura - 11",
+      "Apertura - 12",
+      "Apertura - 13",
+      "Apertura - 14",
+      "Apertura - 15",
+      "Apertura - 16",
+      "Apertura - 17",
+      "Apertura - 2",
+      "Apertura - 3",
+      "Apertura - 4",
+      "Apertura - 5",
+      "Apertura - 6",
+      "Apertura - 7",
+      "Apertura - 8",
+      "Apertura - 9"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 128,
+   "slug": "ligaargentina_2026",
+   "seasons": [
+    {
+     "year": 2025,
+     "rounds": [
+      "1st Phase - 1",
+      "1st Phase - 10",
+      "1st Phase - 11",
+      "1st Phase - 12",
+      "1st Phase - 13",
+      "1st Phase - 14",
+      "1st Phase - 15",
+      "1st Phase - 16",
+      "1st Phase - 2",
+      "1st Phase - 3",
+      "1st Phase - 4",
+      "1st Phase - 5",
+      "1st Phase - 6",
+      "1st Phase - 7",
+      "1st Phase - 8",
+      "1st Phase - 8th Finals",
+      "1st Phase - 9",
+      "1st Phase - Final",
+      "1st Phase - Quarter-finals",
+      "1st Phase - Semi-finals",
+      "2nd Phase - 1",
+      "2nd Phase - 10",
+      "2nd Phase - 11",
+      "2nd Phase - 12",
+      "2nd Phase - 13",
+      "2nd Phase - 14",
+      "2nd Phase - 15",
+      "2nd Phase - 16",
+      "2nd Phase - 2",
+      "2nd Phase - 3",
+      "2nd Phase - 4",
+      "2nd Phase - 5",
+      "2nd Phase - 6",
+      "2nd Phase - 7",
+      "2nd Phase - 8",
+      "2nd Phase - 9",
+      "Final",
+      "Quarter-finals",
+      "Round of 16",
+      "Semi-finals"
+     ]
+    },
+    {
+     "year": 2026,
+     "rounds": [
+      "Apertura - 1",
+      "Apertura - 10",
+      "Apertura - 11",
+      "Apertura - 12",
+      "Apertura - 13",
+      "Apertura - 14",
+      "Apertura - 15",
+      "Apertura - 16",
+      "Apertura - 2",
+      "Apertura - 3",
+      "Apertura - 4",
+      "Apertura - 5",
+      "Apertura - 6",
+      "Apertura - 7",
+      "Apertura - 8",
+      "Apertura - 9",
+      "Apertura - Final",
+      "Apertura - Quarter-finals",
+      "Apertura - Round of 16",
+      "Apertura - Semi-finals",
+      "Clausura - 1",
+      "Clausura - 10",
+      "Clausura - 11",
+      "Clausura - 12",
+      "Clausura - 13",
+      "Clausura - 14",
+      "Clausura - 15",
+      "Clausura - 16",
+      "Clausura - 2",
+      "Clausura - 3",
+      "Clausura - 4",
+      "Clausura - 5",
+      "Clausura - 6",
+      "Clausura - 7",
+      "Clausura - 8",
+      "Clausura - 9"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 848,
+   "slug": "conference_2026",
+   "seasons": [
+    {
+     "year": 2025,
+     "rounds": [
+      "1st Qualifying Round",
+      "2nd Qualifying Round",
+      "3rd Qualifying Round",
+      "Final",
+      "League Stage - 1",
+      "League Stage - 2",
+      "League Stage - 3",
+      "League Stage - 4",
+      "League Stage - 5",
+      "League Stage - 6",
+      "Playoff round",
+      "Quarter-finals",
+      "Round of 16",
+      "Round of 32",
+      "Semi-finals"
+     ]
+    },
+    {
+     "year": 2026,
+     "rounds": [
+      "1st Qualifying Round",
+      "2nd Qualifying Round",
+      "3rd Qualifying Round",
+      "League Stage - 1",
+      "League Stage - 2",
+      "League Stage - 3",
+      "League Stage - 4",
+      "League Stage - 5",
+      "League Stage - 6",
+      "Playoff round"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 253,
+   "slug": "mls_2026",
+   "seasons": [
+    {
+     "year": 2025,
+     "rounds": [
+      "Final",
+      "Quarter-finals",
+      "Regular Season - 1",
+      "Regular Season - 10",
+      "Regular Season - 11",
+      "Regular Season - 12",
+      "Regular Season - 13",
+      "Regular Season - 14",
+      "Regular Season - 15",
+      "Regular Season - 16",
+      "Regular Season - 17",
+      "Regular Season - 18",
+      "Regular Season - 19",
+      "Regular Season - 2",
+      "Regular Season - 20",
+      "Regular Season - 21",
+      "Regular Season - 22",
+      "Regular Season - 23",
+      "Regular Season - 24",
+      "Regular Season - 25",
+      "Regular Season - 26",
+      "Regular Season - 27",
+      "Regular Season - 28",
+      "Regular Season - 29",
+      "Regular Season - 3",
+      "Regular Season - 30",
+      "Regular Season - 31",
+      "Regular Season - 32",
+      "Regular Season - 33",
+      "Regular Season - 34",
+      "Regular Season - 4",
+      "Regular Season - 5",
+      "Regular Season - 6",
+      "Regular Season - 7",
+      "Regular Season - 8",
+      "Regular Season - 9",
+      "Round of 16",
+      "Round of 32",
+      "Semi-finals"
+     ]
+    },
+    {
+     "year": 2026,
+     "rounds": [
+      "Regular Season - 1",
+      "Regular Season - 10",
+      "Regular Season - 11",
+      "Regular Season - 12",
+      "Regular Season - 13",
+      "Regular Season - 14",
+      "Regular Season - 15",
+      "Regular Season - 16",
+      "Regular Season - 17",
+      "Regular Season - 18",
+      "Regular Season - 19",
+      "Regular Season - 2",
+      "Regular Season - 20",
+      "Regular Season - 21",
+      "Regular Season - 22",
+      "Regular Season - 23",
+      "Regular Season - 24",
+      "Regular Season - 25",
+      "Regular Season - 26",
+      "Regular Season - 27",
+      "Regular Season - 28",
+      "Regular Season - 29",
+      "Regular Season - 3",
+      "Regular Season - 30",
+      "Regular Season - 31",
+      "Regular Season - 32",
+      "Regular Season - 33",
+      "Regular Season - 34",
+      "Regular Season - 4",
+      "Regular Season - 5",
+      "Regular Season - 6",
+      "Regular Season - 7",
+      "Regular Season - 8",
+      "Regular Season - 9"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 73,
+   "slug": "copadobrasil_2026",
+   "seasons": [
+    {
+     "year": 2025,
+     "rounds": [
+      "1st Round",
+      "2nd Round",
+      "3rd Round",
+      "Final",
+      "Quarter-finals",
+      "Round of 16",
+      "Semi-finals"
+     ]
+    },
+    {
+     "year": 2026,
+     "rounds": [
+      "1/128-finals",
+      "1/256-finals",
+      "Quarter-finals",
+      "Round of 128",
+      "Round of 16",
+      "Round of 32",
+      "Round of 64",
+      "Semi-finals"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 130,
+   "slug": "copaargentina_2026",
+   "seasons": [
+    {
+     "year": 2025,
+     "rounds": [
+      "1st Round",
+      "Final",
+      "Quarter-finals",
+      "Round of 16",
+      "Round of 32",
+      "Semi-finals"
+     ]
+    },
+    {
+     "year": 2026,
+     "rounds": [
+      "Quarter-finals",
+      "Round of 16",
+      "Round of 32",
+      "Round of 64"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 88,
+   "slug": "eredivisie_2026",
+   "seasons": [
+    {
+     "year": 2026,
+     "rounds": [
+      "Regular Season - 1",
+      "Regular Season - 10",
+      "Regular Season - 11",
+      "Regular Season - 12",
+      "Regular Season - 13",
+      "Regular Season - 14",
+      "Regular Season - 15",
+      "Regular Season - 16",
+      "Regular Season - 17",
+      "Regular Season - 18",
+      "Regular Season - 19",
+      "Regular Season - 2",
+      "Regular Season - 20",
+      "Regular Season - 21",
+      "Regular Season - 22",
+      "Regular Season - 23",
+      "Regular Season - 24",
+      "Regular Season - 25",
+      "Regular Season - 26",
+      "Regular Season - 27",
+      "Regular Season - 28",
+      "Regular Season - 29",
+      "Regular Season - 3",
+      "Regular Season - 30",
+      "Regular Season - 31",
+      "Regular Season - 32",
+      "Regular Season - 33",
+      "Regular Season - 34",
+      "Regular Season - 4",
+      "Regular Season - 5",
+      "Regular Season - 6",
+      "Regular Season - 7",
+      "Regular Season - 8",
+      "Regular Season - 9"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 94,
+   "slug": "primeira_2026",
+   "seasons": [
+    {
+     "year": 2026,
+     "rounds": [
+      "Regular Season - 1",
+      "Regular Season - 10",
+      "Regular Season - 11",
+      "Regular Season - 12",
+      "Regular Season - 13",
+      "Regular Season - 14",
+      "Regular Season - 15",
+      "Regular Season - 16",
+      "Regular Season - 17",
+      "Regular Season - 18",
+      "Regular Season - 19",
+      "Regular Season - 2",
+      "Regular Season - 20",
+      "Regular Season - 21",
+      "Regular Season - 22",
+      "Regular Season - 23",
+      "Regular Season - 24",
+      "Regular Season - 25",
+      "Regular Season - 26",
+      "Regular Season - 27",
+      "Regular Season - 28",
+      "Regular Season - 29",
+      "Regular Season - 3",
+      "Regular Season - 30",
+      "Regular Season - 31",
+      "Regular Season - 32",
+      "Regular Season - 33",
+      "Regular Season - 34",
+      "Regular Season - 4",
+      "Regular Season - 5",
+      "Regular Season - 6",
+      "Regular Season - 7",
+      "Regular Season - 8",
+      "Regular Season - 9"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "slug": "nationsleague_2026",
+   "seasons": [
+    {
+     "year": 2024,
+     "rounds": [
+      "3rd Place Final",
+      "Final",
+      "League A - 1",
+      "League A - 2",
+      "League A - 3",
+      "League A - 4",
+      "League A - 5",
+      "League A - 6",
+      "League B - 1",
+      "League B - 2",
+      "League B - 3",
+      "League B - 4",
+      "League B - 5",
+      "League B - 6",
+      "League C - 1",
+      "League C - 2",
+      "League C - 3",
+      "League C - 4",
+      "League C - 5",
+      "League C - 6",
+      "League D - 1",
+      "League D - 2",
+      "League D - 3",
+      "League D - 4",
+      "League D - 5",
+      "League D - 6",
+      "Play-offs A/B",
+      "Play-offs B/C",
+      "Play-offs C/D",
+      "Quarter-finals",
+      "Semi-finals"
+     ]
+    },
+    {
+     "year": 2026,
+     "rounds": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6"
+     ]
+    }
+   ]
+  }
+ ]
+}

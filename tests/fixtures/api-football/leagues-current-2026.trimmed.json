@@ -1,26 +1,344 @@
 {
  "source": "GET /leagues?current=true",
- "observedAt": "2026-09-13T09:15:29Z",
- "note": "Recorte de 1237 ligas a las 10 del repo más 2 ajenas.",
+ "observedAt": "2026-09-18T15:05:00Z",
+ "note": "Recorte de 1238 ligas a las 21 del repo más 1 ajena (807).",
  "get": "leagues",
  "errors": [],
- "results": 12,
+ "results": 22,
  "paging": {
   "current": 1,
   "total": 1
  },
  "response": [
-  {"league":{"id":807,"name":"AFC Challenge Cup","type":"Cup"},"seasons":[{"year":2014,"start":"2013-03-02","end":"2014-05-30","current":true}]},
-  {"league":{"id":71,"name":"Serie A","type":"League"},"seasons":[{"year":2026,"start":"2026-01-28","end":"2026-12-02","current":true}]},
-  {"league":{"id":13,"name":"CONMEBOL Libertadores","type":"Cup"},"seasons":[{"year":2026,"start":"2026-02-04","end":"2026-09-15","current":true}]},
-  {"league":{"id":239,"name":"Primera A","type":"League"},"seasons":[{"year":2026,"start":"2026-01-16","end":"2026-11-08","current":true}]},
-  {"league":{"id":11,"name":"CONMEBOL Sudamericana","type":"Cup"},"seasons":[{"year":2026,"start":"2026-03-03","end":"2026-09-16","current":true}]},
-  {"league":{"id":135,"name":"Serie A","type":"League"},"seasons":[{"year":2026,"start":"2026-08-22","end":"2027-05-30","current":true}]},
-  {"league":{"id":61,"name":"Ligue 1","type":"League"},"seasons":[{"year":2026,"start":"2026-08-21","end":"2027-05-29","current":true}]},
-  {"league":{"id":2,"name":"UEFA Champions League","type":"Cup"},"seasons":[{"year":2026,"start":"2026-07-07","end":"2027-01-27","current":true}]},
-  {"league":{"id":3,"name":"UEFA Europa League","type":"Cup"},"seasons":[{"year":2026,"start":"2026-07-09","end":"2027-01-28","current":true}]},
-  {"league":{"id":39,"name":"Premier League","type":"League"},"seasons":[{"year":2026,"start":"2026-08-21","end":"2027-05-30","current":true}]},
-  {"league":{"id":140,"name":"La Liga","type":"League"},"seasons":[{"year":2026,"start":"2026-08-15","end":"2027-05-30","current":true}]},
-  {"league":{"id":78,"name":"Bundesliga","type":"League"},"seasons":[{"year":2026,"start":"2026-08-28","end":"2027-05-22","current":true}]}
+  {
+   "league": {
+    "id": 2,
+    "name": "UEFA Champions League",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-07-07",
+     "end": "2027-01-27",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 3,
+    "name": "UEFA Europa League",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-07-09",
+     "end": "2027-01-28",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 5,
+    "name": "UEFA Nations League",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-09-24",
+     "end": "2026-11-17",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 11,
+    "name": "CONMEBOL Sudamericana",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-03-03",
+     "end": "2026-10-21",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 13,
+    "name": "CONMEBOL Libertadores",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-02-04",
+     "end": "2026-10-20",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 39,
+    "name": "Premier League",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-08-21",
+     "end": "2027-05-30",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 61,
+    "name": "Ligue 1",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-08-21",
+     "end": "2027-05-29",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 71,
+    "name": "Serie A",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-01-28",
+     "end": "2026-12-02",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 73,
+    "name": "Copa Do Brasil",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-02-17",
+     "end": "2026-11-08",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 78,
+    "name": "Bundesliga",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-08-28",
+     "end": "2027-05-22",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 88,
+    "name": "Eredivisie",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-08-07",
+     "end": "2027-05-23",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 94,
+    "name": "Primeira Liga",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-08-07",
+     "end": "2027-05-16",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 128,
+    "name": "Liga Profesional Argentina",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-01-22",
+     "end": "2026-11-08",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 130,
+    "name": "Copa Argentina",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-01-18",
+     "end": "2026-09-27",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 135,
+    "name": "Serie A",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-08-22",
+     "end": "2027-05-30",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 140,
+    "name": "La Liga",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-08-15",
+     "end": "2027-05-30",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 239,
+    "name": "Primera A",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-01-16",
+     "end": "2026-11-12",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 241,
+    "name": "Copa Colombia",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-05-07",
+     "end": "2026-10-03",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 253,
+    "name": "Major League Soccer",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-02-21",
+     "end": "2026-11-08",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 262,
+    "name": "Liga MX",
+    "type": "League"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-07-17",
+     "end": "2026-11-23",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 848,
+    "name": "UEFA Europa Conference League",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2026,
+     "start": "2026-07-07",
+     "end": "2026-12-17",
+     "current": true
+    }
+   ]
+  },
+  {
+   "league": {
+    "id": 807,
+    "name": "AFC Challenge Cup",
+    "type": "Cup"
+   },
+   "seasons": [
+    {
+     "year": 2014,
+     "start": "2013-03-02",
+     "end": "2014-05-30",
+     "current": true
+    }
+   ]
+  }
  ]
 }

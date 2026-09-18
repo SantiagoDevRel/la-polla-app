@@ -101,26 +101,116 @@ export const TOURNAMENTS = [
     smallLogoPath: `/tournaments/ligue_1-96.webp?v=${LOGO_V}`,
     color: "#dae025",
   },
+  // Agregados 2026-09-18 a pedido del dueño: once torneos más, todos con
+  // cobertura completa de API-Football (eventos, estadísticas y alineaciones)
+  // verificada contra /leagues?current=true el mismo día. El logo real lo
+  // hornea scripts/bake-team-crests.mjs en league-logos.json; los paths de
+  // acá son el respaldo que usa getTournamentLogo si esa entrada faltara.
+  {
+    slug: "copacolombia_2026",
+    name: "Copa Colombia",
+    apiCode: "CCO",
+    logoPath: "/team-crests/5c77cfd14eddac8f-96.webp",
+    smallLogoPath: "/team-crests/5c77cfd14eddac8f-96.webp",
+    color: "#fcd116",
+  },
+  {
+    slug: "conference_2026",
+    name: "Conference League",
+    apiCode: "UECL",
+    logoPath: "/team-crests/3e5c234c16f63389-96.webp",
+    smallLogoPath: "/team-crests/3e5c234c16f63389-96.webp",
+    color: "#00b94f",
+  },
+  {
+    slug: "eredivisie_2026",
+    name: "Eredivisie",
+    apiCode: "DED",
+    logoPath: "/team-crests/c242e6fa2761fab1-96.webp",
+    smallLogoPath: "/team-crests/c242e6fa2761fab1-96.webp",
+    color: "#e2001a",
+  },
+  {
+    slug: "primeira_2026",
+    name: "Primeira Liga",
+    apiCode: "PPL",
+    logoPath: "/team-crests/3799c36654cbdfd3-96.webp",
+    smallLogoPath: "/team-crests/3799c36654cbdfd3-96.webp",
+    color: "#036c3c",
+  },
+  {
+    slug: "brasileirao_2026",
+    name: "Brasileirão",
+    apiCode: "BSA",
+    logoPath: "/team-crests/292cd315ccc2c20f-96.webp",
+    smallLogoPath: "/team-crests/292cd315ccc2c20f-96.webp",
+    color: "#14b356",
+  },
+  {
+    slug: "copadobrasil_2026",
+    name: "Copa do Brasil",
+    apiCode: "CDB",
+    logoPath: "/team-crests/60c99225b71b5717-96.webp",
+    smallLogoPath: "/team-crests/60c99225b71b5717-96.webp",
+    color: "#f7c600",
+  },
+  {
+    slug: "ligaargentina_2026",
+    name: "Liga Argentina",
+    apiCode: "LPA",
+    logoPath: "/team-crests/0f3982fd1786e614-96.webp",
+    smallLogoPath: "/team-crests/0f3982fd1786e614-96.webp",
+    color: "#75aadb",
+  },
+  {
+    slug: "copaargentina_2026",
+    name: "Copa Argentina",
+    apiCode: "CAR",
+    logoPath: "/team-crests/565f5c3699f12352-96.webp",
+    smallLogoPath: "/team-crests/565f5c3699f12352-96.webp",
+    color: "#6cace4",
+  },
+  {
+    slug: "ligamx_2026",
+    name: "Liga MX",
+    apiCode: "LMX",
+    logoPath: "/team-crests/b084cb75e37d328c-96.webp",
+    smallLogoPath: "/team-crests/b084cb75e37d328c-96.webp",
+    color: "#006847",
+  },
+  {
+    slug: "mls_2026",
+    name: "MLS",
+    apiCode: "MLS",
+    logoPath: "/team-crests/ffa2c1a0abfd1ed2-96.webp",
+    smallLogoPath: "/team-crests/ffa2c1a0abfd1ed2-96.webp",
+    color: "#001b3a",
+  },
+  {
+    slug: "nationsleague_2026",
+    name: "Nations League",
+    apiCode: "UNL",
+    logoPath: "/team-crests/3fe3bf8f8b7c666e-96.webp",
+    smallLogoPath: "/team-crests/3fe3bf8f8b7c666e-96.webp",
+    color: "#0b1b52",
+  },
 ] as const;
 
 export type TournamentSlug = (typeof TOURNAMENTS)[number]["slug"];
 
-// Torneos disponibles para CREAR pollas nuevas. Post-Mundial 2026 dejamos
-// SOLO el Mundial vivo (2026-06-09): las 17 pollas activas son todas
-// worldcup_2026 y las demás ligas (Champions/BetPlay/Libertadores/
-// Sudamericana) solo aparecen en pollas ya terminadas. El resto del array
-// TOURNAMENTS se mantiene como metadata histórica para que esas pollas
-// ended sigan resolviendo nombre/logo — pero no se pueden elegir al crear.
-// Para reactivar una liga (ej. cuando vuelva la temporada), agregá su slug
-// a esta lista. No hace falta tocar nada más.
+// Torneos con los que la CASA puede armar pollas. `worldcup_2026` queda fuera
+// a propósito: sigue en TOURNAMENTS como metadata histórica para que las pollas
+// terminadas resuelvan su nombre y su logo, pero no se puede elegir.
 //
-// 2026-07-26 — TEMPORADA CERRADA: el Mundial terminó el 19-jul y no queda
-// ningún torneo con partidos futuros en la DB (0 filas con scheduled_at >
-// now(), 62/62 pollas en status='ended'). La lista queda VACÍA a
-// propósito: es el interruptor único del modo cierre (ver lib/closure.ts).
-// Con la lista vacía → banner de cierre en toda la app, /pollas/crear
-// muestra el estado de cierre y POST /api/pollas rechaza con 403.
-// Para REABRIR: descomentá/agregá el slug del torneo que vuelva y listo.
+// Agregar un slug acá NO alcanza para que el torneo funcione: también necesita
+// su id en RESULT_LEAGUES, su grupo en TOURNAMENT_GROUPS, sus fases en
+// TOURNAMENT_STRUCTURE, su landing en TOURNAMENTS_SEO, su nombre genérico para
+// iOS y un pase de scripts/bake-team-crests.mjs. Los tests
+// `tournament-availability` y `football-media` fallan si falta alguno.
+//
+// (Ojo con el historial: entre el 2026-07-26 y el 2026-08-25 esta lista estuvo
+// VACÍA como interruptor del modo "temporada cerrada". Eso se separó: hoy el
+// estado de producto vive en `lib/closure.ts` y esta lista es solo un dato.)
 export const CREATABLE_TOURNAMENT_SLUGS: readonly TournamentSlug[] = [
   "premier_2025",
   "laliga_2025",
@@ -129,39 +219,68 @@ export const CREATABLE_TOURNAMENT_SLUGS: readonly TournamentSlug[] = [
   "ligue1_2025",
   "champions_2025",
   "europa_2026",
+  "conference_2026",
+  "eredivisie_2026",
+  "primeira_2026",
   "libertadores_2026",
   "sudamericana_2026",
   "betplay_2026",
+  "copacolombia_2026",
+  "brasileirao_2026",
+  "copadobrasil_2026",
+  "ligaargentina_2026",
+  "copaargentina_2026",
+  "ligamx_2026",
+  "mls_2026",
+  "nationsleague_2026",
 ];
 
 export const CREATABLE_TOURNAMENTS = TOURNAMENTS.filter((t) =>
   CREATABLE_TOURNAMENT_SLUGS.includes(t.slug),
 );
 
+/**
+ * Los torneos que la casa puede usar, por región. Desde el 2026-09-18 son
+ * veintiuno: una sola lista de botones era un muro de once filas donde había
+ * que leerlos todos para encontrar uno. Agrupados se busca por región, que es
+ * como los nombra la gente.
+ *
+ * El orden dentro de cada grupo es el de `TOURNAMENTS`. Un grupo con una
+ * cantidad impar deja su último botón a lo ancho, para que la última fila se
+ * lea como una decisión y no como un hueco (misma regla que la ventana de
+ * fechas del selector de partidos).
+ */
+export const TOURNAMENT_GROUPS: ReadonlyArray<{ label: string; slugs: readonly string[] }> = [
+  { label: "Colombia", slugs: ["betplay_2026", "copacolombia_2026"] },
+  { label: "Copas de Europa", slugs: ["champions_2025", "europa_2026", "conference_2026", "nationsleague_2026"] },
+  { label: "Ligas de Europa", slugs: ["premier_2025", "laliga_2025", "seriea_2025", "bundesliga_2025", "ligue1_2025", "eredivisie_2026", "primeira_2026"] },
+  { label: "Sudamérica", slugs: ["libertadores_2026", "sudamericana_2026", "brasileirao_2026", "copadobrasil_2026", "ligaargentina_2026", "copaargentina_2026"] },
+  { label: "Norteamérica", slugs: ["ligamx_2026", "mls_2026"] },
+].map((group) => ({
+  ...group,
+  slugs: group.slugs.filter((slug) => (CREATABLE_TOURNAMENT_SLUGS as readonly string[]).includes(slug)),
+})).filter((group) => group.slugs.length > 0);
+
 export function isCreatableTournament(slug: string): boolean {
   return (CREATABLE_TOURNAMENT_SLUGS as readonly string[]).includes(slug);
 }
 
-// Torneos que se SINCRONIZAN automáticamente (fetch de fixtures/scores
-// desde los providers: football-data, ESPN, api-football). Una liga que
-// NO esté acá no se consulta en ningún sync automático (cron + lazy
-// ensure-fresh), para no quemar cuota free-tier en ligas sin pollas
-// activas. Post-Mundial 2026 (2026-06-09) = solo el Mundial.
+// Torneos que se SINCRONIZAN automáticamente desde API-Football, la única
+// fuente desde el 2026-09-13. Una liga que NO esté acá no se consulta en ningún
+// sync automático (cron cada 2 h + refresco on-demand del panel).
 //
 // Se mantiene SEPARADO de CREATABLE_TOURNAMENT_SLUGS a propósito: podrías
-// querer seguir sincronizando una liga para cerrar resultados de pollas
-// ended sin permitir crear pollas nuevas de ella. Hoy ambos = worldcup.
+// querer seguir sincronizando una liga para cerrar resultados de pollas ya
+// terminadas sin permitir armar pollas nuevas con ella.
+//
+// El calendario se pide por liga (una solicitud por liga por vuelta), pero el
+// feed de vivo y de resultados se pide por FECHA y filtra con RESULT_LEAGUES:
+// por eso sumar torneos casi no mueve el consumo de cuota. Lo que sí se apretó
+// es el recorrido del cron, que es serie dentro de los 60 s de Vercel (ver
+// migración 141).
+//
 // Las llamadas EXPLÍCITAS por slug (admin manual / discover ?tournament=)
 // NO pasan por este gate — son override deliberado con CRON_SECRET/admin.
-//
-// 2026-07-26 — TEMPORADA CERRADA: lista vacía. Con el Mundial terminado no
-// queda un solo partido futuro que sincronizar, así que los crons dejan de
-// pegarle a football-data / ESPN / api-football (cuota free-tier intacta).
-// Todos los usos son gates (`filter` / `continue` / early-return), así que
-// vaciarla convierte cada sync automático en no-op sin romper nada.
-// El path EXPLÍCITO por slug (admin manual, discover ?tournament= con
-// CRON_SECRET) NO pasa por este gate: si necesitás resincronizar algo
-// puntual, sigue funcionando sin tocar esta lista.
 export const SYNCABLE_TOURNAMENT_SLUGS: readonly string[] = [
   ...CREATABLE_TOURNAMENT_SLUGS,
 ];
@@ -184,6 +303,17 @@ const TOURNAMENT_NAMES_EN: Record<string, string> = {
   betplay_2026: "BetPlay League",
   bundesliga_2025: "Bundesliga",
   ligue1_2025: "Ligue 1",
+  copacolombia_2026: "Colombia Cup",
+  conference_2026: "Conference League",
+  eredivisie_2026: "Eredivisie",
+  primeira_2026: "Primeira Liga",
+  brasileirao_2026: "Brasileirao",
+  copadobrasil_2026: "Brazil Cup",
+  ligaargentina_2026: "Argentine League",
+  copaargentina_2026: "Argentina Cup",
+  ligamx_2026: "Liga MX",
+  mls_2026: "MLS",
+  nationsleague_2026: "Nations League",
 };
 
 export function getTournamentBySlug(slug: string) {
@@ -197,16 +327,49 @@ export function getTournamentName(slug: string, locale: string = "es"): string {
   return getTournamentBySlug(slug)?.name ?? slug;
 }
 
+// Nombre corto para chips y listas donde el nombre completo no aporta. Es un
+// mapa EXPLÍCITO y no un recorte de «Copa »/« League»: ese recorte convertía
+// «Copa do Brasil» en «do Brasil» y dejaba «Copa Argentina» y «Liga Argentina»
+// como «Argentina» y «Liga Argentina». Un torneo sin entrada acá conserva su
+// nombre entero, que es el default correcto.
+const TOURNAMENT_SHORT_NAMES: Record<string, string> = {
+  champions_2025: "Champions",
+  europa_2026: "Europa League",
+  premier_2025: "Premier",
+  libertadores_2026: "Libertadores",
+  sudamericana_2026: "Sudamericana",
+  betplay_2026: "BetPlay",
+  worldcup_2026: "Mundial",
+};
+
+export function getTournamentShortName(slug: string, locale: string = "es"): string {
+  const full = getTournamentName(slug, locale);
+  if (locale === "en") return full;
+  return TOURNAMENT_SHORT_NAMES[slug] ?? full;
+}
+
 export function getTournamentLogo(slug: string, size: "original" | "small" = "original"): string {
   const tournament = getTournamentBySlug(slug) ?? TOURNAMENTS[0];
   // Static 96 px assets cover a 32 px logo at 3x without Image Optimization.
   return (leagueLogos as Record<string,string>)[slug] ?? (size === "small" ? tournament.smallLogoPath : tournament.logoPath);
 }
 
+// Logos que el proveedor sirve en un tono oscuro y que sobre nuestras
+// superficies casi no se ven. Comprobado mirando cada marca sobre #0e1420, no
+// por su nombre: las monocromas se pasan a blanco y las que llevan color de
+// marca solo se aclaran, para no perder su identidad.
+const LOGOS_A_BLANCO = new Set([
+  'ligue1_2025', 'sudamericana_2026', 'europa_2026',
+  'conference_2026', 'eredivisie_2026',
+]);
+const LOGOS_A_ACLARAR = new Set([
+  'betplay_2026', 'copadobrasil_2026', 'nationsleague_2026',
+]);
+
 /** Monochrome marks need their light treatment on our dark surfaces. */
 export function getTournamentLogoClassName(slug: string): string {
-  if (slug === 'ligue1_2025' || slug === 'sudamericana_2026' || slug === 'europa_2026') return 'brightness-0 invert';
-  if (slug === 'betplay_2026') return 'brightness-200';
+  if (LOGOS_A_BLANCO.has(slug)) return 'brightness-0 invert';
+  if (LOGOS_A_ACLARAR.has(slug)) return 'brightness-200';
   return '';
 }
 

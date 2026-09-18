@@ -166,7 +166,193 @@ export const TOURNAMENTS_SEO: TournamentSeo[] = [
       en: ["serie a pool", "italian league predictions"],
     },
   },
-];
+  {
+    internalSlug: "copacolombia_2026",
+    publicSlug: "copa-colombia",
+    name: { es: "Copa Colombia 2026", en: "Colombia Cup 2026" },
+    description: {
+      es: "Pollas de Copa Colombia 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Colombia Cup 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Copa Colombia",
+      en: "Colombia Cup pools",
+    },
+    keywords: {
+      es: ["polla copa colombia", "quiniela copa colombia", "pronosticos copa colombia"],
+      en: ["colombia cup pool", "colombia cup predictions"],
+    },
+  },
+  {
+    internalSlug: "conference_2026",
+    publicSlug: "conference-league",
+    name: { es: "Conference League 2026/27", en: "Conference League 2026/27" },
+    description: {
+      es: "Pollas de Conference League 2026/27 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Conference League 2026/27 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Conference League",
+      en: "Conference League pools",
+    },
+    keywords: {
+      es: ["polla conference league", "quiniela conference league", "pronosticos conference league"],
+      en: ["conference league pool", "conference league predictions"],
+    },
+  },
+  {
+    internalSlug: "eredivisie_2026",
+    publicSlug: "eredivisie",
+    name: { es: "Eredivisie 2026/27", en: "Eredivisie 2026/27" },
+    description: {
+      es: "Pollas de Eredivisie 2026/27 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Eredivisie 2026/27 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Eredivisie",
+      en: "Eredivisie pools",
+    },
+    keywords: {
+      es: ["polla eredivisie", "quiniela liga holandesa", "pronosticos eredivisie"],
+      en: ["eredivisie pool", "eredivisie predictions"],
+    },
+  },
+  {
+    internalSlug: "primeira_2026",
+    publicSlug: "primeira-liga",
+    name: { es: "Primeira Liga 2026/27", en: "Primeira Liga 2026/27" },
+    description: {
+      es: "Pollas de Primeira Liga 2026/27 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Primeira Liga 2026/27 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Primeira Liga",
+      en: "Primeira Liga pools",
+    },
+    keywords: {
+      es: ["polla primeira liga", "quiniela liga portuguesa", "pronosticos liga de portugal"],
+      en: ["primeira liga pool", "primeira liga predictions"],
+    },
+  },
+  {
+    internalSlug: "brasileirao_2026",
+    publicSlug: "brasileirao",
+    name: { es: "Brasileirão 2026", en: "Brasileirao 2026" },
+    description: {
+      es: "Pollas de Brasileirão 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Brasileirao 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Brasileirão",
+      en: "Brasileirao pools",
+    },
+    keywords: {
+      es: ["polla brasileirao", "quiniela liga brasilena", "pronosticos brasileirao"],
+      en: ["brasileirao pool", "brasileirao predictions"],
+    },
+  },
+  {
+    internalSlug: "copadobrasil_2026",
+    publicSlug: "copa-do-brasil",
+    name: { es: "Copa do Brasil 2026", en: "Brazil Cup 2026" },
+    description: {
+      es: "Pollas de Copa do Brasil 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Brazil Cup 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Copa do Brasil",
+      en: "Brazil Cup pools",
+    },
+    keywords: {
+      es: ["polla copa do brasil", "quiniela copa de brasil", "pronosticos copa do brasil"],
+      en: ["brazil cup pool", "brazil cup predictions"],
+    },
+  },
+  {
+    internalSlug: "ligaargentina_2026",
+    publicSlug: "liga-argentina",
+    name: { es: "Liga Argentina 2026", en: "Argentine League 2026" },
+    description: {
+      es: "Pollas de Liga Argentina 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Argentine League 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Liga Argentina",
+      en: "Argentine League pools",
+    },
+    keywords: {
+      es: ["polla liga argentina", "quiniela futbol argentino", "pronosticos liga argentina"],
+      en: ["argentine league pool", "argentine league predictions"],
+    },
+  },
+  {
+    internalSlug: "copaargentina_2026",
+    publicSlug: "copa-argentina",
+    name: { es: "Copa Argentina 2026", en: "Argentina Cup 2026" },
+    description: {
+      es: "Pollas de Copa Argentina 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Argentina Cup 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Copa Argentina",
+      en: "Argentina Cup pools",
+    },
+    keywords: {
+      es: ["polla copa argentina", "quiniela copa argentina", "pronosticos copa argentina"],
+      en: ["argentina cup pool", "argentina cup predictions"],
+    },
+  },
+  {
+    internalSlug: "ligamx_2026",
+    publicSlug: "liga-mx",
+    name: { es: "Liga MX 2026", en: "Liga MX 2026" },
+    description: {
+      es: "Pollas de Liga MX 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Liga MX 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Liga MX",
+      en: "Liga MX pools",
+    },
+    keywords: {
+      es: ["polla liga mx", "quiniela liga mx", "pronosticos futbol mexicano"],
+      en: ["liga mx pool", "liga mx predictions"],
+    },
+  },
+  {
+    internalSlug: "mls_2026",
+    publicSlug: "mls",
+    name: { es: "MLS 2026", en: "MLS 2026" },
+    description: {
+      es: "Pollas de MLS 2026 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "MLS 2026 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de MLS",
+      en: "MLS pools",
+    },
+    keywords: {
+      es: ["polla mls", "quiniela mls", "pronosticos mls"],
+      en: ["mls pool", "mls predictions"],
+    },
+  },
+  {
+    internalSlug: "nationsleague_2026",
+    publicSlug: "nations-league",
+    name: { es: "Nations League 2026/27", en: "Nations League 2026/27" },
+    description: {
+      es: "Pollas de Nations League 2026/27 publicadas por la casa. Paga la entrada, pronostica y compite por el pozo.",
+      en: "Nations League 2026/27 pools published by the house. Pay the entry fee, make your picks and compete for the prize pool.",
+    },
+    heading: {
+      es: "Pollas de Nations League",
+      en: "Nations League pools",
+    },
+    keywords: {
+      es: ["polla nations league", "quiniela nations league", "pronosticos nations league"],
+      en: ["nations league pool", "nations league predictions"],
+    },
+  },];
 
 export function findByPublicSlug(slug: string): TournamentSeo | undefined {
   return TOURNAMENTS_SEO.find((t) => t.publicSlug === slug);

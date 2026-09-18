@@ -29,7 +29,8 @@ export async function syncApiFootballLive(): Promise<Set<string>> {
  // TODOS los partidos de los torneos activos en la ventana, estén o no en una
  // polla: nadie más los actualiza. El corte del 2026-09-13 dejó a Celta–Málaga
  // en «vivo, minuto 48» dos horas después. No cuesta cuota extra: el feed por
- // fecha ya trae los diez torneos.
+ // fecha ya trae todos los torneos configurados, así que sumar ligas no agrega
+ // solicitudes — solo más partidos dentro de la misma respuesta por fecha.
  //
  // Las filas ya terminadas (finished/cancelled) salen de la ventana: el vivo no
  // tiene nada más que escribirles (matches_prevent_status_regress no deja bajar

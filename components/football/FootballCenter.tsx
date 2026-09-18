@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { CalendarDays, ChevronDown, ChevronRight, Search, X } from 'lucide-react';
 import { TeamCrest } from '@/components/match/TeamCrest';
-import { TOURNAMENTS, getTournamentName } from '@/lib/tournaments';
+import { TOURNAMENTS, getTournamentName, getTournamentShortName } from '@/lib/tournaments';
 import { RESULT_LEAGUES } from '@/lib/api-football/results';
 import { isLiveStatus, type FootballMatch } from '@/lib/api-football/detail-model';
 import { teamNameKey } from '@/lib/teams/team-name-key';
@@ -55,7 +55,7 @@ export default function FootballCenter({teams}:{teams:readonly CatalogTeam[]}) {
     <label className="block min-w-0 space-y-1 text-[13px] text-text-secondary"><span>{en?'Competitions':'Torneos'}</span>
      <select value={league} onChange={e=>setLeague(e.target.value)} className="lp-input block min-h-11 w-full text-[15px]">
       <option value="all">{en?'All':'Todos'}</option>
-      {tournaments.map(t=><option key={t.slug} value={t.slug}>{getTournamentName(t.slug,locale).replace('Champions League','Champions').replace('Premier League','Premier').replace('Copa ','').replace('Liga BetPlay','BetPlay')}</option>)}
+      {tournaments.map(t=><option key={t.slug} value={t.slug}>{getTournamentShortName(t.slug,locale)}</option>)}
      </select>
     </label>
     <div className="min-w-0 space-y-1">

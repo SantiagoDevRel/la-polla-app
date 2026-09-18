@@ -10,6 +10,7 @@ import {TOURNAMENTS,getTournamentLogo} from '@/lib/tournaments';
 import {teamNameKey} from '@/lib/teams/team-name-key';
 import {flagUrlForTeam} from '@/lib/flags/country-iso';
 import {localCrestSource} from '@/lib/teams/crest-source';
+import sharedIdentities from '@/lib/teams/shared-crests.json';
 
 const sources:Record<string,string>=catalog.bySource,names:Record<string,string>=catalog.byName;
 const sharp=createRequire(createRequire(import.meta.url).resolve('next/package.json'))('sharp') as (input:Uint8Array)=>{
@@ -26,10 +27,21 @@ describe('complete football media catalog',()=>{
  it('covers every configured competition and every current provider team with local artwork',()=>{
   expect(Object.keys(logos).sort()).toEqual(Object.keys(RESULT_LEAGUES).sort());
   expect(coverage.leagues.map(l=>l.slug).sort()).toEqual(Object.keys(RESULT_LEAGUES).sort());
+  // Clubes a los que el proveedor le sirve el escudo de OTRO club: van sin
+  // escudo a propósito, con su identidad revisada en shared-crests.json.
+  const shared=new Set((coverage.sharedCrestTeams as string[]).map(teamNameKey));
+  expect([...shared].every(name=>Object.values(sharedIdentities).every(entry=>teamNameKey(entry.keep)!==name))).toBe(true);
   const byId=new Map<number,string>();
   for(const league of coverage.leagues){
    expect(league.teams.length).toBeGreaterThan(0);
-   for(const team of league.teams){expect(sources[team.source]).toMatch(/^\/team-crests\/[a-z0-9-]+\.(webp|png|svg)$/);byId.set(team.id,sources[team.source]);}
+   for(const team of league.teams){
+    if(shared.has(teamNameKey(team.name))){
+     // Sin escudo es correcto; el del otro club sería una identidad falsa.
+     expect(localCrestSource(team.name,team.source),team.name).toBeUndefined();
+     continue;
+    }
+    expect(sources[team.source]).toMatch(/^\/team-crests\/[a-z0-9-]+\.(webp|png|svg)$/);byId.set(team.id,sources[team.source]);
+   }
   }
   // A generic placeholder reused for two different clubs is not coverage.
   expect(new Set(byId.values()).size).toBe(byId.size);

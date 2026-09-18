@@ -466,6 +466,43 @@ el ID público del build con el cliente cada dos minutos visibles y al volver a 
 Perfil ofrece el mismo botón manual. No borrar cookies, storage ni registros del SW.
 La bienvenida presenta nueve logos locales y no lleva crédito personal.
 
+### Veintiún torneos, todos de API-Football (2026-09-18, migración 141)
+
+El dueño pidió once torneos más: Copa Colombia, Brasileirão, Liga MX, Liga
+Argentina, Conference League, MLS, Copa do Brasil, Copa Argentina, Eredivisie,
+Primeira Liga y Nations League. Todos salen de **API-Football**, con cobertura
+completa del proveedor verificada el mismo día; no se agrega ninguna otra fuente.
+
+El calendario se pide por FECHA, así que sumar ligas **no gasta más cuota** de
+lectura: `RESULT_LEAGUES` solo filtra qué partidos de esa respuesta se guardan.
+Lo que sí cambia es el recorrido del cron, que va liga por liga dentro de los
+60 s de Vercel: pasó a cada 2 h (migración 141) para que ninguna liga quede más
+de medio día sin refrescarse. No volver a 6 h sin recortar la lista.
+
+`classifyRound` recibe ahora el **id de liga**, porque dos nombres de ronda
+significan cosas distintas según el torneo: «Play-offs» es una fase real de la
+Copa Colombia y una previa que no guardamos en la UEFA; un «3» pelado solo es
+jornada en la Nations League. Una ronda sin mapear NO se escribe y alerta en
+/admin — nunca inventes una fase aproximada. Las 418 etiquetas reales del
+proveedor viven en `tests/fixtures/api-football/rounds-observed.json` y el test
+las clasifica todas; si el proveedor estrena un nombre, se agrega ahí primero.
+Las rondas tempranas de copa (`Round of 128`, `1/128-finals`, `1st/2nd/3rd
+Round`) quedan excluidas a propósito: equipos de ascenso y nomenclatura que el
+proveedor cambia de una temporada a otra.
+
+Cuando el proveedor sirve la MISMA imagen para dos clubes reales distintos, el
+escudo se queda con su dueño verificado y el otro va **sin escudo** — nunca con
+el ajeno, ni con iniciales. Se revisa a mano y se anota en
+`lib/teams/shared-crests.json`; un duplicado sin anotar aborta el bake.
+
+La bienvenida fija **nueve** logos explícitos (rejilla 3×3): no derivarlos otra
+vez de `RESULT_LEAGUES`, que dejaba una última fila suelta. El selector del
+panel agrupa por región (`TOURNAMENT_GROUPS`) y un grupo impar deja su último
+botón a lo ancho. Un torneo fuera de todo grupo se cae del selector sin fallar,
+por eso el test exige que los grupos cubran exactamente los creables.
+
+Detalle, tabla de torneos y pasos para agregar otro: README → Fútbol.
+
 ### Centro de fútbol y API-Football Pro (2026-09-09, migraciones 094–095)
 
 El usuario aprobó y pagó un mes de Pro. `/status` decide plan y vencimiento;

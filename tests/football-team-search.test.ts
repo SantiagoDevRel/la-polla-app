@@ -57,6 +57,6 @@ describe('football team search',()=>{
   expect(coverage.leagues.map(l=>l.slug).sort()).toEqual([...select].sort());
   for(const slug of select)expect(real.some(team=>team.tournaments.includes(slug)),slug).toBe(true);
   expect(new Set(real.map(team=>team.id)).size).toBe(real.length);
-  expect([...searchTeams(real,'ATLÉTICO NACIONAL','all',6).results.find(team=>team.name==='Atletico Nacional')?.tournaments??[]].sort()).toEqual(['betplay_2026','sudamericana_2026']);
+  expect([...searchTeams(real,'ATLÉTICO NACIONAL','all',6).results.find(team=>team.name==='Atletico Nacional')?.tournaments??[]].sort()).toEqual(['betplay_2026','copacolombia_2026','sudamericana_2026']);
  });
 });
