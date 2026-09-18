@@ -116,14 +116,16 @@ function LiveCard({ row }: { row: CasaLiveMatch }) {
       href={`/futbol/partidos/${row.matchId}`}
       className="lp-card flex h-full flex-col gap-2 p-3 transition-colors duration-200 hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
     >
-      <span className="flex items-start justify-between gap-2">
+      {/* Con el texto del sistema al 200 % la etiqueta no cabe al lado del
+          nombre: envuelve a la línea siguiente en vez de aplastarlo a 0 px. */}
+      <span className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
         <span className="min-w-0 text-[12px] font-semibold leading-snug text-text-secondary [overflow-wrap:anywhere]">{row.pollaName}</span>
         {live ? (
-          <span className="lp-label shrink-0 !text-red-alert">Vivo{minute ? ` · ${minute}` : ""}</span>
+          <span className="lp-label min-w-0 !text-red-alert [overflow-wrap:anywhere]">Vivo{minute ? ` · ${minute}` : ""}</span>
         ) : waiting ? (
-          <span className="lp-label shrink-0 !text-amber">Esperando datos</span>
+          <span className="lp-label min-w-0 !text-amber [overflow-wrap:anywhere]">Esperando datos</span>
         ) : (
-          <span className="lp-label shrink-0">{row.finalVerifiedAt ? "Final" : "Terminó"}</span>
+          <span className="lp-label min-w-0 [overflow-wrap:anywhere]">{row.finalVerifiedAt ? "Final" : "Terminó"}</span>
         )}
       </span>
 
