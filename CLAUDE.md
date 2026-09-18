@@ -504,6 +504,19 @@ panel agrupa por región (`TOURNAMENT_GROUPS`) y un grupo impar deja su último
 botón a lo ancho. Un torneo fuera de todo grupo se cae del selector sin fallar,
 por eso el test exige que los grupos cubran exactamente los creables.
 
+⚠️ **Al agregar una liga, la caché de temporadas la deja afuera un día.**
+`app_config.api_football_current_seasons` guarda solo las ligas que conocía el
+código que la escribió (`parseCurrentSeasons` filtra por `RESULT_LEAGUES`), y
+vale 24 h. Recién deployadas las once, sus refrescos abortaban con
+`ABORTED=no_season` **sin gastar una sola solicitud**, porque la caché de esa
+mañana solo tenía diez. No es un error del proveedor ni del mapeo: se arregla
+regenerando esa fila (un UPDATE con las ligas nuevas y `fetchedAt` de ahora) o
+esperando a que venza. `scripts/af-import.ts` no sirve para detectarlo: pasa
+`cache: {read: () => null}` a propósito, así que pide `/leagues` siempre — y esa
+reserva tiene su propio candado de 1 hora, de modo que un dry-run reciente hace
+fallar al `--apply` que le sigue. El camino del panel (`/api/admin/sync-ligas`)
+sí usa la caché, y es el que conviene para sembrar.
+
 Detalle, tabla de torneos y pasos para agregar otro: README → Fútbol.
 
 ### Centro de fútbol y API-Football Pro (2026-09-09, migraciones 094–095)
