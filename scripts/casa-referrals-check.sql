@@ -442,24 +442,23 @@ BEGIN
   ASSERT NOT public.casa_referral_is_new_user(y), 'without an auth account nobody is new';
   RAISE NOTICE 'PASS new people are decided by the auth account';
 
-  -- 17) Administradores: sin código; uno de antes deja de invitar y de sumar regalos.
-  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_code_v1(%L)',admin_id),'REFERRAL_NOT_AVAILABLE');
-  ASSERT public.casa_referral_profile_v1(admin_id)->'code'='null'::jsonb;
-  ASSERT public.casa_referral_polla_view_v1(admin_id,q)->'code'='null'::jsonb;
-  x:=pg_temp.ref_user('Futura admin');
-  code_x:=public.casa_referral_code_v1(x);
-  UPDATE public.users SET is_admin=true WHERE id=x;
+  -- 17) Administradores: invitan como cualquiera (migración 138, decisión del dueño).
+  code_x:=public.casa_referral_code_v1(admin_id);
+  ASSERT code_x ~ '^[A-Z]{3,6}[0-9]{4,6}$', code_x;
+  ASSERT public.casa_referral_profile_v1(admin_id)->>'code'=code_x, 'an admin has a code';
+  ASSERT public.casa_referral_polla_view_v1(admin_id,q)->>'code'=code_x, 'and sees it in the pool';
   y:=pg_temp.ref_user('Invitada de admin');
-  ASSERT public.casa_referral_invitee_v1(y,code_x)->'hint'='null'::jsonb;
+  ASSERT public.casa_referral_invitee_v1(y,code_x)->'hint'->>'code'=code_x, 'the link of an admin is offered';
   res:=public.casa_set_referrer_v1(y,code_x,'enlace');
-  ASSERT res->>'error'='REFERRAL_CODE_NOT_FOUND', res::text;
+  ASSERT (res->>'ok')::boolean AND (res->>'changed')::boolean, res::text;
+  -- Sus regalos también se conservan: ser administrador ya no los quita.
   ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=r2 AND user_id=ana AND origin='invitacion' AND status='pagada')=2;
   UPDATE public.users SET is_admin=true WHERE id=ana;
   PERFORM public.casa_set_max_entries_v2(r2,9,admin_id,2);
-  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=r2 AND user_id=ana AND origin='invitacion' AND status='pagada'),
-    'an admin keeps no gifts';
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=r2 AND user_id=ana AND origin='invitacion' AND status='pagada')=2,
+    'an admin keeps their gifts';
   UPDATE public.users SET is_admin=false WHERE id=ana;
-  RAISE NOTICE 'PASS admins neither invite nor collect gifts';
+  RAISE NOTICE 'PASS admins invite and collect like anyone else';
 
   -- 18) Si se desmarca el pago que ancla a un invitado, cuenta con su otro cupo pagado
   --     ahí o, si no le queda ninguno, en la próxima polla donde pague.
