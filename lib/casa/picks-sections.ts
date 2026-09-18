@@ -1,16 +1,24 @@
 // lib/casa/picks-sections.ts — cómo se ordena la lista de partidos de una polla.
 //
-// (2026-09-16) Pedido del dueño: volver al recorrido de la polla vieja, que era
-// más fácil de entender. Tres bloques, en orden de tiempo:
-//   · Finalizados — desplegable CERRADO, del más reciente al más viejo.
-//   · En vivo     — se están jugando (o cierran en menos de 5 minutos): ya no
-//                   se pueden cambiar, pero es lo que la gente quiere mirar.
-//   · Próximos    — por día, cada día abierto, donde se pronostica.
+// (2026-09-18) Regla del dueño, y es la única: los partidos van SIEMPRE en
+// orden de empezada — arriba el que arranca primero, abajo el que arranca de
+// último — y no se mueven de lugar por ninguna otra razón.
+//
+// Antes (16-sep) la lista se partía en tres bloques por estado: Finalizados,
+// En vivo y Próximos. Se veía ordenada, pero el orden CAMBIABA SOLO: cada vez
+// que un partido arrancaba saltaba de bloque, así que quien había marcado el
+// sábado encontraba otra lista el domingo. Un jugador lo reportó así: «ayer
+// tenían un orden y hoy otro orden», y tenía razón — la lista es el mapa con
+// el que la gente revisa sus pronósticos, y moverla les hace marcar el palo
+// equivocado.
+//
+// El estado de cada partido (en vivo, final, anulado) se muestra DENTRO de su
+// tarjeta, sin sacarlo de su lugar. Los encabezados de día solo separan; no
+// reordenan, porque los días también van en orden de empezada.
 //
 // Funciones puras: se prueban en node sin React ni base de datos.
 
 import { COLOMBIA_TIME_ZONE, colombiaDateKey } from "@/lib/time/colombia";
-import { canEditCasaMatch, hasCasaMatchStarted } from "./match-rules";
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
@@ -41,12 +49,6 @@ export interface DayGroup<T> {
   matches: T[];
 }
 
-export interface MatchSections<T> {
-  finished: T[];
-  live: T[];
-  upcoming: Array<DayGroup<T>>;
-}
-
 /** Terminó para efectos de la polla: verificado, anulado o el proveedor dio el final. */
 export function isSectionFinished(match: SectionMatch): boolean {
   return Boolean(match.final_verified_at || match.voided_at || match.status === "finished");
@@ -62,23 +64,21 @@ export function dayLabel(iso: string, now = Date.now()): string {
   return shortDay(iso, COLOMBIA_TIME_ZONE);
 }
 
-export function partitionCasaMatches<T extends SectionMatch>(matches: T[], now = Date.now()): MatchSections<T> {
-  const finished: T[] = [];
-  const live: T[] = [];
-  const upcoming: T[] = [];
-  for (const match of matches) {
-    if (isSectionFinished(match)) finished.push(match);
-    // Empezó según el proveedor, o cierra ya (5 min) sin estar verificado: se
-    // mira, no se edita. Los reprogramados sin minutos siguen editables.
-    else if (hasCasaMatchStarted(match, now) || !canEditCasaMatch(match, now)) live.push(match);
-    else upcoming.push(match);
-  }
-  finished.sort((a, b) => kickoff(b) - kickoff(a));
-  live.sort((a, b) => kickoff(a) - kickoff(b));
-  upcoming.sort((a, b) => kickoff(a) - kickoff(b));
+/**
+ * Los partidos en orden de empezada, agrupados por día.
+ *
+ * Dos partidos a la misma hora conservan el orden en que vienen (el que la
+ * casa definió al crear la polla): el sort es estable y el empate se resuelve
+ * por la posición original, nunca por el estado ni por el nombre.
+ */
+export function groupCasaMatchesByDay<T extends SectionMatch>(matches: T[], now = Date.now()): Array<DayGroup<T>> {
+  const enOrden = matches
+    .map((match, index) => ({ match, index }))
+    .sort((a, b) => (kickoff(a.match) - kickoff(b.match)) || (a.index - b.index))
+    .map((fila) => fila.match);
 
   const groups = new Map<string, DayGroup<T>>();
-  for (const match of upcoming) {
+  for (const match of enOrden) {
     const confirmed = match.scheduled_at_confirmed !== false;
     const key = confirmed ? colombiaDateKey(match.scheduled_at) : `tbd-${match.scheduled_at.slice(0, 10)}`;
     const group = groups.get(key) ?? {
@@ -90,5 +90,5 @@ export function partitionCasaMatches<T extends SectionMatch>(matches: T[], now =
     group.matches.push(match);
     groups.set(key, group);
   }
-  return { finished, live, upcoming: [...groups.values()] };
+  return [...groups.values()];
 }

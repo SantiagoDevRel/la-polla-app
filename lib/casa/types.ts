@@ -3,6 +3,8 @@
 // Espejo TS del schema de las migraciones 081/082. Si tocas una, toca la otra:
 // el motor de puntaje vive en SQL (fuente de verdad) y aca solo lo describimos.
 
+import { formatShortDate } from "./format";
+
 export type CasaPollaKind = "partidos" | "manual" | "rifa";
 export type CasaScoringMode = "1x2" | "marcador";
 export type CasaPollaStatus =
@@ -421,12 +423,27 @@ export function isPublicClosedPolla(polla: Pick<CasaPolla, "status" | "closes_at
     && new Date(polla.closes_at) >= new Date(PUBLIC_CLOSED_SINCE);
 }
 
+/**
+ * «Terminó el 17 sep 2026»: cuándo terminó de verdad una polla repartida.
+ *
+ * (2026-09-18) En Pollas cerradas se leían varias seguidas diciendo apenas
+ * «Resuelta», sin ninguna pista de cuándo fue cada una. La fecha es la del
+ * reparto (`settled_at`), que es el momento en que la polla terminó con
+ * ganador; si faltara, cae al cierre de inscripciones. Va donde una polla
+ * abierta dice «Cierra en …» — el mismo renglón, la misma pregunta.
+ */
+export function pollaEndedLabel(polla: CasaPolla): string | null {
+  if (polla.status !== "resuelta") return null;
+  return `Terminó el ${formatShortDate(polla.settled_at ?? polla.closes_at, { year: true })}`;
+}
+
 /** Etiqueta corta de estado, en el idioma de la app. */
 export function pollaStatusLabel(polla: CasaPolla): {
   text: string;
   tone: "cal" | "red" | "live" | "mute";
 } {
-  if (polla.status === "resuelta") return { text: "Resuelta", tone: "mute" };
+  // «Terminada» se entiende sin pensarlo; «Resuelta» sonaba a trámite.
+  if (polla.status === "resuelta") return { text: "Terminada", tone: "mute" };
   if (polla.status === "anulada") return { text: "Anulada", tone: "red" };
   if (polla.status === "borrador" || polla.publication_mode === "oculta") return { text: "Oculta", tone: "mute" };
   if (new Date(polla.opens_at) > new Date()) return { text: "Programada", tone: "mute" };
