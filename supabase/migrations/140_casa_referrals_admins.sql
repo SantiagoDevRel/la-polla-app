@@ -1,4 +1,4 @@
--- 138_casa_referrals_admins.sql — los administradores también invitan.
+-- 140_casa_referrals_admins.sql — los administradores también invitan.
 --
 -- Decisión del dueño (2026-09-18): «que le salga a los admins también, para que
 -- nosotros veamos cómo funciona». La 135 los había dejado fuera (decisión mía, para
@@ -14,6 +14,10 @@
 -- cupo pagado en esa polla y solo cuentan invitados nuevos.
 --
 -- Para volver a excluirlos, basta con devolver el `u.is_admin IS NOT TRUE` aquí.
+--
+-- Numeración: se escribió como 138 y se renumeró a 140 porque la rama de
+-- cortesías tomó 138 y 139 en paralelo el mismo día. En producción ya está
+-- aplicada con la versión 20260918074000, después de las dos de cortesías.
 --
 -- Regresión: scripts/casa-referrals-check.sql (bloque 17).
 

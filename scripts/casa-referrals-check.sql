@@ -442,7 +442,7 @@ BEGIN
   ASSERT NOT public.casa_referral_is_new_user(y), 'without an auth account nobody is new';
   RAISE NOTICE 'PASS new people are decided by the auth account';
 
-  -- 17) Administradores: invitan como cualquiera (migración 138, decisión del dueño).
+  -- 17) Administradores: invitan como cualquiera (migración 140, decisión del dueño).
   code_x:=public.casa_referral_code_v1(admin_id);
   ASSERT code_x ~ '^[A-Z]{3,6}[0-9]{4,6}$', code_x;
   ASSERT public.casa_referral_profile_v1(admin_id)->>'code'=code_x, 'an admin has a code';

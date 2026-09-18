@@ -27,7 +27,7 @@ la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
   si se rechaza, pasa a otro cupo pagado de esa polla, a su primer cupo pagado en otra
   polla con invitaciones (y se recuenta allá) o se libera. Conteo por invitador y por
   polla; en otra polla empieza de cero.
-- **Administradores dentro** (migración 138, decisión del dueño 2026-09-18: «que le
+- **Administradores dentro** (migración 140, decisión del dueño 2026-09-18: «que le
   salga a los admins también»): tienen código, ven el aviso y ganan regalos como
   cualquiera. Para excluirlos otra vez basta con devolver el `u.is_admin IS NOT TRUE`
   a `casa_referral_can_refer`; el riesgo que cubría era que la casa se llevara cupos
