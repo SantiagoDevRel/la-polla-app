@@ -27,9 +27,11 @@ la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
   si se rechaza, pasa a otro cupo pagado de esa polla, a su primer cupo pagado en otra
   polla con invitaciones (y se recuenta allá) o se libera. Conteo por invitador y por
   polla; en otra polla empieza de cero.
-- **Administradores fuera** (`casa_referral_can_refer`): sin código, sus códigos no
-  vinculan ni sugieren, y no ganan regalos. Así la casa no se lleva cupos pagados por
-  los jugadores ni sus enlaces le quitan el invitado a nadie.
+- **Administradores dentro** (migración 138, decisión del dueño 2026-09-18: «que le
+  salga a los admins también»): tienen código, ven el aviso y ganan regalos como
+  cualquiera. Para excluirlos otra vez basta con devolver el `u.is_admin IS NOT TRUE`
+  a `casa_referral_can_refer`; el riesgo que cubría era que la casa se llevara cupos
+  pagados por los jugadores y que sus enlaces le quitaran el invitado a quien lo trajo.
 - **El regalo.** `casa_referral_sync` (trigger AFTER en `casa_entries`) crea una fila
   `origin='invitacion'`, `pagada`, `amount_cop=0` cuando el invitador tiene su propio
   cupo pagado ahí (en cualquier orden). No suma al pozo, compite normal y cuenta en

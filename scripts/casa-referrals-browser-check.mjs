@@ -166,7 +166,7 @@ try {
   const codeJuan = code(juan.id), codeAna = code(ana.id);
   assert.match(codeJuan, /^JUANPE\d{4}$/);
   assert.match(codeAna, /^ANAGOM\d{4}$/);
-  // El aviso se prueba con Juan (y el administrador, que no lo ve); los demás ya lo vieron.
+  // El aviso se prueba con Juan y con el administrador; los demás ya lo vieron.
   for (const actor of [ana, pedro, carla, diego]) {
     await actor.context.addInitScript((key) => { try { localStorage.setItem(key, "1"); } catch { /* sin almacenamiento */ } }, `lp_promo_invitados:${pollaId}`);
   }
@@ -226,9 +226,13 @@ try {
   await juan.page.reload();
   await hydrated(juan.page);
   await noPromo(juan.page);
+  // Los administradores también lo ven (migración 138, pedido del dueño).
   await admin.page.goto(`${origin}/casa`);
   await hydrated(admin.page);
-  await noPromo(admin.page);
+  const promoAdmin = admin.page.getByRole(PROMO, { name: "Por 5 invitados, te damos un cupo en la POLLAGOL" });
+  await promoAdmin.waitFor();
+  await (await ready(promoAdmin.getByRole("button", { name: "Cerrar", exact: true }))).click();
+  await promoAdmin.waitFor({ state: "detached" });
 
   // ── 1) Pedro abre el enlace de Juan: cookie, URL limpia y la pregunta con Juan.
   await pedro.page.goto(`${origin}/casa/${slug}?ref=${codeJuan.toLowerCase()}`);
