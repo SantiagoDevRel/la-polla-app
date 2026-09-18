@@ -226,7 +226,7 @@ try {
   await juan.page.reload();
   await hydrated(juan.page);
   await noPromo(juan.page);
-  // Los administradores también lo ven (migración 138, pedido del dueño).
+  // Los administradores también lo ven (migración 140, pedido del dueño).
   await admin.page.goto(`${origin}/casa`);
   await hydrated(admin.page);
   const promoAdmin = admin.page.getByRole(PROMO, { name: "Por 5 invitados, te damos un cupo en la POLLAGOL" });

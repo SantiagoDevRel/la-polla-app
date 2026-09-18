@@ -223,7 +223,7 @@ primera polla; el conteo se renueva en cada polla. El regalo no suma al pozo.
   sí lo puede reescribir su dueño) desde `accounts_since`, sin cupos comprados
   aprobados con monto y sin correcciones de pagos con monto. Una entrada gratis no
   cuenta como pago, ni aprobada ni corregida.
-- **Administradores** (`casa_referral_can_refer`, migración 138): participan como
+- **Administradores** (`casa_referral_can_refer`, migración 140): participan como
   cualquier persona — código, aviso, conteo y cupos de regalo. La 135 los excluía; el
   dueño pidió lo contrario el 18-sep para ver la función desde su cuenta. Volver a
   excluirlos es una línea en esa función.
