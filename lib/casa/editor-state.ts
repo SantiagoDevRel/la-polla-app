@@ -95,6 +95,9 @@ export async function getPollaEditorState(pollaId: string, actorId: string): Pro
     block: state.block ?? null,
     entries: Number(state.entries ?? 0),
     operationMode: state.operation_mode ?? null,
+    // Mismo orden que ve el jugador: por hora de empezada, y `order_index`
+    // solo como desempate (2026-09-18). Si el admin viera otro recorrido, no
+    // podría revisar la polla como la revisa la gente.
     matches: state.matches.flatMap((link) => {
       const row = byId.get(link.match_id);
       if (!row) return [];
@@ -110,6 +113,6 @@ export async function getPollaEditorState(pollaId: string, actorId: string): Pro
         status: row.status,
         tournament: row.tournament ?? null,
       }];
-    }),
+    }).sort((a, b) => (Date.parse(a.scheduled_at) - Date.parse(b.scheduled_at)) || (a.order_index - b.order_index)),
   };
 }

@@ -21,7 +21,7 @@ import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
 import { entryPriceLabel, formatCop, timeLeft } from "@/lib/casa/format";
 import { isCourtesyEntry } from "@/lib/casa/courtesies-shared";
 import { entryCanPick, pollaAcceptsPicks } from "@/lib/casa/picks-save";
-import { isPollaOpen, LOCK_MINUTES, pollaStatusLabel, type CasaEntry, type CasaPolla, type CasaPot } from "@/lib/casa/types";
+import { isPollaOpen, LOCK_MINUTES, pollaEndedLabel, pollaStatusLabel, type CasaEntry, type CasaPolla, type CasaPot } from "@/lib/casa/types";
 import { formatColombiaDateTime } from "@/lib/time/colombia";
 import { getTournamentName } from "@/lib/tournaments";
 import { loginLinkOrigin } from "@/lib/auth/telegram-login/links";
@@ -188,7 +188,7 @@ export async function pollaDetailScreen(ctx: PlayerCtx, polla: CasaPolla, notice
     `👥 Inscritos: ${pot.paid_entries}`,
     open
       ? `⏰ Inscripciones hasta: ${esc(formatDateTime(polla.closes_at))} (faltan ${timeLeft(polla.closes_at)})`
-      : `Estado: ${esc(pollaStatusLabel(polla).text)}`,
+      : `Estado: ${esc(pollaEndedLabel(polla) ?? pollaStatusLabel(polla).text)}`,
   ];
   if (payouts.length > 0) {
     const winners = payouts.map((w) => `${esc(w.display_name ?? "Sin nombre")}${w.prize_kind === "objeto" ? "" : ` (${formatCop(w.amount_cop)})`}`);

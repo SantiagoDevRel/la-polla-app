@@ -34,6 +34,7 @@ import {
   isLiveEntry,
   isPollaOpen,
   isPublicClosedPolla,
+  pollaEndedLabel,
   pollaStatusLabel,
   type CasaPayout,
   type CasaPolla,
@@ -684,7 +685,7 @@ function PollaPublica({
             <div className="text-right">
               <Label>{abierta ? "Cierra en" : "Estado"}</Label>
               <div className="lp-money mt-0.5 text-[18px] leading-none text-text-secondary">
-                {abierta ? timeLeft(polla.closes_at) : pollaStatusLabel(polla).text}
+                {abierta ? timeLeft(polla.closes_at) : (pollaEndedLabel(polla) ?? pollaStatusLabel(polla).text)}
               </div>
             </div>
           </div>

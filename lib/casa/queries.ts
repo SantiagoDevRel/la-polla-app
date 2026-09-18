@@ -209,7 +209,13 @@ export async function getMyPicks(
   return (data ?? []) as CasaPick[];
 }
 
-/** Los partidos de la polla, en el orden que definio el admin. */
+/**
+ * Los partidos de la polla, en ORDEN DE EMPEZADA: primero el que arranca
+ * primero. (2026-09-18, regla del dueño tras el reporte de un jugador: «ayer
+ * tenían un orden y hoy otro».) Dos partidos a la misma hora conservan el
+ * orden que la casa les dio al crear la polla (`order_index`), que es el
+ * desempate — nunca el azar del heap de Postgres.
+ */
 export async function getPollaMatches(pollaId: string) {
   const db = createAdminClient();
   const { data: links, error } = await db
@@ -235,10 +241,17 @@ export async function getPollaMatches(pollaId: string) {
     ]),
   );
   const voided = new Map((links ?? []).map(link => [link.match_id, link.voided_at]));
-  return (matches ?? []).map(match => ({ ...match, voided_at: voided.get(match.id) ?? null })).sort(
-    (a: { id: string }, b: { id: string }) =>
-      (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
-  );
+  const kickoff = (iso: string | null) => {
+    const ms = iso ? Date.parse(iso) : Number.NaN;
+    return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+  };
+  return (matches ?? [])
+    .map(match => ({ ...match, voided_at: voided.get(match.id) ?? null }))
+    .sort(
+      (a: { id: string; scheduled_at: string | null }, b: { id: string; scheduled_at: string | null }) =>
+        kickoff(a.scheduled_at) - kickoff(b.scheduled_at) ||
+        (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
+    );
 }
 
 export async function getPollaQuestions(pollaId: string): Promise<CasaQuestion[]> {

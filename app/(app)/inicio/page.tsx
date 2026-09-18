@@ -33,7 +33,7 @@ import {
   getPayoutProgress,
   listPollasConPicksPendientes,
 } from "@/lib/casa/queries";
-import { isPollaOpen, isPublicClosedPolla, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
+import { isPollaOpen, isPublicClosedPolla, pollaEndedLabel, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
 import { entryPriceLabel, formatCop, timeLeft } from "@/lib/casa/format";
 import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
@@ -283,7 +283,7 @@ function PollaRow({
             <span
               className={`min-w-0 text-right ${abierta ? "text-gold" : "text-text-muted"}`}
             >
-              {abierta ? `Cierra en ${timeLeft(polla.closes_at)}` : estado.text}
+              {abierta ? `Cierra en ${timeLeft(polla.closes_at)}` : (pollaEndedLabel(polla) ?? estado.text)}
             </span>
           </div>
           {/* Prueba de pago (2026-09-16): la polla cerrada muestra que el premio

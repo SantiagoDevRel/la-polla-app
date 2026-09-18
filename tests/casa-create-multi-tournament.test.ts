@@ -111,18 +111,23 @@ describe("CASA creation across tournaments", () => {
     expect(dbFetch).not.toHaveBeenCalled();
   });
 
-  it("reads back all linked fixtures in selection order and resolves both tournament logos", async () => {
+  // (2026-09-18) La lista va en ORDEN DE EMPEZADA, no en el orden en que el
+  // admin fue eligiendo: un jugador reportó que «ayer tenían un orden y hoy
+  // otro». `order_index` queda solo como desempate entre dos misma hora.
+  it("reads back all linked fixtures by kickoff and resolves both tournament logos", async () => {
     dbFetch.mockResolvedValueOnce(response(links))
       .mockResolvedValueOnce(response([fixtures[1], fixtures[2], fixtures[0]]));
 
     const matches = await getPollaMatches(pollaId);
 
-    expect(matches).toEqual(fixtures.map(match => ({ ...match, voided_at: null })));
+    expect(matches).toEqual([fixtures[1], fixtures[0], fixtures[2]].map(match => ({ ...match, voided_at: null })));
     expect(query(0).get("polla_id")).toBe(`eq.${pollaId}`);
     expect(query(1).get("id")).toBe(`in.(${matchIds.join(",")})`);
     expect(query(1).has("tournament")).toBe(false);
+    // Los logos de liga siguen el mismo recorrido que los partidos: el primero
+    // en jugarse manda. Acá el primer partido es el de la Premier.
     expect(resolveTournamentSlugs({ kind: "partidos", tournament: "champions_2025" }, matches)).toEqual([
-      "laliga_2025", "premier_2025",
+      "premier_2025", "laliga_2025",
     ]);
     expect(dbFetch).toHaveBeenCalledTimes(2);
   });
