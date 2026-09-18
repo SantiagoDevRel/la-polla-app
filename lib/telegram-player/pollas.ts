@@ -64,7 +64,7 @@ export function kindLabel(polla: Pick<CasaPolla, "kind" | "scoring_mode">): stri
 
 function prizeLine(polla: CasaPolla, pot: CasaPot | undefined): string {
   if (polla.prize_kind === "objeto") return `🏆 Premio: <b>${esc(polla.prize_object)}</b>`;
-  const base = `🏆 Pozo: <b>${pot ? formatCop(pot.prize_cop) : "por confirmar"}</b>`;
+  const base = `🏆 Premio: <b>${pot ? formatCop(pot.prize_cop) : "por confirmar"}</b>`;
   if (polla.pot_mode !== "fijo" || typeof polla.fixed_prize_cop !== "number") return base;
   return pot && pot.prize_cop > polla.fixed_prize_cop
     ? `${base} (mínimo garantizado ${formatCop(polla.fixed_prize_cop)})`
@@ -91,7 +91,7 @@ export async function showOpenPollas(ctx: PlayerCtx, page = 0): Promise<void> {
   const pots = await getPots(slice.map((p) => p.id));
   const lines = slice.map((p) => {
     const prize = p.prize_kind === "objeto" ? esc(p.prize_object) : formatCop(pots[p.id]?.prize_cop ?? 0);
-    return `• <b>${esc(p.name)}</b>\n   Entrada ${entryPriceLabel(p.entry_price_cop)} · ${p.prize_kind === "objeto" ? "Premio" : "Pozo"} ${prize} · cierra en ${timeLeft(p.closes_at)}`;
+    return `• <b>${esc(p.name)}</b>\n   Entrada ${entryPriceLabel(p.entry_price_cop)} · Premio ${prize} · cierra en ${timeLeft(p.closes_at)}`;
   });
   const buttons: Keyboard = slice.map((p) => [
     { text: buttonText(`${p.name} · ${entryPriceLabel(p.entry_price_cop)}`), callback_data: cb("p", shortId(p.id)) },

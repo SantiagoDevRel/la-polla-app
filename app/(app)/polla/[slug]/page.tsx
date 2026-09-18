@@ -41,6 +41,7 @@ import {
   type Pick1x2,
 } from "@/lib/casa/types";
 import { entryPriceLabel, formatCop, formatShortDate, prizeImageUrl, timeLeft } from "@/lib/casa/format";
+import { premioLabel } from "@/lib/casa/premio";
 import { getPollitoBase } from "@/lib/pollitos";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
@@ -62,6 +63,7 @@ import { BarraPagar } from "@/components/casa/BarraPagar";
 import { UnirmeGratis } from "@/components/casa/UnirmeGratis";
 import { PagoConfirmado } from "@/components/casa/PagoConfirmado";
 import { ActivarCortesia } from "@/components/casa/ActivarCortesia";
+import { AvisoDesempate } from "@/components/casa/AvisoDesempate";
 import { MisCortesias } from "@/components/casa/MisCortesias";
 import { courtesyPreview, listMyCourtesies } from "@/lib/casa/courtesies";
 import { COURTESY_COOKIE, COURTESY_FINE_PRINT, isCourtesyEntry, validCourtesyCode, type CourtesyPreview } from "@/lib/casa/courtesies-shared";
@@ -294,7 +296,7 @@ export default async function PollaPage({
               />
             )}
             <div className="min-w-0">
-              <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : objeto ? "Premio" : "Pozo"}</Label>
+              <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
               <div className="lp-money mt-1 text-[32px] leading-none text-gold [overflow-wrap:anywhere]">
                 {objeto ? polla.prize_object : formatCop(pot.prize_cop)}
               </div>
@@ -338,6 +340,13 @@ export default async function PollaPage({
         {polla.prize_kind === "objeto" && (polla.draw_pending || payouts.length > 0) && (isAdmin || bestEntry?.status === "pagada") && <PremioObjeto slug={polla.slug} />}
 
         {polla.kind === "rifa" && <div className="mt-4 first:mt-0"><MisBoletas slug={polla.slug} open={abierta} /></div>}
+
+        {/* La regla que decide la polla cuando el premio no se puede partir
+            (migración 142). Va aquí, con el peso de un aviso, porque el empate
+            arriba es el caso normal en modo marcador, no el borde. */}
+        {polla.prize_kind === "objeto" && polla.kind !== "rifa" && (
+          <AvisoDesempate />
+        )}
 
         {/* Llegó por un enlace de cortesía y todavía no está inscrito: activar el
             cupo gratis es LO que tiene que hacer, así que va antes del CTA de
@@ -650,7 +659,7 @@ function PollaPublica({
         </h1>
         {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className="mt-3 self-start" />}
         <div className="mt-3">
-          <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label>
+          <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
           <div className="lp-money mt-0.5 text-[40px] leading-none text-gold">
             {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
           </div>
@@ -661,6 +670,11 @@ function PollaPublica({
       </HeroFrame>
 
       <div className="px-4 pt-6">
+        {/* Quien abre el enlace compartido ve la regla del desempate ANTES de
+            registrarse: es la que decide la polla cuando el premio no se parte. */}
+        {polla.prize_kind === "objeto" && polla.kind !== "rifa" && (
+          <div className="mb-4"><AvisoDesempate /></div>
+        )}
         {regalo && (
           <StreetCard hero className="mb-4 bg-bg-card p-5">
             <p className="flex items-start gap-2 text-[17px] font-semibold leading-snug text-text-primary">

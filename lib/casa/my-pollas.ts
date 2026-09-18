@@ -23,7 +23,7 @@ export async function listMyPollas(userId: string): Promise<MyCasaPolla[]> {
   const pageSize = 500;
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await db.from("casa_entries")
-      .select("id, status, entry_number, origin, polla:casa_pollas!inner(id, slug, name, kind, tournament, status, closes_at)")
+      .select("id, status, entry_number, origin, polla:casa_pollas!inner(id, slug, name, kind, tournament, status, closes_at, prize_kind, prize_object)")
       .eq("user_id", userId)
       .in("status", ["pagada", "pendiente"])
       .in("polla.status", ["abierta", "cerrada", "resuelta"])
