@@ -22,6 +22,16 @@ export function formatCop(cop: number): string {
   return `$${Math.round(cop).toLocaleString("es-CO")}`;
 }
 
+/**
+ * Lo que cuesta entrar, como lo lee una persona (migración 143): «$20.000», o
+ * «Gratis» cuando no cuesta nada. Un precio de «$0» hacía pensar en una
+ * transferencia de cero pesos — y de hecho dos personas subieron ese
+ * comprobante. Lo usan la app y el bot para no decir cosas distintas.
+ */
+export function entryPriceLabel(cop: number): string {
+  return cop === 0 ? "Gratis" : formatCop(cop);
+}
+
 /** 1.250.000 — igual pero sin el signo, para cuando el $ ya esta en la etiqueta. */
 export function formatNumber(n: number): string {
   return Math.round(n).toLocaleString("es-CO");

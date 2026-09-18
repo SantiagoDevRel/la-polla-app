@@ -12,6 +12,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { getActiveProofs, getMyEntry, getOutstandingTicket, getPollaById, getPot, listPublicPollas } from "@/lib/casa/queries";
 import { formatCop } from "@/lib/casa/format";
 import { casaErrorMessage } from "@/lib/casa/operations";
+import { CASA_CONTRACT } from "@/lib/casa/contract";
 import { entryCanPick } from "@/lib/casa/picks-save";
 import { beginCasaProof, confirmCasaProof, failCasaProof, readOwnedProofAttempt, type ProofContentType } from "@/lib/casa/proof-server";
 import { isPollaOpen, type CasaPolla } from "@/lib/casa/types";
@@ -98,6 +99,21 @@ export async function startJoin(ctx: PlayerCtx, polla: CasaPolla): Promise<void>
   }
   if (!isPollaOpen(polla)) {
     await showPollaDetail(ctx, polla, "Esta polla ya no recibe inscripciones.");
+    return;
+  }
+  // Entrada gratis (migración 143): no hay transferencia ni comprobante. El
+  // mismo botón inscribe aquí mismo, igual que «Unirme» en la app — si no, el
+  // bot seguiría pidiendo el pantallazo de una transferencia de $0.
+  if (polla.entry_price_cop === 0) {
+    const { error } = await ctx.db.rpc("casa_join_free_v1", {
+      p_polla_id: polla.id, p_user_id: ctx.account.userId, p_contract: CASA_CONTRACT,
+    });
+    if (error) {
+      console.warn("[telegram-player] entrada gratis:", error.message);
+      await showPollaDetail(ctx, polla, "No pudimos inscribirte. Intenta de nuevo en un momento.");
+      return;
+    }
+    await showPollaDetail(ctx, polla, "✅ Listo, ya estás inscrito. Entrar a esta polla es gratis. Ahora haz tus pronósticos.");
     return;
   }
   const lead = !entry
