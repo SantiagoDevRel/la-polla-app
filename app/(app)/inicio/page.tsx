@@ -34,7 +34,7 @@ import {
   listPollasConPicksPendientes,
 } from "@/lib/casa/queries";
 import { isPollaOpen, isPublicClosedPolla, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
-import { formatCop, timeLeft } from "@/lib/casa/format";
+import { entryPriceLabel, formatCop, timeLeft } from "@/lib/casa/format";
 import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
 import { ScoringModeBadge } from "@/components/casa/ScoringModeBadge";
@@ -267,8 +267,9 @@ function PollaRow({
             </div>
             <div className="min-w-0 text-right">
               <Label>Entrada</Label>
+              {/* «$0» se lee como un precio; una polla gratis dice «Gratis». */}
               <div className={`lp-money mt-1 text-[28px] leading-none ${amountTone} [overflow-wrap:anywhere]`}>
-                {formatCop(polla.entry_price_cop)}
+                {entryPriceLabel(polla.entry_price_cop)}
               </div>
             </div>
           </div>

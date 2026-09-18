@@ -39,7 +39,7 @@ import {
   type CasaPolla,
   type Pick1x2,
 } from "@/lib/casa/types";
-import { formatCop, prizeImageUrl, timeLeft } from "@/lib/casa/format";
+import { entryPriceLabel, formatCop, prizeImageUrl, timeLeft } from "@/lib/casa/format";
 import { getPollitoBase } from "@/lib/pollitos";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
@@ -301,8 +301,9 @@ export default async function PollaPage({
           </div>
           <div className={objeto ? "min-w-0" : "min-w-0 border-l border-border-subtle pl-3"}>
             <Label>Entrada</Label>
+            {/* «$0» se lee como una transferencia de cero pesos (migración 143). */}
             <div className="lp-money mt-1 text-[32px] leading-none text-text-primary [overflow-wrap:anywhere]">
-              {formatCop(polla.entry_price_cop)}
+              {entryPriceLabel(polla.entry_price_cop)}
             </div>
           </div>
         </div>
@@ -677,7 +678,7 @@ function PollaPublica({
             <div>
               <Label>Entrada</Label>
               <div className="lp-money mt-0.5 text-[26px] leading-none text-text-primary">
-                {formatCop(polla.entry_price_cop)}
+                {entryPriceLabel(polla.entry_price_cop)}
               </div>
             </div>
             <div className="text-right">
