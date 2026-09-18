@@ -3,6 +3,8 @@
 // Espejo TS del schema de las migraciones 081/082. Si tocas una, toca la otra:
 // el motor de puntaje vive en SQL (fuente de verdad) y aca solo lo describimos.
 
+import { formatShortDate } from "./format";
+
 export type CasaPollaKind = "partidos" | "manual" | "rifa";
 export type CasaScoringMode = "1x2" | "marcador";
 export type CasaPollaStatus =
@@ -421,20 +423,29 @@ export function isPublicClosedPolla(polla: Pick<CasaPolla, "status" | "closes_at
     && new Date(polla.closes_at) >= new Date(PUBLIC_CLOSED_SINCE);
 }
 
-/** Etiqueta corta de estado, en el idioma de la app. */
+/**
+ * Etiqueta corta de estado, en el idioma del jugador.
+ *
+ * (2026-09-18, pedido del dueño) «Cerrada» y «Resuelta» son palabras del panel:
+ * al jugador «cerrada» le suena a candado y no le dice si la polla sigue viva.
+ * Ahora hay tres momentos que se entienden sin explicación:
+ *   · Abierta (verde)  → todavía se puede entrar.
+ *   · En juego         → ya no entra nadie; los partidos se están jugando.
+ *   · Terminó 17 sep   → se acabó, y se dice CUÁNDO (`settled_at`).
+ */
 export function pollaStatusLabel(polla: CasaPolla): {
   text: string;
   tone: "cal" | "red" | "live" | "mute";
 } {
-  if (polla.status === "resuelta") return { text: "Resuelta", tone: "mute" };
+  if (polla.status === "resuelta") return { text: polla.settled_at ? `Terminó ${formatShortDate(polla.settled_at)}` : "Terminada", tone: "mute" };
   if (polla.status === "anulada") return { text: "Anulada", tone: "red" };
   if (polla.status === "borrador" || polla.publication_mode === "oculta") return { text: "Oculta", tone: "mute" };
   if (new Date(polla.opens_at) > new Date()) return { text: "Programada", tone: "mute" };
   if (polla.draw_pending) return { text: "Desempate pendiente", tone: "red" };
-  if (polla.status === "cerrada") return { text: "Cerrada", tone: "red" };
-  if (new Date(polla.closes_at) <= new Date())
-    return { text: "Cerrando", tone: "red" };
-  return { text: "Abierta", tone: "cal" };
+  // Inscripciones cerradas (por estado o porque ya pasó la hora de cierre).
+  if (polla.status === "cerrada" || new Date(polla.closes_at) <= new Date()) return { text: "En juego", tone: "mute" };
+  // Verde y no dorado: el oro es del premio, y «abierta» es una invitación a entrar.
+  return { text: "Abierta", tone: "live" };
 }
 
 /** Resultado 1X2 real de un partido, a 90 minutos. null si no se verifico. */

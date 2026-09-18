@@ -19,6 +19,16 @@ export function fechaPago(iso: string): string {
   return formatShortDate(iso, { year: true });
 }
 
+function estado(p: CasaPayout, pagado: boolean) {
+  return (
+    <span className={`flex items-center gap-1.5 ${pagado ? "text-turf" : "text-text-muted"}`}>
+      {pagado ? <CheckCircle2 aria-hidden="true" className="h-4 w-4 max-w-none shrink-0" /> : <Clock3 aria-hidden="true" className="h-4 w-4 max-w-none shrink-0" />}
+      {pagado ? `Pagado · ${fechaPago(p.paid_at!)}` : "Pago pendiente"}
+      {pagado && p.paid_reference && <span className="text-text-secondary"> · Ref. {p.paid_reference}</span>}
+    </span>
+  );
+}
+
 export function PruebasDePago({
   payouts,
   proofUrls,
@@ -57,22 +67,22 @@ export function PruebasDePago({
                 </span>
                 <span className="lp-money shrink-0 text-[15px] text-text-primary">{formatCop(p.amount_cop)}</span>
               </div>
-              <p className={`flex items-center gap-1.5 border-t border-border-subtle px-3 py-1.5 text-[12px] ${pagado ? "text-turf" : "text-text-muted"}`}>
-                {pagado ? <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> : <Clock3 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
-                {pagado ? `Pagado · ${fechaPago(p.paid_at!)}` : "Pago pendiente"}
-                {pagado && p.paid_reference && <span className="text-text-secondary"> · Ref. {p.paid_reference}</span>}
-              </p>
-              {url && (
+              {/* (2026-09-18) «Pagado · fecha» y «Ver comprobante» eran dos pisos;
+                  ahora es uno: el estado a la izquierda y, si hay imagen, el
+                  mismo renglón la despliega. */}
+              {url ? (
                 <details className="border-t border-border-subtle">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-[13px] font-semibold text-text-secondary transition-colors hover:text-text-primary [&::-webkit-details-marker]:hidden">
-                    <span>Ver comprobante de pago</span>
-                    <span aria-hidden="true" className="text-text-muted">›</span>
+                  <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 px-3 text-[13px] transition-colors hover:bg-bg-elevated [&::-webkit-details-marker]:hidden">
+                    {estado(p, pagado)}
+                    <span className="flex items-center gap-0.5 font-semibold text-text-secondary">Comprobante <span aria-hidden="true" className="text-text-muted">›</span></span>
                   </summary>
                   <div className="px-3 pb-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={url} alt={`Comprobante del pago a ${p.display_name ?? "el ganador"}`} loading="lazy" className="max-h-[420px] w-full rounded-sm bg-bg-base object-contain" />
                   </div>
                 </details>
+              ) : (
+                <p className="border-t border-border-subtle px-3 py-1.5 text-[13px]">{estado(p, pagado)}</p>
               )}
             </li>
           );

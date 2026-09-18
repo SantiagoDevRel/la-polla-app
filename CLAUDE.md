@@ -6,6 +6,55 @@
 
 ## READ THIS FIRST
 
+### Menos texto: la pantalla se entiende sin leer (2026-09-18)
+
+Pedido del dueño: «la gente no lee ni hace tutoriales; va directo a tocar
+botones». **Info es la ÚNICA parte de la polla con mucho texto.** Fuera de Info,
+ningún bloque explica nada: si alguien puede querer el detalle, va un
+`<VerMasInfo section="…">` (components/casa/VerMasInfo.tsx) que cambia a la
+pestaña Info y abre esa regla. Las anclas viven en `lib/casa/info-sections.ts`
+(`info-puntos`, `info-premio`, `info-cierre`, `info-marcador`, `info-suspendido`,
+`info-otros`, `info-invita`, `info-entrada`, `info-cobro`); también sirve el hash
+`/polla/<slug>#info-premio`. Antes de agregar un párrafo a una pantalla de
+jugador: ¿cambia una decisión AHORA? Si no, va en Info.
+
+- **Inicio:** hero de 136 px; «Mis pollas» y «Para entrar» son `PollaSection flat`
+  (sin desplegable ni subtítulo; las tarjetas salen de una). Las mías llevan filo
+  verde (rojo si faltan pronósticos, ámbar si el pago está en revisión); las de
+  entrar traen el botón «Entrar · $20.000» y no llevan etiqueta «Abierta»; solo
+  «Terminadas» se pliega. Secciones vacías no se dibujan. No volver a los tres
+  acordeones ni a `auto-rows-fr` (dejaba huecos en una sola columna).
+- **Estados en idioma de jugador** (`pollaStatusLabel`): Abierta (verde) · En
+  juego · «Terminó 17 sep» (de `settled_at`). «Cerrada», «Cerrando» y «Resuelta»
+  ya no se le muestran a nadie.
+- **Polla, para quien ya está inscrito:** hero corto, Compartir es el ícono del
+  encabezado, «Otro cupo» + «Invita 0/5» comparten UNA fila (`InvitaYGana` con
+  `leading`), «Pago confirmado» es una franja de una línea y sale una vez, y el
+  mínimo garantizado solo se le muestra a quien todavía no entra. Las pestañas
+  pasaron de y=779 a y≈480–540 a 390 px. No apilar bloques a todo el ancho encima
+  de las pestañas.
+- **Pestañas:** ícono + palabra (Partidos/Tabla/Info). Solo ícono se descartó a
+  propósito: escondería Info, que es donde ahora vive toda la explicación.
+- **Tabla:** sin párrafos. «Ganaría $X» bajo el nombre ya cuenta el reparto.
+- **Partido en una fila** (`PicksBoard` → `MatchCard`): línea fina con
+  hora/estado a la izquierda y «Tú 2-1 +3» a la derecha; debajo
+  `[escudo+nombre] [marcador o casillas] [escudo+nombre]`. El nombre va DEBAJO
+  de su escudo dentro de su columna (tiene todo el ancho para partir en líneas);
+  el centro mide en px fijos. Clases `.lp-match*` en globals.css: una container
+  query en rem sube el marcador a su propia fila cuando la tarjeta no da el
+  ancho (320 px + texto de la app ampliado; sin eso los nombres colapsaban a
+  2 px, medido). 1X2: 147 → 106 px por partido; marcador: 115 → 96.
+- La barra «Guardar» solo aparece con cambios sin guardar o un mensaje.
+- `AvisoDesempate compact` (titular + ejemplo a un toque) es solo para inscritos;
+  quien no ha entrado y la vista pública ven el aviso completo del dueño.
+- Polla terminada con premio en dinero: los ganadores se listan UNA vez, dentro
+  de «Prueba de pago» (nombre, monto, «Pagado · fecha» y el comprobante en el
+  mismo renglón).
+
+⚠️ Bug conocido, sin tocar: `lib/font-scale.ts` reescribe también el
+`font-size` inline de `<html>`, así que «+60 %» aplica 1,6 × 1,6 = 2,56×. Probar
+layouts nuevos con `localStorage.la_polla_font_scale='lg'` a 320 px.
+
 ### Invitaciones y cupos de regalo (2026-09-17, migración 135)
 
 Pedido del dueño: por cada 5 invitados NUEVOS con pago aprobado en una polla, quien
@@ -449,12 +498,13 @@ el dorado es del premio.
 Casa (2026-09-17): En vivo → «¿Alguien te invitó?» (solo personas nuevas, migración
 135) → Mis pollas → Pollas disponibles → Pollas cerradas; el aviso de OFIGOLAZO
 flota encima una sola vez.
-Mis pollas lleva solo pollas en juego; al finalizar (resuelta/anulada) la polla pasa
-sola a Pollas cerradas con la marca «Participaste», y una en juego no se repite allí.
-Siempre hay una abierta al cargar: Mis pollas si hay pollas en juego; disponibles si
-hay alguna o si no hay nada en juego; cerradas siempre cerrada, en gris translúcido
+(2026-09-18, ver «Menos texto» arriba) Las secciones ahora se llaman Mis pollas →
+Para entrar → Terminadas. Mis pollas lleva solo pollas en juego; al finalizar
+(resuelta/anulada) la polla pasa sola a Terminadas con la marca «Participaste», y
+una en juego no se repite allí. Mis pollas y Para entrar salen de una, sin
+desplegable; Terminadas va plegada, en gris translúcido
 (sección `bg-bg-base/45`, logos desaturados). Contenedores `PollaSection`. Perfil (2026-09-17): Mis pollas
-(en juego) y Pollas cerradas (finalizadas, en gris) en dos desplegables compactos
+(en juego) y Terminadas (finalizadas, en gris) en dos desplegables compactos
 (`MyPollas split`), ambos cerrados al cargar. Eliminar polla requiere rol admin y un clic de confirmación; no pedir nombre.
 Equipo: Próximos (default) / Pasados / Plantel / Club. Partido: equipos clickeables
 con nombre/escudo centrados y «Ver equipo», marcador central, categorías de estadísticas
@@ -2549,11 +2599,12 @@ mostrar la cuenta del ganador). La tabla ya era visible con sesión.
 
 `components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
-En `/casa`, el orden es Mis pollas, Pollas disponibles y Pollas cerradas. Mis pollas
-(prop `activeOnly`) muestra solo pollas en juego y empieza abierta si hay alguna; las
-finalizadas pasan a Pollas cerradas marcadas «Participaste». Pollas disponibles empieza
-abierta si hay disponibles o si no hay nada en juego; cerradas empieza cerrada. Comparten título/subtítulo y contienen sus tarjetas dentro de
-`PollaSection`. En Perfil, `MyPollas split` muestra Mis pollas (en juego) y Pollas cerradas (en gris) como dos desplegables compactos cerrados, debajo de «Cuenta para cobrar», que
+En el inicio, el orden es Mis pollas, Para entrar y Terminadas (2026-09-18). Mis
+pollas (props `activeOnly flat`) muestra solo pollas en juego, sin desplegable, y no
+se dibuja si la persona no está en ninguna; las finalizadas pasan a Terminadas
+marcadas «Participaste». Para entrar tampoco es desplegable; Terminadas sí, y
+empieza plegada. Ninguna lleva subtítulo visible. Contienen sus tarjetas dentro de
+`PollaSection`. En Perfil, `MyPollas split` muestra Mis pollas (en juego) y Terminadas (en gris) como dos desplegables compactos cerrados, debajo de «Cuenta para cobrar», que
 quedó justo bajo el celular (2026-09-17, pedido del dueño). Las inscripciones pendientes o pagadas se
 muestran una vez por polla y se excluyen del listado para nuevas inscripciones.
 Las rechazadas/anuladas y los borradores/archivados no se cuentan como participación.

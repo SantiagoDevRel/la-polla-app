@@ -29,8 +29,14 @@ const searchKey = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, 
  * hacer no se dice nada: estar en esta lista ya significa que estás dentro, y
  * un «Pagado» verde permanente solo le roba atención al rojo que sí pide algo.
  */
-export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, split = false, pendingByPolla = {} }: {
+export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, split = false, flat = false, pendingByPolla = {} }: {
   initialPollas?: MyCasaPolla[]; defaultOpen?: boolean;
+  /**
+   * Inicio (2026-09-18): sin desplegable. Las pollas en las que estás salen de
+   * una arriba; si no estás en ninguna, la sección no se dibuja (la pantalla
+   * pasa directo a las pollas para entrar, que es lo único que hay que hacer).
+   */
+  flat?: boolean;
   /** /casa: la página ya filtró las finalizadas (viven en Pollas cerradas). */
   activeOnly?: boolean;
   /** Perfil (2026-09-17): en juego y cerradas en dos desplegables compactos. */
@@ -55,7 +61,8 @@ export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false
   }, [initialPollas, attempt]);
 
   const retry = () => setAttempt(n => n + 1);
-  if (!split) return <MyPollasSection id="mis-pollas" kind="mine" pollas={pollas} error={error} retry={retry} defaultOpen={defaultOpen} activeOnly={activeOnly} pendingByPolla={pendingByPolla} />;
+  if (flat && pollas && pollas.length === 0 && !error) return null;
+  if (!split) return <MyPollasSection id="mis-pollas" kind="mine" flat={flat} pollas={pollas} error={error} retry={retry} defaultOpen={defaultOpen} activeOnly={activeOnly} pendingByPolla={pendingByPolla} />;
   return <div className="space-y-3">
     <MyPollasSection id="mis-pollas" kind="mine" compact activeOnly pollas={pollas?.filter(p => !isFinished(p))} error={error} retry={retry} defaultOpen={defaultOpen} pendingByPolla={pendingByPolla} />
     <MyPollasSection id="mis-pollas-cerradas" kind="closed" compact pollas={pollas?.filter(isFinished)} error={error} retry={retry} defaultOpen={false} pendingByPolla={pendingByPolla} />
@@ -94,15 +101,15 @@ export function siguientePaso(polla: MyCasaPolla, fallback: number, en: boolean)
   return null;
 }
 
-function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOnly = false, compact = false, pendingByPolla }: {
+function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOnly = false, compact = false, flat = false, pendingByPolla }: {
   id: string; kind: "mine" | "closed"; pollas?: MyCasaPolla[]; error: boolean; retry: () => void;
-  defaultOpen: boolean; activeOnly?: boolean; compact?: boolean; pendingByPolla: Record<string, number>;
+  defaultOpen: boolean; activeOnly?: boolean; compact?: boolean; flat?: boolean; pendingByPolla: Record<string, number>;
 }) {
   const en = useLocale() === "en";
   const closedList = kind === "closed";
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
-  const title = closedList ? (en ? "Closed pools" : "Pollas cerradas") : (en ? "My pools" : "Mis pollas");
+  const title = closedList ? (en ? "Finished" : "Terminadas") : (en ? "My pools" : "Mis pollas");
   const description = closedList
     ? (en ? "Finished pools you took part in" : "Pollas finalizadas en las que participaste")
     : activeOnly ? (en ? "Your pools still in play" : "Tus pollas en juego") : (en ? "Pools you have joined" : "Pollas a las que te has unido");
@@ -112,7 +119,7 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
   const currentPage = Math.min(page, Math.max(0, pageCount - 1));
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
-  return <PollaSection id={id} kind={kind} compact={compact} title={title} description={description} count={pollas ? pollas.length : "—"} defaultOpen={defaultOpen}>
+  return <PollaSection id={id} kind={kind} compact={compact} flat={flat} title={title} description={description} count={pollas ? pollas.length : "—"} defaultOpen={defaultOpen}>
       {error ? <div className="lp-card p-4 text-[15px] text-text-secondary" role="alert">
         <p>{en ? "Unable to load your pools." : "No pudimos cargar tus pollas."}</p>
         <button onClick={retry} className="mt-2 min-h-11 cursor-pointer rounded-full border border-border-default px-4 text-text-primary transition-colors hover:bg-bg-elevated">{en ? "Try again" : "Intentar de nuevo"}</button>
@@ -138,7 +145,7 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
               {/* Toda la tarjeta es el enlace: un toque, sin elegir cupo antes de entrar. */}
               <Link
                 href={`/polla/${polla.slug}`}
-                className={`lp-card block space-y-3 p-4 transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${finished ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : "bg-bg-elevated"} ${paso?.tono === "urgente" ? "border-red-alert/50" : ""}`}
+                className={`lp-card block space-y-3 p-4 transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${finished ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : `bg-bg-elevated border-l-[3px] ${paso?.tono === "urgente" ? "border-l-red-alert" : paso?.tono === "espera" ? "border-l-amber" : "border-l-turf"}`} ${paso?.tono === "urgente" ? "border-red-alert/50" : ""}`}
               >
                 <div className="flex items-start gap-3">
                   <h3 className={`min-w-0 flex-1 font-display text-[22px] leading-tight tracking-wide ${finished ? "text-text-secondary" : "text-text-primary"} [overflow-wrap:anywhere]`}>{polla.name}</h3>

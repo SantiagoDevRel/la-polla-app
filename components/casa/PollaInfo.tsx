@@ -5,6 +5,7 @@ import { formatCop } from "@/lib/casa/format";
 import { REFERRAL_FINE_PRINT, referralEvery } from "@/lib/casa/referrals-shared";
 import { PayoutAccountButton } from "./PayoutAccountButton";
 import { FixedPrizeGrowth, fixedPrizeGrows, type FixedPrizeThreshold } from "./FixedPrizeGrowth";
+import { infoAnchor, type InfoSection } from "@/lib/casa/info-sections";
 
 export type { FixedPrizeThreshold };
 
@@ -19,8 +20,10 @@ type Rules = Pick<CasaPolla, "kind" | "scoring_mode" | "points_exact" | "points_
  * cortas y abrir solo la que uno quiere ver. `<details>` funciona sin
  * JavaScript, con teclado y con lector de pantalla.
  */
-function Rule({ icon, title, children, extra, plain = false }: { icon: ReactNode; title: string; children: ReactNode; extra?: ReactNode; plain?: boolean }) {
-  return <details className="lp-card overflow-hidden">
+function Rule({ id, icon, title, children, extra, plain = false }: { id: InfoSection; icon: ReactNode; title: string; children: ReactNode; extra?: ReactNode; plain?: boolean }) {
+  // `id` es el ancla de «Ver más»: desde cualquier parte de la polla se abre
+  // esta regla y solo esta (ver VerMasInfo y PollaTabs).
+  return <details id={infoAnchor(id)} className="lp-card scroll-mt-24 overflow-hidden">
     <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 text-text-primary transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold [&::-webkit-details-marker]:hidden">
       <span className="shrink-0 text-text-secondary" aria-hidden>{icon}</span>
       <h3 className="min-w-0 flex-1 font-display text-[20px] leading-tight tracking-[0.04em] [overflow-wrap:anywhere]">{title}</h3>
@@ -54,7 +57,7 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
     <h2 className="font-display text-[24px] leading-tight tracking-[0.04em]">Info de esta polla</h2>
     {polla.description && <p className="whitespace-pre-line text-[15px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]">{polla.description}</p>}
 
-    {polla.kind === "partidos" && <Rule icon={<Target size={20} />} title="Cómo sumas puntos">
+    {polla.kind === "partidos" && <Rule id="puntos" icon={<Target size={20} />} title="Cómo sumas puntos">
       {polla.scoring_mode === "marcador" ? (polla.points_one_team > 0 ? <>
         {/* Pollas creadas antes de la migración 132: conservan su punto por un solo equipo. */}
         <li><Strong>Marcador exacto:</Strong> {points(polla.points_exact)}.</li>
@@ -69,12 +72,12 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
         <li><Strong>Si aciertas:</Strong> {points(polla.points_result)}. Si no, 0 puntos.</li>
       </>}
     </Rule>}
-    {polla.kind === "manual" && <Rule icon={<Target size={20} />} title="Cómo sumas puntos">
+    {polla.kind === "manual" && <Rule id="puntos" icon={<Target size={20} />} title="Cómo sumas puntos">
       <li>Cada pregunta indica cuántos puntos vale.</li>
       <li>Una respuesta incorrecta suma 0 puntos.</li>
     </Rule>}
 
-    <Rule icon={<Trophy size={20} />} title="Premio y ganadores">
+    <Rule id="premio" icon={<Trophy size={20} />} title="Premio y ganadores">
       {minimo !== null && <li><Strong>Premio mínimo garantizado:</Strong> {formatCop(minimo)}.</li>}
       {minimo !== null && fixedPrizeGrows(threshold) && <li><FixedPrizeGrowth threshold={threshold} /></li>}
       {polla.kind === "rifa" ? <>
@@ -96,26 +99,26 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
     </Rule>
 
     {polla.kind === "partidos" && <>
-      <Rule icon={<Clock3 size={20} />} title="Hasta cuándo puedes pronosticar">
+      <Rule id="cierre" icon={<Clock3 size={20} />} title="Hasta cuándo puedes pronosticar">
         <li>Cada partido se cierra {LOCK_MINUTES} minutos antes de empezar.</li>
         <li>Desde ese momento no puedes agregar ni cambiar su pronóstico.</li>
         <li>El cierre de inscripciones no cambia ese plazo.</li>
       </Rule>
-      <Rule icon={<Timer size={20} />} title="Qué marcador cuenta">
+      <Rule id="marcador" icon={<Timer size={20} />} title="Qué marcador cuenta">
         <li>Los 90 minutos más el tiempo de adición.</li>
         <li>No cuentan el alargue ni los penales.</li>
       </Rule>
-      <Rule icon={<Ban size={20} />} title="Si se suspende un partido">
+      <Rule id="suspendido" icon={<Ban size={20} />} title="Si se suspende un partido">
         <li>Si se suspende, aplaza, cancela o abandona, lo revisa la administración.</li>
         <li>Puede anularlo (0 puntos para todos en ese partido) o mantenerlo si se juega.</li>
       </Rule>
-      <Rule icon={<Eye size={20} />} title="Pronósticos de otros jugadores">
+      <Rule id="otros" icon={<Eye size={20} />} title="Pronósticos de otros jugadores">
         <li>Los ves en «Ver pronósticos de otros» cuando empieza cada partido.</li>
         <li>Antes del inicio son privados.</li>
       </Rule>
     </>}
 
-    {cadaInvitados !== null && <Rule icon={<Gift size={20} />} title="Invita y gana cupos" plain>
+    {cadaInvitados !== null && <Rule id="invita" icon={<Gift size={20} />} title="Invita y gana cupos" plain>
       <p><Strong>{cadaInvitados === 1 ? "Por cada invitado" : `Por cada ${cadaInvitados} invitados`}, te damos un cupo en esta polla.</Strong></p>
       <p className="text-[13px] italic text-text-muted">{REFERRAL_FINE_PRINT}</p>
     </Rule>}
@@ -126,11 +129,11 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
         viendo su propia cuenta para recibir dinero. */}
     {/* (2026-09-18, migración 143) Con entrada gratis no hay nada que pagar:
         pedir el comprobante de una transferencia de $0 no tenía sentido. */}
-    {polla.kind !== "rifa" && (polla.entry_price_cop === 0 ? <Rule icon={<CreditCard size={20} />} title="Cómo entras">
+    {polla.kind !== "rifa" && (polla.entry_price_cop === 0 ? <Rule id="entrada" icon={<CreditCard size={20} />} title="Cómo entras">
       <li><Strong>Entrar es gratis.</Strong> No transfieres nada ni subes comprobante.</li>
       <li>Tocas «Unirme» y quedas registrado de una vez, con un cupo.</li>
       <li>Desde ese momento puedes pronosticar y tus puntos cuentan en la tabla.</li>
-    </Rule> : <Rule icon={<CreditCard size={20} />} title="Cómo se paga la entrada">
+    </Rule> : <Rule id="entrada" icon={<CreditCard size={20} />} title="Cómo se paga la entrada">
       {typeof polla.entry_price_cop === "number" && <li>Transfieres <Strong>{formatCop(polla.entry_price_cop)}</Strong> a la cuenta que aparece en el botón de pagar, por Nequi o transferencia.</li>}
       <li>Subes la foto del comprobante en la app. No se cobra nada automáticamente ni pedimos datos bancarios.</li>
       <li>Puedes pronosticar desde que lo subes; tus puntos entran a la tabla cuando confirmamos el pago.</li>
@@ -138,11 +141,11 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
     </Rule>)}
 
     {money
-      ? <Rule icon={<Wallet size={20} />} title="Cómo recibes tu premio si ganas" extra={<PayoutAccountButton />}>
+      ? <Rule id="cobro" icon={<Wallet size={20} />} title="Cómo recibes tu premio si ganas" extra={<PayoutAccountButton />}>
         <li>Si ganas, te enviamos el dinero a tu Nequi o a tu cuenta de Bancolombia.</li>
         <li>Registra tu cuenta de pago para que el pago no se demore.</li>
       </Rule>
-      : <Rule icon={<Wallet size={20} />} title="Cómo recibes tu premio">
+      : <Rule id="cobro" icon={<Wallet size={20} />} title="Cómo recibes tu premio">
         <li>Si ganas, el administrador coordina contigo la entrega.</li>
       </Rule>}
   </div>;

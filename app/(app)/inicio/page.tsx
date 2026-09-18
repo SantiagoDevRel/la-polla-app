@@ -15,7 +15,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
-import { CheckCircle2, Settings } from "lucide-react";
+import { ArrowRight, CheckCircle2, Settings } from "lucide-react";
 import { cookies } from "next/headers";
 import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
 import { PromoInvitados } from "@/components/casa/PromoInvitados";
@@ -97,11 +97,8 @@ export default async function CasaPage() {
   const promo = promoPolla ? referralPromo(promoPolla, promoView, pots[promoPolla.id]?.prize_cop ?? 0) : null;
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
 
-  // Siempre queda al menos una sección abierta (2026-09-14/17): Mis pollas si
-  // la persona tiene pollas en juego; disponibles si hay alguna o si no tiene
-  // nada en juego. Cerradas empieza cerrada.
-  const misPollasOpen = enJuegoMias.length > 0;
-  const disponiblesOpen = disponibles.length > 0 || !misPollasOpen;
+  // (2026-09-18) Mis pollas y Para entrar ya no son desplegables: salen de una.
+  // Solo Terminadas se pliega, porque es historial.
 
   // El número grande de arriba: todo lo que hay repartible ahora mismo.
   const enJuego = abiertas.reduce((sum, p) => sum + (pots[p.id]?.prize_cop ?? 0), 0);
@@ -120,38 +117,40 @@ export default async function CasaPage() {
       <LiveNow initialRows={enVivo} />
 
       {/* ── Hero: la plata en juego ───────────────────────────────────── */}
-      <HeroFrame height="h-[228px]">
-        <Label>En juego ahora mismo</Label>
-        <div className="lp-money mt-1 text-[54px] leading-[0.9] text-gold">
+      {/* (2026-09-18) El hero baja de 228 a 136 px: la cifra sigue siendo el
+          gancho, pero no se come medio pantallazo antes de la primera polla. */}
+      <HeroFrame height="h-[136px]">
+        <Label>En juego</Label>
+        <div className="lp-money mt-1 text-[44px] leading-[0.9] text-gold">
           {formatCop(enJuego)}
         </div>
-        <p className="mt-2 text-[13px] text-text-secondary">
-          {abiertas.length === 0
-            ? "Todavía no hay pollas disponibles. Las próximas aparecerán aquí."
-            : `${abiertas.length} polla${abiertas.length === 1 ? "" : "s"} abierta${
-                abiertas.length === 1 ? "" : "s"
-              } · ${jugando} inscritos`}
-        </p>
+        {abiertas.length > 0 && (
+          <p className="mt-2 text-[13px] text-text-secondary">
+            {`${abiertas.length} polla${abiertas.length === 1 ? "" : "s"} abierta${
+              abiertas.length === 1 ? "" : "s"
+            } · ${jugando} inscritos`}
+          </p>
+        )}
       </HeroFrame>
 
-      <div className="space-y-4 px-4 pt-6">
+      <div className="space-y-6 px-4 pt-5">
         {/* Punto 3 del dueño (2026-09-17): quien entró sin el enlace también puede decir quién lo invitó. */}
         {verInvitacion && invitee && <QuienTeInvito initial={invitee} variant="casa" />}
 
         {/* El respaldo se suma por polla: la tarjeta ya no habla de cupos. */}
-        <MyPollas initialPollas={enJuegoMias} activeOnly defaultOpen={misPollasOpen} pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
+        <MyPollas initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
 
-        <PollaSection id="pollas-disponibles" kind="open" title="Pollas disponibles" description="Elige una polla e inscríbete." count={disponibles.length} defaultOpen={disponiblesOpen}>
+        {/* Para entrar: sin desplegable. Si no hay ninguna y la persona ya juega
+            en otra, la sección no se dibuja; el aviso de «pronto» es solo para
+            quien llega y no tiene nada que hacer. */}
+        {(disponibles.length > 0 || enJuegoMias.length === 0) && (
+        <PollaSection id="pollas-disponibles" kind="open" flat title="Para entrar" description="Pollas abiertas en las que todavía no estás" count={disponibles.length}>
         {disponibles.length === 0 ? (
           // `bg-bg-card` pisa a proposito el 80% de opacidad de .lp-card: es la
           // unica card de la app que lleva ilustracion adentro, y sobre el video
           // del fondo (que tiene su propio pollito) el translucido superponia las
           // dos y no se leia ninguna.
           <StreetCard className="bg-bg-card p-6 text-center">
-            {/* (2026-09-02) El pollito vuelve al estado vacio. No es adorno:
-                el design system lo reserva para los momentos en que la
-                pantalla no tiene nada que mostrar, que es justo cuando una
-                caja de texto sola se siente como un error de la app. */}
             <Image
               src="/pollitos/Pollito_esperando-256.webp"
               alt=""
@@ -160,34 +159,27 @@ export default async function CasaPage() {
               height={112}
               className="mx-auto mb-3 h-28 w-28 max-w-none object-contain opacity-90"
             />
-            <p className="lp-display-sm text-text-primary">Sin pollas disponibles</p>
-            <p className="mt-2 text-[13px] text-text-muted">
-              Las nuevas pollas aparecerán aquí cuando se publiquen.
-            </p>
+            <p className="lp-display-sm text-text-primary">Pronto hay pollas nuevas</p>
           </StreetCard>
         ) : (
-          <ul className="grid auto-rows-fr gap-3">
+          <ul className="grid gap-3">
             {disponibles.map((polla) => (
               <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} />
             ))}
           </ul>
         )}
         </PollaSection>
+        )}
 
-        <PollaSection id="pollas-cerradas" kind="closed" title="Pollas cerradas" description="Consulta los resultados de pollas anteriores." count={cerradas.length}>
-            {cerradas.length > 0 ? (
-              <ul className="grid auto-rows-fr gap-3">
+        {cerradas.length > 0 && (
+        <PollaSection id="pollas-cerradas" kind="closed" title="Terminadas" description="Pollas que ya no reciben inscripciones" count={cerradas.length}>
+              <ul className="grid gap-3">
                 {cerradas.map((polla) => (
                   <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} participated={joinedIds.has(polla.id)} closed />
                 ))}
               </ul>
-            ) : (
-              <StreetCard className="bg-transparent p-5 text-center">
-                <p className="lp-display-sm text-text-primary">Todavía no hay pollas cerradas</p>
-                <p className="mt-2 text-[13px] text-text-muted">Cuando una polla cierre, podrás consultarla aquí.</p>
-              </StreetCard>
-            )}
         </PollaSection>
+        )}
       </div>
       {promo && <PromoInvitados promo={promo} verPolla />}
     </div>
@@ -237,18 +229,21 @@ function PollaRow({
         {/* Cerrada = gris translúcido y logos desaturados: se lee como polla
             terminada sin perder contraste de lectura. */}
         <StreetCard className={`flex h-full flex-col p-4 transition-colors hover:border-border-strong ${closed ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : "bg-bg-elevated"}`}>
-          {/* Equal-height list rows let names wrap without shifting the
-              logos and amounts in neighboring cards. */}
+          {/* (2026-09-18) Cada tarjeta mide lo que necesita: igualar alturas en una
+              sola columna dejaba un hueco grande en la polla de nombre corto. */}
           <div className={`flex items-start justify-between gap-3 ${editable ? "pr-12" : ""}`}>
             <h3 className={`min-w-0 flex-1 font-display text-[22px] leading-[1.2] tracking-[0.04em] ${closed ? "text-text-secondary" : "text-text-primary"} [overflow-wrap:anywhere]`}>
               {polla.name}
             </h3>
-            <Tape tone={estado.tone} className="shrink-0">{estado.text}</Tape>
+            {/* Abierta no lleva etiqueta: el botón «Entrar» de abajo lo dice
+                mejor. Las demás dicen en qué van: «En juego» o «Terminó 17 sep». */}
+            {!abierta && <Tape tone={estado.tone} className="shrink-0">{estado.text}</Tape>}
           </div>
 
           {/* (2026-09-13) Qué hay que acertar, antes de entrar: "no me queda
-              claro cuándo una polla es de 1X2 o de marcadores" (dueño). */}
-          {polla.kind === "partidos" && (
+              claro cuándo una polla es de 1X2 o de marcadores" (dueño). En una
+              terminada ya no hay nada que decidir, así que no se dibuja. */}
+          {polla.kind === "partidos" && !closed && (
             <div className="mt-2">
               <ScoringModeBadge mode={polla.scoring_mode} />
             </div>
@@ -258,9 +253,9 @@ function PollaRow({
             <TournamentIdentity tournaments={tournaments} kind={polla.kind} />
           </div>
 
-          {/* Equal columns, label baselines and number sizes for both amounts. */}
-          <div className="mt-4 grid grid-cols-2">
-            <div className="min-w-0 border-r border-border-subtle">
+          {/* El premio manda; lo demás es una línea. */}
+          <div className="mt-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+            <div className="min-w-0">
               <Label>{premioLabel()}</Label>
               {/* Un premio en objeto muestra el objeto: «POZO $0» hacía ver una
                   polla que regala entradas como una que no reparte nada. */}
@@ -268,35 +263,31 @@ function PollaRow({
                 {premioValor({ ...polla, prize_cop: pot?.prize_cop ?? 0 }) ?? formatCop(pot?.prize_cop ?? 0)}
               </div>
             </div>
-            <div className="min-w-0 text-right">
-              <Label>Entrada</Label>
-              {/* «$0» se lee como un precio; una polla gratis dice «Gratis». */}
-              <div className={`lp-money mt-1 text-[28px] leading-none ${amountTone} [overflow-wrap:anywhere]`}>
-                {entryPriceLabel(polla.entry_price_cop)}
-              </div>
-            </div>
+            <span className="min-w-0 pb-1 text-right text-[13px] leading-snug text-text-secondary">
+              {pot?.paid_entries ?? 0} inscritos
+              {abierta && <span className="block font-semibold text-gold">Cierra en {timeLeft(polla.closes_at)}</span>}
+              {participated && <span className="block font-semibold text-text-primary">Participaste</span>}
+            </span>
           </div>
 
-          {/* Fila 3 — el apuro y la gente. Hairline arriba para separar sin peso. */}
-          <div className="mt-4 grid grid-cols-2 items-start gap-3 border-t border-border-subtle pt-3 text-[12px] leading-normal">
-            <span className="min-w-0 text-text-muted">
-              {pot?.paid_entries ?? 0} inscritos
-              {participated && <span className="block font-semibold text-text-secondary">Participaste</span>}
+          {/* La puerta, en la tarjeta: «disponible» se entiende porque hay un
+              botón con el precio. Toda la tarjeta es el enlace, así que esto es
+              un adorno con forma de botón y no un segundo enlace anidado. */}
+          {abierta && (
+            <span aria-hidden="true" className="lp-btn lp-btn-ghost mt-4 w-full gap-2 !border-turf/50 !px-4 text-text-primary">
+              Entrar · {entryPriceLabel(polla.entry_price_cop)}
+              <ArrowRight className="h-4 w-4 max-w-none shrink-0 text-turf" />
             </span>
-            <span
-              className={`min-w-0 text-right ${abierta ? "text-gold" : "text-text-muted"}`}
-            >
-              {abierta ? `Cierra en ${timeLeft(polla.closes_at)}` : estado.text}
-            </span>
-          </div>
+          )}
+
           {/* Prueba de pago (2026-09-16): la polla cerrada muestra que el premio
               ya se pagó; el comprobante se ve adentro, en el resultado. */}
           {payout && payout.total > 0 && (
-            <p className={`mt-2 flex items-center gap-1.5 text-[12px] font-semibold ${premioPagado ? "text-turf" : "text-text-secondary"}`}>
-              <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+            <p className={`mt-3 flex items-center gap-1.5 text-[13px] font-semibold ${premioPagado ? "text-turf" : "text-text-secondary"}`}>
+              <CheckCircle2 aria-hidden="true" className="h-4 w-4 max-w-none shrink-0" />
               {premioPagado
-                ? `${payout.total === 1 ? "Premio pagado" : "Premios pagados"} · comprobante en la polla`
-                : `Pago del premio en curso · ${payout.paid} de ${payout.total}`}
+                ? (payout.total === 1 ? "Premio pagado" : "Premios pagados")
+                : `Pagando premios · ${payout.paid} de ${payout.total}`}
             </p>
           )}
         </StreetCard>

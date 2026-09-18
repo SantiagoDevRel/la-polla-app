@@ -42,18 +42,15 @@ export function PagoConfirmado({ entryId, cortesia = false, cupo = null, abierta
   }
 
   if (!show) return null;
+  // (2026-09-18) De recuadro de tres líneas a una franja: es una buena noticia,
+  // no un párrafo. «Ya compites por el premio» y «haz tus pronósticos antes del
+  // cierre» sobraban: los partidos están justo debajo.
   return (
-    <div className="mt-4 flex items-start gap-3 border border-turf/40 bg-turf/10 p-3 first:mt-0" role="status">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-turf/40 text-turf">
-        <Check aria-hidden="true" className="h-4 w-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="lp-label text-turf">{cupo ? `Cupo ${cupo} · ` : ""}Ya estás dentro</p>
-        <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">
-          {cortesia ? "Activamos tu cortesía y ya compites por el premio." : "Confirmamos tu pago y ya compites por el premio."}
-          {abierta ? " Haz tus pronósticos antes del cierre." : ""}
-        </p>
-      </div>
+    <div className="mt-4 flex items-center gap-2 rounded-full border border-turf/40 bg-turf/10 py-1 pl-3 pr-1 first:mt-0" role="status">
+      <Check aria-hidden="true" className="h-5 w-5 max-w-none shrink-0 text-turf" />
+      <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-text-primary [overflow-wrap:anywhere]">
+        {cupo ? `Cupo ${cupo}: ` : ""}{cortesia ? "Cortesía activada" : "Pago confirmado"}{abierta ? ". ¡A pronosticar!" : ""}
+      </p>
       <button
         type="button"
         onClick={cerrar}

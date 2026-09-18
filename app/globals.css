@@ -473,6 +473,28 @@ h2[tabindex="-1"]:focus-visible {
 
 /* Barra de porcentaje ("cuantos eligieron esta opcion"). Redondeada y con un
    relleno degradado: es un dato, pero no tiene por que verse crudo. */
+/* Partido en una fila: [escudo + nombre] [marcador] [escudo + nombre].
+   (2026-09-18) El centro mide en px fijos; los lados se reparten lo que sobra y
+   el nombre parte en líneas dentro de su columna. Cuando la tarjeta no da el
+   ancho —pantalla de 320 px con el texto de la app ampliado, donde los rem
+   inflan rellenos y separaciones— el marcador sube a su propia fila y los
+   equipos quedan debajo, mitad y mitad. El umbral va en rem a propósito: crece
+   con el tamaño de texto elegido, así que la fila cede justo cuando los nombres
+   dejarían de caber. Sin esto colapsaban a 2 px (medido), el mismo fallo de
+   junio. */
+.lp-match { container-type: inline-size; }
+.lp-match-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+}
+.lp-match-center { display: flex; align-items: center; justify-content: center; gap: 6px; }
+@container (max-width: 15rem) {
+  .lp-match-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 6px; }
+  .lp-match-center { grid-column: 1 / -1; order: -1; }
+}
+
 .lp-pct {
   height: 5px;
   background: var(--bg-elevated);

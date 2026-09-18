@@ -117,10 +117,11 @@ export function MatchPicks({ slug, matchId, scoringMode, home, away, count = nul
     if (element.scrollTop + element.clientHeight >= element.scrollHeight - 48) loadMore();
   }
 
-  const label = `${open ? "Ocultar" : "Ver"} pronósticos de otros${count != null && count > 0 ? ` (${count})` : ""}`;
+  // (2026-09-18) Sin «Ver/Ocultar»: la flecha y aria-expanded ya lo dicen.
+  const label = `Pronósticos de otros${count != null && count > 0 ? ` · ${count}` : ""}`;
 
   return (
-    <div className="mt-2 border-t border-border-subtle pt-2">
+    <div className="mt-1.5 border-t border-border-subtle">
       <button
         type="button"
         aria-expanded={open}

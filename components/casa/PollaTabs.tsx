@@ -2,11 +2,13 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, Trophy } from "lucide-react";
+import { Goal, Info, ListChecks, RefreshCw, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { formatCop } from "@/lib/casa/format";
 import { formatColombiaDateTime } from "@/lib/time/colombia";
 import type { CasaEntryStatus, CasaLeaderboardRow, CasaPollaStatus, CasaProvisionalPrize } from "@/lib/casa/types";
+import { INFO_EVENT, infoAnchorFromHash } from "@/lib/casa/info-sections";
+import { VerMasInfo } from "./VerMasInfo";
 
 interface Props {
   slug: string;
@@ -45,8 +47,43 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
   const buttons = useRef<Array<HTMLButtonElement | null>>([]);
   const id = useId();
   const router = useRouter();
-  const labels = [firstLabel, "Tabla", ...(info ? ["Info"] : [])];
+  // (2026-09-18) Ícono + palabra: el ícono hace que la barra se entienda de un
+  // vistazo y la palabra evita adivinar. Solo el ícono escondería Info, que es
+  // justo donde ahora vive toda la explicación.
+  const firstIcon: LucideIcon = firstLabel === "Preguntas" ? ListChecks : firstLabel === "Sorteo" ? Ticket : Goal;
+  const tabs: Array<{ label: string; icon: LucideIcon }> = [
+    { label: firstLabel, icon: firstIcon },
+    { label: "Tabla", icon: Trophy },
+    ...(info ? [{ label: "Info", icon: Info }] : []),
+  ];
+  const infoIndex = info ? 2 : -1;
   const prizeByEntry = new Map(prizes.map((prize) => [prize.entry_id, prize.amount_cop]));
+
+  // «Ver más» (components/casa/VerMasInfo.tsx) y los enlaces `#info-…`: cambian
+  // a Info y despliegan esa regla. El panel está montado aunque esté oculto, así
+  // que el <details> existe; se espera un cuadro para que ya sea visible al bajar.
+  useEffect(() => {
+    if (infoIndex < 0) return;
+    const abrir = (anchor: string | null) => {
+      if (!anchor) return;
+      setTab(infoIndex);
+      window.requestAnimationFrame(() => {
+        const rule = document.getElementById(anchor);
+        if (!(rule instanceof HTMLDetailsElement)) return;
+        rule.open = true;
+        rule.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      });
+    };
+    const onEvent = (event: Event) => abrir((event as CustomEvent<string>).detail ?? null);
+    const onHash = () => abrir(infoAnchorFromHash(window.location.hash));
+    onHash();
+    window.addEventListener(INFO_EVENT, onEvent);
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      window.removeEventListener(INFO_EVENT, onEvent);
+      window.removeEventListener("hashchange", onHash);
+    };
+  }, [infoIndex]);
 
   useEffect(() => { setRows(initialRows); }, [initialRows]);
   useEffect(() => { setPrizes(initialPrizes); }, [initialPrizes]);
@@ -98,7 +135,7 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
   return (
     <section className="mt-5">
       <div role="tablist" aria-label="Contenido de la polla" className="flex gap-1 overflow-x-auto rounded-full border border-border-subtle bg-bg-card p-1">
-        {labels.map((label, index) => (
+        {tabs.map(({ label, icon: Icon }, index) => (
           <button
             key={label}
             ref={(element) => { buttons.current[index] = element; }}
@@ -112,13 +149,16 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
             onKeyDown={(event) => {
               if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
               event.preventDefault();
-              const next = event.key === "Home" ? 0 : event.key === "End" ? labels.length - 1
-                : (index + (event.key === "ArrowRight" ? 1 : -1) + labels.length) % labels.length;
+              const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
+                : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
               setTab(next);
               buttons.current[next]?.focus();
             }}
-            className={`min-h-12 flex-1 shrink-0 cursor-pointer whitespace-nowrap rounded-full px-3 py-2 text-[15px] font-semibold leading-normal transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${tab === index ? "bg-bg-elevated text-text-primary" : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"}`}
-          >{label}</button>
+            className={`flex min-h-12 flex-1 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-2 text-[15px] font-semibold leading-normal transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${tab === index ? "bg-bg-elevated text-text-primary" : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary"}`}
+          >
+            <Icon aria-hidden="true" className={`h-[18px] w-[18px] max-w-none shrink-0 ${tab === index ? "text-gold" : ""}`} />
+            {label}
+          </button>
         ))}
       </div>
 
@@ -126,25 +166,19 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
         {children}
       </div>
       <div id={`${id}-panel-1`} role="tabpanel" aria-labelledby={`${id}-tab-1`} hidden={tab !== 1} tabIndex={0} className="pt-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* (2026-09-18) Aquí iba un párrafo de 21 palabras sobre pagos y cupos, y
+            otro de 26-33 sobre el reparto. La tabla ya lo dice sola («Ganaría
+            $X» bajo el nombre) y la regla completa está en Info: un toque. */}
+        <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="lp-display-sm text-text-primary">Posiciones</h2>
-          <button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} className="lp-btn lp-btn-ghost min-h-11 gap-2 text-xs disabled:opacity-50" aria-label="Actualizar tabla">
-            <RefreshCw size={16} aria-hidden />{loading ? "Actualizando…" : "Actualizar"}
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {info && <VerMasInfo section="premio">Cómo se gana</VerMasInfo>}
+            <button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} aria-label={loading ? "Actualizando tabla" : "Actualizar tabla"} title="Actualizar"
+              className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-default disabled:opacity-50">
+              <RefreshCw aria-hidden="true" className={`h-5 w-5 ${loading ? "motion-safe:animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
-        <p className="mb-4 mt-1 text-xs leading-relaxed text-text-secondary">
-          Solo cuentan los pagos aprobados. Cada cupo aparece por separado y suma los puntos de sus pronósticos cuando confirmamos su pago.
-          {prizes.length > 0 && (
-            <>
-              {" "}
-              <span className="text-text-primary">
-                {finished
-                  ? <>La polla terminó: el pozo es para {prizes.length === 1 ? "quien quedó de primero" : `los ${prizes.length} que quedaron de primeros`} (lo que se lleva cada uno va debajo de su nombre). Falta que la casa confirme el reparto y el pago.</>
-                  : <>Si la polla terminara ahora, el pozo se reparte entre {prizes.length === 1 ? "quien va de primero" : `los ${prizes.length} que van de primeros`}: lo que ganaría cada uno va debajo de su nombre.</>}
-              </span>
-            </>
-          )}
-        </p>
         {error && <div role="alert" className="mb-3 rounded-lg border border-red-alert/40 bg-red-alert/10 p-3 text-sm text-text-primary">
           <p>{error} Los datos anteriores se conservan.</p>
           <button type="button" onClick={() => setRevision(value => value + 1)} className="lp-btn lp-btn-ghost mt-2 min-h-11">Reintentar</button>

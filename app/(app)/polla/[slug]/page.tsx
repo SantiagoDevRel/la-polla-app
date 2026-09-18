@@ -74,6 +74,7 @@ import { premioCompartir } from "@/lib/casa/share-text";
 import { InvitaYGana } from "@/components/casa/InvitaYGana";
 import { PromoInvitados } from "@/components/casa/PromoInvitados";
 import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
+import { VerMasInfo } from "@/components/casa/VerMasInfo";
 import { Plus, Settings, Ticket } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -260,11 +261,28 @@ export default async function PollaPage({
             solo logos, estado junto al nombre, qué hay que acertar, y pozo +
             entrada en un solo bloque. Antes la entrada y "se lleva el ganador"
             iban en otra tarjeta que repetía la cifra del pozo. */}
-      <HeroFrame height="min-h-[200px]" className="flex flex-col justify-end">
+      {/* (2026-09-18) Quien ya está dentro viene a pronosticar, no a que le
+            vuelvan a vender la polla: el hero se acorta, Compartir pasa a un
+            ícono y el mínimo garantizado queda en Info. Las pestañas pasaron de
+            y=779 a verse en el primer pantallazo. */}
+      <HeroFrame height={participa ? "min-h-[150px]" : "min-h-[200px]"} className="flex flex-col justify-end">
         {/* (2026-09-14) Tuerca de edición: solo administradores y solo hasta
             el cierre. SQL (migración 122) vuelve a validar al guardar. */}
-        <div className="flex items-start justify-between gap-3">
-          <TournamentIdentity tournaments={tournaments} kind={polla.kind} size="lg" />
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1"><TournamentIdentity tournaments={tournaments} kind={polla.kind} size={participa ? undefined : "lg"} /></div>
+          {/* Compartir solo mientras esté abierta: pasar el link de una polla
+              cerrada no le sirve a nadie. */}
+          {abierta && (
+            <CompartirPolla
+              variant="icon"
+              slug={polla.slug}
+              nombre={polla.name}
+              entradaCop={polla.entry_price_cop}
+              premio={premioCompartir(polla, pot.prize_cop)}
+              codigo={codigo}
+              ayuda={every && codigo ? referralRule(every) : undefined}
+            />
+          )}
           {isAdmin && canEditPolla(polla) && (
             <Link
               href={editorHref(polla.id)}
@@ -277,13 +295,13 @@ export default async function PollaPage({
           )}
         </div>
         <div className="mt-3 flex items-start justify-between gap-3">
-          <h1 className="lp-display min-w-0 flex-1 text-[34px] [overflow-wrap:anywhere]">{polla.name}</h1>
+          <h1 className={`lp-display min-w-0 flex-1 ${participa ? "text-[28px]" : "text-[34px]"} [overflow-wrap:anywhere]`}>{polla.name}</h1>
           <Tape tone={estado.tone} className="mt-1 shrink-0">
             {estado.text}
           </Tape>
         </div>
-        {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className="mt-3 self-start" />}
-        <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4">
+        {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className={`${participa ? "mt-2" : "mt-3"} self-start`} />}
+        <div className={`${participa ? "mt-3" : "mt-4"} grid grid-cols-2 gap-x-3 gap-y-4`}>
           <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : "min-w-0"}>
             {objeto && polla.prize_image_path && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -312,11 +330,13 @@ export default async function PollaPage({
         {/* Una línea por dato: seguidos en la misma fila se leían como una sola frase. */}
         <p className="mt-3 grid gap-1 text-[13px] leading-snug text-text-secondary">
           {/* Pozo fijo = mínimo garantizado (migración 109): la cifra del pozo puede crecer. */}
-          {!objeto && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
+          {/* Es un argumento para ENTRAR: quien ya está dentro lo tiene en Info. */}
+          {!participa && !objeto && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
             <span>Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</span>
           )}
+          {/* El estado ya va en la etiqueta junto al nombre: aquí no se repite. */}
           <span>
-            {pot.paid_entries} inscritos · {abierta ? `cierra en ${timeLeft(polla.closes_at)}` : estado.text}
+            {pot.paid_entries} inscritos{abierta ? ` · cierra en ${timeLeft(polla.closes_at)}` : ""}
           </span>
         </p>
       </HeroFrame>
@@ -343,8 +363,10 @@ export default async function PollaPage({
         {/* La regla que decide la polla cuando el premio no se puede partir
             (migración 142). Va aquí, con el peso de un aviso, porque el empate
             arriba es el caso normal en modo marcador, no el borde. */}
+        {/* Quien ya está inscrito ve el titular y abre el ejemplo con un toque:
+            su hora de registro ya quedó, y el aviso entero tapaba los partidos. */}
         {polla.prize_kind === "objeto" && polla.kind !== "rifa" && (
-          <AvisoDesempate />
+          <AvisoDesempate compact={participa} />
         )}
 
         {/* Llegó por un enlace de cortesía y todavía no está inscrito: activar el
@@ -381,43 +403,30 @@ export default async function PollaPage({
           />
         ))}
 
-        {(mostrarEntrar || comprarOtro || abierta) && (
-          <div className="mt-4 flex flex-wrap gap-2 first:mt-0">
-            {mostrarEntrar && activarCortesia && (
-              // Con una cortesía por activar, pagar es la opción secundaria: el
-              // dorado se queda en el cupo gratis (y en el pozo), no en dos CTA.
-              <Link href={`/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
-                className="lp-btn lp-btn-ghost flex-[2_1_auto] !px-4">
-                {entry ? "Retomar comprobante" : `Pagar la entrada · ${formatCop(polla.entry_price_cop)}`}
-              </Link>
-            )}
-            {/* Comprar otro cupo vive en «Tus cupos» cuando ya hay varios: es la
-                acción de quien ya está dentro, no la puerta de la pantalla. */}
-            {comprarOtro && !showCupos && (
-              <Link href={`/polla/${polla.slug}/pagar?participacion=nueva`} className="lp-btn lp-btn-ghost flex-[2_1_auto] gap-2 !px-4">
-                <Plus aria-hidden="true" className="h-5 w-5 shrink-0" />
-                Comprar otro cupo · {formatCop(polla.entry_price_cop)}
-              </Link>
-            )}
-            {abierta && (
-              <CompartirPolla
-                slug={polla.slug}
-                nombre={polla.name}
-                entradaCop={polla.entry_price_cop}
-                premio={premioCompartir(polla, pot.prize_cop)}
-                codigo={codigo}
-                ayuda={every && codigo ? referralRule(every) : undefined}
-                className={mostrarEntrar && activarCortesia || comprarOtro && !showCupos ? "flex-[1_0_auto]" : "w-full"}
-              />
-            )}
-          </div>
+        {mostrarEntrar && activarCortesia && (
+          // Con una cortesía por activar, pagar es la opción secundaria: el
+          // dorado se queda en el cupo gratis (y en el pozo), no en dos CTA.
+          <Link href={`/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
+            className="lp-btn lp-btn-ghost mt-4 w-full !px-4 first:mt-0">
+            {entry ? "Retomar comprobante" : `Pagar la entrada · ${formatCop(polla.entry_price_cop)}`}
+          </Link>
         )}
-        {/* (2026-09-17) Pedido del dueño: la regla de invitaciones, pequeña, junto a Compartir.
-              Para quien ya juega aquí o ya tiene invitados; a quien todavía no entra le basta
-              con entrar (la regla sigue en el cursor de Compartir y en Info). */}
-        {abierta && every && codigo && referral && (participa || referral.counted > 0 || referral.in_review > 0) && (
-          <InvitaYGana view={referral} every={every} />
-        )}
+        {/* (2026-09-18) «Comprar otro cupo», «Compartir» y la tarjeta de
+              invitaciones eran TRES bloques a todo el ancho encima de los
+              partidos. Compartir es ahora el ícono del encabezado; los otros
+              dos comparten una fila corta y el detalle se abre si lo tocan.
+              Comprar otro cupo vive en «Tus cupos» cuando ya hay varios. El
+              precio no se repite en el botón: está arriba, en Entrada. */}
+        <InvitaYGana
+          view={abierta && every && codigo && referral && (participa || referral.counted > 0 || referral.in_review > 0) ? referral : null}
+          every={every}
+          leading={comprarOtro && !showCupos ? (
+            <Link href={`/polla/${polla.slug}/pagar?participacion=nueva`} className="lp-btn lp-btn-ghost min-w-0 flex-[1_1_150px] gap-2 !px-3">
+              <Plus aria-hidden="true" className="h-5 w-5 max-w-none shrink-0" />
+              <span className="min-w-0 [overflow-wrap:anywhere]">Otro cupo</span>
+            </Link>
+          ) : null}
+        />
 
         {/* (2026-09-18) Esto era un recuadro verde permanente. La aprobación es
             una NOTICIA, no un estado: se avisa la primera vez que la persona
@@ -436,11 +445,10 @@ export default async function PollaPage({
         {pagoPendiente && polla.kind !== "rifa" && !showCupos && (
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">{etiqueta}Pago en revisión</p>
-            <p className="mt-1 text-[13px] text-text-secondary">
-              Recibimos {multiple ? "el comprobante de este cupo" : "tu comprobante"}. Puedes pronosticar mientras tanto: tus
-              pronósticos quedan guardados y sus puntos se suman en la tabla
-              apenas confirmemos el pago, también los de partidos ya jugados.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-x-3">
+              <p className="text-[15px] font-semibold text-text-primary">Ya puedes pronosticar.</p>
+              <VerMasInfo section="entrada" />
+            </div>
           </div>
         )}
 
@@ -464,10 +472,7 @@ export default async function PollaPage({
         {(entry?.status === "anulada" || (entry?.status === "pendiente" && !entry.proof_path)) && abierta && polla.kind !== "rifa" && !showCupos && (
           <div className="mt-4 border border-amber/40 bg-amber/10 p-3">
             <p className="lp-label text-amber">{etiqueta}Tu comprobante no se guardó</p>
-            <p className="mt-1 text-[13px] text-text-secondary">
-              No alcanzamos a recibir la imagen, así que {participa ? "este cupo" : "tu inscripción"} no
-              quedó. Vuelve a subirla y sigues en carrera.
-            </p>
+            <p className="mt-1 text-[15px] text-text-primary">Súbelo otra vez.</p>
             {participa && entry?.entry_number && (
               <Link href={`/polla/${polla.slug}/pagar?participacion=${entry.entry_number}`} className="lp-btn lp-btn-ghost mt-3 w-full">
                 Subir el comprobante de este cupo
@@ -479,9 +484,7 @@ export default async function PollaPage({
         {partidosTerminados && payouts.length === 0 && (
           <StreetCard className="mt-4 border-turf/40 p-4 first:mt-0">
             <p className="lp-label !text-turf">Todos los partidos terminaron</p>
-            <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">
-              Estamos confirmando a los ganadores y el pago. En la Tabla ves cuánto se lleva cada uno; cuando paguemos, el comprobante aparece aquí.
-            </p>
+            <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">Confirmando ganadores y pago.</p>
           </StreetCard>
         )}
 
@@ -804,7 +807,11 @@ function ResultadoPolla({
             </span>
           </div>
           {reparto && <p className="mt-1 text-[13px] text-text-secondary">{reparto}</p>}
-          <ul className="mt-3 space-y-2">
+          {/* (2026-09-18) Con premio en dinero, «Prueba de pago» ya lista a cada
+              ganador con su monto: repetirlos aquí duplicaba la tarjeta y dejaba
+              las pestañas a más de un pantallazo. Esta lista queda para premios
+              en objeto, donde no hay prueba de pago que los nombre. */}
+          {objeto && <ul className="mt-3 space-y-2">
             {payouts.map((p) => (
               <li key={p.user_id} className="flex items-center gap-3">
                 {/* `users.avatar_url` NO es una URL: guarda la clave del
@@ -828,7 +835,7 @@ function ResultadoPolla({
                 </span>
               </li>
             ))}
-          </ul>
+          </ul>}
           {pruebas}
         </StreetCard>
       )}
