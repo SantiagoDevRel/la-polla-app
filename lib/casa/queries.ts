@@ -281,7 +281,21 @@ export async function getLeaderboard(
     p_polla_id: pollaId,
   });
   if (error) throw error;
-  return (data ?? []) as CasaLeaderboardRow[];
+  const rows = (data ?? []) as CasaLeaderboardRow[];
+
+  // Cuándo se registró cada participación (migración 142). Con premio en objeto
+  // el empate lo gana el registro más antiguo, así que ese dato tiene que estar
+  // a la vista de todos, no solo del administrador. Va en una lectura aparte
+  // para no cambiar la firma de `casa_leaderboard`, que usa el settlement.
+  if (rows.length === 0) return rows;
+  const { data: entries } = await db
+    .from("casa_entries")
+    .select("id, created_at")
+    .eq("polla_id", pollaId)
+    .eq("status", "pagada");
+  if (!entries) return rows;
+  const registered = new Map(entries.map(entry => [entry.id as string, entry.created_at as string]));
+  return rows.map(row => ({ ...row, registered_at: registered.get(row.entry_id) ?? null }));
 }
 
 /**

@@ -2576,6 +2576,17 @@ revertir a ciegas. Procedimiento, límites, pruebas y despliegue en
 [docs/casa-v2-production.md](docs/casa-v2-production.md). La descripción histórica
 de 096 arriba no es el contrato de liquidación una vez activado v2.
 
+**Empate por un premio en objeto (2026-09-18, migración 142):** no se sortea.
+Gana la participación registrada primero (`casa_entries.created_at`), decisión
+del dueño para un premio que no se parte. La regla se anuncia antes de abrir la
+polla y la tabla muestra en público la fecha de registro de cada participación,
+en hora de Colombia; la Info de la app y el bot de jugadores deben decir lo
+mismo. Publicar una polla por puntos con objeto ya no depende de
+`object_draws_enabled`. No reponer el texto «se sortea entre los empatados» ni
+volver a abrir `casa_object_draws` para pollas nuevas; esas tablas quedan sin
+uso, sin borrarse. Con `scoring_mode='marcador'` y solo el marcador exacto
+sumando, el empate arriba es lo normal, no el borde.
+
 ### Comprobantes: compresión determinista en el navegador (2026-09-13)
 
 Preparar UNA vez al elegir (`prepareImageUpload`) y reutilizar ese mismo Blob en

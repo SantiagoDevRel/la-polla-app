@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw, Trophy } from "lucide-react";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { formatCop } from "@/lib/casa/format";
+import { formatColombiaDateTime } from "@/lib/time/colombia";
 import type { CasaEntryStatus, CasaLeaderboardRow, CasaPollaStatus, CasaProvisionalPrize } from "@/lib/casa/types";
 
 interface Props {
@@ -24,9 +25,17 @@ interface Props {
   pollaStatus: CasaPollaStatus;
   drawPending?: boolean;
   userId: string;
+  /**
+   * El premio es un objeto que no se puede dividir, así que un empate en el
+   * primer puesto lo gana quien se registró primero (migración 142). Cuando
+   * aplica, la tabla muestra la fecha de registro de cada participación: es el
+   * dato que decide, y tiene que poder verificarlo cualquiera, no solo la casa.
+   * En las pollas de dinero el empate se reparte, así que ahí sería ruido.
+   */
+  tiebreakByRegistration?: boolean;
 }
 
-export function PollaTabs({ slug, firstLabel, children, info, initialRows, initialPrizes = [], finished = false, entryStatus, pollaStatus, userId, drawPending = false }: Props) {
+export function PollaTabs({ slug, firstLabel, children, info, initialRows, initialPrizes = [], finished = false, entryStatus, pollaStatus, userId, drawPending = false, tiebreakByRegistration = false }: Props) {
   const [tab, setTab] = useState(0);
   const [rows, setRows] = useState(initialRows);
   const [prizes, setPrizes] = useState(initialPrizes);
@@ -165,6 +174,15 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
                         {prizeByEntry.has(row.entry_id) && (
                           <span className="mt-0.5 block text-xs font-semibold text-gold">
                             {finished ? "Se lleva" : "Ganaría"} <span className="lp-money text-[14px]">{formatCop(prizeByEntry.get(row.entry_id)!)}</span>
+                          </span>
+                        )}
+                        {/* El dato que desempata, a la vista de todos (migración 142). */}
+                        {tiebreakByRegistration && row.registered_at && (
+                          <span className="mt-0.5 block text-[11px] leading-snug text-text-muted">
+                            Se registró el {formatColombiaDateTime(row.registered_at, {
+                              day: "2-digit", month: "2-digit", year: "numeric",
+                              hour: "numeric", minute: "2-digit",
+                            })}
                           </span>
                         )}
                       </span>

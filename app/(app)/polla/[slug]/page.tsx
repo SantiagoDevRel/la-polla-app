@@ -480,6 +480,7 @@ export default async function PollaPage({
           pollaStatus={polla.status}
           drawPending={polla.draw_pending}
           userId={user.id}
+          tiebreakByRegistration={polla.prize_kind === "objeto" && polla.kind !== "rifa"}
         >
         {/* ── Tus cupos (migración 131) ─────────────────────────────────────────
               (2026-09-16) Pedido del dueño: las pestañas Partidos / Tabla / Info

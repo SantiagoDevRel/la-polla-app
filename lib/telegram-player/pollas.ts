@@ -284,7 +284,9 @@ export async function showInfo(ctx: PlayerCtx, polla: CasaPolla): Promise<void> 
   } else if (money) {
     lines.push("• Gana quien sume más puntos.", "• Si hay empate en el primer puesto, el pozo se divide en partes iguales, incluidos los pesos del redondeo.");
   } else {
-    lines.push(`• El premio es ${esc(polla.prize_object)}. Gana quien sume más puntos.`, "• Si hay empate en el primer puesto, se sortea entre los empatados.", "• El premio no se divide ni se cambia por dinero.");
+    // Mismo texto que la Info de la app (migración 142): el bot y la pantalla
+    // no pueden prometer desempates distintos.
+    lines.push(`• El premio es ${esc(polla.prize_object)}. Gana quien sume más puntos.`, "• Si hay empate en el primer puesto, gana la persona que se haya registrado primero en la polla.", "• El premio no se divide ni se cambia por dinero.");
   }
   if (polla.kind !== "rifa") lines.push("• Necesitas al menos 1 punto para ganar. Si todos terminan con 0, no se entrega el premio.");
 

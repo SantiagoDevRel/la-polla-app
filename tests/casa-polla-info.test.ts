@@ -99,3 +99,26 @@ describe("TournamentIdentity", () => {
     }
   });
 });
+
+// (2026-09-18, migración 142) Un premio en objeto no se puede partir. El dueño
+// cambió el sorteo de desempate por uno determinista: gana quien se registró
+// primero. La app y el bot de Telegram tienen que prometer LO MISMO.
+describe("desempate de un premio en objeto", () => {
+  const objeto = { prize_kind: "objeto" as const, prize_object: "DOS ENTRADAS", pot_mode: null, fixed_prize_cop: null };
+
+  it("anuncia que gana quien se registró primero, no un sorteo", () => {
+    const html = text(info(objeto, null));
+    expect(html).toContain("gana la persona que se haya registrado primero en la polla");
+    expect(html).not.toContain("se sortea entre los empatados");
+  });
+
+  it("dice dónde verificar la fecha de registro", () => {
+    expect(text(info(objeto, null))).toContain("están en la tabla de posiciones");
+  });
+
+  it("no toca el desempate de las pollas de dinero: el pozo se sigue dividiendo", () => {
+    const html = text(info());
+    expect(html).toContain("el pozo se divide en partes iguales");
+    expect(html).not.toContain("registrado primero");
+  });
+});

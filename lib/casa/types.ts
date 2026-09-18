@@ -241,6 +241,12 @@ export interface CasaLeaderboardRow {
   entry_number?: number | null;
   /** Cuántas participaciones aprobadas tiene esa persona en la polla. */
   user_entries?: number;
+  /**
+   * Cuándo se registró esa participación (migración 142). Es el criterio de
+   * desempate cuando el premio es un objeto que no se puede dividir, así que
+   * se muestra en la tabla para que cualquiera pueda verificarlo.
+   */
+  registered_at?: string | null;
 }
 
 /**
