@@ -1009,6 +1009,32 @@ lista y no se vuelve a preguntar.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
+- **«Menos texto», segunda tanda (2026-09-18).** La primera (PR #131) cubrió
+  inicio, polla, Tabla, tarjetas de partido y la puerta de entrada. Quedó sin
+  tocar, y falta que el dueño diga sí/no a cada una:
+  - **Tabla e Info como ícono SOLO.** El dueño lo sugirió («es intuitivo, solo
+    trato de que haya menos cosas»). Se hizo ícono + palabra porque Info es ahora
+    donde vive toda la explicación y un ícono mudo la esconde; grok, muse y la
+    auditoría propia coincidieron. Si igual lo quiere, es una línea en
+    `components/casa/PollaTabs.tsx`.
+  - **`/polla/<slug>/pagar`:** sigue con párrafos de 12–30 palabras (premio en
+    objeto, pozo fijo, «El administrador revisa el comprobante…»). Inventario con
+    archivo:línea en el PR #131.
+  - **`LiveNow`** (franja En vivo del inicio): conserva los pisos viejos
+    (escudos+marcador, nombres, «Tu marcador», «Ver partido»). Pasarla a la fila
+    única de `MatchCard`.
+  - **Perfil** repite «Mis pollas» y «Terminadas» del inicio. Decisión de
+    producto: ¿se quitan de Perfil?
+  - **Cinta de anuncios** que rueda texto bajo el encabezado («…el alargue no
+    cuenta»): se puede cerrar, pero es texto en movimiento en cada pantalla.
+  - **`EntrarSheet`, `UnirmeGratis`, vista pública:** frases de 13–20 palabras.
+  - **Diseño con Claude Design / Lovable:** el dueño lo ofreció; no se usó (se
+    trabajó sobre el sistema «Tribuna Caliente» existente).
+- **Bug de «Tamaño del texto» (2026-09-18).** `lib/font-scale.ts` reescribe
+  también el `font-size` inline de `<html>`, así que «+60 %» aplica 2,56× y
+  «−30 %» 0,49×. Arreglarlo es una línea (saltar `documentElement`), pero le
+  cambia el tamaño a quien ya lo usa: falta el OK del dueño.
+
 - **Reparto automático al verificarse el último partido (2026-09-17).** El
   dueño pidió que al terminar la polla «calcules bien los ganadores y muestres
   las cuentas para pagarles». Quedó así: la 134 detecta la polla lista y el
