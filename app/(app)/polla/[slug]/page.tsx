@@ -62,6 +62,7 @@ import { BarraPagar } from "@/components/casa/BarraPagar";
 import { UnirmeGratis } from "@/components/casa/UnirmeGratis";
 import { PagoConfirmado } from "@/components/casa/PagoConfirmado";
 import { ActivarCortesia } from "@/components/casa/ActivarCortesia";
+import { AvisoDesempate } from "@/components/casa/AvisoDesempate";
 import { MisCortesias } from "@/components/casa/MisCortesias";
 import { courtesyPreview, listMyCourtesies } from "@/lib/casa/courtesies";
 import { COURTESY_COOKIE, COURTESY_FINE_PRINT, isCourtesyEntry, validCourtesyCode, type CourtesyPreview } from "@/lib/casa/courtesies-shared";
@@ -338,6 +339,13 @@ export default async function PollaPage({
         {polla.prize_kind === "objeto" && (polla.draw_pending || payouts.length > 0) && (isAdmin || bestEntry?.status === "pagada") && <PremioObjeto slug={polla.slug} />}
 
         {polla.kind === "rifa" && <div className="mt-4 first:mt-0"><MisBoletas slug={polla.slug} open={abierta} /></div>}
+
+        {/* La regla que decide la polla cuando el premio no se puede partir
+            (migración 142). Va aquí, con el peso de un aviso, porque el empate
+            arriba es el caso normal en modo marcador, no el borde. */}
+        {polla.prize_kind === "objeto" && polla.kind !== "rifa" && (
+          <AvisoDesempate />
+        )}
 
         {/* Llegó por un enlace de cortesía y todavía no está inscrito: activar el
             cupo gratis es LO que tiene que hacer, así que va antes del CTA de
@@ -661,6 +669,11 @@ function PollaPublica({
       </HeroFrame>
 
       <div className="px-4 pt-6">
+        {/* Quien abre el enlace compartido ve la regla del desempate ANTES de
+            registrarse: es la que decide la polla cuando el premio no se parte. */}
+        {polla.prize_kind === "objeto" && polla.kind !== "rifa" && (
+          <div className="mb-4"><AvisoDesempate /></div>
+        )}
         {regalo && (
           <StreetCard hero className="mb-4 bg-bg-card p-5">
             <p className="flex items-start gap-2 text-[17px] font-semibold leading-snug text-text-primary">
