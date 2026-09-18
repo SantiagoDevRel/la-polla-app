@@ -38,8 +38,13 @@ export function CompartirPolla({
   codigo?: string | null;
   /** Explicación al pasar el cursor (la regla de invitaciones). */
   ayuda?: string;
-  /** Principal solo donde compartir es la acción de la pantalla (el aviso de invitaciones). */
-  variant?: "ghost" | "primary";
+  /**
+   * Principal solo donde compartir es la acción de la pantalla (el aviso de
+   * invitaciones). `icon` (2026-09-18): botón redondo de 44 px para el
+   * encabezado de quien ya está inscrito, donde un botón a todo el ancho
+   * empujaba los partidos fuera del primer pantallazo.
+   */
+  variant?: "ghost" | "primary" | "icon";
   /** Ancho/flex según dónde va: sola ocupa toda la fila; junto al CTA se reparte. */
   className?: string;
 }) {
@@ -85,6 +90,18 @@ export function CompartirPolla({
       // el link esta visible en la barra de direcciones.
     }
   }
+
+  if (variant === "icon") return (
+    <button
+      type="button"
+      onClick={compartir}
+      title={copiado ? "Mensaje copiado" : "Compartir"}
+      aria-label={copiado ? "Mensaje copiado" : `Compartir ${nombre}${tip ? `. ${tip}` : ""}`}
+      className={`flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border bg-bg-card/80 backdrop-blur-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-95 ${copiado ? "border-turf/60 text-turf" : "border-border-default text-text-secondary hover:border-border-strong hover:text-text-primary"}`}
+    >
+      {copiado ? <Check className="h-5 w-5" aria-hidden="true" /> : <Share2 className="h-5 w-5" aria-hidden="true" />}
+    </button>
+  );
 
   return (
     <button

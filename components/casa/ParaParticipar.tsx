@@ -10,12 +10,18 @@
 // Esto NO es un modal: el dueño pidió expresamente que los partidos, la tabla y
 // la info se sigan viendo sin pagar. Es una tarjeta fija entre el hero y las
 // pestañas, con los tres pasos, la cuenta a la vista y un solo botón dorado.
+//
+// (2026-09-18, más tarde) «La gente no lee»: el párrafo de entrada decía lo
+// mismo que los tres pasos, y los pasos eran tres renglones. Ahora los pasos son
+// una fila de tres números con dos palabras cada uno, la cuenta sigue a la vista
+// y el detalle completo está a un toque en Info → «Cómo se paga la entrada».
 
 import Link from "next/link";
 import { StreetCard } from "@/components/street";
 import { formatCop } from "@/lib/casa/format";
 import type { CasaPolla } from "@/lib/casa/types";
 import { CopiarDato } from "./CopiarDato";
+import { VerMasInfo } from "./VerMasInfo";
 
 export function ParaParticipar({ polla, href, retomar = false }: {
   polla: Pick<CasaPolla, "slug" | "entry_price_cop" | "payout_account" | "payout_account_name" | "payout_method">;
@@ -26,12 +32,20 @@ export function ParaParticipar({ polla, href, retomar = false }: {
   const entrada = formatCop(polla.entry_price_cop);
   return (
     <StreetCard className="mt-4 border-gold/30 p-4 first:mt-0">
-      <h2 className="lp-display-sm text-text-primary">Para participar</h2>
-      <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">
-        {retomar
-          ? <>Tu inscripción quedó a medias. Sube el comprobante de tu transferencia de {entrada} y sigues en carrera.</>
-          : <>Transfiere {entrada} a esta cuenta y sube el comprobante. Puedes ver los partidos y las reglas antes de pagar.</>}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-x-3">
+        <h2 className="lp-display-sm text-text-primary">{retomar ? "Te falta el comprobante" : "Para participar"}</h2>
+        <VerMasInfo section="entrada" />
+      </div>
+      {/* Los tres pasos, de un vistazo. Con texto ampliado cada paso baja de línea
+          dentro de su columna en vez de salirse. */}
+      <ol className="mt-2 grid grid-cols-3 gap-2 text-center text-[13px] font-semibold leading-tight text-text-primary">
+        {[`Transfiere ${entrada}`, "Sube el comprobante", "Pronostica"].map((paso, i) => (
+          <li key={paso} className={`flex min-w-0 flex-col items-center gap-1 [overflow-wrap:anywhere] ${retomar && i === 0 ? "opacity-50" : ""}`}>
+            <span aria-hidden="true" className="lp-money grid h-[28px] w-[28px] shrink-0 place-items-center rounded-full border border-border-strong bg-bg-elevated text-[15px] text-text-primary">{i + 1}</span>
+            <span className="w-full">{paso}</span>
+          </li>
+        ))}
+      </ol>
 
       {/* La cuenta, acá mismo. Antes había que cruzar a otra pantalla para
           saber a quién transferirle: ese era el «no sé dónde pagar». */}
@@ -58,12 +72,6 @@ export function ParaParticipar({ polla, href, retomar = false }: {
           </p>
         </div>
       )}
-
-      <ol className="mt-3 space-y-1.5 text-[13px] leading-relaxed text-text-secondary">
-        <li><span className="lp-money text-text-primary">1</span> · Transfiere exactamente {entrada}.</li>
-        <li><span className="lp-money text-text-primary">2</span> · Sube la foto del comprobante.</li>
-        <li><span className="lp-money text-text-primary">3</span> · Pronostica. Tus puntos entran a la tabla cuando confirmemos el pago.</li>
-      </ol>
 
       <Link href={href} className="lp-btn lp-btn-primary mt-4 w-full !px-4">
         {retomar ? "Subir el comprobante" : `Pagar la entrada · ${entrada}`}

@@ -10,10 +10,48 @@
 //
 // Solo aparece donde manda: premio en objeto, que es cuando no se puede
 // dividir. En una polla de dinero el pozo se reparte y esto sería mentira.
+//
+// (2026-09-18, más tarde) `compact`: para quien YA está inscrito. La regla
+// completa cambia una decisión antes de entrar (registrarse temprano); después,
+// la hora de registro ya quedó y el bloque de 240 px solo empujaba los partidos
+// fuera del primer pantallazo. Al inscrito le queda el titular dorado, y el
+// ejemplo de las horas a un toque. Quien todavía no entra —y la vista pública—
+// siguen viendo el aviso entero.
 
-import { Trophy } from "lucide-react";
+import { ChevronDown, Trophy } from "lucide-react";
 
-export function AvisoDesempate() {
+const REGLA = "En caso de empate, el premio se le dará a la persona que se haya registrado antes en esta polla";
+
+function Ejemplo() {
+  return (
+    <p className="mt-2 text-[13px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]">
+      {/* El ejemplo con horas es del dueño: es lo que hace entendible la regla
+          sin leer nada más. El nombre del premio NO se mete en la frase —
+          escrito en mayúsculas y con paréntesis queda ilegible aquí. */}
+      Si alguien se registró a las 9:00 a. m. y otra persona a las 10:00 a. m., y quedan empatados, el premio
+      es para quien se registró a las 9:00 a. m. Solo en caso de empate. La fecha y la hora de registro de
+      cada participante están en la tabla de posiciones.
+    </p>
+  );
+}
+
+export function AvisoDesempate({ compact = false }: { compact?: boolean }) {
+  if (compact) return (
+    <details role="note" className="mt-4 border border-gold/45 bg-gold/10 first:mt-0">
+      <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold [&::-webkit-details-marker]:hidden">
+        <Trophy aria-hidden="true" className="h-5 w-5 max-w-none shrink-0 text-gold" />
+        <span className="min-w-0 flex-1 font-display text-[17px] uppercase leading-tight tracking-[0.04em] text-gold [overflow-wrap:anywhere]">
+          Si hay empate, gana quien se registró primero
+        </span>
+        <ChevronDown aria-hidden="true" className="h-5 w-5 max-w-none shrink-0 text-gold transition-transform duration-200 [[open]>summary>&]:rotate-180" />
+      </summary>
+      <div className="border-t border-gold/25 px-3 pb-3 pt-2">
+        <p className="text-[15px] font-semibold leading-snug text-text-primary [overflow-wrap:anywhere]">{REGLA}.</p>
+        <Ejemplo />
+      </div>
+    </details>
+  );
+
   return (
     <div
       role="note"
@@ -25,16 +63,9 @@ export function AvisoDesempate() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-display text-[19px] uppercase leading-tight tracking-[0.04em] text-gold [overflow-wrap:anywhere]">
-            En caso de empate, el premio se le dará a la persona que se haya registrado antes en esta polla
+            {REGLA}
           </p>
-          <p className="mt-2 text-[13px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]">
-            {/* El ejemplo con horas es del dueño: es lo que hace entendible la regla
-                sin leer nada más. El nombre del premio NO se mete en la frase —
-                escrito en mayúsculas y con paréntesis queda ilegible aquí. */}
-            Si alguien se registró a las 9:00 a. m. y otra persona a las 10:00 a. m., y quedan empatados, el premio
-            es para quien se registró a las 9:00 a. m. Solo en caso de empate. La fecha y la hora de registro de
-            cada participante están en la tabla de posiciones.
-          </p>
+          <Ejemplo />
         </div>
       </div>
     </div>

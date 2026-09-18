@@ -17,6 +17,17 @@
 //
 // Bajo cada opción 1X2 va la barra con el porcentaje de la gente que eligió
 // eso; en marcador, «cuántos pusieron 2-1» vive dentro del desplegable.
+//
+// (2026-09-18) «Todo en una fila» (dueño). La tarjeta tenía cuatro pisos: hora y
+// «Ver partido», escudos + marcador, nombres, y «Tu marcador». Ahora son dos:
+//   · una línea fina con la hora/estado a la izquierda y, a la derecha, TU
+//     pronóstico con sus puntos y la flecha al partido;
+//   · el partido: [escudo + nombre] [marcador o casillas] [escudo + nombre].
+// El nombre va DEBAJO de su escudo, dentro de su columna, y no al lado: así
+// tiene todo el ancho de la columna para partir en dos líneas con texto
+// ampliado, en vez de quedar en tres letras por renglón. El centro mide en px
+// fijos y no crece con la fuente, que fue lo que rompió el intento de junio.
+// Una tarjeta 1X2 pasó de 146 a ~100 px: 13 partidos caben en casi la mitad.
 
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -343,8 +354,10 @@ export function PicksBoard({
         </section>
       )}
 
-      {/* Barra de guardado: pegada abajo, encima del nav. */}
-      {canEdit && (
+      {/* Barra de guardado: pegada abajo, encima del nav. (2026-09-18) Solo
+          cuando hay cambios o un mensaje: un «Guardado 13/13» fijo tapaba 120 px
+          de partidos sin pedir nada. Lo que falta ya lo dice la franja roja. */}
+      {canEdit && (dirty || saving || msg) && (
         <div className="sticky bottom-[88px] z-20 -mx-4 border-t border-border-default bg-bg-base px-4 pb-3 pt-3">
           {msg && (
             <p
@@ -468,32 +481,71 @@ function MatchCard({
     <span className="text-text-muted">{showDay ? `${dayLabel(m.scheduled_at, now)} · ${horaDe(m)}` : horaDe(m)}</span>
   );
 
+  // Medidas en px fijos a propósito: el tamaño de texto de la app escala los
+  // rem, y un centro que crece aplasta los nombres (ver la cabecera).
   const cell = (value: number | null) => (
-    <span className="lp-money grid h-11 w-11 shrink-0 place-items-center overflow-hidden text-[28px] text-text-primary [-webkit-text-size-adjust:none]">
+    <span className="lp-money grid h-[44px] w-[34px] shrink-0 place-items-center overflow-hidden text-[28px] text-text-primary [-webkit-text-size-adjust:none]">
       {started || finished ? value ?? "–" : "–"}
     </span>
   );
+  const dash = <span aria-hidden="true" className="h-[2px] w-[10px] shrink-0 bg-border-strong" />;
+
+  /** Escudo con el nombre debajo; toca el equipo. */
+  const side = (which: "home" | "away") => {
+    const name = which === "home" ? m.home_team : m.away_team;
+    const flag = which === "home" ? m.home_team_flag : m.away_team_flag;
+    return (
+      <Link href={`/futbol/equipos/${which}.${m.id}`} aria-label={`Ver equipo: ${name}`} className="flex min-w-0 flex-col items-center gap-0.5 rounded-md py-0.5 text-center transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+        <TeamCrest team={name} src={flag} className="h-[28px] w-[28px] max-w-none shrink-0" />
+        {/* Sin recorte a propósito: con texto ampliado un nombre largo parte en dos líneas. */}
+        <span className="w-full text-[13px] font-semibold leading-tight text-text-primary [overflow-wrap:anywhere]">{shortTeam(name)}</span>
+      </Link>
+    );
+  };
+
+  // Tu pronóstico y sus puntos, desde que el partido cierra: van en la línea de
+  // arriba, a la derecha, y no en un piso propio.
+  const showMineInline = showMine && (started || cerrado || finished) && !showButtons1x2;
 
   return (
-    <article className={`lp-card p-3 ${voided ? "opacity-70" : ""}`} aria-label={`${m.home_team} contra ${m.away_team}`}>
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-semibold uppercase tracking-[0.08em]">
+    <article className={`lp-card lp-match relative px-[12px] py-[10px] ${voided ? "opacity-70" : ""}`} aria-label={`${m.home_team} contra ${m.away_team}`}>
+      {/* La flecha al partido va fuera del flujo (esquina): su área de toque
+          de 32 px no le suma alto a la línea. */}
+      <div className="flex min-h-[20px] flex-wrap items-center justify-between gap-x-2 pr-[28px]">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-[12px] font-semibold uppercase tracking-[0.08em]">
           {estado}
           {editable && !tengoPick && (
             <span className="rounded-md border border-red-alert/40 bg-red-alert/15 px-1.5 py-0.5 text-[10px] text-red-alert">Falta</span>
           )}
           {cerrado && !started && !finished && !voided && !waiting && <span className="text-red-alert">Cerrado</span>}
         </span>
-        <Link href={`/futbol/partidos/${m.id}`} className="flex min-h-8 shrink-0 items-center gap-0.5 text-[12px] font-semibold text-text-secondary transition-colors hover:text-text-primary">
-          Ver partido <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
-        </Link>
+        <span className="flex shrink-0 items-center gap-1.5">
+          {showMineInline && (
+            <span className="flex items-center gap-1.5 text-[13px]">
+              <span className="text-text-secondary">Tú</span>
+              <span className={`font-semibold ${!tengoPick ? "text-text-muted" : onTrack || (points ?? 0) > 0 ? "text-turf" : "text-text-primary"}`}>
+                {label ?? "sin pronóstico"}
+              </span>
+              {points != null && tengoPick && (
+                // (2026-09-17) Los aciertos en verde y los 0 pts en amarillo, fáciles de leer.
+                <span className={`lp-money rounded-md px-1.5 text-[14px] ${points > 0 ? "bg-turf/15 text-turf" : "bg-amber/15 text-amber"}`}>
+                  {points > 0 ? `+${points}` : "0"}<span className="sr-only"> puntos</span>
+                </span>
+              )}
+            </span>
+          )}
+          <Link href={`/futbol/partidos/${m.id}`} aria-label={`Ver partido: ${m.home_team} contra ${m.away_team}`} title="Ver partido"
+            className="absolute right-[4px] top-[4px] grid h-[32px] w-[32px] place-items-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+            <ChevronRight aria-hidden="true" className="h-[16px] w-[16px] max-w-none" />
+          </Link>
+        </span>
       </div>
 
       {showButtons1x2 ? (
         /* (2026-09-14) Pedido del dueño: el escudo con el nombre debajo ES el
            botón de cada equipo y «Empate» ocupa el lugar del «vs». Columnas con
            minmax(0,1fr): con texto ampliado el nombre baja de línea. */
-        <div role="group" aria-label={`Tu pronóstico: ${m.home_team} contra ${m.away_team}`} className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2">
+        <div role="group" aria-label={`Tu pronóstico: ${m.home_team} contra ${m.away_team}`} className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-[8px]">
           {opcionesDe(m).map((op) => {
             const elegido = mine?.pick1x2 === op.key;
             const equipo = op.key === "L" ? { name: m.home_team, flag: m.home_team_flag } : op.key === "V" ? { name: m.away_team, flag: m.away_team_flag } : null;
@@ -506,7 +558,7 @@ function MatchCard({
                 aria-pressed={elegido}
                 aria-label={equipo ? `Gana ${equipo.name}` : "Empate"}
                 className={[
-                  "flex min-h-[80px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-md border px-1.5 py-2 text-center transition-colors",
+                  "flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border px-1.5 py-1.5 text-center transition-colors",
                   equipo ? "" : "px-3",
                   elegido
                     ? "border-gold bg-gold/15 text-gold"
@@ -518,7 +570,7 @@ function MatchCard({
               >
                 {equipo ? (
                   <>
-                    <TeamCrest team={equipo.name} src={equipo.flag} className="h-8 w-8" />
+                    <TeamCrest team={equipo.name} src={equipo.flag} className="h-[28px] w-[28px] max-w-none shrink-0" />
                     <span className="w-full text-[13px] font-semibold leading-tight [overflow-wrap:anywhere]">{op.label}</span>
                   </>
                 ) : (
@@ -529,62 +581,53 @@ function MatchCard({
           })}
         </div>
       ) : (
-        <>
-          <div className="mt-2 flex items-center justify-center gap-2">
-            <Link href={`/futbol/equipos/home.${m.id}`} aria-label={`Ver equipo: ${m.home_team}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-bg-elevated">
-              <TeamCrest team={m.home_team} src={m.home_team_flag} className="h-8 w-8" />
-            </Link>
+        <div className="lp-match-row mt-1">
+          {side("home")}
+          <div className="lp-match-center">
             {invitando && scoringMode === "marcador" ? (
               // Casillas que invitan a pagar: el toque abre la hoja, no edita.
               <button
                 type="button"
                 onClick={() => onBlocked?.()}
                 aria-label="Pagar la entrada para pronosticar"
-                className="lp-money flex h-12 cursor-pointer items-center gap-2 rounded-md border border-border-default bg-bg-elevated px-3 text-[22px] text-text-muted transition-colors hover:border-gold/30"
+                className="lp-money flex h-[44px] cursor-pointer items-center gap-2 rounded-md border border-border-default bg-bg-elevated px-3 text-[22px] text-text-muted transition-colors hover:border-gold/30"
               >
-                <span>–</span><span aria-hidden="true" className="h-[2px] w-3 bg-border-strong" /><span>–</span>
+                <span>–</span>{dash}<span>–</span>
               </button>
             ) : editable && scoringMode === "marcador" ? (
-              (["home", "away"] as const).map((side, i) => (
-                <Fragment key={side}>
-                  {i === 1 && <span className="h-[2px] w-3 shrink-0 bg-border-strong" aria-hidden />}
+              (["home", "away"] as const).map((sideKey, i) => (
+                <Fragment key={sideKey}>
+                  {i === 1 && dash}
                   <input
-                    ref={(el) => { inputs.current.set(`${m.id}:${side}`, el); }}
+                    ref={(el) => { inputs.current.set(`${m.id}:${sideKey}`, el); }}
                     type="number"
                     inputMode="numeric"
                     enterKeyHint="next"
                     min={0}
                     max={30}
-                    value={(side === "home" ? mine?.homeScore : mine?.awayScore) ?? ""}
+                    value={(sideKey === "home" ? mine?.homeScore : mine?.awayScore) ?? ""}
                     onFocus={(e) => e.currentTarget.select()}
                     onChange={(e) => {
-                      onScore(m.id, side, e.target.value);
+                      onScore(m.id, sideKey, e.target.value);
                       // Un dígito completa la casilla: salta a la siguiente.
                       // Para 10 o más, se vuelve a tocar la casilla y se agrega el segundo.
-                      if (e.target.value.length === 1) onJump(m.id, side);
+                      if (e.target.value.length === 1) onJump(m.id, sideKey);
                     }}
-                    aria-label={`Goles de ${side === "home" ? m.home_team : m.away_team}`}
-                    className={`lp-input lp-money h-12 !w-12 shrink-0 !px-0 text-center text-[22px] [-webkit-text-size-adjust:none] ${!tengoPick ? "!border-red-alert/60" : ""}`}
+                    aria-label={`Goles de ${sideKey === "home" ? m.home_team : m.away_team}`}
+                    className={`lp-input lp-money !h-[44px] !w-[44px] shrink-0 !px-0 text-center text-[22px] [-webkit-text-size-adjust:none] ${!tengoPick ? "!border-red-alert/60" : ""}`}
                   />
                 </Fragment>
               ))
             ) : (
               <>
                 {cell(m.home_score)}
-                <span aria-hidden="true" className="h-[2px] w-3 shrink-0 bg-border-strong" />
+                {dash}
                 {cell(m.away_score)}
               </>
             )}
-            <Link href={`/futbol/equipos/away.${m.id}`} aria-label={`Ver equipo: ${m.away_team}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-bg-elevated">
-              <TeamCrest team={m.away_team} src={m.away_team_flag} className="h-8 w-8" />
-            </Link>
           </div>
-          {/* Sin recorte a propósito: con texto ampliado un nombre largo parte en dos líneas. */}
-          <div className="mt-1 grid grid-cols-2 gap-x-3 text-center text-[12px] font-semibold leading-tight text-text-primary">
-            <span className="min-w-0 [overflow-wrap:anywhere]">{m.home_team}</span>
-            <span className="min-w-0 [overflow-wrap:anywhere]">{m.away_team}</span>
-          </div>
-        </>
+          {side("away")}
+        </div>
       )}
 
       {/* Porcentajes 1X2 una vez empezado: una barra por opción, sin repetir botones. */}
@@ -603,22 +646,6 @@ function MatchCard({
             );
           })}
         </div>
-      )}
-
-      {/* Tu pronóstico y sus puntos, desde que el partido cierra. */}
-      {showMine && (started || cerrado || finished) && !showButtons1x2 && (
-        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
-          <span className="text-text-secondary">{scoringMode === "marcador" ? "Tu marcador:" : "Tu pronóstico:"}</span>
-          <span className={`font-semibold ${!tengoPick ? "text-text-muted" : onTrack || (points ?? 0) > 0 ? "text-turf" : "text-text-primary"}`}>
-            {label ?? "sin pronóstico"}
-          </span>
-          {points != null && tengoPick && (
-            // (2026-09-17) Los aciertos en verde y los 0 pts en amarillo, fáciles de leer.
-            <span className={`lp-money text-[15px] ${points > 0 ? "text-turf" : "text-amber"}`}>
-              {points > 0 ? `+${points}` : "0"} pts
-            </span>
-          )}
-        </p>
       )}
 
       {started && canViewOthers && (
