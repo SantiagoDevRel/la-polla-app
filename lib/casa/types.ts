@@ -424,6 +424,21 @@ export function isPublicClosedPolla(polla: Pick<CasaPolla, "status" | "closes_at
 }
 
 /**
+ * «Terminó el 17 sep 2026»: cuándo terminó de verdad una polla repartida.
+ *
+ * (2026-09-18) En Pollas cerradas se leían varias seguidas diciendo apenas
+ * «Resuelta», sin ninguna pista de cuándo fue cada una. La fecha es la del
+ * reparto (`settled_at`), que es el momento en que la polla terminó con
+ * ganador; si faltara, cae al cierre de inscripciones. La usa la vista pública;
+ * en las tarjetas y en el encabezado la fecha va dentro de la etiqueta de
+ * estado (ver abajo), para decirla UNA vez y no dos.
+ */
+export function pollaEndedLabel(polla: CasaPolla): string | null {
+  if (polla.status !== "resuelta") return null;
+  return `Terminó el ${formatShortDate(polla.settled_at ?? polla.closes_at, { year: true })}`;
+}
+
+/**
  * Etiqueta corta de estado, en el idioma del jugador.
  *
  * (2026-09-18, pedido del dueño) «Cerrada» y «Resuelta» son palabras del panel:
@@ -431,13 +446,18 @@ export function isPublicClosedPolla(polla: Pick<CasaPolla, "status" | "closes_at
  * Ahora hay tres momentos que se entienden sin explicación:
  *   · Abierta (verde)  → todavía se puede entrar.
  *   · En juego         → ya no entra nadie; los partidos se están jugando.
- *   · Terminó 17 sep   → se acabó, y se dice CUÁNDO (`settled_at`).
+ *   · Terminó 17 sep   → se acabó, y se dice CUÁNDO. El año solo aparece si no
+ *                        es el actual: «Terminó 3 dic 2025».
  */
 export function pollaStatusLabel(polla: CasaPolla): {
   text: string;
   tone: "cal" | "red" | "live" | "mute";
 } {
-  if (polla.status === "resuelta") return { text: polla.settled_at ? `Terminó ${formatShortDate(polla.settled_at)}` : "Terminada", tone: "mute" };
+  if (polla.status === "resuelta") {
+    const fin = polla.settled_at ?? polla.closes_at;
+    const otroAno = new Date(fin).getFullYear() !== new Date().getFullYear();
+    return { text: `Terminó ${formatShortDate(fin, { year: otroAno })}`, tone: "mute" };
+  }
   if (polla.status === "anulada") return { text: "Anulada", tone: "red" };
   if (polla.status === "borrador" || polla.publication_mode === "oculta") return { text: "Oculta", tone: "mute" };
   if (new Date(polla.opens_at) > new Date()) return { text: "Programada", tone: "mute" };

@@ -493,6 +493,28 @@ para guardar tu pronóstico»). En Info son dos reglas distintas: «Cómo se pag
 entrada» y «Cómo recibes tu premio». El marcador en vivo va en texto primario:
 el dorado es del premio.
 
+### Orden de los partidos de una polla (2026-09-18)
+
+Los partidos van SIEMPRE en orden de empezada: arriba el que arranca primero,
+abajo el que arranca de último. No se reordenan por estado, y ninguno cambia
+de lugar al empezar o al terminar — su estado (en vivo, final, anulado) se
+pinta dentro de la tarjeta. `order_index` queda solo como desempate entre dos
+partidos a la misma hora, en el orden que la casa eligió al crear la polla.
+
+Sale de `getPollaMatches` (servidor, así lo heredan web y bot), de
+`groupCasaMatchesByDay` (`lib/casa/picks-sections.ts`, que agrupa por día sin
+reordenar) y del editor admin, que ve el mismo recorrido que el jugador. Los
+tres bloques por estado (Finalizados · En vivo · Próximos) del 16-sep se
+quitaron: movían la lista sola y un jugador lo reportó como «ayer tenían un
+orden y hoy otro orden». No reintroducir una partición que mueva partidos.
+
+Una polla repartida dice cuándo terminó DENTRO de la cinta: «Terminó 17 sep» (el
+año solo si no es el actual; `pollaStatusLabel`, fecha de `settled_at`). El mismo
+18-sep, más tarde, el dueño pidió menos cosas en pantalla, así que el renglón
+aparte «Terminó el 17 sep 2026» salió de las tarjetas y del encabezado;
+`pollaEndedLabel` (con año) queda para la vista pública y el bot de Telegram. La
+fecha va UNA vez por tarjeta. Contrato en `tests/casa-polla-status-label.test.ts`.
+
 ### Navegación y actualización de la app (2026-09-09)
 
 Casa (2026-09-17): En vivo → «¿Alguien te invitó?» (solo personas nuevas, migración

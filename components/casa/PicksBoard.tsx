@@ -32,11 +32,11 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Clock3, Lock } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { TeamCrest } from "@/components/match/TeamCrest";
 import { PctBar } from "@/components/street";
 import { hasPick, liveMinuteLabel, pickLabel, pickOnTrack, shortTeam } from "@/lib/casa/live-status";
-import { dayLabel, partitionCasaMatches, type SectionMatch } from "@/lib/casa/picks-sections";
+import { dayLabel, groupCasaMatchesByDay, type SectionMatch } from "@/lib/casa/picks-sections";
 import type { CasaDistribution, Pick1x2 } from "@/lib/casa/types";
 import { canEditCasaMatch, hasCasaMatchStarted } from "@/lib/casa/match-rules";
 import { MatchPicks } from "./MatchPicks";
@@ -204,14 +204,12 @@ export function PicksBoard({
     };
   }, [matches, router]);
 
-  const sections = useMemo(() => partitionCasaMatches(matches, now), [matches, now]);
-  // Con todo terminado (polla resuelta) no tiene sentido esconder la única lista.
-  const [finishedOpen, setFinishedOpen] = useState(() => sections.live.length + sections.upcoming.length === 0);
-  // (2026-09-17) «En vivo» también se pliega; empieza abierta.
-  const [liveOpen, setLiveOpen] = useState(true);
+  // Orden de empezada, siempre. El estado (en vivo, final, anulado) se pinta
+  // dentro de la tarjeta: ningún partido cambia de lugar por haber arrancado.
+  const dias = useMemo(() => groupCasaMatchesByDay(matches, now), [matches, now]);
   const baseId = useId();
   const [closedDays, setClosedDays] = useState<Set<string>>(() => new Set());
-  const upcomingOrder = useMemo(() => sections.upcoming.flatMap((group) => group.matches), [sections]);
+  const ordenCompleto = useMemo(() => dias.flatMap((group) => group.matches), [dias]);
 
   const marcados = useMemo(
     () => matches.filter((m) => hasPick(scoringMode, picks[m.id])).length,
@@ -247,8 +245,8 @@ export function PicksBoard({
       inputs.current.get(`${matchId}:away`)?.focus();
       return;
     }
-    const idx = upcomingOrder.findIndex((m) => m.id === matchId);
-    const siguiente = upcomingOrder.slice(idx + 1).map((m) => inputs.current.get(`${m.id}:home`)).find((el) => el && !el.disabled);
+    const idx = ordenCompleto.findIndex((m) => m.id === matchId);
+    const siguiente = ordenCompleto.slice(idx + 1).map((m) => inputs.current.get(`${m.id}:home`)).find((el) => el && !el.disabled);
     if (siguiente) siguiente.focus();
     else inputs.current.get(`${matchId}:away`)?.blur();
   }
@@ -327,58 +325,12 @@ export function PicksBoard({
 
   return (
     <div data-app-update-blocked={dirty || saving} className="space-y-4">
-      {/* ── Finalizados — cerrado por defecto ─────────────────────────── */}
-      {sections.finished.length > 0 && (
-        <section>
-          <button
-            type="button"
-            onClick={() => setFinishedOpen((value) => !value)}
-            aria-expanded={finishedOpen}
-            aria-controls={`${baseId}-finalizados`}
-            className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 px-1 text-left"
-          >
-            <span className="lp-label flex items-center gap-2 !text-[12px] text-text-secondary">
-              <Lock aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
-              Finalizados · {sections.finished.length}
-            </span>
-            <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 ${finishedOpen ? "rotate-180" : ""}`} />
-          </button>
-          {finishedOpen && <div id={`${baseId}-finalizados`} className="mt-1 space-y-2">{sections.finished.map((m) => renderCard(m, true))}</div>}
-        </section>
-      )}
-
-      {/* ── En vivo — se mira, no se edita. Abierto por defecto, se pliega. ── */}
-      {sections.live.length > 0 && (
-        <section>
-          <button
-            type="button"
-            onClick={() => setLiveOpen((value) => !value)}
-            aria-expanded={liveOpen}
-            aria-controls={`${baseId}-envivo`}
-            className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-2 px-1 text-left"
-          >
-            <span className="lp-label flex items-center gap-2 !text-[12px] text-text-secondary">
-              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert motion-safe:animate-pulse" />
-              En vivo · {sections.live.length}
-            </span>
-            <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 ${liveOpen ? "rotate-180" : ""}`} />
-          </button>
-          {liveOpen && <div id={`${baseId}-envivo`} className="mt-1 space-y-2">{sections.live.map((m) => renderCard(m, true))}</div>}
-        </section>
-      )}
-
-      {/* ── Próximos — por día, abiertos ──────────────────────────────── */}
-      {upcomingOrder.length > 0 && (
+      {/* ── Los partidos, en orden de empezada ───────────────────────────
+          Un solo recorrido, de arriba abajo. El día es apenas un separador;
+          dentro de cada uno el orden es la hora de inicio y no cambia nunca. */}
+      {dias.length > 0 && (
         <section className="space-y-3">
-          {/* Sin finalizados ni en vivo, «Próximos» no distingue nada: el
-              encabezado de cada día ya lo dice. */}
-          {sections.finished.length + sections.live.length > 0 && (
-            <h3 className="lp-label flex min-h-11 items-center gap-2 px-1 !text-[12px] text-text-secondary">
-              <Clock3 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-gold" />
-              Próximos · {upcomingOrder.length}
-            </h3>
-          )}
-          {sections.upcoming.map((group) => {
+          {dias.map((group) => {
             const open = !closedDays.has(group.key);
             return (
               <div key={group.key}>
