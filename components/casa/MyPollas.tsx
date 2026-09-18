@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useLocale } from "next-intl";
 import { ChevronRight, Search, Ticket } from "lucide-react";
 import type { MyCasaPolla } from "@/lib/casa/types";
-import { formatCop, timeLeft } from "@/lib/casa/format";
+import { timeLeft } from "@/lib/casa/format";
+import { premioLabel, premioValor } from "@/lib/casa/premio";
 import { isPollaOpen } from "@/lib/casa/types";
 import { TournamentIdentity } from "./TournamentIdentity";
 import { PollaSection } from "./PollaSection";
@@ -132,6 +133,7 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
             const paso = siguientePaso(polla, pendingByPolla[polla.id] ?? 0, en);
             const abierta = !finished && isPollaOpen({ status: polla.status, closes_at: polla.closes_at });
             const cupos = polla.entries.length;
+            const premio = premioValor(polla);
             return <li key={polla.id}>
               {/* Toda la tarjeta es el enlace: un toque, sin elegir cupo antes de entrar. */}
               <Link
@@ -145,11 +147,13 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
                 </div>
                 <TournamentIdentity tournaments={polla.tournaments} kind={polla.kind} />
 
-                {/* Pozo y cierre: lo único que de verdad se compara entre pollas. */}
-                {(typeof polla.prize_cop === "number" || abierta) && <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-                  {typeof polla.prize_cop === "number" && <div className="min-w-0">
-                    <span className="lp-label block">{en ? "Pot" : "Pozo"}</span>
-                    <span className={`lp-money mt-0.5 block text-[24px] leading-none [overflow-wrap:anywhere] ${finished ? "text-text-secondary" : "text-text-primary"}`}>{formatCop(polla.prize_cop)}</span>
+                {/* Premio y cierre: lo único que de verdad se compara entre pollas.
+                    Un premio en objeto muestra el objeto: «POZO $0» hacía ver una
+                    polla que regala entradas como una que no reparte nada. */}
+                {(premio !== null || abierta) && <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+                  {premio !== null && <div className="min-w-0">
+                    <span className="lp-label block">{premioLabel(en)}</span>
+                    <span className={`${polla.prize_kind === "objeto" ? "font-semibold" : "lp-money"} mt-0.5 block text-[24px] leading-tight [overflow-wrap:anywhere] ${finished ? "text-text-secondary" : "text-text-primary"}`}>{premio}</span>
                   </div>}
                   {abierta && <div className="min-w-0 text-right">
                     <span className="lp-label block">{en ? "Closes in" : "Cierra en"}</span>

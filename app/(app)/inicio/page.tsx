@@ -35,6 +35,7 @@ import {
 } from "@/lib/casa/queries";
 import { isPollaOpen, isPublicClosedPolla, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
 import { entryPriceLabel, formatCop, timeLeft } from "@/lib/casa/format";
+import { premioLabel, premioValor } from "@/lib/casa/premio";
 import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
 import { ScoringModeBadge } from "@/components/casa/ScoringModeBadge";
@@ -260,9 +261,11 @@ function PollaRow({
           {/* Equal columns, label baselines and number sizes for both amounts. */}
           <div className="mt-4 grid grid-cols-2">
             <div className="min-w-0 border-r border-border-subtle">
-              <Label>Pozo</Label>
-              <div className={`lp-money mt-1 text-[28px] leading-none ${amountTone} [overflow-wrap:anywhere]`}>
-                {formatCop(pot?.prize_cop ?? 0)}
+              <Label>{premioLabel()}</Label>
+              {/* Un premio en objeto muestra el objeto: «POZO $0» hacía ver una
+                  polla que regala entradas como una que no reparte nada. */}
+              <div className={`${polla.prize_kind === "objeto" ? "font-semibold" : "lp-money"} mt-1 text-[28px] leading-tight ${amountTone} [overflow-wrap:anywhere]`}>
+                {premioValor({ ...polla, prize_cop: pot?.prize_cop ?? 0 }) ?? formatCop(pot?.prize_cop ?? 0)}
               </div>
             </div>
             <div className="min-w-0 text-right">
