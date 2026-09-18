@@ -278,7 +278,11 @@ en caché, sin gastar cuota) o `{source:"manual",home,away}`; `espn` y `fd` resp
 «Próximos 10 días», «30 días» y «Toda la temporada», agrupados por fecha en hora de
 Colombia. La temporada completa de cada liga se importa desde API-Football
 (`lib/api-football/calendar.ts`, 1 solicitud por liga) y el cron la refresca por
-diferencias. **Actualizar calendario** fuerza ese refresco. Los partidos sin hora
+diferencias, cada 3 h desde la migración 141. **Actualizar calendario** fuerza ese
+refresco. La cadencia no baja de 3 h porque el sub-tope de calendario son 300
+solicitudes por día UTC (migración 116) y cada corrida gasta una por liga: con
+veintiuna ligas, a 3 h son hasta 168/día y a 2 h serían 252, sin aire para un
+refresco manual. Los partidos sin hora
 fija muestran «hora por confirmar». Un partido aplazado (PST) cuyo saque sigue en
 el futuro se muestra con la hora que trae API-Football y se puede elegir; uno con
 fecha vieja no entra hasta que el proveedor publique la nueva.

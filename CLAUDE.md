@@ -476,8 +476,11 @@ completa del proveedor verificada el mismo día; no se agrega ninguna otra fuent
 El calendario se pide por FECHA, así que sumar ligas **no gasta más cuota** de
 lectura: `RESULT_LEAGUES` solo filtra qué partidos de esa respuesta se guardan.
 Lo que sí cambia es el recorrido del cron, que va liga por liga dentro de los
-60 s de Vercel: pasó a cada 2 h (migración 141) para que ninguna liga quede más
-de medio día sin refrescarse. No volver a 6 h sin recortar la lista.
+60 s de Vercel: pasó a cada 3 h (migración 141) para que ninguna liga quede más
+de medio día sin refrescarse. No son 2 h porque el sub-tope de CALENDARIO son
+300 solicitudes por día UTC (migración 116) y cada corrida gasta una por liga:
+a 2 h el techo teórico es 252/día y no queda aire para un refresco manual. No
+volver a 6 h sin recortar la lista.
 
 `classifyRound` recibe ahora el **id de liga**, porque dos nombres de ronda
 significan cosas distintas según el torneo: «Play-offs» es una fase real de la
