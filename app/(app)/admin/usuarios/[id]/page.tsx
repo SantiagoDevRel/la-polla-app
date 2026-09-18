@@ -13,7 +13,7 @@ export default async function AdminUserHistoryPage({ params }: { params: Promise
   const { id } = await params;
   const user = await getAuthenticatedUser();
   if (!user) redirect(`/login?returnTo=/admin`);
-  if (!user.is_admin) redirect("/casa");
+  if (!user.is_admin) redirect("/inicio");
 
   return <div className="px-4 pb-28 pt-5">
     <Link href="/admin" className="mb-4 inline-flex min-h-11 items-center gap-2 text-[15px] text-text-secondary transition-colors hover:text-text-primary">

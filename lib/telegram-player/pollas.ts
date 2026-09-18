@@ -32,7 +32,7 @@ import { buttonText, esc, show, type Keyboard, type PlayerCtx, type Screen } fro
 const PAGE_SIZE = 8;
 
 export function pollaUrl(ctx: Pick<PlayerCtx, "env">, slug: string): string {
-  return `${loginLinkOrigin("es", ctx.env)}/casa/${encodeURIComponent(slug)}`;
+  return `${loginLinkOrigin("es", ctx.env)}/polla/${encodeURIComponent(slug)}`;
 }
 
 /**

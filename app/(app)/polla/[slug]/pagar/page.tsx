@@ -33,7 +33,7 @@ export default async function PagarPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?returnTo=/casa/${(await params).slug}/pagar`);
+  if (!user) redirect(`/login?returnTo=/polla/${(await params).slug}/pagar`);
 
   const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador") notFound();
@@ -66,18 +66,18 @@ export default async function PagarPage({
         return <div className="px-4 py-6"><StreetCard className="space-y-4 p-4">
           <h1 className="lp-display text-[30px] [overflow-wrap:anywhere]">Llegaste al máximo</h1>
           <p className="text-[15px] text-text-secondary">Puedes tener hasta {maxEntries} cupos en {polla.name}. Si alguno fue rechazado, envía de nuevo su comprobante desde la polla.</p>
-          <Link className="lp-btn lp-btn-primary w-full" href={`/casa/${polla.slug}`}>Ver mis cupos</Link>
+          <Link className="lp-btn lp-btn-primary w-full" href={`/polla/${polla.slug}`}>Ver mis cupos</Link>
         </StreetCard></div>;
       }
       // Una carga fallida o rechazada sin otras participaciones se retoma en su propia fila.
       if (!isAnother) target = entries.find(retryable) ?? null;
     } else if (participacion && /^\d{1,2}$/.test(participacion)) {
       target = entries.find((e) => e.entry_number === Number(participacion)) ?? null;
-      if (!target) redirect(`/casa/${polla.slug}`);
-      if (isLiveEntry(target)) redirect(`/casa/${polla.slug}?p=${target.entry_number}`);
+      if (!target) redirect(`/polla/${polla.slug}`);
+      if (isLiveEntry(target)) redirect(`/polla/${polla.slug}?p=${target.entry_number}`);
     } else {
       target = entries.find(retryable) ?? null;
-      if (!target && entries.some(isLiveEntry)) redirect(`/casa/${polla.slug}`);
+      if (!target && entries.some(isLiveEntry)) redirect(`/polla/${polla.slug}`);
     }
   }
   let recovering = Boolean(target);
@@ -101,14 +101,14 @@ export default async function PagarPage({
       return <div className="px-4 py-6"><StreetCard className="space-y-4 p-4">
         <h1 className="lp-display text-[30px] [overflow-wrap:anywhere]">{inReview ? "Comprobante en revisión" : "Ya tienes una boleta reservada"}</h1>
         <p className="text-[15px] text-text-secondary">Boleta {waiting.ticket_number} de {polla.name}. {inReview ? "Espera la confirmación de tu pago antes de comprar otra boleta." : "Completa el comprobante de esta boleta antes de reservar otra."} Si ya transferiste, no repitas el pago.</p>
-        <Link className="lp-btn lp-btn-primary w-full" href={inReview ? `/casa/${polla.slug}` : `/casa/${polla.slug}/pagar?boleta=${waiting.ticket_number}`}>{inReview ? "Ver mi rifa" : "Retomar comprobante"}</Link>
+        <Link className="lp-btn lp-btn-primary w-full" href={inReview ? `/polla/${polla.slug}` : `/polla/${polla.slug}/pagar?boleta=${waiting.ticket_number}`}>{inReview ? "Ver mi rifa" : "Retomar comprobante"}</Link>
       </StreetCard></div>;
     }
   }
   const resumeOnly = !isPollaOpen(polla);
   if (resumeOnly) {
     const active = await getActiveProofs(polla.id, user.id);
-    if (!active.some((proof) => polla.kind !== "rifa" ? proof.entry_id === target?.id : String(proof.ticket_number) === boleta)) redirect(`/casa/${polla.slug}`);
+    if (!active.some((proof) => polla.kind !== "rifa" ? proof.entry_id === target?.id : String(proof.ticket_number) === boleta)) redirect(`/polla/${polla.slug}`);
   }
 
   const entrada = polla.entry_price_cop;

@@ -18,7 +18,7 @@ export default async function EditarPollaPage({ params }: { params: Promise<{ id
   if (!z.string().uuid().safeParse(id).success) notFound();
   const user = await getAuthenticatedUser();
   if (!user) redirect(`/login?returnTo=/admin/pollas/${id}/editar`);
-  if (!user.is_admin) redirect("/casa");
+  if (!user.is_admin) redirect("/inicio");
 
   const state = await getPollaEditorState(id, user.id);
   if (!state) notFound();

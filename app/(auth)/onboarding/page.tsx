@@ -78,7 +78,7 @@ export default function OnboardingPage() {
             ? window.sessionStorage.getItem("lp_returnTo")
             : null;
           if (rt) window.sessionStorage.removeItem("lp_returnTo");
-          router.push(rt || "/casa");
+          router.push(rt || "/inicio");
           return;
         }
 
@@ -123,7 +123,7 @@ export default function OnboardingPage() {
       if (typeof window !== "undefined") {
         window.sessionStorage.removeItem("lp_returnTo");
       }
-      router.push(rt || "/casa");
+      router.push(rt || "/inicio");
     } catch {
       setError(t("errSaveProfile"));
     } finally {

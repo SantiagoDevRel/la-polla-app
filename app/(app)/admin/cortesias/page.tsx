@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminCortesiasPage() {
   const user = await getAuthenticatedUser();
   if (!user) redirect("/login?returnTo=/admin/cortesias");
-  if (!user.is_admin) redirect("/casa");
+  if (!user.is_admin) redirect("/inicio");
 
   // Las mismas condiciones que exige casa_grant_courtesies_v1: publicada, con
   // inscripciones abiertas, con entrada en dinero y sin boletas numeradas.

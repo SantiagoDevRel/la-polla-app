@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     label: requesterLabel(request.headers, locale),
   });
 
-  const target = session.needsOnboarding ? "/onboarding" : "/casa";
+  const target = session.needsOnboarding ? "/onboarding" : "/inicio";
   const response = finishTelegramSessionResponse(
     NextResponse.redirect(new URL(target, request.url), 303),
     session.needsOnboarding,

@@ -28,7 +28,7 @@ export function validCourtesyCode(value: string | null | undefined): string | nu
 
 /** El enlace que reparte quien tiene la cortesía. */
 export function courtesyLink(origin: string, slug: string, code: string): string {
-  return `${origin}/casa/${encodeURIComponent(slug)}?${COURTESY_PARAM}=${encodeURIComponent(code)}`;
+  return `${origin}/polla/${encodeURIComponent(slug)}?${COURTESY_PARAM}=${encodeURIComponent(code)}`;
 }
 
 /** Letra menuda única: una frase, sin lista de condiciones. */

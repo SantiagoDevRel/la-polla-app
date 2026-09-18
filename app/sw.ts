@@ -66,6 +66,8 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   // pagar, y un contador congelado lo deja creyendo que todavía alcanza a
   // entrar. Siempre a la red.
   /^\/casa(\/|$)/,
+  // Mismo trato para los nombres nuevos (2026-09-18): /inicio ya está arriba.
+  /^\/polla(\/|$)/,
   /^\/futbol(\/|$)/,
 ];
 

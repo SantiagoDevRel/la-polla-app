@@ -1053,7 +1053,7 @@ describe("POST /api/auth/telegram/link — the only way to a Telegram session", 
       }),
     );
     expect(first.status).toBe(303);
-    expect(first.headers.get("location")).toBe("http://localhost/casa");
+    expect(first.headers.get("location")).toBe("http://localhost/inicio");
     expect(first.headers.get("cache-control")).toBe("no-store");
     // La cookie de la solicitud se queda: la pestaña que espera en este mismo
     // navegador la usa para ver «consumed» con sesión (si no, diría «venció»).

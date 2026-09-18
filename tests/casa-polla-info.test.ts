@@ -25,9 +25,21 @@ describe("PollaInfo (2026-09-13: desplegables con viñetas cortas)", () => {
   it("renders every rule as a collapsed <details> with a list", () => {
     const html = info();
     const details = html.match(/<details[^>]*>/g) ?? [];
-    expect(details).toHaveLength(7);
+    // 8 desde el 2026-09-18: se sumó «Cómo se paga la entrada», que antes no
+    // existía — la única regla de dinero hablaba de COBRAR el premio.
+    expect(details).toHaveLength(8);
     expect(details.every((tag) => !/\sopen/.test(tag))).toBe(true);
     expect(html).toContain("<ul");
+  });
+
+  it("separa pagar la entrada de cobrar el premio (2026-09-18)", () => {
+    const html = info();
+    // El título viejo, «¿Cómo me pagan?», mandaba a quien buscaba dónde pagar
+    // a su propia cuenta para RECIBIR dinero.
+    expect(html).not.toContain("¿Cómo me pagan?");
+    expect(text(html)).toContain("Cómo se paga la entrada");
+    expect(text(html)).toContain("Cómo recibes tu premio si ganas");
+    expect(text(html)).toContain("Subes la foto del comprobante en la app.");
   });
 
   it("explains the fixed prize by the double threshold, with amounts computed in SQL", () => {

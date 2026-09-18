@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function CrearCasaPollaPage() {
   const user = await getAuthenticatedUser();
   if (!user) redirect("/login?returnTo=/admin/pollas/crear");
-  if (!user.is_admin) redirect("/casa");
+  if (!user.is_admin) redirect("/inicio");
 
   return (
     <div className="pb-28">

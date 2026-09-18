@@ -74,12 +74,12 @@ export function MisBoletas({ slug, open }: { slug: string; open: boolean }) {
           <p className="font-semibold">Boleta {entry.ticket_number}</p>
           <p className="text-[13px] text-text-secondary">{entry.status === "pagada" ? "Pago confirmado" : entry.status === "pendiente" && entry.hasProof ? "Comprobante en revisión" : "Comprobante por completar"}</p>
           {entry.reject_reason && <p className="text-[13px] text-text-secondary">{entry.reject_reason}</p>}
-          {(open || entry.canResume) && entry.status !== "pagada" && !(entry.status === "pendiente" && entry.hasProof) && <Link className="lp-btn lp-btn-ghost mt-2 text-[13px]" href={`/casa/${slug}/pagar?boleta=${entry.ticket_number}`}>Retomar esta boleta</Link>}
+          {(open || entry.canResume) && entry.status !== "pagada" && !(entry.status === "pendiente" && entry.hasProof) && <Link className="lp-btn lp-btn-ghost mt-2 text-[13px]" href={`/polla/${slug}/pagar?boleta=${entry.ticket_number}`}>Retomar esta boleta</Link>}
         </li>)}</ul>}
     {data && (offset > 0 || data.next !== null) && <div className="flex flex-wrap gap-2">
       <button className="lp-btn lp-btn-ghost flex-1" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>Anteriores</button>
       <button className="lp-btn lp-btn-ghost flex-1" disabled={data.next === null} onClick={() => setOffset(data.next!)}>Siguientes</button>
     </div>}
-    {open && data?.canReserve && <Link className="lp-btn lp-btn-ghost w-full" href={`/casa/${slug}/pagar`}>Comprar otra boleta</Link>}
+    {open && data?.canReserve && <Link className="lp-btn lp-btn-ghost w-full" href={`/polla/${slug}/pagar`}>Comprar otra boleta</Link>}
   </section>;
 }

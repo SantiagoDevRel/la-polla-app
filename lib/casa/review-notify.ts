@@ -54,7 +54,7 @@ async function notifyPlayer(n: {
       .maybeSingle();
     if (!u?.whatsapp_number) return;
 
-    const url = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://lapollacolombiana.com"}/casa/${n.pollaSlug}`;
+    const url = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://lapollacolombiana.com"}/polla/${n.pollaSlug}`;
 
     const texto = n.aprobado
       ? [

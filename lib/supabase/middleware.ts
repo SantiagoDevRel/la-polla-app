@@ -136,7 +136,7 @@ export async function updateSession(request: NextRequest) {
   ];
   const isPublicRoute = publicRoutes.some((route) => path.startsWith(route));
 
-  // `/casa/<slug>` — la ÚNICA pantalla de la casa que se comparte por fuera.
+  // `/polla/<slug>` — la ÚNICA pantalla de la casa que se comparte por fuera.
   //
   // (2026-09-02) Se abre porque el link que el admin pega en el grupo de
   // WhatsApp mandaba a `/login`: el que no tiene cuenta no veía ni de qué se
@@ -145,12 +145,12 @@ export async function updateSession(request: NextRequest) {
   // pozo, entrada y cierre — sin tabla de posiciones, sin nombres y sin
   // pronósticos. Cero datos de otras personas.
   //
-  // NO se hace con `startsWith("/casa")` a propósito: eso abriría también el
-  // hub `/casa` y, mucho peor, `/casa/admin`. El patrón exige exactamente 3
-  // segmentos, así que `/casa`, `/casa/<slug>/pagar` y `/casa/admin` (bloqueado
+  // NO se hace con `startsWith("/polla")` a propósito: eso abriría también
+  // `/polla/<slug>/pagar`. El patrón exige exactamente 2 segmentos, así que
+  // `/inicio`, `/polla/<slug>/pagar` y `/casa/admin` (bloqueado
   // además explícito) siguen pidiendo sesión.
   const isCasaPollaPublica =
-    /^\/casa\/[^/]+$/.test(path) && !path.startsWith("/casa/admin");
+    /^\/polla\/[^/]+$/.test(path);
 
   // These routes handle their own auth (cron secret, webhook signature, etc.)
   const isApiWebhook =
@@ -200,7 +200,7 @@ export async function updateSession(request: NextRequest) {
   if (user && (path.startsWith("/login") || path.startsWith("/verify"))) {
     const url = request.nextUrl.clone();
     const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));
-    const [pathname, search = ""] = (returnTo ?? "/casa").split("?");
+    const [pathname, search = ""] = (returnTo ?? "/inicio").split("?");
     url.pathname = pathname;
     url.search = search ? `?${search}` : "";
     return redirectWithCookies(url, supabaseResponse);

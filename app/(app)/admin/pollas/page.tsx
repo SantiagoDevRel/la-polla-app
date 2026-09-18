@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function CasaAdminPage() {
   const user = await getAuthenticatedUser();
   if (!user) redirect("/login?returnTo=/admin/pollas");
-  if (!user.is_admin) redirect("/casa");
+  if (!user.is_admin) redirect("/inicio");
 
   const pollas = await listAllPollas();
   const pots = await getPots(pollas.map((polla) => polla.id));

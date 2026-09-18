@@ -11,7 +11,7 @@ import { premioCompartir, type PremioCompartir } from "./share-text";
 /** Cookie con el código del primer enlace de invitación que abrió la persona. */
 export const REFERRAL_COOKIE = "lp_ref";
 export const REFERRAL_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
-/** Parámetro del enlace: /casa/<slug>?ref=JUANPE4821 */
+/** Parámetro del enlace: /polla/<slug>?ref=JUANPE4821 */
 export const REFERRAL_PARAM = "ref";
 /**
  * «Nadie me invitó» en el inicio de Casa: cookie (no localStorage) para que el
@@ -56,9 +56,9 @@ export function isGiftEntry(entry: Pick<CasaEntry, "origin"> | null | undefined)
   return entry?.origin === "invitacion";
 }
 
-/** Enlace de invitación con el dominio público; sin polla lleva al inicio de Casa. */
+/** Enlace de invitación con el dominio público; sin polla lleva al inicio. */
 export function referralLink(origin: string, slug: string | null, code: string | null): string {
-  const base = `${origin}/casa${slug ? `/${encodeURIComponent(slug)}` : ""}`;
+  const base = slug ? `${origin}/polla/${encodeURIComponent(slug)}` : `${origin}/inicio`;
   return code ? `${base}?${REFERRAL_PARAM}=${encodeURIComponent(code)}` : base;
 }
 

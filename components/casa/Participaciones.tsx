@@ -6,18 +6,25 @@
 // cupo tiene sus propios pronósticos, su propia transferencia y su propio
 // comprobante, que el administrador aprueba por separado.
 //
-// (2026-09-15) Un desplegable en vez de una fila de botones: con 5-10 cupos los
-// botones ocupaban media pantalla. Debajo, el estado del cupo elegido en color
-// (verde pagado, amarillo en revisión) y en rojo si le faltan pronósticos. El
-// estado ya no se repite en cuadros aparte bajo la tarjeta.
+// (2026-09-18) Rediseño pedido por el dueño, tras el desplegable del 15-09:
+//   · Lista de filas tocables en vez de un <select>. Elegir cupo es una
+//     decisión, y para decidir hay que poder comparar; el menú nativo mostraba
+//     un cupo a la vez y se cortaba a 320 px.
+//   · Cada fila dice DOS cosas: quién es (Cupo 2) y qué te falta. El pago solo
+//     aparece cuando NO está resuelto: si ya está aprobado, el silencio es
+//     «estás dentro», y un verde permanente solo le roba atención al rojo.
+//   · El párrafo largo de abajo se fue a la (i) del título. Ver Ayuda.tsx.
+//   · Con un solo cupo esta tarjeta no se dibuja: la polla muestra una franja
+//     de una línea (la arma la página) y se acabó.
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { Plus } from "lucide-react";
 import { StreetCard } from "@/components/street";
 import { formatCop } from "@/lib/casa/format";
 import { isCourtesyEntry } from "@/lib/casa/courtesies-shared";
 import type { CasaEntry } from "@/lib/casa/types";
+import { Ayuda } from "./Ayuda";
 
 export type ParticipationState = "activa" | "regalo" | "cortesia" | "revision" | "rechazada" | "sin-comprobante";
 
@@ -35,37 +42,16 @@ export function participationState(
   return "sin-comprobante";
 }
 
-const LABEL: Record<ParticipationState, string> = {
-  activa: "Pagado",
-  regalo: "Regalo por invitar",
-  cortesia: "Cortesía",
-  revision: "Pago en revisión",
-  rechazada: "Pago rechazado",
-  "sin-comprobante": "Falta el comprobante",
+/** Un cupo resuelto no dice nada del pago; los demás sí, y en su color. */
+const PAGO: Partial<Record<ParticipationState, { texto: string; clase: string }>> = {
+  revision: { texto: "En revisión", clase: "text-amber" },
+  rechazada: { texto: "Pago rechazado", clase: "text-red-alert" },
+  "sin-comprobante": { texto: "Falta el comprobante", clase: "text-amber" },
+  regalo: { texto: "Regalo por invitar", clase: "text-text-secondary" },
+  cortesia: { texto: "Cortesía", clase: "text-text-secondary" },
 };
 
-/** Color del estado de pago: verde pagado (y regalo), amarillo en revisión. */
-const PILL: Record<ParticipationState, string> = {
-  activa: "border-turf/50 bg-turf/15 text-turf",
-  regalo: "border-turf/50 bg-turf/15 text-turf",
-  // Verde como cualquier cupo activo: el dorado de esta pantalla es del pozo.
-  cortesia: "border-turf/50 bg-turf/15 text-turf",
-  revision: "border-amber/50 bg-amber/15 text-amber",
-  rechazada: "border-red-alert/50 bg-red-alert/15 text-red-alert",
-  "sin-comprobante": "border-amber/50 bg-amber/15 text-amber",
-};
-
-const faltanTexto = (n: number) => (n === 1 ? "falta 1 pronóstico" : `faltan ${n} pronósticos`);
-
-/** Texto corto para el desplegable: cabe a 320 px; el detalle va en las etiquetas de color. */
-const OPTION: Record<ParticipationState, string> = {
-  activa: "Pagado",
-  regalo: "Regalo",
-  cortesia: "Cortesía",
-  revision: "En revisión",
-  rechazada: "Rechazado",
-  "sin-comprobante": "Sin comprobante",
-};
+export const faltanTexto = (n: number) => (n === 1 ? "Te falta 1 pronóstico" : `Te faltan ${n} pronósticos`);
 
 export function Participaciones({
   slug,
@@ -95,79 +81,88 @@ export function Participaciones({
   const selected = visible.find((e) => e.entry_number === selectedNumber) ?? visible[0];
   if (!selected?.entry_number) return null;
   const state = participationState(selected);
-  const pending = pendingByNumber?.[selected.entry_number] ?? 0;
-  const otrosSinPronosticos = visible
-    .filter((e) => e.entry_number !== selected.entry_number && (pendingByNumber?.[e.entry_number!] ?? 0) > 0)
-    .map((e) => `#${e.entry_number}`);
+  const quedan = Math.max(0, maxEntries - counted);
 
   return (
     <StreetCard className="mt-4 p-4 first:mt-0">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="lp-display-sm min-w-0 text-text-primary [overflow-wrap:anywhere]">Tus cupos</h2>
-        <span className="text-[13px] tabular-nums text-text-secondary">{counted} de {maxEntries}</span>
+        <Ayuda titulo="Cómo funcionan los cupos" etiqueta="Cómo funcionan los cupos">
+          <li>Cada cupo tiene <strong className="font-semibold text-text-primary">sus propios pronósticos</strong> y su propio pago. Compites con todos a la vez.</li>
+          <li>Puedes pronosticar desde que subes tu comprobante. Los puntos de ese cupo entran a la tabla cuando confirmemos el pago.</li>
+          <li>Cada cupo nuevo es una transferencia aparte de {formatCop(entryPriceCop)}, con su propio comprobante.</li>
+          <li>En esta polla puedes tener hasta {maxEntries} cupos.</li>
+        </Ayuda>
       </div>
 
-      <label htmlFor="elegir-cupo" className="mt-3 block text-[13px] text-text-secondary">
-        Elige el cupo para ver o editar sus pronósticos
-      </label>
-      <div className="relative mt-2">
-        <select
-          id="elegir-cupo"
-          value={selected.entry_number}
-          onChange={(event) => router.push(`/casa/${slug}?p=${event.target.value}`, { scroll: false })}
-          className="lp-input min-h-12 w-full cursor-pointer appearance-none pr-10 text-[15px] font-semibold"
-        >
-          {visible.map((entry) => {
-            const faltan = pendingByNumber?.[entry.entry_number!] ?? 0;
-            return (
-              <option key={entry.entry_number} value={entry.entry_number!}>
-                {`Cupo ${entry.entry_number} · ${OPTION[participationState(entry)]}${faltan > 0 ? ` · faltan ${faltan}` : ""}`}
-              </option>
-            );
-          })}
-        </select>
-        <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-text-secondary" />
-      </div>
+      <ul className="mt-1 space-y-2" aria-label="Elige el cupo para ver o editar sus pronósticos">
+        {visible.map((entry) => {
+          const numero = entry.entry_number!;
+          const elegido = numero === selected.entry_number;
+          const estado = participationState(entry);
+          const pago = PAGO[estado];
+          const faltan = pendingByNumber?.[numero] ?? 0;
+          return (
+            <li key={numero}>
+              <button
+                type="button"
+                aria-pressed={elegido}
+                onClick={() => router.push(`/polla/${slug}?p=${numero}`, { scroll: false })}
+                className={`flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${
+                  elegido ? "border-gold/50 bg-gold/[0.07]" : "border-border-default bg-bg-elevated hover:border-border-strong"
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block text-[15px] font-semibold text-text-primary [overflow-wrap:anywhere]">Cupo {numero}</span>
+                  {pago && <span className={`block text-[13px] leading-snug ${pago.clase} [overflow-wrap:anywhere]`}>{pago.texto}</span>}
+                </span>
+                {pendingByNumber && (faltan > 0 ? (
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-alert/50 bg-red-alert/10 px-2.5 py-1 text-[13px] font-semibold text-red-alert">
+                    <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert" />
+                    Faltan {faltan}
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-[13px] text-text-secondary">Listo</span>
+                ))}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2" aria-live="polite">
-        <span className={`inline-flex min-h-8 items-center rounded-full border px-3 text-[13px] font-semibold ${PILL[state]}`}>
-          {LABEL[state]}
-        </span>
-        {pendingByNumber && (pending > 0 ? (
-          <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-red-alert/50 bg-red-alert/10 px-3 text-[13px] font-semibold text-red-alert">
-            <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert" />
-            Te {faltanTexto(pending)}
-          </span>
-        ) : (
-          <span className="inline-flex min-h-8 items-center rounded-full border border-border-default px-3 text-[13px] text-text-secondary">
-            Pronósticos al día
-          </span>
-        ))}
-      </div>
-
+      {/* Lo que el cupo elegido necesita de ti, pegado a su fila. */}
       {state === "rechazada" && (
         <p className="mt-3 text-[13px] leading-relaxed text-red-alert">
           {selected.reject_reason ?? "Comunícate con el administrador."}
-          {open && <> <Link href={`/casa/${slug}/pagar?participacion=${selected.entry_number}`} className="font-semibold underline">Enviar otro comprobante</Link></>}
+          {open && <> <Link href={`/polla/${slug}/pagar?participacion=${selected.entry_number}`} className="font-semibold underline">Enviar otro comprobante</Link></>}
         </p>
       )}
       {state === "sin-comprobante" && open && (
         <p className="mt-3 text-[13px] leading-relaxed text-amber">
           No alcanzamos a recibir la imagen de este cupo.{" "}
-          <Link href={`/casa/${slug}/pagar?participacion=${selected.entry_number}`} className="font-semibold underline">Subir el comprobante</Link>
+          <Link href={`/polla/${slug}/pagar?participacion=${selected.entry_number}`} className="font-semibold underline">Subir el comprobante</Link>
         </p>
       )}
-      {otrosSinPronosticos.length > 0 && (
-        <p className="mt-3 text-[13px] leading-relaxed text-red-alert">
-          También te faltan pronósticos en {otrosSinPronosticos.length === 1 ? "el cupo" : "los cupos"} {otrosSinPronosticos.join(", ")}.
+      {state === "revision" && (
+        <p className="mt-3 text-[13px] leading-relaxed text-text-secondary">
+          Puedes pronosticar ahora. Los puntos de este cupo entran a la tabla cuando confirmemos el pago.
         </p>
       )}
 
-      <p className="mt-3 border-t border-border-subtle pt-3 text-[13px] leading-relaxed text-text-muted">
-        Puedes pronosticar y guardar aunque el pago esté en revisión: cuando lo aprobemos, los puntos de ese cupo se verán reflejados en la tabla.
-        {open && counted < maxEntries && <> Cada cupo nuevo necesita su propia transferencia de {formatCop(entryPriceCop)}.</>}
-        {open && counted >= maxEntries && <> Llegaste al máximo de {maxEntries} cupos.</>}
-      </p>
+      {open && quedan > 0 && (
+        <Link href={`/polla/${slug}/pagar?participacion=nueva`} className="lp-btn lp-btn-ghost mt-4 w-full gap-2">
+          <Plus aria-hidden="true" className="h-5 w-5 shrink-0" />
+          Comprar otro cupo · {formatCop(entryPriceCop)}
+        </Link>
+      )}
+      {open && quedan > 0 && quedan <= 2 && (
+        <p className="mt-2 text-center text-[13px] text-text-muted">
+          {quedan === 1 ? "Queda 1 cupo" : `Quedan ${quedan} cupos`}
+        </p>
+      )}
+      {open && quedan === 0 && (
+        <p className="mt-4 text-center text-[13px] text-text-muted">Llegaste al máximo de {maxEntries} cupos.</p>
+      )}
     </StreetCard>
   );
 }

@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { acceptsCasaMatchPicks, canEditCasaMatch } from "./match-rules";
+import { getPots } from "./queries";
 import { getPollaTournamentSlugs } from "./tournaments";
 import type { CasaPollaStatus, MyCasaPolla } from "./types";
 
@@ -51,10 +52,30 @@ export async function listMyPollas(userId: string): Promise<MyCasaPolla[]> {
   const pollas = [...byId.values()];
   for (const polla of pollas) polla.entries.sort((a, b) => a.number - b.number);
   await addPendingPicks(pollas, entryIds);
+  await addPots(pollas);
   const tournaments = await getPollaTournamentSlugs(pollas);
   const priority = (p: MyCasaPolla) => p.status === "resuelta" || p.status === "anulada" ? 2 : p.entry_status === "pagada" ? 0 : 1;
   return pollas.map(p => ({ ...p, tournaments: tournaments[p.id] ?? [] }))
     .sort((a, b) => priority(a) - priority(b) || b.closes_at.localeCompare(a.closes_at) || a.id.localeCompare(b.id));
+}
+
+/**
+ * El pozo vivo de cada polla, para que la lista diga lo único que de verdad se
+ * compara entre pollas. Una sola llamada para todas (`casa_pot_summaries_v2`);
+ * la plata se calcula en SQL, nunca acá. Si falla, las tarjetas salen sin esa
+ * fila: es un dato de contexto, no puede tumbar la pantalla.
+ */
+async function addPots(pollas: MyCasaPolla[]) {
+  if (pollas.length === 0) return;
+  try {
+    const pots = await getPots(pollas.map((p) => p.id));
+    for (const polla of pollas) {
+      const pot = pots[polla.id];
+      if (pot) polla.prize_cop = pot.prize_cop;
+    }
+  } catch {
+    // Sin pozo en la lista; el detalle de la polla lo muestra igual.
+  }
 }
 
 /**

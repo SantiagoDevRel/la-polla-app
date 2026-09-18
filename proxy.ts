@@ -44,6 +44,24 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // ── La casa se llama Inicio (2026-09-18) ───────────────────────────────
+  // El producto vive en `/inicio` (la lista) y `/polla/<slug>` (una polla).
+  // `/casa/*` fue su nombre hasta hoy y NO se retira: ese enlace está pegado en
+  // grupos de WhatsApp, en mensajes del bot de Telegram, en invitaciones con
+  // `?ref=` y en cortesías con `?cortesia=`. Redirección permanente, con la
+  // query intacta, para que ninguno de esos enlaces se caiga nunca.
+  //
+  // `/casa/admin` queda afuera a propósito: es su propia redirección al panel
+  // (/admin/pollas) y nadie comparte ese enlace.
+  const casaPath = request.nextUrl.pathname;
+  const navegacion = request.method === "GET" || request.method === "HEAD";
+  if (navegacion && (casaPath === "/casa" || (casaPath.startsWith("/casa/") && !casaPath.startsWith("/casa/admin")))) {
+    const url = request.nextUrl.clone();
+    const resto = casaPath.slice("/casa".length);
+    url.pathname = resto === "" || resto === "/" ? "/inicio" : `/polla${resto}`;
+    return NextResponse.redirect(url, 308);
+  }
+
   // ── Enlaces con código: invitación (135) y cortesía (136) ──────────────
   // `?ref=` y `?cortesia=` guardan su código en una cookie httpOnly y dejan la
   // URL limpia: quien copie la barra de direcciones no reparte el código ajeno,
@@ -81,7 +99,7 @@ export async function proxy(request: NextRequest) {
   // El producto pasó de pollas P2P a una casa centralizada. Estas pantallas
   // eran del modelo viejo y ya no forman parte de la app:
   //
-  //   /inicio, /dashboard   el tablero P2P (mis pollas, podio, evolución)
+  //   /dashboard            el tablero P2P (mis pollas, podio, evolución)
   //   /road-to-worldcup     las llaves de un Mundial que terminó en julio
   //
   // Se resuelve acá y no borrando las páginas a propósito: los archivos
@@ -90,11 +108,14 @@ export async function proxy(request: NextRequest) {
   // directa —  salieron del nav, pero son la única forma de consultar las
   // 62 pollas y los 15.426 pronósticos del histórico. /pollas/crear no
   // necesita entrada acá: ya lo bloquea P2P_CREATION_RETIRED.
-  const RETIRADAS = ["/inicio", "/dashboard", "/road-to-worldcup"];
+  // `/inicio` salió de esta lista el 18-09: dejó de ser el tablero P2P y pasó a
+  // ser la pantalla principal de la casa (el archivo viejo vive en
+  // app/(app)/_retirados/inicio, fuera del enrutador).
+  const RETIRADAS = ["/dashboard", "/road-to-worldcup"];
   const path = request.nextUrl.pathname;
   if (RETIRADAS.some((r) => path === r || path.startsWith(`${r}/`))) {
     const url = request.nextUrl.clone();
-    url.pathname = "/casa";
+    url.pathname = "/inicio";
     url.search = "";
     return NextResponse.redirect(url, 307); // temporal: es una decisión de producto, no una URL muerta
   }

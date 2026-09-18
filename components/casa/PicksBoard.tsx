@@ -29,6 +29,7 @@ import { dayLabel, partitionCasaMatches, type SectionMatch } from "@/lib/casa/pi
 import type { CasaDistribution, Pick1x2 } from "@/lib/casa/types";
 import { canEditCasaMatch, hasCasaMatchStarted } from "@/lib/casa/match-rules";
 import { MatchPicks } from "./MatchPicks";
+import { EntrarSheet } from "./EntrarSheet";
 
 interface MatchLite extends SectionMatch {
   id: string;
@@ -71,6 +72,12 @@ interface Props {
   /** false = espectador de una polla cerrada pública: sin la línea «Tu pronóstico». */
   showMine?: boolean;
   lockedReason?: string;
+  /**
+   * (2026-09-18) Quien todavía no está inscrito sí puede TOCAR un partido: en
+   * vez de un botón muerto, sube la hoja «paga para guardar tu pronóstico».
+   * El bloqueo va después de mirar, no al entrar.
+   */
+  joinPrompt?: { href: string; entryPriceCop: number };
 }
 
 const REFRESH_INTERVAL_MS = 30_000;
@@ -139,8 +146,10 @@ export function PicksBoard({
   canViewOthers,
   showMine = true,
   lockedReason,
+  joinPrompt,
 }: Props) {
   const [picks, setPicks] = useState(initialPicks);
+  const [joinOpen, setJoinOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -297,6 +306,7 @@ export function PicksBoard({
       canViewOthers={canViewOthers}
       showMine={showMine}
       showDay={showDay}
+      onBlocked={joinPrompt ? () => setJoinOpen(true) : undefined}
       inputs={inputs}
       onPick1x2={set1x2}
       onScore={setScore}
@@ -407,9 +417,24 @@ export function PicksBoard({
       )}
 
       {!canEdit && lockedReason && (
-        <p className="border border-border-default bg-bg-elevated p-3 text-center text-[12px] text-text-secondary">
-          {lockedReason}
-        </p>
+        // Con la polla abierta esto deja de ser un cartel y pasa a ser la
+        // puerta: antes decía «Inscríbete para pronosticar» sin nada que tocar.
+        joinPrompt ? (
+          <div className="border border-border-default bg-bg-elevated p-3 text-center">
+            <p className="text-[13px] text-text-secondary">{lockedReason}</p>
+            <Link href={joinPrompt.href} className="lp-btn lp-btn-primary mt-3 w-full !px-4">
+              Pagar la entrada y pronosticar
+            </Link>
+          </div>
+        ) : (
+          <p className="border border-border-default bg-bg-elevated p-3 text-center text-[12px] text-text-secondary">
+            {lockedReason}
+          </p>
+        )
+      )}
+
+      {joinPrompt && (
+        <EntrarSheet open={joinOpen} onClose={() => setJoinOpen(false)} href={joinPrompt.href} entryPriceCop={joinPrompt.entryPriceCop} />
       )}
     </div>
   );
@@ -424,7 +449,7 @@ export function PicksBoard({
    Fila 4 (desde el inicio): «Tu marcador» y el desplegable de los demás.
    ──────────────────────────────────────────────────────────────────────── */
 function MatchCard({
-  m, now, slug, scoringMode, mine, distribution, canEdit, canViewOthers, showMine, showDay, inputs, onPick1x2, onScore, onJump,
+  m, now, slug, scoringMode, mine, distribution, canEdit, canViewOthers, showMine, showDay, inputs, onPick1x2, onScore, onJump, onBlocked,
 }: {
   m: MatchLite;
   now: number;
@@ -441,10 +466,14 @@ function MatchCard({
   onPick1x2: (matchId: string, value: Pick1x2) => void;
   onScore: (matchId: string, side: "home" | "away", raw: string) => void;
   onJump: (matchId: string, side: "home" | "away") => void;
+  /** Sin inscripción: tocar un partido abre la hoja de pago en vez de no hacer nada. */
+  onBlocked?: () => void;
 }) {
   const cerrado = !canEditCasaMatch(m, now);
   const started = hasCasaMatchStarted(m, now);
   const editable = canEdit && !cerrado;
+  // Se puede tocar aunque no esté inscrito: el toque abre la hoja de pago.
+  const invitando = !canEdit && !cerrado && Boolean(onBlocked);
   const live = m.status === "live";
   const voided = Boolean(m.voided_at);
   const scored = Boolean(m.final_verified_at) || voided;
@@ -484,7 +513,7 @@ function MatchCard({
   );
 
   const cell = (value: number | null) => (
-    <span className={`lp-money grid h-11 w-11 shrink-0 place-items-center overflow-hidden text-[28px] [-webkit-text-size-adjust:none] ${live ? "text-gold" : "text-text-primary"}`}>
+    <span className="lp-money grid h-11 w-11 shrink-0 place-items-center overflow-hidden text-[28px] text-text-primary [-webkit-text-size-adjust:none]">
       {started || finished ? value ?? "–" : "–"}
     </span>
   );
@@ -516,8 +545,8 @@ function MatchCard({
               <button
                 key={op.key}
                 type="button"
-                disabled={!editable}
-                onClick={() => onPick1x2(m.id, op.key)}
+                disabled={!editable && !invitando}
+                onClick={() => (invitando ? onBlocked?.() : onPick1x2(m.id, op.key))}
                 aria-pressed={elegido}
                 aria-label={equipo ? `Gana ${equipo.name}` : "Empate"}
                 className={[
@@ -525,10 +554,10 @@ function MatchCard({
                   equipo ? "" : "px-3",
                   elegido
                     ? "border-gold bg-gold/15 text-gold"
-                    : editable
+                    : editable || invitando
                       ? "border-border-default bg-bg-elevated text-text-primary hover:border-gold/30"
                       : "border-border-subtle text-text-primary",
-                  editable ? "cursor-pointer" : "cursor-default",
+                  editable || invitando ? "cursor-pointer" : "cursor-default",
                 ].join(" ")}
               >
                 {equipo ? (
@@ -549,7 +578,17 @@ function MatchCard({
             <Link href={`/futbol/equipos/home.${m.id}`} aria-label={`Ver equipo: ${m.home_team}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-bg-elevated">
               <TeamCrest team={m.home_team} src={m.home_team_flag} className="h-8 w-8" />
             </Link>
-            {editable && scoringMode === "marcador" ? (
+            {invitando && scoringMode === "marcador" ? (
+              // Casillas que invitan a pagar: el toque abre la hoja, no edita.
+              <button
+                type="button"
+                onClick={() => onBlocked?.()}
+                aria-label="Pagar la entrada para pronosticar"
+                className="lp-money flex h-12 cursor-pointer items-center gap-2 rounded-md border border-border-default bg-bg-elevated px-3 text-[22px] text-text-muted transition-colors hover:border-gold/30"
+              >
+                <span>–</span><span aria-hidden="true" className="h-[2px] w-3 bg-border-strong" /><span>–</span>
+              </button>
+            ) : editable && scoringMode === "marcador" ? (
               (["home", "away"] as const).map((side, i) => (
                 <Fragment key={side}>
                   {i === 1 && <span className="h-[2px] w-3 shrink-0 bg-border-strong" aria-hidden />}

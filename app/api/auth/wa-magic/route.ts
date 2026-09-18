@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
   // Where to land? Onboarding gate in middleware will catch incomplete
   // profiles regardless, but bouncing once instead of twice feels
   // smoother.
-  const target = session.needsOnboarding ? "/onboarding" : "/casa";
+  const target = session.needsOnboarding ? "/onboarding" : "/inicio";
   const response = NextResponse.redirect(new URL(target, request.url));
   applyOnboardingCookie(response, session.needsOnboarding);
   return response;

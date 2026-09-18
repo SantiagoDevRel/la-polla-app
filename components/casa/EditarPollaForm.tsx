@@ -470,7 +470,7 @@ export function EditarPollaForm({ state }: { state: PollaEditorState }) {
         {polla.status === "borrador" ? (
           <Link href="/admin/pollas" className="underline underline-offset-4 hover:text-text-primary">Volver a Administrar pollas</Link>
         ) : (
-          <Link href={`/casa/${polla.slug}`} className="underline underline-offset-4 hover:text-text-primary">Ver la polla</Link>
+          <Link href={`/polla/${polla.slug}`} className="underline underline-offset-4 hover:text-text-primary">Ver la polla</Link>
         )}
       </p>
     </div>

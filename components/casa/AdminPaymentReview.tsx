@@ -20,7 +20,7 @@ export async function AdminPaymentReview({ status, pollaId }: { status: "pendien
   const user = await getAuthenticatedUser();
   const route = status === "pagada" ? "/admin/pollas/pagos" : "/admin/pollas/recibos";
   if (!user) redirect(`/login?returnTo=${route}`);
-  if (!user.is_admin) redirect("/casa");
+  if (!user.is_admin) redirect("/inicio");
   const polla = pollaId ? await filteredPolla(pollaId) : null;
   const suffix = pollaId && polla?.state !== "missing" ? `?pollaId=${encodeURIComponent(pollaId)}` : "";
 

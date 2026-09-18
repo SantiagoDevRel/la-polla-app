@@ -143,7 +143,7 @@ export function PromoInvitados({ promo, verPolla = false }: {
               className="mt-3 w-full"
             />
             {verPolla && (
-              <Link href={`/casa/${promo.slug}`} onClick={close} className="lp-btn lp-btn-ghost mt-2 w-full !px-4">
+              <Link href={`/polla/${promo.slug}`} onClick={close} className="lp-btn lp-btn-ghost mt-2 w-full !px-4">
                 Ver la polla
               </Link>
             )}

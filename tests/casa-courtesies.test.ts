@@ -83,7 +83,7 @@ describe("código del enlace", () => {
 
   it("arma el enlace de la polla con el código", () => {
     expect(courtesyLink("https://lapollacolombiana.com", "ofigolazo", code))
-      .toBe(`https://lapollacolombiana.com/casa/ofigolazo?cortesia=${code}`);
+      .toBe(`https://lapollacolombiana.com/polla/ofigolazo?cortesia=${code}`);
   });
 });
 

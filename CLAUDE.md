@@ -414,6 +414,36 @@ No mezclar esto con el sistema de referidos (rama aparte, migración 135): son
 features distintas. Detalle y regresión: README → Cortesías;
 `scripts/casa-courtesies-check.sql`.
 
+### Rutas e interfaz del jugador (2026-09-18)
+
+`/inicio` es la lista y `/polla/<slug>` una polla (con `/polla/<slug>/pagar`).
+`/casa` y `/casa/<slug>` redirigen 308 **para siempre** con la query intacta:
+por ahí viajan los enlaces de WhatsApp, Telegram, `?ref=` y `?cortesia=`. No
+retirar esa redirección. `/casa/admin` queda como estaba (redirige a
+`/admin/pollas`) y las API siguen en `/api/casa/*`. El tablero P2P viejo salió
+del enrutador a `app/(app)/_retirados/inicio` (carpeta con `_`, sin ruta).
+
+Mis pollas **no habla de cupos**: nombre, torneos, pozo, cierre y UNA línea de
+estado por orden de urgencia (pronósticos que faltan → pago en revisión → nada).
+No poner un «Pagado» verde permanente: estar en la lista ya significa estar
+dentro. Los cupos viven solo dentro de la polla, en `Participaciones`, como
+lista de filas tocables (nunca `<select>` ni carrusel); con un solo cupo la
+tarjeta no se dibuja y la tarea se dice en una franja sobre el tablero. El pago
+solo aparece cuando NO está resuelto; la aprobación se avisa una vez
+(`PagoConfirmado`, recordado en `localStorage`) y no vuelve.
+
+La explicación de los cupos vive en la (i) del título (`Ayuda`), nunca como
+párrafo fijo ni como otro desplegable anidado. Regla: se pliega la consulta,
+nunca lo que hace avanzar (pagar, cuántos faltan, cierre, motivo de un rechazo).
+
+Quien no está inscrito ve `ParaParticipar` (pasos, la cuenta de cobro con botón
+de copiar y un solo CTA dorado) entre el hero y las pestañas, más `BarraPagar`
+pegada abajo mientras baja, y los partidos y la Info se siguen viendo: nada de
+modal al entrar. Al tocar un partido sin inscripción sube `EntrarSheet` («Paga
+para guardar tu pronóstico»). En Info son dos reglas distintas: «Cómo se paga la
+entrada» y «Cómo recibes tu premio». El marcador en vivo va en texto primario:
+el dorado es del premio.
+
 ### Navegación y actualización de la app (2026-09-09)
 
 Casa (2026-09-17): En vivo → «¿Alguien te invitó?» (solo personas nuevas, migración

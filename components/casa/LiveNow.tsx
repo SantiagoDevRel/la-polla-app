@@ -64,7 +64,7 @@ export function LiveNow({ initialRows }: { initialRows: CasaLiveMatch[] }) {
   const single = rows.length === 1;
 
   return (
-    <section aria-labelledby={`${id}-titulo`} data-live-now>
+    <section aria-labelledby={`${id}-titulo`} data-live-now className="px-4 pt-4">
       <h2 id={`${id}-titulo`} className="m-0">
         <button
           type="button"
@@ -77,8 +77,8 @@ export function LiveNow({ initialRows }: { initialRows: CasaLiveMatch[] }) {
             {enJuego > 0 && <span className="absolute inset-0 rounded-full bg-red-alert opacity-60 motion-safe:animate-ping" />}
             <span className={`absolute inset-0 rounded-full ${enJuego > 0 ? "bg-red-alert" : "bg-text-muted"}`} />
           </span>
-          <span className="font-display text-[22px] leading-tight tracking-wide text-text-primary">En vivo</span>
-          <span className="ml-auto text-[13px] tabular-nums text-text-secondary">{resumen}</span>
+          <span className="min-w-0 font-display text-[22px] leading-tight tracking-wide text-text-primary [overflow-wrap:anywhere]">En vivo de tus pollas</span>
+          <span className="ml-auto shrink-0 text-[13px] tabular-nums text-text-secondary">{resumen}</span>
           <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-text-secondary transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
         </button>
       </h2>
@@ -107,7 +107,7 @@ function LiveCard({ row }: { row: CasaLiveMatch }) {
   const score = { home: row.homeScore, away: row.awayScore };
   const marcador = row.scoringMode === "marcador";
   const cell = (value: number | null) => (
-    <span className={`lp-money grid h-10 w-10 shrink-0 place-items-center text-[30px] [-webkit-text-size-adjust:none] ${live ? "text-gold" : "text-text-primary"}`}>
+    <span className="lp-money grid h-11 w-11 shrink-0 place-items-center text-[34px] leading-none text-text-primary [-webkit-text-size-adjust:none]">
       {waiting ? "–" : value ?? "–"}
     </span>
   );
@@ -128,14 +128,14 @@ function LiveCard({ row }: { row: CasaLiveMatch }) {
       </span>
 
       {/* Escudos y marcador en una sola fila; nombres debajo, sin recorte. */}
-      <span className="flex items-center justify-center gap-2">
-        <TeamCrest team={row.homeTeam} src={row.homeFlag} className="h-8 w-8" />
+      <span className="mt-1 flex items-center justify-center gap-2.5">
+        <TeamCrest team={row.homeTeam} src={row.homeFlag} className="h-11 w-11" />
         {cell(row.homeScore)}
         <span aria-hidden="true" className="h-[2px] w-3 shrink-0 bg-border-strong" />
         {cell(row.awayScore)}
-        <TeamCrest team={row.awayTeam} src={row.awayFlag} className="h-8 w-8" />
+        <TeamCrest team={row.awayTeam} src={row.awayFlag} className="h-11 w-11" />
       </span>
-      <span className="grid grid-cols-2 gap-x-3 text-center text-[12px] font-semibold leading-tight text-text-primary">
+      <span className="grid grid-cols-2 gap-x-3 text-center text-[13px] font-semibold leading-tight text-text-primary">
         <span className="min-w-0 [overflow-wrap:anywhere]">{row.homeTeam}</span>
         <span className="min-w-0 [overflow-wrap:anywhere]">{row.awayTeam}</span>
       </span>
@@ -143,7 +143,7 @@ function LiveCard({ row }: { row: CasaLiveMatch }) {
         <span className="text-[12px] leading-snug text-text-secondary">Pasó la hora de inicio y todavía no llega el marcador. Se actualiza solo.</span>
       )}
 
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-text-secondary">
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border border-border-subtle bg-bg-elevated px-2.5 py-1.5 text-[13px] text-text-secondary">
         <span>{marcador ? "Tu marcador:" : "Tu pronóstico:"}</span>
         {row.picks.length === 0 ? (
           <span className="text-text-muted">sin pronóstico</span>
