@@ -8,21 +8,32 @@ pagadas participan en la adjudicación. Los puntos siguen el sistema existente.
 
 El puntaje positivo más alto recibe el pozo completo; los empates comparten el
 importe y sus pesos de redondeo. Un objeto se adjudica con `amount_cop=0`, sin
-dinero adicional. El empate por objeto abre una lista fija de candidatos y luego
-se registra un sorteo externo documentado. Adjudicación y entrega son eventos
-distintos. Todos en cero termina como `house_retained_zero_points`, sin payouts.
-No pagadas y boleta sorteada sin pago son errores distintos que no adjudican.
+dinero adicional. Adjudicación y entrega son eventos distintos. Todos en cero
+termina como `house_retained_zero_points`, sin payouts. No pagadas y boleta
+sorteada sin pago son errores distintos que no adjudican.
 
-El procedimiento de evidencia sigue pendiente de aceptación operativa del dueño.
-`object_draws_enabled=false` impide confirmarlo y publicar nuevas pollas por puntos
-con premio en objeto hasta entonces. Se pueden guardar borradores; las rifas de
-objeto usan el sorteo anunciado y no dependen de este desempate por puntos.
-No apagar este flag mientras exista una polla por puntos con objeto publicada o
-un desempate pendiente; finalizar esas operaciones primero. El preflight vuelve
-a comprobar este conjunto antes de cada corte.
-La grabación debe mostrar lista, método con posibilidades iguales y ganador;
-la aplicación comprueba pertenencia, integridad del archivo y trazabilidad,
-pero no certifica que el sorteo externo sea imparcial.
+### Empate por un premio en objeto: gana el registro más antiguo (migración 142)
+
+Desde el 2026-09-18 el empate en el primer puesto por un premio en objeto **no
+se sortea**: gana la participación con `casa_entries.created_at` más antiguo,
+con `entry_number` y `id` como orden estable si coincidieran. Es la decisión del
+dueño para un premio que no se puede dividir, como un pase doble de boletas.
+`casa_settle_polla_v2` adjudica ahí mismo con `outcome='object_awarded'` y
+`tiebreak='registro'`; la nota del payout deja la fecha que decidió.
+
+La regla se anuncia antes de abrir la polla, en la Info y en el bot de jugadores
+(los dos textos tienen que decir lo mismo), y la tabla de posiciones muestra en
+público la fecha y hora de registro de cada participación, en hora de Colombia.
+Con `scoring_mode='marcador'` y solo el marcador exacto sumando, el empate arriba
+es el caso normal, no el borde: OFIGOLAZO, con 43 inscritos, terminó con tres
+personas empatadas en el primer puesto.
+
+Publicar una polla por puntos con premio en objeto ya **no** depende de
+`object_draws_enabled`: ese camino dejó de usarse. Las tablas del sorteo
+(`casa_object_draws`, candidatos, intentos de evidencia) y sus RPC siguen en pie
+sin uso nuevo — nunca tuvieron filas — y el flag sigue gobernando la
+confirmación de un sorteo, por si quedara uno pendiente. El procedimiento de
+evidencia sigue sin aceptación operativa del dueño, y ya no bloquea publicar.
 
 ## Esquema y límites
 

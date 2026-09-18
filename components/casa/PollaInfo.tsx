@@ -85,7 +85,11 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
         <li>Si hay empate en el primer puesto, el pozo se divide en partes iguales, incluidos los pesos del redondeo.</li>
       </> : <>
         <li>El premio es {polla.prize_object}. Gana quien sume más puntos.</li>
-        <li>Si hay empate en el primer puesto, se sortea entre los empatados.</li>
+        {/* (2026-09-18, migración 142) Antes decía «se sortea entre los empatados».
+            El dueño cambió el desempate por uno determinista: el premio es un
+            objeto que no se parte, y el orden de registro ya está guardado y
+            visible en la tabla, así que cualquiera puede verificar quién ganó. */}
+        <li><Strong>Si hay empate en el primer puesto, gana la persona que se haya registrado primero en la polla.</Strong> La fecha y la hora de registro de cada participante están en la tabla de posiciones.</li>
         <li>El premio no se divide ni se cambia por dinero.</li>
       </>}
       {polla.kind !== "rifa" && <li>Necesitas al menos 1 punto para ganar. Si todos terminan con 0, no se entrega el premio.</li>}
