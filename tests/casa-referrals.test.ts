@@ -81,9 +81,9 @@ describe("reglas de la polla", () => {
 describe("compartir con código", () => {
   it("el enlace lleva el código y el dominio público", () => {
     expect(referralLink("https://lapollacolombiana.com", "ofigolazo", "JUANPE4821"))
-      .toBe("https://lapollacolombiana.com/casa/ofigolazo?ref=JUANPE4821");
-    expect(referralLink("https://lapollacolombiana.com", "ofigolazo", null)).toBe("https://lapollacolombiana.com/casa/ofigolazo");
-    expect(referralLink("https://lapollacolombiana.com", null, "ANA0001")).toBe("https://lapollacolombiana.com/casa?ref=ANA0001");
+      .toBe("https://lapollacolombiana.com/polla/ofigolazo?ref=JUANPE4821");
+    expect(referralLink("https://lapollacolombiana.com", "ofigolazo", null)).toBe("https://lapollacolombiana.com/polla/ofigolazo");
+    expect(referralLink("https://lapollacolombiana.com", null, "ANA0001")).toBe("https://lapollacolombiana.com/inicio?ref=ANA0001");
   });
 
   it("el mensaje dice el código para quien entre sin el enlace", () => {
@@ -139,12 +139,12 @@ describe("aviso de invitaciones al entrar", () => {
 });
 
 describe("proxy: enlace de invitación", () => {
-  const url = "https://lapollacolombiana.com/casa/ofigolazo?ref=juanpe4821&x=1";
+  const url = "https://lapollacolombiana.com/polla/ofigolazo?ref=juanpe4821&x=1";
 
   it("guarda el primer código y limpia la URL", async () => {
     const response = await proxy(new NextRequest(url, { headers: { "sec-fetch-dest": "document" } }));
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("https://lapollacolombiana.com/casa/ofigolazo?x=1");
+    expect(response.headers.get("location")).toBe("https://lapollacolombiana.com/polla/ofigolazo?x=1");
     const cookie = response.cookies.get(REFERRAL_COOKIE);
     expect(cookie?.value).toBe("JUANPE4821");
     expect(cookie?.httpOnly).toBe(true);
@@ -159,7 +159,7 @@ describe("proxy: enlace de invitación", () => {
   });
 
   it("un código inválido o una carga que no es navegación no dejan cookie", async () => {
-    const invalid = await proxy(new NextRequest("https://lapollacolombiana.com/casa/x?ref=<b>"));
+    const invalid = await proxy(new NextRequest("https://lapollacolombiana.com/polla/x?ref=<b>"));
     expect(invalid.status).toBe(307);
     expect(invalid.cookies.get(REFERRAL_COOKIE)).toBeUndefined();
     const image = await proxy(new NextRequest(url, { headers: { "sec-fetch-dest": "image" } }));
@@ -173,6 +173,33 @@ describe("proxy: enlace de invitación", () => {
     const post = await proxy(new NextRequest(url, { method: "POST" }));
     expect(post.status).toBe(200);
     expect(updateSession).toHaveBeenCalledTimes(2);
+  });
+});
+
+// (2026-09-18) La casa pasó a llamarse /inicio y cada polla a /polla/<slug>.
+// Los enlaces /casa/* ya están pegados en WhatsApp, en Telegram, en enlaces de
+// invitación y de cortesía: si esta redirección se cae, todos esos se caen.
+describe("proxy: los enlaces viejos de /casa siguen abriendo", () => {
+  const permanente = async (path: string) => {
+    const response = await proxy(new NextRequest(`https://lapollacolombiana.com${path}`, { headers: { "sec-fetch-dest": "document" } }));
+    return { status: response.status, location: response.headers.get("location") };
+  };
+
+  it("la lista, la polla y su pago se mudan con 308", async () => {
+    expect(await permanente("/casa")).toEqual({ status: 308, location: "https://lapollacolombiana.com/inicio" });
+    expect(await permanente("/casa/ofigolazo")).toEqual({ status: 308, location: "https://lapollacolombiana.com/polla/ofigolazo" });
+    expect(await permanente("/casa/ofigolazo/pagar")).toEqual({ status: 308, location: "https://lapollacolombiana.com/polla/ofigolazo/pagar" });
+  });
+
+  it("conserva la query, que es donde viaja el código de invitación", async () => {
+    expect(await permanente("/casa/ofigolazo?ref=JUANPE4821")).toEqual({
+      status: 308, location: "https://lapollacolombiana.com/polla/ofigolazo?ref=JUANPE4821",
+    });
+  });
+
+  it("no toca el panel de administración ni las API", async () => {
+    expect((await permanente("/casa/admin")).status).not.toBe(308);
+    expect((await permanente("/api/casa/mis-pollas")).status).not.toBe(308);
   });
 });
 
@@ -207,6 +234,6 @@ describe("aviso de cupo de regalo por Telegram", () => {
     expect(message.text).toContain("5 personas que invitaste ya pagaron esta polla.");
     expect(message.text).toContain("Tu cupo 3 ya está activo y compite por el premio.");
     expect(message.text).not.toContain("partido");
-    expect(message.buttons[0][0]).toEqual({ text: "👉 Pronosticar con el cupo 3", url: "https://lapollacolombiana.com/casa/ofi%20golazo?p=3" });
+    expect(message.buttons[0][0]).toEqual({ text: "👉 Pronosticar con el cupo 3", url: "https://lapollacolombiana.com/polla/ofi%20golazo?p=3" });
   });
 });

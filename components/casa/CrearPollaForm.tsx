@@ -271,7 +271,7 @@ export function CrearPollaForm() {
       // Un borrador NO es visible en /casa/<slug> (esa ruta hace notFound()
       // para los borradores), asi que mandar ahi era mandar a un 404.
       if (json.publicada) {
-        router.push(`/casa/${json.slug}`);
+        router.push(`/polla/${json.slug}`);
       } else {
         setError(null);
         setMsgOk(json.programada ? `Publicación programada: ${formatMatchTime(json.opens_at)}. Puedes administrarla desde el panel.` : "Polla guardada oculta. Puedes publicarla desde Administrar pollas.");

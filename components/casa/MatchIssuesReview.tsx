@@ -40,7 +40,7 @@ function AffectedPollas({ issue }: { issue: MatchIssueView }) {
     <ul className="mt-1 space-y-1">
       {issue.pollas.map((polla) => <li key={polla.id} className="flex flex-wrap items-center gap-x-2 text-[15px] leading-[1.45]">
         {polla.linkable
-          ? <Link href={`/casa/${polla.slug}`} className="inline-flex min-h-11 items-center text-text-primary underline underline-offset-4 transition-colors hover:text-gold [overflow-wrap:anywhere]">{polla.name}</Link>
+          ? <Link href={`/polla/${polla.slug}`} className="inline-flex min-h-11 items-center text-text-primary underline underline-offset-4 transition-colors hover:text-gold [overflow-wrap:anywhere]">{polla.name}</Link>
           : <span className="inline-flex min-h-11 items-center text-text-primary [overflow-wrap:anywhere]">{polla.name}</span>}
         <span className="text-[13px] text-text-secondary">{polla.statusLabel}{polla.voided ? " · anulado en esta polla" : ""}</span>
       </li>)}

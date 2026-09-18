@@ -1088,6 +1088,52 @@ La plataforma no procesa pagos reales. El campo `payment_mode` solo registra el 
 
 Construido con ☕ en Medellín / Lisboa por [@SantiagoDevRel](https://github.com/SantiagoDevRel)
 
+### Rutas nuevas y flujo de entrada (2026-09-18)
+
+Siete cambios de interfaz pedidos por el dueño, sin tocar lógica de negocio ni
+cálculo de dinero (todo sigue saliendo de SQL).
+
+**Rutas.** `/inicio` (lista) y `/polla/<slug>` + `/polla/<slug>/pagar` (una
+polla). `proxy.ts` redirige `/casa` y `/casa/<slug>*` con **308 permanente** y
+la query intacta, solo en GET/HEAD: los enlaces ya compartidos en WhatsApp,
+Telegram, invitaciones (`?ref=`) y cortesías (`?cortesia=`) siguen abriendo.
+`/casa/admin` no se toca (sigue redirigiendo a `/admin/pollas`) y las API
+siguen en `/api/casa/*`. El tablero P2P que ocupaba `/inicio` pasó a
+`app/(app)/_retirados/inicio` — carpeta con `_`, fuera del enrutador, sin
+borrar el archivo. Cobertura: `tests/casa-referrals.test.ts`
+(«los enlaces viejos de /casa siguen abriendo»).
+
+**Mis pollas (`components/casa/MyPollas.tsx`).** Portada, no tablero: nombre,
+torneos, pozo (`prize_cop`, nuevo en `listMyPollas` vía `casa_pot_summaries_v2`),
+cierre y una sola línea de estado (`siguientePaso`): pronósticos que faltan →
+pago en revisión → nada. Salieron el selector de cupo, las dos pastillas y la
+línea «también te faltan en #2, #3».
+
+**Cupos (`components/casa/Participaciones.tsx`).** Lista de filas tocables de
+56 px; el pago solo se nombra si no está resuelto; el conteo de faltantes
+desaparece cuando la polla ya no recibe pronósticos. Con un solo cupo la
+tarjeta no se dibuja: la página muestra una franja con lo que falta. La
+explicación se movió a la (i) del título (`components/casa/Ayuda.tsx`).
+
+**Pago aprobado.** `components/casa/PagoConfirmado.tsx` avisa una vez (clave
+`lp_pago_ok:<entryId>` en `localStorage`) en vez del recuadro verde permanente.
+
+**Entrada (`ParaParticipar`, `BarraPagar`, `EntrarSheet`).** Quien no está
+inscrito ve los pasos y la cuenta de cobro con botón de copiar en la propia
+polla, un CTA dorado («Pagar la entrada · $X») y una barra fija mientras baja;
+los partidos, la tabla y la Info se siguen viendo. Tocar un partido sin
+inscripción abre la hoja «Paga para guardar tu pronóstico». En `PollaInfo` se
+separaron «Cómo se paga la entrada» y «Cómo recibes tu premio»: el título viejo
+(«¿Cómo me pagan?») hablaba de cobrar el premio y confundía a quien buscaba
+dónde pagar.
+
+**En vivo.** `LiveNow` va antes del hero, se titula «En vivo de tus pollas»,
+tiene escudos de 44 px y el marcador en texto primario (el dorado es del
+premio; también se quitó del marcador en vivo de `PicksBoard`).
+
+Verificado con `npm test` (1.173 pruebas), `npm run build` y en el navegador a
+320, 390 y 900 px, con texto al 200 %.
+
 ### Mis pollas en Casa y Perfil (2026-09-09)
 
 **Pollas cerradas públicas (2026-09-17, pedido del dueño).** Desde el 16-sep

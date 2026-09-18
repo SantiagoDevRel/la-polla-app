@@ -431,7 +431,7 @@ Esta es de respuesta libre. Mándame:
   if (error) { await sendMessage(chatId, casaErrorMessage(error)); return; }
   const result = data as CasaSettlement;
   const next = result.outcome === "object_draw_pending" || result.outcome === "object_awarded"
-    ? `\n\nContinúa en la ficha para ${result.outcome === "object_draw_pending" ? "registrar el sorteo y su evidencia" : "registrar la entrega"}: ${appOrigin()}/casa/${slug}` : "";
+    ? `\n\nContinúa en la ficha para ${result.outcome === "object_draw_pending" ? "registrar el sorteo y su evidencia" : "registrar la entrega"}: ${appOrigin()}/polla/${slug}` : "";
   await sendMessage(chatId, `<b>${esc(polla.name)}</b>\n${esc(settlementMessage(result))}${esc(next)}`);
 }
 

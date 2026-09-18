@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function MatchIssuesPage() {
   const user = await getAuthenticatedUser();
   if (!user) redirect("/login?returnTo=/admin/issues");
-  if (!user.is_admin) redirect("/casa");
+  if (!user.is_admin) redirect("/inicio");
 
   const result = await listMatchIssues();
 

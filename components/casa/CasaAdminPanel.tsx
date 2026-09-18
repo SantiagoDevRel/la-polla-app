@@ -199,7 +199,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, rea
                             <div className="min-w-0"><Label>{polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label><p className="lp-money mt-1 text-[24px] text-text-primary [overflow-wrap:anywhere]">{polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot?.prize_cop ?? 0)}</p></div>
                             <div className="flex flex-wrap gap-2">
                               {polla.editable && <Link href={editorHref(polla.id)} className="lp-btn lp-btn-ghost !px-3 !text-[13px]"><Settings className="h-4 w-4 shrink-0" aria-hidden="true" />Editar</Link>}
-                              {polla.status !== "borrador" && <Link href={`/casa/${polla.slug}`} className="lp-btn lp-btn-ghost !px-3 !text-[13px]">Ver polla</Link>}
+                              {polla.status !== "borrador" && <Link href={`/polla/${polla.slug}`} className="lp-btn lp-btn-ghost !px-3 !text-[13px]">Ver polla</Link>}
                             </div>
                           </div>
                           <div className="[&_button]:!min-h-11">

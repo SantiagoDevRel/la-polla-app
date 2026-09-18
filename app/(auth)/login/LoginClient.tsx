@@ -307,7 +307,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
     if (typeof window !== "undefined") {
       window.sessionStorage.removeItem(RETURN_TO_KEY);
     }
-    window.location.href = newUser ? "/onboarding" : rt || "/casa";
+    window.location.href = newUser ? "/onboarding" : rt || "/inicio";
   }, []);
 
   // PhoneInput emits an E.164 string already (e.g. "+573001234567")

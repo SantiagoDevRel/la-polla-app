@@ -53,7 +53,10 @@ import { EliminarPolla } from "@/components/casa/EliminarPolla";
 import { MisBoletas } from "@/components/casa/Boletas";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
-import { Participaciones } from "@/components/casa/Participaciones";
+import { Participaciones, faltanTexto } from "@/components/casa/Participaciones";
+import { ParaParticipar } from "@/components/casa/ParaParticipar";
+import { BarraPagar } from "@/components/casa/BarraPagar";
+import { PagoConfirmado } from "@/components/casa/PagoConfirmado";
 import { ActivarCortesia } from "@/components/casa/ActivarCortesia";
 import { MisCortesias } from "@/components/casa/MisCortesias";
 import { courtesyPreview, listMyCourtesies } from "@/lib/casa/courtesies";
@@ -105,8 +108,8 @@ export default async function PollaPage({
   // Ahora ve una versión REDUCIDA. Lo que se muestra es exactamente lo que la
   // casa ya está publicitando — torneo, nombre, pozo, entrada y cierre — y
   // NADA más: cero tabla de posiciones, cero nombres, cero pronósticos. Esa
-  // línea la sostiene también el middleware, que solo abre `/casa/<slug>` y
-  // deja `/casa`, `/casa/admin` y `/casa/<slug>/pagar` pidiendo sesión.
+  // línea la sostiene también el middleware, que solo abre `/polla/<slug>` y
+  // deja `/inicio`, `/casa/admin` y `/polla/<slug>/pagar` pidiendo sesión.
   if (!user) {
     const [potPublico, tournaments] = await Promise.all([
       getPot(polla.id),
@@ -162,7 +165,9 @@ export default async function PollaPage({
   const editables = polla.kind === "partidos" && acceptsCasaMatchPicks(polla.status, polla.draw_pending)
     ? (matches as Array<Parameters<typeof canEditCasaMatch>[0] & { id: string }>).filter((m) => canEditCasaMatch(m, nowMs)).map((m) => m.id)
     : [];
-  const pendingByNumber: Record<number, number> | null = polla.kind === "partidos"
+  // Con la polla cerrada ya no hay nada que completar: sin este gate, cada cupo
+  // decía "Listo" en una polla terminada, como si quedara tarea hecha ayer.
+  const pendingByNumber: Record<number, number> | null = polla.kind === "partidos" && acceptsCasaMatchPicks(polla.status, polla.draw_pending)
     ? Object.fromEntries(entries.filter((e) => e.entry_number != null).map((e) => [e.entry_number!,
       editables.filter((id) => !allPicks.some((p) => p.entry_id === e.id && p.match_id === id)).length]))
     : null;
@@ -188,8 +193,11 @@ export default async function PollaPage({
   const puedeVerComprobantes = isAdmin || participa || payouts.some((p) => p.user_id === user.id);
   const proofUrls = puedeVerComprobantes && payouts.length > 0 ? await signPayoutProofs(payouts) : {};
   const pagoPendiente = entry?.status === "pendiente" && Boolean(entry.proof_path);
-  // Con la tarjeta "Tus cupos" el estado del cupo vive ahí; no se repite en cuadros aparte.
-  const showCupos = polla.kind !== "rifa" && entries.length > 0 && (participa || entries.length > 1);
+  // (2026-09-18) La tarjeta "Tus cupos" es para ELEGIR entre varios. Con uno
+  // solo —el caso de casi todos— no hay nada que elegir: la tarjeta sobraba,
+  // decía "1 de 10" y ofrecía un menú de una sola opción. Con un cupo, el
+  // estado vive en los cuadros de abajo y la tarea, en la franja de faltantes.
+  const showCupos = polla.kind !== "rifa" && entries.filter((e) => e.status !== "anulada").length > 1;
   const tournaments = resolveTournamentSlugs(polla, matches as { tournament: string | null }[]);
   // (2026-09-17) Todos los partidos con resultado verificado (o anulados) y la casa
   // todavía no confirma el reparto: se avisa para que nadie piense que se olvidó.
@@ -339,18 +347,34 @@ export default async function PollaPage({
               mientras esté abierta: pasar el link de una polla cerrada no le
               sirve a nadie. Si la fila no cabe (320 px o texto ampliado), se
               parte en dos y cada botón ocupa todo el ancho. */}
+        {/* (2026-09-18) La puerta de entrada: quien no está inscrito ve los tres
+              pasos y la cuenta a la que se transfiere, acá mismo. Antes el
+              botón decía «Entrar por $20.000», compartía fila y peso con
+              «Compartir», y la cuenta solo existía en /pagar: de ahí salía el
+              «no sé dónde pagar». Con una cortesía por activar esto no se
+              dibuja — el cupo gratis manda y pagar no viene al caso. */}
+        {mostrarEntrar && !activarCortesia && (
+          <ParaParticipar
+            polla={polla}
+            retomar={Boolean(entry)}
+            href={`/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
+          />
+        )}
+
         {(mostrarEntrar || comprarOtro || abierta) && (
           <div className="mt-4 flex flex-wrap gap-2 first:mt-0">
-            {mostrarEntrar && (
+            {mostrarEntrar && activarCortesia && (
               // Con una cortesía por activar, pagar es la opción secundaria: el
               // dorado se queda en el cupo gratis (y en el pozo), no en dos CTA.
-              <Link href={`/casa/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
-                className={`lp-btn flex-[2_1_auto] !px-4 ${activarCortesia ? "lp-btn-ghost" : "lp-btn-primary"}`}>
-                {entry ? "Retomar comprobante" : `Entrar por ${formatCop(polla.entry_price_cop)}`}
+              <Link href={`/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
+                className="lp-btn lp-btn-ghost flex-[2_1_auto] !px-4">
+                {entry ? "Retomar comprobante" : `Pagar la entrada · ${formatCop(polla.entry_price_cop)}`}
               </Link>
             )}
-            {comprarOtro && (
-              <Link href={`/casa/${polla.slug}/pagar?participacion=nueva`} className="lp-btn lp-btn-primary flex-[2_1_auto] gap-2 !px-4">
+            {/* Comprar otro cupo vive en «Tus cupos» cuando ya hay varios: es la
+                acción de quien ya está dentro, no la puerta de la pantalla. */}
+            {comprarOtro && !showCupos && (
+              <Link href={`/polla/${polla.slug}/pagar?participacion=nueva`} className="lp-btn lp-btn-ghost flex-[2_1_auto] gap-2 !px-4">
                 <Plus aria-hidden="true" className="h-5 w-5 shrink-0" />
                 Comprar otro cupo · {formatCop(polla.entry_price_cop)}
               </Link>
@@ -363,7 +387,7 @@ export default async function PollaPage({
                 premio={premioCompartir(polla, pot.prize_cop)}
                 codigo={codigo}
                 ayuda={every && codigo ? referralRule(every) : undefined}
-                className="flex-[1_0_auto]"
+                className={mostrarEntrar && activarCortesia || comprarOtro && !showCupos ? "flex-[1_0_auto]" : "w-full"}
               />
             )}
           </div>
@@ -375,20 +399,18 @@ export default async function PollaPage({
           <InvitaYGana view={referral} every={every} />
         )}
 
-        {/* Estás dentro. Antes, cuando Tama aprobaba, simplemente DESAPARECÍA
-            el aviso ámbar y no aparecía nada — la única señal de que el pago
-            se confirmó era una ausencia, que nadie nota. */}
-        {entry?.status === "pagada" && polla.kind !== "rifa" && !showCupos && (
-          <div className="mt-4 border border-turf/40 bg-turf/10 p-3">
-            <p className="lp-label text-turf">{etiqueta}Estás dentro</p>
-            <p className="mt-1 text-[13px] text-text-secondary">
-              {/* Con una cortesía nadie pagó nada: decir «confirmamos tu pago» sería falso. */}
-              {isCourtesyEntry(entry)
-                ? `Activaste tu cortesía y ${multiple ? "este cupo ya compite" : "ya participas"} por el premio.`
-                : `Confirmamos tu pago y ${multiple ? "este cupo ya compite" : "ya participas"} por el premio.`}
-              {abierta ? " Haz tus pronósticos antes del cierre." : ""}
-            </p>
-          </div>
+        {/* (2026-09-18) Esto era un recuadro verde permanente. La aprobación es
+            una NOTICIA, no un estado: se avisa la primera vez que la persona
+            vuelve después de que el administrador aprobó, y no otra vez. Un
+            «Estás dentro» que nunca se va se vuelve paisaje y le quita
+            atención al rojo, que sí pide algo. */}
+        {entry?.status === "pagada" && polla.kind !== "rifa" && (
+          <PagoConfirmado
+            entryId={entry.id}
+            cortesia={isCourtesyEntry(entry)}
+            cupo={multiple ? entry.entry_number : null}
+            abierta={abierta}
+          />
         )}
 
         {pagoPendiente && polla.kind !== "rifa" && !showCupos && (
@@ -409,7 +431,7 @@ export default async function PollaPage({
               {entry.reject_reason ?? "Comunícate con el administrador."}
             </p>
             {abierta && participa && entry.entry_number && (
-              <Link href={`/casa/${polla.slug}/pagar?participacion=${entry.entry_number}`} className="lp-btn lp-btn-ghost mt-3 w-full">
+              <Link href={`/polla/${polla.slug}/pagar?participacion=${entry.entry_number}`} className="lp-btn lp-btn-ghost mt-3 w-full">
                 Enviar otro comprobante para este cupo
               </Link>
             )}
@@ -427,7 +449,7 @@ export default async function PollaPage({
               quedó. Vuelve a subirla y sigues en carrera.
             </p>
             {participa && entry?.entry_number && (
-              <Link href={`/casa/${polla.slug}/pagar?participacion=${entry.entry_number}`} className="lp-btn lp-btn-ghost mt-3 w-full">
+              <Link href={`/polla/${polla.slug}/pagar?participacion=${entry.entry_number}`} className="lp-btn lp-btn-ghost mt-3 w-full">
                 Subir el comprobante de este cupo
               </Link>
             )}
@@ -478,12 +500,26 @@ export default async function PollaPage({
           </div>
         )}
 
+        {/* ── Tu tarea, con un solo cupo ────────────────────────────────────
+              Sin la tarjeta «Tus cupos» (que es para elegir entre varios), lo
+              que falta se dice acá, en una línea, pegado al tablero. El estado
+              del pago NO se repite: si está aprobado, no se dice nada. */}
+        {polla.kind === "partidos" && !showCupos && inscrito && pendingByNumber && entry?.entry_number != null && (
+          (pendingByNumber[entry.entry_number] ?? 0) > 0 ? (
+            <p className="mt-4 flex items-center gap-2 border border-red-alert/40 bg-red-alert/10 p-3 text-[15px] font-semibold text-red-alert first:mt-0">
+              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert" />
+              {faltanTexto(pendingByNumber[entry.entry_number] ?? 0)}
+            </p>
+          ) : null
+        )}
+
         {/* ── Los partidos ─────────────────────────────────────────────── */}
         {polla.kind === "partidos" && matches.length > 0 && (
           <div className="pt-4">
             <PicksBoard
               key={entry?.id ?? "sin-participacion"}
               slug={polla.slug}
+              joinPrompt={!inscrito && abierta ? { href: `/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`, entryPriceCop: polla.entry_price_cop } : undefined}
               entryNumber={entry?.entry_number ?? null}
               scoringMode={polla.scoring_mode ?? "1x2"}
               matches={matches as never}
@@ -542,7 +578,19 @@ export default async function PollaPage({
             </StreetCard>
           )}
         </PollaTabs>
-        {isAdmin && !polla.draw_pending && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/casa" />}
+
+        {/* (2026-09-18) El botón de pagar te sigue mientras bajas por los
+            partidos, la tabla y la info. La puerta ya no se queda arriba. Se
+            deja de dibujar en cuanto hay una inscripción viva. */}
+        {mostrarEntrar && !activarCortesia && (
+          <BarraPagar
+            href={`/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
+            entryPriceCop={polla.entry_price_cop}
+            texto={entry ? "Subir el comprobante" : undefined}
+          />
+        )}
+
+        {isAdmin && !polla.draw_pending && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/inicio" />}
       </div>
       {/* Aviso de invitaciones (2026-09-17): solo en la polla del aviso. */}
       {promo && <PromoInvitados promo={promo} />}
@@ -573,7 +621,7 @@ function PollaPublica({
   cortesia?: CourtesyPreview | null;
 }) {
   const abierta = isPollaOpen(polla);
-  const entrar = `/login?returnTo=${encodeURIComponent(`/casa/${slug}`)}`;
+  const entrar = `/login?returnTo=${encodeURIComponent(`/polla/${slug}`)}`;
   // Le regalaron un cupo: eso manda sobre el precio de la entrada. El cupo se
   // activa DESPUÉS de crear la cuenta, porque solo es para personas nuevas.
   const regalo = cortesia?.usable ? cortesia : null;

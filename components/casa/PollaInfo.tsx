@@ -1,4 +1,4 @@
-import { Ban, ChevronDown, Clock3, Eye, Gift, Target, Timer, Trophy, Wallet } from "lucide-react";
+import { Ban, ChevronDown, Clock3, CreditCard, Eye, Gift, Target, Timer, Trophy, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 import { LOCK_MINUTES, type CasaPolla } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
@@ -116,8 +116,19 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
       <p className="text-[13px] italic text-text-muted">{REFERRAL_FINE_PRINT}</p>
     </Rule>}
 
+    {/* (2026-09-18) Cómo se PAGA la entrada y cómo se COBRA el premio son dos
+        cosas distintas, y hasta hoy solo estaba la segunda — con el título
+        «¿Cómo me pagan?». Quien abría Info buscando dónde pagar terminaba
+        viendo su propia cuenta para recibir dinero. */}
+    {polla.kind !== "rifa" && <Rule icon={<CreditCard size={20} />} title="Cómo se paga la entrada">
+      {typeof polla.entry_price_cop === "number" && <li>Transfieres <Strong>{formatCop(polla.entry_price_cop)}</Strong> a la cuenta que aparece en el botón de pagar, por Nequi o transferencia.</li>}
+      <li>Subes la foto del comprobante en la app. No se cobra nada automáticamente ni pedimos datos bancarios.</li>
+      <li>Puedes pronosticar desde que lo subes; tus puntos entran a la tabla cuando confirmamos el pago.</li>
+      <li>Cada cupo es una transferencia aparte, con su propio comprobante.</li>
+    </Rule>}
+
     {money
-      ? <Rule icon={<Wallet size={20} />} title="¿Cómo me pagan?" extra={<PayoutAccountButton />}>
+      ? <Rule icon={<Wallet size={20} />} title="Cómo recibes tu premio si ganas" extra={<PayoutAccountButton />}>
         <li>Si ganas, te enviamos el dinero a tu Nequi o a tu cuenta de Bancolombia.</li>
         <li>Registra tu cuenta de pago para que el pago no se demore.</li>
       </Rule>

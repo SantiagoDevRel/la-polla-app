@@ -116,7 +116,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       setRegistrado(result.entryNumber);
       if (onRegistered) { onRegistered(result.entryNumber); return; }
       // Un respiro para que se lea la confirmación antes de volver.
-      setTimeout(() => router.push(`/casa/${slug}${result.entryNumber ? `?p=${result.entryNumber}` : ""}`), 1600);
+      setTimeout(() => router.push(`/polla/${slug}${result.entryNumber ? `?p=${result.entryNumber}` : ""}`), 1600);
     } catch (cause) {
       setRevision((n) => n + 1);
       setError(cause instanceof Error ? cause.message : "Error de conexión. Intenta de nuevo.");

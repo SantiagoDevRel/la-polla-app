@@ -78,7 +78,7 @@ export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
               Enviaste {registrados.length} de {cupos}. Los que falten puedes enviarlos ahora o más tarde desde la polla.
             </p>
           )}
-          <Link href={`/casa/${slug}${primero ? `?p=${primero}` : ""}`} className="lp-btn lp-btn-primary w-full">
+          <Link href={`/polla/${slug}${primero ? `?p=${primero}` : ""}`} className="lp-btn lp-btn-primary w-full">
             {registrados.length === 1 ? "Ver mi cupo y pronosticar" : "Ver mis cupos y pronosticar"}
           </Link>
         </div>

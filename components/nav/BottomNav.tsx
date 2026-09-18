@@ -52,7 +52,7 @@ interface Tab {
   labelKey: "tabPollas" | "tabFutbol" | "tabPerfil";
 }
 
-const TAB_POLLAS: Tab = { key: "pollas", href: "/casa", Icon: Ticket, labelKey: "tabPollas" };
+const TAB_POLLAS: Tab = { key: "pollas", href: "/inicio", Icon: Ticket, labelKey: "tabPollas" };
 const TAB_FUTBOL: Tab = { key: "futbol", href: "/futbol", Icon: FootballNavigationBall, labelKey: "tabFutbol" };
 const TAB_PERFIL: Tab = { key: "perfil", href: "/perfil", Icon: User, labelKey: "tabPerfil" };
 function deriveActive(pathname: string | null): NavKey | undefined {
@@ -60,7 +60,9 @@ function deriveActive(pathname: string | null): NavKey | undefined {
   // /admin/* no tiene tab propia: no se marca ninguna. Va ANTES que /casa
   // por si alguna ruta futura los comparte.
   if (pathname.startsWith("/admin")) return undefined;
-  if (pathname.startsWith("/casa")) return "pollas";
+  // /inicio (la lista), /polla/<slug> (una polla) y /casa/* (el nombre viejo,
+  // que sigue redirigiendo) marcan la misma pestaña.
+  if (pathname.startsWith("/inicio") || pathname.startsWith("/polla") || pathname.startsWith("/casa")) return "pollas";
   if (pathname.startsWith("/futbol")) return "futbol";
   if (pathname.startsWith("/perfil")) return "perfil";
   // Las rutas del modelo viejo (/inicio, /pollas, /road-to-worldcup) ya no

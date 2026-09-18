@@ -103,6 +103,12 @@ export interface MyCasaPolla extends Pick<CasaPolla, "id" | "slug" | "name" | "k
   entry_status: "pendiente" | "pagada";
   tournaments: string[];
   /**
+   * Pozo vivo, calculado en SQL (casa_pot_summaries_v2). La lista lo muestra
+   * porque es lo único que se compara entre pollas; `undefined` si no se pudo
+   * leer, y entonces la tarjeta sale sin esa fila en vez de mentir con un 0.
+   */
+  prize_cop?: number;
+  /**
    * Participaciones vivas (pagada o en revisión) en polla de partidos/preguntas,
    * ordenadas por número. Vacío en rifas: ahí manda la boleta.
    */

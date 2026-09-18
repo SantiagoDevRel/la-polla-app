@@ -124,7 +124,7 @@ export interface ReferralGiftNotice {
  * con el cupo principal, así que el botón abre ese cupo en la web.
  */
 export function referralGiftMessage(n: ReferralGiftNotice): { text: string; buttons: NoticeButton[][] } {
-  const url = `https://lapollacolombiana.com/casa/${encodeURIComponent(n.pollaSlug)}?p=${n.entryNumber}`;
+  const url = `https://lapollacolombiana.com/polla/${encodeURIComponent(n.pollaSlug)}?p=${n.entryNumber}`;
   return {
     text: [
       `🎁 <b>¡Ganaste un cupo de regalo en ${esc(n.pollaName)}!</b>`,
