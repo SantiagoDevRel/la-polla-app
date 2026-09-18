@@ -99,7 +99,7 @@ export interface CasaPot {
 }
 
 /** Minimal personal-list payload: no payment accounts, proofs or user IDs. */
-export interface MyCasaPolla extends Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "tournament" | "status" | "closes_at"> {
+export interface MyCasaPolla extends Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "tournament" | "status" | "closes_at" | "prize_kind" | "prize_object"> {
   entry_status: "pendiente" | "pagada";
   tournaments: string[];
   /**

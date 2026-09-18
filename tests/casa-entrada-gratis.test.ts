@@ -15,6 +15,7 @@ vi.mock("@/components/casa/PayoutAccountButton", () => ({ PayoutAccountButton: (
 import { PollaInfo } from "@/components/casa/PollaInfo";
 import { entryPriceLabel } from "@/lib/casa/format";
 import { textoCompartir } from "@/lib/casa/share-text";
+import { premioLabel, premioValor } from "@/lib/casa/premio";
 
 type Rules = Parameters<typeof PollaInfo>[0]["polla"];
 const base: Rules = {
@@ -54,5 +55,33 @@ describe("entrada gratis", () => {
     const compartido = textoCompartir({ nombre: "POLLA REGALO", entradaCop: 0, premio: { objeto: "DOS ENTRADAS" } });
     expect(compartido).toContain("Entrada: gratis");
     expect(compartido).not.toContain("$0");
+  });
+});
+
+/**
+ * (2026-09-18) Pedido del dueño: la etiqueta dice «Premio», no «Pozo», y cuando
+ * el premio es un objeto el valor es el objeto. POLLA REGALO entrega dos
+ * boletas y las tarjetas mostraban «POZO $0» — una polla que regala entradas
+ * parecía no repartir nada.
+ */
+describe("cómo se nombra el premio", () => {
+  it("la etiqueta es «Premio», nunca «Pozo»", () => {
+    expect(premioLabel()).toBe("Premio");
+    expect(premioLabel(true)).toBe("Prize");
+  });
+
+  it("un premio en objeto muestra el objeto, no una cifra", () => {
+    const v = premioValor({ prize_kind: "objeto", prize_object: "DOS ENTRADAS NACIONAL VS MILLONARIOS", prize_cop: 0 });
+    expect(v).toBe("DOS ENTRADAS NACIONAL VS MILLONARIOS");
+    expect(v).not.toMatch(/\$/);
+  });
+
+  it("un premio en dinero conserva la cifra del pozo", () => {
+    expect(premioValor({ prize_kind: "pozo", prize_object: null, prize_cop: 1_000_000 })).toBe("$1.000.000");
+  });
+
+  it("sin dato no inventa un cero: la tarjeta omite la fila", () => {
+    expect(premioValor({ prize_kind: "pozo", prize_object: null })).toBeNull();
+    expect(premioValor({ prize_kind: "objeto", prize_object: "   ", prize_cop: 0 })).toBeNull();
   });
 });

@@ -40,6 +40,7 @@ import {
   type Pick1x2,
 } from "@/lib/casa/types";
 import { entryPriceLabel, formatCop, prizeImageUrl, timeLeft } from "@/lib/casa/format";
+import { premioLabel } from "@/lib/casa/premio";
 import { getPollitoBase } from "@/lib/pollitos";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
@@ -293,7 +294,7 @@ export default async function PollaPage({
               />
             )}
             <div className="min-w-0">
-              <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : objeto ? "Premio" : "Pozo"}</Label>
+              <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
               <div className="lp-money mt-1 text-[32px] leading-none text-gold [overflow-wrap:anywhere]">
                 {objeto ? polla.prize_object : formatCop(pot.prize_cop)}
               </div>
@@ -649,7 +650,7 @@ function PollaPublica({
         </h1>
         {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className="mt-3 self-start" />}
         <div className="mt-3">
-          <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label>
+          <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
           <div className="lp-money mt-0.5 text-[40px] leading-none text-gold">
             {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
           </div>
