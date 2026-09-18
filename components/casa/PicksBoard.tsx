@@ -434,7 +434,7 @@ export function PicksBoard({
       )}
 
       {joinPrompt && (
-        <EntrarSheet open={joinOpen} onClose={() => setJoinOpen(false)} href={joinPrompt.href} entryPriceCop={joinPrompt.entryPriceCop} />
+        <EntrarSheet open={joinOpen} onClose={() => setJoinOpen(false)} href={joinPrompt.href} entryPriceCop={joinPrompt.entryPriceCop} slug={slug} />
       )}
     </div>
   );

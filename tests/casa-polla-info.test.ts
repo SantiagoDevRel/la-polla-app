@@ -104,7 +104,7 @@ describe("TournamentIdentity", () => {
 // cambió el sorteo de desempate por uno determinista: gana quien se registró
 // primero. La app y el bot de Telegram tienen que prometer LO MISMO.
 describe("desempate de un premio en objeto", () => {
-  const objeto = { prize_kind: "objeto" as const, prize_object: "DOS ENTRADAS", pot_mode: null, fixed_prize_cop: null };
+  const objeto = { prize_kind: "objeto" as const, prize_object: "DOS ENTRADAS", pot_mode: "proporcional" as const, fixed_prize_cop: null };
 
   it("anuncia que gana quien se registró primero, no un sorteo", () => {
     const html = text(info(objeto, null));

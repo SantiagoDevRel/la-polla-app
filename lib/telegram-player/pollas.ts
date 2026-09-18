@@ -18,7 +18,7 @@ import {
 } from "@/lib/casa/queries";
 import { listMyPollas } from "@/lib/casa/my-pollas";
 import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
-import { formatCop, timeLeft } from "@/lib/casa/format";
+import { entryPriceLabel, formatCop, timeLeft } from "@/lib/casa/format";
 import { isCourtesyEntry } from "@/lib/casa/courtesies-shared";
 import { entryCanPick, pollaAcceptsPicks } from "@/lib/casa/picks-save";
 import { isPollaOpen, LOCK_MINUTES, pollaStatusLabel, type CasaEntry, type CasaPolla, type CasaPot } from "@/lib/casa/types";
@@ -91,10 +91,10 @@ export async function showOpenPollas(ctx: PlayerCtx, page = 0): Promise<void> {
   const pots = await getPots(slice.map((p) => p.id));
   const lines = slice.map((p) => {
     const prize = p.prize_kind === "objeto" ? esc(p.prize_object) : formatCop(pots[p.id]?.prize_cop ?? 0);
-    return `• <b>${esc(p.name)}</b>\n   Entrada ${formatCop(p.entry_price_cop)} · ${p.prize_kind === "objeto" ? "Premio" : "Pozo"} ${prize} · cierra en ${timeLeft(p.closes_at)}`;
+    return `• <b>${esc(p.name)}</b>\n   Entrada ${entryPriceLabel(p.entry_price_cop)} · ${p.prize_kind === "objeto" ? "Premio" : "Pozo"} ${prize} · cierra en ${timeLeft(p.closes_at)}`;
   });
   const buttons: Keyboard = slice.map((p) => [
-    { text: buttonText(`${p.name} · ${formatCop(p.entry_price_cop)}`), callback_data: cb("p", shortId(p.id)) },
+    { text: buttonText(`${p.name} · ${entryPriceLabel(p.entry_price_cop)}`), callback_data: cb("p", shortId(p.id)) },
   ]);
   const nav = [];
   if (safePage > 0) nav.push({ text: "⬅️ Anteriores", callback_data: cb("ol", safePage - 1) });
@@ -184,7 +184,7 @@ export async function pollaDetailScreen(ctx: PlayerCtx, polla: CasaPolla, notice
     `${esc(kindLabel(polla))}${names.length ? ` · ${esc(names.join(", "))}` : ""}`,
     "",
     prizeLine(polla, pot),
-    `🎟 Entrada: <b>${formatCop(polla.entry_price_cop)}</b>`,
+    `🎟 Entrada: <b>${entryPriceLabel(polla.entry_price_cop)}</b>`,
     `👥 Inscritos: ${pot.paid_entries}`,
     open
       ? `⏰ Inscripciones hasta: ${esc(formatDateTime(polla.closes_at))} (faltan ${timeLeft(polla.closes_at)})`
@@ -208,7 +208,8 @@ export async function pollaDetailScreen(ctx: PlayerCtx, polla: CasaPolla, notice
   const buttons: Keyboard = [];
   const inscrito = entryCanPick(entry);
   if (polla.kind !== "rifa" && open && !inscrito) {
-    buttons.push([{ text: entry ? "📸 Enviar comprobante" : `✅ Inscribirme · ${formatCop(polla.entry_price_cop)}`, callback_data: cb("j", P) }]);
+    // Entrada gratis (migración 143): «Unirme» inscribe de una, sin comprobante.
+    buttons.push([{ text: polla.entry_price_cop === 0 ? "✅ Unirme · es gratis" : entry ? "📸 Enviar comprobante" : `✅ Inscribirme · ${formatCop(polla.entry_price_cop)}`, callback_data: cb("j", P) }]);
   }
   if (polla.kind === "rifa" && open) {
     // Una boleta sin pago confirmado ni comprobante en revisión (rechazada o

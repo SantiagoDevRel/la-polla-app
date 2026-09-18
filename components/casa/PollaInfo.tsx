@@ -124,12 +124,18 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
         cosas distintas, y hasta hoy solo estaba la segunda — con el título
         «¿Cómo me pagan?». Quien abría Info buscando dónde pagar terminaba
         viendo su propia cuenta para recibir dinero. */}
-    {polla.kind !== "rifa" && <Rule icon={<CreditCard size={20} />} title="Cómo se paga la entrada">
+    {/* (2026-09-18, migración 143) Con entrada gratis no hay nada que pagar:
+        pedir el comprobante de una transferencia de $0 no tenía sentido. */}
+    {polla.kind !== "rifa" && (polla.entry_price_cop === 0 ? <Rule icon={<CreditCard size={20} />} title="Cómo entras">
+      <li><Strong>Entrar es gratis.</Strong> No transfieres nada ni subes comprobante.</li>
+      <li>Tocas «Unirme» y quedas registrado de una vez, con un cupo.</li>
+      <li>Desde ese momento puedes pronosticar y tus puntos cuentan en la tabla.</li>
+    </Rule> : <Rule icon={<CreditCard size={20} />} title="Cómo se paga la entrada">
       {typeof polla.entry_price_cop === "number" && <li>Transfieres <Strong>{formatCop(polla.entry_price_cop)}</Strong> a la cuenta que aparece en el botón de pagar, por Nequi o transferencia.</li>}
       <li>Subes la foto del comprobante en la app. No se cobra nada automáticamente ni pedimos datos bancarios.</li>
       <li>Puedes pronosticar desde que lo subes; tus puntos entran a la tabla cuando confirmamos el pago.</li>
       <li>Cada cupo es una transferencia aparte, con su propio comprobante.</li>
-    </Rule>}
+    </Rule>)}
 
     {money
       ? <Rule icon={<Wallet size={20} />} title="Cómo recibes tu premio si ganas" extra={<PayoutAccountButton />}>

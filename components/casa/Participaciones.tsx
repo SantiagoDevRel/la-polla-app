@@ -51,7 +51,9 @@ const PAGO: Partial<Record<ParticipationState, { texto: string; clase: string }>
   cortesia: { texto: "Cortesía", clase: "text-text-secondary" },
 };
 
-export const faltanTexto = (n: number) => (n === 1 ? "Te falta 1 pronóstico" : `Te faltan ${n} pronósticos`);
+// `faltanTexto` vive en @/lib/casa/participaciones-texto y NO se re-exporta
+// desde aquí: re-exportarla desde un módulo "use client" es lo que tumbaba
+// /polla/[slug] cuando el servidor la llamaba.
 
 export function Participaciones({
   slug,

@@ -35,11 +35,12 @@ export function textoCompartir({
   english?: boolean;
 }): string {
   if (english) {
-    const entry = `Entry: ${formatCop(entradaCop)} COP`;
+    const entry = entradaCop === 0 ? "Entry: free" : `Entry: ${formatCop(entradaCop)} COP`;
     const prize = !premio ? "" : "cop" in premio ? ` · Prize: ${formatCop(premio.cop)} COP` : ` · Prize: ${premio.objeto}`;
     return `Join ${nombre} on Chicken Picks.\n${entry}${prize}${codigo ? `\nUse my code ${codigo} when you join.` : ""}`;
   }
-  const entrada = `Entrada: ${formatCop(entradaCop)}`;
+  // Compartir una polla gratis decía «Entrada: $0» (migración 143).
+  const entrada = entradaCop === 0 ? "Entrada: gratis" : `Entrada: ${formatCop(entradaCop)}`;
   const extra = !premio ? "" : "cop" in premio ? ` · Premio: ${formatCop(premio.cop)}` : ` · Premio: ${premio.objeto}`;
   return `Únete a ${nombre} en La Polla Colombiana.\n${entrada}${extra}${codigo ? `\nUsa mi código ${codigo} al inscribirte.` : ""}`;
 }

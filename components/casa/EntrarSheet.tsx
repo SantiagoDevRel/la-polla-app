@@ -12,19 +12,32 @@
 // persona ya decidió que quiere jugar, y es el único momento en que un bloqueo
 // ayuda en vez de estorbar.
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { formatCop } from "@/lib/casa/format";
+import { joinFreePolla } from "@/lib/casa/join-free";
+import { useToast } from "@/components/ui/Toast";
 
-export function EntrarSheet({ open, onClose, href, entryPriceCop }: {
+export function EntrarSheet({ open, onClose, href, entryPriceCop, slug }: {
   open: boolean;
   onClose: () => void;
   href: string;
   entryPriceCop: number;
+  /**
+   * Entrada gratis (migración 143): con `slug` y precio 0 no hay nada que
+   * transferir — el mismo botón inscribe aquí mismo y la persona sigue
+   * pronosticando sin cambiar de pantalla.
+   */
+  slug?: string;
 }) {
+  const gratis = entryPriceCop === 0 && Boolean(slug);
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [entrando, setEntrando] = useState(false);
   const reduce = useReducedMotion();
   const dialog = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
@@ -87,7 +100,7 @@ export function EntrarSheet({ open, onClose, href, entryPriceCop }: {
           >
             <div className="flex items-start justify-between gap-3">
               <h2 id="entrar-sheet-titulo" className="min-w-0 font-display text-[26px] leading-tight tracking-[0.04em] text-text-primary [overflow-wrap:anywhere]">
-                Paga para guardar tu pronóstico
+                {gratis ? "Únete para guardar tu pronóstico" : "Paga para guardar tu pronóstico"}
               </h2>
               <button
                 type="button"
@@ -100,12 +113,33 @@ export function EntrarSheet({ open, onClose, href, entryPriceCop }: {
             </div>
 
             <p className="mt-3 text-[15px] leading-relaxed text-text-secondary">
-              Los partidos los puedes ver sin pagar. Para que este marcador cuente, transfiere {formatCop(entryPriceCop)} y sube el comprobante.
+              {gratis
+                ? <>Entrar es gratis: no tienes que transferir nada ni subir comprobante. Para que este marcador cuente, únete a la polla.</>
+                : <>Los partidos los puedes ver sin pagar. Para que este marcador cuente, transfiere {formatCop(entryPriceCop)} y sube el comprobante.</>}
             </p>
 
-            <Link href={href} className="lp-btn lp-btn-primary mt-5 w-full !px-4">
-              Pagar la entrada · {formatCop(entryPriceCop)}
-            </Link>
+            {gratis ? (
+              <button
+                type="button"
+                disabled={entrando}
+                onClick={async () => {
+                  setEntrando(true);
+                  const result = await joinFreePolla(slug!);
+                  setEntrando(false);
+                  if (!result.ok) { showToast(result.error, "error"); router.refresh(); return; }
+                  showToast("Listo, ya estás dentro. Guarda tu pronóstico.", "success");
+                  close();
+                  router.refresh();
+                }}
+                className="lp-btn lp-btn-primary mt-5 w-full !px-4"
+              >
+                {entrando ? "Entrando..." : "Unirme · es gratis"}
+              </button>
+            ) : (
+              <Link href={href} className="lp-btn lp-btn-primary mt-5 w-full !px-4">
+                Pagar la entrada · {formatCop(entryPriceCop)}
+              </Link>
+            )}
             <button type="button" onClick={close} className="lp-btn lp-btn-ghost mt-2 w-full">
               Seguir mirando
             </button>

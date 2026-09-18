@@ -38,6 +38,12 @@ export default async function PagarPage({
   const polla = await getPollaBySlug((await params).slug);
   if (!polla || polla.status === "borrador") notFound();
 
+  // Entrada gratis (migración 143): acá no hay nada que hacer — no se transfiere
+  // ni se sube comprobante. La puerta es el botón «Unirme» de la polla. Se cierra
+  // el camino, no solo el botón: un enlace viejo o guardado traía de vuelta la
+  // pantalla que pedía el pantallazo de una transferencia de $0.
+  if (polla.entry_price_cop === 0 && polla.kind !== "rifa") redirect(`/polla/${polla.slug}`);
+
   const [entries, pot, threshold, invitee] = await Promise.all([
     polla.kind === "rifa" ? Promise.resolve([] as CasaEntry[]) : getMyEntries(polla.id, user.id),
     getPot(polla.id),

@@ -8,6 +8,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MATCH_COLUMNS } from "@/lib/db/columns";
+import { CASA_CONTRACT } from "./contract";
 import { hasCasaMatchStarted } from "./match-rules";
 import {
   CASA_ENTRY_COLUMNS,
@@ -547,4 +548,20 @@ export async function getOutstandingTicket(pollaId: string, userId: string, tick
   const { data, error } = await query.order("created_at").order("id").limit(1).maybeSingle();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Entrada gratis (migración 143): «Unirme» y ya estás dentro, sin comprobante.
+ *
+ * SQL es quien decide: la función solo existe si la entrada vale $0, y es
+ * idempotente — si ya tienes cupo te devuelve ese, no crea otro.
+ */
+export async function joinFreePolla(pollaId: string, userId: string): Promise<{
+  ok: boolean; slug: string; entry_id: string; entry_number: number | null; created: boolean;
+}> {
+  const { data, error } = await createAdminClient().rpc("casa_join_free_v1", {
+    p_polla_id: pollaId, p_user_id: userId, p_contract: CASA_CONTRACT,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; slug: string; entry_id: string; entry_number: number | null; created: boolean };
 }

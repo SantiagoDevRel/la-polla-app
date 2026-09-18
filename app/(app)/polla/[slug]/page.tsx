@@ -53,9 +53,12 @@ import { EliminarPolla } from "@/components/casa/EliminarPolla";
 import { MisBoletas } from "@/components/casa/Boletas";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
-import { Participaciones, faltanTexto } from "@/components/casa/Participaciones";
+import { Participaciones } from "@/components/casa/Participaciones";
+// Server Component: el texto sale de un módulo sin "use client" (ver el archivo).
+import { faltanTexto } from "@/lib/casa/participaciones-texto";
 import { ParaParticipar } from "@/components/casa/ParaParticipar";
 import { BarraPagar } from "@/components/casa/BarraPagar";
+import { UnirmeGratis } from "@/components/casa/UnirmeGratis";
 import { PagoConfirmado } from "@/components/casa/PagoConfirmado";
 import { ActivarCortesia } from "@/components/casa/ActivarCortesia";
 import { MisCortesias } from "@/components/casa/MisCortesias";
@@ -230,6 +233,9 @@ export default async function PollaPage({
   }
 
   const objeto = polla.prize_kind === "objeto";
+  // Entrada gratis (migración 143): no hay nada que transferir ni comprobante
+  // que subir, así que la puerta es un botón «Unirme», no la pantalla de pago.
+  const gratis = polla.entry_price_cop === 0 && polla.kind !== "rifa";
   // Sin ninguna participación viva: el CTA es entrar (o retomar la que falta).
   const mostrarEntrar = !participa && (abierta || canResumeProof) && polla.kind !== "rifa";
   const retomar = !participa && entry && !isLiveEntry(entry) ? entry.entry_number : null;
@@ -237,7 +243,9 @@ export default async function PollaPage({
   const maxCupos = polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER;
   // Llegó por un enlace de cortesía y todavía no está inscrito (migración 138).
   const activarCortesia = Boolean(cortesiaDeEstaPolla?.redeemable) && !participa;
-  const comprarOtro = polla.kind !== "rifa" && participa && abierta
+  // Con entrada gratis, un cupo por persona: varios cupos regalados serían
+  // varias oportunidades gratis de ganar el mismo premio.
+  const comprarOtro = polla.kind !== "rifa" && participa && abierta && !gratis
     && entries.filter((e) => e.status !== "anulada").length < maxCupos;
   // Invitaciones: sin código (administradores) no hay regla que ofrecer ni avance.
   const codigo = referral?.code ?? null;
@@ -353,13 +361,15 @@ export default async function PollaPage({
               «Compartir», y la cuenta solo existía en /pagar: de ahí salía el
               «no sé dónde pagar». Con una cortesía por activar esto no se
               dibuja — el cupo gratis manda y pagar no viene al caso. */}
-        {mostrarEntrar && !activarCortesia && (
+        {mostrarEntrar && !activarCortesia && (gratis ? (
+          <UnirmeGratis slug={polla.slug} nombre={polla.name} premio={objeto ? polla.prize_object : null} />
+        ) : (
           <ParaParticipar
             polla={polla}
             retomar={Boolean(entry)}
             href={`/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
           />
-        )}
+        ))}
 
         {(mostrarEntrar || comprarOtro || abierta) && (
           <div className="mt-4 flex flex-wrap gap-2 first:mt-0">
@@ -583,7 +593,9 @@ export default async function PollaPage({
         {/* (2026-09-18) El botón de pagar te sigue mientras bajas por los
             partidos, la tabla y la info. La puerta ya no se queda arriba. Se
             deja de dibujar en cuanto hay una inscripción viva. */}
-        {mostrarEntrar && !activarCortesia && (
+        {/* Con entrada gratis la barra no se dibuja: el botón «Unirme» ya está
+            arriba y no hay nada que pagar ni comprobante que subir. */}
+        {mostrarEntrar && !activarCortesia && !gratis && (
           <BarraPagar
             href={`/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
             entryPriceCop={polla.entry_price_cop}
