@@ -40,7 +40,7 @@ import {
   type CasaPolla,
   type Pick1x2,
 } from "@/lib/casa/types";
-import { entryPriceLabel, formatCop, prizeImageUrl, timeLeft } from "@/lib/casa/format";
+import { entryPriceLabel, formatCop, formatShortDate, prizeImageUrl, timeLeft } from "@/lib/casa/format";
 import { premioLabel } from "@/lib/casa/premio";
 import { getPollitoBase } from "@/lib/pollitos";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
@@ -317,7 +317,7 @@ export default async function PollaPage({
             <span>Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</span>
           )}
           <span>
-            {pot.paid_entries} inscritos · {abierta ? `cierra en ${timeLeft(polla.closes_at)}` : estado.text}
+            {pot.paid_entries} inscritos · {abierta ? `cierra en ${timeLeft(polla.closes_at)}` : (pollaEndedLabel(polla)?.toLowerCase() ?? estado.text)}
           </span>
         </p>
       </HeroFrame>
@@ -697,9 +697,14 @@ function PollaPublica({
               </div>
             </div>
             <div className="text-right">
-              <Label>{abierta ? "Cierra en" : "Estado"}</Label>
+              {/* Una polla repartida responde «cuándo terminó», no «en qué estado está». */}
+              <Label>{abierta ? "Cierra en" : polla.status === "resuelta" ? "Terminó" : "Estado"}</Label>
               <div className="lp-money mt-0.5 text-[18px] leading-none text-text-secondary">
-                {abierta ? timeLeft(polla.closes_at) : (pollaEndedLabel(polla) ?? pollaStatusLabel(polla).text)}
+                {abierta
+                  ? timeLeft(polla.closes_at)
+                  : polla.status === "resuelta"
+                    ? formatShortDate(polla.settled_at ?? polla.closes_at, { year: true })
+                    : pollaStatusLabel(polla).text}
               </div>
             </div>
           </div>
