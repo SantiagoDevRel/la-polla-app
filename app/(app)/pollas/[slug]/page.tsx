@@ -267,6 +267,7 @@ function formatDateHeader(
 
 const PHASE_KEYS: Record<string, string> = {
   group_stage: "phaseGroupStage",
+  round_of_64: "phaseRoundOf64",
   round_of_32: "phaseRoundOf32",
   round_of_16: "phaseRoundOf16",
   quarter_finals: "phaseQuarterFinals",

@@ -16,6 +16,7 @@ import { isPlaceholderTeam } from "../lib/matches/is-placeholder.ts";
 import { teamNameKey } from "../lib/teams/team-name-key.ts";
 import reviewedLeagues from "../lib/teams/league-logo-overrides.json" with { type: "json" };
 import reviewedTeams from "../lib/teams/crest-overrides.json" with { type: "json" };
+import sharedCrests from "../lib/teams/shared-crests.json" with { type: "json" };
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
@@ -84,16 +85,30 @@ async function apiInventory() {
   const file=arg('--inventory');
   if(file)return JSON.parse(await readFile(file,'utf8'));
   if(!process.env.API_FOOTBALL_KEY)throw new Error('API_FOOTBALL_KEY is required to cover every current club.');
+  // Un tropiezo del proveedor a mitad del recorrido dejaba el catálogo sin
+  // escribir y obligaba a repetir TODAS las llamadas. Tres intentos espaciados
+  // por endpoint: sigue siendo una corrida acotada y no enmascara un fallo real.
   async function api(endpoint) {
-    const response=await fetch(`https://v3.football.api-sports.io${endpoint}`,{headers:{'x-apisports-key':process.env.API_FOOTBALL_KEY},signal:AbortSignal.timeout(20000)});
-    const body=await response.json();
-    if(!response.ok||Object.keys(body.errors??{}).length)throw new Error(`API-Football inventory failed: ${endpoint}`);
-    return body.response;
+    let last;
+    for(let attempt=1;attempt<=3;attempt++) {
+      try {
+        const response=await fetch(`https://v3.football.api-sports.io${endpoint}`,{headers:{'x-apisports-key':process.env.API_FOOTBALL_KEY},signal:AbortSignal.timeout(20000)});
+        const body=await response.json();
+        if(!response.ok||Object.keys(body.errors??{}).length)throw new Error(`HTTP ${response.status} ${JSON.stringify(body.errors??{})}`);
+        return body.response;
+      } catch(error) {
+        last=error;
+        if(attempt<3)await new Promise(resolve=>setTimeout(resolve,2000*attempt));
+      }
+    }
+    throw new Error(`API-Football inventory failed: ${endpoint} — ${last?.message}`);
   }
-  // An explicit maintenance run uses at most 18 calls from the manual reserve.
-  // Runtime requests remain governed by the atomic database reservations.
+  // Una corrida explícita de mantenimiento gasta 1 + 2 por liga (/leagues y
+  // /teams). Se exige ese consumo más un margen, para no dejar al runtime sin
+  // cuota. Las solicitudes del runtime siguen bajo las reservas atómicas.
+  const needed=1+2*Object.keys(RESULT_LEAGUES).length;
   const status=await api('/status');
-  if(status.subscription.plan==='Free'||status.requests.limit_day-status.requests.current<50)throw new Error('A paid plan and 50 available requests are required.');
+  if(status.subscription.plan==='Free'||status.requests.limit_day-status.requests.current<needed+20)throw new Error(`A paid plan and ${needed+20} available requests are required.`);
   const inventory=[];
   for(const [slug,id]of Object.entries(RESULT_LEAGUES)) {
     const league=(await api(`/leagues?id=${id}`))[0];
@@ -209,18 +224,55 @@ async function main() {
 
   // Only publish after every source has decoded. Keep older entries/assets.
   // A repeated image across distinct provider IDs is usually a generic placeholder.
+  // El proveedor a veces sirve la MISMA imagen para dos clubes reales distintos
+  // (el Vasco da Gama de Acre trae el escudo del Vasco de Río). Mostrar ese
+  // escudo sería afirmar una identidad falsa, así que esos clubes se quedan sin
+  // escudo — nunca con el del otro. Se juntan TODOS antes de decidir: un
+  // conflicto que no esté revisado en shared-crests.json aborta la corrida.
   const apiHashes=new Map();
-  for(const team of apiTeams){const hash=downloaded.get(team.logo).filename;if(apiHashes.has(hash))throw new Error(`Shared/generic crest: ${team.name} and ${apiHashes.get(hash)}`);apiHashes.set(hash,team.name);}
+  const conflicts=new Map();
+  for(const team of apiTeams){
+    const hash=downloaded.get(team.logo).filename;
+    const owner=apiHashes.get(hash);
+    if(owner){
+      const group=conflicts.get(hash)??new Set([owner]);
+      group.add(team.name); conflicts.set(hash,group);
+    } else apiHashes.set(hash,team.name);
+  }
+  const sharedTeams=new Set();
+  const sharedSources=new Set();
+  if(conflicts.size){
+    const groups=[...conflicts.values()].map(g=>[...g].sort());
+    const reviewed=new Map(Object.entries(sharedCrests).map(([k,v])=>[k.toLowerCase(),v]));
+    const unreviewed=groups.filter(g=>!reviewed.has(g.join(' | ').toLowerCase()));
+    if(unreviewed.length)throw new Error(`Escudos duplicados sin revisar. Comprobá la identidad de cada club (id, fundación, estadio) y agregá la entrada en lib/teams/shared-crests.json indicando cuál lo conserva: ${JSON.stringify(unreviewed)}`);
+    for(const group of groups){
+      // `keep` es el dueño verificado: los demás se quedan sin escudo, porque
+      // el del otro club sería una identidad falsa.
+      const {keep}=reviewed.get(group.join(' | ').toLowerCase());
+      if(!group.includes(keep))throw new Error(`shared-crests.json: "${keep}" no es uno de ${JSON.stringify(group)}`);
+      for(const name of group) if(name!==keep) {
+        sharedTeams.add(teamNameKey(name));
+        // También se saca su URL: `localCrestSource` resuelve por URL antes que
+        // por nombre, así que dejarla registrada devolvería el escudo ajeno.
+        for(const team of apiTeams) if(team.name===name) sharedSources.add(team.logo);
+      }
+      console.warn(`Escudo duplicado por el proveedor: lo conserva ${keep}; sin escudo ${group.filter(n=>n!==keep).join(' | ')}`);
+    }
+  }
   const bySource = { ...previous.bySource };
   const byName = { ...previous.byName };
   await mkdir(assetDir, { recursive: true });
   for (const source of urls) {
     const { filename, image } = downloaded.get(source);
     await writeFile(path.join(assetDir, filename), image);
-    bySource[source] = `/team-crests/${filename}`;
+    if (!sharedSources.has(source)) bySource[source] = `/team-crests/${filename}`;
   }
   const seenNames = new Set();
-  for(const team of apiTeams)byName[teamNameKey(team.name)]=bySource[team.logo];
+  for(const team of apiTeams){
+    if(sharedTeams.has(teamNameKey(team.name)))continue;
+    byName[teamNameKey(team.name)]=bySource[team.logo];
+  }
   for (const row of rows) {
     for (const side of ["home", "away"]) {
       const name = teamNameKey(row[`${side}_team`]);
@@ -233,6 +285,11 @@ async function main() {
       }
     }
   }
+  // El catálogo conserva lo horneado antes, así que un club que pasa a estar
+  // sin escudo (porque el proveedor le sirve el de otro) tiene que perder
+  // también la entrada vieja: si no, seguiría mostrando la identidad ajena.
+  for(const source of sharedSources) delete bySource[source];
+  for(const name of sharedTeams) delete byName[name];
   const sorted = (record) => Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
   const missing=required.filter(t=>!bySource[t.source]&&!byName[teamNameKey(t.name)]);
   if(missing.length)throw new Error(`Missing club crests: ${JSON.stringify(missing)}`);
@@ -245,7 +302,8 @@ async function main() {
   await writeFile(path.join(repo,'lib/teams/league-logos.json'),JSON.stringify(leagues,null,2)+'\n');
   await writeFile(path.join(repo,'lib/teams/crest-coverage.json'),JSON.stringify({
     generatedAt:new Date().toISOString(),fixtures:rows.length,
-    leagues:inventory.map(l=>({slug:l.slug,id:l.id,season:l.season,teams:l.teams.map(t=>({id:t.team.id,name:t.team.name,source:t.team.logo}))})),
+    sharedCrestTeams:[...new Set(apiTeams.filter(t=>sharedTeams.has(teamNameKey(t.name))).map(t=>t.name))].sort(),
+   leagues:inventory.map(l=>({slug:l.slug,id:l.id,season:l.season,teams:l.teams.map(t=>({id:t.team.id,name:t.team.name,source:t.team.logo}))})),
     observedTeams:[...new Map(required.map(t=>[teamNameKey(t.name),{name:t.name,source:t.source}])).values()],
   },null,2)+'\n');
   await writeFile(catalogPath, `${JSON.stringify({

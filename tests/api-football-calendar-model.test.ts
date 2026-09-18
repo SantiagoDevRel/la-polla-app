@@ -22,6 +22,12 @@ const FEEDS = {
   betplay: load('betplay-2026.trimmed.json'),
 };
 const LEAGUE_OF = { ucl: 2, laliga: 140, libertadores: 13, betplay: 239 } as const;
+// Etiquetas de ronda reales de los once torneos agregados el 2026-09-18, en su
+// temporada vigente y en la anterior (así entran también las fases finales que
+// todavía no se publican).
+const OBSERVED = JSON.parse(readFileSync(new URL('./fixtures/api-football/rounds-observed.json', import.meta.url), 'utf8')) as {
+  leagues: { id: number; slug: string; seasons: { year: number; rounds: string[] }[] }[];
+};
 const fixturesOf = (feed: FeedFile) => feed.response.map((raw) => {
   const f = trimFixture(raw);
   if (!f) throw new Error(`fixture inválido en ${feed.source}`);
@@ -89,6 +95,55 @@ describe('roundToPhase', () => {
       const phase = roundToPhase(fixture.league.round)?.phase;
       if (phase) expect(canonical.has(phase)).toBe(true);
     }
+  });
+
+  it('classifies every round the newly added competitions really emit', () => {
+    const canonical = new Set(Object.values(TOURNAMENT_STRUCTURE).flatMap((t) => t.phases.map((p) => p.phase)));
+    const unmapped: string[] = [];
+    let seen = 0;
+    for (const league of OBSERVED.leagues) {
+      // La estructura declarada del torneo no puede quedarse corta respecto a
+      // lo que el proveedor manda: si emite una fase que no listamos, la UI la
+      // mostraría sin nombre.
+      const declared = new Set(TOURNAMENT_STRUCTURE[league.slug].phases.map((p) => p.phase));
+      for (const season of league.seasons) {
+        for (const round of season.rounds) {
+          seen += 1;
+          const c = classifyRound(round, league.id);
+          if (c.kind === 'unknown') { unmapped.push(`${league.slug} ${season.year}: ${round}`); continue; }
+          if (c.kind !== 'phase') continue;
+          expect(canonical.has(c.phase)).toBe(true);
+          expect({ slug: league.slug, round, phase: c.phase, declared: declared.has(c.phase) })
+            .toEqual({ slug: league.slug, round, phase: c.phase, declared: true });
+        }
+      }
+    }
+    expect(unmapped).toEqual([]);
+    expect(seen).toBeGreaterThanOrEqual(400);
+  });
+
+  it('keeps a round name ambiguous across competitions tied to its league', () => {
+    // «Play-offs» es la ronda previa a octavos en la Copa Colombia y la previa
+    // de agosto que NO guardamos en la UEFA. Sin liga, se mantiene excluida.
+    expect(classifyRound('Play-offs', 241)).toEqual({ kind: 'phase', phase: 'round_of_32', matchDay: null, segment: null });
+    expect(classifyRound('Play-offs', 2)).toEqual({ kind: 'excluded', reason: 'ambiguous' });
+    expect(classifyRound('Play-offs')).toEqual({ kind: 'excluded', reason: 'ambiguous' });
+    // Un «3» pelado solo es jornada en la Nations League.
+    expect(classifyRound('3', 5)).toEqual({ kind: 'phase', phase: 'league_stage', matchDay: 3, segment: null });
+    expect(classifyRound('3', 239)).toEqual({ kind: 'unknown' });
+    expect(classifyRound('3')).toEqual({ kind: 'unknown' });
+    expect(classifyRound('0', 5)).toEqual({ kind: 'unknown' });
+    // Rondas tempranas de copa: conocidas, no guardadas y sin alerta al admin.
+    for (const round of ['1st Round', '2nd Round', '3rd Round', 'Round of 128', '1/128-finals', '1/256-finals']) {
+      expect(classifyRound(round, 73)).toEqual({ kind: 'excluded', reason: 'early_cup_round' });
+      expect(roundToPhase(round, 73)).toBeNull();
+    }
+    expect(roundToPhase('Round of 64', 130)?.phase).toBe('round_of_64');
+    expect(roundToPhase('Playoff round', 848)?.phase).toBe('playoff');
+    expect(roundToPhase('Apertura - Play-In Final', 262)).toEqual({ phase: 'playoff', matchDay: null, segment: 'apertura' });
+    expect(roundToPhase('Play-offs A/B', 5)?.phase).toBe('playoff');
+    expect(roundToPhase('League C - 4', 5)).toEqual({ phase: 'league_stage', matchDay: 4, segment: null });
+    expect(roundToPhase('1st Round - 2', 241)).toEqual({ phase: 'group_stage', matchDay: 2, segment: null });
   });
 
   it('blocks qualifying rounds, the ambiguous UEFA "Play-offs" and anything unknown', () => {
@@ -216,20 +271,20 @@ describe('season resolution', () => {
   const hoursAgo = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
 
   it('resolves an API-Football league for every repo tournament, one to one', () => {
-    expect(CREATABLE_TOURNAMENT_SLUGS).toHaveLength(10);
+    expect(CREATABLE_TOURNAMENT_SLUGS).toHaveLength(21);
     const ids = CREATABLE_TOURNAMENT_SLUGS.map((slug) => afLeagueIdForTournament(slug));
     for (const [i, leagueId] of ids.entries()) {
       expect(Number.isSafeInteger(leagueId) && leagueId! > 0).toBe(true);
       expect(tournamentForAfLeague(leagueId!)).toBe(CREATABLE_TOURNAMENT_SLUGS[i]);
     }
-    expect(new Set(ids).size).toBe(10);
+    expect(new Set(ids).size).toBe(21);
     expect(afLeagueIdForTournament('worldcup_2026')).toBeNull();
     expect(afLeagueIdForTournament('constructor')).toBeNull();
   });
 
-  it('reads season 2026 for the ten leagues from /leagues?current=true, ignoring the slug suffix', async () => {
+  it('reads season 2026 for every repo league from /leagues?current=true, ignoring the slug suffix', async () => {
     const parsed = parseCurrentSeasons(leagues, leagues.observedAt);
-    expect(Object.keys(parsed.byLeague)).toHaveLength(10);
+    expect(Object.keys(parsed.byLeague)).toHaveLength(21);
     for (const slug of CREATABLE_TOURNAMENT_SLUGS) {
       expect(parsed.byLeague[String(afLeagueIdForTournament(slug))]).toBe(2026);
     }

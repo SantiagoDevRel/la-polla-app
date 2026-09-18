@@ -18,6 +18,7 @@ export type PhaseSlug =
   | "league_stage"
   | "group_stage"
   | "playoff"
+  | "round_of_64"
   | "round_of_32"
   | "round_of_16"
   | "quarter_finals"
@@ -91,6 +92,14 @@ export const TOURNAMENT_STRUCTURE: Record<string, TournamentStructure> = {
   seriea_2025: {
     phases: [{ phase: "regular_season", label: "Liga regular", slots: null, estimatedDate: null }],
   },
+  // Faltaban desde que se agregaron (2026-08-25): sin entrada acá, la app no
+  // conoce ninguna fase suya y `computePendingPhases` devuelve vacío.
+  bundesliga_2025: {
+    phases: [{ phase: "regular_season", label: "Liga regular", slots: null, estimatedDate: null }],
+  },
+  ligue1_2025: {
+    phases: [{ phase: "regular_season", label: "Liga regular", slots: null, estimatedDate: null }],
+  },
   // CONMEBOL: estructura típica (puede variar año a año).
   libertadores_2026: {
     phases: [
@@ -125,6 +134,105 @@ export const TOURNAMENT_STRUCTURE: Record<string, TournamentStructure> = {
       { phase: "quarter_finals", label: "Cuartos de final", slots: 8, estimatedDate: "2026-05-09" },
       { phase: "semi_finals", label: "Semifinales", slots: 4, estimatedDate: "2026-05-16" },
       { phase: "final", label: "Final", slots: 2, estimatedDate: "2026-06-02" },
+    ],
+  },
+  // Torneos agregados 2026-09-18. Las fases son las que API-Football emitió de
+  // verdad en la temporada vigente y en la anterior (`league.round`), no un
+  // formato supuesto. `slots`/`estimatedDate` van en null a propósito: sin un
+  // calendario oficial confirmado preferimos no anunciar cuántos partidos
+  // faltan ni cuándo — `computePendingPhases` omite las fases sin slots.
+  copacolombia_2026: {
+    phases: [
+      { phase: "group_stage", label: "Fase de grupos", slots: null, estimatedDate: null },
+      { phase: "round_of_32", label: "Dieciseisavos", slots: null, estimatedDate: null },
+      { phase: "round_of_16", label: "Octavos", slots: null, estimatedDate: null },
+      { phase: "quarter_finals", label: "Cuartos", slots: null, estimatedDate: null },
+      { phase: "semi_finals", label: "Semifinales", slots: null, estimatedDate: null },
+      { phase: "final", label: "Final", slots: null, estimatedDate: null },
+    ],
+  },
+  brasileirao_2026: {
+    phases: [
+      { phase: "regular_season", label: "Liga regular", slots: null, estimatedDate: null },
+    ],
+  },
+  eredivisie_2026: {
+    phases: [
+      { phase: "regular_season", label: "Liga regular", slots: null, estimatedDate: null },
+    ],
+  },
+  primeira_2026: {
+    phases: [
+      { phase: "regular_season", label: "Liga regular", slots: null, estimatedDate: null },
+    ],
+  },
+  conference_2026: {
+    phases: [
+      { phase: "league_stage", label: "Fase de liga", slots: null, estimatedDate: null },
+      { phase: "playoff", label: "Playoffs", slots: null, estimatedDate: null },
+      { phase: "round_of_32", label: "Dieciseisavos", slots: null, estimatedDate: null },
+      { phase: "round_of_16", label: "Octavos", slots: null, estimatedDate: null },
+      { phase: "quarter_finals", label: "Cuartos", slots: null, estimatedDate: null },
+      { phase: "semi_finals", label: "Semifinales", slots: null, estimatedDate: null },
+      { phase: "final", label: "Final", slots: null, estimatedDate: null },
+    ],
+  },
+  ligamx_2026: {
+    phases: [
+      { phase: "regular_season", label: "Fase regular", slots: null, estimatedDate: null },
+      { phase: "playoff", label: "Play-In", slots: null, estimatedDate: null },
+      { phase: "quarter_finals", label: "Cuartos", slots: null, estimatedDate: null },
+      { phase: "semi_finals", label: "Semifinales", slots: null, estimatedDate: null },
+      { phase: "final", label: "Final", slots: null, estimatedDate: null },
+    ],
+  },
+  ligaargentina_2026: {
+    phases: [
+      { phase: "regular_season", label: "Fase regular", slots: null, estimatedDate: null },
+      { phase: "round_of_16", label: "Octavos", slots: null, estimatedDate: null },
+      { phase: "quarter_finals", label: "Cuartos", slots: null, estimatedDate: null },
+      { phase: "semi_finals", label: "Semifinales", slots: null, estimatedDate: null },
+      { phase: "final", label: "Final", slots: null, estimatedDate: null },
+    ],
+  },
+  mls_2026: {
+    phases: [
+      { phase: "regular_season", label: "Temporada regular", slots: null, estimatedDate: null },
+      { phase: "round_of_32", label: "Dieciseisavos", slots: null, estimatedDate: null },
+      { phase: "round_of_16", label: "Octavos", slots: null, estimatedDate: null },
+      { phase: "quarter_finals", label: "Cuartos", slots: null, estimatedDate: null },
+      { phase: "semi_finals", label: "Semifinales", slots: null, estimatedDate: null },
+      { phase: "final", label: "Final", slots: null, estimatedDate: null },
+    ],
+  },
+  copadobrasil_2026: {
+    phases: [
+      { phase: "round_of_64", label: "Ronda de 64", slots: null, estimatedDate: null },
+      { phase: "round_of_32", label: "Dieciseisavos", slots: null, estimatedDate: null },
+      { phase: "round_of_16", label: "Octavos", slots: null, estimatedDate: null },
+      { phase: "quarter_finals", label: "Cuartos", slots: null, estimatedDate: null },
+      { phase: "semi_finals", label: "Semifinales", slots: null, estimatedDate: null },
+      { phase: "final", label: "Final", slots: null, estimatedDate: null },
+    ],
+  },
+  copaargentina_2026: {
+    phases: [
+      { phase: "round_of_64", label: "Ronda de 64", slots: null, estimatedDate: null },
+      { phase: "round_of_32", label: "Dieciseisavos", slots: null, estimatedDate: null },
+      { phase: "round_of_16", label: "Octavos", slots: null, estimatedDate: null },
+      { phase: "quarter_finals", label: "Cuartos", slots: null, estimatedDate: null },
+      { phase: "semi_finals", label: "Semifinales", slots: null, estimatedDate: null },
+      { phase: "final", label: "Final", slots: null, estimatedDate: null },
+    ],
+  },
+  nationsleague_2026: {
+    phases: [
+      { phase: "league_stage", label: "Fase de liga", slots: null, estimatedDate: null },
+      { phase: "playoff", label: "Playoffs de ascenso", slots: null, estimatedDate: null },
+      { phase: "quarter_finals", label: "Cuartos", slots: null, estimatedDate: null },
+      { phase: "semi_finals", label: "Semifinales", slots: null, estimatedDate: null },
+      { phase: "third_place", label: "Tercer puesto", slots: null, estimatedDate: null },
+      { phase: "final", label: "Final", slots: null, estimatedDate: null },
     ],
   },
 };

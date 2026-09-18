@@ -24,6 +24,17 @@ const IOS_NAMES: Record<string, string> = {
   libertadores_2026: "Copa Sur · Primera",
   sudamericana_2026: "Copa Sur · Segunda",
   betplay_2026: "Liga de Colombia",
+  copacolombia_2026: "Copa de Colombia",
+  conference_2026: "Copa de Europa · Tercera",
+  eredivisie_2026: "Liga de Países Bajos",
+  primeira_2026: "Liga de Portugal",
+  brasileirao_2026: "Liga de Brasil",
+  copadobrasil_2026: "Copa de Brasil",
+  ligaargentina_2026: "Liga de Argentina",
+  copaargentina_2026: "Copa de Argentina",
+  ligamx_2026: "Liga de México",
+  mls_2026: "Liga de Estados Unidos",
+  nationsleague_2026: "Torneo de Selecciones de Europa",
 };
 
 /**

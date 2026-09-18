@@ -25,7 +25,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useLocale, useTranslations } from "next-intl";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
-import { getTournamentLogo, getTournamentLogoClassName, getTournamentName } from "@/lib/tournaments";
+import { getTournamentLogo, getTournamentLogoClassName, getTournamentShortName } from "@/lib/tournaments";
 import { RESULT_LEAGUES } from "@/lib/api-football/leagues";
 
 const SEEN_KEY = "lp_welcome_seen_v1";
@@ -35,8 +35,15 @@ const CHAR_FADE_MS = 160; // each char's fade-in; multiple chars overlap mid-fad
 // "physics". Acts close to easeOutExpo — soft landing, no overshoot.
 const SMOOTH: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-// Nine supported competitions, arranged as a balanced 3 × 3 grid.
-const TOURNAMENT_ORDER = Object.keys(RESULT_LEAGUES);
+// Nueve torneos, en una rejilla 3 × 3 exacta. La lista es EXPLÍCITA y no
+// `Object.keys(RESULT_LEAGUES)`: la app soporta muchos más, y derivarla de ahí
+// dejaba una última fila suelta (10 logos = 3+3+3+1) y alargaba la cascada de
+// entrada. Si se cambia, que el total siga siendo múltiplo de 3.
+const TOURNAMENT_ORDER = [
+  'champions_2025', 'premier_2025', 'laliga_2025',
+  'seriea_2025', 'bundesliga_2025', 'ligue1_2025',
+  'libertadores_2026', 'betplay_2026', 'brasileirao_2026',
+].filter((slug) => slug in RESULT_LEAGUES);
 
 // Stage gates — ms between the previous beat finishing and the next
 // one starting. Tight enough to keep momentum, loose enough that
@@ -345,14 +352,14 @@ export function WelcomeIntro() {
                   {isIOSApp ? null : (
                     <img
                       src={getTournamentLogo(tournament, "small")}
-                      alt={getTournamentName(tournament, locale).replace("Copa ", "").replace(" League", "").replace("Liga BetPlay", "BetPlay")}
+                      alt={getTournamentShortName(tournament, locale)}
                       width={36}
                       height={36}
                       className={`h-11 w-11 rounded-sm p-1 object-contain ${getTournamentLogoClassName(tournament)}`}
                     />
                   )}
                   <span className="text-center text-[13px] leading-tight text-text-secondary [overflow-wrap:anywhere]">
-                    {getTournamentName(tournament, locale).replace("Copa ", "").replace(" League", "").replace("Liga BetPlay", "BetPlay")}
+                    {getTournamentShortName(tournament, locale)}
                   </span>
                 </motion.div>
               ))}

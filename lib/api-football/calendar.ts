@@ -203,7 +203,7 @@ export function mapFixtureToRow(
   nowMs: number,
 ): MapOutcome {
   if (f.fixture.timestamp * 1000 < nowMs - IMPORT_WINDOW_BACK_MS) return { kind: 'skip', reason: 'before_window' };
-  const round = classifyRound(f.league.round);
+  const round = classifyRound(f.league.round, f.league.id);
   if (round.kind === 'excluded') return { kind: 'skip', reason: 'round_excluded' };
   if (round.kind === 'unknown') return { kind: 'skip', reason: 'round_unknown' };
   const status = mapStatus(f.fixture.status.short);
@@ -406,7 +406,7 @@ export async function refreshAfTournament(
     // nombre nuevo no puede desaparecer en silencio. Alerta en /admin, una por
     // combinación de torneo y rondas (dedupe_key UNIQUE).
     const unknownOnly = fixtures
-      .filter((f) => classifyRound(f.league.round).kind === 'unknown' && f.fixture.timestamp * 1000 >= observedAt - IMPORT_WINDOW_BACK_MS)
+      .filter((f) => classifyRound(f.league.round, f.league.id).kind === 'unknown' && f.fixture.timestamp * 1000 >= observedAt - IMPORT_WINDOW_BACK_MS)
       .map((f) => f.league.round);
     if (mode === 'apply' && unknownOnly.length) {
       const rounds = Array.from(new Set(unknownOnly)).sort();

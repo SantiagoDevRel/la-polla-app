@@ -51,7 +51,35 @@ solo cuando lo recaudado supera el doble del premio garantizado.
 
 ## Fútbol: calendario, partidos y equipos (API-Football Pro)
 
-La pestaña **Fútbol** (`/futbol`) presenta los diez torneos con sus logos,
+### Torneos disponibles (2026-09-18)
+
+Veintiuno, todos de **API-Football** y todos con cobertura completa del proveedor
+(eventos, estadísticas y alineaciones), verificada contra `/leagues?current=true`:
+
+| Región | Torneos |
+|---|---|
+| Colombia | Liga BetPlay · Copa Colombia |
+| Copas de Europa | Champions · Europa League · Conference League · Nations League |
+| Ligas de Europa | Premier · LaLiga · Serie A · Bundesliga · Ligue 1 · Eredivisie · Primeira Liga |
+| Sudamérica | Libertadores · Sudamericana · Brasileirão · Copa do Brasil · Liga Argentina · Copa Argentina |
+| Norteamérica | Liga MX · MLS |
+
+Para agregar otro: entrada en `RESULT_LEAGUES` (`lib/api-football/leagues.ts`),
+en `TOURNAMENTS` y `TOURNAMENT_GROUPS` (`lib/tournaments.ts`), en
+`TOURNAMENT_STRUCTURE`, en `TOURNAMENTS_SEO`, un nombre genérico en
+`tournament-name-ios.ts`, y correr `scripts/bake-team-crests.mjs`. Los tests
+`tournament-availability` y `football-media` fallan si falta alguno de esos pasos.
+
+**Rondas.** `classifyRound` (`lib/api-football/calendar-model.ts`) traduce
+`league.round` a una fase del repo con coincidencia EXACTA; una ronda sin mapear
+NO se escribe y deja una alerta en `/admin`. Dos nombres son ambiguos entre
+torneos y por eso la función recibe también el id de liga: «Play-offs» es fase
+real en la Copa Colombia y previa descartada en la UEFA, y un «3» pelado solo es
+jornada en la Nations League. `tests/fixtures/api-football/rounds-observed.json`
+guarda las 418 etiquetas que el proveedor emitió de verdad en cada torneo, en la
+temporada vigente y en la anterior, y el test las clasifica todas.
+
+La pestaña **Fútbol** (`/futbol`) presenta los veintiún torneos con sus logos,
 escudos, marcadores y acceso al detalle. El partido muestra goles, jugadas,
 estadísticas, titulares y suplentes. Tocar un escudo abre la ficha del club:
 plantel por posición, fotos, dorsales, edades, resultados, próximos partidos
@@ -81,7 +109,10 @@ vuelven a los límites gratuitos y el detalle conserva la última información.
   los últimos o próximos siete días.
 - Calendario de Fútbol: ±6 días, agrupados por **día de Colombia** (dos feeds UTC).
   Los equipos agregan sus últimos cinco y próximos cinco partidos, filtrados
-  a los nueve torneos. No se fija un año de temporada para estas consultas.
+  a los torneos configurados. No se fija un año de temporada para estas consultas.
+  Agregar un torneo NO agrega llamadas acá: el calendario se pide por FECHA
+  (`/fixtures?date=`) y `RESULT_LEAGUES` solo decide qué partidos de esa
+  respuesta se conservan.
 - Pro: límite propio de 7.000 llamadas/día UTC frente a las 7.500 contratadas.
   El detalle y los equipos paran a las 6.000 para reservar capacidad a resultados.
   Un calendario cercano se comparte durante 60 segundos; el detalle activo,
@@ -137,9 +168,9 @@ La creación es exclusivamente administrativa (`/admin/pollas/crear`). Los
 enlaces antiguos a `/pollas/crear` redirigen directamente a `/casa`, sin aviso
 de transición ni formulario para jugadores. El POST P2P continúa bloqueado.
 
-El catálogo incluye **258 clubes de las temporadas actuales**, los **280 nombres
-de equipos observados en 3.515 partidos históricos** (incluidas selecciones) y
-los nueve logos de las competiciones. Todos tienen imágenes locales; las selecciones
+El catálogo incluye **705 clubes y selecciones de las temporadas actuales**, los
+**385 nombres de equipos observados en 3.778 partidos históricos** y los
+veintiún logos de las competiciones. Todos tienen imágenes locales; las selecciones
 conservan sus banderas. `crest-coverage.json` registra el inventario completo
 para comprobar faltantes; nunca se importa en el cliente.
 
@@ -165,11 +196,18 @@ npm test -- tests/football-media.test.ts
 ```
 
 El script verifica la temporada vigente con `/leagues`, inventaría `/teams`
-para los nueve torneos (18 llamadas con Pro), lee los partidos paginados y
+para cada torneo (1 + 2 por liga: 43 llamadas con los veintiún actuales), lee los partidos paginados y
 genera WebP de hasta 96 px. No escribe en la DB ni elimina assets anteriores.
 `--inventory <json> --fixtures <json>` permite repetir un inventario auditado
 sin más consultas. Aborta ante imágenes vacías, clubes sin escudo o imágenes
 idénticas para IDs de clubes diferentes. Los logos quedan en `league-logos.json`.
+
+Cuando el proveedor sirve la MISMA imagen para dos clubes reales distintos, el
+escudo se queda con su dueño verificado y el otro club va **sin escudo**: nunca
+con el ajeno. Cada caso se revisa a mano (id, fundación y estadio) y se anota en
+`lib/teams/shared-crests.json` indicando cuál lo conserva; un duplicado que no
+esté anotado aborta la corrida. Hoy hay uno: API-Football le da al Vasco da Gama
+AC de Rio Branco (Acre, 1952) el escudo del CR Vasco da Gama de Río (1898).
 Revisar visualmente cualquier proveedor nuevo o cambio de identidad antes de
 publicar: una imagen válida puede pertenecer al club equivocado.
 
@@ -198,7 +236,7 @@ API_FOOTBALL_KEY=<clave privada>
 
 El plan gratuito acepta `/fixtures?date=YYYY-MM-DD` para fechas actuales aunque
 rechace pedir la temporada completa. La integración consulta hoy/ayer en UTC,
-filtra los nueve torneos y comparte una caché de 20 minutos. Solo consulta cuando
+filtra los torneos configurados y comparte una caché de 20 minutos. Solo consulta cuando
 un partido vinculado a una polla necesita resultado. Una reserva atómica en la
 DB limita esta integración a **80 solicitudes/día UTC**, sin reintentos HTTP;
 quedan 20 de las 100 gratuitas para otras consultas. Con dos fechas activas y

@@ -1,0 +1,7 @@
+{
+  "Vasco DA Gama | Vasco da Gama AC": {
+    "keep": "Vasco DA Gama",
+    "reference": "https://v3.football.api-sports.io/teams?id=133 y ?id=6370",
+    "reason": "Dos clubes reales distintos: el CR Vasco da Gama de Río (id 133, 1898, Estádio São Januário) y el Vasco da Gama AC de Rio Branco, Acre (id 6370, 1952, Arena Acreana), que juega la Copa do Brasil. API-Football sirve para el segundo una imagen byte a byte idéntica a la del primero, así que el escudo queda con su dueño verificado y el club de Acre se muestra sin escudo — nunca con el ajeno."
+  }
+}
