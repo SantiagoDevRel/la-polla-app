@@ -1277,6 +1277,13 @@ de 096 arriba no es el contrato de liquidación una vez activado v2.
 
 ### Casa: invitaciones y cupos de regalo (2026-09-17, migración 135)
 
+**Desde la migración 144 (2026-09-19) el conteo es global:** 5 invitados nuevos en
+total que paguen una polla con entrada = 1 cupo gratis de saldo, que la persona usa
+en la polla que quiera con «Usar mi cupo gratis» (`POST
+/api/casa/pollas/[slug]/canjear` → `casa_referral_redeem_v1`). Perfil muestra el
+avance con una barrita de 5 puntos («2/5»). Las pollas gratis, las cortesías y las
+rifas no cuentan. Regresión: `scripts/casa-referrals-check.sql` (20 bloques).
+
 Por cada 5 personas nuevas que alguien invita y pagan una polla, esa persona
 recibe un cupo gratis en la misma polla. Nadie en la administración tiene que
 hacer nada.

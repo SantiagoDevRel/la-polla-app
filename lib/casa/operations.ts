@@ -60,6 +60,9 @@ const messages: Record<string, string> = {
   ENTRY_NOT_FOUND: "Ese cupo no existe. Vuelve a la polla y elige uno de los tuyos.",
   INVALID_ENTRY: "Ese cupo no es válido para esta polla.",
   INVALID_MAX_ENTRIES: "Elige entre 1 y 50 cupos por persona.",
+  // Migración 144: cupo gratis por invitar.
+  NO_FREE_ENTRY: "No tienes cupos gratis por usar.",
+  FREE_ENTRY_NOT_ALLOWED: "El cupo gratis no aplica para esta polla.",
 };
 
 /** Errores cuyo DETAIL de SQL ya viene redactado para la persona (con cifras exactas). */

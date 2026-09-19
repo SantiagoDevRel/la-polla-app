@@ -50,7 +50,7 @@ function Strong({ children }: { children: ReactNode }) {
 export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold?: FixedPrizeThreshold | null }) {
   const money = polla.prize_kind !== "objeto";
   const minimo = money && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" ? polla.fixed_prize_cop : null;
-  // Invitaciones (migración 135): la regla sale del número guardado en la polla.
+  // Invitaciones: la polla solo dice si participa; el conteo es de la persona (migración 144).
   const cadaInvitados = referralEvery({ kind: polla.kind, entry_price_cop: polla.entry_price_cop ?? 0, referral_every: polla.referral_every });
 
   return <div className="space-y-3 pt-5">
@@ -119,7 +119,7 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
     </>}
 
     {cadaInvitados !== null && <Rule id="invita" icon={<Gift size={20} />} title="Invita y gana cupos" plain>
-      <p><Strong>{cadaInvitados === 1 ? "Por cada invitado" : `Por cada ${cadaInvitados} invitados`}, te damos un cupo en esta polla.</Strong></p>
+      <p><Strong>{cadaInvitados === 1 ? "Por cada invitado" : `Por cada ${cadaInvitados} invitados`}, te damos un cupo gratis.</Strong></p>
       <p className="text-[13px] italic text-text-muted">{REFERRAL_FINE_PRINT}</p>
     </Rule>}
 

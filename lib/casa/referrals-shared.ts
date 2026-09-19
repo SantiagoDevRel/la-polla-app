@@ -1,9 +1,12 @@
 // lib/casa/referrals-shared.ts — lo que la UI necesita de las invitaciones (migración 135).
 //
 // Solo lectura y formato. La autoridad es SQL: casa_referral_every decide si una
-// polla participa, casa_set_referrer_v1 quién invitó a quién y
-// casa_referral_sync cuántos cupos de regalo hay. Aquí no se decide nada que
-// cambie cupos ni dinero.
+// polla participa, casa_set_referrer_v1 quién invitó a quién,
+// casa_referral_balance cuántos cupos gratis hay y casa_referral_redeem_v1
+// dónde se usan. Aquí no se decide nada que cambie cupos ni dinero.
+//
+// (2026-09-19, migración 144) El conteo es de la PERSONA, no de la polla: cada 5
+// invitados que pagan una polla dan un cupo gratis para la polla que ella elija.
 
 import type { CasaEntry, CasaPolla, ReferralPollaView } from "./types";
 import { premioCompartir, type PremioCompartir } from "./share-text";
@@ -20,7 +23,11 @@ export const REFERRAL_PARAM = "ref";
  */
 export const REFERRAL_DISMISS_COOKIE = "lp_ref_no";
 
-/** DEFAULT de casa_pollas.referral_every: el editor lo usa al volver a activar el programa. */
+/**
+ * DEFAULT de casa_pollas.referral_every. Desde la 144 esa columna es solo el
+ * interruptor por polla (NULL = fuera del programa); el divisor real es global
+ * (casa_referral_settings.every) y llega en las lecturas como `every`.
+ */
 export const DEFAULT_REFERRAL_EVERY = 5;
 
 /** Mismo formato que casa_referral_codes: letras del nombre (3-6) + 4-6 dígitos. */
@@ -40,8 +47,9 @@ export function validReferralCode(value: string | null | undefined): string | nu
 }
 
 /**
- * Cada cuántos invitados hay un cupo de regalo; null = la polla no participa.
- * Espejo de casa_referral_every: rifas y entradas gratis nunca participan.
+ * ¿La polla participa en las invitaciones? null = no: sus pagos no cuentan y el
+ * cupo gratis no se usa ahí. Espejo de casa_referral_every: rifas y entradas
+ * gratis nunca participan.
  */
 export function referralEvery(
   polla: Pick<CasaPolla, "kind" | "entry_price_cop"> & { referral_every?: number | null },
@@ -62,16 +70,16 @@ export function referralLink(origin: string, slug: string | null, code: string |
   return code ? `${base}?${REFERRAL_PARAM}=${encodeURIComponent(code)}` : base;
 }
 
-/** La regla en una frase, con el número de la polla (nunca un 5 escrito a mano). */
+/** La regla en una frase, con el número que llega de SQL (nunca un 5 escrito a mano). */
 export function referralRule(every: number): string {
   return every === 1
-    ? "Por cada invitado, te damos un cupo en esta polla."
-    : `Por cada ${every} invitados, te damos un cupo en esta polla.`;
+    ? "Por cada invitado, te damos un cupo gratis."
+    : `Por cada ${every} invitados, te damos un cupo gratis.`;
 }
 
 /** Letra menuda única (pedido del dueño: nada de listas de condiciones). */
 export const REFERRAL_FINE_PRINT =
-  "*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código, 1 polla por usuario.";
+  "*Cuenta cada usuario nuevo que entre con tu código o enlace y pague una polla.";
 
 /**
  * Aviso al entrar (pedido del dueño, 2026-09-17): «Por 5 invitados, te damos un
@@ -108,12 +116,9 @@ export function pickPromoPolla<T extends PromoPolla>(abiertas: T[]): T | undefin
     (a.closes_at ?? "").localeCompare(b.closes_at ?? "") || a.id.localeCompare(b.id))[0];
 }
 
-/**
- * El aviso para esta persona, o null: sin código (administradores), sin
- * programa o sin cupos libres (el regalo no tendría dónde entrar).
- */
-export function referralPromo(polla: PromoPolla, view: Pick<ReferralPollaView, "code" | "every" | "slots_left"> | null, prizeCop: number): ReferralPromo | null {
-  if (!isPromoPolla(polla) || !view?.code || !view.every || view.slots_left <= 0) return null;
+/** El aviso para esta persona, o null: sin código o sin programa en la polla. */
+export function referralPromo(polla: PromoPolla, view: Pick<ReferralPollaView, "code" | "every"> | null, prizeCop: number): ReferralPromo | null {
+  if (!isPromoPolla(polla) || !view?.code || !view.every) return null;
   return {
     pollaId: polla.id,
     slug: polla.slug,
@@ -125,9 +130,19 @@ export function referralPromo(polla: PromoPolla, view: Pick<ReferralPollaView, "
   };
 }
 
-/** Cuántos invitados faltan para el próximo cupo de regalo. */
+/** Cuántos invitados faltan para el próximo cupo gratis. */
 export function referralMissing(counted: number, every: number): number {
   return every - (counted % every);
+}
+
+/**
+ * La barrita «2/5» (pedido del dueño, 2026-09-19): cuántos puntos van llenos
+ * camino al PRÓXIMO cupo. Con un cupo recién ganado y sin usar se ve llena
+ * (5/5) en vez de volver a cero: el premio se nota.
+ */
+export function referralProgress(counted: number, every: number, available: number): number {
+  const avance = counted % every;
+  return avance === 0 && available > 0 ? every : avance;
 }
 
 /** Mensajes para los resultados {ok:false,error} de casa_set_referrer_v1. */

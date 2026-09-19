@@ -112,29 +112,25 @@ export function notifyPlayerReviewByTelegram(
 
 export interface ReferralGiftNotice {
   userId: string;
-  pollaName: string;
-  pollaSlug: string;
-  entryNumber: number;
-  /** Invitados que ya cuentan en esa polla. */
+  /** Invitados con pago aprobado, en total. */
   invited: number;
 }
 
 /**
- * Cupo de regalo por invitar (migración 135). El bot todavía pronostica solo
- * con el cupo principal, así que el botón abre ese cupo en la web.
+ * Cupo gratis por invitar (migración 144): queda de saldo y la persona lo usa
+ * en la polla que quiera, así que el botón lleva a las pollas abiertas.
  */
 export function referralGiftMessage(n: ReferralGiftNotice): { text: string; buttons: NoticeButton[][] } {
-  const url = `https://lapollacolombiana.com/polla/${encodeURIComponent(n.pollaSlug)}?p=${n.entryNumber}`;
   return {
     text: [
-      `🎁 <b>¡Ganaste un cupo de regalo en ${esc(n.pollaName)}!</b>`,
+      "🎁 <b>¡Ganaste un cupo gratis!</b>",
       "",
       n.invited > 0
-        ? `${n.invited} ${n.invited === 1 ? "persona que invitaste ya pagó" : "personas que invitaste ya pagaron"} esta polla.`
-        : "Las personas que invitaste ya pagaron esta polla.",
-      `Tu cupo ${n.entryNumber} ya está activo y compite por el premio.`,
+        ? `${n.invited} ${n.invited === 1 ? "persona que invitaste ya pagó" : "personas que invitaste ya pagaron"} una polla.`
+        : "Las personas que invitaste ya pagaron una polla.",
+      "Úsalo en la polla que quieras: entra y toca «Usar mi cupo gratis».",
     ].join("\n"),
-    buttons: [[{ text: `👉 Pronosticar con el cupo ${n.entryNumber}`, url }]],
+    buttons: [[{ text: "👉 Ver las pollas", url: "https://lapollacolombiana.com/inicio" }]],
   };
 }
 

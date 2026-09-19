@@ -79,7 +79,7 @@ export function RegalosPolla({ pollaId, every, editable, refreshKey = 0 }: {
         Cupos de regalo por invitar
       </h3>
       <p className="mt-1 text-[13px] text-text-secondary">
-        Se crean solos: 1 cupo por cada {every} invitados nuevos con pago aprobado. No suman al pozo.
+        Cupos gratis que alguien usó aquí: se gana 1 por cada {every} invitados nuevos con pago aprobado, en total. No suman al pozo.
       </p>
 
       {error && <p role="alert" className="mt-3 rounded-md border border-red-alert/30 p-3 text-[13px] text-red-alert">{error}</p>}
@@ -87,7 +87,7 @@ export function RegalosPolla({ pollaId, every, editable, refreshKey = 0 }: {
       {regalos === null ? (
         !error && <Skeleton className="mt-3 h-16 w-full" />
       ) : regalos.length === 0 ? (
-        <p className="mt-3 text-[13px] text-text-secondary">Todavía nadie ha ganado un cupo de regalo en esta polla.</p>
+        <p className="mt-3 text-[13px] text-text-secondary">Todavía nadie ha usado un cupo gratis en esta polla.</p>
       ) : (
         <ul className="mt-3 space-y-2">
           {regalos.map((regalo) => {

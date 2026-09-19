@@ -14,11 +14,16 @@
 // botones cortos (`leading` es el otro), y el detalle —avance, código, letra
 // menuda— se abre debajo solo si alguien lo toca. La frase larga de la regla
 // vive en Info → «Invita y gana cupos».
+//
+// (2026-09-19, migración 144) El avance es de la PERSONA, no de la polla: 5
+// invitados en total = 1 cupo gratis para la polla que ella elija. El botón
+// muestra siempre «N/5» camino al próximo cupo; el saldo se usa con
+// <UsarCupoGratis>, no aquí.
 
 import { useId, useState, type ReactNode } from "react";
 import { ChevronDown, Gift } from "lucide-react";
 import type { ReferralPollaView } from "@/lib/casa/types";
-import { REFERRAL_FINE_PRINT, referralMissing } from "@/lib/casa/referrals-shared";
+import { REFERRAL_FINE_PRINT, referralMissing, referralProgress } from "@/lib/casa/referrals-shared";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { CopiarDato } from "./CopiarDato";
 
@@ -35,9 +40,7 @@ export function InvitaYGana({ view, every, leading = null }: {
   const invita = !isIOSApp && view && every ? { view, every } : null;
   if (!invita && !leading) return null;
 
-  const counted = invita?.view.counted ?? 0;
-  const ganados = invita?.view.gifts ?? 0;
-  const avance = invita ? counted % invita.every : 0;
+  const avance = invita ? referralProgress(invita.view.counted, invita.every, invita.view.available) : 0;
 
   return (
     <div className="mt-4 first:mt-0">
@@ -54,8 +57,8 @@ export function InvitaYGana({ view, every, leading = null }: {
           >
             <Gift aria-hidden="true" className="h-5 w-5 max-w-none shrink-0 text-turf" />
             <span className="min-w-0 [overflow-wrap:anywhere]">Invita</span>
-            <span className="lp-money shrink-0 text-[15px] tabular-nums text-text-secondary" aria-label={ganados > 0 ? `${ganados} cupos ganados` : `Llevas ${avance} de ${invita.every}`}>
-              {ganados > 0 ? `+${ganados}` : `${avance}/${invita.every}`}
+            <span className="lp-money shrink-0 text-[15px] tabular-nums text-text-secondary" aria-label={`Llevas ${avance} de ${invita.every} invitados`}>
+              {avance}/{invita.every}
             </span>
             <ChevronDown aria-hidden="true" className={`h-4 w-4 max-w-none shrink-0 text-text-secondary transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
           </button>
@@ -68,29 +71,30 @@ export function InvitaYGana({ view, every, leading = null }: {
 }
 
 function InvitaDetalle({ id, view, every }: { id: string; view: ReferralPollaView; every: number }) {
-  const { counted, in_review: enRevision, gifts: ganados, waiting_gifts: esperando, active_gifts: activos, owner_paid: pagado, slots_left: espacio, code } = view;
-  const avance = counted % every;
+  const { counted, in_review: enRevision, available: disponibles, waiting_gifts: esperando, code } = view;
+  const avance = referralProgress(counted, every, disponibles);
   const faltan = referralMissing(counted, every);
-  const estado = ganados > 0
-    ? `Ganaste ${ganados === 1 ? "1 cupo" : `${ganados} cupos`}. Te faltan ${faltan} para el siguiente.`
-    : `Te faltan ${faltan} para tu cupo.`;
+  const estado = disponibles > 0
+    ? `Tienes ${disponibles === 1 ? "1 cupo gratis" : `${disponibles} cupos gratis`} por usar.`
+    : `Te ${faltan === 1 ? "falta 1 invitado" : `faltan ${faltan} invitados`} para tu cupo gratis.`;
 
   return (
     <div id={id} className="lp-card mt-2 space-y-3 p-3">
       <p className="text-[15px] font-semibold leading-snug text-text-primary">
-        {every === 1 ? "Por cada invitado" : `Por cada ${every} invitados`}, te damos un cupo*
+        {every === 1 ? "1 invitado" : `${every} invitados`} = 1 cupo gratis*
       </p>
-      <div className="flex gap-1" aria-hidden="true">
-        {Array.from({ length: every }, (_, i) => (
-          <span key={i} className={`h-1.5 min-w-0 flex-1 rounded-full ${i < avance ? "bg-turf" : "bg-border-default"}`} />
-        ))}
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 gap-1" aria-hidden="true">
+          {Array.from({ length: every }, (_, i) => (
+            <span key={i} className={`h-2 min-w-0 flex-1 rounded-full ${i < avance ? "bg-turf" : "bg-border-default"}`} />
+          ))}
+        </div>
+        <span className="lp-money shrink-0 text-[15px] tabular-nums text-text-primary">{avance}/{every}</span>
       </div>
       <p className="text-[15px] leading-relaxed text-text-primary">
         {estado}{enRevision > 0 && <span className="text-text-secondary"> (+{enRevision} en revisión)</span>}
       </p>
-      {activos > 0 && <p className="text-[13px] font-semibold text-turf">Tu cupo de regalo ya está en Tus cupos.</p>}
-      {esperando > 0 && !pagado && <p className="text-[13px] font-semibold text-amber">Tu cupo aparece cuando confirmemos tu pago en esta polla.</p>}
-      {esperando > 0 && pagado && espacio === 0 && <p className="text-[13px] font-semibold text-amber">Llegaste al máximo de cupos de esta polla.</p>}
+      {esperando > 0 && <p className="text-[13px] font-semibold text-amber">Llegaste al máximo de cupos de esta polla.</p>}
 
       {code && (
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-md border border-dashed border-border-strong px-3 py-2">

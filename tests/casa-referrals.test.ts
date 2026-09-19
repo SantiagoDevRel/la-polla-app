@@ -16,6 +16,7 @@ import {
   referralEvery,
   referralLink,
   referralMissing,
+  referralProgress,
   referralPromo,
   referralRule,
   validReferralCode,
@@ -61,12 +62,22 @@ describe("reglas de la polla", () => {
   });
 
   it("la regla es una frase con el número de la polla y una sola letra menuda", () => {
-    expect(referralRule(5)).toBe("Por cada 5 invitados, te damos un cupo en esta polla.");
-    expect(referralRule(1)).toBe("Por cada invitado, te damos un cupo en esta polla.");
-    expect(REFERRAL_FINE_PRINT).toBe("*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código, 1 polla por usuario.");
+    expect(referralRule(5)).toBe("Por cada 5 invitados, te damos un cupo gratis.");
+    expect(referralRule(1)).toBe("Por cada invitado, te damos un cupo gratis.");
+    expect(REFERRAL_FINE_PRINT).toBe("*Cuenta cada usuario nuevo que entre con tu código o enlace y pague una polla.");
     expect(referralMissing(0, 5)).toBe(5);
     expect(referralMissing(3, 5)).toBe(2);
     expect(referralMissing(5, 5)).toBe(5);
+  });
+
+  it("la barrita va de 0/5 a 5/5 camino al próximo cupo", () => {
+    expect(referralProgress(0, 5, 0)).toBe(0);
+    expect(referralProgress(3, 5, 0)).toBe(3);
+    // Cupo recién ganado y sin usar: se ve llena, no vuelve a cero.
+    expect(referralProgress(5, 5, 1)).toBe(5);
+    // Ya lo usó: arranca el siguiente.
+    expect(referralProgress(5, 5, 0)).toBe(0);
+    expect(referralProgress(7, 5, 1)).toBe(2);
   });
 
   it("el cupo de regalo se distingue del comprado", () => {
@@ -107,7 +118,7 @@ describe("aviso de invitaciones al entrar", () => {
     id: "p1", slug: "ofigolazo-1", name: "OFIGOLAZO", kind: "partidos" as const, entry_price_cop: 20000,
     prize_kind: "pozo" as const, prize_object: null, pot_mode: "fijo" as const, referral_every: 5,
   };
-  const view = { code: "JUANPE4821", every: 5, slots_left: 9 };
+  const view = { code: "JUANPE4821", every: 5 };
 
   it("sale en la polla abierta con invitaciones, se llame como se llame", () => {
     expect(isPromoPolla(polla)).toBe(true);
@@ -128,12 +139,12 @@ describe("aviso de invitaciones al entrar", () => {
     expect(pickPromoPolla([])).toBeUndefined();
   });
 
-  it("no sale sin programa, sin código o sin cupos libres", () => {
+  it("no sale sin programa o sin código", () => {
     expect(isPromoPolla({ ...polla, referral_every: null })).toBe(false);
     expect(isPromoPolla({ ...polla, entry_price_cop: 0 })).toBe(false);
     expect(isPromoPolla({ ...polla, kind: "rifa" })).toBe(false);
     expect(referralPromo(polla, { ...view, code: null }, 0)).toBeNull();
-    expect(referralPromo(polla, { ...view, slots_left: 0 }, 0)).toBeNull();
+    expect(referralPromo(polla, { ...view, every: null }, 0)).toBeNull();
     expect(referralPromo(polla, null, 0)).toBeNull();
   });
 });
@@ -227,13 +238,12 @@ describe("editor: interruptor de invitaciones", () => {
   });
 });
 
-describe("aviso de cupo de regalo por Telegram", () => {
-  it("dice cuántos invitados pagaron y abre ese cupo en la web", () => {
-    const message = referralGiftMessage({ userId: "u", pollaName: "OFI <b>", pollaSlug: "ofi golazo", entryNumber: 3, invited: 5 });
-    expect(message.text).toContain("OFI &lt;b&gt;");
-    expect(message.text).toContain("5 personas que invitaste ya pagaron esta polla.");
-    expect(message.text).toContain("Tu cupo 3 ya está activo y compite por el premio.");
-    expect(message.text).not.toContain("partido");
-    expect(message.buttons[0][0]).toEqual({ text: "👉 Pronosticar con el cupo 3", url: "https://lapollacolombiana.com/polla/ofi%20golazo?p=3" });
+describe("aviso de cupo gratis por Telegram", () => {
+  it("dice cuántos invitados pagaron y lleva a elegir la polla", () => {
+    const message = referralGiftMessage({ userId: "u", invited: 5 });
+    expect(message.text).toContain("¡Ganaste un cupo gratis!");
+    expect(message.text).toContain("5 personas que invitaste ya pagaron una polla.");
+    expect(message.text).toContain("Úsalo en la polla que quieras");
+    expect(message.buttons[0][0]).toEqual({ text: "👉 Ver las pollas", url: "https://lapollacolombiana.com/inicio" });
   });
 });

@@ -1,8 +1,9 @@
--- LOCAL DOCKER ONLY. Migración 135: invitaciones y cupos de regalo.
+-- LOCAL DOCKER ONLY. Invitaciones y cupos gratis (migraciones 135-140 y 144: conteo global).
 -- Fixtures nuevos; todo se revierte al final. No toca predictions reales.
 --   docker exec -i supabase_db_la-polla psql -U postgres -v ON_ERROR_STOP=1 < scripts/casa-referrals-check.sql
--- Antes de instalar la 135 en local, se puede probar en la misma transacción:
---   { echo 'BEGIN;'; cat supabase/migrations/135_casa_referrals.sql scripts/casa-referrals-check.sql; } \
+-- Antes de instalar la 144 en local, se puede probar en la misma transacción (el
+-- BEGIN/ROLLBACK de este archivo envuelve también la migración):
+--   { echo 'BEGIN;'; cat supabase/migrations/144_casa_referrals_global.sql scripts/casa-referrals-check.sql; } \
 --     | docker exec -i supabase_db_la-polla psql -U postgres -v ON_ERROR_STOP=1
 \set ON_ERROR_STOP on
 BEGIN;
@@ -89,11 +90,29 @@ BEGIN
   RETURN (r->>'entry_id')::uuid;
 END $$;
 
+-- Usar el cupo gratis (migración 144).
+CREATE FUNCTION pg_temp.ref_redeem(p_polla uuid, p_user uuid) RETURNS jsonb LANGUAGE sql AS $$
+  SELECT public.casa_referral_redeem_v1(p_polla,p_user,2);
+$$;
+
+-- El canje repetido en 15 segundos devuelve el mismo cupo (doble toque). Para
+-- canjear otra vez en la misma polla, la prueba envejece los canjes de esa
+-- persona un minuto: todos a la vez, así la fila conserva su orden.
+CREATE FUNCTION pg_temp.ref_age_redeems(p_user uuid) RETURNS void LANGUAGE sql AS $$
+  UPDATE public.casa_referral_events SET created_at=created_at-interval '1 minute'
+    WHERE kind='regalo_otorgado' AND referrer_user_id=p_user;
+$$;
+
+CREATE FUNCTION pg_temp.ref_balance(p_user uuid, p_key text) RETURNS integer LANGUAGE sql AS $$
+  SELECT (public.casa_referral_balance(p_user)->>p_key)::integer;
+$$;
+
 DO $$
 DECLARE admin_id uuid; juan uuid; ana uuid; old_user uuid; sin_perfil uuid; spam uuid;
   inv uuid[]:='{}'; i integer; p uuid; q uuid; r2 uuid; off_p uuid; rifa_p uuid; free_p uuid;
   code_juan text; code_ana text; res jsonb; view jsonb; gift uuid; e5 uuid; juan_e uuid; x uuid; y uuid; mid uuid;
-  settle jsonb; s uuid; sv uuid[]:='{}'; g1 uuid; g2 uuid; t1 uuid; t2 uuid; u uuid; code_x text; z uuid;
+  settle jsonb; s uuid; sv uuid[]:='{}'; g1 uuid; g2 uuid; g3 uuid; t1 uuid; t2 uuid; u uuid; code_x text; z uuid;
+  w uuid; m uuid; n integer;
 BEGIN
   admin_id:=pg_temp.ref_user('Admin ref local');
   UPDATE public.users SET is_admin=true WHERE id=admin_id;
@@ -103,6 +122,7 @@ BEGIN
   sin_perfil:=pg_temp.ref_user('Sin pollito');
   UPDATE public.users SET avatar_url=NULL WHERE id=sin_perfil;
   spam:=pg_temp.ref_user('Prueba códigos');
+  ASSERT (SELECT every FROM public.casa_referral_settings)=5, 'the divisor is global';
 
   -- 1) Código personal: letras del nombre sin tildes + 4 dígitos, estable.
   code_juan:=public.casa_referral_code_v1(juan);
@@ -140,7 +160,8 @@ BEGIN
   ASSERT (view->>'can_set_referrer')::boolean AND view->'hint'='null'::jsonb AND view->'referrer'->>'name'='Juan Pérez', view::text;
   RAISE NOTICE 'PASS linking: one referrer per person, new people only, rate limit';
 
-  -- 3) Cinco invitados nuevos pagan esta polla → cupo de regalo, aunque Juan pague de último.
+  -- 3) Cinco invitados nuevos pagan → UN cupo gratis de saldo. Nada aparece solo:
+  --    Juan lo usa donde quiera, y ni siquiera necesita haber pagado.
   p:=pg_temp.ref_polla(admin_id,'Ofigolazo ref');
   FOR i IN 1..5 LOOP
     x:=pg_temp.ref_user('Invitado '||i);
@@ -154,27 +175,44 @@ BEGIN
   ASSERT res->>'error'='REFERRAL_EXISTS' AND res->'referrer'->>'name'='Juan Pérez', 'opening another link never replaces the referrer: '||res::text;
   FOR i IN 1..4 LOOP PERFORM pg_temp.ref_pay(p,inv[i],admin_id,'a'); END LOOP;
   view:=public.casa_referral_polla_view_v1(juan,p);
-  ASSERT (view->>'counted')::integer=4 AND (view->>'earned')::integer=0 AND view->>'code'=code_juan, view::text;
+  ASSERT (view->>'counted')::integer=4 AND (view->>'earned')::integer=0 AND (view->>'available')::integer=0
+    AND NOT (view->>'can_redeem')::boolean AND (view->>'every')::integer=5 AND view->>'code'=code_juan, view::text;
+  PERFORM pg_temp.ref_must_fail(format('SELECT pg_temp.ref_redeem(%L,%L)',p,juan),'NO_FREE_ENTRY');
   e5:=public.casa_begin_entry_proof_v3(p,inv[5],gen_random_uuid(),NULL,NULL,repeat('b',64),'image/png',100,2)->>'entry_id';
   INSERT INTO storage.objects(bucket_id,name) SELECT 'payment-proofs',a.proof_path FROM public.casa_entry_proof_attempts a
     JOIN public.casa_entries e ON e.current_proof_attempt_id=a.id WHERE e.id=e5;
   PERFORM public.casa_confirm_entry_proof_v2((SELECT current_proof_attempt_id FROM public.casa_entries WHERE id=e5),inv[5],2);
   view:=public.casa_referral_polla_view_v1(juan,p);
   ASSERT (view->>'counted')::integer=4 AND (view->>'in_review')::integer=1, view::text;
+  ASSERT (public.casa_referral_profile_v1(juan)->>'in_review')::integer=1;
   PERFORM pg_temp.ref_review(e5,admin_id);
   view:=public.casa_referral_polla_view_v1(juan,p);
-  ASSERT (view->>'counted')::integer=5 AND (view->>'earned')::integer=1 AND NOT (view->>'owner_paid')::boolean
-    AND (view->>'active_gifts')::integer=0, view::text;
-  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=p AND user_id=juan), 'no gift before the referrer pays';
-  juan_e:=pg_temp.ref_pay(p,juan,admin_id,'c');
-  SELECT id INTO gift FROM public.casa_entries WHERE polla_id=p AND user_id=juan AND origin='invitacion';
-  ASSERT gift IS NOT NULL, 'the gift appears on its own';
-  ASSERT (SELECT status='pagada' AND amount_cop=0 AND entry_number=2 AND proof_path IS NULL
+  ASSERT (view->>'counted')::integer=5 AND (view->>'earned')::integer=1 AND (view->>'available')::integer=1
+    AND (view->>'can_redeem')::boolean AND (view->>'active_gifts')::integer=0 AND (view->>'in_review')::integer=0, view::text;
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE user_id=juan), 'nothing is created on its own';
+  ASSERT (SELECT count(*) FROM public.casa_referral_events WHERE kind='cupo_ganado' AND referrer_user_id=juan)=1, 'one notice per earned cupo';
+  view:=public.casa_referral_profile_v1(juan);
+  ASSERT (view->>'counted')::integer=5 AND (view->>'every')::integer=5 AND (view->>'available')::integer=1
+    AND (view->>'used')::integer=0, view::text;
+  PERFORM pg_temp.ref_must_fail(format('SELECT pg_temp.ref_redeem(%L,%L)',p,ana),'NO_FREE_ENTRY');
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_redeem_v1(%L,%L,2)',p,gen_random_uuid()),'AUTH_REQUIRED');
+  res:=pg_temp.ref_redeem(p,juan);
+  ASSERT (res->>'created')::boolean AND (res->>'entry_number')::integer=1 AND (res->>'available')::integer=0, res::text;
+  gift:=(res->>'entry_id')::uuid;
+  res:=pg_temp.ref_redeem(p,juan);
+  ASSERT NOT (res->>'created')::boolean AND (res->>'entry_id')::uuid=gift, 'a double tap returns the same cupo: '||res::text;
+  PERFORM pg_temp.ref_age_redeems(juan);
+  PERFORM pg_temp.ref_must_fail(format('SELECT pg_temp.ref_redeem(%L,%L)',p,juan),'NO_FREE_ENTRY');
+  ASSERT (SELECT status='pagada' AND amount_cop=0 AND entry_number=1 AND proof_path IS NULL AND origin='invitacion'
     FROM public.casa_entries WHERE id=gift), 'gift shape';
-  ASSERT (SELECT count(*) FROM public.casa_leaderboard(p) WHERE user_id=juan)=2, 'the gift competes';
-  ASSERT (SELECT gross_cop FROM public.casa_polla_pot(p))=120000, 'the gift adds no money';
-  ASSERT (SELECT paid_entries FROM public.casa_polla_pot(p))=7;
+  ASSERT (SELECT count(*) FROM public.casa_leaderboard(p) WHERE user_id=juan)=1, 'the gift competes';
+  ASSERT (SELECT gross_cop FROM public.casa_polla_pot(p))=100000, 'the gift adds no money';
+  ASSERT (SELECT paid_entries FROM public.casa_polla_pot(p))=6;
+  ASSERT public.casa_my_entry_v2(p,juan)->>'origin'='invitacion';
+  juan_e:=pg_temp.ref_pay(p,juan,admin_id,'c');
+  ASSERT (SELECT entry_number FROM public.casa_entries WHERE id=juan_e)=2;
   ASSERT public.casa_my_entry_v2(p,juan)->>'origin'='compra', 'the main entry is a purchase';
+  ASSERT (SELECT gross_cop FROM public.casa_polla_pot(p))=120000 AND (SELECT paid_entries FROM public.casa_polla_pot(p))=7;
   ASSERT (SELECT locked_at IS NOT NULL AND counted_polla_id=p FROM public.casa_referrals WHERE referred_user_id=inv[1]);
   res:=public.casa_set_referrer_v1(inv[1],code_ana,'codigo');
   ASSERT res->>'error'='REFERRAL_LOCKED', res::text;
@@ -182,31 +220,27 @@ BEGIN
   ASSERT NOT (view->>'can_set_referrer')::boolean AND view->'hint'='null'::jsonb, view::text;
   SELECT match_id INTO mid FROM public.casa_polla_matches WHERE polla_id=p;
   INSERT INTO public.casa_picks(polla_id,entry_id,user_id,match_id,home_score,away_score) VALUES(p,gift,juan,mid,2,1);
-  RAISE NOTICE 'PASS five new people grant one gift automatically, whatever the order';
+  RAISE NOTICE 'PASS five new people earn one free cupo; the person chooses where to use it';
 
-  -- 4) Otra polla: el conteo empieza de cero y los mismos invitados ya no cuentan.
+  -- 4) El conteo es de la persona: en otra polla no empieza de cero, y los mismos
+  --    invitados no vuelven a contar.
   q:=pg_temp.ref_polla(admin_id,'Otra polla ref');
   PERFORM pg_temp.ref_pay(q,juan,admin_id,'d');
   FOR i IN 1..5 LOOP PERFORM pg_temp.ref_pay(q,inv[i],admin_id,'e'); END LOOP;
   view:=public.casa_referral_polla_view_v1(juan,q);
-  ASSERT (view->>'counted')::integer=0 AND (view->>'active_gifts')::integer=0, view::text;
-  -- Un invitado nuevo de Juan que empieza en q sí cuenta allí (y dispara el recuento),
-  -- pero los cinco de p siguen sin contar: 1 de 5, sin regalo.
-  x:=pg_temp.ref_user('Invitado q');
-  ASSERT (public.casa_set_referrer_v1(x,code_juan,'enlace')->>'ok')::boolean;
-  PERFORM pg_temp.ref_pay(q,x,admin_id,'f');
-  view:=public.casa_referral_polla_view_v1(juan,q);
-  ASSERT (view->>'counted')::integer=1, view::text;
-  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=q AND origin='invitacion'), 'people counted in p do not count again in q';
-  RAISE NOTICE 'PASS the count resets per pool and each invitee counts once';
+  ASSERT (view->>'counted')::integer=5 AND (view->>'earned')::integer=1 AND (view->>'available')::integer=0
+    AND (view->>'active_gifts')::integer=0 AND NOT (view->>'can_redeem')::boolean, view::text;
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE user_id=juan AND origin='invitacion')=1, 'paying again adds nothing';
+  RAISE NOTICE 'PASS the count is global and each invitee counts once';
 
-  -- 5) Desmarcar pausa el regalo con sus pronósticos; aprobar otra vez lo reactiva.
+  -- 5) Desmarcar pausa el cupo gratis con sus pronósticos; aprobar otra vez lo reactiva.
   PERFORM pg_temp.ref_unpay(e5,admin_id);
   ASSERT (SELECT status FROM public.casa_entries WHERE id=gift)='anulada';
   ASSERT NOT EXISTS(SELECT 1 FROM public.casa_leaderboard(p) WHERE entry_id=gift);
   ASSERT EXISTS(SELECT 1 FROM public.casa_picks WHERE entry_id=gift), 'paused gift keeps its picks';
+  ASSERT pg_temp.ref_balance(juan,'available')=0, 'a paused cupo still holds its place';
   PERFORM pg_temp.ref_must_fail(format('UPDATE public.casa_picks SET home_score=3 WHERE entry_id=%L',gift),'inscribirte');
-  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_begin_entry_proof_v3(%L,%L,%L,NULL,2,%L,''image/png'',100,2)',
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_begin_entry_proof_v3(%L,%L,%L,NULL,1,%L,''image/png'',100,2)',
     p,juan,gen_random_uuid(),repeat('f',64)),'GIFT_ENTRY');
   res:=public.casa_begin_entry_proof_v3(p,juan,gen_random_uuid(),NULL,NULL,repeat('f',64),'image/png',100,2);
   ASSERT (res->>'entry_number')::integer=3 AND (res->>'entry_id')::uuid<>gift, 'a paused gift is never reused: '||res::text;
@@ -216,11 +250,12 @@ BEGIN
   PERFORM public.casa_fail_entry_proof_v2((res->>'attempt_id')::uuid,juan,2);
   PERFORM pg_temp.ref_review(e5,admin_id);
   ASSERT (SELECT status FROM public.casa_entries WHERE id=gift)='pagada', 'approving again restores the gift';
-  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=p AND user_id=juan AND origin='invitacion')=1;
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE user_id=juan AND origin='invitacion')=1;
   ASSERT (SELECT home_score FROM public.casa_picks WHERE entry_id=gift)=2;
+  ASSERT (SELECT count(*) FROM public.casa_referral_events WHERE kind='cupo_ganado' AND referrer_user_id=juan)=1, 'earning it again is not news';
   RAISE NOTICE 'PASS unmark pauses, approve restores, the gift number never takes a receipt';
 
-  -- 6) Tope por persona: el regalo cuenta y espera espacio.
+  -- 6) Tope por persona: el cupo gratis cuenta y espera espacio.
   PERFORM public.casa_set_max_entries_v2(p,2,admin_id,2);
   PERFORM pg_temp.ref_unpay(e5,admin_id);
   x:=pg_temp.ref_pay(p,juan,admin_id,'7');
@@ -229,7 +264,7 @@ BEGIN
   ASSERT (SELECT status FROM public.casa_entries WHERE id=gift)='anulada', 'the gift waits: the person is at the cap';
   view:=public.casa_referral_polla_view_v1(juan,p);
   ASSERT (view->>'earned')::integer=1 AND (view->>'active_gifts')::integer=0 AND (view->>'slots_left')::integer=0
-    AND (view->>'gifts')::integer=1 AND (view->>'waiting_gifts')::integer=1, view::text;
+    AND (view->>'waiting_gifts')::integer=1 AND (view->>'available')::integer=0 AND NOT (view->>'can_redeem')::boolean, view::text;
   PERFORM public.casa_set_max_entries_v2(p,3,admin_id,2);
   ASSERT (SELECT status FROM public.casa_entries WHERE id=gift)='pagada', 'raising the cap releases the gift';
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_begin_entry_proof_v3(%L,%L,%L,NULL,NULL,%L,''image/png'',100,2)',
@@ -242,18 +277,24 @@ BEGIN
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_remove_gift_v1(%L,''  '',%L,2)',gift,admin_id),'INVALID_REASON');
   res:=public.casa_referral_remove_gift_v1(gift,'Varias cuentas de la misma persona',admin_id,2);
   ASSERT (res->>'changed')::boolean AND (SELECT status FROM public.casa_entries WHERE id=gift)='anulada', res::text;
+  ASSERT pg_temp.ref_balance(juan,'available')=0, 'a removed cupo is spent';
   -- Un regalo en pausa solo lo protege casa_referral_entry_guard.
   PERFORM pg_temp.ref_must_fail(format('UPDATE public.casa_entries SET status=''pagada'' WHERE id=%L',gift),'REFERRAL_ENTRY_LOCKED');
   ASSERT NOT (public.casa_referral_remove_gift_v1(gift,'otra vez',admin_id,2)->>'changed')::boolean;
   PERFORM pg_temp.ref_unpay(e5,admin_id);
   PERFORM pg_temp.ref_review(e5,admin_id);
   ASSERT (SELECT status FROM public.casa_entries WHERE id=gift)='anulada', 'a removed gift does not come back by itself';
-  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=p AND user_id=juan AND origin='invitacion')=1, 'no replacement gift';
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE user_id=juan AND origin='invitacion')=1, 'no replacement gift';
   ASSERT (SELECT jsonb_array_length(public.casa_referral_gifts_admin_v1(p,admin_id)))=1;
   ASSERT (SELECT public.casa_referral_gifts_admin_v1(p,admin_id)->0->>'invitados')='5';
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_gifts_admin_v1(%L,%L)',p,juan),'ADMIN_REQUIRED');
   res:=public.casa_referral_restore_gift_v1(gift,admin_id,2);
   ASSERT (res->>'active')::boolean, res::text;
+  -- Un invitado nuevo que empieza en q suma al mismo conteo: 6 de Juan, en total.
+  x:=pg_temp.ref_user('Invitado q');
+  ASSERT (public.casa_set_referrer_v1(x,code_juan,'enlace')->>'ok')::boolean;
+  PERFORM pg_temp.ref_pay(q,x,admin_id,'f');
+  ASSERT pg_temp.ref_balance(juan,'counted')=6 AND pg_temp.ref_balance(juan,'earned')=1;
   RAISE NOTICE 'PASS admin removal sticks until restored';
 
   -- 8) Nadie escribe un cupo de regalo por fuera del conteo.
@@ -270,10 +311,11 @@ BEGIN
     WHERE entry_id IS NOT NULL AND entry_id<>gift ORDER BY created_at LIMIT 1),true);
   PERFORM pg_temp.ref_must_fail(format('UPDATE public.casa_entries SET status=''anulada'' WHERE id=%L',gift),'REFERRAL_ENTRY_LOCKED');
   PERFORM set_config('app.casa_referral_sync','',true);
-  RAISE NOTICE 'PASS gift rows are written only by the referral count';
+  RAISE NOTICE 'PASS gift rows are written only by the referral functions';
 
   -- 9) Primer pago en una polla sin programa, rifa o gratis: el vínculo se fija
   --    (salvo gratis) y la persona cuenta en su primera polla con invitaciones.
+  --    En esas pollas tampoco se puede usar el cupo gratis.
   off_p:=pg_temp.ref_polla(admin_id,'Sin programa ref',NULL);
   free_p:=pg_temp.ref_polla(admin_id,'Gratis ref',5,0);
   rifa_p:=gen_random_uuid();
@@ -283,6 +325,11 @@ BEGIN
   ASSERT public.casa_referral_every((SELECT c FROM public.casa_pollas c WHERE c.id=rifa_p)) IS NULL, 'raffles never participate';
   ASSERT public.casa_referral_every((SELECT c FROM public.casa_pollas c WHERE c.id=free_p)) IS NULL, 'free pools never participate';
   ASSERT public.casa_referral_every((SELECT c FROM public.casa_pollas c WHERE c.id=off_p)) IS NULL;
+  PERFORM pg_temp.ref_must_fail(format('SELECT pg_temp.ref_redeem(%L,%L)',off_p,juan),'FREE_ENTRY_NOT_ALLOWED');
+  PERFORM pg_temp.ref_must_fail(format('SELECT pg_temp.ref_redeem(%L,%L)',free_p,juan),'FREE_ENTRY_NOT_ALLOWED');
+  PERFORM pg_temp.ref_must_fail(format('SELECT pg_temp.ref_redeem(%L,%L)',rifa_p,juan),'FREE_ENTRY_NOT_ALLOWED');
+  ASSERT NOT (public.casa_referral_polla_view_v1(juan,off_p)->>'can_redeem')::boolean
+    AND public.casa_referral_polla_view_v1(juan,off_p)->'every'='null'::jsonb;
   x:=pg_temp.ref_user('Carla');
   ASSERT (public.casa_set_referrer_v1(x,code_ana,'codigo')->>'ok')::boolean;
   PERFORM pg_temp.ref_pay(rifa_p,x,admin_id,'1',7);
@@ -290,16 +337,19 @@ BEGIN
     'a raffle payment locks the referrer but does not count';
   PERFORM pg_temp.ref_pay(off_p,x,admin_id,'2');
   ASSERT (SELECT counted_polla_id IS NULL FROM public.casa_referrals WHERE referred_user_id=x);
+  ASSERT pg_temp.ref_balance(ana,'counted')=0;
   PERFORM pg_temp.ref_pay(q,x,admin_id,'3');
   ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=x)=q, 'the first eligible pool counts';
+  ASSERT pg_temp.ref_balance(ana,'counted')=1;
   y:=pg_temp.ref_user('Fer');
   ASSERT (public.casa_set_referrer_v1(y,code_juan,'codigo')->>'ok')::boolean;
   PERFORM pg_temp.ref_pay(free_p,y,admin_id,'4');
   ASSERT (SELECT locked_at IS NULL FROM public.casa_referrals WHERE referred_user_id=y), 'a free entry is not a payment';
+  ASSERT pg_temp.ref_balance(juan,'counted')=6, 'a free pool never counts';
   ASSERT (public.casa_set_referrer_v1(y,code_ana,'codigo')->>'changed')::boolean;
   PERFORM pg_temp.ref_unpay((SELECT id FROM public.casa_entries WHERE polla_id=free_p AND user_id=y),admin_id);
   ASSERT public.casa_referral_is_new_user(y), 'correcting a free entry keeps the person new';
-  RAISE NOTICE 'PASS first eligible pool anchors; raffles, free pools and pools without the program never grant';
+  RAISE NOTICE 'PASS first eligible pool anchors; raffles, free pools and pools without the program never count nor take the free cupo';
 
   -- 10) Un pago aprobado (aunque luego se desmarque) quita la condición de persona nueva.
   x:=pg_temp.ref_user('Diego');
@@ -312,23 +362,33 @@ BEGIN
   ASSERT res->>'error'='NOT_NEW_USER', res::text;
   RAISE NOTICE 'PASS new-user rule';
 
-  -- 11) Diez invitados → dos regalos; el pozo solo suma el dinero.
+  -- 11) Diez invitados más → dos cupos de saldo; el pozo solo suma el dinero.
   r2:=pg_temp.ref_polla(admin_id,'Diez ref');
   PERFORM pg_temp.ref_pay(r2,ana,admin_id,'6');
   FOR i IN 1..10 LOOP
     x:=pg_temp.ref_user('Nuevo '||i);
     ASSERT (public.casa_set_referrer_v1(x,code_ana,'enlace')->>'ok')::boolean;
-    PERFORM pg_temp.ref_pay(r2,x,admin_id,'a');
+    sv:=sv||pg_temp.ref_pay(r2,x,admin_id,'a');
   END LOOP;
-  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=r2 AND user_id=ana AND origin='invitacion' AND status='pagada')=2;
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE user_id=ana AND origin='invitacion'), 'nothing appears on its own';
   ASSERT (SELECT gross_cop FROM public.casa_polla_pot(r2))=220000;
   view:=public.casa_referral_profile_v1(ana);
-  -- Carla, Fer (cambió a Ana antes de pagar) y los diez nuevos.
-  ASSERT (view->>'invited')::integer=12 AND (view->>'gifts')::integer=2 AND view->>'code'=code_ana, view::text;
-  RAISE NOTICE 'PASS every five invitees add one gift';
+  -- Carla, Fer (cambió a Ana antes de pagar, y solo entró gratis) y los diez nuevos.
+  ASSERT (view->>'invited')::integer=12 AND (view->>'counted')::integer=11 AND (view->>'earned')::integer=2
+    AND (view->>'available')::integer=2 AND (view->>'gifts')::integer=0 AND view->>'code'=code_ana, view::text;
+  -- Avisos: uno por cupo ganado, y cada uno se reclama una sola vez.
+  SELECT count(*) INTO n FROM public.casa_referral_claim_credit_notices_v1(50) c WHERE c.user_id IN (ana,juan);
+  ASSERT n=3, 'two for Ana, one for Juan: '||n;
+  SELECT count(*) INTO n FROM public.casa_referral_claim_credit_notices_v1(50) c WHERE c.user_id IN (ana,juan);
+  ASSERT n=0, 'claimed once';
+  g1:=(pg_temp.ref_redeem(r2,ana)->>'entry_id')::uuid;
+  ASSERT (SELECT entry_number=2 AND status='pagada' FROM public.casa_entries WHERE id=g1);
+  ASSERT (SELECT gross_cop FROM public.casa_polla_pot(r2))=220000, 'still only real money';
+  RAISE NOTICE 'PASS every five invitees add one free cupo to the balance';
 
-  -- 12) Reparto: un cupo de regalo puede ganar; el premio sale del dinero que entró.
+  -- 12) Reparto: un cupo gratis puede ganar; el premio sale del dinero que entró.
   PERFORM public.casa_change_status_v2(p,'cerrar',2,admin_id,NULL);
+  PERFORM pg_temp.ref_must_fail(format('SELECT pg_temp.ref_redeem(%L,%L)',p,ana),'INSCRIPTIONS_CLOSED');
   UPDATE public.matches SET status='finished',home_score=2,away_score=1,final_verified_at=clock_timestamp() WHERE id=mid;
   ASSERT (SELECT entry_id FROM public.casa_leaderboard(p) ORDER BY points DESC LIMIT 1)=gift;
   settle:=public.casa_settle_polla_v2(p,2,admin_id,NULL);
@@ -336,6 +396,7 @@ BEGIN
   ASSERT (settle->>'prize_cop')::bigint=98000, settle::text;
   ASSERT (SELECT amount_cop FROM public.casa_payouts WHERE polla_id=p AND user_id=juan)=98000;
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_remove_gift_v1(%L,''x'',%L,2)',gift,admin_id),'POLLA_FINAL');
+  ASSERT pg_temp.ref_balance(juan,'used')=1 AND pg_temp.ref_balance(juan,'available')=0, 'a cupo used in a finished pool stays spent';
   RAISE NOTICE 'PASS a gift can win; the prize comes only from real money';
 
   -- 13) Interruptor por polla: prender se puede con inscritos (migración 136),
@@ -362,6 +423,16 @@ BEGIN
   ASSERT NOT has_function_privilege('service_role','public.casa_referral_lock_unsettled(uuid)','EXECUTE');
   ASSERT NOT has_function_privilege('authenticated','public.casa_referral_is_new_user(uuid)','EXECUTE');
   ASSERT NOT has_function_privilege('service_role','public.casa_referral_log(text,uuid,uuid,uuid,uuid,uuid,jsonb)','EXECUTE');
+  ASSERT has_function_privilege('service_role','public.casa_referral_redeem_v1(uuid,uuid,integer)','EXECUTE');
+  ASSERT NOT has_function_privilege('authenticated','public.casa_referral_redeem_v1(uuid,uuid,integer)','EXECUTE');
+  ASSERT NOT has_function_privilege('anon','public.casa_referral_redeem_v1(uuid,uuid,integer)','EXECUTE');
+  ASSERT has_function_privilege('service_role','public.casa_referral_claim_credit_notices_v1(integer)','EXECUTE');
+  ASSERT NOT has_function_privilege('anon','public.casa_referral_claim_credit_notices_v1(integer)','EXECUTE');
+  ASSERT NOT has_function_privilege('service_role','public.casa_referral_balance(uuid)','EXECUTE');
+  ASSERT NOT has_function_privilege('authenticated','public.casa_referral_balance(uuid)','EXECUTE');
+  ASSERT NOT has_function_privilege('authenticated','public.casa_referral_gift_slots(uuid)','EXECUTE');
+  ASSERT NOT has_function_privilege('anon','public.casa_referral_polla_live(uuid)','EXECUTE');
+  ASSERT NOT has_function_privilege('anon','public.casa_referral_in_review(uuid)','EXECUTE');
   ASSERT has_table_privilege('service_role','public.casa_referrals','SELECT');
   ASSERT NOT has_table_privilege('service_role','public.casa_referrals','INSERT');
   ASSERT NOT has_table_privilege('service_role','public.casa_referral_events','INSERT');
@@ -369,67 +440,82 @@ BEGIN
   ASSERT NOT has_table_privilege('authenticated','public.casa_referral_codes','SELECT');
   RAISE NOTICE 'PASS server-only permissions';
 
-  -- 15) Los regalos van en fila por número: remover descuenta justo ese regalo.
+  -- 15) Los cupos gratis van en fila por orden de canje, ENTRE pollas: g1 está en
+  --     r2 y g2 en s. Remover descuenta justo ese cupo.
   s:=pg_temp.ref_polla(admin_id,'Fila ref');
-  PERFORM pg_temp.ref_pay(s,ana,admin_id,'b');
-  FOR i IN 1..10 LOOP
-    x:=pg_temp.ref_user('Fila '||i);
-    ASSERT (public.casa_set_referrer_v1(x,code_ana,'enlace')->>'ok')::boolean;
-    sv:=sv||pg_temp.ref_pay(s,x,admin_id,'c');
-  END LOOP;
-  SELECT id INTO g1 FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion' AND entry_number=2;
-  SELECT id INTO g2 FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion' AND entry_number=3;
-  ASSERT g1 IS NOT NULL AND g2 IS NOT NULL, 'ten invitees, two gifts';
-  -- a) Remover el #3 y después desmarcar a un invitado: el #2 sigue activo.
+  g2:=(pg_temp.ref_redeem(s,ana)->>'entry_id')::uuid;
+  ASSERT (SELECT entry_number=1 AND status='pagada' FROM public.casa_entries WHERE id=g2), 'a free cupo needs no purchase in that pool';
+  ASSERT pg_temp.ref_balance(ana,'available')=0;
+  SELECT match_id INTO mid FROM public.casa_polla_matches WHERE polla_id=s;
+  INSERT INTO public.casa_picks(polla_id,entry_id,user_id,match_id,home_score,away_score) VALUES(s,g2,ana,mid,1,0);
+  -- a) Remover g2 y después perder dos invitados (11 → 9): g1 sigue activo.
   PERFORM public.casa_referral_remove_gift_v1(g2,'Pago mal aprobado',admin_id,2);
   PERFORM pg_temp.ref_unpay(sv[1],admin_id);
-  ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada', 'removing #3 then losing an invitee keeps #2';
+  PERFORM pg_temp.ref_unpay(sv[2],admin_id);
+  ASSERT pg_temp.ref_balance(ana,'earned')=1;
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada', 'removing the second then losing invitees keeps the first';
   ASSERT (SELECT status FROM public.casa_entries WHERE id=g2)='anulada';
-  ASSERT (SELECT counted_polla_id=s AND locked_at IS NOT NULL FROM public.casa_referrals
+  ASSERT (SELECT counted_polla_id=r2 AND locked_at IS NOT NULL FROM public.casa_referrals
     WHERE referred_user_id=(SELECT user_id FROM public.casa_entries WHERE id=sv[1])),
     'an unmarked payment keeps its pool: it can be approved again';
-  -- b) Restaurar con un solo regalo ganado lo deja en pausa; vuelve con el pago.
+  -- b) Restaurar con un solo cupo ganado lo deja en pausa; vuelve con los pagos,
+  --    aunque esos pagos sean de OTRA polla.
   res:=public.casa_referral_restore_gift_v1(g2,admin_id,2);
   ASSERT (res->>'changed')::boolean AND NOT (res->>'active')::boolean, res::text;
+  ASSERT pg_temp.ref_balance(ana,'counted')=9 AND pg_temp.ref_balance(ana,'available')=0, 'a paused cupo holds its place';
   PERFORM pg_temp.ref_review(sv[1],admin_id);
-  ASSERT (SELECT status FROM public.casa_entries WHERE id=g2)='pagada', 'the restored gift returns once earned';
-  -- c) Remover el activo mientras otro está en pausa: nadie ocupa su lugar.
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g2)='pagada', 'the restored gift returns once earned, across pools';
+  PERFORM pg_temp.ref_review(sv[2],admin_id);
+  -- c) Perder invitados pausa el ÚLTIMO cupo, en otra polla y con sus pronósticos.
   PERFORM pg_temp.ref_unpay(sv[1],admin_id);
+  PERFORM pg_temp.ref_unpay(sv[2],admin_id);
   ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada' AND (SELECT status FROM public.casa_entries WHERE id=g2)='anulada',
-    'losing an invitee pauses the last gift';
+    'losing invitees pauses the last gift';
+  ASSERT EXISTS(SELECT 1 FROM public.casa_picks WHERE entry_id=g2), 'with its picks';
   PERFORM public.casa_referral_remove_gift_v1(g1,'Varias cuentas',admin_id,2);
-  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion' AND status='pagada'),
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE user_id=ana AND origin='invitacion' AND status='pagada'),
     'a paused gift never takes the place of a removed one';
   view:=public.casa_referral_polla_view_v1(ana,s);
-  ASSERT (view->>'earned')::integer=1 AND (view->>'gifts')::integer=0 AND (view->>'waiting_gifts')::integer=0, view::text;
+  ASSERT (view->>'earned')::integer=1 AND (view->>'available')::integer=0 AND (view->>'waiting_gifts')::integer=0, view::text;
   -- d) Remover uno en pausa no toca a los demás.
   PERFORM public.casa_referral_remove_gift_v1(g2,'Otra razón',admin_id,2);
   PERFORM public.casa_referral_restore_gift_v1(g1,admin_id,2);
   ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada' AND (SELECT status FROM public.casa_entries WHERE id=g2)='anulada';
-  -- e) Con el conteo completo, el removido sigue descontando; cinco más crean otro.
+  -- e) Con el conteo completo, el removido sigue descontando; cinco más dan otro.
   PERFORM pg_temp.ref_review(sv[1],admin_id);
-  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion')=2
-    AND (SELECT status FROM public.casa_entries WHERE id=g2)='anulada', 'a removed gift is not replaced';
+  PERFORM pg_temp.ref_review(sv[2],admin_id);
+  ASSERT pg_temp.ref_balance(ana,'earned')=2 AND pg_temp.ref_balance(ana,'available')=0, 'a removed gift is not replaced';
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g2)='anulada';
   FOR i IN 11..15 LOOP
     x:=pg_temp.ref_user('Fila '||i);
     ASSERT (public.casa_set_referrer_v1(x,code_ana,'enlace')->>'ok')::boolean;
     PERFORM pg_temp.ref_pay(s,x,admin_id,'d');
   END LOOP;
-  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion' AND status='pagada')=2
-    AND EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=s AND user_id=ana AND origin='invitacion'
-      AND entry_number=4 AND status='pagada'), 'fifteen invitees with one removal: two active gifts';
+  ASSERT pg_temp.ref_balance(ana,'earned')=3 AND pg_temp.ref_balance(ana,'available')=1;
+  ASSERT (SELECT count(*) FROM public.casa_entries WHERE user_id=ana AND origin='invitacion')=2, 'still nothing on its own';
+  PERFORM pg_temp.ref_age_redeems(ana);
+  g3:=(pg_temp.ref_redeem(s,ana)->>'entry_id')::uuid;
+  ASSERT (SELECT entry_number=2 AND status='pagada' FROM public.casa_entries WHERE id=g3);
   view:=public.casa_referral_polla_view_v1(ana,s);
-  ASSERT (view->>'earned')::integer=3 AND (view->>'gifts')::integer=2 AND (view->>'waiting_gifts')::integer=0
+  ASSERT (view->>'earned')::integer=3 AND (view->>'available')::integer=0 AND (view->>'active_gifts')::integer=1
     AND (view->>'removed_gifts')::integer=1, view::text;
-  ASSERT (SELECT bool_and(jsonb_array_length(g->'nombres')=(g->>'invitados')::integer)
-    FROM jsonb_array_elements(public.casa_referral_gifts_admin_v1(s,admin_id)) g), 'the names match the count';
+  ASSERT (SELECT bool_and(jsonb_array_length(g->'nombres')=(g->>'invitados')::integer AND (g->>'invitados')::integer=16)
+    FROM jsonb_array_elements(public.casa_referral_gifts_admin_v1(s,admin_id)) g), 'the names match the global count';
   -- f) Después del reparto no se remueve ni se restaura.
   PERFORM public.casa_change_status_v2(s,'cerrar',2,admin_id,NULL);
   UPDATE public.casa_pollas SET settled_at=clock_timestamp() WHERE id=s;
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_restore_gift_v1(%L,%L,2)',g2,admin_id),'ALREADY_SETTLED');
-  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_remove_gift_v1(%L,''x'',%L,2)',g1,admin_id),'ALREADY_SETTLED');
+  PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_referral_remove_gift_v1(%L,''x'',%L,2)',g3,admin_id),'ALREADY_SETTLED');
+  -- Un cupo activo en una polla repartida ya no se pausa aunque el conteo baje.
+  PERFORM pg_temp.ref_unpay(sv[3],admin_id);
+  PERFORM pg_temp.ref_unpay(sv[4],admin_id);
+  ASSERT pg_temp.ref_balance(ana,'earned')=2;
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g3)='pagada', 'a settled pool is never touched';
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada', 'and the older live gift keeps its place';
+  PERFORM pg_temp.ref_review(sv[3],admin_id);
+  PERFORM pg_temp.ref_review(sv[4],admin_id);
   UPDATE public.casa_pollas SET settled_at=NULL WHERE id=s;
-  RAISE NOTICE 'PASS removing a gift discounts exactly that gift';
+  RAISE NOTICE 'PASS free cupos queue across pools; removing one discounts exactly that one';
 
   -- 16) Persona nueva según su cuenta de acceso: reescribir public.users.created_at no sirve.
   x:=pg_temp.ref_user('Cuenta vieja 2',true);
@@ -451,17 +537,16 @@ BEGIN
   ASSERT public.casa_referral_invitee_v1(y,code_x)->'hint'->>'code'=code_x, 'the link of an admin is offered';
   res:=public.casa_set_referrer_v1(y,code_x,'enlace');
   ASSERT (res->>'ok')::boolean AND (res->>'changed')::boolean, res::text;
-  -- Sus regalos también se conservan: ser administrador ya no los quita.
-  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=r2 AND user_id=ana AND origin='invitacion' AND status='pagada')=2;
+  -- Sus cupos gratis también se conservan: ser administrador no los quita.
   UPDATE public.users SET is_admin=true WHERE id=ana;
   PERFORM public.casa_set_max_entries_v2(r2,9,admin_id,2);
-  ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=r2 AND user_id=ana AND origin='invitacion' AND status='pagada')=2,
-    'an admin keeps their gifts';
+  ASSERT (SELECT status FROM public.casa_entries WHERE id=g1)='pagada', 'an admin keeps their gifts';
   UPDATE public.users SET is_admin=false WHERE id=ana;
   RAISE NOTICE 'PASS admins invite and collect like anyone else';
 
-  -- 18) Si se desmarca el pago que ancla a un invitado, cuenta con su otro cupo pagado
-  --     ahí o, si no le queda ninguno, en la próxima polla donde pague.
+  -- 18) Si se rechaza el pago que ancla a un invitado, cuenta con su otro cupo pagado
+  --     ahí o, si no le queda ninguno, en la próxima polla donde pague. El saldo del
+  --     invitador sigue al ancla.
   t1:=pg_temp.ref_polla(admin_id,'Ancla 1 ref');
   t2:=pg_temp.ref_polla(admin_id,'Ancla 2 ref');
   u:=pg_temp.ref_user('Gabriela');
@@ -469,9 +554,13 @@ BEGIN
   x:=pg_temp.ref_pay(t1,u,admin_id,'e');
   y:=pg_temp.ref_pay(t1,u,admin_id,'f');
   ASSERT (SELECT counted_polla_id=t1 AND counted_entry_id=x FROM public.casa_referrals WHERE referred_user_id=u);
+  -- Los 5 de p, el de q, Ana (paga r2 desde el bloque 11) y Gabriela.
+  ASSERT pg_temp.ref_balance(juan,'counted')=8, public.casa_referral_balance(juan)::text;
   PERFORM pg_temp.ref_unpay(x,admin_id);
   ASSERT (SELECT counted_polla_id=t1 AND counted_entry_id=x FROM public.casa_referrals WHERE referred_user_id=u),
     'unmarking alone keeps the anchor';
+  -- Sigue contando: tiene otro cupo pagado en la polla donde cuenta.
+  ASSERT pg_temp.ref_balance(juan,'counted')=8;
   PERFORM public.casa_review_attempt_v3((SELECT current_proof_attempt_id FROM public.casa_entries WHERE id=x),
     (SELECT a.review_revision FROM public.casa_entry_proof_attempts a JOIN public.casa_entries e ON e.current_proof_attempt_id=a.id WHERE e.id=x),
     'rechazada','Comprobante de prueba no válido',2,admin_id);
@@ -480,32 +569,35 @@ BEGIN
   PERFORM pg_temp.ref_reject(y,admin_id);
   ASSERT (SELECT counted_polla_id IS NULL AND counted_entry_id IS NULL AND locked_at IS NOT NULL
     FROM public.casa_referrals WHERE referred_user_id=u), 'released, the referrer stays fixed';
+  ASSERT pg_temp.ref_balance(juan,'counted')=7;
   PERFORM pg_temp.ref_pay(t2,u,admin_id,'0');
   ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=t2, 'counts in the next paid pool';
-  -- Con un pago ya aprobado en otra polla, el ancla pasa ahí de una vez y el
-  -- conteo de allá se rehace: Juan completa 5 en t2 y su regalo aparece.
-  PERFORM pg_temp.ref_pay(t2,juan,admin_id,'3');
+  ASSERT pg_temp.ref_balance(juan,'counted')=8;
+  -- Tres más: 11 en total entre cuatro pollas → segundo cupo de Juan, con su aviso.
   FOR i IN 1..3 LOOP
     x:=pg_temp.ref_user('Ancla '||i);
     ASSERT (public.casa_set_referrer_v1(x,code_juan,'enlace')->>'ok')::boolean;
     PERFORM pg_temp.ref_pay(t2,x,admin_id,'4');
   END LOOP;
+  ASSERT pg_temp.ref_balance(juan,'counted')=11 AND pg_temp.ref_balance(juan,'earned')=2 AND pg_temp.ref_balance(juan,'available')=1,
+    'invitees across pools earn the second cupo';
+  ASSERT (SELECT count(*) FROM public.casa_referral_events WHERE kind='cupo_ganado' AND referrer_user_id=juan)=2;
+  -- Con un pago ya aprobado en otra polla, el ancla pasa ahí de una vez.
   u:=pg_temp.ref_user('Helena');
   ASSERT (public.casa_set_referrer_v1(u,code_juan,'enlace')->>'ok')::boolean;
   x:=pg_temp.ref_pay(t1,u,admin_id,'5');
   PERFORM pg_temp.ref_pay(t2,u,admin_id,'6');
   ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=t1;
-  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=t2 AND user_id=juan AND origin='invitacion'), 'four count in t2';
+  ASSERT pg_temp.ref_balance(juan,'counted')=12;
   PERFORM pg_temp.ref_unpay(x,admin_id);
   ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=t1, 'still t1 while in review';
-  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=t2 AND user_id=juan AND origin='invitacion');
+  ASSERT pg_temp.ref_balance(juan,'counted')=11 AND (public.casa_referral_profile_v1(juan)->>'in_review')::integer=1;
   PERFORM public.casa_review_attempt_v3((SELECT current_proof_attempt_id FROM public.casa_entries WHERE id=x),
     (SELECT a.review_revision FROM public.casa_entry_proof_attempts a JOIN public.casa_entries e ON e.current_proof_attempt_id=a.id WHERE e.id=x),
     'rechazada','Comprobante de prueba no válido',2,admin_id);
   ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=t2, 'moves to the paid cupo in another pool';
-  ASSERT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=t2 AND user_id=juan AND origin='invitacion' AND status='pagada'),
-    'the other pool is recounted at once';
-  RAISE NOTICE 'PASS a reversed anchor moves or is released';
+  ASSERT pg_temp.ref_balance(juan,'counted')=12, 'and counts again at once';
+  RAISE NOTICE 'PASS a reversed anchor moves or is released, and the balance follows';
 
   -- 19) Prender el programa con inscripciones (136/137): cuenta desde ese momento.
   z:=pg_temp.ref_polla(admin_id,'Prender ref',NULL);
@@ -525,19 +617,40 @@ BEGIN
   ASSERT (SELECT referral_since IS NOT NULL FROM public.casa_pollas WHERE id=z), 'it records since when';
   UPDATE public.casa_pollas SET referral_since=clock_timestamp()-interval '1 hour' WHERE id=z;
   -- Desmarcar y volver a aprobar un pago anterior NO lo vuelve retroactivo.
+  n:=pg_temp.ref_balance(ana,'counted');
   PERFORM pg_temp.ref_unpay(y,admin_id);
   PERFORM pg_temp.ref_review(y,admin_id);
   ASSERT (SELECT counted_polla_id IS NULL FROM public.casa_referrals WHERE referred_user_id=x),
     'an entry from before the program never counts';
-  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=z AND origin='invitacion');
+  ASSERT pg_temp.ref_balance(ana,'counted')=n;
   -- Quien paga después sí cuenta.
   u:=pg_temp.ref_user('Después de prender');
   ASSERT (public.casa_set_referrer_v1(u,code_ana,'enlace')->>'ok')::boolean;
   PERFORM pg_temp.ref_pay(z,u,admin_id,'9');
   ASSERT (SELECT counted_polla_id FROM public.casa_referrals WHERE referred_user_id=u)=z, 'from then on it counts';
+  ASSERT pg_temp.ref_balance(ana,'counted')=n+1;
   -- Con inscripciones no se cambia el divisor ni se apaga.
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,1,%L,2)',z,admin_id),'POLLA_HAS_ENTRIES');
   PERFORM pg_temp.ref_must_fail(format('SELECT public.casa_set_referral_every_v1(%L,NULL,%L,2)',z,admin_id),'POLLA_HAS_ENTRIES');
   RAISE NOTICE 'PASS turning it on mid-pool only counts from then on';
+
+  -- 20) Usar el cupo: tope por persona, y una polla anulada lo devuelve.
+  m:=pg_temp.ref_polla(admin_id,'Tope uno ref',5,20000,1);
+  PERFORM pg_temp.ref_pay(m,juan,admin_id,'a');
+  PERFORM pg_temp.ref_must_fail(format('SELECT pg_temp.ref_redeem(%L,%L)',m,juan),'MAX_ENTRIES');
+  ASSERT NOT (public.casa_referral_polla_view_v1(juan,m)->>'can_redeem')::boolean;
+  w:=pg_temp.ref_polla(admin_id,'Anulada ref');
+  ASSERT (public.casa_referral_polla_view_v1(juan,w)->>'can_redeem')::boolean;
+  res:=pg_temp.ref_redeem(w,juan);
+  ASSERT (res->>'created')::boolean AND pg_temp.ref_balance(juan,'available')=0, res::text;
+  PERFORM public.casa_change_status_v2(w,'anular',2,admin_id,NULL);
+  ASSERT pg_temp.ref_balance(juan,'available')=1 AND pg_temp.ref_balance(juan,'used')=1, 'a cancelled pool gives the cupo back';
+  -- Una polla que todavía no abre (publicación programada) tampoco lo recibe.
+  x:=pg_temp.ref_polla(admin_id,'Programada ref');
+  ALTER TABLE public.casa_pollas DISABLE TRIGGER USER;
+  UPDATE public.casa_pollas SET opens_at=clock_timestamp()+interval '30 minutes' WHERE id=x;
+  ALTER TABLE public.casa_pollas ENABLE TRIGGER USER;
+  PERFORM pg_temp.ref_must_fail(format('SELECT pg_temp.ref_redeem(%L,%L)',x,juan),'INSCRIPTIONS_CLOSED');
+  RAISE NOTICE 'PASS the free cupo respects the cap and the window; a cancelled pool returns it';
 END $$;
 ROLLBACK;

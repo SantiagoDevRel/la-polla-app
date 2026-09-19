@@ -70,11 +70,48 @@ jugador: ¿cambia una decisión AHORA? Si no, va en Info.
 `font-size` inline de `<html>`, así que «+60 %» aplica 1,6 × 1,6 = 2,56×. Probar
 layouts nuevos con `localStorage.la_polla_font_scale='lg'` a 320 px.
 
-### Invitaciones y cupos de regalo (2026-09-17, migración 135)
+### Invitaciones y cupos gratis (2026-09-17, migración 135 · conteo GLOBAL desde la 144)
 
-Pedido del dueño: por cada 5 invitados NUEVOS con pago aprobado en una polla, quien
-invitó recibe un cupo gratis en esa polla, sin intervención del admin. Reglas (SQL es
-la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
+**Regla vigente (dueño, 2026-09-19, migración 144):** por cada 5 invitados NUEVOS
+**en total** —no por polla— que entren con el código o el enlace y paguen una polla
+CON ENTRADA, quien invitó gana **un cupo gratis para la polla que quiera**. SQL es la
+autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md).
+
+- **Saldo, no cupo automático.** El cupo ganado queda de saldo
+  (`casa_referral_balance`: `counted / every − puestos ocupados`) y la persona lo usa
+  con «Usar mi cupo gratis» (`casa_referral_redeem_v1`, `POST
+  /api/casa/pollas/[slug]/canjear`, `UsarCupoGratis` en la polla y en /pagar). Nada
+  aparece solo y ya no hace falta tener un cupo pagado propio. El dueño delegó la
+  decisión «entra solo a la próxima polla vs. la persona elige»: se eligió la segunda
+  porque la primera obligaba a adivinar la polla y podía gastar el cupo donde la
+  persona no iba a jugar. Un doble toque en 15 s devuelve el mismo cupo.
+- **Dónde se usa.** Solo en pollas del programa (`casa_referral_every`: con entrada,
+  no rifas, interruptor prendido), publicadas, abiertas y antes del cierre, dentro de
+  `max_entries_per_user`. `casa_pollas.referral_every` ya es solo ese interruptor; el
+  divisor es global: `casa_referral_settings.every` (5).
+- **Las dos reglas que el dueño pidió blindar:** (1) cuenta solo quien entró con el
+  código/enlace (`casa_set_referrer_v1`, persona nueva, un solo invitador); (2) cuenta
+  solo un pago APROBADO mayor a $0 en una polla con entrada — pollas gratis,
+  cortesías ($0), cupos gratis y rifas nunca cuentan.
+- **Fila de cupos entre pollas** (`casa_referral_gift_slots`): cada cupo gratis ocupa
+  un puesto por orden de canje y vale mientras `puesto <= ganados`. Si un pago se
+  desmarca y el conteo baja, el ÚLTIMO cupo en una polla sin repartir queda en pausa
+  (`anulada`, conserva pronósticos) y vuelve al aprobar otra vez — aunque el pago y el
+  cupo estén en pollas distintas (`casa_referral_sync` bloquea la otra polla antes de
+  tocarla; dos recuentos cruzados pueden chocar y se reintenta). Una polla ya repartida
+  nunca se toca. «Remover cupo» conserva su puesto (ese cupo queda gastado); una polla
+  **anulada** devuelve el cupo al saldo.
+- **Pantallas.** Perfil muestra solo esto: barrita de 5 puntos con «2/5»
+  (`referralProgress`; llena 5/5 mientras haya un cupo sin usar), código, Compartir y,
+  con saldo, «Usar mi cupo gratis». La línea «0 invitados con pago · 0 cupos de
+  regalo» se quitó por confusa: **no volver a agregarla**. Las cortesías son OTRA cosa
+  (`MisCortesias`, solo para quien las recibió). El aviso dice «Invita 5 amigos y gana
+  un cupo gratis» (la polla del aviso solo es la que se comparte).
+- **Avisos.** Un evento `cupo_ganado` por cada cupo ganado por primera vez
+  (`casa_referral_claim_credit_notices_v1` → Telegram «¡Ganaste un cupo gratis!»).
+
+Lo que sigue es de la 135 y sigue vigente salvo donde dice «por polla» o «regalo
+automático» (reemplazado por lo de arriba):
 
 - **Código y enlace.** `casa_referral_code_v1` (letras del nombre + 4 dígitos, fijo).
   Compartir agrega `?ref=CODIGO`; `proxy.ts` lo guarda en la cookie httpOnly `lp_ref`
@@ -127,12 +164,14 @@ la autoridad; detalle en [docs/casa-admin-rules.md](docs/casa-admin-rules.md)):
   enlace ni código propio (segundo PR); sí avisa el cupo ganado y «Mis pagos» marca el
   regalo activo como regalo y oculta el pausado (nunca pide comprobante por él).
 - **Textos mínimos** (pedido del dueño): la regla es una frase y la única letra menuda
-  es «*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código, 1
-  polla por usuario.» (`REFERRAL_FINE_PRINT`). Nada de listas de condiciones.
+  es «*Cuenta cada usuario nuevo que entre con tu código o enlace y pague una polla.»
+  (`REFERRAL_FINE_PRINT`, una línea desde la 144). Nada de listas de condiciones.
 - **Orden de despliegue:** migración 135 antes del código (el código lee
   `casa_entries.origin` y `casa_pollas.referral_every`: al revés, Casa entera falla).
-  Aplicarla en UNA transacción. Regresión: `scripts/casa-referrals-check.sql`
-  (ROLLBACK, 18 bloques), `tests/casa-referrals.test.ts`,
+  Aplicarla en UNA transacción. La 144 también va antes del código (conserva las
+  llaves que lee el código anterior y verifica por md5 que las funciones que redefine
+  son las esperadas). Regresión: `scripts/casa-referrals-check.sql`
+  (ROLLBACK, 20 bloques, modelo global), `tests/casa-referrals.test.ts`,
   `tests/telegram-player.test.ts` y `scripts/casa-referrals-browser-check.mjs`
   (dev server local).
 
