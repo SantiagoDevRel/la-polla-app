@@ -76,6 +76,11 @@ describe("cómo se nombra el premio", () => {
     expect(v).not.toMatch(/\$/);
   });
 
+  it("limpia los espacios de más que deja quien escribe el premio a mano", () => {
+    const v = premioValor({ prize_kind: "objeto", prize_object: " DOS ENTRADAS NACIONAL VS MILLONARIOS  ( ORIENTAL O SUR ) ", prize_cop: 0 });
+    expect(v).toBe("DOS ENTRADAS NACIONAL VS MILLONARIOS (ORIENTAL O SUR)");
+  });
+
   it("un premio en dinero conserva la cifra del pozo", () => {
     expect(premioValor({ prize_kind: "pozo", prize_object: null, prize_cop: 1_000_000 })).toBe("$1.000.000");
   });

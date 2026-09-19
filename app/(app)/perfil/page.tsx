@@ -1,9 +1,8 @@
 // app/(app)/perfil/page.tsx — Perfil del usuario "estadio de noche"
-// Avatar, nombre editable, stats, actividad reciente, puntuación, logout
+// Avatar, nombre editable, cuenta de cobro, invitaciones, ajustes, logout
 "use client";
 
 import Link from "next/link";
-import { MyPollas } from "@/components/casa/MyPollas";
 import { InvitacionesPerfil } from "@/components/casa/InvitacionesPerfil";
 import { MisCortesias } from "@/components/casa/MisCortesias";
 
@@ -33,12 +32,6 @@ interface UserProfile {
   default_payout_account_type: PayoutAccountType | null;
 }
 
-interface ActivityItem {
-  matchName: string;
-  pollaName: string;
-  pointsEarned: number;
-}
-
 export default function PerfilPage() {
   const t = useTranslations("Perfil");
   const tCommon = useTranslations("Common");
@@ -47,7 +40,6 @@ export default function PerfilPage() {
   const { showToast } = useToast();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [editName, setEditName] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -71,7 +63,6 @@ export default function PerfilPage() {
           setProfile(data.profile);
           setEditName(data.profile.display_name);
         }
-        if (data.recentActivity) setActivity(data.recentActivity);
       } catch { /* silently fail */ } finally { setLoading(false); }
     }
     load();
@@ -174,16 +165,6 @@ export default function PerfilPage() {
     } catch {
       showToast(t("errClearPayout"), "error");
     }
-  }
-
-  function pointsColorClass(pts: number): string {
-    // Los cortes eran 5 y 2, heredados del puntaje del Mundial donde el
-    // marcador exacto valia 5. En la casa el maximo por partido es 3, asi
-    // que el umbral verde no se alcanzaba NUNCA y todo se veia apagado.
-    // Ahora: 3 = le acertaste de lleno, 1 = le pegaste a algo.
-    if (pts >= 3) return "text-turf";
-    if (pts >= 1) return "text-gold";
-    return "text-text-muted";
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="flex flex-col items-center gap-2"><FootballLoader /><p className="text-text-muted">{t("loading")}</p></div></div>;
@@ -299,9 +280,11 @@ export default function PerfilPage() {
           />
         )}
 
-        {/* Mis pollas (en juego) y Pollas cerradas, como en /casa, pero en dos
-            desplegables compactos y cerrados para no recargar el perfil. */}
-        <MyPollas split defaultOpen={false} />
+        {/* (2026-09-19, pedido del dueño) «Mis pollas» y «Terminadas» salieron de
+            acá: se repetían tal cual en Pollas (/inicio), que es donde se
+            juega. También salió «Actividad reciente»: no ayudaba a decidir
+            nada. El perfil queda para la cuenta: datos, cobro, invitaciones
+            y ajustes. */}
 
         {/* Invitaciones (migración 135). iOS: fuera, como el resto de promociones con premio. */}
         {!isIOSApp && <InvitacionesPerfil />}
@@ -313,37 +296,6 @@ export default function PerfilPage() {
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />
-
-        {/* Actividad reciente */}
-        {activity.length > 0 && (
-          <div className="lp-card p-3.5">
-            <div className="text-[13px] font-bold text-text-primary mb-2.5 flex items-center gap-1.5">
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
-              {t("recentActivity")}
-            </div>
-            {activity.map((item, i) => (
-              <div
-                key={i}
-                className={`flex items-center justify-between py-2 ${
-                  i < activity.length - 1 ? "border-b border-white/5" : ""
-                }`}
-              >
-                <div>
-                  <div className="text-xs font-semibold text-text-primary">{item.matchName}</div>
-                  <div className="text-[10px] text-text-secondary mt-0.5">{item.pollaName}</div>
-                </div>
-                <div className="text-right">
-                  <div className={`font-display text-[20px] ${pointsColorClass(item.pointsEarned)}`}>
-                    +{item.pointsEarned}
-                  </div>
-                  <div className="text-[9px] text-text-muted">{t("pointsLabel")}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* La guia global de puntaje SE FUE de acá (2026-08-25).
             Mostraba la escalera del Mundial — marcador exacto / diferencia de

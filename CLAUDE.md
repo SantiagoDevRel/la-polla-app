@@ -24,6 +24,21 @@ jugador: ¿cambia una decisión AHORA? Si no, va en Info.
   entrar traen el botón «Entrar · $20.000» y no llevan etiqueta «Abierta»; solo
   «Terminadas» se pliega. Secciones vacías no se dibujan. No volver a los tres
   acordeones ni a `auto-rows-fr` (dejaba huecos en una sola columna).
+- **Tarjetas de polla simétricas (2026-09-19, «no podemos ser asimétricos»):** toda
+  tarjeta de polla sale de `components/casa/PollaCard.tsx` (`PollaCardBody`) y mide
+  lo mismo que sus vecinas, escriba lo que escriba el administrador: nombre en UNA
+  línea con «…», torneos en UNA fila (más de seis → «+N»), premio a la izquierda
+  (cifra Bebas 24 px, u objeto en Outfit 15/600 y máximo dos líneas con «…», en la
+  misma caja) y el dato SIEMPRE a la derecha («Cierra en», «En juego» o inscritos).
+  El nombre y el premio completos se leen dentro de la polla. Lo que varía va en un
+  lugar fijo y nunca abre una fila: el aviso «Faltan 3» / «En revisión» va junto al
+  nombre (donde las demás llevan la flecha) y el premio pagado se marca en la
+  etiqueta («✓ Pagado»). En «Para entrar» todas llevan la línea de cómo se juega
+  (`ScoringModeBadge` con `kind`) y el botón. Solo el texto ampliado del teléfono
+  puede hacer crecer una tarjeta (los altos son mínimos y el dato baja alineado a
+  la derecha). No volver a `flex-wrap justify-between` para premio/cierre: al no
+  caber, el cierre caía a la IZQUIERDA. `premioValor` limpia espacios dobles y
+  «( X» al mostrar, sin tocar el dato.
 - **Estados en idioma de jugador** (`pollaStatusLabel`): Abierta (verde) · En
   juego · «Terminó 17 sep» (de `settled_at`). «Cerrada», «Cerrando» y «Resuelta»
   ya no se le muestran a nadie.
@@ -192,7 +207,7 @@ tarjetas compactas y prueba de pago» y [docs/casa-admin-rules.md](docs/casa-adm
   botón de copiar). En la polla, `PruebasDePago` muestra «Pagado · fecha» a
   cualquier sesión, pero la imagen (URL firmada 1 h, `<details>` cerrado) solo se
   firma para admin, ganadores y participantes de esa polla: el pantallazo puede
-  traer la cuenta del ganador. «Pollas cerradas» marca «Premio pagado». La 133
+  traer la cuenta del ganador. «Terminadas» marca «✓ Pagado» en la etiqueta del premio. La 133
   parchea `casa_v2_write_guard` con needle/replacement sobre la definición VIVA
   (como la 105): nunca redefinas ese guard entero, prod ya no es la 100. El
   premio sigue inmutable. Regresión: `scripts/casa-exact-score-check.sql`,
@@ -525,9 +540,10 @@ Para entrar → Terminadas. Mis pollas lleva solo pollas en juego; al finalizar
 (resuelta/anulada) la polla pasa sola a Terminadas con la marca «Participaste», y
 una en juego no se repite allí. Mis pollas y Para entrar salen de una, sin
 desplegable; Terminadas va plegada, en gris translúcido
-(sección `bg-bg-base/45`, logos desaturados). Contenedores `PollaSection`. Perfil (2026-09-17): Mis pollas
-(en juego) y Terminadas (finalizadas, en gris) en dos desplegables compactos
-(`MyPollas split`), ambos cerrados al cargar. Eliminar polla requiere rol admin y un clic de confirmación; no pedir nombre.
+(sección `bg-bg-base/45`, logos desaturados). Contenedores `PollaSection`. Perfil (2026-09-19, pedido
+del dueño): ya NO lista pollas ni «Actividad reciente» — se repetían tal cual en
+Pollas; el perfil es solo la cuenta (datos, cobro, invitaciones, ajustes). No
+volver a agregarlas. Eliminar polla requiere rol admin y un clic de confirmación; no pedir nombre.
 Equipo: Próximos (default) / Pasados / Plantel / Club. Partido: equipos clickeables
 con nombre/escudo centrados y «Ver equipo», marcador central, categorías de estadísticas
 y selector Titulares/Suplentes. Referencia inspeccionada: 365Scores web móvil y app.
@@ -1023,8 +1039,6 @@ cuando el user diga sí/no explícito o se haya completado.
   - **`LiveNow`** (franja En vivo del inicio): conserva los pisos viejos
     (escudos+marcador, nombres, «Tu marcador», «Ver partido»). Pasarla a la fila
     única de `MatchCard`.
-  - **Perfil** repite «Mis pollas» y «Terminadas» del inicio. Decisión de
-    producto: ¿se quitan de Perfil?
   - **Cinta de anuncios** que rueda texto bajo el encabezado («…el alargue no
     cuenta»): se puede cerrar, pero es texto en movimiento en cada pantalla.
   - **`EntrarSheet`, `UnirmeGratis`, vista pública:** frases de 13–20 palabras.
