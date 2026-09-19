@@ -17,6 +17,13 @@
 // code); consulta /status y, si el enlace se abrió en este mismo navegador,
 // ya tiene la sesión y sigue. Si se abrió en otro (el de Telegram), lo explica.
 //
+// Facebook (2026-09-19, migracion 145): si page.tsx dice que esta prendido,
+// el paso del telefono y el del codigo ofrecen «Entrar con Facebook».
+// signInWithOAuth se va a facebook.com y vuelve a /api/auth/facebook/callback,
+// que canjea el code y deja la sesion. El salto a la APP de Facebook lo decide
+// el sistema operativo (Universal/App Links), no este codigo: si no salta, el
+// navegador resuelve el permiso con la sesion que ya tiene abierta.
+//
 // Captcha (2026-09-14): si page.tsx recibe la site key de Turnstile, el paso
 // del teléfono muestra el widget (components/auth/SmsCaptcha.tsx) y el envío
 // del SMS lleva `captchaToken`. Quien decide es Supabase Auth
@@ -33,6 +40,8 @@ import { ArrowLeft, MessageSquare, Loader2, Send } from "lucide-react";
 import axios from "axios";
 import { useTranslations } from "next-intl";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
+import { createClient } from "@/lib/supabase/client";
+import { facebookRedirectUrl } from "@/lib/auth/facebook-login";
 import {
   CAPTCHA_FAILED_CODE,
   COUNTRY_NOT_ALLOWED_CODE,
@@ -52,6 +61,25 @@ import {
   PRIMARY_GLOW,
   SECONDARY_BTN,
 } from "@/components/auth/login-styles";
+
+// Logo de Facebook. lucide-react ya no trae iconos de marca, asi que va
+// inline. El azul es el de la marca y por eso es un atributo del SVG, no una
+// clase: el sistema de color de la app no tiene ese token ni debe tenerlo.
+function FacebookLogo() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-5 h-5 shrink-0"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="#1877F2"
+        d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"
+      />
+    </svg>
+  );
+}
 
 function fmtCOP(n: number): string {
   return `$${n.toLocaleString("es-CO")}`;
@@ -167,7 +195,12 @@ function writeTelegramPending(value: TelegramPending | null) {
   }
 }
 
-function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
+function LoginInner({
+  telegramBotUsername,
+  turnstileSiteKey,
+  smsCaptchaRequired,
+  facebookEnabled,
+}: LoginClientProps) {
   const t = useTranslations("Login");
   const searchParams = useSearchParams();
   const telegramEnabled = Boolean(telegramBotUsername);
@@ -196,6 +229,8 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Facebook: queda en true mientras el navegador se va a facebook.com.
+  const [facebookLoading, setFacebookLoading] = useState(false);
   const [preview, setPreview] = useState<PollaPreview | null>(null);
   // Client-side OTP send cooldown. cooldownUntil is the epoch ms when
   // the user can send again. nowTick triggers a re-render every second
@@ -262,6 +297,15 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
   // server-side justo antes de mintear la sesión nueva, y además el
   // middleware redirige usuarios autenticados fuera de /login.
 
+  // Vuelta de Facebook sin sesion: el callback manda ?fb=cancel (la persona
+  // toco Cancelar) o ?fb=error (algo fallo). Se explica aca, en el mismo
+  // lugar donde ya se leen los errores del SMS, y la via del SMS queda a mano.
+  useEffect(() => {
+    const fb = searchParams.get("fb");
+    if (fb === "cancel") setError(t("fbCancelled"));
+    else if (fb === "error") setError(t("fbError"));
+  }, [searchParams, t]);
+
   // Capturar returnTo + cargar preview de polla si viene de invite link.
   // safeReturnTo: solo paths internos — sin sanitizar, /login?returnTo=
   // https://evil.com era un open redirect post-login (hallazgo codex
@@ -309,6 +353,35 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
     }
     window.location.href = newUser ? "/onboarding" : rt || "/inicio";
   }, []);
+
+  // ── Facebook ────────────────────────────────────────────────────────────
+  //
+  // El destino posterior viaja como `next` en la URL de vuelta: el
+  // sessionStorage sobrevive el viaje, pero la vuelta la resuelve el servidor
+  // y necesita el dato en la URL. safeReturnTo sanea a la ida; el callback
+  // vuelve a sanear a la vuelta.
+  async function startFacebook() {
+    if (facebookLoading) return;
+    setError(null);
+    setFacebookLoading(true);
+    try {
+      const rt = safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY));
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "facebook",
+        options: { redirectTo: facebookRedirectUrl(window.location.origin, rt) },
+      });
+      // Sin error el navegador ya esta saliendo hacia Facebook: dejamos el
+      // boton en espera para que nadie lo toque dos veces.
+      if (oauthError) {
+        setError(t("fbError"));
+        setFacebookLoading(false);
+      }
+    } catch {
+      setError(t("fbError"));
+      setFacebookLoading(false);
+    }
+  }
 
   // PhoneInput emits an E.164 string already (e.g. "+573001234567")
   // or "" while the user types. Si por alguna razón el state quedó
@@ -816,21 +889,38 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
 
             </div>
 
-            {telegramEnabled && (
+            {(telegramEnabled || facebookEnabled) && (
               <div className="space-y-3">
                 <div className="flex items-center gap-3" aria-hidden="true">
                   <span className="h-px flex-1 bg-border-subtle" />
                   <span className="text-xs text-text-muted">{t("tgOr")}</span>
                   <span className="h-px flex-1 bg-border-subtle" />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void startTelegram("input")}
-                  className={SECONDARY_BTN}
-                >
-                  <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
-                  <span>{t("tgUseTelegram")}</span>
-                </button>
+                {telegramEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => void startTelegram("input")}
+                    className={SECONDARY_BTN}
+                  >
+                    <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
+                    <span>{t("tgUseTelegram")}</span>
+                  </button>
+                )}
+                {facebookEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => void startFacebook()}
+                    disabled={facebookLoading}
+                    className={SECONDARY_BTN}
+                  >
+                    {facebookLoading ? (
+                      <Loader2 className="w-5 h-5 shrink-0 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <FacebookLogo />
+                    )}
+                    <span>{t("fbUseFacebook")}</span>
+                  </button>
+                )}
               </div>
             )}
           </form>
@@ -928,19 +1018,36 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
             </button>
           </form>
 
-          {telegramEnabled && (
+          {(telegramEnabled || facebookEnabled) && (
             <div className="space-y-3 border-t border-border-subtle pt-4">
               <p className="text-sm text-text-secondary text-center">
                 {t("tgDidntArrive")}
               </p>
-              <button
-                type="button"
-                onClick={() => void startTelegram("otp")}
-                className={SECONDARY_BTN}
-              >
-                <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
-                <span>{t("tgUseTelegram")}</span>
-              </button>
+              {telegramEnabled && (
+                <button
+                  type="button"
+                  onClick={() => void startTelegram("otp")}
+                  className={SECONDARY_BTN}
+                >
+                  <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
+                  <span>{t("tgUseTelegram")}</span>
+                </button>
+              )}
+              {facebookEnabled && (
+                <button
+                  type="button"
+                  onClick={() => void startFacebook()}
+                  disabled={facebookLoading}
+                  className={SECONDARY_BTN}
+                >
+                  {facebookLoading ? (
+                    <Loader2 className="w-5 h-5 shrink-0 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <FacebookLogo />
+                  )}
+                  <span>{t("fbUseFacebook")}</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1077,15 +1184,23 @@ interface LoginClientProps {
   turnstileSiteKey: string | null;
   /** start-otp exige el token (SMS_CAPTCHA_ENFORCED): nunca enviar sin él. */
   smsCaptchaRequired: boolean;
+  /** FACEBOOK_LOGIN_ENABLED: ofrecer «Entrar con Facebook». */
+  facebookEnabled: boolean;
 }
 
-export default function LoginClient({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
+export default function LoginClient({
+  telegramBotUsername,
+  turnstileSiteKey,
+  smsCaptchaRequired,
+  facebookEnabled,
+}: LoginClientProps) {
   return (
     <Suspense fallback={<div className="min-h-screen" />}>
       <LoginInner
         telegramBotUsername={telegramBotUsername}
         turnstileSiteKey={turnstileSiteKey}
         smsCaptchaRequired={smsCaptchaRequired}
+        facebookEnabled={facebookEnabled}
       />
     </Suspense>
   );

@@ -774,9 +774,61 @@ El trigger `on_match_finished` recalcula puntos cuando el partido pasa a `finish
 
 Botones interactivos vía Meta Cloud API (button + list messages, CTA URL).
 
+### Entrar con Facebook (migración 145)
+
+Tercera puerta de entrada, junto al SMS y a Telegram. Apagada por defecto:
+`FACEBOOK_LOGIN_ENABLED=true` es lo único que la muestra. El proveedor se
+configura en Supabase (Authentication → Providers → Facebook) con el App ID y
+el secreto de la app de Meta; este repo no guarda ninguna de las dos cosas.
+
+Recorrido: `/login` → `signInWithOAuth` → facebook.com → vuelta a
+`/api/auth/facebook/callback` → `exchangeCodeForSession` → `/onboarding` (solo
+falta el pollito, el nombre llega de Facebook) o el destino guardado.
+
+**El salto a la app de Facebook no lo decide este código.** Lo resuelve el
+sistema operativo con sus Universal/App Links. Si no salta, el navegador
+resuelve el permiso con la sesión que la persona ya tiene abierta en
+facebook.com y el resultado es el mismo. En un navegador embebido (el de
+WhatsApp, por ejemplo) esa sesión puede no existir y sí va a pedir credenciales:
+por eso el SMS nunca se quita de la pantalla.
+
+Lo que cambió en la base (migración 145): `users.whatsapp_number` dejó de ser
+obligatorio y el trigger `handle_new_auth_user` ya no escribe el correo en esa
+columna. Antes, un alta sin teléfono fallaba en la base — un correo real no
+cabía en `varchar(20)` y la segunda cuenta sin número chocaba contra el UNIQUE.
+
+Lo que NO resuelve todavía, y hay que tenerlo presente antes de prenderla en
+producción:
+
+- **Una cuenta que entra por Facebook no tiene teléfono.** La casa cruza los
+  comprobantes de Nequi con el número (`/admin/pollas/recibos`,
+  `UserDirectory`), así que esa persona aparece sin número en el panel. Falta
+  pedir y verificar el teléfono en el momento de inscribirse a una polla.
+- **No hay fusión de cuentas.** Quien ya tiene cuenta por SMS y entra por
+  Facebook queda con dos cuentas. Con plata de por medio, esa fusión se decide
+  aparte; no se adivina.
+- **Facebook puede no entregar el correo** (cuentas creadas con teléfono, o
+  permiso desmarcado). Nada del flujo depende del correo, a propósito.
+
+Antes de que entre alguien que no sea tester hay que pasar el App Review de
+Meta (permiso `email`), tener verificación de negocio y publicar el callback de
+borrado de datos. En modo desarrollo solo entran los administradores y testers
+de la app de Meta.
+
+Configuración de Supabase que hay que tocar una vez, en Authentication → URL
+Configuration → Redirect URLs:
+
+```
+https://lapollacolombiana.com/api/auth/facebook/callback
+https://chickenpicks.app/api/auth/facebook/callback
+https://*.vercel.app/api/auth/facebook/callback   # previews
+```
+
+Pruebas: `npx vitest run lib/auth/facebook-login.test.ts`.
+
 ### Login events en /avisos
 
-Cada login exitoso (SMS, magic-link o Telegram) genera una notificación tipo `login_event` con device + ciudad+país (de los headers de Vercel). Aparece en el feed de avisos del usuario.
+Cada login exitoso (SMS, magic-link, Telegram o Facebook) genera una notificación tipo `login_event` con device + ciudad+país (de los headers de Vercel). Aparece en el feed de avisos del usuario.
 
 ---
 

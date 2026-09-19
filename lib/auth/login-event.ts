@@ -12,7 +12,8 @@ import { parseDeviceLabel } from "@/lib/auth/user-agent";
 interface RecordLoginEventParams {
   userId: string;
   // 'telegram' = código o enlace emitido por el bot de login de Telegram.
-  method: "password" | "otp" | "telegram";
+  // 'facebook' = entrada por Facebook (migración 145).
+  method: "password" | "otp" | "telegram" | "facebook";
   request: NextRequest;
 }
 
