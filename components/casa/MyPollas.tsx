@@ -8,7 +8,7 @@ import type { MyCasaPolla } from "@/lib/casa/types";
 import { timeLeft } from "@/lib/casa/format";
 import { premioLabel, premioValor } from "@/lib/casa/premio";
 import { isPollaOpen } from "@/lib/casa/types";
-import { TournamentIdentity } from "./TournamentIdentity";
+import { PollaCardBody, type PollaCardDato } from "./PollaCard";
 import { PollaSection } from "./PollaSection";
 
 const PAGE_SIZE = 5;
@@ -24,10 +24,14 @@ const searchKey = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, 
  * la polla. Eso vive ahora SOLO dentro de la polla (components/casa/
  * Participaciones.tsx), que es donde se pronostica.
  *
- * Lo que queda es una portada: nombre, torneos, pozo, cierre y UNA línea de
- * estado, la más urgente de todas (ver `siguientePaso`). Si no hay nada que
- * hacer no se dice nada: estar en esta lista ya significa que estás dentro, y
- * un «Pagado» verde permanente solo le roba atención al rojo que sí pide algo.
+ * Lo que queda es una portada: nombre, torneos, premio, cierre y UN aviso, el
+ * más urgente de todos (ver `siguientePaso`). Si no hay nada que hacer no se
+ * dice nada: estar en esta lista ya significa que estás dentro, y un «Pagado»
+ * verde permanente solo le roba atención al rojo que sí pide algo.
+ *
+ * (2026-09-19) Todas las tarjetas miden lo mismo (molde en PollaCard.tsx). El
+ * aviso ya no abre una fila propia debajo, que hacía más alta a la polla con
+ * pendientes: va junto al nombre, donde las demás llevan la flecha.
  */
 export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, split = false, flat = false, pendingByPolla = {} }: {
   initialPollas?: MyCasaPolla[]; defaultOpen?: boolean;
@@ -71,10 +75,11 @@ export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false
 
 const isFinished = (p: MyCasaPolla) => p.status === "resuelta" || p.status === "anulada";
 
-type Paso = { texto: string; tono: "urgente" | "espera"; verbo: string } | null;
+type Paso = { texto: string; corto: string; tono: "urgente" | "espera" } | null;
 
 /**
- * La única línea de estado de la tarjeta, por orden de urgencia:
+ * El único aviso de la tarjeta, por orden de urgencia (`corto` es lo que se
+ * ve; `texto`, la frase completa para lectores de pantalla):
  *   1. Te faltan pronósticos (sumados entre todos tus cupos, sin enumerarlos).
  *   2. Un pago en revisión y nada más urgente.
  *   3. Nada. Estás dentro y al día: la tarjeta se calla.
@@ -89,14 +94,14 @@ export function siguientePaso(polla: MyCasaPolla, fallback: number, en: boolean)
     texto: en
       ? `${faltan} ${faltan === 1 ? "prediction" : "predictions"} missing`
       : faltan === 1 ? "Te falta 1 pronóstico" : `Te faltan ${faltan} pronósticos`,
+    corto: en ? `${faltan} missing` : faltan === 1 ? "Falta 1" : `Faltan ${faltan}`,
     tono: "urgente",
-    verbo: en ? "Continue" : "Continuar",
   };
   const revision = polla.entries.some(e => e.status === "pendiente") || (polla.entries.length === 0 && polla.entry_status === "pendiente");
   if (revision) return {
     texto: en ? "Payment under review" : "Pago en revisión",
+    corto: en ? "In review" : "En revisión",
     tono: "espera",
-    verbo: en ? "Open pool" : "Ver polla",
   };
   return null;
 }
@@ -141,43 +146,37 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
             const abierta = !finished && isPollaOpen({ status: polla.status, closes_at: polla.closes_at });
             const cupos = polla.entries.length;
             const premio = premioValor(polla);
+            const dato: PollaCardDato | undefined = finished ? undefined
+              : abierta ? { label: en ? "Closes in" : "Cierra en", value: timeLeft(polla.closes_at), tone: "gold" }
+              : { value: en ? "In play" : "En juego" };
             return <li key={polla.id}>
               {/* Toda la tarjeta es el enlace: un toque, sin elegir cupo antes de entrar. */}
               <Link
                 href={`/polla/${polla.slug}`}
-                className={`lp-card block space-y-3 p-4 transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${finished ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : `bg-bg-elevated border-l-[3px] ${paso?.tono === "urgente" ? "border-l-red-alert" : paso?.tono === "espera" ? "border-l-amber" : "border-l-turf"}`} ${paso?.tono === "urgente" ? "border-red-alert/50" : ""}`}
+                className={`lp-card block p-4 transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${finished ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : `bg-bg-elevated border-l-[3px] ${paso?.tono === "urgente" ? "border-l-red-alert" : paso?.tono === "espera" ? "border-l-amber" : "border-l-turf"}`} ${paso?.tono === "urgente" ? "border-red-alert/50" : ""}`}
               >
-                <div className="flex items-start gap-3">
-                  <h3 className={`min-w-0 flex-1 font-display text-[22px] leading-tight tracking-wide ${finished ? "text-text-secondary" : "text-text-primary"} [overflow-wrap:anywhere]`}>{polla.name}</h3>
-                  {cupos > 1 && <span className="mt-1 shrink-0 text-[13px] tabular-nums text-text-secondary">{cupos} {en ? "entries" : "cupos"}</span>}
-                  <ChevronRight aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-text-secondary" />
-                </div>
-                <TournamentIdentity tournaments={polla.tournaments} kind={polla.kind} />
-
-                {/* Premio y cierre: lo único que de verdad se compara entre pollas.
-                    Un premio en objeto muestra el objeto: «POZO $0» hacía ver una
+                {/* Un premio en objeto muestra el objeto: «POZO $0» hacía ver una
                     polla que regala entradas como una que no reparte nada. */}
-                {(premio !== null || abierta) && <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-                  {premio !== null && <div className="min-w-0">
-                    <span className="lp-label block">{premioLabel(en)}</span>
-                    <span className={`${polla.prize_kind === "objeto" ? "font-semibold" : "lp-money"} mt-0.5 block text-[24px] leading-tight [overflow-wrap:anywhere] ${finished ? "text-text-secondary" : "text-text-primary"}`}>{premio}</span>
-                  </div>}
-                  {abierta && <div className="min-w-0 text-right">
-                    <span className="lp-label block">{en ? "Closes in" : "Cierra en"}</span>
-                    <span className="mt-0.5 block text-[15px] font-semibold text-gold [overflow-wrap:anywhere]">{timeLeft(polla.closes_at)}</span>
-                  </div>}
-                </div>}
-
-                {/* Una sola línea de estado, y solo si hay algo que hacer. */}
-                {paso && <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3">
-                  <span className={`inline-flex min-h-8 items-center gap-2 rounded-full border px-3 text-[13px] font-semibold ${paso.tono === "urgente" ? "border-red-alert/50 bg-red-alert/10 text-red-alert" : "border-amber/50 bg-amber/15 text-amber"}`}>
-                    {paso.tono === "urgente" && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert" />}
-                    {paso.texto}
-                  </span>
-                  <span className="inline-flex min-h-8 items-center gap-1 text-[13px] font-semibold text-text-primary">
-                    {paso.verbo}<ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" />
-                  </span>
-                </div>}
+                <PollaCardBody
+                  name={polla.name}
+                  tournaments={polla.tournaments}
+                  kind={polla.kind}
+                  muted={finished}
+                  premioLabel={premioLabel(en)}
+                  premio={premio}
+                  objeto={polla.prize_kind === "objeto"}
+                  dato={dato}
+                  topRight={<>
+                    {cupos > 1 && <span className="hidden shrink-0 text-[13px] tabular-nums text-text-secondary min-[360px]:inline">{cupos} {en ? "entries" : "cupos"}</span>}
+                    {paso
+                      ? <span className={`inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-semibold ${paso.tono === "urgente" ? "border-red-alert/50 bg-red-alert/10 text-red-alert" : "border-amber/50 bg-amber/15 text-amber"}`}>
+                          {paso.tono === "urgente" && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-alert" />}
+                          <span aria-hidden="true">{paso.corto}</span>
+                          <span className="sr-only">{paso.texto}</span>
+                        </span>
+                      : <ChevronRight aria-hidden="true" className="h-5 w-5 max-w-none shrink-0 text-text-secondary" />}
+                  </>}
+                />
               </Link>
             </li>;
           })}

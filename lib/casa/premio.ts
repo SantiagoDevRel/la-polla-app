@@ -29,7 +29,9 @@ type PremioFuente = {
  */
 export function premioValor(polla: PremioFuente): string | null {
   if (polla.prize_kind === "objeto") {
-    const objeto = (polla.prize_object ?? "").trim();
+    // Lo escribe el administrador a mano: espacios dobles y «( ORIENTAL» se
+    // limpian al mostrar, sin tocar el dato guardado.
+    const objeto = (polla.prize_object ?? "").replace(/\s+/g, " ").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")").trim();
     return objeto.length > 0 ? objeto : null;
   }
   return typeof polla.prize_cop === "number" ? formatCop(polla.prize_cop) : null;
