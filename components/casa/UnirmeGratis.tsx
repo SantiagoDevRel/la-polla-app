@@ -47,12 +47,11 @@ export function UnirmeGratis({ slug, nombre, premio }: {
   return (
     <StreetCard hero className="mt-4 p-4 first:mt-0">
       <h2 className="lp-display-sm text-text-primary">Para participar</h2>
+      {/* (2026-09-19) El párrafo era eco del botón, que ya dice «es gratis»: el
+          botón es el blindaje contra el comprobante de $0, no la frase. */}
       <p className="mt-1 flex items-start gap-2 text-[15px] leading-relaxed text-text-secondary">
         <Ticket className="mt-0.5 h-5 w-5 shrink-0 text-gold" aria-hidden="true" />
-        <span>
-          Entrar a {nombre} es <strong className="font-semibold text-text-primary">gratis</strong>. No tienes que
-          transferir nada ni subir comprobante: te unes y haces tus pronósticos.
-        </span>
+        <span className="min-w-0 [overflow-wrap:anywhere]">Entrar a {nombre} es <strong className="font-semibold text-text-primary">gratis</strong>.</span>
       </p>
       {premio && <p className="mt-2 text-[15px] leading-relaxed text-text-secondary">Se juega <strong className="font-semibold text-text-primary">{premio}</strong>.</p>}
       <button type="button" onClick={unirme} disabled={entrando || listo} className="lp-btn lp-btn-primary mt-4 w-full">

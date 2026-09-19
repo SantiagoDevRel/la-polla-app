@@ -49,7 +49,9 @@ jugador: ¿cambia una decisión AHORA? Si no, va en Info.
   pasaron de y=779 a y≈480–540 a 390 px. No apilar bloques a todo el ancho encima
   de las pestañas.
 - **Pestañas:** ícono + palabra (Partidos/Tabla/Info). Solo ícono se descartó a
-  propósito: escondería Info, que es donde ahora vive toda la explicación.
+  propósito: escondería Info, que es donde ahora vive toda la explicación. El
+  dueño lo confirmó el 2026-09-19 («deja así ícono y texto»): decisión cerrada, no
+  volver a proponer ícono solo.
 - **Tabla:** sin párrafos. «Ganaría $X» bajo el nombre ya cuenta el reparto.
 - **Partido en una fila** (`PicksBoard` → `MatchCard`): línea fina con
   hora/estado a la izquierda y «Tú 2-1 +3» a la derecha; debajo
@@ -66,9 +68,35 @@ jugador: ¿cambia una decisión AHORA? Si no, va en Info.
   de «Prueba de pago» (nombre, monto, «Pagado · fecha» y el comprobante en el
   mismo renglón).
 
-⚠️ Bug conocido, sin tocar: `lib/font-scale.ts` reescribe también el
-`font-size` inline de `<html>`, así que «+60 %» aplica 1,6 × 1,6 = 2,56×. Probar
-layouts nuevos con `localStorage.la_polla_font_scale='lg'` a 320 px.
+**Segunda tanda (2026-09-19, decidida con grok-build y muse a pedido del dueño):**
+- **`/polla/<slug>/pagar`:** es donde la gente PAGA, así que se recortó a medias.
+  Se quedan las frases que evitan un error con plata («Transfiere exactamente
+  $X», «no repitas el pago», cuenta + copiar, una transferencia por cupo). El
+  premio en objeto es «Premio: X», el pozo fijo son filas de cifras («Pozo hoy»,
+  «Mínimo garantizado», «Pozo si entras») y el resto es un enlace «Cómo se gana»
+  a `/polla/<slug>#info-premio` (`VerMasInfo` solo sirve dentro de la polla).
+- **`LiveNow`:** se fueron el párrafo de espera, la caja «Tu marcador:» y «Ver
+  partido» (toda la tarjeta es el enlace); queda una línea «Tú 2-1». NO se pasó
+  a una sola fila: a 320 px con texto ampliado aplasta los nombres.
+- **Cinta de anuncios:** desmontada de `app/(app)/layout.tsx`. La regla de los
+  90 minutos vive en Info → «Qué marcador cuenta». No volver a montarla ni a
+  poner un bloque a todo el ancho con esa frase (`AnnouncementTicker` sigue en
+  disco sin uso).
+- **`EntrarSheet`, `UnirmeGratis`, `CuposForm`, `PagarForm`:** una frase corta
+  cada uno.
+- **`/api/users/me`** ya no calcula ni devuelve `recentActivity` (el Perfil dejó
+  de mostrar «Actividad reciente» en el PR #133; era una consulta sin lector).
+
+**«Tamaño del texto» (arreglado el 2026-09-19, `lib/font-scale.ts`):** (1) el
+barrido inline ya no reescribe `<html>` (antes «+60 %» daba 2,56× y «−30 %»
+0,49×); (2) en el teléfono el control usa `text-size-adjust` en `<html>`, que
+agranda TODO el texto —también las clases en px (`text-[15px]`), que son la
+mayoría en Casa y antes no cambiaban— sin mover el layout. Una sonda mide si el
+navegador obedece la propiedad; si no (escritorio), queda raíz + inline. Nunca
+los dos a la vez. Las celdas con `[-webkit-text-size-adjust:none]` no crecen, a
+propósito. Pruebas: `tests/font-scale.test.ts`. Probar layouts nuevos con
+`localStorage.la_polla_font_scale='lg'` a 320 px **en emulación móvil** (en
+escritorio la sonda da falso y solo crece lo que va en rem).
 
 ### Invitaciones y cupos gratis (2026-09-17, migración 135 · conteo GLOBAL desde la 144)
 
@@ -1064,29 +1092,9 @@ lista y no se vuelve a preguntar.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
-- **«Menos texto», segunda tanda (2026-09-18).** La primera (PR #131) cubrió
-  inicio, polla, Tabla, tarjetas de partido y la puerta de entrada. Quedó sin
-  tocar, y falta que el dueño diga sí/no a cada una:
-  - **Tabla e Info como ícono SOLO.** El dueño lo sugirió («es intuitivo, solo
-    trato de que haya menos cosas»). Se hizo ícono + palabra porque Info es ahora
-    donde vive toda la explicación y un ícono mudo la esconde; grok, muse y la
-    auditoría propia coincidieron. Si igual lo quiere, es una línea en
-    `components/casa/PollaTabs.tsx`.
-  - **`/polla/<slug>/pagar`:** sigue con párrafos de 12–30 palabras (premio en
-    objeto, pozo fijo, «El administrador revisa el comprobante…»). Inventario con
-    archivo:línea en el PR #131.
-  - **`LiveNow`** (franja En vivo del inicio): conserva los pisos viejos
-    (escudos+marcador, nombres, «Tu marcador», «Ver partido»). Pasarla a la fila
-    única de `MatchCard`.
-  - **Cinta de anuncios** que rueda texto bajo el encabezado («…el alargue no
-    cuenta»): se puede cerrar, pero es texto en movimiento en cada pantalla.
-  - **`EntrarSheet`, `UnirmeGratis`, vista pública:** frases de 13–20 palabras.
-  - **Diseño con Claude Design / Lovable:** el dueño lo ofreció; no se usó (se
-    trabajó sobre el sistema «Tribuna Caliente» existente).
-- **Bug de «Tamaño del texto» (2026-09-18).** `lib/font-scale.ts` reescribe
-  también el `font-size` inline de `<html>`, así que «+60 %» aplica 2,56× y
-  «−30 %» 0,49×. Arreglarlo es una línea (saltar `documentElement`), pero le
-  cambia el tamaño a quien ya lo usa: falta el OK del dueño.
+- **Diseño con Claude Design / Lovable (2026-09-18).** El dueño lo ofreció para
+  la tanda de «menos texto»; no se usó (se trabajó sobre el sistema «Tribuna
+  Caliente» existente). Falta que diga si lo quiere para algo puntual.
 
 - **Reparto automático al verificarse el último partido (2026-09-17).** El
   dueño pidió que al terminar la polla «calcules bien los ganadores y muestres

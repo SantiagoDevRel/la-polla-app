@@ -45,8 +45,8 @@ export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
           ))}
         </select>
         <p className="mt-2 text-[13px] text-text-secondary">
-          Cada cupo es una opción más de ganar, con sus propios pronósticos.
-          {available > 1 && ` Puedes tener hasta ${available} ${another ? "cupos más" : "cupos"}.`}
+          Cada cupo lleva sus propios pronósticos.
+          {available > 1 && ` Máximo ${available}${another ? " más" : ""}.`}
         </p>
       </div>
 

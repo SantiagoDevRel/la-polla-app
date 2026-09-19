@@ -14,7 +14,6 @@ import { redirect } from "next/navigation";
 import { ToastProvider } from "@/components/ui/Toast";
 import BottomNav from "@/components/nav/BottomNav";
 import { AppBackground } from "@/components/layout/AppBackground";
-import AnnouncementTicker from "@/components/layout/AnnouncementTicker";
 import BrandHeader from "@/components/layout/BrandHeader";
 import FontScaleApplier from "@/components/layout/FontScaleApplier";
 import { createClient } from "@/lib/supabase/server";
@@ -159,16 +158,13 @@ export default async function AppLayout({
       <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">
         <BrandHeader />
-        {/* La cinta del alargue vuelve a aplicar: hay partidos reales otra
-            vez y el puntaje de la casa se calcula con el marcador de los 90
-            minutos (REGLA #4). El SeasonClosedBanner NO se usa más acá — su
-            copy anuncia que la app se despide, que dejó de ser cierto
-            cuando el producto se relanzó como la casa. El componente sigue
-            existiendo por si alguna vez hay que cerrar de verdad. */}
-        <AnnouncementTicker
-          messageKey="ninetyMinutes"
-          dismissKey="lp_ticker_dismissed:results-90min"
-        />
+        {/* (2026-09-19, segunda tanda de «menos texto») La cinta que rodaba «…el
+            alargue no cuenta» en TODAS las pantallas se quitó: era texto en
+            movimiento que nadie lee y la regla ya vive en Info → «Qué marcador
+            cuenta». Decisión delegada por el dueño; grok y muse coincidieron. El
+            componente AnnouncementTicker se queda en disco por si hay un aviso
+            temporal de verdad, igual que SeasonClosedBanner (su copy anuncia que
+            la app se despide, y eso dejó de ser cierto con el relanzamiento). */}
         {/* Pequeño respiro entre el header sticky y el contenido de la
             página. Antes el "Hola santi" del inicio (y otros titulares)
             quedaban pegados al header. */}

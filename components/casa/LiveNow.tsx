@@ -17,7 +17,7 @@
 
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { TeamCrest } from "@/components/match/TeamCrest";
 import { liveMinuteLabel, pickLabel, pickOnTrack } from "@/lib/casa/live-status";
 import type { CasaLiveMatch } from "@/lib/casa/types";
@@ -119,7 +119,7 @@ function LiveCard({ row }: { row: CasaLiveMatch }) {
       {/* Con el texto del sistema al 200 % la etiqueta no cabe al lado del
           nombre: envuelve a la línea siguiente en vez de aplastarlo a 0 px. */}
       <span className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
-        <span className="min-w-0 text-[12px] font-semibold leading-snug text-text-secondary [overflow-wrap:anywhere]">{row.pollaName}</span>
+        <span title={row.pollaName} className="min-w-[4em] flex-1 truncate text-[12px] font-semibold leading-snug text-text-secondary">{row.pollaName}</span>
         {live ? (
           <span className="lp-label min-w-0 !text-red-alert [overflow-wrap:anywhere]">Vivo{minute ? ` · ${minute}` : ""}</span>
         ) : waiting ? (
@@ -141,12 +141,14 @@ function LiveCard({ row }: { row: CasaLiveMatch }) {
         <span className="min-w-0 [overflow-wrap:anywhere]">{row.homeTeam}</span>
         <span className="min-w-0 [overflow-wrap:anywhere]">{row.awayTeam}</span>
       </span>
-      {waiting && (
-        <span className="text-[12px] leading-snug text-text-secondary">Pasó la hora de inicio y todavía no llega el marcador. Se actualiza solo.</span>
-      )}
-
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border border-border-subtle bg-bg-elevated px-2.5 py-1.5 text-[13px] text-text-secondary">
-        <span>{marcador ? "Tu marcador:" : "Tu pronóstico:"}</span>
+      {/* (2026-09-19, segunda tanda de «menos texto») Se fueron el párrafo de
+          espera (la etiqueta «Esperando datos» ya lo dice), la caja de «Tu
+          marcador:» y «Ver partido» (toda la tarjeta es el enlace). Queda lo que
+          responde «¿voy ganando?»: una línea fina con «Tú 2-1», como MatchCard.
+          No se pasó a UNA sola fila: a 320 px con texto ampliado aplasta los
+          nombres (medido en PicksBoard). */}
+      <span className="mt-auto flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[13px] text-text-secondary">
+        <span>Tú<span className="sr-only">{marcador ? " (tu marcador)" : " (tu pronóstico)"}</span></span>
         {row.picks.length === 0 ? (
           <span className="text-text-muted">sin pronóstico</span>
         ) : row.picks.map((pick, index) => {
@@ -159,9 +161,6 @@ function LiveCard({ row }: { row: CasaLiveMatch }) {
             </span>
           );
         })}
-      </span>
-      <span className="mt-auto flex items-center justify-end gap-0.5 text-[12px] font-semibold text-text-secondary">
-        Ver partido <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />
       </span>
     </Link>
   );
