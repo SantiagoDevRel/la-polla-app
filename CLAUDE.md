@@ -540,9 +540,10 @@ Para entrar → Terminadas. Mis pollas lleva solo pollas en juego; al finalizar
 (resuelta/anulada) la polla pasa sola a Terminadas con la marca «Participaste», y
 una en juego no se repite allí. Mis pollas y Para entrar salen de una, sin
 desplegable; Terminadas va plegada, en gris translúcido
-(sección `bg-bg-base/45`, logos desaturados). Contenedores `PollaSection`. Perfil (2026-09-17): Mis pollas
-(en juego) y Terminadas (finalizadas, en gris) en dos desplegables compactos
-(`MyPollas split`), ambos cerrados al cargar. Eliminar polla requiere rol admin y un clic de confirmación; no pedir nombre.
+(sección `bg-bg-base/45`, logos desaturados). Contenedores `PollaSection`. Perfil (2026-09-19, pedido
+del dueño): ya NO lista pollas ni «Actividad reciente» — se repetían tal cual en
+Pollas; el perfil es solo la cuenta (datos, cobro, invitaciones, ajustes). No
+volver a agregarlas. Eliminar polla requiere rol admin y un clic de confirmación; no pedir nombre.
 Equipo: Próximos (default) / Pasados / Plantel / Club. Partido: equipos clickeables
 con nombre/escudo centrados y «Ver equipo», marcador central, categorías de estadísticas
 y selector Titulares/Suplentes. Referencia inspeccionada: 365Scores web móvil y app.
@@ -1038,8 +1039,6 @@ cuando el user diga sí/no explícito o se haya completado.
   - **`LiveNow`** (franja En vivo del inicio): conserva los pisos viejos
     (escudos+marcador, nombres, «Tu marcador», «Ver partido»). Pasarla a la fila
     única de `MatchCard`.
-  - **Perfil** repite «Mis pollas» y «Terminadas» del inicio. Decisión de
-    producto: ¿se quitan de Perfil?
   - **Cinta de anuncios** que rueda texto bajo el encabezado («…el alargue no
     cuenta»): se puede cerrar, pero es texto en movimiento en cada pantalla.
   - **`EntrarSheet`, `UnirmeGratis`, vista pública:** frases de 13–20 palabras.
