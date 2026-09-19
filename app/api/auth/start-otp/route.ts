@@ -25,6 +25,7 @@ import {
   checkDailySmsCap,
   otpRejectedBeforeSending,
   releaseGenerateAttempt,
+  GENERATE_MAX_POR_HORA,
 } from "@/lib/auth/rate-limit";
 import { normalizePhone } from "@/lib/auth/phone";
 import {
@@ -34,6 +35,7 @@ import {
   SUPPORT_PATH,
 } from "@/lib/auth/otp-codes";
 import { paisSmsPermitido } from "@/lib/sms/paises";
+import { avisarTopeSmsPorHora } from "@/lib/auth/sms-tope-alerta";
 import {
   isCaptchaRejection,
   isSmsCaptchaEnforced,
@@ -164,15 +166,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Rate limit por phone (5 generate-attempts / hora). El verify-otp
+  // Rate limit por phone (10 generate-attempts / hora). El verify-otp
   // tiene su propio limit de 5/15min, pero limitar generates evita
   // que un atacante use signInWithOtp como un canal para inundar
   // costos de SMS.
   const limit = await checkAndRecordAttempt(phoneNormalized, "generate", ip);
   if (limit.blocked) {
+    // El bloqueo deja de ser silencioso: avisa al administrador (una vez por
+    // número y por hora). Es fail-soft y se espera a propósito — en serverless
+    // una promesa suelta se corta cuando la respuesta se va.
+    await avisarTopeSmsPorHora({
+      phone: phoneNormalized,
+      maxPorHora: GENERATE_MAX_POR_HORA,
+      ip,
+      retryAfter: limit.retryAfter,
+    });
     return NextResponse.json(
       {
-        error: "Demasiados intentos. Espera un rato.",
+        error: "Pediste muchos códigos seguidos. Espera unos minutos.",
         retryAfter: limit.retryAfter,
       },
       { status: 429 },
