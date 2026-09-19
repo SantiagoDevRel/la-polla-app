@@ -153,23 +153,31 @@ export interface ReferralPerson {
   code: string | null;
 }
 
-/** casa_referral_polla_view_v1: la polla vista por una persona. */
+/**
+ * casa_referral_polla_view_v1: la polla vista por una persona. Desde la
+ * migración 144 el avance es GLOBAL (de la persona, no de la polla); de la
+ * polla solo sale si participa y si el cupo gratis se puede usar aquí.
+ */
 export interface ReferralPollaView {
   code: string | null;
-  /** null = esta polla no tiene invitaciones. */
+  /** null = esta polla está fuera del programa de invitaciones. */
   every: number | null;
-  /** Invitados que cuentan aquí con un cupo pagado aquí. */
+  /** Invitados con pago aprobado, en total. */
   counted: number;
-  /** Invitados con comprobante en revisión aquí (todavía no cuentan). */
+  /** Invitados con comprobante en revisión (todavía no cuentan). */
   in_review: number;
   earned: number;
-  /** Ganados que valen: sin los que el administrador removió. */
-  gifts: number;
-  /** Ganados que todavía no están activos (falta tu pago o espacio). */
+  /** Cupos gratis ya usados (o removidos por el administrador). */
+  used: number;
+  /** Cupos gratis por usar. */
+  available: number;
+  /** El cupo gratis se puede usar en esta polla ahora mismo. */
+  can_redeem: boolean;
+  /** Ganados que esperan espacio en el tope de esta polla. */
   waiting_gifts: number;
+  /** Cupos gratis activos en esta polla. */
   active_gifts: number;
   removed_gifts: number;
-  owner_paid: boolean;
   slots_left: number;
   referrer: ReferralPerson | null;
   referrer_locked: boolean;
@@ -189,7 +197,15 @@ export interface ReferralInviteeState {
 export interface ReferralProfile {
   code: string | null;
   invited: number;
+  /** Cada cuántos invitados hay un cupo gratis (global, migración 144). */
+  every: number;
+  /** Invitados con pago aprobado, en total. */
   counted: number;
+  in_review: number;
+  earned: number;
+  used: number;
+  /** Cupos gratis por usar, en la polla que la persona elija. */
+  available: number;
   gifts: number;
   referrer: ReferralPerson | null;
   referrer_locked: boolean;

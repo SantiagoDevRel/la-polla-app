@@ -16,7 +16,8 @@ import { PagarForm } from "@/components/casa/PagarForm";
 import { CuposForm } from "@/components/casa/CuposForm";
 import { CopiarDato } from "@/components/casa/CopiarDato";
 import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
-import { getReferralInvitee } from "@/lib/casa/referrals";
+import { getReferralInvitee, getReferralPollaView } from "@/lib/casa/referrals";
+import { UsarCupoGratis } from "@/components/casa/UsarCupoGratis";
 import { REFERRAL_COOKIE, validReferralCode } from "@/lib/casa/referrals-shared";
 import { cookies } from "next/headers";
 
@@ -44,12 +45,14 @@ export default async function PagarPage({
   // pantalla que pedía el pantallazo de una transferencia de $0.
   if (polla.entry_price_cop === 0 && polla.kind !== "rifa") redirect(`/polla/${polla.slug}`);
 
-  const [entries, pot, threshold, invitee] = await Promise.all([
+  const [entries, pot, threshold, invitee, referral] = await Promise.all([
     polla.kind === "rifa" ? Promise.resolve([] as CasaEntry[]) : getMyEntries(polla.id, user.id),
     getPot(polla.id),
     getFixedPrizeThreshold(polla),
     // Invitaciones (migración 135): solo personas nuevas, antes del primer pago aprobado.
     getReferralInvitee(user.id, validReferralCode((await cookies()).get(REFERRAL_COOKIE)?.value)),
+    // Cupo gratis por invitar (migración 144): si tiene saldo y esta polla lo recibe.
+    polla.kind === "rifa" ? Promise.resolve(null) : getReferralPollaView(user.id, polla.id),
   ]);
   const { boleta, participacion } = await searchParams;
 
@@ -132,6 +135,11 @@ export default async function PagarPage({
       <div className="space-y-4 px-4 pt-5">
         {rejected ? <p className="text-[15px] text-text-secondary">Tu comprobante fue rechazado. {rejectReason} Revisa el motivo y consulta con el administrador antes de hacer otra transferencia.</p>
           : recovering && <p className="text-[15px] text-text-secondary">Si ya transferiste, solo completa el comprobante. No repitas el pago.</p>}
+        {/* Antes de hablar de plata: si tiene un cupo gratis por invitar, puede
+            entrar sin transferir. No aplica cuando está completando un comprobante. */}
+        {referral?.can_redeem && !recovering && !resumeOnly && (
+          <UsarCupoGratis slug={polla.slug} disponibles={referral.available} />
+        )}
         {/* Qué pasa con tu plata. Explícito, sin letra chica. */}
         <StreetCard className="p-4">
           <div className="flex items-end justify-between">

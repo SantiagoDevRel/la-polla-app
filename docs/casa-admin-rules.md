@@ -204,6 +204,18 @@ comprobante. No existe «un pago de $100.000 por cinco cupos».
 
 ## Invitaciones y cupos de regalo (2026-09-17, migración 135)
 
+> **Migración 144 (2026-09-19) — el conteo es de la persona, no de la polla.** Por
+> cada `casa_referral_settings.every` (5) invitados nuevos EN TOTAL con un pago
+> aprobado mayor a $0 en una polla con entrada, quien invitó gana un cupo gratis de
+> saldo y lo usa en la polla que quiera (`casa_referral_redeem_v1`; misma ventana que
+> una entrada gratis, dentro del tope por persona, solo en pollas con el interruptor
+> prendido). `casa_referral_balance` es la única cuenta (`counted`, `earned`, `used`,
+> `available`); `casa_referral_gift_slots` ordena los cupos por canje y
+> `casa_referral_sync` pausa/reactiva entre pollas. Ya no se exige un cupo pagado
+> propio, nada se crea solo, un cupo removido sigue gastado y una polla anulada lo
+> devuelve. El panel de cada polla lista los cupos gratis USADOS ahí; «invitados» es
+> el total de la persona. Donde abajo dice «por polla» o «aparece solo», manda esto.
+
 **Reglas del dueño:** por cada `referral_every` (5) personas nuevas que alguien
 invita y que pagan una polla, esa persona recibe un cupo gratis en la misma polla,
 automáticamente. Solo cuentan usuarios nuevos; cada invitado cuenta una vez, en su

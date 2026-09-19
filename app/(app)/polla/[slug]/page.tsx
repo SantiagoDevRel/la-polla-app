@@ -59,6 +59,7 @@ import { Participaciones } from "@/components/casa/Participaciones";
 import { faltanTexto } from "@/lib/casa/participaciones-texto";
 import { ParaParticipar } from "@/components/casa/ParaParticipar";
 import { BarraPagar } from "@/components/casa/BarraPagar";
+import { UsarCupoGratis } from "@/components/casa/UsarCupoGratis";
 import { UnirmeGratis } from "@/components/casa/UnirmeGratis";
 import { PagoConfirmado } from "@/components/casa/PagoConfirmado";
 import { ActivarCortesia } from "@/components/casa/ActivarCortesia";
@@ -69,7 +70,7 @@ import { COURTESY_COOKIE, COURTESY_FINE_PRINT, isCourtesyEntry, validCourtesyCod
 import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { getReferralInvitee, getReferralPollaView } from "@/lib/casa/referrals";
-import { REFERRAL_COOKIE, referralEvery, referralPromo, referralRule, validReferralCode } from "@/lib/casa/referrals-shared";
+import { REFERRAL_COOKIE, isGiftEntry, referralEvery, referralPromo, referralRule, validReferralCode } from "@/lib/casa/referrals-shared";
 import { premioCompartir } from "@/lib/casa/share-text";
 import { InvitaYGana } from "@/components/casa/InvitaYGana";
 import { PromoInvitados } from "@/components/casa/PromoInvitados";
@@ -253,6 +254,9 @@ export default async function PollaPage({
   // Invitaciones: sin código (administradores) no hay regla que ofrecer ni avance.
   const codigo = referral?.code ?? null;
   const promo = abierta ? referralPromo(polla, referral, pot.prize_cop) : null;
+  // Cupo gratis por invitar (migración 144): SQL ya dijo que aquí se puede usar.
+  // Con una cortesía por activar manda la cortesía: un solo cupo gratis a la vez.
+  const usarCupo = Boolean(referral?.can_redeem) && !activarCortesia;
 
   return (
     <div className="pb-32">
@@ -393,7 +397,13 @@ export default async function PollaPage({
               «Compartir», y la cuenta solo existía en /pagar: de ahí salía el
               «no sé dónde pagar». Con una cortesía por activar esto no se
               dibuja — el cupo gratis manda y pagar no viene al caso. */}
-        {mostrarEntrar && !activarCortesia && (gratis ? (
+        {/* Tiene un cupo gratis por invitar y esta polla lo recibe: usarlo es LO
+            primero, esté o no inscrito (si ya juega, es un cupo más). */}
+        {usarCupo && (
+          <UsarCupoGratis slug={polla.slug} disponibles={referral!.available} className="mt-4 first:mt-0" />
+        )}
+
+        {mostrarEntrar && !activarCortesia && !usarCupo && (gratis ? (
           <UnirmeGratis slug={polla.slug} nombre={polla.name} premio={objeto ? polla.prize_object : null} />
         ) : (
           <ParaParticipar
@@ -403,9 +413,9 @@ export default async function PollaPage({
           />
         ))}
 
-        {mostrarEntrar && activarCortesia && (
-          // Con una cortesía por activar, pagar es la opción secundaria: el
-          // dorado se queda en el cupo gratis (y en el pozo), no en dos CTA.
+        {mostrarEntrar && (activarCortesia || usarCupo) && (
+          // Con un cupo gratis por usar (cortesía o invitaciones), pagar es la
+          // opción secundaria: el dorado se queda en el cupo gratis, no en dos CTA.
           <Link href={`/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
             className="lp-btn lp-btn-ghost mt-4 w-full !px-4 first:mt-0">
             {entry ? "Retomar comprobante" : `Pagar la entrada · ${formatCop(polla.entry_price_cop)}`}
@@ -437,6 +447,7 @@ export default async function PollaPage({
           <PagoConfirmado
             entryId={entry.id}
             cortesia={isCourtesyEntry(entry)}
+            gratis={isGiftEntry(entry)}
             cupo={multiple ? entry.entry_number : null}
             abierta={abierta}
           />
@@ -608,7 +619,7 @@ export default async function PollaPage({
             deja de dibujar en cuanto hay una inscripción viva. */}
         {/* Con entrada gratis la barra no se dibuja: el botón «Unirme» ya está
             arriba y no hay nada que pagar ni comprobante que subir. */}
-        {mostrarEntrar && !activarCortesia && !gratis && (
+        {mostrarEntrar && !activarCortesia && !usarCupo && !gratis && (
           <BarraPagar
             href={`/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`}
             entryPriceCop={polla.entry_price_cop}

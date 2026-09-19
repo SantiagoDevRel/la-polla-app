@@ -17,10 +17,12 @@ import { Check, X } from "lucide-react";
 
 const seenKey = (entryId: string) => `lp_pago_ok:${entryId}`;
 
-export function PagoConfirmado({ entryId, cortesia = false, cupo = null, abierta }: {
+export function PagoConfirmado({ entryId, cortesia = false, gratis = false, cupo = null, abierta }: {
   entryId: string;
   /** Con una cortesía nadie pagó nada: decir «confirmamos tu pago» sería falso. */
   cortesia?: boolean;
+  /** Cupo gratis por invitar (migración 144): nadie pagó nada. */
+  gratis?: boolean;
   /** Número de cupo cuando la persona tiene varios. */
   cupo?: number | null;
   abierta: boolean;
@@ -49,7 +51,7 @@ export function PagoConfirmado({ entryId, cortesia = false, cupo = null, abierta
     <div className="mt-4 flex items-center gap-2 rounded-full border border-turf/40 bg-turf/10 py-1 pl-3 pr-1 first:mt-0" role="status">
       <Check aria-hidden="true" className="h-5 w-5 max-w-none shrink-0 text-turf" />
       <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-text-primary [overflow-wrap:anywhere]">
-        {cupo ? `Cupo ${cupo}: ` : ""}{cortesia ? "Cortesía activada" : "Pago confirmado"}{abierta ? ". ¡A pronosticar!" : ""}
+        {cupo ? `Cupo ${cupo}: ` : ""}{cortesia ? "Cortesía activada" : gratis ? "Cupo gratis activado" : "Pago confirmado"}{abierta ? ". ¡A pronosticar!" : ""}
       </p>
       <button
         type="button"

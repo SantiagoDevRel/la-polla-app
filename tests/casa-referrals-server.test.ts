@@ -7,7 +7,8 @@ vi.mock("@/lib/supabase/admin", () => adminFactory);
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/telegram-player/notify", () => ({ notifyReferralGiftByTelegram: vi.fn() }));
 
-import { linkReferralFromCookie } from "@/lib/casa/referrals";
+import { linkReferralFromCookie, notifyReferralGifts, redeemFreeEntry } from "@/lib/casa/referrals";
+import { notifyReferralGiftByTelegram } from "@/lib/telegram-player/notify";
 
 function answer(data: unknown, error: unknown = null) {
   const rpc = vi.fn().mockResolvedValue({ data, error });
@@ -41,5 +42,26 @@ describe("linkReferralFromCookie", () => {
   it("si la base falla, la cookie se conserva para el próximo intento", async () => {
     answer(null, { message: "timeout" });
     await expect(linkReferralFromCookie("u1", "JUANPE4821")).resolves.toEqual({ linked: false, clearCookie: false });
+  });
+});
+
+describe("cupo gratis (migración 144)", () => {
+  it("canjea con el contrato vigente y devuelve el cupo", async () => {
+    const rpc = answer({ ok: true, slug: "pollagol", entry_id: "e1", entry_number: 2, created: true });
+    await expect(redeemFreeEntry("p1", "u1")).resolves.toMatchObject({ entry_number: 2, created: true });
+    expect(rpc).toHaveBeenCalledWith("casa_referral_redeem_v1", { p_polla_id: "p1", p_user_id: "u1", p_contract: 2 });
+  });
+
+  it("propaga el rechazo de SQL (sin saldo, polla cerrada, tope)", async () => {
+    answer(null, { message: "NO_FREE_ENTRY", code: "55000" });
+    await expect(redeemFreeEntry("p1", "u1")).rejects.toMatchObject({ message: "NO_FREE_ENTRY" });
+  });
+
+  it("avisa cada cupo ganado con el total de invitados, y nunca rompe la revisión", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [{ event_id: "v1", user_id: "u1", detail: { invitados: 5, cada: 5 } }], error: null });
+    await notifyReferralGifts({ rpc } as never);
+    expect(rpc).toHaveBeenCalledWith("casa_referral_claim_credit_notices_v1", { p_limit: 20 });
+    expect(notifyReferralGiftByTelegram).toHaveBeenCalledWith(expect.anything(), { userId: "u1", invited: 5 });
+    await expect(notifyReferralGifts({ rpc: vi.fn().mockRejectedValue(new Error("x")) } as never)).resolves.toBeUndefined();
   });
 });

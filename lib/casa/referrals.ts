@@ -8,6 +8,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyReferralGiftByTelegram } from "@/lib/telegram-player/notify";
+import { CASA_CONTRACT } from "./contract";
 import { validReferralCode } from "./referrals-shared";
 import type { ReferralInviteeState, ReferralPerson, ReferralPollaView, ReferralProfile } from "./types";
 
@@ -95,38 +96,43 @@ export async function linkReferralFromCookie(
   }
 }
 
-interface GiftNotice {
+interface CreditNotice {
   event_id: string;
-  polla_id: string;
   user_id: string;
-  entry_id: string;
-  detail: { invitados?: number } | null;
+  detail: { invitados?: number; cada?: number } | null;
 }
 
 /**
- * Avisa por Telegram los cupos de regalo recién creados. Cada aviso se reclama
- * una sola vez en SQL; es mejor esfuerzo y nunca rompe la revisión del pago.
+ * Avisa por Telegram los cupos gratis recién GANADOS (migración 144: el cupo
+ * queda de saldo y la persona elige dónde usarlo). Cada aviso se reclama una
+ * sola vez en SQL; es mejor esfuerzo y nunca rompe la revisión del pago.
  */
 export async function notifyReferralGifts(db: SupabaseClient = createAdminClient()): Promise<void> {
   try {
-    const { data, error } = await db.rpc("casa_referral_claim_gift_notices_v1", { p_limit: 20 });
+    const { data, error } = await db.rpc("casa_referral_claim_credit_notices_v1", { p_limit: 20 });
     if (error || !Array.isArray(data)) return;
-    for (const notice of data as GiftNotice[]) {
-      const [{ data: entry }, { data: polla }] = await Promise.all([
-        db.from("casa_entries").select("entry_number, status")
-          .eq("id", notice.entry_id).eq("user_id", notice.user_id).maybeSingle(),
-        db.from("casa_pollas").select("name, slug").eq("id", notice.polla_id).maybeSingle(),
-      ]);
-      if (!entry || entry.status !== "pagada" || entry.entry_number == null || !polla) continue;
+    for (const notice of data as CreditNotice[]) {
       await notifyReferralGiftByTelegram(db, {
         userId: notice.user_id,
-        pollaName: polla.name,
-        pollaSlug: polla.slug,
-        entryNumber: entry.entry_number,
         invited: Number(notice.detail?.invitados ?? 0),
       });
     }
   } catch (error) {
     console.warn("[casa/referrals] gift notices not sent:", (error as { name?: string }).name);
   }
+}
+
+/**
+ * Usar un cupo gratis en esta polla (migración 144). SQL decide todo: saldo,
+ * ventana de inscripciones, tope por persona y si la polla participa. Un doble
+ * toque devuelve el mismo cupo.
+ */
+export async function redeemFreeEntry(pollaId: string, userId: string): Promise<{
+  ok: boolean; slug: string; entry_id: string; entry_number: number; created: boolean;
+}> {
+  const { data, error } = await createAdminClient().rpc("casa_referral_redeem_v1", {
+    p_polla_id: pollaId, p_user_id: userId, p_contract: CASA_CONTRACT,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; slug: string; entry_id: string; entry_number: number; created: boolean };
 }

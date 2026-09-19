@@ -217,9 +217,9 @@ export function EditarPollaForm({ state }: { state: PollaEditorState }) {
               className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-turf disabled:cursor-default"
             />
             <span className="min-w-0">
-              <span className="block text-[15px] font-semibold text-text-primary">Cupo de regalo por invitar</span>
+              <span className="block text-[15px] font-semibold text-text-primary">Invitaciones en esta polla</span>
               <span id="editar-invitaciones-ayuda" className="mt-1 block text-[13px] text-text-secondary">
-                1 cupo gratis por cada {polla.referral_every ?? DEFAULT_REFERRAL_EVERY} invitados nuevos que paguen. Automático y sin sumar al pozo.{draft.entryPriceCop <= 0 ? " No aplica con entrada gratis." : ""}{hasEntries && (original.referralOn ?? false) ? " Con inscripciones ya no se puede apagar." : ""}
+                Los pagos de esta polla cuentan para las invitaciones ({DEFAULT_REFERRAL_EVERY} invitados = 1 cupo gratis) y aquí se puede usar ese cupo. No suma al pozo.{draft.entryPriceCop <= 0 ? " No aplica con entrada gratis." : ""}{hasEntries && (original.referralOn ?? false) ? " Con inscripciones ya no se puede apagar." : ""}
               </span>
             </span>
           </label>

@@ -4,7 +4,9 @@
 //
 // Pedido del dueño: un aviso para todos los que entren, «Por 5 invitados, te
 // damos un cupo en la OFIGOLAZO», sencillo y llamativo, con el código a mano
-// para copiar. Sale una vez por persona y polla en cada dispositivo; se cierra
+// para copiar. (2026-09-19, migración 144) El cupo ya no es «en la OFIGOLAZO»:
+// es un cupo gratis para la polla que la persona quiera; la polla del aviso solo
+// es la que se comparte. Sale una vez por persona y polla en cada dispositivo; se cierra
 // con la X, Escape o tocando afuera. No aparece en la app de iOS (como el resto
 // de las invitaciones). Qué polla y qué código: referralPromo(), en el servidor.
 
@@ -78,7 +80,7 @@ export function PromoInvitados({ promo, verPolla = false }: {
 
   // El portal va solo después de hidratar: el servidor no pinta nada aquí.
   if (isIOSApp || !mounted) return null;
-  const cada = promo.every === 1 ? "Por cada invitado" : `Por ${promo.every} invitados`;
+  const cada = promo.every === 1 ? "Invita 1 amigo" : `Invita ${promo.every} amigos`;
 
   return createPortal(
     <AnimatePresence>
@@ -120,7 +122,7 @@ export function PromoInvitados({ promo, verPolla = false }: {
             </div>
 
             <h2 id="promo-invitados-titulo" className="mt-3 font-display text-[32px] leading-[1.05] tracking-[0.03em] text-text-primary [overflow-wrap:anywhere]">
-              {cada}, te damos un cupo en la <span className="text-gold">{promo.name}</span>
+              {cada} y gana un <span className="text-gold">cupo gratis</span>
             </h2>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-md border border-dashed border-border-strong px-3 py-2.5">
