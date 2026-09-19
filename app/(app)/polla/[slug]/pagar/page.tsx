@@ -7,8 +7,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyEntries, getPollaBySlug, getPot, getActiveProofs, getOutstandingTicket, getFixedPrizeThreshold } from "@/lib/casa/queries";
-import { FixedPrizeGrowth } from "@/components/casa/FixedPrizeGrowth";
+import { getMyEntries, getPollaBySlug, getPot, getActiveProofs, getOutstandingTicket } from "@/lib/casa/queries";
+import { ChevronRight } from "lucide-react";
 import { DEFAULT_MAX_ENTRIES_PER_USER, isLiveEntry, isPollaOpen, type CasaEntry } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
 import { HeroFrame, Label, StreetCard } from "@/components/street";
@@ -45,10 +45,9 @@ export default async function PagarPage({
   // pantalla que pedía el pantallazo de una transferencia de $0.
   if (polla.entry_price_cop === 0 && polla.kind !== "rifa") redirect(`/polla/${polla.slug}`);
 
-  const [entries, pot, threshold, invitee, referral] = await Promise.all([
+  const [entries, pot, invitee, referral] = await Promise.all([
     polla.kind === "rifa" ? Promise.resolve([] as CasaEntry[]) : getMyEntries(polla.id, user.id),
     getPot(polla.id),
-    getFixedPrizeThreshold(polla),
     // Invitaciones (migración 135): solo personas nuevas, antes del primer pago aprobado.
     getReferralInvitee(user.id, validReferralCode((await cookies()).get(REFERRAL_COOKIE)?.value)),
     // Cupo gratis por invitar (migración 144): si tiene saldo y esta polla lo recibe.
@@ -133,7 +132,12 @@ export default async function PagarPage({
       </HeroFrame>
 
       <div className="space-y-4 px-4 pt-5">
-        {rejected ? <p className="text-[15px] text-text-secondary">Tu comprobante fue rechazado. {rejectReason} Revisa el motivo y consulta con el administrador antes de hacer otra transferencia.</p>
+        {/* (2026-09-19, segunda tanda de «menos texto») En esta pantalla la gente
+            PAGA: solo quedan las frases que evitan un error con plata (no repetir la
+            transferencia, monto exacto, cuenta correcta). Cómo se gana, el empate y
+            cómo crece el pozo viven en Info; aquí hay un enlace. grok y muse
+            coincidieron: recortar de más acá sale más caro que una frase corta. */}
+        {rejected ? <p className="text-[15px] text-text-secondary">Comprobante rechazado. {rejectReason} Revísalo antes de transferir otra vez.</p>
           : recovering && <p className="text-[15px] text-text-secondary">Si ya transferiste, solo completa el comprobante. No repitas el pago.</p>}
         {/* Antes de hablar de plata: si tiene un cupo gratis por invitar, puede
             entrar sin transferir. No aplica cuando está completando un comprobante. */}
@@ -150,10 +154,21 @@ export default async function PagarPage({
               </div>
             </div>
           </div>
-          {polla.prize_kind === "objeto" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary">El premio es <strong className="text-text-primary">{polla.prize_object}</strong>. La inscripción te permite participar por ese objeto. No hay reparto del pozo ni premio adicional en dinero.</p> : polla.pot_mode === "fijo" ? <div className="mt-4 space-y-2 text-[15px] leading-relaxed text-text-secondary">
-            {/* Mínimo garantizado (migración 109). Las cifras salen de casa_payment_details_v2. */}
-            <p>Participas por un pozo de <strong className="text-text-primary">{formatCop(pot.prize_cop)}</strong>{typeof polla.fixed_prize_cop === "number" && <>, con un premio mínimo garantizado de <strong className="text-text-primary">{formatCop(polla.fixed_prize_cop)}</strong></>}. <FixedPrizeGrowth threshold={threshold} /> Si varios ganadores empatan, se divide entre ellos.</p>
-            {pot.projected_prize_cop > pot.prize_cop && <p>Con tu entrada, el pozo queda en <strong className="text-text-primary">{formatCop(pot.projected_prize_cop)}</strong>.</p>}
+          {polla.prize_kind === "objeto" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]">Premio: <strong className="text-text-primary">{polla.prize_object}</strong></p> : polla.pot_mode === "fijo" ? <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
+            {/* Mínimo garantizado (migración 109). Las cifras salen de casa_payment_details_v2.
+                Filas como las del pozo proporcional: cifras, no prosa. */}
+            <div className="flex justify-between gap-3">
+              <span className="text-text-secondary">Pozo hoy</span>
+              <span className="lp-money text-text-primary">{formatCop(pot.prize_cop)}</span>
+            </div>
+            {typeof polla.fixed_prize_cop === "number" && <div className="flex justify-between gap-3">
+              <span className="text-text-secondary">Mínimo garantizado</span>
+              <span className="lp-money text-text-primary">{formatCop(polla.fixed_prize_cop)}</span>
+            </div>}
+            {pot.projected_prize_cop > pot.prize_cop && <div className="flex justify-between gap-3 border-t border-border-subtle pt-1.5">
+              <span className="text-text-secondary">Pozo si entras</span>
+              <span className="lp-money text-text-primary">{formatCop(pot.projected_prize_cop)}</span>
+            </div>}
           </div> : <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
             <div className="flex justify-between">
               <span className="text-text-secondary">
@@ -176,6 +191,9 @@ export default async function PagarPage({
               </span>
             </div>
           </div>}
+          <Link href={`/polla/${polla.slug}#info-premio`} className="mt-2 inline-flex min-h-11 items-center gap-0.5 text-[13px] font-semibold text-text-secondary underline-offset-4 transition-colors hover:text-text-primary hover:underline">
+            Cómo se gana <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+          </Link>
         </StreetCard>
 
         {/* A DÓNDE se transfiere. Sin esto el flujo era imposible de
@@ -201,7 +219,7 @@ export default async function PagarPage({
               </p>
             )}
             <p className="mt-3 border-t border-border-subtle pt-3 text-[12px] text-text-muted">
-              {recovering ? "Verifica que el comprobante corresponda a esta cuenta y súbelo para revisión." : <>Transfiere exactamente {formatCop(entrada)}. Luego subes el comprobante aquí abajo y lo confirmamos.</>}
+              {recovering ? "El comprobante debe ser de esta cuenta." : <>Transfiere exactamente {formatCop(entrada)}.</>}
             </p>
           </StreetCard>
         ) : (
@@ -227,10 +245,7 @@ export default async function PagarPage({
           entryNumber={polla.kind === "rifa" ? undefined : target?.entry_number ?? null}
         />}
 
-        <p className="text-center text-[11px] leading-relaxed text-text-muted">
-          El administrador revisa el comprobante. Se guarda solo para verificar
-          tu pago. Si hay un error, lo rechaza y te avisa.
-        </p>
+        <p className="text-center text-[12px] leading-relaxed text-text-muted">Revisamos tu comprobante y te avisamos.</p>
       </div>
     </div>
   );

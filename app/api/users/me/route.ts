@@ -86,25 +86,8 @@ export async function GET() {
       0,
     );
 
-    // Lo ultimo que sumo puntos, para "actividad reciente".
-    const { data: recentPicks } = await admin
-      .from("casa_picks")
-      .select("points_earned, matches(home_team, away_team), casa_pollas(name)")
-      .eq("user_id", user.id)
-      .gt("points_earned", 0)
-      .order("updated_at", { ascending: false })
-      .limit(3);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const recentActivity = ((recentPicks || []) as any[]).map((r) => {
-      const match = Array.isArray(r.matches) ? r.matches[0] : r.matches;
-      const polla = Array.isArray(r.casa_pollas) ? r.casa_pollas[0] : r.casa_pollas;
-      return {
-        matchName: match ? `${match.home_team} vs ${match.away_team}` : "Pregunta",
-        pollaName: polla?.name || "Polla",
-        pointsEarned: r.points_earned || 0,
-      };
-    });
+    // (2026-09-19) «Actividad reciente» salió del Perfil por decisión del dueño
+    // y con ella la consulta que la alimentaba: nadie la leía.
 
     return NextResponse.json({
       profile: userData,
@@ -117,7 +100,6 @@ export async function GET() {
         bestRank: null,
         totalPoints,
       },
-      recentActivity,
     });
   } catch (error) {
     console.error("Error obteniendo perfil:", error);

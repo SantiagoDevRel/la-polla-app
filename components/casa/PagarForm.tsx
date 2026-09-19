@@ -142,8 +142,8 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         <p className="lp-display-sm text-gold">Pago registrado</p>
         <p className="mt-2 text-[13px] text-text-secondary">
           {esRifa
-            ? "Recibimos tu comprobante. Tu participación se activa cuando confirmemos el pago."
-            : "Recibimos tu comprobante. Ya puedes hacer los pronósticos de este cupo; suma puntos cuando confirmemos el pago."}
+            ? "Comprobante recibido. Te avisamos al confirmar."
+            : "Comprobante recibido. Ya puedes pronosticar; suma al confirmar."}
         </p>
       </StreetCard>
     );
@@ -151,7 +151,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
 
   return (
     <StreetCard className="p-4">
-      {resumeOnly && <p className="mb-4 text-[15px] text-text-secondary">La inscripción cerró. Puedes completar la carga que ya iniciaste; selecciona el mismo comprobante. No repitas la transferencia.</p>}
+      {resumeOnly && <p className="mb-4 text-[15px] text-text-secondary">La inscripción cerró. Sube el mismo comprobante; no vuelvas a transferir.</p>}
       {esRifa && <div className="mb-4"><SelectorBoleta slug={slug} value={ticket} onChange={setTicket} disabled={enviando || resumeOnly} revision={revision} /></div>}
 
       <Label>{slot && slot.total > 1 ? `Comprobante del cupo ${slot.index} de ${slot.total}` : "Comprobante de la transferencia"}</Label>
@@ -206,7 +206,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       {error && (
         <p className="mt-3 border border-red-alert/40 bg-red-alert/10 p-2 text-center text-[13px] text-red-alert">
           {error}
-          <span className="mt-2 block">Si ya transferiste, no repitas el pago. <a href="/soporte" className="underline">Contacta a soporte</a> si no puedes registrar el comprobante.</span>
+          <span className="mt-2 block">Si ya transferiste, no repitas el pago. <a href="/soporte" className="underline">Pide ayuda en Soporte</a>.</span>
         </p>
       )}
 

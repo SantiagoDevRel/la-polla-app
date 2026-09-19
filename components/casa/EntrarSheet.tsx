@@ -114,8 +114,8 @@ export function EntrarSheet({ open, onClose, href, entryPriceCop, slug }: {
 
             <p className="mt-3 text-[15px] leading-relaxed text-text-secondary">
               {gratis
-                ? <>Entrar es gratis: no tienes que transferir nada ni subir comprobante. Para que este marcador cuente, únete a la polla.</>
-                : <>Los partidos los puedes ver sin pagar. Para que este marcador cuente, transfiere {formatCop(entryPriceCop)} y sube el comprobante.</>}
+                ? <>Es gratis. Únete y guarda este marcador.</>
+                : <>Transfiere {formatCop(entryPriceCop)} y sube el comprobante.</>}
             </p>
 
             {gratis ? (
