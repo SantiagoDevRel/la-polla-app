@@ -1,10 +1,14 @@
 // lib/auth/rate-limit.ts — OTP rate limiting using Supabase as backing store
-// Limits: 5 generate attempts per phone per hour, 5 verify attempts per 15 minutes
+// Limits: 10 generate attempts per phone per hour, 5 verify attempts per 15 minutes
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const LIMITS = {
-  generate: { maxAttempts: 5, windowMinutes: 60 },
+  // 2026-09-19: de 5 a 10 por hora, por pedido del dueño. El tope por hora es
+  // ahora el límite que de verdad manda para una persona; cuando alguien lo
+  // toca, start-otp avisa por correo (lib/auth/sms-tope-alerta.ts) en vez de
+  // dejar el bloqueo en silencio.
+  generate: { maxAttempts: 10, windowMinutes: 60 },
   verify: { maxAttempts: 5, windowMinutes: 15 },
   // Join-by-code: 5 attempts per phone per 10 minutes. Tighter than verify
   // so brute-forcing the 32^6 code space is not feasible.
@@ -25,10 +29,18 @@ const LIMITS = {
 // sesión) sin castigar a nadie. Bumpealo si hay quejas de gente sin WhatsApp.
 // 2026-09-15: de 2 a 4 — usuarios reales topaban el cupo al reintentar el login
 // (WhatsApp ya no existe como salida). Con LabsMobile son ~COP 8 por SMS.
-export const DAILY_SMS_CAP = 4;
+//
+// 2026-09-19: de 4 a 30. El 4 era la causa real de "no me llega el SMS": la
+// ventana son 24 HORAS MÓVILES, así que quien pedía 4 códigos un mediodía
+// quedaba sin login hasta el mediodía siguiente, sin haber recibido nada malo
+// del proveedor (caso verificado: un admin gastó 4 el 18-sep entre 10:18 y
+// 11:11, y el 19-sep a las 09:46 seguía bloqueado). El tope por hora (10) es
+// el que gobierna a una persona; este queda solo como techo de abuso diario
+// por número: 30 SMS = ~1,3 créditos LabsMobile (~COP 250) en el peor caso.
+export const DAILY_SMS_CAP = 30;
 
 // IP-based generate limit — cap GENEROSO contra Twilio bill-bombing.
-// El límite por phone (5/hora) NO frena el ataque real: un bot rota
+// El límite por phone (10/hora) NO frena el ataque real: un bot rota
 // 1000 números colombianos random, cada uno es un phone distinto y
 // ninguno pega el límite → 1000 SMS a ~$0.05 = $50.
 //
@@ -44,6 +56,12 @@ export const DAILY_SMS_CAP = 4;
 const IP_GENERATE_WINDOWS = [
   { maxAttempts: 60, windowMinutes: 60 },
 ] as const;
+
+/**
+ * Cuántos códigos puede pedir un mismo número en una hora. Se exporta para que
+ * el aviso al administrador y los textos digan el mismo número que el gate.
+ */
+export const GENERATE_MAX_POR_HORA: number = LIMITS.generate.maxAttempts;
 
 type AttemptType = keyof typeof LIMITS;
 
