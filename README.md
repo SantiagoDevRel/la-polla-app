@@ -781,9 +781,24 @@ Tercera puerta de entrada, junto al SMS y a Telegram. Apagada por defecto:
 configura en Supabase (Authentication → Providers → Facebook) con el App ID y
 el secreto de la app de Meta; este repo no guarda ninguna de las dos cosas.
 
-Recorrido: `/login` → `signInWithOAuth` → facebook.com → vuelta a
-`/api/auth/facebook/callback` → `exchangeCodeForSession` → `/onboarding` (solo
-falta el pollito, el nombre llega de Facebook) o el destino guardado.
+Recorrido: `/login` → **la pregunta** → `signInWithOAuth` → facebook.com →
+vuelta a `/api/auth/facebook/callback` → `exchangeCodeForSession` →
+`/onboarding` (solo falta el pollito, el nombre llega de Facebook) o el destino
+guardado.
+
+**La pregunta va ANTES de salir a Facebook, y eso no es cosmético.** Tocar el
+botón abre un paso que pregunta «¿Ya tienes cuenta en La Polla Colombiana?»,
+sin opción preseleccionada:
+
+- *No, es mi primera vez* → sale a Facebook y se crea la cuenta.
+- *Sí, ya tengo cuenta* → vuelve al paso del número. Entra por SMS a su cuenta
+  de siempre y conecta Facebook después, desde el perfil.
+
+Si se preguntara DESPUÉS, la cuenta de Facebook ya habría nacido, y quien
+contesta «sí tengo» dejaría una cuenta vacía a la que su llave de Facebook
+sigue apuntando: la próxima vez que tocara Facebook volvería a la vacía, no a
+la suya. Mover una identidad de una cuenta a otra no es algo que Supabase
+ofrezca, así que la única salida limpia es que esa cuenta nunca se cree.
 
 **El salto a la app de Facebook no lo decide este código.** Lo resuelve el
 sistema operativo con sus Universal/App Links. Si no salta, el navegador

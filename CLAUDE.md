@@ -606,6 +606,12 @@ nativa lo decide el sistema operativo, no este código: si no salta, el
 navegador resuelve con la sesión de facebook.com. El SMS no se quita nunca de
 la pantalla — en un navegador embebido esa sesión puede no existir.
 
+La pregunta «¿Ya tienes cuenta en La Polla Colombiana?» va ANTES de salir a
+Facebook, sin opción preseleccionada. Preguntar después deja una cuenta vacía a
+la que la llave de Facebook sigue apuntando, y Supabase no mueve identidades
+entre cuentas: la única salida limpia es que esa cuenta no nazca. No cambiar
+ese orden.
+
 La migración 145 permite `users.whatsapp_number` NULL y saca el correo de esa
 columna; sin eso el alta sin teléfono fallaba en la base. No existe fusión de
 cuentas: quien ya entraba por SMS y ahora entra por Facebook queda con dos, y

@@ -19,6 +19,12 @@
 //
 // Facebook (2026-09-19, migracion 145): si page.tsx dice que esta prendido,
 // el paso del telefono y el del codigo ofrecen «Entrar con Facebook».
+// Antes de salir a Facebook se pregunta si ya tiene cuenta (paso «fbAsk»).
+// Va ANTES y no despues a proposito: preguntar despues significa que la cuenta
+// de Facebook ya nacio, y quien contesta «si tengo» dejaria una cuenta vacia a
+// la que su llave de Facebook sigue apuntando — volveria a ella en el proximo
+// intento. Preguntando antes, esa cuenta nunca se crea.
+//
 // signInWithOAuth se va a facebook.com y vuelve a /api/auth/facebook/callback,
 // que canjea el code y deja la sesion. El salto a la APP de Facebook lo decide
 // el sistema operativo (Universal/App Links), no este codigo: si no salta, el
@@ -94,7 +100,7 @@ const RETURN_TO_KEY = "lp_returnTo";
 const OTP_COOLDOWN_MS = 60_000;
 const OTP_COOLDOWN_KEY = "lp_otp_cooldown_until";
 
-type Step = "input" | "otp" | "telegram";
+type Step = "input" | "otp" | "telegram" | "fbAsk";
 
 // Espera de Telegram. En teléfonos con poca memoria el navegador puede recargar
 // la pestaña al volver de Telegram: se guarda el deep link y el vencimiento
@@ -231,6 +237,8 @@ function LoginInner({
   const [error, setError] = useState<string | null>(null);
   // Facebook: queda en true mientras el navegador se va a facebook.com.
   const [facebookLoading, setFacebookLoading] = useState(false);
+  // Eligio «si, ya tengo cuenta»: el paso del telefono explica por que volvio.
+  const [facebookHint, setFacebookHint] = useState(false);
   const [preview, setPreview] = useState<PollaPreview | null>(null);
   // Client-side OTP send cooldown. cooldownUntil is the epoch ms when
   // the user can send again. nowTick triggers a re-render every second
@@ -842,6 +850,12 @@ function LoginInner({
               <PhoneInput onChange={setPhoneE164} countries={PAISES_SMS} />
             </div>
 
+            {facebookHint && (
+              <p className="text-sm text-text-secondary text-center bg-bg-elevated border border-border-subtle rounded-xl p-3">
+                {t("fbAskHint")}
+              </p>
+            )}
+
             {error && (
               <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
                 {error}
@@ -909,7 +923,7 @@ function LoginInner({
                 {facebookEnabled && (
                   <button
                     type="button"
-                    onClick={() => void startFacebook()}
+                    onClick={() => { setError(null); setFacebookHint(false); setStep("fbAsk"); }}
                     disabled={facebookLoading}
                     className={SECONDARY_BTN}
                   >
@@ -1036,7 +1050,7 @@ function LoginInner({
               {facebookEnabled && (
                 <button
                   type="button"
-                  onClick={() => void startFacebook()}
+                  onClick={() => { setError(null); setFacebookHint(false); setStep("fbAsk"); }}
                   disabled={facebookLoading}
                   className={SECONDARY_BTN}
                 >
@@ -1050,6 +1064,61 @@ function LoginInner({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {step === "fbAsk" && (
+        <div className={LOGIN_CARD} data-testid="fb-ask">
+          <div className="space-y-1.5 text-center">
+            <h1 className={LOGIN_TITLE}>{t("fbAskTitle")}</h1>
+            <p className="text-sm text-text-secondary leading-snug">
+              {t("fbAskHelp")}
+            </p>
+          </div>
+
+          {/* Ninguna preseleccionada y hay que elegir una: son excluyentes, por
+              eso son botones y no casillas. */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                setFacebookHint(true);
+                setStep("input");
+              }}
+              className={SECONDARY_BTN}
+            >
+              {/* Cada opción lleva el ícono del camino al que va: el «sí»
+                  termina en un código por SMS, el «no» sale a Facebook. Los
+                  dos botones son idénticos en todo lo demás. */}
+              <MessageSquare className="w-5 h-5 shrink-0" aria-hidden="true" />
+              <span>{t("fbAskYes")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void startFacebook()}
+              disabled={facebookLoading}
+              className={SECONDARY_BTN}
+            >
+              {facebookLoading ? (
+                <Loader2 className="w-5 h-5 shrink-0 animate-spin" aria-hidden="true" />
+              ) : (
+                <FacebookLogo />
+              )}
+              <span>{t("fbAskNo")}</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFacebookHint(false);
+              setStep("input");
+            }}
+            className={GHOST_BTN}
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden="true" />
+            {t("fbAskBack")}
+          </button>
         </div>
       )}
 
