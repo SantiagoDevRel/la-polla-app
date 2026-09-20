@@ -1,7 +1,8 @@
 # Resúmenes de partidos de las pollas
 
-Implementado el 20 de septiembre de 2026. Activación de producción pendiente:
-no se contrató TheSportsDB y la integración permanece apagada por defecto.
+Implementado el 20 de septiembre de 2026. El usuario confirmó que la app no está
+publicada en ninguna tienda y pidió activar el plan gratuito en la web.
+No se contrató TheSportsDB. La integración requiere habilitación explícita.
 
 Integrado sobre la versión de producción `918bba6`, conservando las rutas
 vigentes `/inicio` y `/polla/[slug]`, el login y las invitaciones actuales.
@@ -55,17 +56,19 @@ Servidor únicamente:
 
 ```dotenv
 SPORTSDB_HIGHLIGHTS_ENABLED=true
-SPORTSDB_API_KEY=<clave privada de la suscripción>
+SPORTSDB_API_KEY=123
 ```
 
 Sin habilitación explícita, la ruta responde `enabled:false` y no consulta DB
-ni proveedor de videos después de validar la sesión. En desarrollo se permite
-la clave compartida `123`; producción la rechaza incluso si se configura.
+ni proveedor de videos después de validar la sesión. La clave pública `123`
+funciona también en producción web y es el valor usado si se omite
+`SPORTSDB_API_KEY`. Una clave privada es opcional, no un requisito.
 
-La página de precios anuncia Single Developer a US$9/mes. Sus términos describen
-el acceso gratis para desarrollo y exigen suscripción para publicar en tiendas.
-La publicación comercial y la cobertura deseada deben resolverse antes de
-activar: esta implementación no equivale a autorización para contratar.
+El plan gratuito permite 30 solicitudes por minuto y devuelve resultados
+limitados por consulta. Se comparte la caché de diez minutos entre usuarios.
+No asumir que esta web está publicada en una tienda: el dueño confirmó que no.
+Si se decide distribuir en tiendas en el futuro, revisar entonces las condiciones
+aplicables; no bloquear el despliegue web exigiendo una suscripción no autorizada.
 
 - Precios: <https://www.thesportsdb.com/docs_pricing.php>
 - Condiciones: <https://www.thesportsdb.com/docs_terms_of_use.php>

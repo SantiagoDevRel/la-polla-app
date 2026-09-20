@@ -6,13 +6,15 @@ const match: HighlightMatch = { id: "match", home_team: "Once Caldas", away_team
 const event = { idEvent: "2481179", idLeague: "4497", strHomeTeam: "Once Caldas", strAwayTeam: "Deportivo Cali", strTimestamp: "2026-09-13T20:10:00", strStatus: "FT", strVideo: "https://www.youtube.com/watch?v=FJZvibo9d00" };
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe("highlight provider", () => {
-  it("requires explicit activation and refuses shared free key in production", () => {
+  it("requires explicit activation and permits the free key in web production", () => {
     vi.stubEnv("NODE_ENV", "production"); vi.stubEnv("SPORTSDB_API_KEY", "123"); vi.stubEnv("SPORTSDB_HIGHLIGHTS_ENABLED", "true");
-    expect(highlightsApiKey()).toBeNull();
+    expect(highlightsApiKey()).toBe("123");
+    vi.stubEnv("SPORTSDB_API_KEY", ""); expect(highlightsApiKey()).toBe("123");
     vi.stubEnv("NODE_ENV", "development"); expect(highlightsApiKey()).toBe("123");
     vi.stubEnv("SPORTSDB_HIGHLIGHTS_ENABLED", "false"); expect(highlightsApiKey()).toBeNull();
     vi.stubEnv("NODE_ENV", "production"); vi.stubEnv("SPORTSDB_HIGHLIGHTS_ENABLED", "true"); vi.stubEnv("SPORTSDB_API_KEY", "paid-test-key");
     expect(highlightsApiKey()).toBe("paid-test-key");
+    vi.stubEnv("SPORTSDB_API_KEY", "bad/key"); expect(highlightsApiKey()).toBeNull();
   });
   it("makes no external requests without pool matches", async () => {
     const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
