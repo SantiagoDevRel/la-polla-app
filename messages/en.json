@@ -1028,5 +1028,17 @@
     "deleteSuccess": "Your account was deleted",
     "deleteError": "Couldn't delete the account. Please try again.",
     "oldPollas": "See my old pools"
+  },
+  "Install": {
+    "ariaButton": "Install the app",
+    "ariaButtonIOS": "Install the app on your iPhone",
+    "subtitle": "The icon stays on your screen, one tap away.",
+    "iosTitle": "Install on your iPhone",
+    "iosStep1": "Tap the Share button at the bottom center.",
+    "iosStep2": "Scroll down and tap “Add to Home Screen”.",
+    "iosStep3": "Tap Add. Done, it is on your screen.",
+    "inAppIOS": "You are inside another app. Open it in Safari to install it.",
+    "copyLink": "Copy link",
+    "copyError": "We could not copy the link."
   }
 }
