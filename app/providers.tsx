@@ -107,3 +107,15 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     </>
   );
 }
+
+// Captura un evento suelto desde cualquier componente cliente, reusando la
+// MISMA instancia diferida de arriba: si PostHog todavia no cargo (o no hay
+// key), la llamada se resuelve en no-op sin romper el flujo que la disparo.
+export function captureEvent(
+  name: string,
+  properties?: Record<string, unknown>,
+): void {
+  void getPostHog().then((posthog) => {
+    posthog?.capture(name, properties);
+  });
+}

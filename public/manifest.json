@@ -1,24 +1,71 @@
 {
+  "id": "/casa",
   "name": "La Polla App",
   "short_name": "La Polla",
-  "description": "La mejor polla deportiva de Colombia",
+  "description": "La polla del fin de semana: entras, pronosticas y compites por el pozo.",
+  "lang": "es-CO",
+  "dir": "ltr",
   "start_url": "/casa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#003087",
+  "background_color": "#080c10",
   "theme_color": "#FCD116",
   "orientation": "portrait",
+  "categories": ["sports", "games", "entertainment"],
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512x512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/install/captura-pollas.png",
+      "sizes": "540x1080",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Las pollas del fin de semana"
+    },
+    {
+      "src": "/install/captura-partidos.png",
+      "sizes": "540x1080",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Los partidos del dia"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mis pollas",
+      "short_name": "Mis pollas",
+      "url": "/casa",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Partidos",
+      "short_name": "Partidos",
+      "url": "/futbol",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ]
 }
