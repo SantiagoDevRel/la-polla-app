@@ -621,6 +621,46 @@ el ID público del build con el cliente cada dos minutos visibles y al volver a 
 Perfil ofrece el mismo botón manual. No borrar cookies, storage ni registros del SW.
 La bienvenida presenta nueve logos locales y no lleva crédito personal.
 
+### Instalar la app en la pantalla del teléfono (2026-09-20)
+
+La app siempre fue instalable; lo que faltaba era ofrecerlo. `InstallAppBubble`
+vive en `BrandHeader`, al lado de reportar un problema, y **solo tiene dos
+caras** — la diferencia la pone Apple, no nosotros:
+
+- **`prompt`** — Chrome (Android y escritorio) emitió `beforeinstallprompt`:
+  un toque abre su diálogo y queda instalada. **Sin tutorial, a propósito.**
+- **`ios`** — Safari nunca expuso ese evento; no existe instalar con un clic en
+  iPhone. Se enseñan tres pasos con capturas.
+- Cualquier otro caso **no muestra nada** (decisión del dueño): ya instalada,
+  wrapper Capacitor, o un Android cuyo navegador no puede instalar — el caso
+  típico es el navegador interno de WhatsApp. Un botón que no puede cumplir es
+  peor que ningún botón. **No reintroducir un instructivo de Android.**
+
+Reglas duras:
+
+- La decisión vive en `lib/pwa/install-mode.ts`, función **pura y testeada**
+  (`install-mode.test.ts`). El componente solo lee el entorno y la llama. No
+  duplicar la lógica en el componente ni decidir por modelo de teléfono: para
+  Android manda el EVENTO del navegador, no el User-Agent.
+- El evento se atrapa en un **script inline del `<head>`** (`app/layout.tsx`,
+  `window.__lpInstallEvent`). Chrome lo emite una sola vez por carga y puede
+  llegar antes de que React hidrate o estando en login/onboarding; si solo
+  escucha la burbuja, se pierde y el botón no aparece hasta recargar.
+- **Los íconos son OPACOS.** iOS no admite transparencia: pinta el PNG sobre
+  negro. `app/apple-icon.png` y `icons/icon-{192,512}` van sobre `#080c10`, más
+  variantes `-maskable` con el arte en el 66 % central (el launcher de Android
+  puede recortar hasta un círculo). Si se regenera el pollito, rehornear las
+  cinco y mantener `background_color` igual al fondo del ícono.
+- El manifest necesita `screenshots` o Chrome muestra su diálogo pobre en vez
+  del grande tipo tienda. `id` es `/casa` y **no se cambia**: es lo que conserva
+  la identidad de quien ya tiene la app instalada.
+- Las imágenes de los pasos (`public/install/ios-paso-*.webp`) son capturas de
+  la app real dentro de una réplica de Safari. Sin `next/image` (cuota de Image
+  Optimization, free-tier) y **sin `loading="lazy"`**: dentro del panel con
+  scroll Chrome no lo dispara al montarse la hoja y los tres pasos salían en
+  blanco. No entran al precache del SW.
+- Preview local solo en dev: `?instalar=prompt` y `?instalar=ios`.
+
 ### Veintiún torneos, todos de API-Football (2026-09-18, migración 141)
 
 El dueño pidió once torneos más: Copa Colombia, Brasileirão, Liga MX, Liga

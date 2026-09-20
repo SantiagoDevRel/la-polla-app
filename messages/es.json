@@ -1028,5 +1028,17 @@
     "deleteSuccess": "Tu cuenta fue eliminada",
     "deleteError": "No se pudo eliminar la cuenta. Intenta de nuevo.",
     "oldPollas": "Ver pollas anteriores"
+  },
+  "Install": {
+    "ariaButton": "Instalar la app",
+    "ariaButtonIOS": "Instalar la app en tu iPhone",
+    "subtitle": "Queda el ícono en tu pantalla y entras de una.",
+    "iosTitle": "Instalar en tu iPhone",
+    "iosStep1": "Toca el botón Compartir, abajo en el centro.",
+    "iosStep2": "Baja y toca «Agregar a pantalla de inicio» (en algunos iPhone dice «Añadir»).",
+    "iosStep3": "Toca Agregar. Listo, ya quedó en tu pantalla.",
+    "inAppIOS": "Estás dentro de otra aplicación. Ábrela en Safari para poder instalarla.",
+    "copyLink": "Copiar enlace",
+    "copyError": "No pudimos copiar el enlace."
   }
 }

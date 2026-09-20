@@ -17,6 +17,7 @@
 
 import { useTranslations } from "next-intl";
 import ReportProblemBubble from "@/components/shared/ReportProblemBubble";
+import InstallAppBubble from "@/components/shared/InstallAppBubble";
 
 export default function BrandHeader() {
   const t = useTranslations("Brand");
@@ -86,7 +87,15 @@ export default function BrandHeader() {
             Se cae el gap-2 porque ya no hay dos burbujas que separar; el
             flex-shrink-0 se queda porque con el text-zoom de accesibilidad es
             lo que evita que el wordmark aplaste la burbuja. */}
-        <div className="flex flex-shrink-0 items-center">
+        {/* (2026-09-19) Vuelve a haber DOS burbujas: al lado de "reportar un
+            problema" entra "instalar la app". InstallAppBubble se auto-oculta
+            cuando no aplica (ya instalada, wrapper Capacitor, escritorio), asi
+            que la mayoria de las veces esto sigue siendo un solo boton y el
+            gap-2 no cuesta nada. El flex-shrink-0 se queda: con el text-zoom
+            de accesibilidad es lo que evita que el wordmark aplaste las
+            burbujas — el wordmark clipea (overflow-hidden), los botones no. */}
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <InstallAppBubble />
           <ReportProblemBubble />
         </div>
       </div>
