@@ -11,6 +11,7 @@ import { FootballBack, FootballEmpty, FootballLoading, FootballPhoto, FootballLe
 import { FootballEventIcon, FootballStatIcon } from './FootballIcons';
 import { FootballOptions } from './FootballOptions';
 import { footballStatGroups } from '@/lib/football-stat-groups';
+import { PollaHighlights } from '@/components/highlights/PollaHighlights';
 
 export function FootballPlayerRow({player}:{player:PlayerPerformance}) {
  const locale=useLocale(),en=locale==='en';
@@ -36,8 +37,9 @@ export default function FootballMatchDetail({id,initialLineup=false,initialSide=
  const {data,error,loading,reload}=useFootballResource<FootballDetail>(endpoint,30_000);
  const [view,setView]=useState<'summary'|'stats'|'lineup'>(initialLineup?'lineup':'stats'),[side,setSide]=useState<'home'|'away'>(initialSide);
  const [statGroup,setStatGroup]=useState('general'),[playersView,setPlayersView]=useState<'starters'|'bench'>('starters');
+ const highlights=/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(id)?<PollaHighlights matchId={id}/>:null;
  if(loading)return <main className="space-y-4 px-4"><FootballBack/><FootballLoading/></main>;
- if(!data?.match)return <main className="space-y-4 px-4"><FootballBack/><FootballEmpty title={en?'Match information unavailable':'Información del partido no disponible'} message={en?'Try again shortly.':'Intenta de nuevo en unos momentos.'} onRetry={reload}/></main>;
+ if(!data?.match)return <main className="space-y-4 px-4"><FootballBack/>{highlights}<FootballEmpty title={en?'Match information unavailable':'Información del partido no disponible'} message={en?'Try again shortly.':'Intenta de nuevo en unos momentos.'} onRetry={reload}/></main>;
  const m=data.match,lineup=data.summary.lineups.find(l=>l.side===side);
  const groups=footballStatGroups(data.summary.stats);
  const selectedStats=groups.find(g=>g.id===statGroup)??groups[0];
@@ -65,6 +67,7 @@ export default function FootballMatchDetail({id,initialLineup=false,initialSide=
     {m.venue&&<p className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0"/>{m.venue}</p>}
    </div>
   </section>
+  {highlights}
   <div className="flex overflow-x-auto rounded-xl border border-border-subtle bg-bg-card/90 p-1" role="tablist" aria-label={en?'Match information':'Información del partido'}>
    {(['stats','lineup','summary'] as const).map((tab,i)=>{
     const Icon=[BarChart3,Users,List][i];

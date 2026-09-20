@@ -180,7 +180,7 @@ export async function updateSession(request: NextRequest) {
   // These handlers validate their own session and return JSON 401/403.
   // Redirecting a fetch to login turns an expired session into an HTML parse error.
   const isCasaJsonApi = /^\/api\/casa\/pollas\/[^/]+\/(leaderboard|tickets|award|join|picks|match-picks)\/?$/.test(path)
-    || path === "/api/casa/mis-pollas" || path === "/api/casa/en-vivo"
+    || path === "/api/casa/highlights" || path === "/api/casa/mis-pollas" || path === "/api/casa/en-vivo"
     || path === "/api/casa/referidos" || path === "/api/casa/cortesias"
     || path.startsWith("/api/casa/admin/");
   if (!user && !isPublicRoute && !isApiWebhook && !isCasaPollaPublica && !isCasaJsonApi) {
