@@ -597,32 +597,6 @@ aparte «Terminó el 17 sep 2026» salió de las tarjetas y del encabezado;
 `pollaEndedLabel` (con año) queda para la vista pública y el bot de Telegram. La
 fecha va UNA vez por tarjeta. Contrato en `tests/casa-polla-status-label.test.ts`.
 
-### Entrar con Facebook (2026-09-19, migración 145)
-
-Tercera puerta, apagada salvo `FACEBOOK_LOGIN_ENABLED=true`. El App ID y el
-secreto viven en Supabase, nunca en el repo. `/login` → `signInWithOAuth` →
-`/api/auth/facebook/callback` (canjea el code y abre sesión). El salto a la app
-nativa lo decide el sistema operativo, no este código: si no salta, el
-navegador resuelve con la sesión de facebook.com. El SMS no se quita nunca de
-la pantalla — en un navegador embebido esa sesión puede no existir.
-
-La pregunta «¿Ya tienes cuenta en La Polla Colombiana?» va ANTES de salir a
-Facebook, sin opción preseleccionada. Quien dice que sí entra por SMS y ahí
-mismo se le pega Facebook con `linkIdentity()`: las dos llaves quedan en la
-misma cuenta. Exige «Allow manual linking» encendido en Supabase. Preguntar después deja una cuenta vacía a
-la que la llave de Facebook sigue apuntando, y Supabase no mueve identidades
-entre cuentas: la única salida limpia es que esa cuenta no nazca. No cambiar
-ese orden.
-
-La migración 145 permite `users.whatsapp_number` NULL y saca el correo de esa
-columna; sin eso el alta sin teléfono fallaba en la base. No existe fusión de
-cuentas: quien ya entraba por SMS y ahora entra por Facebook queda con dos, y
-eso se decide aparte porque hay plata de por medio. Una cuenta sin teléfono
-aparece sin número en el panel de comprobantes — pedirlo al inscribirse a una
-polla es el paso que falta, no un detalle cosmético. Nada del flujo depende del
-correo: Facebook puede no entregarlo. Detalle y configuración de Supabase:
-README → «Entrar con Facebook».
-
 ### Navegación y actualización de la app (2026-09-09)
 
 Casa (2026-09-17): En vivo → «¿Alguien te invitó?» (solo personas nuevas, migración
