@@ -607,7 +607,9 @@ navegador resuelve con la sesión de facebook.com. El SMS no se quita nunca de
 la pantalla — en un navegador embebido esa sesión puede no existir.
 
 La pregunta «¿Ya tienes cuenta en La Polla Colombiana?» va ANTES de salir a
-Facebook, sin opción preseleccionada. Preguntar después deja una cuenta vacía a
+Facebook, sin opción preseleccionada. Quien dice que sí entra por SMS y ahí
+mismo se le pega Facebook con `linkIdentity()`: las dos llaves quedan en la
+misma cuenta. Exige «Allow manual linking» encendido en Supabase. Preguntar después deja una cuenta vacía a
 la que la llave de Facebook sigue apuntando, y Supabase no mueve identidades
 entre cuentas: la única salida limpia es que esa cuenta no nazca. No cambiar
 ese orden.

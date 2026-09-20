@@ -19,6 +19,13 @@
 //
 // Facebook (2026-09-19, migracion 145): si page.tsx dice que esta prendido,
 // el paso del telefono y el del codigo ofrecen «Entrar con Facebook».
+// Las dos llaves viven en la MISMA cuenta. Quien ya tiene cuenta entra por
+// SMS y, apenas la sesion existe, se dispara linkIdentity('facebook'): Facebook
+// queda pegado a esa cuenta, no a una nueva. El orden es SMS y despues
+// Facebook, nunca al reves — arrancar por Facebook crea la cuenta antes de que
+// podamos preguntar nada, y una identidad ya pegada a otra cuenta hace fallar
+// linkIdentity (Supabase no mueve identidades entre cuentas).
+//
 // Antes de salir a Facebook se pregunta si ya tiene cuenta (paso «fbAsk»).
 // Va ANTES y no despues a proposito: preguntar despues significa que la cuenta
 // de Facebook ya nacio, y quien contesta «si tengo» dejaria una cuenta vacia a
@@ -92,6 +99,9 @@ function fmtCOP(n: number): string {
 }
 
 const RETURN_TO_KEY = "lp_returnTo";
+// Eligio «si, ya tengo cuenta»: al terminar el SMS hay que pegarle Facebook a
+// esa cuenta. Vive en sessionStorage porque el paso del codigo puede recargar.
+const FB_LINK_KEY = "lp_fb_link_after_login";
 // 60s client-side cooldown after a successful OTP send. Persisted in
 // sessionStorage so a refresh / navigation does not reset it. Server-side
 // (Supabase auth) also rate-limits, but this gives the user a visible
@@ -359,7 +369,46 @@ function LoginInner({
     if (typeof window !== "undefined") {
       window.sessionStorage.removeItem(RETURN_TO_KEY);
     }
-    window.location.href = newUser ? "/onboarding" : rt || "/inicio";
+    const destination = newUser ? "/onboarding" : rt || "/inicio";
+
+    // Pidio entrar con Facebook y resulto que ya tenia cuenta: la sesion ya es
+    // la suya, así que ahora se le pega Facebook a ESTA cuenta. Se intenta
+    // también cuando la cuenta se acaba de crear (dijo «sí» y el número no
+    // tenía cuenta): el resultado buscado es el mismo, una cuenta con las dos
+    // llaves.
+    let wantsFacebook = false;
+    try {
+      wantsFacebook = window.sessionStorage.getItem(FB_LINK_KEY) === "1";
+      window.sessionStorage.removeItem(FB_LINK_KEY);
+    } catch {
+      /* sessionStorage bloqueado: se entra igual, sin vincular */
+    }
+
+    if (!wantsFacebook) {
+      window.location.href = destination;
+      return;
+    }
+
+    void (async () => {
+      try {
+        const supabase = createClient();
+        const { error: linkError } = await supabase.auth.linkIdentity({
+          provider: "facebook",
+          options: { redirectTo: facebookRedirectUrl(window.location.origin, rt) },
+        });
+        if (!linkError) return; // el navegador ya va camino a Facebook
+        // Falla esperable: «Manual linking» apagado en el proyecto, o esa
+        // cuenta de Facebook ya está pegada a otra cuenta. No se bloquea la
+        // entrada — ya tiene sesión — y puede reintentar desde el perfil.
+        console.warn("[login] no se pudo conectar Facebook:", linkError.message);
+      } catch (err) {
+        console.warn(
+          "[login] no se pudo conectar Facebook:",
+          err instanceof Error ? err.message : "desconocido",
+        );
+      }
+      window.location.href = destination;
+    })();
   }, []);
 
   // ── Facebook ────────────────────────────────────────────────────────────
@@ -1082,6 +1131,11 @@ function LoginInner({
             <button
               type="button"
               onClick={() => {
+                try {
+                  window.sessionStorage.setItem(FB_LINK_KEY, "1");
+                } catch {
+                  /* sin sessionStorage entra igual, solo que sin vincular */
+                }
                 setFacebookHint(true);
                 setStep("input");
               }}
@@ -1111,6 +1165,11 @@ function LoginInner({
           <button
             type="button"
             onClick={() => {
+              try {
+                window.sessionStorage.removeItem(FB_LINK_KEY);
+              } catch {
+                /* nada que limpiar */
+              }
               setFacebookHint(false);
               setStep("input");
             }}

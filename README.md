@@ -791,8 +791,15 @@ botón abre un paso que pregunta «¿Ya tienes cuenta en La Polla Colombiana?»,
 sin opción preseleccionada:
 
 - *No, es mi primera vez* → sale a Facebook y se crea la cuenta.
-- *Sí, ya tengo cuenta* → vuelve al paso del número. Entra por SMS a su cuenta
-  de siempre y conecta Facebook después, desde el perfil.
+- *Sí, ya tengo cuenta* → vuelve al paso del número, entra por SMS a su cuenta
+  de siempre y, apenas existe la sesión, se dispara
+  `linkIdentity('facebook')`: **las dos llaves quedan en la misma cuenta.**
+  Desde ahí entra por cualquiera de las dos.
+
+El orden es SMS y después Facebook, nunca al revés. Arrancar por Facebook crea
+la cuenta antes de que podamos preguntar nada, y `linkIdentity()` falla si esa
+identidad ya está pegada a otra cuenta — Supabase no mueve identidades entre
+cuentas. Por eso la pregunta va primero.
 
 Si se preguntara DESPUÉS, la cuenta de Facebook ya habría nacido, y quien
 contesta «sí tengo» dejaría una cuenta vacía a la que su llave de Facebook
@@ -829,6 +836,11 @@ Antes de que entre alguien que no sea tester hay que pasar el App Review de
 Meta (permiso `email`), tener verificación de negocio y publicar el callback de
 borrado de datos. En modo desarrollo solo entran los administradores y testers
 de la app de Meta.
+
+`linkIdentity()` exige **Allow manual linking** encendido en el proyecto
+(Authentication → Sign In / Providers). Estaba apagado al escribir esto. Si
+sigue apagado, la vinculación falla en silencio controlado: la persona entra
+igual por SMS, queda el aviso en consola y puede reintentar desde el perfil.
 
 Configuración de Supabase que hay que tocar una vez, en Authentication → URL
 Configuration → Redirect URLs:
