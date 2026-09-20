@@ -2,7 +2,7 @@
 // 4 tabs: Partidos, Ranking, Pagos, Info — con marcadores Bebas Neue y inputs gold glow
 "use client";
 
-import { COLOMBIA_TIME_ZONE, colombiaDateKey } from "@/lib/time/colombia";
+import { COLOMBIA_TIME_ZONE } from "@/lib/time/colombia";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -232,37 +232,6 @@ function formatKickoffShort(iso: string, locale: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(iso));
-}
-
-// Group by Colombia's calendar day, including users abroad and UTC servers.
-function dateKey(iso: string): string {
-  return colombiaDateKey(iso);
-}
-
-// Human-friendly date header, e.g. "HOY · MIÉ 23 ABR" or "JUEVES 24 ABR".
-function formatDateHeader(
-  iso: string,
-  locale: string,
-  todayLabel: string,
-  tomorrowLabel: string,
-): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const day = colombiaDateKey(d);
-  const sameDay = day === colombiaDateKey(now);
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const isTomorrow = day === colombiaDateKey(tomorrow);
-  const intlTag = locale === "en" ? "en-US" : "es-CO";
-  const base = new Intl.DateTimeFormat(intlTag, {
-    timeZone: COLOMBIA_TIME_ZONE,
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-  }).format(d);
-  const pretty = base.replace(/\./g, "").toUpperCase();
-  if (sameDay) return `${todayLabel} · ${pretty}`;
-  if (isTomorrow) return `${tomorrowLabel} · ${pretty}`;
-  return pretty;
 }
 
 const PHASE_KEYS: Record<string, string> = {
@@ -938,13 +907,8 @@ function MatchRow({
 export default function PollaSlugPage() {
   const t = useTranslations("Detail");
   const tCommon = useTranslations("Common");
-  const tMatch = useTranslations("Match");
   const isIOSApp = useIsIOSApp();
   const locale = useLocale();
-  const tDateLabels = useMemo(
-    () => ({ today: tMatch("today"), tomorrow: tMatch("tomorrow") }),
-    [tMatch],
-  );
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1011,15 +975,10 @@ export default function PollaSlugPage() {
   const [savingAll, setSavingAll] = useState(false);
   const [touchedMatches, setTouchedMatches] = useState<Set<string>>(new Set());
   const [finishedOpen, setFinishedOpen] = useState(false);
-  // Which upcoming-date groups are currently expanded. Defaults to the
-  // earliest date on load so the next action is always visible; users
-  // can collapse days they do not care about and expand the rest.
-  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
-
-  // Group toggle (date vs phase). Solo aparece en pollas single-tournament
-  // del Mundial — para ligas regulares "por fase" no aporta (todo es
-  // regular_season). Pedido user 2026-05-12.
-  const [groupBy, setGroupBy] = useState<"date" | "phase">("date");
+  // En vivo y futuros comparten un solo dropdown abierto por defecto. Los
+  // partidos conservan fecha/hora y estado dentro de cada MatchRow, sin un
+  // segundo acordeón por fecha ("Hoy", "Mañana", etc.).
+  const [upcomingOpen, setUpcomingOpen] = useState(true);
 
   // TeamInfoSheet: equipo tocado (bandera o nombre en una MatchRow).
   // null = cerrado. Feedback user 2026-06-11: "bacano que dieran info
@@ -1050,10 +1009,8 @@ export default function PollaSlugPage() {
   );
 
   // Status-grouped partitions driving the Partidos tab. Timeline order:
-  // Finalizados (collapsed history) → En vivo (locked display) →
-  // Próximos (editable with auto-jump). Locked scheduled matches (kickoff
-  // within 5 min) render alongside live in the En vivo section because
-  // both share the "can no longer predict" behavior.
+  // Finalizados (collapsed history) → Próximos (open by default). The
+  // latter contains both live/locked matches and editable future matches.
   const upcomingMatches = useMemo(
     () => matches.filter((m) => m.status === "scheduled" && !isLocked(m)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1080,78 +1037,14 @@ export default function PollaSlugPage() {
         .sort((a, b) => b.scheduled_at.localeCompare(a.scheduled_at)),
     [matches],
   );
-
-  // Upcoming matches bucketed segun groupBy. Cada grupo trae label propio
-  // (header) — date headers se calculan inline desde el primer scheduled_at;
-  // phase labels se resuelven desde PHASE_KEYS via t().
-  const upcomingByDate = useMemo(() => {
-    const bucketMap = new Map<string, Match[]>();
-    // En iOS forzamos siempre agrupación por fecha (sin etiquetas de
-    // fase tipo "fase de grupos / cuartos / final" — App Store 5.2.1).
-    if (!isIOSApp && groupBy === "phase") {
-      for (const m of upcomingMatches) {
-        const key = m.phase || "unknown";
-        const list = bucketMap.get(key);
-        if (list) list.push(m);
-        else bucketMap.set(key, [m]);
-      }
-      const entries = Array.from(bucketMap.entries()).map(([key, list]) => ({
-        key,
-        label: PHASE_KEYS[key.toLowerCase()] ? t(PHASE_KEYS[key.toLowerCase()]) : t("phaseOther"),
-        matches: list.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at)),
-      }));
-      // Orden cronologico por primer match del grupo (group_stage primero,
-      // final ultimo).
-      entries.sort((a, b) =>
-        (a.matches[0]?.scheduled_at ?? "").localeCompare(b.matches[0]?.scheduled_at ?? ""),
-      );
-      return entries;
-    }
-    // date grouping (default)
-    for (const m of upcomingMatches) {
-      const key = dateKey(m.scheduled_at);
-      const list = bucketMap.get(key);
-      if (list) list.push(m);
-      else bucketMap.set(key, [m]);
-    }
-    return Array.from(bucketMap.entries()).map(([key, list]) => ({
-      key,
-      label: null as string | null,
-      matches: list,
-    }));
-  }, [upcomingMatches, groupBy, t, isIOSApp]);
-
-  // Default state: el grupo de la PRÓXIMA fecha (la más cercana en el
-  // tiempo, sea hoy / mañana / pasado mañana / dentro de una semana)
-  // arranca expandido. Todo el resto cerrado (incluido finalizadas).
-  // Es la primera cosa que el user va a querer pronosticar.
-  // upcomingByDate ya está sorted por kickoff ASC porque
-  // upcomingMatches lo está, así que el primer grupo es siempre el
-  // más próximo. Preservamos toggles previos del user — solo seteamos
-  // mientras el set sigue vacío.
-  useEffect(() => {
-    if (upcomingByDate.length === 0) return;
-    setExpandedDates((prev) => {
-      if (prev.size > 0) return prev;
-      const firstUpcomingKey = upcomingByDate[0]?.key;
-      return firstUpcomingKey ? new Set([firstUpcomingKey]) : new Set();
-    });
-  }, [upcomingByDate]);
-
-  function toggleDate(key: string) {
-    setExpandedDates((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
+  const activeMatches = useMemo(
+    () => [...liveMatches, ...upcomingMatches],
+    [liveMatches, upcomingMatches],
+  );
 
   // Focus the home input of the next upcoming match (after `fromId`).
-  // Only walks the upcoming list so focus never lands on a live /
-  // finished row. If the target match lives in a collapsed date group,
-  // expand it first and defer focus to the next frame so the input DOM
-  // exists when focus() fires.
+  // Only walks the editable upcoming list so focus never lands on a live /
+  // finished row.
   function focusNextUpcomingHome(fromId: string) {
     const idx = upcomingMatches.findIndex((m) => m.id === fromId);
     for (let i = idx + 1; i < upcomingMatches.length; i++) {
@@ -1161,17 +1054,6 @@ export default function PollaSlugPage() {
         el.focus();
         return;
       }
-      const nextKey = dateKey(next.scheduled_at);
-      setExpandedDates((prev) => {
-        if (prev.has(nextKey)) return prev;
-        const updated = new Set(prev);
-        updated.add(nextKey);
-        return updated;
-      });
-      requestAnimationFrame(() => {
-        homeInputRefs.current[next.id]?.focus();
-      });
-      return;
     }
   }
   // PhoneInput emits the full E.164 string (e.g. "+573001234567"). The invite
@@ -1765,7 +1647,7 @@ export default function PollaSlugPage() {
                     <button
                       type="button"
                       onClick={() => setFinishedOpen((v) => !v)}
-                      className="w-full flex items-center justify-between px-1 py-1"
+                      className="w-full flex min-h-11 items-center justify-between rounded-lg px-1 py-1 transition-colors hover:bg-bg-elevated/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
                       aria-expanded={finishedOpen}
                     >
                       <span className="lp-section-title flex items-center gap-2" style={{ fontSize: 14 }}>
@@ -1807,150 +1689,68 @@ export default function PollaSlugPage() {
                   </div>
                 )}
 
-                {/* ── En vivo — live + locked-scheduled; non-editable display ── */}
-                {liveMatches.length > 0 && (
+                {/* ── Próximos — un solo dropdown abierto por defecto.
+                    Reúne partidos en vivo, bloqueados y futuros; cada MatchRow
+                    conserva su estado y fecha/hora, sin acordeones anidados por
+                    "Hoy", "Mañana" o jornada. ── */}
+                {activeMatches.length > 0 && (
                   <div className="space-y-2">
-                    <h3 className="lp-section-title flex items-center gap-2 px-1" style={{ fontSize: 14 }}>
-                      <span className="w-2 h-2 rounded-full bg-red-alert animate-pulse" />
-                      {t("liveSection")}
-                      <span className="text-text-primary/60 font-normal">· {liveMatches.length}</span>
-                    </h3>
-                    <div className="space-y-3">
-                      {liveMatches.map((match) => (
-                        <MatchRow
-                          key={match.id}
-                          match={match}
-                          pred={getPred(match.id)}
-                          draft={drafts[match.id]}
-                          editable={false}
-                          touched={touchedMatches.has(match.id)}
-                          onDraftChange={() => { /* not editable */ }}
-                          onJumpNext={() => { /* not editable */ }}
-                          homeRef={null}
-                          awayRef={null}
-                          tournamentSlug={polla.tournament}
-                          {...predProps(match.id)}
-                          locked={isLocked(match)}
-                          missingPredictions={missingByMatch.get(match.id) ?? []}
-                          onTeamClick={openTeamSheet}
-                          advanceEnabled={advanceActiveFor(match)}
-                          score120Enabled={score120ActiveFor(match)}
-                          onAdvanceChange={() => { /* not editable */ }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Próximos — grouped by kickoff day; each day is a
-                    plain collapsible (no surrounding card). First day
-                    expanded by default. Auto-jump across days works
-                    because focusNextUpcomingHome auto-expands the
-                    target group when it is collapsed. ── */}
-                {upcomingMatches.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="lp-section-title flex items-center gap-2 px-1" style={{ fontSize: 14 }}>
-                      <Clock className="w-3.5 h-3.5 text-gold" />
-                      {t("upcomingSection")}
-                      <span className="text-text-primary/60 font-normal">· {upcomingMatches.length}</span>
-                    </h3>
-                    {/* Toggle date/phase: solo Mundial single-tournament.
-                        En iOS lo ocultamos — solo agrupación por fecha,
-                        sin etiquetas de fase (fase de grupos, cuartos,
-                        final, etc) que invocan estructuras de torneos
-                        de marcas registradas. App Store 5.2.1. */}
-                    {!isIOSApp && polla.tournament === "worldcup_2026" && (polla.tournaments?.length ?? 1) === 1 && (
-                      <div className="flex gap-2 px-1" role="tablist" aria-label={t("groupByLabel")}>
-                        <button
-                          role="tab"
-                          aria-selected={groupBy === "date"}
-                          onClick={() => setGroupBy("date")}
-                          className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
-                            groupBy === "date"
-                              ? "bg-gold/10 text-gold border border-gold/30"
-                              : "bg-card border border-subtle text-text-secondary hover:border-gold/20"
-                          }`}
-                        >
-                          {t("groupByDate")}
-                        </button>
-                        <button
-                          role="tab"
-                          aria-selected={groupBy === "phase"}
-                          onClick={() => setGroupBy("phase")}
-                          className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
-                            groupBy === "phase"
-                              ? "bg-gold/10 text-gold border border-gold/30"
-                              : "bg-card border border-subtle text-text-secondary hover:border-gold/20"
-                          }`}
-                        >
-                          {t("groupByPhase")}
-                        </button>
+                    <button
+                      type="button"
+                      onClick={() => setUpcomingOpen((v) => !v)}
+                      className="w-full flex min-h-11 items-center justify-between rounded-lg px-1 py-1 transition-colors hover:bg-bg-elevated/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+                      aria-expanded={upcomingOpen}
+                    >
+                      <span className="lp-section-title flex items-center gap-2" style={{ fontSize: 14 }}>
+                        <Clock className="w-3.5 h-3.5 text-text-primary/70" aria-hidden="true" />
+                        {t("upcomingSection")}
+                        <span className="text-text-primary/60 font-normal">· {activeMatches.length}</span>
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-text-primary/70 transition-transform ${upcomingOpen ? "rotate-180" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    {upcomingOpen && (
+                      <div className="space-y-3">
+                        {activeMatches.map((match) => {
+                          const editable = match.status === "scheduled" && !isLocked(match);
+                          return (
+                            <MatchRow
+                              key={match.id}
+                              match={match}
+                              pred={getPred(match.id)}
+                              draft={drafts[match.id]}
+                              editable={editable}
+                              touched={touchedMatches.has(match.id)}
+                              onDraftChange={editable ? (side, val) => {
+                                const cur = drafts[match.id] ?? { home: "", away: "" };
+                                setDrafts((prev) => ({ ...prev, [match.id]: { ...cur, [side]: val } }));
+                                setTouchedMatches((prev) => new Set(prev).add(match.id));
+                                if (side === "home" && val.length >= 1) {
+                                  awayInputRefs.current[match.id]?.focus();
+                                }
+                              } : () => { /* not editable */ }}
+                              onJumpNext={editable ? () => focusNextUpcomingHome(match.id) : () => { /* not editable */ }}
+                              homeRef={editable ? (el) => { homeInputRefs.current[match.id] = el; } : null}
+                              awayRef={editable ? (el) => { awayInputRefs.current[match.id] = el; } : null}
+                              tournamentSlug={polla.tournament}
+                              {...predProps(match.id)}
+                              locked={isLocked(match)}
+                              missingPredictions={missingByMatch.get(match.id) ?? []}
+                              onTeamClick={openTeamSheet}
+                              advanceEnabled={advanceActiveFor(match)}
+                              score120Enabled={score120ActiveFor(match)}
+                              onAdvanceChange={editable ? (val) => {
+                                const cur = drafts[match.id] ?? { home: "", away: "" };
+                                setDrafts((prev) => ({ ...prev, [match.id]: { ...cur, advance: val } }));
+                                setTouchedMatches((prev) => new Set(prev).add(match.id));
+                              } : () => { /* not editable */ }}
+                            />
+                          );
+                        })}
                       </div>
                     )}
-                    {upcomingByDate.map((group) => {
-                      const open = expandedDates.has(group.key);
-                      return (
-                        <div key={group.key} className="space-y-2">
-                          <button
-                            type="button"
-                            onClick={() => toggleDate(group.key)}
-                            className="w-full flex items-center justify-between px-1 py-1"
-                            aria-expanded={open}
-                          >
-                            <span className="text-[11px] font-bold tracking-[0.08em] uppercase text-text-primary/80">
-                              {group.label ?? formatDateHeader(
-                                group.matches[0].scheduled_at,
-                                locale,
-                                tDateLabels.today,
-                                tDateLabels.tomorrow,
-                              )}
-                              <span className="text-text-primary/50 font-normal ml-1.5">· {group.matches.length}</span>
-                            </span>
-                            <ChevronDown
-                              className={`w-4 h-4 text-text-primary/70 transition-transform ${open ? "rotate-180" : ""}`}
-                              aria-hidden="true"
-                            />
-                          </button>
-                          {open && (
-                            <div className="space-y-3">
-                              {group.matches.map((match) => (
-                                <MatchRow
-                                  key={match.id}
-                                  match={match}
-                                  pred={getPred(match.id)}
-                                  draft={drafts[match.id]}
-                                  editable={true}
-                                  touched={touchedMatches.has(match.id)}
-                                  onDraftChange={(side, val) => {
-                                    const cur = drafts[match.id] ?? { home: "", away: "" };
-                                    setDrafts((prev) => ({ ...prev, [match.id]: { ...cur, [side]: val } }));
-                                    setTouchedMatches((prev) => new Set(prev).add(match.id));
-                                    if (side === "home" && val.length >= 1) {
-                                      awayInputRefs.current[match.id]?.focus();
-                                    }
-                                  }}
-                                  onJumpNext={() => focusNextUpcomingHome(match.id)}
-                                  homeRef={(el) => { homeInputRefs.current[match.id] = el; }}
-                                  awayRef={(el) => { awayInputRefs.current[match.id] = el; }}
-                                  tournamentSlug={polla.tournament}
-                                  {...predProps(match.id)}
-                                  locked={isLocked(match)}
-                                  missingPredictions={missingByMatch.get(match.id) ?? []}
-                                  onTeamClick={openTeamSheet}
-                                  advanceEnabled={advanceActiveFor(match)}
-                                  score120Enabled={score120ActiveFor(match)}
-                                  onAdvanceChange={(val) => {
-                                    const cur = drafts[match.id] ?? { home: "", away: "" };
-                                    setDrafts((prev) => ({ ...prev, [match.id]: { ...cur, advance: val } }));
-                                    setTouchedMatches((prev) => new Set(prev).add(match.id));
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
                   </div>
                 )}
 
