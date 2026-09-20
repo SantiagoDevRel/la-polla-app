@@ -51,6 +51,19 @@ function isCapacitorShell(): boolean {
   return typeof cap?.isNativePlatform === "function" && cap.isNativePlatform();
 }
 
+// El evento que atrapo el script del <head> (ver app/layout.tsx). Chrome lo
+// emite una sola vez por carga y puede llegar antes de que esto se monte —
+// estando en login/onboarding, por ejemplo — asi que no alcanza con escuchar
+// desde aca: hay que recoger tambien el que ya paso.
+function tomarEventoGuardado(): BeforeInstallPromptEvent | null {
+  const w = window as unknown as { __lpInstallEvent?: BeforeInstallPromptEvent | null };
+  return w.__lpInstallEvent ?? null;
+}
+
+function olvidarEventoGuardado(): void {
+  (window as unknown as { __lpInstallEvent?: unknown }).__lpInstallEvent = null;
+}
+
 // Todo lo que el resolver necesita saber del telefono, leido una sola vez.
 function readEnvironment(hasInstallPrompt: boolean) {
   return {
@@ -89,7 +102,12 @@ export default function InstallAppBubble({
     if (isStandalone() || isCapacitorShell()) return;
 
     setInApp(isInAppBrowser(navigator.userAgent));
-    setMode(resolveInstallMode(readEnvironment(false)));
+
+    // Primero el que ya paso (lo tiene el script del head), despues los que
+    // lleguen mientras la persona navega.
+    const yaEmitido = tomarEventoGuardado();
+    if (yaEmitido) setDeferred(yaEmitido);
+    setMode(resolveInstallMode(readEnvironment(Boolean(yaEmitido))));
 
     const onBeforeInstall = (event: Event) => {
       // Sin preventDefault Chrome decide solo cuando mostrar su barrita. Nos
@@ -103,6 +121,7 @@ export default function InstallAppBubble({
       setMode("hidden");
       setOpen(false);
       setDeferred(null);
+      olvidarEventoGuardado();
       captureEvent("pwa_installed");
     };
 
@@ -143,9 +162,11 @@ export default function InstallAppBubble({
       captureEvent("pwa_install_choice", { outcome });
       // El evento es de un solo uso; Chrome lo vuelve a emitir si hace falta.
       setDeferred(null);
+      olvidarEventoGuardado();
       if (outcome === "dismissed") setMode("hidden");
     } catch {
       setDeferred(null);
+      olvidarEventoGuardado();
       setMode("hidden");
     }
   }, [deferred]);
