@@ -1302,6 +1302,33 @@ están documentadas en migration 056-057.
 
 ---
 
+## Puertas de entrada: SMS y Telegram. Nada más. (2026-09-20)
+
+Decisión cerrada del dueño, tomada y confirmada el mismo día. **No re-proponer
+Facebook, Google ni código al correo.** Si hace falta una alternativa nueva,
+que la pida él.
+
+- **El registro es SIEMPRE por número de celular.** Una cuenta = un teléfono.
+- **Telegram es la alternativa, y también registra.**
+  `resolveAccountForVerifiedPhone` (`lib/auth/phone-session.ts`) hace
+  find-or-create con el número que Telegram verifica, así que la cuenta nace
+  con teléfono igual. Eso ya cubre el caso «no me llega el SMS» sin abrir una
+  segunda identidad.
+- **Por qué no un proveedor externo:** una cuenta sin número no se cruza con un
+  comprobante de Nequi en `/admin/pollas/recibos`. En un producto donde la
+  gente manda dinero real, ese pago queda sin dueño. Esa es la razón de fondo,
+  no el costo de implementarlo.
+- **El «no me llega el SMS» casi nunca fue el operador:** era el tope propio,
+  que corría sobre 24 h móviles. Arreglado el 19-sep (10/hora + aviso al
+  administrador). Antes de proponer una puerta nueva por ese síntoma, mirá el
+  tope.
+
+Historia: el 19-sep se construyó login con Facebook (PR #137, migración 145) y
+se retiró el 20-sep sin llegar a usarse (PR #141). La migración 145 se queda
+—está aplicada en prod— y dejó `users.whatsapp_number` aceptando NULL; ninguna
+cuenta quedó sin número. El proveedor Facebook de Supabase está deshabilitado y
+sin App ID.
+
 ## Auth model (current — 2026-04)
 
 - Login: phone (solo 9 países: CO, US, PA, AR, PE, CL, BR, EC, ES — lista única en
