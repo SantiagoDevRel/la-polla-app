@@ -102,6 +102,9 @@ export function PollaHighlights({ polla, matchId, className = "" }: Props) {
   if (matchId && feed?.matchCount === 0) return null;
   // At Colombia midnight never label yesterday's cached response as today.
   const videos = feed && (matchId || feed.day === colombiaDateKey(new Date())) ? feed.videos : [];
+  // Keep polling while hidden, but do not reserve space or show an empty,
+  // loading or error state. This discovery section only exists with content.
+  if (!feed || videos.length === 0) return null;
   const title = matchId ? (en ? "Match highlights" : "Resumen del partido") : (en ? "Today's highlights" : "Resúmenes de hoy");
   return <section aria-labelledby={titleId} className={`min-w-0 space-y-3 ${className}`} data-polla-highlights>
     <div className="flex items-start gap-3">
@@ -120,10 +123,8 @@ export function PollaHighlights({ polla, matchId, className = "" }: Props) {
         </button>)}
       </div>}
     </div>
-    {!feed && !failed ? <div role="status" aria-label={en ? "Loading highlights" : "Cargando resúmenes"} className="flex gap-3 overflow-hidden">
-      {[0, 1].map(i => <div key={i} className="w-[260px] max-w-full shrink-0 space-y-3 rounded-lg border border-border-subtle p-3 motion-safe:animate-pulse"><div className="aspect-video rounded-md bg-bg-elevated" /><div className="h-5 w-4/5 rounded bg-bg-elevated" /></div>)}
-    </div> : <>
-      {videos.length > 0 && <div ref={scroller} role="region" aria-label={title} tabIndex={0}
+    <>
+      <div ref={scroller} role="region" aria-label={title} tabIndex={0}
         className="lp-hscroll flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto overscroll-x-contain pb-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">
         {videos.map(video => <article key={video.matchId} className="lp-card flex w-[260px] max-w-full shrink-0 snap-start flex-col overflow-hidden !p-0">
           <button type="button" onClick={() => setSelected(video)} aria-label={`${en ? "Watch highlights" : "Ver resumen"}: ${video.title}`}
@@ -141,16 +142,13 @@ export function PollaHighlights({ polla, matchId, className = "" }: Props) {
             </span>
           </button>
         </article>)}
-      </div>}
+      </div>
       {(failed || feed?.partial) && <div role="status" className="rounded-lg border border-border-subtle bg-bg-card/80 p-3 text-[13px] leading-relaxed text-text-secondary">
         <p>{en ? "Some highlights couldn't be loaded." : "No pudimos cargar todos los resúmenes."}</p>
         <button type="button" onClick={retry} className="mt-2 min-h-11 cursor-pointer rounded-full border border-border-subtle px-4 font-semibold transition-colors hover:bg-bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">{en ? "Try again" : "Reintentar"}</button>
       </div>}
-      {!failed && !feed?.partial && videos.length === 0 && <p className="rounded-lg border border-border-subtle bg-bg-card/80 p-4 text-[13px] leading-relaxed text-text-secondary">{matchId
-        ? (en ? "The video highlights haven't been published yet." : "El video del resumen aún no está disponible.")
-        : (en ? "Today's highlights will appear here as they become available after the matches." : "Los resúmenes de hoy aparecerán aquí cuando estén disponibles después de los partidos.")}</p>}
-      {videos.length > 0 && <a href="https://www.thesportsdb.com" target="_blank" rel="noopener noreferrer" className="inline-block rounded text-[13px] leading-relaxed text-text-muted underline underline-offset-4 hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">{en ? "Videos found with TheSportsDB" : "Videos encontrados con TheSportsDB"}</a>}
-    </>}
+      <a href="https://www.thesportsdb.com" target="_blank" rel="noopener noreferrer" className="inline-block rounded text-[13px] leading-relaxed text-text-muted underline underline-offset-4 hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">{en ? "Videos found with TheSportsDB" : "Videos encontrados con TheSportsDB"}</a>
+    </>
     {selected && <VideoDialog video={selected} en={en} onClose={() => setSelected(null)} />}
   </section>;
 }

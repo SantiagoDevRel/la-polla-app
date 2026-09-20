@@ -23,7 +23,9 @@ no se contrató TheSportsDB y la integración permanece apagada por defecto.
   ni API de YouTube antes de esa acción. Cerrar o pulsar Escape detiene el video
   y devuelve el foco. No hay reproducción automática al abrir el inicio.
 - El cliente actualiza cada cinco minutos visibles y al volver a la pestaña.
-  Vacío, error y respuesta parcial tienen estados distintos y reintento.
+  La sección completa permanece oculta durante la carga, ante un error y cuando
+  hay cero videos; solo aparece con uno o más resúmenes válidos. Una respuesta
+  parcial conserva el aviso y reintento si ya existe al menos un video visible.
 
 ## Disponibilidad real de reproducción
 
