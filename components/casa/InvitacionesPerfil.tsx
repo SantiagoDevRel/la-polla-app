@@ -18,6 +18,8 @@ import { REFERRAL_FINE_PRINT, referralLink, referralMissing, referralProgress } 
 import type { ReferralInviteeState, ReferralProfile } from "@/lib/casa/types";
 import { CopiarDato } from "./CopiarDato";
 import { QuienTeInvito } from "./QuienTeInvito";
+import { shareLink } from "@/lib/casa/share-link";
+import { useToast } from "@/components/ui/Toast";
 
 type Data = { profile: ReferralProfile; invitee: ReferralInviteeState };
 
@@ -25,6 +27,7 @@ export function InvitacionesPerfil() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -44,16 +47,11 @@ export function InvitacionesPerfil() {
 
   async function compartir() {
     const url = referralLink("https://lapollacolombiana.com", null, code);
-    const texto = `Te invito a La Polla Colombiana. Usa mi código ${code} al inscribirte.`;
-    if (navigator.share) {
-      try { await navigator.share({ title: "La Polla Colombiana", text: texto, url }); return; }
-      catch (cause) { if (cause instanceof DOMException && cause.name === "AbortError") return; }
-    }
     try {
-      await navigator.clipboard.writeText(`${texto}\n${url}`);
+      if (await shareLink(url) !== "copied") return;
       setCopiado(true);
       window.setTimeout(() => setCopiado(false), 2200);
-    } catch { /* El código queda visible para copiarlo a mano. */ }
+    } catch { showToast("No pudimos compartir el enlace. Intenta de nuevo.", "error"); }
   }
 
   return (
@@ -99,7 +97,7 @@ export function InvitacionesPerfil() {
         </div>
         <button type="button" onClick={compartir} className="lp-btn lp-btn-ghost min-h-11 w-full gap-2 text-[15px]">
           <Share2 aria-hidden="true" className="h-4 w-4 shrink-0" />
-          <span aria-live="polite">{copiado ? "Mensaje copiado" : "Compartir mi invitación"}</span>
+          <span aria-live="polite">{copiado ? "Enlace copiado" : "Compartir mi invitación"}</span>
         </button>
         <p className="text-[13px] italic text-text-muted">{REFERRAL_FINE_PRINT}</p>
       </section>

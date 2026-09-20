@@ -1288,8 +1288,11 @@ Por cada 5 personas nuevas que alguien invita y pagan una polla, esa persona
 recibe un cupo gratis en la misma polla. Nadie en la administración tiene que
 hacer nada.
 
-- **Invitar.** Compartir agrega `?ref=CODIGO` al enlace y el mensaje dice el
-  código. Junto a Compartir, «Invita y gana» muestra la regla en una frase, el
+- **Invitar.** Compartir envía o copia solo el enlace directo con `?ref=CODIGO`,
+  sin texto promocional (2026-09-20). Las cortesías conservan `?cortesia=CODIGO`
+  al compartir o copiar; Perfil conserva su enlace general con invitación.
+  Cancelar no modifica el portapapeles y un fallo muestra un aviso.
+  Junto a Compartir, «Invita y gana» muestra la regla en una frase, el
   avance (`Llevas 3 de 5`), el código para copiar y una sola letra menuda
   («*Solo aplica para usuarios nuevos que entren con tu enlace o pongan tu código,
   1 polla por usuario.»); en Perfil está el
