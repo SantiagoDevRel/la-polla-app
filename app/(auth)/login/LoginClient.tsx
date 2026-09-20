@@ -167,7 +167,7 @@ function writeTelegramPending(value: TelegramPending | null) {
   }
 }
 
-function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
+function LoginInner({ telegramBotUsername, telegramOidcEnabled, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
   const t = useTranslations("Login");
   const searchParams = useSearchParams();
   const telegramEnabled = Boolean(telegramBotUsername);
@@ -196,6 +196,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openingOidc, setOpeningOidc] = useState(false);
   const [preview, setPreview] = useState<PollaPreview | null>(null);
   // Client-side OTP send cooldown. cooldownUntil is the epoch ms when
   // the user can send again. nowTick triggers a re-render every second
@@ -219,7 +220,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
 
   // Retomar la espera de Telegram si la pestaña se recargó al volver de la app.
   useEffect(() => {
-    if (!telegramEnabled || typeof window === "undefined") return;
+    if (!telegramEnabled || telegramOidcEnabled || typeof window === "undefined") return;
     const saved = readTelegramPending();
     if (!saved) return;
     telegramExpiresAt.current = saved.expiresAt;
@@ -231,7 +232,23 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
       sameTab: saved.sameTab,
     });
     setStep("telegram");
-  }, [telegramEnabled]);
+  }, [telegramEnabled, telegramOidcEnabled]);
+
+  useEffect(() => {
+    const reason = searchParams.get("telegram");
+    if (!reason) return;
+    setError(t(reason === "sms_only" ? "tgErrSmsOnly"
+      : reason === "phone_required" ? "tgOidcPhoneRequired"
+      : reason === "expired" ? "tgOidcExpired"
+      : reason === "cancelled" ? "tgOidcCancelled"
+      : reason === "unavailable" ? "tgErrUnavailable" : "tgErrGeneric"));
+  }, [searchParams, t]);
+
+  useEffect(() => {
+    const resume = () => { setOpeningOidc(false); telegramBusy.current = false; };
+    window.addEventListener("pageshow", resume);
+    return () => window.removeEventListener("pageshow", resume);
+  }, []);
 
   // Tick once per second only while a cooldown is active. When it
   // finishes, clean up so we are not running a no-op interval.
@@ -460,6 +477,30 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
     telegramBusy.current = true;
     setError(null);
     setTelegramReturnStep(from);
+
+    if (telegramOidcEnabled) {
+      setOpeningOidc(true);
+      try {
+        let returnTo = safeReturnTo(searchParams.get("returnTo"));
+        try { returnTo ??= safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY)); } catch { /* storage opcional */ }
+        const response = await fetch("/api/auth/telegram/oidc/start", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" }, body: JSON.stringify({ returnTo }),
+        });
+        const body = await response.json();
+        if (!response.ok) {
+          setError(t(response.status === 429 ? "tgErrRateLimited" : response.status === 404 ? "tgErrUnavailable" : "tgErrGeneric"));
+          return;
+        }
+        const destination = new URL(body.authorizeUrl);
+        if (destination.origin !== "https://oauth.telegram.org" || destination.pathname !== "/auth") throw new Error("invalid_authorization_url");
+        // Telegram abre su autorización nativa y devuelve el código al navegador externo.
+        // No popup, enlace de bot ni sesión en Telegram Web.
+        window.location.assign(destination.href);
+      } catch { setError(t("errNetwork")); }
+      finally { setOpeningOidc(false); telegramBusy.current = false; }
+      return;
+    }
 
     const sameTab = prefersSameTab();
     let popup: Window | null = null;
@@ -827,9 +868,11 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
                   type="button"
                   onClick={() => void startTelegram("input")}
                   className={SECONDARY_BTN}
+                  disabled={openingOidc}
+                  aria-busy={openingOidc}
                 >
                   <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
-                  <span>{t("tgUseTelegram")}</span>
+                  <span>{t(openingOidc ? "tgOpening" : "tgUseTelegram")}</span>
                 </button>
               </div>
             )}
@@ -937,9 +980,11 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
                 type="button"
                 onClick={() => void startTelegram("otp")}
                 className={SECONDARY_BTN}
+                disabled={openingOidc}
+                aria-busy={openingOidc}
               >
                 <Send className="w-5 h-5 shrink-0" aria-hidden="true" />
-                <span>{t("tgUseTelegram")}</span>
+                <span>{t(openingOidc ? "tgOpening" : "tgUseTelegram")}</span>
               </button>
             </div>
           )}
@@ -1073,17 +1118,20 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
 interface LoginClientProps {
   /** Usuario del bot de login de Telegram; null si el canal está apagado. */
   telegramBotUsername: string | null;
+  /** Autorización nativa oficial con regreso al navegador que inició el ingreso. */
+  telegramOidcEnabled?: boolean;
   /** Site key pública de Cloudflare Turnstile; null si la captcha no está configurada. */
   turnstileSiteKey: string | null;
   /** start-otp exige el token (SMS_CAPTCHA_ENFORCED): nunca enviar sin él. */
   smsCaptchaRequired: boolean;
 }
 
-export default function LoginClient({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
+export default function LoginClient({ telegramBotUsername, telegramOidcEnabled, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
   return (
     <Suspense fallback={<div className="min-h-screen" />}>
       <LoginInner
         telegramBotUsername={telegramBotUsername}
+        telegramOidcEnabled={telegramOidcEnabled}
         turnstileSiteKey={turnstileSiteKey}
         smsCaptchaRequired={smsCaptchaRequired}
       />

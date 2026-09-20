@@ -640,7 +640,60 @@ npm test            # vitest unit tests (111 tests)
 - **Orden en `/login`**: primero **Enviar código por SMS** (botón primario); debajo, **Entrar con Telegram** (secundario, no necesita el número). En el paso del código SMS: «¿No te llegó el SMS?» + **Entrar con Telegram**.
 - **Login por Telegram (v2, 2026-09-13, migración 119)**: sin códigos. Ver la sección siguiente.
 
-#### Login por Telegram (v2)
+#### Login por Telegram con regreso al navegador (OIDC)
+
+El botón **Entrar con Telegram** usa la autorización oficial de Telegram cuando
+están configuradas `TELEGRAM_OIDC_CLIENT_ID` y `TELEGRAM_OIDC_CLIENT_SECRET`
+(ambas solo servidor, además de las variables existentes del bot público).
+La navegación comienza en Safari/Chrome, pasa por `oauth.telegram.org` y permite
+autorizar en la app nativa de Telegram. Según el protocolo oficial, Telegram abre
+el retorno en un navegador externo, preferiblemente el que inició el ingreso.
+No requiere iniciar sesión en Telegram Web ni enviar `/start` al bot en cada ingreso.
+La apertura efectiva depende de la versión de Telegram y del sistema operativo;
+no se simula con enlaces del bot ni con esquemas privados de Safari/Chrome.
+
+**Activación:** BotFather → `@LaPollaColombianaBot` → Login Widget → OpenID Connect.
+BotFather advierte que migrar desactiva **permanentemente** el widget legacy;
+requiere confirmación explícita del dueño antes de aceptar ese aviso. El login
+anterior de esta app usa enlaces del bot, no ese widget. Copiar las credenciales
+directamente a variables privadas de Vercel, nunca a Git ni a logs. Registrar:
+
+```text
+https://lapollacolombiana.com
+https://lapollacolombiana.com/api/auth/telegram/oidc/callback
+https://chickenpicks.app
+https://chickenpicks.app/api/auth/telegram/oidc/callback
+```
+
+Redeploy después de configurar. Sin ambas variables se conserva el flujo de enlaces
+descrito abajo; no se anuncia OIDC como activo. Un preview necesita su propio origen
+en `NEXT_PUBLIC_APP_URL` y su callback autorizado en BotFather para probar el canje real.
+
+**Seguridad:** POST mismo origen `/api/auth/telegram/oidc/start`, PKCE S256,
+`state` y `nonce` independientes, cookie `lp_tg_oidc` cifrada con AES-GCM,
+HttpOnly/SameSite=Lax/host-only, 5 minutos. Callback valida cookie/estado/origen
+antes de canjear el código de un solo uso; `jose` valida firma JWKS de Telegram,
+issuer, audience, nonce, tiempos e ID numérico (`sub` es opaco, no es el ID del bot).
+La sesión se crea con el helper existente; conserva vínculos y políticas de números
+reciclados. Nuevas cuentas exigen teléfono firmado y `phone_number_verified=true`.
+Los vínculos existentes funcionan sin volver a compartir teléfono. Cookie de
+intento consumida también al fallar, respuesta no-store/no-referrer y sin tokens
+en la URL final. Abrir el retorno en un navegador distinto falla cerrado.
+
+Reutiliza el límite atómico existente de 10 solicitudes/15 minutos por IP;
+no agrega tablas, migraciones, proveedores pagos ni polling. Una fila pendiente
+sirve únicamente para contar el inicio, nunca para autorizar sesión. La aprobación
+del bot sigue sin poder abrir la sesión del navegador solicitante.
+
+```bash
+npm test -- tests/telegram-oidc.test.ts tests/telegram-oidc-routes.test.ts tests/telegram-login.test.ts tests/telegram-login-polish.test.ts tests/telegram-login-middleware.test.ts
+npm run build
+```
+
+Fuentes: [Telegram Login](https://core.telegram.org/bots/telegram-login) y
+[retorno OAuth al navegador externo](https://core.telegram.org/api/url-authorization#oauth-authorization).
+
+#### Login por Telegram mediante enlaces del bot (v2, compatibilidad)
 
 Bot **público y separado** del panel de admin. v1 (código de 6 dígitos que la persona copiaba en la web) se retiró por feedback del dueño: no se entendía y el botón «Compartir mi número» quedaba escondido en Telegram Web. El dueño pidió un enlace de un solo uso que dure 5 minutos y abra una sola sesión.
 

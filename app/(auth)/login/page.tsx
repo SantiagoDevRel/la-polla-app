@@ -12,6 +12,7 @@
 // CLOUDFLARE_TURNSTILE_SECRET_KEY y el cliente ya no envía sin token.
 // README → «Captcha de Auth (Turnstile)».
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
+import { getTelegramOidcConfig } from "@/lib/auth/telegram-login/oidc";
 import { isSmsCaptchaEnforced } from "@/lib/auth/captcha";
 import LoginClient from "./LoginClient";
 
@@ -21,6 +22,7 @@ export default function LoginPage() {
   return (
     <LoginClient
       telegramBotUsername={telegram?.botUsername ?? null}
+      telegramOidcEnabled={Boolean(telegram && getTelegramOidcConfig())}
       turnstileSiteKey={turnstileSiteKey}
       smsCaptchaRequired={Boolean(turnstileSiteKey) && isSmsCaptchaEnforced()}
     />
