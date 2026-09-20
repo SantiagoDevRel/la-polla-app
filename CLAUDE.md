@@ -417,8 +417,13 @@ se pierden ideas grandes que el usuario sí quería.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
-- (Sin ideas abiertas. El chat embebido de Claude en /admin quedó descartado
-  por ahora el 2026-09-13, por decisión del dueño.)
+- (2026-09-20) Investigar más valor y participación de bajo costo, incluida la
+  idea del dueño de transmitir los partidos dentro de una polla mediante IPTV
+  u otro proveedor. Investigación entregada: diferenciar acceso personal de
+  derechos de retransmisión; alternativas de sala del partido, avisos y videos
+  oficiales. Pendiente decidir qué priorizar; sin autorización para contratar
+  servicios ni implementar estas ideas. El chat embebido de Claude en /admin
+  sigue descartado por ahora desde el 2026-09-13.
 <!-- Pollas combinadas multi-torneo: COMPLETADO 2026-04-30. Migración
      038 + UI de creación con multi-select + display con stack de logos
      en PollaCard y header de detail. Removido de pendings. -->
