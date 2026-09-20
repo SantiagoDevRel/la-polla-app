@@ -217,8 +217,8 @@ const nextConfig = {
               // PostHog corre analytics-only desde el bundle: flags, replay,
               // surveys y dependencias externas quedan apagados en providers.
               process.env.NODE_ENV === "development"
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com"
-                : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.challenges.cloudflare.com"
+                : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://*.challenges.cloudflare.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               // i.ytimg.com: thumbnails de los highlights del Mundial (FIFA
@@ -229,10 +229,18 @@ const nextConfig = {
               // API-Football.
               "img-src 'self' data: blob: https://crests.football-data.org https://a.espncdn.com https://media.api-sports.io https://upload.wikimedia.org https://i.ytimg.com https://*.supabase.co" + localStorageCsp,
               // us.i.posthog.com recibe eventos; no se cargan scripts remotos.
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://graph.facebook.com https://us.i.posthog.com" + localStorageCsp,
+              //
+              // *.challenges.cloudflare.com (2026-09-20): Turnstile carga su
+              // script desde el host exacto, pero resuelve el desafío contra un
+              // SUBDOMINIO repartido (hagen.challenges.cloudflare.com/cdn-cgi/
+              // challenge-platform/...) por fetch. Sin esto, connect-src abortaba
+              // esa llamada, el widget nunca entregaba token y /login mostraba
+              // «No pudimos verificar que eres una persona» a todo el mundo.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com https://*.challenges.cloudflare.com https://graph.facebook.com https://us.i.posthog.com" + localStorageCsp,
               // www.youtube.com + youtube-nocookie: embed inline de highlights
               // del Mundial (canales de broadcasters que permiten embed).
-              "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
+              // El iframe del desafío también puede venir del subdominio.
+              "frame-src https://challenges.cloudflare.com https://*.challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
