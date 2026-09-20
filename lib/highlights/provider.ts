@@ -1,12 +1,12 @@
 import "server-only";
 import { HIGHLIGHT_LEAGUES, highlightQueryDays, matchHighlightEvent, youtubeVideoId, type HighlightMatch, type PollaHighlight, type SportsVideoEvent } from "./matching";
 
-/** Production is opt-in and requires a paid key; free 123 is development only. */
+/** Opt-in web integration. The shared free key also works in production. */
 export function highlightsApiKey(): string | null {
   if (process.env.SPORTSDB_HIGHLIGHTS_ENABLED !== "true") return null;
   const key = process.env.SPORTSDB_API_KEY?.trim();
-  if (key && /^[a-zA-Z0-9_-]+$/.test(key) && key !== "123") return key;
-  return process.env.NODE_ENV === "development" ? "123" : null;
+  if (!key) return "123";
+  return /^[a-zA-Z0-9_-]+$/.test(key) ? key : null;
 }
 
 // Coalesce simultaneous home/pool requests within one worker. Persistent

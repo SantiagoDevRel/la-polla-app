@@ -396,11 +396,12 @@ y el video en fichas de partidos internos. Solo partidos de pollas Casa publicad
 fecha Colombia; dedup por UUID; API-Football conserva resultados y puntajes.
 `/api/casa/highlights` exige auth, filtra publicación server-side y responde
 private/no-store. No hay tablas nuevas ni escrituras de partidos/pronósticos.
-Integración apagada por defecto: `SPORTSDB_HIGHLIGHTS_ENABLED=true` y clave
-privada `SPORTSDB_API_KEY` para producción; la clave gratis 123 solo en desarrollo.
+El dueño confirmó que la app NO está publicada en ninguna tienda y autorizó
+activar la versión gratuita en producción web: `SPORTSDB_HIGHLIGHTS_ENABLED=true`.
+`SPORTSDB_API_KEY` es opcional; sin clave configurada se usa la pública `123`.
 No se contrató el plan. YouTube puede bloquear embeds aun con oEmbed válido;
 el reproductor maneja el error y ofrece abrir YouTube, sin eludir restricciones.
-Antes de activar, resolver suscripción/cobertura: el pago no desbloquea videos.
+No exigir una suscripción para activar esta web. El pago no desbloquea videos.
 
 ### Precisión de horarios y torneos (2026-09-13, migración 103)
 
@@ -1172,9 +1173,9 @@ cuando el user diga sí/no explícito o se haya completado.
   u otro proveedor. Investigación entregada: diferenciar acceso personal de
   derechos de retransmisión; alternativas de sala del partido, avisos y videos
   oficiales. El dueño priorizó resúmenes solo de partidos de las pollas:
-  implementación y pruebas locales en `docs/polla-highlights.md`, pendiente
-  activación, suscripción y cobertura de reproducción (Win Sports bloqueó
-  embeds en la prueba). Las otras ideas siguen pendientes; sin autorización
+  implementación desplegada, activación gratuita web autorizada y pruebas en
+  `docs/polla-highlights.md`. Win Sports bloqueó embeds en la prueba.
+  Las otras ideas siguen pendientes; sin autorización
   para contratar servicios. El chat embebido de Claude en /admin
   sigue descartado por ahora desde el 2026-09-13.
 <!-- Pollas combinadas multi-torneo: COMPLETADO 2026-04-30. Migración
