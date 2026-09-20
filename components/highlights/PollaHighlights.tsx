@@ -130,10 +130,16 @@ export function PollaHighlights({ polla, matchId, className = "" }: Props) {
           <button type="button" onClick={() => setSelected(video)} aria-label={`${en ? "Watch highlights" : "Ver resumen"}: ${video.title}`}
             className="group relative flex flex-1 cursor-pointer flex-col text-left transition-colors hover:bg-bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-turf">
             <span className="relative block aspect-video w-full overflow-hidden bg-bg-elevated">
+              <span className="lp-humo absolute inset-0" aria-hidden="true">
+                <span className="lp-humo-a" />
+                <span className="lp-humo-b" />
+                <span className="lp-humo-c" />
+              </span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`} alt="" loading="lazy" className="h-full w-full object-cover"
+              <img src={`https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`} alt="" loading="lazy" className="relative z-10 h-full w-full object-cover"
+                onLoad={event => { if (event.currentTarget.naturalWidth <= 120) event.currentTarget.hidden = true; }}
                 onError={event => { event.currentTarget.hidden = true; }} />
-              <span className="absolute inset-0 flex items-center justify-center bg-bg-base/20"><span className="flex h-12 w-12 items-center justify-center rounded-full border border-border-strong bg-bg-base/80 text-text-primary transition-transform motion-safe:group-hover:scale-110"><Play className="h-5 w-5 fill-current" aria-hidden="true" /></span></span>
+              <span className="absolute inset-0 z-20 flex items-center justify-center bg-bg-base/20"><span className="flex h-12 w-12 items-center justify-center rounded-full border border-border-strong bg-bg-base/80 text-text-primary transition-transform motion-safe:group-hover:scale-110"><Play className="h-5 w-5 fill-current" aria-hidden="true" /></span></span>
             </span>
             <span className="block w-full space-y-2 p-3">
               <span className="block text-[15px] font-semibold leading-relaxed text-text-primary [overflow-wrap:anywhere]">{video.title}</span>
@@ -147,7 +153,6 @@ export function PollaHighlights({ polla, matchId, className = "" }: Props) {
         <p>{en ? "Some highlights couldn't be loaded." : "No pudimos cargar todos los resúmenes."}</p>
         <button type="button" onClick={retry} className="mt-2 min-h-11 cursor-pointer rounded-full border border-border-subtle px-4 font-semibold transition-colors hover:bg-bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">{en ? "Try again" : "Reintentar"}</button>
       </div>}
-      <a href="https://www.thesportsdb.com" target="_blank" rel="noopener noreferrer" className="inline-block rounded text-[13px] leading-relaxed text-text-muted underline underline-offset-4 hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">{en ? "Videos found with TheSportsDB" : "Videos encontrados con TheSportsDB"}</a>
     </>
     {selected && <VideoDialog video={selected} en={en} onClose={() => setSelected(null)} />}
   </section>;

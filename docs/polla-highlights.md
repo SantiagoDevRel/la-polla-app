@@ -99,7 +99,10 @@ En gratis, `eventsday` devuelve como máximo tres partidos por consulta; la
 cobertura del prototipo puede ser incompleta. No hay cron, proxy de video,
 dependencias nuevas, migraciones ni escrituras de partidos/resultados. El video
 viaja directo de YouTube al usuario; API-Football sigue siendo el proveedor
-de resultados. Se muestra atribución a TheSportsDB y al canal.
+de resultados. La tarjeta muestra el canal y usa la miniatura pública de
+YouTube como previsualización. Si YouTube devuelve su miniatura genérica o la
+imagen falla, se oculta y aparece el fondo de humo tricolor de la marca; el
+proveedor de búsqueda no se expone como publicidad dentro de la interfaz.
 
 ## Verificación
 
