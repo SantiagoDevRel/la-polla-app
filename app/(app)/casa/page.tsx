@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { MyPollas } from "@/components/casa/MyPollas";
+import { PollaHighlights } from "@/components/highlights/PollaHighlights";
 import { listMyPollas } from "@/lib/casa/my-pollas";
 import Image from "next/image";
 import { PollaSection } from "@/components/casa/PollaSection";
@@ -116,6 +117,8 @@ export default async function CasaPage() {
           </ul>
         )}
         </PollaSection>
+
+        <PollaHighlights className="py-2" />
 
         <PollaSection id="pollas-cerradas" kind="closed" title="Pollas cerradas" description="Consulta los resultados de pollas anteriores." count={cerradas.length}>
             {cerradas.length > 0 ? (

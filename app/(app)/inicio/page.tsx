@@ -60,7 +60,7 @@ import { QuickPickStrip } from "@/components/inicio/QuickPickStrip";
 import UpcomingHeroCard from "@/components/inicio/UpcomingHeroCard";
 import PredictNowCTA from "@/components/inicio/PredictNowCTA";
 import WorldCupFactsCard from "@/components/inicio/WorldCupFactsCard";
-import { HighlightsStrip } from "@/components/inicio/HighlightsStrip";
+import { PollaHighlights } from "@/components/highlights/PollaHighlights";
 import RoadToWorldCupCard from "@/components/inicio/RoadToWorldCupCard";
 import { getPendingPredictionsSummary } from "@/lib/predictions/pending";
 import { type PodiumEntry } from "@/components/leaderboard/PodiumLeaderboard";
@@ -1006,7 +1006,7 @@ export default async function InicioPage() {
           {/* Road to World Cup — entrada a la bracket interactiva. */}
           <RoadToWorldCupCard />
 
-          {/* Próximos + "Lo último del Mundial" (highlights), en orden según
+          {/* Próximos + resúmenes de partidos de las pollas de Casa, en orden según
               si el user todavía debe pronósticos de hoy/mañana:
                 • faltan pronósticos → Próximos PRIMERO (el CTA de pronosticar
                   manda sobre el contenido de engagement).
@@ -1016,11 +1016,11 @@ export default async function InicioPage() {
               pronóstico) React MUEVE los nodos por key en vez de re-montarlos
               por índice. Renderizar el MISMO elemento en dos slots hermanos
               sin key reconciliaba por posición y era frágil (riesgo de
-              "Rendered more hooks…" en reorders). HighlightsStrip se auto-
-              oculta si no hay clips o falla — nunca rompe el home. */}
+              "Rendered more hooks…" en reorders). Los videos no dependen de
+              la participación en las pollas P2P históricas. */}
           {(hasUnpredictedUpcoming
-            ? [proximosSection, !isActiveEmpty ? <HighlightsStrip key="inicio-highlights" /> : null]
-            : [!isActiveEmpty ? <HighlightsStrip key="inicio-highlights" /> : null, proximosSection]
+            ? [proximosSection, <PollaHighlights key="inicio-highlights" className="px-4" />]
+            : [<PollaHighlights key="inicio-highlights" className="px-4" />, proximosSection]
           ).filter(Boolean)}
 
           {/* Block 4b - Rival callout (only when we have a neighbour).

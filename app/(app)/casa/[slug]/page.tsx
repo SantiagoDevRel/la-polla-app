@@ -36,6 +36,7 @@ import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tour
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
 import { HeroFrame, Label, SectionHead, StreetCard, Tape } from "@/components/street";
 import { PicksBoard } from "@/components/casa/PicksBoard";
+import { PollaHighlights } from "@/components/highlights/PollaHighlights";
 import { QuestionsBoard } from "@/components/casa/QuestionsBoard";
 import { PollaTabs } from "@/components/casa/PollaTabs";
 import { PollaInfo } from "@/components/casa/PollaInfo";
@@ -317,6 +318,7 @@ export default async function PollaPage({
         {/* ── Los partidos ─────────────────────────────────────────────── */}
         {polla.kind === "partidos" && matches.length > 0 && (
           <>
+            <PollaHighlights polla={polla.slug} className="mt-6" />
             <SectionHead
               title="Tus pronósticos"
               meta={`${matches.length} partidos`}
