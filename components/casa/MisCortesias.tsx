@@ -11,11 +11,12 @@ import { Check, Copy, Share2, Ticket } from "lucide-react";
 import { SectionHead, Tape } from "@/components/street";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import { shareLink } from "@/lib/casa/share-link";
 import {
   COURTESY_FINE_PRINT,
   courtesyLabel,
   courtesyLink,
-  courtesyShareText,
   isCourtesyLive,
   type MyCourtesy,
 } from "@/lib/casa/courtesies-shared";
@@ -28,32 +29,29 @@ function publicOrigin(): string {
 
 function Cortesia({ cortesia, mostrarPolla }: { cortesia: MyCourtesy; mostrarPolla: boolean }) {
   const [copiado, setCopiado] = useState(false);
+  const { showToast } = useToast();
   const estado = courtesyLabel(cortesia);
   const viva = isCourtesyLive(cortesia);
 
   async function compartir() {
     const url = courtesyLink(publicOrigin(), cortesia.slug, cortesia.code);
-    const texto = courtesyShareText(cortesia.polla, url);
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: cortesia.polla, text: texto, url });
-        return;
-      } catch (error) {
-        // Cancelar no debe tocar el portapapeles.
-        if (error instanceof DOMException && error.name === "AbortError") return;
-      }
+    try {
+      if (await shareLink(url) !== "copied") return;
+      setCopiado(true);
+      window.setTimeout(() => setCopiado(false), 2200);
+    } catch {
+      showToast("No pudimos compartir el enlace. Intenta de nuevo.", "error");
     }
-    await copiar();
   }
 
   async function copiar() {
     const url = courtesyLink(publicOrigin(), cortesia.slug, cortesia.code);
     try {
-      await navigator.clipboard.writeText(`${courtesyShareText(cortesia.polla, url)}`);
+      await navigator.clipboard.writeText(url);
       setCopiado(true);
       window.setTimeout(() => setCopiado(false), 2200);
     } catch {
-      // Sin permiso de portapapeles el enlace queda visible en la fila.
+      showToast("No pudimos copiar el enlace. Intenta de nuevo.", "error");
     }
   }
 
