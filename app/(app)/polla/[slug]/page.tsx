@@ -46,6 +46,7 @@ import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tour
 import { TournamentIdentity } from "@/components/casa/TournamentIdentity";
 import { ScoringModeBadge } from "@/components/casa/ScoringModeBadge";
 import { HeroFrame, Label, SectionHead, StreetCard, Tape } from "@/components/street";
+import { PollaHighlights } from "@/components/highlights/PollaHighlights";
 import { PicksBoard } from "@/components/casa/PicksBoard";
 import { QuestionsBoard } from "@/components/casa/QuestionsBoard";
 import { PollaTabs } from "@/components/casa/PollaTabs";
@@ -551,6 +552,7 @@ export default async function PollaPage({
         {/* ── Los partidos ─────────────────────────────────────────────── */}
         {polla.kind === "partidos" && matches.length > 0 && (
           <div className="pt-4">
+            <PollaHighlights polla={polla.slug} className="mb-6" />
             <PicksBoard
               key={entry?.id ?? "sin-participacion"}
               slug={polla.slug}

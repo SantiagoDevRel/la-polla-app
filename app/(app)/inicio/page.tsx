@@ -5,6 +5,7 @@
 // lo más grande de la pantalla y lo único en el acento.
 
 import Link from "next/link";
+import { PollaHighlights } from "@/components/highlights/PollaHighlights";
 import { MyPollas } from "@/components/casa/MyPollas";
 import { LiveNow } from "@/components/casa/LiveNow";
 import { listMyPollas } from "@/lib/casa/my-pollas";
@@ -170,6 +171,8 @@ export default async function CasaPage() {
         )}
         </PollaSection>
         )}
+
+        <PollaHighlights className="py-2" />
 
         {cerradas.length > 0 && (
         <PollaSection id="pollas-cerradas" kind="closed" title="Terminadas" description="Pollas que ya no reciben inscripciones" count={cerradas.length}>

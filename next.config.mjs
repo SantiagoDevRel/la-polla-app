@@ -217,8 +217,8 @@ const nextConfig = {
               // PostHog corre analytics-only desde el bundle: flags, replay,
               // surveys y dependencias externas quedan apagados en providers.
               process.env.NODE_ENV === "development"
-                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.challenges.cloudflare.com"
-                : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://*.challenges.cloudflare.com",
+                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.challenges.cloudflare.com https://www.youtube.com"
+                : "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://*.challenges.cloudflare.com https://www.youtube.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               // i.ytimg.com: thumbnails de los highlights del Mundial (FIFA

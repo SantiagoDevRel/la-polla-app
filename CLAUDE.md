@@ -389,6 +389,19 @@ Telegram para jugadores». Reglas que no se negocian:
 - **Doble toque:** un botón tocado sobre un mensaje editado hace ≤1 s (`edit_date`)
   se descarta con un aviso: el botón siguiente queda donde estaba el tocado.
 
+### Resúmenes de partidos de las pollas (2026-09-20)
+
+`docs/polla-highlights.md` documenta el carrusel de hoy en Casa/Inicio y por polla,
+y el video en fichas de partidos internos. Solo partidos de pollas Casa publicadas;
+fecha Colombia; dedup por UUID; API-Football conserva resultados y puntajes.
+`/api/casa/highlights` exige auth, filtra publicación server-side y responde
+private/no-store. No hay tablas nuevas ni escrituras de partidos/pronósticos.
+Integración apagada por defecto: `SPORTSDB_HIGHLIGHTS_ENABLED=true` y clave
+privada `SPORTSDB_API_KEY` para producción; la clave gratis 123 solo en desarrollo.
+No se contrató el plan. YouTube puede bloquear embeds aun con oEmbed válido;
+el reproductor maneja el error y ofrece abrir YouTube, sin eludir restricciones.
+Antes de activar, resolver suscripción/cobertura: el pago no desbloquea videos.
+
 ### Precisión de horarios y torneos (2026-09-13, migración 103)
 
 `matches.scheduled_at_confirmed=false` significa fecha provisional, no medianoche
@@ -1153,6 +1166,17 @@ cuando el user diga sí/no explícito o se haya completado.
   Cloudflare, `SMS_CAPTCHA_ENFORCED=true` en Vercel y el PATCH de
   `security_captcha_*` en Auth. Pasos, smoke y reversa: README → «Captcha de
   Auth (Turnstile)».
+
+- (2026-09-20) Investigar más valor y participación de bajo costo, incluida la
+  idea del dueño de transmitir los partidos dentro de una polla mediante IPTV
+  u otro proveedor. Investigación entregada: diferenciar acceso personal de
+  derechos de retransmisión; alternativas de sala del partido, avisos y videos
+  oficiales. El dueño priorizó resúmenes solo de partidos de las pollas:
+  implementación y pruebas locales en `docs/polla-highlights.md`, pendiente
+  activación, suscripción y cobertura de reproducción (Win Sports bloqueó
+  embeds en la prueba). Las otras ideas siguen pendientes; sin autorización
+  para contratar servicios. El chat embebido de Claude en /admin
+  sigue descartado por ahora desde el 2026-09-13.
 <!-- Pollas combinadas multi-torneo: COMPLETADO 2026-04-30. Migración
      038 + UI de creación con multi-select + display con stack de logos
      en PollaCard y header de detail. Removido de pendings. -->
