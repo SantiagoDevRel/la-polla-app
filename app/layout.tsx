@@ -153,6 +153,22 @@ export default async function RootLayout({
   return (
     <html lang={locale} className={`${bebas.variable} ${outfit.variable}`}>
       <head>
+        {/* Chrome emite `beforeinstallprompt` UNA vez por carga, y puede
+            hacerlo antes de que React hidrate o estando en una pantalla sin
+            header (login, onboarding). Si el unico que escucha es la burbuja
+            del header, ese evento se pierde y la persona no vuelve a ver el
+            boton de instalar hasta recargar. Por eso se atrapa aca, en el
+            head, que corre antes que todo, y la burbuja lo recoge al montarse
+            (components/shared/InstallAppBubble.tsx). */}
+        <script
+          id="install-prompt-catcher"
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){window.__lpInstallEvent=null;" +
+              "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__lpInstallEvent=e;});" +
+              "window.addEventListener('appinstalled',function(){window.__lpInstallEvent=null;});})();",
+          }}
+        />
         <script
           id="organization-jsonld"
           type="application/ld+json"
