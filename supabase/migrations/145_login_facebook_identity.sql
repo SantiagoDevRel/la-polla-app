@@ -1,5 +1,14 @@
 -- 145_login_facebook_identity.sql — Una cuenta puede nacer SIN teléfono.
 --
+-- ⚠️ 2026-09-20: el login con Facebook se RETIRÓ el mismo día (decisión del
+-- dueño). Esta migración NO se revierte y el archivo se queda: ya está
+-- aplicada en producción, y borrarlo dejaría el repo mintiendo sobre el
+-- estado real de la base. Devolver la columna a NOT NULL sería un cambio
+-- destructivo de esquema y no se hace sin una orden explícita.
+--
+-- Lo que deja vivo: `users.whatsapp_number` acepta NULL y el trigger ya no
+-- mete el correo en esa columna. Ninguna cuenta actual quedó sin número.
+--
 -- Hasta hoy la identidad de La Polla era el teléfono, sin excepción: 440
 -- cuentas, ninguna sin número. `users.whatsapp_number` es NOT NULL UNIQUE y
 -- el trigger `handle_new_auth_user` (migración 058) rellenaba esa columna con
