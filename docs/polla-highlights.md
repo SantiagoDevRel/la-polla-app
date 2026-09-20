@@ -29,7 +29,13 @@ proveedores ni los helpers retirados de ESPN/football-data.
   ni API de YouTube antes de esa acción. Cerrar o pulsar Escape detiene el video
   y devuelve el foco. No hay reproducción automática al abrir el inicio.
 - El cliente actualiza cada cinco minutos visibles y al volver a la pestaña.
-  Vacío, error y respuesta parcial tienen estados distintos y reintento.
+  La sección completa permanece oculta mientras carga, si la consulta falla o
+  si no existe ningún video. Solo aparece con uno o más resúmenes. Si ya hay
+  videos y la respuesta es parcial, muestra el aviso con reintento.
+- Cada tarjeta intenta mostrar la miniatura oficial de YouTube. Si YouTube no
+  entrega una miniatura real, se oculta la imagen genérica y queda un fondo de
+  humo estático del sistema visual. La interfaz muestra el canal, pero no
+  publicidad sobre el proveedor usado para encontrar los videos.
 
 ## Disponibilidad real de reproducción
 
@@ -105,7 +111,8 @@ En gratis, `eventsday` devuelve como máximo tres partidos por consulta; la
 cobertura del prototipo puede ser incompleta. No hay cron, proxy de video,
 dependencias nuevas, migraciones ni escrituras de partidos/resultados. El video
 viaja directo de YouTube al usuario; API-Football sigue siendo el proveedor
-de resultados. Se muestra atribución a TheSportsDB y al canal.
+de resultados. Se conserva la identificación del canal de YouTube; TheSportsDB
+no aparece como texto promocional en la interfaz.
 
 ## Verificación
 
