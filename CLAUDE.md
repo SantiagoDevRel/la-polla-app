@@ -611,6 +611,23 @@ aparte «Terminó el 17 sep 2026» salió de las tarjetas y del encabezado;
 `pollaEndedLabel` (con año) queda para la vista pública y el bot de Telegram. La
 fecha va UNA vez por tarjeta. Contrato en `tests/casa-polla-status-label.test.ts`.
 
+### El traductor del navegador no puede tumbar la app (2026-09-21)
+
+Chrome, en un teléfono con otro idioma, ofrece traducir la página y reemplaza
+cada nodo de texto por `<font><font>…</font></font>`. Los nodos que React tenía
+guardados dejan de ser hijos de su padre, así que el primer cambio de pantalla
+lanza `NotFoundError: insertBefore/removeChild`, sube hasta `app/global-error.tsx`
+y la persona ve «Algo salió mal». Caso real: alguien entró desde un Android en
+portugués, el SMS llegaba siempre, pero al pasar de «tu número» a «ingresa tu
+código» aparecía el error; no alcanzó a enviar el código ni una vez.
+
+`lib/dom/traduccion-segura.ts` envuelve `Node.prototype.insertBefore` y
+`removeChild` para que toleren el nodo desubicado, y se carga desde un `<script>`
+del `<head>` en `app/layout.tsx`: tiene que estar en pie ANTES de la hidratación.
+NO se marca la app como `notranslate` — traducir sigue siendo válido, lo que no
+puede pasar es que la app se caiga. Regresión: `e2e/traduccion.spec.ts`
+(simula la reescritura del traductor; falla si el script se quita del layout).
+
 ### Navegación y actualización de la app (2026-09-09)
 
 Casa (2026-09-17): En vivo → «¿Alguien te invitó?» (solo personas nuevas, migración
