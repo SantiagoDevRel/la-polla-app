@@ -16,6 +16,7 @@ import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { PlatformProvider } from "@/components/platform/PlatformProvider";
 import { PostHogProvider } from "./providers";
 import { AgentationDev } from "@/components/dev/AgentationDev";
+import { TRADUCCION_SEGURA_SCRIPT } from "@/lib/dom/traduccion-segura";
 
 // Tribuna Caliente — las dos familias de siempre, de vuelta (2026-09-02).
 //
@@ -153,6 +154,14 @@ export default async function RootLayout({
   return (
     <html lang={locale} className={`${bebas.variable} ${outfit.variable}`}>
       <head>
+        {/* El traductor del navegador (Chrome en un teléfono con otro
+            idioma) reemplaza los nodos de texto y React se cae en el
+            siguiente cambio de pantalla. Esto va PRIMERO, antes de hidratar:
+            lib/dom/traduccion-segura.ts cuenta el caso completo. */}
+        <script
+          id="dom-traduccion-segura"
+          dangerouslySetInnerHTML={{ __html: TRADUCCION_SEGURA_SCRIPT }}
+        />
         {/* Chrome emite `beforeinstallprompt` UNA vez por carga, y puede
             hacerlo antes de que React hidrate o estando en una pantalla sin
             header (login, onboarding). Si el unico que escucha es la burbuja
