@@ -79,7 +79,7 @@
     "captchaFailed": "We couldn't verify that you're a person. Tap Retry verification.",
     "captchaRetry": "Retry verification",
     "errCaptchaRejected": "We didn't send the code because the verification is missing. Wait for it to finish or tap Retry verification.",
-    "errCountryNotAllowed": "For now we only send SMS codes to Colombia, the United States, Panama, Argentina, Peru, Chile, Brazil, Ecuador and Spain.",
+    "errCountryNotAllowed": "For now we only send SMS codes to Colombia, the United States, Panama, Argentina, Peru, Chile, Brazil, Ecuador, Spain, Portugal and Belgium.",
     "errOtpLength": "The code has 6 digits",
     "errOtpInvalid": "Invalid or expired code",
     "btnSending": "Sending…",

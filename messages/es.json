@@ -79,7 +79,7 @@
     "captchaFailed": "No pudimos verificar que eres una persona. Toca Reintentar verificación.",
     "captchaRetry": "Reintentar verificación",
     "errCaptchaRejected": "No enviamos el código porque falta la verificación. Espera a que termine o toca Reintentar verificación.",
-    "errCountryNotAllowed": "Por ahora solo enviamos códigos por SMS a Colombia, Estados Unidos, Panamá, Argentina, Perú, Chile, Brasil, Ecuador y España.",
+    "errCountryNotAllowed": "Por ahora solo enviamos códigos por SMS a Colombia, Estados Unidos, Panamá, Argentina, Perú, Chile, Brasil, Ecuador, España, Portugal y Bélgica.",
     "errOtpLength": "El código tiene 6 dígitos",
     "errOtpInvalid": "Código inválido o vencido",
     "btnSending": "Enviando…",
