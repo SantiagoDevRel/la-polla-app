@@ -67,9 +67,11 @@ describe("resolveInstallMode", () => {
     ).toBe("hidden");
   });
 
-  it("Chrome dio el evento → un toque, sin tutorial", () => {
-    expect(resolveInstallMode(env({ hasInstallPrompt: true }))).toBe("prompt");
-    // Tambien en escritorio: el evento manda sobre el sistema operativo.
+  it("Android ofrece el APK aunque Chrome también ofrezca instalar la PWA", () => {
+    expect(resolveInstallMode(env({ hasInstallPrompt: true }))).toBe("apk");
+  });
+
+  it("otros sistemas conservan el diálogo de instalación PWA", () => {
     expect(
       resolveInstallMode(
         env({ userAgent: MAC, maxTouchPoints: 0, hasInstallPrompt: true }),
@@ -86,14 +88,17 @@ describe("resolveInstallMode", () => {
     expect(resolveInstallMode(env({ userAgent: IPAD }))).toBe("ios");
   });
 
-  it("Android sin evento → nada, ni un tutorial", () => {
-    // Decision del dueno (2026-09-20): en Android o se instala de un toque, o
-    // no se ofrece. El caso tipico es el navegador interno de WhatsApp, que no
-    // puede instalar nada; un boton ahi seria un boton que no cumple.
-    expect(resolveInstallMode(env())).toBe("hidden");
+  it("Android puede descargar el APK sin el evento PWA", () => {
+    expect(resolveInstallMode(env())).toBe("apk");
     expect(resolveInstallMode(env({ userAgent: INSTAGRAM_ANDROID }))).toBe(
-      "hidden",
+      "apk",
     );
+  });
+
+  it("tabletas Android también ofrecen el APK", () => {
+    expect(
+      resolveInstallMode(env({ userAgent: ANDROID.replace("Mobile ", "") })),
+    ).toBe("apk");
   });
 
   it("escritorio sin evento → nada", () => {

@@ -6,7 +6,88 @@ El modelo histórico de grupos privados permanece disponible.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
-### Horarios y torneos (2026-09-13)
+## Android: descarga directa del APK (2026-09-22)
+
+**Versión 1.0.8 · versionCode 11 · Android 7.0/API 24 o superior.**
+El botón «Descargar para Android» descarga el [APK firmado 1.0.8](https://github.com/SantiagoDevRel/la-polla-app/releases/download/android-v1.0.8/la-polla-1.0.8.apk).
+El destino está fijado por versión en `lib/platform/android-release.ts`; nunca
+apunta a un `latest` mutable. Android pide que la persona autorice al navegador
+a instalar esta aplicación. La instalación directa tiene prioridad sobre la PWA
+en navegadores Android; dentro del APK o de una PWA ya instalada no se ofrece
+instalar otra vez. iPhone conserva su guía de instalación en pantalla de inicio.
+
+El APK usa Capacitor y la misma aplicación de `https://lapollacolombiana.com`:
+**requiere internet para entrar, consultar la cuenta y jugar**. Un fallo al cargar
+muestra `android-www-stub/index.html`, una página local sin datos de sesión con
+«Reintentar». `server.errorPath` y el límite del splash permiten verla aun sin
+React ni red. No hay base de datos, cuenta ni servicio nuevos: el binario se
+distribuye como asset de GitHub Releases, sin costo adicional de alojamiento;
+la web sigue en la infraestructura existente.
+
+### Compilar y comprobar la firma
+
+Requisitos: Node.js ≥22.12, Java 21, Android SDK Platform 36 y Build Tools 36
+(`apksigner.bat` disponible en el `PATH`). Configurar `JAVA_HOME` y la ubicación
+del SDK mediante `ANDROID_HOME` o `android/local.properties`. La firma usa la
+clave existente mediante **`android/keystore.properties`**, ignorado por Git;
+no copiar sus valores a documentación, logs ni commits. Si falta la clave,
+pedir acceso a la firma existente: crear otra rompe las actualizaciones.
+
+Desde la raíz, en PowerShell:
+
+```powershell
+npm.cmd ci
+npx.cmd cap sync android
+.\android\gradlew.bat -p android assembleRelease lintRelease
+apksigner.bat verify --verbose --print-certs android\app\build\outputs\apk\release\app-release.apk
+```
+
+El resultado es `android/app/build/outputs/apk/release/app-release.apk`.
+Comprobar con `apksigner` que la firma es válida y su certificado coincide con
+la versión distribuida. Publicar el archivo como `la-polla-1.0.8.apk` en el tag
+`android-v1.0.8`, separado del código fuente: **ni APK, keystores, propiedades
+de firma ni secretos se agregan a Git**. Para actualizar sin desinstalar,
+conservar `applicationId=com.lapollacolombiana.app` y el certificado; en cada
+versión futura aumentar `versionCode` y mantener nombre, código y enlace
+coherentes entre Gradle y `lib/platform/android-release.ts`.
+
+Los cambios de la web llegan con el deploy de Vercel. Un cambio del contenedor
+nativo requiere compilar y publicar otro APK e instalar esa actualización;
+la distribución directa no usa las actualizaciones de Google Play.
+
+### Contrato del contenedor y verificación
+
+- `MainActivity` reserva una sola vez los espacios de barras, recortes y teclado.
+  `SystemBars.insetsHandling="disable"` evita una segunda aplicación de insets;
+  no sumar paddings Android equivalentes en CSS. El marcador del User-Agent
+  `LaPollaAndroid/1.0.8` impide que `CapacitorReady` cambie el layout con los
+  métodos legacy de `StatusBar`; mantiene el estilo de sus íconos.
+  El fondo de ventana y contenedor permanece oscuro; el splash no activa
+  fullscreen/immersive, cuyo cierre alteraba los insets al salir de la app.
+  Las fuentes del fallback van incrustadas: con `server.url` remoto,
+  Capacitor solo sirve localmente la URL exacta de `errorPath`.
+- Los deep links aceptan únicamente HTTPS de `lapollacolombiana.com` y `www`,
+  sin credenciales ni puertos ajenos. Navegan al origen canónico absoluto,
+  conservando query/hash para Telegram e invitaciones. `getLaunchUrl` y
+  `appUrlOpen` cubren arranque y regreso a la app; la huella SHA-256 del enlace
+  inicial evita repetirlo después del login sin guardar su token. Cambiar solo
+  el hash no bloquea enlaces posteriores. Back respeta los diálogos y el
+  historial nativo de Android.
+- Verificado en esta entrega: Gradle `assembleRelease` y `lintRelease`, **1.321
+  pruebas** (una prueba Docker opcional omitida), build Next.js y navegación
+  web con fixtures locales en **320/390/768 px y texto
+  al 200 %**, con **28 capturas** y subida de comprobante en el entorno local.
+  Se corrigieron el encabezado Tabla, interlineado de jugadores y cifras del
+  premio/entrada ampliadas, sin reducir fuentes ni cortar etiquetas.
+  No se escribieron pronósticos en producción.
+- Emuladores **Android 14/API 34 y Android 16/API 36**: barras del sistema,
+  teclado y regreso a primer plano. Android 16 conserva la sesión al reiniciar,
+  abre Perfil, atiende enlaces y vuelve con Back. El teclado reduce/restaura
+  el viewport (817 → 546 → 817 px). Android 14 prueba arranque sin red y reintento.
+  Son pruebas en emuladores; no sustituyen todos los fabricantes/dispositivos
+  físicos. El acceso completo mediante una app externa de Telegram no se probó.
+
+## Horarios y torneos (2026-09-13)
 
 Sudamericana y Europa League (`europa_2026`, liga 3 de API-Football)
 están habilitadas para estadísticas, creación de pollas y sincronización.

@@ -652,27 +652,31 @@ el ID público del build con el cliente cada dos minutos visibles y al volver a 
 Perfil ofrece el mismo botón manual. No borrar cookies, storage ni registros del SW.
 La bienvenida presenta nueve logos locales y no lleva crédito personal.
 
-### Instalar la app en la pantalla del teléfono (2026-09-20)
+### Instalar la app en la pantalla del teléfono (2026-09-22)
 
-La app siempre fue instalable; lo que faltaba era ofrecerlo. `InstallAppBubble`
-vive en `BrandHeader`, al lado de reportar un problema, y **solo tiene dos
-caras** — la diferencia la pone Apple, no nosotros:
+`InstallAppBubble` vive en `BrandHeader`, al lado de reportar un problema.
+El dueño pidió **descarga directa del APK en Android** (2026-09-22): esto
+reemplaza la regla anterior que ocultaba la opción sin evento de instalación.
 
-- **`prompt`** — Chrome (Android y escritorio) emitió `beforeinstallprompt`:
+- **`apk`** — navegador Android: «Descargar para Android» abre el APK firmado
+  **1.0.8 / versionCode 11**, fijado en `lib/platform/android-release.ts` como
+  asset `android-v1.0.8/la-polla-1.0.8.apk` de GitHub Releases. Tiene prioridad
+  aunque Chrome emita `beforeinstallprompt`; no depende de ese evento. La
+  persona autoriza al navegador a instalar el APK cuando Android se lo pide.
+- **`prompt`** — otros sistemas cuyo navegador emitió `beforeinstallprompt`:
   un toque abre su diálogo y queda instalada. **Sin tutorial, a propósito.**
 - **`ios`** — Safari nunca expuso ese evento; no existe instalar con un clic en
   iPhone. Se enseñan tres pasos con capturas.
-- Cualquier otro caso **no muestra nada** (decisión del dueño): ya instalada,
-  wrapper Capacitor, o un Android cuyo navegador no puede instalar — el caso
-  típico es el navegador interno de WhatsApp. Un botón que no puede cumplir es
-  peor que ningún botón. **No reintroducir un instructivo de Android.**
+- **`hidden`** — ya instalada en standalone, wrapper Capacitor u otro sistema
+  sin una vía disponible. La detección de app instalada sigue teniendo prioridad
+  sobre las tres opciones anteriores.
 
 Reglas duras:
 
 - La decisión vive en `lib/pwa/install-mode.ts`, función **pura y testeada**
   (`install-mode.test.ts`). El componente solo lee el entorno y la llama. No
-  duplicar la lógica en el componente ni decidir por modelo de teléfono: para
-  Android manda el EVENTO del navegador, no el User-Agent.
+  duplicar la lógica en el componente: Android se identifica por User-Agent
+  para ofrecer el APK; en los demás sistemas la PWA depende del evento real.
 - El evento se atrapa en un **script inline del `<head>`** (`app/layout.tsx`,
   `window.__lpInstallEvent`). Chrome lo emite una sola vez por carga y puede
   llegar antes de que React hidrate o estando en login/onboarding; si solo
@@ -690,7 +694,40 @@ Reglas duras:
   Optimization, free-tier) y **sin `loading="lazy"`**: dentro del panel con
   scroll Chrome no lo dispara al montarse la hoja y los tres pasos salían en
   blanco. No entran al precache del SW.
-- Preview local solo en dev: `?instalar=prompt` y `?instalar=ios`.
+- Preview local solo en dev: `?instalar=apk`, `?instalar=prompt` y `?instalar=ios`.
+
+**Contrato Android 1.0.8:** mínimo Android 7/API 24; Java 21 y SDK 36 para
+compilar. `MainActivity` aplica una vez los insets de barras/recortes/teclado;
+`SystemBars.insetsHandling="disable"` y los insets devueltos en cero impiden
+duplicarlos en el WebView. **No sumar compensaciones Android en CSS.** El
+User-Agent `LaPollaAndroid/1.0.8` hace que `CapacitorReady` conserve el estilo
+de íconos sin reconfigurar fondo/overlay con el plugin legacy `StatusBar`.
+El fallback local `android-www-stub/index.html` ofrece Reintentar si la web no
+carga: consultar datos y jugar requieren internet.
+
+`lib/platform/native-links.ts` valida HTTPS/origen exacto, sin userinfo ni
+puertos ajenos, y navega con URL absoluta al apex conservando query/hash.
+El listener atiende arranque frío y eventos posteriores sin repetir el enlace
+de inicio tras el POST de Telegram: guarda solo una huella SHA-256 en
+sessionStorage. Cambiar el hash no inmoviliza los enlaces posteriores. El
+cleanup soporta StrictMode y promesas tardías. Back es solo Android y respeta
+Escape de diálogos e historial nativo.
+
+La web remota se actualiza al desplegar Vercel; los cambios nativos necesitan
+otro APK, sin promesas de actualización por Google Play. Conservar applicationId
+y certificado de firma, subir versionCode en cada nueva versión y nunca
+commitear APK/keystore/`keystore.properties`. No se crean bases ni servicios
+pagos. Comandos, enlace y verificaciones en README → «Android: descarga directa
+del APK»: Gradle build/lint, build Next.js, 1.321 pruebas y capturas web locales
+a 320/390/768 px y texto200, incluida subida local de comprobante. Emuladores
+Android 14/16 verifican barras, teclado y regreso; Android 16 también sesión
+persistente, Perfil, enlaces y Back. Android 14 cubre arranque sin red/reintento.
+Sin prueba en teléfonos físicos ni login completo desde la app de Telegram.
+Mantener `android:windowBackground` y contenedor oscuros: SystemBars repinta el
+decor con ese atributo. No activar splash fullscreen/immersive: su teardown
+restaura decorFitsSystemWindows y compite con MainActivity. Fuentes del fallback
+incrustadas en HTML: `server.url` remoto solo permite servir local el errorPath
+exacto, no sus recursos relativos.
 
 ### Veintiún torneos, todos de API-Football (2026-09-18, migración 141)
 

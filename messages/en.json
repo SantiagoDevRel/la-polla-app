@@ -1031,6 +1031,7 @@
   },
   "Install": {
     "ariaButton": "Install the app",
+    "ariaButtonAndroid": "Download for Android",
     "ariaButtonIOS": "Install the app on your iPhone",
     "subtitle": "The icon stays on your screen, one tap away.",
     "iosTitle": "Install on your iPhone",
