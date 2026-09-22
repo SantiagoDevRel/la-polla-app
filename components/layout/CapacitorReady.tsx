@@ -30,11 +30,14 @@ export function CapacitorReady() {
         /* plugin missing — splash auto-hides at launchShowDuration */
       });
 
-    // 2) Status bar style: dark background (#080c10) + light icons,
-    // overlapping disabled so content does not slide under it.
+    // 2) Light status bar icons. Background/overlay are legacy settings
+    // (Android <=14); Android 15/16 uses the native SystemBars insets.
     import("@capacitor/status-bar")
       .then(async ({ StatusBar, Style }) => {
         await StatusBar.setStyle({ style: Style.Dark });
+        // APK 1.0.8+ owns its system/keyboard insets in MainActivity. The
+        // legacy plugin must not change that window layout on Android 7–14.
+        if (navigator.userAgent.includes("LaPollaAndroid/")) return;
         await StatusBar.setBackgroundColor({ color: "#080c10" });
         await StatusBar.setOverlaysWebView({ overlay: false });
       })

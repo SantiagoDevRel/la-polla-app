@@ -263,7 +263,7 @@ export default async function PollaPage({
     <div className="pb-32">
       {/* ── Hero ──────────────────────────────────────────────────────────
             (2026-09-13) Compacto para que las pestañas aparezcan sin bajar:
-            solo logos, estado junto al nombre, qué hay que acertar, y pozo +
+            solo logos, nombre y estado, qué hay que acertar, y pozo +
             entrada en un solo bloque. Antes la entrada y "se lleva el ganador"
             iban en otra tarjeta que repetía la cifra del pozo. */}
       {/* (2026-09-18) Quien ya está dentro viene a pronosticar, no a que le
@@ -299,15 +299,15 @@ export default async function PollaPage({
             </Link>
           )}
         </div>
-        <div className="mt-3 flex items-start justify-between gap-3">
-          <h1 className={`lp-display min-w-0 flex-1 ${participa ? "text-[28px]" : "text-[34px]"} [overflow-wrap:anywhere]`}>{polla.name}</h1>
-          <Tape tone={estado.tone} className="mt-1 shrink-0">
+        <div className="mt-3 flex flex-col items-start gap-2">
+          <h1 className={`lp-display w-full min-w-0 ${participa ? "text-[28px]" : "text-[34px]"} [overflow-wrap:anywhere]`}>{polla.name}</h1>
+          <Tape tone={estado.tone} className="max-w-full [overflow-wrap:anywhere]">
             {estado.text}
           </Tape>
         </div>
         {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className={`${participa ? "mt-2" : "mt-3"} self-start`} />}
-        <div className={`${participa ? "mt-3" : "mt-4"} grid grid-cols-2 gap-x-3 gap-y-4`}>
-          <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : "min-w-0"}>
+        <div className={`${participa ? "mt-3" : "mt-4"} ${objeto ? "grid grid-cols-2" : "flex flex-wrap"} gap-x-3 gap-y-4`}>
+          <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : "min-w-0 flex-[1_1_min-content]"}>
             {objeto && polla.prize_image_path && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -319,15 +319,15 @@ export default async function PollaPage({
             )}
             <div className="min-w-0">
               <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
-              <div className="lp-money mt-1 text-[32px] leading-none text-gold [overflow-wrap:anywhere]">
+              <div className={`lp-money mt-1 text-[32px] leading-none text-gold ${objeto ? "[overflow-wrap:anywhere]" : "break-words"}`}>
                 {objeto ? polla.prize_object : formatCop(pot.prize_cop)}
               </div>
             </div>
           </div>
-          <div className={objeto ? "min-w-0" : "min-w-0 border-l border-border-subtle pl-3"}>
+          <div className={objeto ? "min-w-0" : "min-w-0 flex-[1_1_min-content] border-l border-border-subtle pl-3"}>
             <Label>Entrada</Label>
             {/* «$0» se lee como una transferencia de cero pesos (migración 143). */}
-            <div className="lp-money mt-1 text-[32px] leading-none text-text-primary [overflow-wrap:anywhere]">
+            <div className="lp-money mt-1 break-words text-[32px] leading-none text-text-primary">
               {entryPriceLabel(polla.entry_price_cop)}
             </div>
           </div>
@@ -339,7 +339,7 @@ export default async function PollaPage({
           {!participa && !objeto && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
             <span>Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</span>
           )}
-          {/* El estado ya va en la etiqueta junto al nombre: aquí no se repite. */}
+          {/* El estado ya va en la etiqueta bajo el nombre: aquí no se repite. */}
           <span>
             {pot.paid_entries} inscritos{abierta ? ` · cierra en ${timeLeft(polla.closes_at)}` : ""}
           </span>

@@ -5,21 +5,18 @@
 // porque es la unica parte con reglas de verdad, y asi se puede probar sin
 // browser — el repo no tiene testing-library.
 //
-// Solo hay dos ofertas posibles, y la diferencia la pone Apple:
-//   · prompt  Chrome (Android y escritorio) emite `beforeinstallprompt`, asi
-//             que UN toque abre su dialogo y la app queda instalada de verdad
-//             (WebAPK: icono en el cajon de apps, sin barra de navegador).
-//             No hay tutorial porque no hace falta.
+//   · apk     Android descarga el APK firmado desde la publicación oficial.
+//             Tiene prioridad incluso si Chrome ofrece instalar la PWA.
+//   · prompt  En otros sistemas, el evento `beforeinstallprompt` abre el
+//             diálogo de instalación de la PWA.
 //   · ios     Safari NUNCA emitio ese evento y Apple no expone ninguna otra
 //             via: en iPhone no existe forma de instalar con un clic. Lo unico
 //             honesto es ensenar "Compartir > Agregar a pantalla de inicio".
 //
-// Y si no hay ninguna de las dos (ya instalada, wrapper Capacitor, o un
-// Android cuyo navegador no ofrece instalar — el caso tipico es el navegador
-// interno de WhatsApp) no se muestra nada: decision del dueno, 2026-09-20.
-// Un boton que no puede cumplir es peor que ningun boton.
+// Dentro de la app instalada o del wrapper no se ofrece instalar otra vez.
+// El APK no depende de que el navegador emita el evento de la PWA.
 
-export type InstallMode = "hidden" | "prompt" | "ios";
+export type InstallMode = "hidden" | "apk" | "prompt" | "ios";
 
 export interface InstallEnvironment {
   userAgent: string;
@@ -48,8 +45,8 @@ export function isInAppBrowser(userAgent: string): boolean {
 export function resolveInstallMode(env: InstallEnvironment): InstallMode {
   // Ofrecer instalar lo que ya esta instalado es ruido.
   if (env.standalone || env.nativeShell) return "hidden";
-  // El evento manda sobre el sistema operativo: si Chrome lo dio, hay un toque
-  // y se acabo. Tambien cubre Chrome/Edge de escritorio.
+  if (/Android/i.test(env.userAgent)) return "apk";
+  // Los otros sistemas conservan su instalación PWA cuando está disponible.
   if (env.hasInstallPrompt) return "prompt";
   if (isIOSDevice(env.userAgent, env.maxTouchPoints)) return "ios";
   return "hidden";

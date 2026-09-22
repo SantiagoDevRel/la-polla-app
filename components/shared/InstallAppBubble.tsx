@@ -5,14 +5,14 @@
 // faltaba era que alguien lo ofreciera. Nadie llega solo a "Compartir >
 // Agregar a pantalla de inicio".
 //
-// Dos caras, y la diferencia la pone Apple (ver lib/pwa/install-mode.ts):
-//   · prompt  Chrome nos dio `beforeinstallprompt` -> UN toque abre su dialogo
-//             y queda instalada. Sin tutorial: no hace falta.
+// Opciones según el dispositivo (ver lib/pwa/install-mode.ts):
+//   · apk     Android descarga directamente el APK firmado.
+//   · prompt  Otros sistemas con `beforeinstallprompt` abren el diálogo PWA.
 //   · ios     Safari no permite instalar con un clic, asi que se ensenan los
 //             tres pasos con capturas.
 // Cualquier otro caso no muestra nada.
 //
-// Preview local (SOLO en dev): ?instalar=prompt | ios fuerza una cara sin
+// Preview local (SOLO en dev): ?instalar=apk | prompt | ios fuerza una cara sin
 // necesidad de un telefono. En produccion no existe.
 "use client";
 
@@ -22,6 +22,7 @@ import { Download, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
 import { captureEvent } from "@/app/providers";
+import { ANDROID_APK_URL } from "@/lib/platform/android-release";
 import {
   isInAppBrowser,
   resolveInstallMode,
@@ -93,7 +94,7 @@ export default function InstallAppBubble({
     // Preview local, solo en desarrollo.
     if (process.env.NODE_ENV === "development") {
       const forced = new URLSearchParams(window.location.search).get("instalar");
-      if (forced === "prompt" || forced === "ios") {
+      if (forced === "apk" || forced === "prompt" || forced === "ios") {
         setMode(forced);
         return;
       }
@@ -149,8 +150,7 @@ export default function InstallAppBubble({
   }, [open]);
 
   const install = useCallback(async () => {
-    // Sin evento guardado no hay nada que abrir, y no inventamos un tutorial
-    // de Android: mejor retirar el boton que dejar uno que no cumple.
+    // La instalación PWA requiere un evento guardado de un solo uso.
     if (!deferred) {
       setMode("hidden");
       return;
@@ -193,6 +193,22 @@ export default function InstallAppBubble({
 
   if (mode === "hidden") return null;
 
+  const buttonClassName = `inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border-default bg-bg-elevated text-gold transition-colors hover:border-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold active:bg-bg-card ${className}`;
+
+  if (mode === "apk") {
+    return (
+      <a
+        href={ANDROID_APK_URL}
+        aria-label={t("ariaButtonAndroid")}
+        title={t("ariaButtonAndroid")}
+        onClick={() => captureEvent("android_apk_download_clicked")}
+        className={buttonClassName}
+      >
+        <Download size={22} strokeWidth={2.25} aria-hidden="true" />
+      </a>
+    );
+  }
+
   const isIOS = mode === "ios";
   // Capturas de la app REAL dentro del Safari del iPhone (mockup armado con la
   // pantalla verdadera), las tres al mismo alto para que se vean parejas.
@@ -210,7 +226,7 @@ export default function InstallAppBubble({
         onClick={onButtonClick}
         aria-label={buttonLabel}
         title={buttonLabel}
-        className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-border-default bg-bg-elevated text-gold transition-colors hover:border-gold ${className}`}
+        className={buttonClassName}
       >
         {isIOS ? (
           // La manzanita. lucide-react no trae logos de marca, asi que va el

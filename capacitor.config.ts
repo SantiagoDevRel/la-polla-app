@@ -8,12 +8,10 @@
 //    /auth/callback, middleware, API routes, Supabase SSR).
 //  - Cada feature nueva se deploya a Vercel y la app mobile la "hereda"
 //    sin rebuilder el APK ni subir a Play Store.
-//  - Desventaja: sin conexion al primer arranque, queda en el splash.
-//    Pero como es PWA con Service Worker (Serwist), despues del primer
-//    uso funciona offline normal.
-//
-// Para BUILD LOCAL (dev en emulador sin red), comentar `server.url`
-// y usar `webDir: "out"` despues de `npx next build && next export`.
+//  - Requiere conexion para consultar la cuenta y jugar. Ante un fallo de
+//    carga muestra una pagina local sin datos de sesion, con reintento.
+// Capacitor documenta server.url para live reload; este wrapper remoto es
+// una decision explicita del proyecto porque Next necesita su servidor.
 
 import type { CapacitorConfig } from "@capacitor/cli";
 
@@ -30,21 +28,17 @@ const config: CapacitorConfig = {
   server: {
     url: "https://lapollacolombiana.com",
     cleartext: false,
-    allowNavigation: [
-      "lapollacolombiana.com",
-      "*.lapollacolombiana.com",
-      // Supabase: phone OTP verify, sessions, postgrest.
-      "*.supabase.co",
-      // WhatsApp deep links — algunos botones del app abren chat con bot.
-      "wa.me",
-      "api.whatsapp.com",
-      // Cloudflare Turnstile — si se reactiva como anti-bot en login.
-      "challenges.cloudflare.com",
-    ],
+    errorPath: "index.html",
+    // El origen principal ya esta permitido por server.url. Los demas
+    // destinos abren fuera de la WebView; fetch/imagenes no necesitan
+    // allowNavigation ni acceso al puente nativo.
+    allowNavigation: ["www.lapollacolombiana.com"],
   },
 
   android: {
     allowMixedContent: false,
+    zoomEnabled: true,
+    appendUserAgent: "LaPollaAndroid/1.0.8",
     backgroundColor: "#080c10", // matchea --bg-base del design system
   },
 
@@ -71,19 +65,23 @@ const config: CapacitorConfig = {
   },
 
   plugins: {
+    SystemBars: {
+      style: "DARK",
+      // MainActivity reserves bars, cutouts and IME once for every WebView.
+      insetsHandling: "disable",
+    },
     SplashScreen: {
-      // Native splash queda visible hasta que React monta y llama
-      // SplashScreen.hide() (ver components/layout/CapacitorReady.tsx).
-      // Evita el "flash blanco" durante cold start de Vercel + WebView
-      // load + bundle download. Si por algun motivo React nunca monta
-      // (ej. crash JS), el launchShowDuration funciona como timeout
-      // hard.
-      launchShowDuration: 30000,
-      launchAutoHide: false,
+      // React lo oculta al montar. El limite nativo tambien lo oculta
+      // si falla la red o JavaScript: la pagina local de error no tiene
+      // plugins Capacitor y no podria llamar SplashScreen.hide().
+      launchShowDuration: 3000,
+      launchAutoHide: true,
       backgroundColor: "#080c10",
       androidSplashResourceName: "splash",
-      splashFullScreen: true,
-      splashImmersive: true,
+      // Fullscreen teardown resets decorFitsSystemWindows when leaving the
+      // app, competing with MainActivity's persistent inset handling.
+      splashFullScreen: false,
+      splashImmersive: false,
     },
     Keyboard: {
       // resize/style are iOS-only. resizeOnFullScreen es el unico que

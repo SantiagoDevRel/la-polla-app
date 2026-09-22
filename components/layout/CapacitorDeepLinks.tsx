@@ -11,6 +11,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { listenForNativeLinks } from "@/lib/platform/native-links";
 
 export function CapacitorDeepLinks() {
   useEffect(() => {
@@ -22,37 +23,24 @@ export function CapacitorDeepLinks() {
       return;
     }
 
+    let disposed = false;
     let removeHandler: (() => void) | undefined;
 
     import("@capacitor/app")
       .then(({ App }) => {
-        const handlePromise = App.addListener("appUrlOpen", (event) => {
-          // event.url is the full URL that was tapped to open us, e.g.
-          // https://lapollacolombiana.com/api/auth/wa-magic?token=abc
-          // or https://lapollacolombiana.com/invites/polla/XYZ.
-          // We navigate the WebView to the same path so the existing
-          // server routes (auth callback, invite preview, etc.) handle
-          // it normally — no app-side routing needed.
-          try {
-            const url = new URL(event.url);
-            const target = `${url.pathname}${url.search}${url.hash}`;
-            // hard navigation, not router.push, so any in-flight state
-            // (cookies, OTP forms) is reset and the destination route
-            // mounts fresh from scratch.
-            window.location.href = target || "/";
-          } catch {
-            /* malformed URL — ignore; we don't want to crash on bad input */
-          }
+        if (disposed) return;
+        removeHandler = listenForNativeLinks(App, {
+          currentUrl: () => window.location.href,
+          navigate: (target) => window.location.assign(target),
+          storage: () => window.sessionStorage,
         });
-        removeHandler = () => {
-          handlePromise.then((handle) => handle.remove()).catch(() => {});
-        };
       })
       .catch(() => {
         /* @capacitor/app missing — fall back to default Capacitor behavior */
       });
 
     return () => {
+      disposed = true;
       removeHandler?.();
     };
   }, []);

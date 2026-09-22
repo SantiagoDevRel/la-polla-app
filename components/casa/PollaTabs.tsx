@@ -169,12 +169,12 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
         {/* (2026-09-18) Aquí iba un párrafo de 21 palabras sobre pagos y cupos, y
             otro de 26-33 sobre el reparto. La tabla ya lo dice sola («Ganaría
             $X» bajo el nombre) y la regla completa está en Info: un toque. */}
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="lp-display-sm text-text-primary">Posiciones</h2>
-          <div className="flex shrink-0 items-center gap-1">
-            {info && <VerMasInfo section="premio">Cómo se gana</VerMasInfo>}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="lp-display-sm max-w-full text-text-primary [overflow-wrap:anywhere]">Posiciones</h2>
+          <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1">
+            {info && <VerMasInfo section="premio" className="max-w-full text-left [overflow-wrap:anywhere]">Cómo se gana</VerMasInfo>}
             <button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} aria-label={loading ? "Actualizando tabla" : "Actualizar tabla"} title="Actualizar"
-              className="grid h-11 w-11 cursor-pointer place-items-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-default disabled:opacity-50">
+              className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-default disabled:opacity-50">
               <RefreshCw aria-hidden="true" className={`h-5 w-5 ${loading ? "motion-safe:animate-spin" : ""}`} />
             </button>
           </div>
@@ -190,23 +190,27 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
             <p className="mt-2 text-sm text-text-secondary">Aquí aparecerán los jugadores cuando confirmemos sus pagos.</p>
           </div>
         ) : (
-          <table className="w-full table-fixed text-left">
+          <table className="w-full table-auto text-left">
             <caption className="sr-only">Tabla de posiciones: {rows.length} participantes con pago aprobado</caption>
             <thead className="text-[11px] uppercase tracking-wide text-text-muted">
-              <tr><th scope="col" className="w-12 pb-2 font-medium"><span className="sr-only">Posición</span><span aria-hidden>Pos.</span></th><th scope="col" className="pb-2 font-medium">Jugador</th><th scope="col" className="w-16 pb-2 text-right font-medium"><span className="sr-only">Puntos</span><span aria-hidden>Pts.</span></th></tr>
+              <tr>
+                <th scope="col" className="w-12 whitespace-nowrap pb-2 pr-3 font-medium"><span className="sr-only">Posición</span><span aria-hidden>Pos.</span></th>
+                <th scope="col" className="whitespace-nowrap pb-2 pr-3 font-medium">Jugador</th>
+                <th scope="col" className="w-16 whitespace-nowrap pb-2 pl-3 text-right font-medium"><span className="sr-only">Puntos</span><span aria-hidden>Pts.</span></th>
+              </tr>
             </thead>
             <tbody>
               {rows.map(row => (
                 <tr key={row.entry_id} className={`border-t border-border-subtle transition-colors duration-200 hover:bg-bg-elevated ${row.user_id === userId ? "bg-turf/10" : "bg-bg-card"}`}>
                   <td className="lp-money px-2 py-3 align-top text-lg">{row.puesto}</td>
-                  <th scope="row" className="py-3 font-medium">
+                  <th scope="row" className="py-3 pr-3 font-medium">
                     <div className="flex items-start gap-2">
                       <UserAvatar avatarUrl={row.avatar_url} displayName={row.display_name ?? "Jugador"} size="sm" />
-                      <span className="min-w-0 self-center text-sm [overflow-wrap:anywhere]">
-                        {row.display_name ?? "Sin nombre"}{(row.user_entries ?? 1) > 1 && row.entry_number != null && <span className="ml-1 whitespace-nowrap text-xs text-text-secondary" aria-label={`cupo ${row.entry_number}`}>#{row.entry_number}</span>}{row.user_id === userId && <span className="ml-1 text-xs text-turf">(tú)</span>}
+                      <span className="min-w-0 self-center text-sm leading-normal [overflow-wrap:anywhere]">
+                        {row.display_name ?? "Sin nombre"}{(row.user_entries ?? 1) > 1 && row.entry_number != null && <span className="ml-1 whitespace-nowrap text-xs leading-normal text-text-secondary" aria-label={`cupo ${row.entry_number}`}>#{row.entry_number}</span>}{row.user_id === userId && <span className="ml-1 text-xs leading-normal text-turf">(tú)</span>}
                         {/* Premio provisional (migración 133): oro porque es señal de premio, no adorno. */}
                         {prizeByEntry.has(row.entry_id) && (
-                          <span className="mt-0.5 block text-xs font-semibold text-gold">
+                          <span className="mt-0.5 block text-xs font-semibold leading-normal text-gold">
                             {finished ? "Se lleva" : "Ganaría"} <span className="lp-money text-[14px]">{formatCop(prizeByEntry.get(row.entry_id)!)}</span>
                           </span>
                         )}
@@ -222,7 +226,7 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
                       </span>
                     </div>
                   </th>
-                  <td className="lp-money py-3 pr-2 text-right align-top text-lg">{row.points}</td>
+                  <td className="lp-money py-3 pl-3 pr-2 text-right align-top text-lg">{row.points}</td>
                 </tr>
               ))}
             </tbody>

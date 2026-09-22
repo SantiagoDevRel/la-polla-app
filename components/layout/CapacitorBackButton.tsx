@@ -15,38 +15,53 @@
 "use client";
 
 import { useEffect } from "react";
+import type { PluginListenerHandle } from "@capacitor/core";
 
 export function CapacitorBackButton() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } })
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string } })
       .Capacitor;
-    if (!cap || typeof cap.isNativePlatform !== "function" || !cap.isNativePlatform()) {
+    if (!cap?.isNativePlatform?.() || cap.getPlatform?.() !== "android") {
       return;
     }
 
-    let removeHandler: (() => void) | undefined;
+    let disposed = false;
+    let handle: PluginListenerHandle | undefined;
+    const remove = (listener: PluginListenerHandle) => { void listener.remove().catch(() => {}); };
 
     import("@capacitor/app")
-      .then(({ App }) => {
-        const handlePromise = App.addListener("backButton", ({ canGoBack }) => {
-          if (canGoBack || (typeof window !== "undefined" && window.history.length > 1)) {
+      .then(async ({ App }) => {
+        if (disposed) return;
+        const listener = await App.addListener("backButton", ({ canGoBack }) => {
+          if (disposed) return;
+          const dialog = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]'))
+            .reverse().find((element) => element.getClientRects().length > 0);
+          if (dialog) {
+            // Reuse the existing dialogs' Escape handlers. A modal that cannot
+            // dismiss must also prevent Back from exiting the whole screen.
+            dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+            return;
+          }
+          // Native canGoBack is authoritative; history.length also counts
+          // forward entries and can trap Back on the first WebView page.
+          if (canGoBack) {
             window.history.back();
           } else {
-            App.exitApp();
+            void App.exitApp().catch(() => {});
           }
         });
-        removeHandler = () => {
-          handlePromise.then((handle) => handle.remove()).catch(() => {});
-        };
+        if (disposed) remove(listener);
+        else handle = listener;
       })
       .catch(() => {
         /* plugin missing on this build — fall back to Capacitor default */
       });
 
     return () => {
-      removeHandler?.();
+      disposed = true;
+      if (handle) remove(handle);
     };
   }, []);
 
