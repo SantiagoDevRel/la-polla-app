@@ -2,6 +2,7 @@ package com.lapollacolombiana.app;
 
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.CookieManager;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -9,6 +10,15 @@ import androidx.core.view.WindowInsetsCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    @Override
+    public void onPause() {
+        super.onPause();
+        // HTTP Set-Cookie can remain only in WebView memory. Persist the
+        // existing cookie jar before Android may kill the background process;
+        // preserve expiry/security attributes and explicit logout deletions.
+        CookieManager.getInstance().flush();
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

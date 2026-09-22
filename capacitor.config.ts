@@ -38,7 +38,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: false,
     zoomEnabled: true,
-    appendUserAgent: "LaPollaAndroid/1.0.8",
+    appendUserAgent: "LaPollaAndroid/1.0.9",
     backgroundColor: "#080c10", // matchea --bg-base del design system
   },
 
