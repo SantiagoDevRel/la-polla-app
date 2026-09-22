@@ -3,7 +3,7 @@ import { PAISES_SMS, paisSmsPermitido } from "@/lib/sms/paises";
 import { sendSms } from "@/lib/sms/labsmobile";
 
 describe("paisSmsPermitido", () => {
-  it("acepta los nueve países de la lista, con o sin +", () => {
+  it("acepta los once países de la lista, con o sin +", () => {
     const muestras: Record<string, string> = {
       CO: "573001234567",
       US: "+12025550123",
@@ -14,6 +14,8 @@ describe("paisSmsPermitido", () => {
       BR: "+5511912345678",
       EC: "+593991234567",
       ES: "+34612345678",
+      PT: "+351912345678",
+      BE: "+32470123456",
     };
     expect(Object.keys(muestras).sort()).toEqual([...PAISES_SMS].sort());
     for (const [pais, tel] of Object.entries(muestras)) {
@@ -27,7 +29,8 @@ describe("paisSmsPermitido", () => {
   });
 
   it("rechaza otros países y basura", () => {
-    for (const tel of ["+584121234567", "+33612345678", "+61412345678", "+525512345678", "", "abc"]) {
+    // Francia y Países Bajos son vecinos de Bélgica: el +33/+31 no se cuela.
+    for (const tel of ["+584121234567", "+33612345678", "+31612345678", "+61412345678", "+525512345678", "", "abc"]) {
       expect(paisSmsPermitido(tel)).toBeNull();
     }
   });
