@@ -8,8 +8,8 @@ Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
 ## Android: descarga directa del APK (2026-09-22)
 
-**Versión 1.0.8 · versionCode 11 · Android 7.0/API 24 o superior.**
-El botón «Descargar para Android» descarga el [APK firmado 1.0.8](https://github.com/SantiagoDevRel/la-polla-app/releases/download/android-v1.0.8/la-polla-1.0.8.apk).
+**Versión 1.0.9 · versionCode 12 · Android 7.0/API 24 o superior.**
+El botón «Descargar para Android» descarga el [APK firmado 1.0.9](https://github.com/SantiagoDevRel/la-polla-app/releases/download/android-v1.0.9/la-polla-1.0.9.apk).
 El destino está fijado por versión en `lib/platform/android-release.ts`; nunca
 apunta a un `latest` mutable. Android pide que la persona autorice al navegador
 a instalar esta aplicación. La instalación directa tiene prioridad sobre la PWA
@@ -44,8 +44,8 @@ apksigner.bat verify --verbose --print-certs android\app\build\outputs\apk\relea
 
 El resultado es `android/app/build/outputs/apk/release/app-release.apk`.
 Comprobar con `apksigner` que la firma es válida y su certificado coincide con
-la versión distribuida. Publicar el archivo como `la-polla-1.0.8.apk` en el tag
-`android-v1.0.8`, separado del código fuente: **ni APK, keystores, propiedades
+la versión distribuida. Publicar el archivo como `la-polla-1.0.9.apk` en el tag
+`android-v1.0.9`, separado del código fuente: **ni APK, keystores, propiedades
 de firma ni secretos se agregan a Git**. Para actualizar sin desinstalar,
 conservar `applicationId=com.lapollacolombiana.app` y el certificado; en cada
 versión futura aumentar `versionCode` y mantener nombre, código y enlace
@@ -60,7 +60,7 @@ la distribución directa no usa las actualizaciones de Google Play.
 - `MainActivity` reserva una sola vez los espacios de barras, recortes y teclado.
   `SystemBars.insetsHandling="disable"` evita una segunda aplicación de insets;
   no sumar paddings Android equivalentes en CSS. El marcador del User-Agent
-  `LaPollaAndroid/1.0.8` impide que `CapacitorReady` cambie el layout con los
+  `LaPollaAndroid/1.0.9` impide que `CapacitorReady` cambie el layout con los
   métodos legacy de `StatusBar`; mantiene el estilo de sus íconos.
   El fondo de ventana y contenedor permanece oscuro; el splash no activa
   fullscreen/immersive, cuyo cierre alteraba los insets al salir de la app.
@@ -86,6 +86,32 @@ la distribución directa no usa las actualizaciones de Google Play.
   el viewport (817 → 546 → 817 px). Android 14 prueba arranque sin red y reintento.
   Son pruebas en emuladores; no sustituyen todos los fabricantes/dispositivos
   físicos. El acceso completo mediante una app externa de Telegram no se probó.
+
+### Sesión después de cerrar el APK (1.0.9)
+
+La 1.0.8 podía perder un login reciente: WebView recibía las cookies HTTP con
+`Max-Age` y `Secure` correctos, pero no alcanzaba a guardarlas en disco. Al
+cerrar el proceso, el siguiente arranque no tenía sesión. `MainActivity.onPause`
+ahora llama `CookieManager.flush()` antes de que Android pueda terminar el
+proceso en segundo plano. Conserva el almacén, atributos y vencimientos originales;
+no copia tokens a otro almacenamiento ni cambia la duración de la sesión.
+
+Prueba A/B en Android 14: respuesta HTTP con cookies serializadas por Supabase
+SSR/Next → Inicio → Home → cierre del proceso → arranque → Perfil. La 1.0.8
+perdió las cookies; la corrección conservó las dos partes con sus mismos
+vencimientos y abrió Perfil. La prueba anterior, que inyectaba cookies por CDP,
+no verificaba esta persistencia desde la respuesta HTTP.
+
+Regresión sin cuentas, SMS ni base de datos, **solo en un emulador aislado con
+APK debug instalado** (la cookie de prueba no autentica a nadie):
+
+```powershell
+node scripts/android-session-check.mjs --serial emulator-5572
+```
+
+Para recibir este arreglo hay que instalar la 1.0.9 sobre la app existente;
+un deploy web no cambia el ciclo de vida Android. Si la versión anterior ya
+perdió la sesión, será necesario entrar una vez después de actualizar.
 
 ## Horarios y torneos (2026-09-13)
 

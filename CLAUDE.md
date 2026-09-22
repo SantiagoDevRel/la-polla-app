@@ -659,8 +659,8 @@ El dueño pidió **descarga directa del APK en Android** (2026-09-22): esto
 reemplaza la regla anterior que ocultaba la opción sin evento de instalación.
 
 - **`apk`** — navegador Android: «Descargar para Android» abre el APK firmado
-  **1.0.8 / versionCode 11**, fijado en `lib/platform/android-release.ts` como
-  asset `android-v1.0.8/la-polla-1.0.8.apk` de GitHub Releases. Tiene prioridad
+  **1.0.9 / versionCode 12**, fijado en `lib/platform/android-release.ts` como
+  asset `android-v1.0.9/la-polla-1.0.9.apk` de GitHub Releases. Tiene prioridad
   aunque Chrome emita `beforeinstallprompt`; no depende de ese evento. La
   persona autoriza al navegador a instalar el APK cuando Android se lo pide.
 - **`prompt`** — otros sistemas cuyo navegador emitió `beforeinstallprompt`:
@@ -696,11 +696,11 @@ Reglas duras:
   blanco. No entran al precache del SW.
 - Preview local solo en dev: `?instalar=apk`, `?instalar=prompt` y `?instalar=ios`.
 
-**Contrato Android 1.0.8:** mínimo Android 7/API 24; Java 21 y SDK 36 para
+**Contrato Android 1.0.9:** mínimo Android 7/API 24; Java 21 y SDK 36 para
 compilar. `MainActivity` aplica una vez los insets de barras/recortes/teclado;
 `SystemBars.insetsHandling="disable"` y los insets devueltos en cero impiden
 duplicarlos en el WebView. **No sumar compensaciones Android en CSS.** El
-User-Agent `LaPollaAndroid/1.0.8` hace que `CapacitorReady` conserve el estilo
+User-Agent `LaPollaAndroid/1.0.9` hace que `CapacitorReady` conserve el estilo
 de íconos sin reconfigurar fondo/overlay con el plugin legacy `StatusBar`.
 El fallback local `android-www-stub/index.html` ofrece Reintentar si la web no
 carga: consultar datos y jugar requieren internet.
@@ -728,6 +728,14 @@ decor con ese atributo. No activar splash fullscreen/immersive: su teardown
 restaura decorFitsSystemWindows y compite con MainActivity. Fuentes del fallback
 incrustadas en HTML: `server.url` remoto solo permite servir local el errorPath
 exacto, no sus recursos relativos.
+
+**Sesión Android (1.0.9):** `MainActivity.onPause()` persiste el almacén nativo
+con `CookieManager.flush()`. No quitarlo: la 1.0.8 perdía cookies persistentes
+recién recibidas por HTTP al cerrar el proceso. No era falta de Max-Age en
+Supabase; no cambiar duración/atributos ni copiar tokens a localStorage. La
+regresión `scripts/android-session-check.mjs --serial emulator-5572` usa su
+propia cookie ficticia recibida por HTTP y reinicia solo la app en un emulador
+aislado. Inyectar cookies mediante CDP no demuestra persistencia del login.
 
 ### Veintiún torneos, todos de API-Football (2026-09-18, migración 141)
 
