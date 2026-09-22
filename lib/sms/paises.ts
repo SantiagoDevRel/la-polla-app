@@ -9,10 +9,16 @@
 //
 // El país se deduce con libphonenumber-js y no por el prefijo: +1 lo comparten
 // Estados Unidos, Canadá y el Caribe, y solo Estados Unidos está permitido.
+//
+// 2026-09-22: el dueño pidió sumar Portugal y Bélgica (España ya estaba).
+// Tarifa de la cuenta ese día (POST /json/prices, créditos por SMS):
+// CO 0,043 · PT 0,345 · ES 1,0 · BE 1,727 (≈40 veces Colombia). Cualquier
+// otro país entra solo por pedido del dueño: sumar uno acá es aceptar su
+// costo por código en cada login.
 
 import { parsePhoneNumberFromString } from "libphonenumber-js/min";
 
-export const PAISES_SMS = ["CO", "US", "PA", "AR", "PE", "CL", "BR", "EC", "ES"] as const;
+export const PAISES_SMS = ["CO", "US", "PA", "AR", "PE", "CL", "BR", "EC", "ES", "PT", "BE"] as const;
 
 export type PaisSms = (typeof PAISES_SMS)[number];
 
