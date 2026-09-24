@@ -95,6 +95,9 @@ describe("middleware: /api/cron/ se autentica solo", () => {
     "/casa/demo/pagar",
     "/casa/admin",
     "/api/casa/pollas/demo/otra-cosa",
+    "/api/casa/pollas/demo/prize-contact/otra",
+    "/api/casa/pollas/demo/prize-contact-extra",
+    "/api/casa/pollas/demo/object-result/otra",
   ])("sigue protegiendo %s con el gate de sesión", async (path) => {
     const response = await updateSession(new NextRequest(`http://localhost${path}`));
     expect(response.status).toBe(307);
@@ -107,6 +110,17 @@ describe("middleware: /api/cron/ se autentica solo", () => {
       new NextRequest("http://localhost/api/casa/pollas/demo/match-picks?match=x"),
     );
     expect(response.status).not.toBe(307);
+  });
+
+  it.each(["prize-contact", "object-result"])("%s llega a su handler para responder JSON 401", async (endpoint) => {
+    const request = new NextRequest(`https://lapollacolombiana.com/api/casa/pollas/demo/${endpoint}`, {
+      headers: { host: "lapollacolombiana.com" },
+    });
+    for (const handler of [updateSession, proxy]) {
+      const response = await handler(request);
+      expect(response.status).not.toBe(307);
+      expect(response.headers.get("location")).toBeNull();
+    }
   });
 });
 

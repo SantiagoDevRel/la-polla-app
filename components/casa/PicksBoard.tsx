@@ -16,7 +16,7 @@
 // dos casillas de goles entre los escudos, con auto-salto.
 //
 // Bajo cada opción 1X2 va la barra con el porcentaje de la gente que eligió
-// eso; en marcador, «cuántos pusieron 2-1» vive dentro del desplegable.
+// eso; en marcador, «cuántos pusieron 2-1» queda visible bajo su botón.
 //
 // (2026-09-18) «Todo en una fila» (dueño). La tarjeta tenía cuatro pisos: hora y
 // «Ver partido», escudos + marcador, nombres, y «Tu marcador». Ahora son dos:
@@ -158,8 +158,13 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
 
 type RefreshTiming = Pick<MatchLite, "scheduled_at" | "status" | "final_verified_at" | "voided_at">;
 
-function isPendingResult(match: RefreshTiming) {
+function isPendingResult(match: Pick<RefreshTiming, "final_verified_at" | "voided_at">) {
   return !match.final_verified_at && !match.voided_at;
+}
+
+/** A refresh preserves drafts, but a verified result must show the saved pick and fresh SQL points. */
+export function pickForDisplay(match: Pick<RefreshTiming, "final_verified_at" | "voided_at">, draft: BoardPick | undefined, saved: BoardPick | undefined) {
+  return isPendingResult(match) ? draft : saved;
 }
 
 /**
@@ -378,7 +383,7 @@ export function PicksBoard({
       now={now}
       slug={slug}
       scoringMode={scoringMode}
-      mine={planning ? undefined : picks[m.id]}
+      mine={planning ? undefined : pickForDisplay(m, picks[m.id], initialPicks[m.id])}
       distribution={distribution}
       canEdit={!planning && canEdit}
       canViewOthers={!planning && canViewOthers}
@@ -728,7 +733,8 @@ function MatchCard({
       )}
 
       {started && canViewOthers && (
-        <MatchPicks slug={slug} matchId={m.id} scoringMode={scoringMode} home={m.home_team} away={m.away_team} count={total || null} summary={summary} />
+        <MatchPicks slug={slug} matchId={m.id} scoringMode={scoringMode} home={m.home_team} away={m.away_team} count={total || null} summary={summary}
+          resultRevision={`${m.final_verified_at ?? ""}:${m.voided_at ?? ""}:${scored ? `${m.home_score ?? ""}:${m.away_score ?? ""}` : ""}`} />
       )}
     </article>
   );
