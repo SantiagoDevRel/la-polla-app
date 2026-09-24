@@ -519,10 +519,27 @@ export async function getDistribution(pollaId: string): Promise<CasaDistribution
   }) as CasaDistribution;
   const matches = await getPollaMatches(pollaId);
   const visible = new Set(matches.filter(match => hasCasaMatchStarted(match)).map(match => match.id));
+  const visibleQuestions = new Set<string>();
+  if (Object.keys(distribution.preguntas ?? {}).length > 0) {
+    // Defense in depth for the RSC payload, including installations awaiting
+    // migration 151. Never send editable answers and hide them only in CSS.
+    const { data: questions, error: questionError } = await db.from("casa_questions")
+      .select("id, resolved_at, casa_pollas!inner(status, closes_at)")
+      .eq("polla_id", pollaId);
+    if (questionError) throw questionError;
+    const now = Date.now();
+    for (const question of questions ?? []) {
+      const polla = Array.isArray(question.casa_pollas) ? question.casa_pollas[0] : question.casa_pollas;
+      if (polla && ["abierta", "cerrada", "resuelta"].includes(polla.status) &&
+        (polla.status !== "abierta" || new Date(polla.closes_at).getTime() <= now || question.resolved_at)) {
+        visibleQuestions.add(question.id);
+      }
+    }
+  }
   return {
     resultado: Object.fromEntries(Object.entries(distribution.resultado ?? {}).filter(([id]) => visible.has(id))),
     marcador: Object.fromEntries(Object.entries(distribution.marcador ?? {}).filter(([id]) => visible.has(id))),
-    preguntas: distribution.preguntas,
+    preguntas: Object.fromEntries(Object.entries(distribution.preguntas ?? {}).filter(([id]) => visibleQuestions.has(id))),
   };
 }
 

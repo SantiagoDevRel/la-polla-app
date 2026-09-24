@@ -6,6 +6,17 @@
 
 ## READ THIS FIRST
 
+### Privacidad de pronósticos y frecuencia del vivo (2026-09-24, migración 151)
+
+La distribución de marcadores ajenos solo llega al cliente después del inicio
+real del partido, más tarde que el bloqueo de escritura de cinco minutos. Las
+preguntas manuales también filtran sus opciones y respuestas libres en SQL y
+`getDistribution` mientras sigan editables. Nunca ocultar datos solo con CSS.
+El cron consulta el vivo desde el saque, sin la precarga anterior de 30 minutos;
+la verificación final sigue después del último pitazo hasta confirmar el cierre.
+Sin vivo ni candidatos finales no se consulta al proveedor. Regresión local:
+`scripts/casa-picks-privacy-check.sql`; detalle en `docs/casa-quentro-results.md`.
+
 ### POLLA REGALO: correo Quentro y resultado rápido (2026-09-24, 149–150)
 
 Ver [docs/casa-quentro-results.md](docs/casa-quentro-results.md). El correo de

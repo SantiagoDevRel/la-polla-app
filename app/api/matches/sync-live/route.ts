@@ -1,7 +1,7 @@
 // app/api/matches/sync-live/route.ts — Endpoint de sync rápido in-play.
 //
 // Llamado cada 1 min por pg_cron + pg_net cuando hay matches en
-// ventana live (status='live' o scheduled próximo a kickoff). También
+// ventana live (status='live' o scheduled que ya llegó a su kickoff). También
 // se puede pegar manualmente con CRON_SECRET para debugging.
 //
 // Estrategia:
@@ -41,24 +41,22 @@ async function hasActiveMatchWindow(): Promise<boolean> {
   const admin = createAdminClient();
   // Buscamos matches que justifiquen disparar la sync:
   //   - status='live' (obvio: corriendo)
-  //   - status='scheduled' con kickoff entre [now - 30min, now + 30min]
+  //   - status='scheduled' con kickoff entre [now - 30min, now]
   //     (cubre la transición scheduled → live).
   // En reposo (sin matches en ventana) la función devuelve false y la
   // sync no consulta el vivo del proveedor.
   const nowIso = new Date().toISOString();
   const back = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-  const forward = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   const { count, error } = await admin
     .from("matches")
     .select("id", { head: true, count: "exact" })
     .or(
-      `status.eq.live,and(status.eq.scheduled,scheduled_at.gte.${back},scheduled_at.lte.${forward})`,
+      `status.eq.live,and(status.eq.scheduled,scheduled_at.gte.${back},scheduled_at.lte.${nowIso})`,
     );
   if (error) {
     // Si la query falla, conservamos el comportamiento de sí-correr.
     // Es preferible un fetch de más a perder un update.
     console.warn("[sync-live] window check failed:", error.message);
-    void nowIso;
     return true;
   }
   return (count ?? 0) > 0;

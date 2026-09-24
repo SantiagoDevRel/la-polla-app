@@ -101,6 +101,20 @@ describe("Casa participant predictions privacy", () => {
     mocks.matches.mockResolvedValue([{ id: matchId, scheduled_at: "2020-01-01T00:00:00Z", status }]);
     expect((await call()).status).toBe(409); expect(mocks.db).not.toHaveBeenCalled();
   });
+  it.each([
+    { minutes: 60, status: "scheduled" },
+    { minutes: 5, status: "scheduled" },
+    { minutes: 1, status: "scheduled" },
+    { minutes: 1, status: "live" },
+    { minutes: -5, status: "live", elapsed: 0, live_status_detail: "STATUS_SUSPENDED" },
+    { minutes: 60, status: "cancelled", elapsed: 0 },
+  ])("cannot bypass kickoff privacy with a direct API request: %j", async ({ minutes, ...state }) => {
+    mocks.matches.mockResolvedValue([{ id: matchId, scheduled_at: new Date(Date.now() + minutes * 60_000).toISOString(), ...state }]);
+    const response = await call();
+    expect(response.status).toBe(409);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(mocks.db).not.toHaveBeenCalled();
+  });
   it("scopes group reads to this match and paid entries, paginates, and projects no payment data", async () => {
     const rows = Array.from({ length: 21 }, (_, index) => ({ id: String(index), home_score: 2, away_score: 1, pick_1x2: "L", users: { display_name: "Jugador", avatar_url: "millos" }, casa_entries: { status: "pagada" } }));
     fetchDb.mockResolvedValueOnce(new Response(JSON.stringify(rows), { headers: { "Content-Type": "application/json" } }));

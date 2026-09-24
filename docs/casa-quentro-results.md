@@ -8,6 +8,9 @@ Nacional–Millonarios. El formulario de entrega se limita a esta campaña.
 
 El cron existente llama a `/api/matches/sync-live` cada minuto. API-Football
 comparte una reserva por fecha: con Pro vigente, el intervalo es de 60 segundos.
+El vivo se consulta cuando hay un partido en juego o que ya llegó a su hora
+de inicio; no se precargan los 30 minutos anteriores. Sin vivo ni resultados
+pendientes de verificar, el cron no solicita resultados al proveedor.
 El verificador sigue corriendo aunque haya terminado el último partido. Exige
 dos observaciones nuevas del mismo resultado de 90 minutos, separadas al menos
 50 segundos. El retraso de la fuente no se sustituye por un resultado supuesto.
@@ -60,6 +63,15 @@ La distribución del marcador propio queda debajo de «Pronósticos de otros»,
 visible con la lista cerrada. Se conserva la protección que la muestra solo
 desde el inicio real del partido. Con resultado verificado, el servidor ordena
 por puntos descendentes antes de paginar, con UUID como desempate estable.
+El bloqueo de escritura ocurre cinco minutos antes del saque: la distribución
+se publica después, cuando el proveedor confirma el inicio. Antes de eso no
+viajan porcentajes ni marcadores ajenos en el payload de la página o la API.
+
+La migración 151 extiende la protección a preguntas manuales: sus opciones y
+respuestas libres permanecen privadas mientras la pregunta acepte cambios.
+El SQL y `getDistribution` filtran antes de generar el payload RSC. Se permite
+verlas al resolver esa pregunta o cerrar los pronósticos de la polla; cerrar
+inscripciones no adelanta el acceso a pronósticos de partidos futuros.
 
 ## Instalación y pruebas
 
@@ -83,3 +95,11 @@ RLS y permisos verificados; Security Advisor conservó su línea base de cero
 errores, tres advertencias y una sugerencia. El lint completo conserva cinco
 errores previos en `scripts/bake-og-image.cjs` y
 `tests/casa-tiebreak-registro.test.ts`, fuera de este cambio.
+
+Seguimiento del mismo día: 151 aplicada como `20260924192500`. Se comprobó
+en una transacción que la distribución de los ocho partidos de POLLA REGALO
+no cambiara. SQL local: privado antes del cierre, visible después; incluye
+partido futuro, bloqueo de cinco minutos, inicio atrasado y suspensión sin
+saque. Navegador local a 320/768/1440 px: respuestas manuales ausentes del
+HTML/RSC mientras son editables y visibles después del cierre. Build, lint
+puntual y 115 pruebas de vivo, verificación, privacidad y reglas aprobados.
