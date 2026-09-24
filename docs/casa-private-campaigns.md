@@ -8,7 +8,9 @@ no se insertan partidos ficticios en `matches` ni se crean pronósticos.
 ## Acceso y vista previa
 
 La navegación normal **POLLAS** (`/inicio`) muestra los borradores autorizados con
-el mismo `PollaCardBody` de las demás pollas, foto privada del premio y gorro SVG.
+el mismo `PollaCardBody` de las demás pollas, foto privada del premio y gorro SVG
+sobre la N de «navideña». Los títulos numerados conservan #1/#2 visible aunque
+el resto del nombre se recorte en la tarjeta; dentro se lee el título completo.
 `/polla/[slug]` reutiliza la pantalla habitual: `AvisoDesempate` compacto, pestañas
 Partidos/Tabla/Info y tarjetas de `PicksBoard`. El acceso exige sesión, rol
 administrativo vigente y presencia del UUID en `campaign_draft.allowed_admin_ids`.
@@ -76,6 +78,12 @@ operativos. No habilita el editor general ni modifica ACL/publicación. Es un RP
 exclusivo del servidor; el cambio de precio no puede combinarse con metadata en
 el mismo UPDATE. La primera campaña conserva su UUID al cambiar de precio.
 
+La migración 148 permite cambiar **solo el nombre** mediante
+`casa_set_private_draft_name_v1(p_polla_id,p_name,p_expected_name,p_actor_id,p_contract)`.
+Conserva las mismas restricciones y compara el nombre anterior exacto. El cambio
+de nombre no se puede combinar con precio, metadata, publicación ni acceso en un
+mismo UPDATE. UUID, slug y relaciones se conservan; no se habilita el editor general.
+
 ## Verificación
 
 `npm test -- tests/casa-private-drafts.test.ts` verifica parsing y acceso.
@@ -85,6 +93,9 @@ publicación/inscripciones/matches y compatibilidad con pollas normales.
 `scripts/casa-private-draft-price-check.sql` comprueba el cambio atómico de precio,
 rechazo de precio obsoleto/actor excluido, guardas de escritura y privilegios del
 RPC, también dentro de una transacción con rollback.
+`scripts/casa-private-draft-name-check.sql` cubre el cambio de nombre, comparación
+del nombre anterior, acceso por actor, bloqueo de cambios combinados y
+compatibilidad con los RPC de precio/metadata, igualmente con rollback local.
 
 La comprobación de integración cubre HTML y RSC, listado y detalle administrativos,
 imagen privada y rechazo de publicación para tres admins autorizados, un admin
