@@ -20,6 +20,7 @@ import type { pollaStatusLabel, CasaPolla, CasaPot, CasaSettlementReadiness } fr
 
 export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "prize_kind" | "prize_object" | "draw_pending" | "settlement_outcome" | "entry_price_cop" | "referral_every"> & {
   label: ReturnType<typeof pollaStatusLabel>;
+  private_draft?: boolean;
   /** Se puede editar (antes del cierre). */
   editable?: boolean;
 };
@@ -187,8 +188,8 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, rea
                         {settleInline(polla) && (polla.status === "resuelta" || readiness[polla.id]?.inscriptionsClosed) && (
                           <PagosGanadores pollaId={polla.id} pollaName={polla.name} kind={polla.kind === "manual" ? "manual" : "partidos"} />
                         )}
-                        <ColaDePagos key={polla.id} pollaId={polla.id} refreshKey={revision} onReviewed={() => setRevision((value) => value + 1)} />
-                        <Link href={`/admin/pollas/pagos?pollaId=${polla.id}`} className="lp-btn lp-btn-ghost mt-4 w-full !text-[15px]">Ver pagos aprobados</Link>
+                        {!polla.private_draft && <ColaDePagos key={polla.id} pollaId={polla.id} refreshKey={revision} onReviewed={() => setRevision((value) => value + 1)} />}
+                        {!polla.private_draft && <Link href={`/admin/pollas/pagos?pollaId=${polla.id}`} className="lp-btn lp-btn-ghost mt-4 w-full !text-[15px]">Ver pagos aprobados</Link>}
                         {/* Invitaciones (migración 135): los regalos se crean solos; remover es opcional. */}
                         {referralEvery(polla) !== null && (
                           <RegalosPolla key={`regalos-${polla.id}`} pollaId={polla.id} every={referralEvery(polla)!} refreshKey={revision}
@@ -198,6 +199,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, rea
                           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <div className="min-w-0"><Label>{polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label><p className="lp-money mt-1 text-[24px] text-text-primary [overflow-wrap:anywhere]">{polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot?.prize_cop ?? 0)}</p></div>
                             <div className="flex flex-wrap gap-2">
+                              {polla.private_draft && <Link href={`/admin/pollas/${polla.id}/preview`} className="lp-btn lp-btn-primary !text-[15px]">Ver borrador privado</Link>}
                               {polla.editable && <Link href={editorHref(polla.id)} className="lp-btn lp-btn-ghost !px-3 !text-[13px]"><Settings className="h-4 w-4 shrink-0" aria-hidden="true" />Editar</Link>}
                               {polla.status !== "borrador" && <Link href={`/polla/${polla.slug}`} className="lp-btn lp-btn-ghost !px-3 !text-[13px]">Ver polla</Link>}
                             </div>
@@ -211,7 +213,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, rea
                                 <ResolverPolla id={polla.id} kind={polla.kind} />
                               )}
                             {polla.prize_kind === "objeto" && (polla.draw_pending || polla.status === "resuelta") && <PremioObjeto slug={polla.slug} />}
-                            <AccionesPolla id={polla.id} status={polla.status} nombre={polla.name} prizeKind={polla.prize_kind} drawPending={polla.draw_pending} opensAt={polla.opens_at} settleInline={settleInline(polla)} />
+                            {polla.private_draft ? <p className="text-[13px] leading-relaxed text-text-secondary">Solo visible para los administradores autorizados. Publicación e inscripciones bloqueadas.</p> : <AccionesPolla id={polla.id} status={polla.status} nombre={polla.name} prizeKind={polla.prize_kind} drawPending={polla.draw_pending} opensAt={polla.opens_at} settleInline={settleInline(polla)} />}
                           </div>
                         </div>
                       </div>

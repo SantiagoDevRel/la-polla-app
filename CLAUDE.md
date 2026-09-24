@@ -6,6 +6,15 @@
 
 ## READ THIS FIRST
 
+### Borradores privados de campañas (2026-09-24, migración 146)
+
+`campaign_draft` en `casa_pollas` mantiene slots de planificación fuera de
+`matches`, acceso por lista de UUIDs administrativos y publicación bloqueada en
+SQL. `/admin/pollas/[id]/preview` y su imagen exigen ese acceso; no basta ocultar
+la tarjeta. La imagen vive en `casa-private-drafts` privado, nunca en `public/`
+ni `prize-images`. `listAllPollas(actor)` debe recibir el actor para incluir los
+borradores autorizados; sin actor los excluye. Ver [docs/casa-private-campaigns.md](docs/casa-private-campaigns.md).
+
 ### Menos texto: la pantalla se entiende sin leer (2026-09-18)
 
 Pedido del dueño: «la gente no lee ni hace tutoriales; va directo a tocar

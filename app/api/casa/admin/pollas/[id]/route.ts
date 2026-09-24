@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { casaJson, casaError, requireCasaContract } from "@/lib/casa/operations";
 import { MAX_POLLA_MATCHES, editorErrorMessage } from "@/lib/casa/editor";
+import { getAdminPollaAccess } from "@/lib/casa/private-draft-query";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,7 @@ export async function GET(
     return NextResponse.json({ error: "Polla inválida." }, { status: 400 });
   }
 
+  if (!(await getAdminPollaAccess(id, user))) return casaJson({ error: "No existe esa polla." }, 404);
   const db = createAdminClient();
   const { data: polla, error } = await db
     .from("casa_pollas")
@@ -125,6 +127,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (contractError) return contractError;
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) return casaJson({ error: "Polla inválida." }, 400);
+  const access = await getAdminPollaAccess(id, user);
+  if (!access) return casaJson({ error: "No existe esa polla." }, 404);
+  if (access.privateDraft) return casaJson({ error: "Este borrador es privado y tiene la publicación bloqueada.", code: "PRIVATE_DRAFT_LOCKED" }, 409);
   const parsed = BodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

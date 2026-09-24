@@ -340,7 +340,7 @@ async function closePolla(chatId: number, slug: string) {
     return;
   }
   const db = createAdminClient();
-  const { data: polla, error: readError } = await db.from("casa_pollas").select("id, name").eq("slug", slug).is("archived_at", null).maybeSingle();
+  const { data: polla, error: readError } = await db.from("casa_pollas").select("id, name").eq("slug", slug).is("archived_at", null).is("campaign_draft", null).maybeSingle();
   if (readError || !polla) { await sendMessage(chatId, "No se pudo encontrar la polla."); return; }
   const { error } = await db.rpc("casa_change_status_v2", { p_polla_id: polla.id, p_action: "cerrar", p_contract: 2, p_chat_id: chatId });
   await sendMessage(chatId, error ? casaErrorMessage(error) : `🔒 <b>${esc(polla.name)}</b> quedó cerrada.`);
@@ -356,6 +356,7 @@ async function settlePolla(chatId: number, slug: string) {
     .from("casa_pollas")
     .select("id, name, kind, drawn_number, status")
     .eq("slug", slug)
+    .is("campaign_draft", null)
     .maybeSingle();
 
   if (!polla) {
@@ -452,7 +453,7 @@ async function resolveFreeText(chatId: number, slug: string, questionId: string,
     await sendMessage(chatId, "Abre /resolver para obtener el comando con el identificador completo de la pregunta."); return;
   }
   const db = createAdminClient();
-  const { data: polla, error: readError } = await db.from("casa_pollas").select("id").eq("slug", slug).is("archived_at", null).maybeSingle();
+  const { data: polla, error: readError } = await db.from("casa_pollas").select("id").eq("slug", slug).is("archived_at", null).is("campaign_draft", null).maybeSingle();
   if (readError || !polla) { await sendMessage(chatId, "No se pudo encontrar la polla."); return; }
   const { error } = await db.rpc("casa_resolve_question_v2", { p_polla_id: polla.id,
     p_question_id: questionId, p_option_id: null, p_text: respuesta.trim(), p_contract: 2, p_chat_id: chatId });
@@ -462,7 +463,7 @@ async function resolveFreeText(chatId: number, slug: string, questionId: string,
 async function setDrawnNumber(chatId: number, slug: string, n: number) {
   if (!slug || !Number.isInteger(n) || n < 1) { await sendMessage(chatId, "Se usa así: <code>/numero mi-rifa 47</code>"); return; }
   const db = createAdminClient();
-  const { data: polla, error: readError } = await db.from("casa_pollas").select("id, name").eq("slug", slug).is("archived_at", null).maybeSingle();
+  const { data: polla, error: readError } = await db.from("casa_pollas").select("id, name").eq("slug", slug).is("archived_at", null).is("campaign_draft", null).maybeSingle();
   if (readError || !polla) { await sendMessage(chatId, "No se pudo encontrar la rifa."); return; }
   const { error } = await db.rpc("casa_set_drawn_number_v2", { p_polla_id: polla.id, p_number: n, p_contract: 2, p_chat_id: chatId });
   await sendMessage(chatId, error ? casaErrorMessage(error) : `Número ${n} registrado en <b>${esc(polla.name)}</b>. Usa /resolver para adjudicar el premio.`);
