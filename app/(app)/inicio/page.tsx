@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { listPrivateCampaignPollas } from "@/lib/casa/private-draft-query";
 import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
+import { CampaignPrizeMedia } from "@/components/casa/CampaignPrizeMedia";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { ArrowRight, CheckCircle2, Settings } from "lucide-react";
 import { cookies } from "next/headers";
@@ -256,8 +257,7 @@ function PollaRow({
             name={polla.name}
             nameDecoration={polla.private_draft ? <SantaHatTitle>{polla.name}</SantaHatTitle> : undefined}
             prizeVisual={polla.private_draft ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={`/api/casa/admin/pollas/${polla.id}/draft-image`} alt={`Premio: ${polla.prize_object}`} width={44} height={48} className="h-12 w-11 max-w-none shrink-0 rounded-sm object-cover" />
+              <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} />
             ) : undefined}
             tournaments={tournaments}
             kind={polla.kind}

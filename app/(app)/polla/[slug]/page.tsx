@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { getPrivateCampaignBySlug } from "@/lib/casa/private-draft-query";
 import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
+import { CampaignPrizeMedia } from "@/components/casa/CampaignPrizeMedia";
 import {
   getDistribution,
   getLeaderboard,
@@ -316,9 +317,10 @@ export default async function PollaPage({
         <div className={`${participa ? "mt-3" : "mt-4"} ${objeto ? "grid grid-cols-2" : "flex flex-wrap"} gap-x-3 gap-y-4`}>
           <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : "min-w-0 flex-[1_1_min-content]"}>
             {objeto && (polla.prize_image_path || privateCampaign?.draft.image_path) && (
+              privateCampaign ? <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} className="h-20 w-16" /> :
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={privateCampaign ? `/api/casa/admin/pollas/${polla.id}/draft-image` : prizeImageUrl(polla.prize_image_path!)}
+                src={prizeImageUrl(polla.prize_image_path!)}
                 alt=""
                 aria-hidden="true"
                 className="h-14 w-14 max-w-none shrink-0 rounded-md object-cover"

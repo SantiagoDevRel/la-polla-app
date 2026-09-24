@@ -6,16 +6,20 @@
 
 ## READ THIS FIRST
 
-### Borradores privados de campañas (2026-09-24, migración 146)
+### Borradores privados de campañas (2026-09-24, migraciones 146–147)
 
 `campaign_draft` en `casa_pollas` mantiene slots de planificación fuera de
 `matches`, acceso por lista de UUIDs administrativos y publicación bloqueada en
 SQL. Se ven desde POLLAS (`/inicio`) y abren el detalle normal `/polla/[slug]`, con
 Partidos/Tabla/Info, el mismo aviso de desempate y tarjetas con escudos `?` y fecha
 por confirmar. `/admin/pollas/[id]/preview` redirige al detalle tras validar acceso.
-La tarjeta y el detalle usan foto privada y gorro SVG, sin landing independiente.
-La imagen vive en `casa-private-drafts` privado, nunca en `public/`
-ni `prize-images`. `listAllPollas(actor)` debe recibir el actor para incluir los
+La tarjeta y el detalle usan `CampaignPrizeMedia` (giro WebM transparente,
+WebP animado en WebKit y poster para movimiento reducido/ahorro de datos) y gorro
+SVG, sin landing independiente. Todos los medios viven en `casa-private-drafts`
+privado, nunca en `public/` ni `prize-images`; el endpoint valida la misma ACL para
+poster, video y animación. La 147 permite ajustar solo el precio del borrador
+vacío mediante un RPC con comparación del precio anterior, sin abrir el editor
+ni la publicación. `listAllPollas(actor)` debe recibir el actor para incluir los
 borradores autorizados; sin actor los excluye. Ver [docs/casa-private-campaigns.md](docs/casa-private-campaigns.md).
 
 ### Menos texto: la pantalla se entiende sin leer (2026-09-18)

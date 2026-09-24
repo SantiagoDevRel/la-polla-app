@@ -59,6 +59,8 @@ export interface CasaPolla {
   draw_pending?: boolean;
   /** Admin-list marker only. Campaign contents and access lists stay server-side. */
   private_draft?: boolean;
+  /** Present only after the server authorizes this campaign's private media. */
+  private_draft_motion?: boolean;
   opens_at: string;
   closes_at: string;
   /**

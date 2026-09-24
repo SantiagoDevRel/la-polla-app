@@ -33,6 +33,21 @@ acceso antes de descargarla; responde `private, no-store`, sin URL pública ni U
 firmada para compartir. No poner el arte de una campaña privada en `public/` ni
 en el bucket público `prize-images`.
 
+`CampaignPrizeMedia` admite un giro de producto con transparencia. La metadata
+opcional `motion` contiene `video_path` (WebM con alfa) y `animation_path` (WebP
+animado con alfa para WebKit); `image_path` conserva el poster PNG/WebP. El mismo
+endpoint sirve `?asset=video` o `?asset=animation`, siempre tras validar actor y
+carpeta de la polla. La API no acepta rutas suministradas por el cliente. El
+bucket permanece privado y admite `video/webm` además de sus tipos de imagen.
+Los modelos y renders se preparan fuera del repo y se suben como archivos
+pequeños: no hay render 3D, proveedor de video ni dependencia nueva en runtime.
+
+La animación se carga cuando entra en pantalla; fuera de ella, con la pestaña
+oculta, ahorro de datos o movimiento reducido, queda la imagen fija. Video
+fallido pasa a WebP y luego al poster. Son archivos privados sin caché compartida:
+volver a mostrar la animación puede descargarla de nuevo. Los getters entregan
+solo `private_draft_motion`, sin revelar rutas de Storage ni la lista de acceso.
+
 ## Contrato
 
 `campaign_draft` contiene `version:1`, `allowed_admin_ids`,
@@ -53,12 +68,23 @@ metadata mediante `casa_update_private_draft_v1`. Ambos solo ejecutables por
 RPC de edición. Publicar requerirá un cambio deliberado posterior que resuelva
 partidos, fechas y configuración; ningún botón actual lo hace.
 
+La migración 147 permite cambiar **solo el precio** mediante
+`casa_set_private_draft_price_v1(p_polla_id,p_entry_price_cop,p_expected_price_cop,p_actor_id,p_contract)`.
+Exige administrador autorizado, contrato v2, precio anterior coincidente, fila
+bloqueada y borrador oculto sin entradas, picks, preguntas, matches ni premios
+operativos. No habilita el editor general ni modifica ACL/publicación. Es un RPC
+exclusivo del servidor; el cambio de precio no puede combinarse con metadata en
+el mismo UPDATE. La primera campaña conserva su UUID al cambiar de precio.
+
 ## Verificación
 
 `npm test -- tests/casa-private-drafts.test.ts` verifica parsing y acceso.
 `scripts/casa-private-drafts-check.sql` corre exclusivamente contra Supabase local
 en Docker, dentro de una transacción con rollback. Comprueba RLS, ACL, bloqueo de
 publicación/inscripciones/matches y compatibilidad con pollas normales.
+`scripts/casa-private-draft-price-check.sql` comprueba el cambio atómico de precio,
+rechazo de precio obsoleto/actor excluido, guardas de escritura y privilegios del
+RPC, también dentro de una transacción con rollback.
 
 La comprobación de integración cubre HTML y RSC, listado y detalle administrativos,
 imagen privada y rechazo de publicación para tres admins autorizados, un admin
