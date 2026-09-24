@@ -255,7 +255,7 @@ function PollaRow({
               - A la derecha, siempre: el cierre si está abierta; si no, los inscritos. */}
           <PollaCardBody
             name={polla.name}
-            nameDecoration={polla.private_draft ? <SantaHatTitle>{polla.name}</SantaHatTitle> : undefined}
+            nameDecoration={polla.private_draft ? <SantaHatTitle compact>{polla.name}</SantaHatTitle> : undefined}
             prizeVisual={polla.private_draft ? (
               <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} />
             ) : undefined}

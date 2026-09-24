@@ -1,28 +1,38 @@
 import { cn } from "@/lib/cn";
 
-/** A decorative hat on the first P; the accessible title stays unchanged. */
-export function SantaHatTitle({ children, className }: { children: string; className?: string }) {
-  const initial = children.search(/p/i);
-  if (initial === -1) return <span className={className}>{children}</span>;
+/** A decorative hat on the N in Navideña; the accessible title stays unchanged. */
+export function SantaHatTitle({ children, className, compact = false }: { children: string; className?: string; compact?: boolean }) {
+  const number = compact ? children.match(/\s+(#\d+)$/) : null;
+  const title = number ? children.slice(0, number.index) : children;
+  const word = title.match(/\bnavide[ñn]a\b/i);
+  if (!word || word.index === undefined) return <span className={className}>{children}</span>;
+  const initial = word.index;
+  const end = initial + word[0].length;
 
   return (
-    <span className={className}>
-      {children.slice(0, initial)}
-      <span className="relative inline-block">
-        {children[initial]}
-        <svg
-          viewBox="0 0 40 28"
-          aria-hidden="true"
-          focusable="false"
-          className="pointer-events-none absolute -left-[0.14em] -top-[0.35em] h-[0.65em] w-[0.9em] max-w-none"
-        >
-          <path d="M6 21C8 15 9 7 17 4c8-3 14 1 17 8l-6 2c-2-4-5-5-7-4 4 3 7 7 8 12Z" fill="var(--red-alert)" />
-          <path d="M6 21c2-6 3-14 11-17-3 4-3 10-2 17Z" fill="var(--bg-base)" opacity="0.15" />
-          <path d="M5 19c7-2 17-1 24 1 2 1 2 5-1 6-7-2-16-3-23-1-3-1-3-5 0-6Z" fill="var(--text-primary)" />
-          <circle cx="33" cy="13" r="4.5" fill="var(--text-primary)" />
-        </svg>
+    <span className={cn(className, number && "inline-flex max-w-full items-baseline")}>
+      <span className={number ? "-mt-2 min-w-0 truncate pt-2" : undefined}>
+        {title.slice(0, initial)}
+        <span className="whitespace-nowrap">
+          <span className="relative inline-block">
+            {title[initial]}
+            <svg
+              viewBox="0 0 40 28"
+              aria-hidden="true"
+              focusable="false"
+              className="pointer-events-none absolute -left-[0.14em] -top-[0.35em] h-[0.65em] w-[0.9em] max-w-none"
+            >
+              <path d="M6 21C8 15 9 7 17 4c8-3 14 1 17 8l-6 2c-2-4-5-5-7-4 4 3 7 7 8 12Z" fill="var(--red-alert)" />
+              <path d="M6 21c2-6 3-14 11-17-3 4-3 10-2 17Z" fill="var(--bg-base)" opacity="0.15" />
+              <path d="M5 19c7-2 17-1 24 1 2 1 2 5-1 6-7-2-16-3-23-1-3-1-3-5 0-6Z" fill="var(--text-primary)" />
+              <circle cx="33" cy="13" r="4.5" fill="var(--text-primary)" />
+            </svg>
+          </span>
+          {title.slice(initial + 1, end)}
+        </span>
+        {title.slice(end)}
       </span>
-      {children.slice(initial + 1)}
+      {number && <span className="shrink-0 pl-1">{" "}{number[1]}</span>}
     </span>
   );
 }
