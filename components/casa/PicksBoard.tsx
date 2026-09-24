@@ -41,8 +41,10 @@ import type { CasaDistribution, Pick1x2 } from "@/lib/casa/types";
 import { canEditCasaMatch, hasCasaMatchStarted } from "@/lib/casa/match-rules";
 import { MatchPicks } from "./MatchPicks";
 import { EntrarSheet } from "./EntrarSheet";
+import { UnknownTeamCrest } from "./CampaignDecorations";
 
 interface MatchLite extends SectionMatch {
+  planned?: false;
   id: string;
   home_team: string;
   away_team: string;
@@ -59,6 +61,61 @@ interface MatchLite extends SectionMatch {
   voided_at?: string | null;
 }
 
+/** Planning slots have no fixture identity or kickoff and never become picks. */
+export interface PlannedBoardMatch {
+  slot_id: string;
+  order: number;
+  stage: "cuadrangulares" | "final";
+  stage_label: string;
+  group: "A" | "B" | null;
+  matchday: number | null;
+  leg: string | number | null;
+  label: string;
+  home_label: string;
+  away_label: string;
+  scheduled_at: null;
+}
+
+type PlannedMatchLite = Omit<MatchLite, "planned" | "scheduled_at"> & {
+  planned: true;
+  scheduled_at: null;
+  planningLabel: string;
+  groupLabel: string | null;
+};
+type BoardMatch = MatchLite | PlannedMatchLite;
+type BoardGroup = { key: string; label: string; matches: BoardMatch[] };
+
+function groupPlannedMatches(slots: PlannedBoardMatch[]): BoardGroup[] {
+  const groups = new Map<string, BoardGroup>();
+  for (const slot of [...slots].sort((a, b) => a.order - b.order)) {
+    const key = slot.stage === "final" ? slot.slot_id : `${slot.stage}-${slot.matchday}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        label: slot.stage === "final" ? slot.label : `${slot.stage_label} · Fecha ${slot.matchday}`,
+        matches: [],
+      });
+    }
+    groups.get(key)!.matches.push({
+      planned: true,
+      id: slot.slot_id,
+      home_team: slot.home_label,
+      away_team: slot.away_label,
+      home_team_flag: null,
+      away_team_flag: null,
+      scheduled_at: null,
+      scheduled_at_confirmed: false,
+      home_score: null,
+      away_score: null,
+      final_verified_at: null,
+      status: "planned",
+      planningLabel: slot.label,
+      groupLabel: slot.group ? `Grupo ${slot.group}` : null,
+    });
+  }
+  return [...groups.values()];
+}
+
 export interface BoardPick {
   pick1x2: Pick1x2 | null;
   homeScore: number | null;
@@ -73,6 +130,8 @@ interface Props {
   entryNumber?: number | null;
   scoringMode: "1x2" | "marcador";
   matches: MatchLite[];
+  /** Presence selects a static draft: no payments, predictions, stats or refreshes. */
+  plannedMatches?: PlannedBoardMatch[];
   /** picks actuales del usuario, indexados por match_id */
   initialPicks: Record<string, BoardPick>;
   distribution: CasaDistribution;
@@ -141,7 +200,8 @@ function opcionesDe(m: { home_team: string; away_team: string }) {
 }
 
 /** Solo la hora: el día ya lo dice el encabezado del grupo. */
-function horaDe(m: MatchLite): string {
+function horaDe(m: BoardMatch): string {
+  if (m.planned) return "Fecha por confirmar";
   if (m.scheduled_at_confirmed === false) return "Hora por confirmar";
   return new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(m.scheduled_at));
 }
@@ -151,6 +211,7 @@ export function PicksBoard({
   entryNumber,
   scoringMode,
   matches,
+  plannedMatches,
   initialPicks,
   distribution,
   canEdit,
@@ -159,6 +220,7 @@ export function PicksBoard({
   lockedReason,
   joinPrompt,
 }: Props) {
+  const planning = plannedMatches !== undefined;
   const [picks, setPicks] = useState(initialPicks);
   const [joinOpen, setJoinOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -168,11 +230,12 @@ export function PicksBoard({
   const router = useRouter();
   const inputs = useRef(new Map<string, HTMLInputElement | null>());
   useEffect(() => {
+    if (planning) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [planning]);
   useEffect(() => {
-    if (!matches.some(isPendingResult)) return;
+    if (planning || !matches.some(isPendingResult)) return;
     let interval: number | undefined;
     let wake: number | undefined;
     const inWindow = () => matches.some(match => isLiveRefreshWindow(match, Date.now()));
@@ -202,11 +265,14 @@ export function PicksBoard({
       window.clearTimeout(wake);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [matches, router]);
+  }, [matches, planning, router]);
 
   // Orden de empezada, siempre. El estado (en vivo, final, anulado) se pinta
   // dentro de la tarjeta: ningún partido cambia de lugar por haber arrancado.
-  const dias = useMemo(() => groupCasaMatchesByDay(matches, now), [matches, now]);
+  const dias = useMemo<BoardGroup[]>(
+    () => plannedMatches !== undefined ? groupPlannedMatches(plannedMatches) : groupCasaMatchesByDay(matches, now),
+    [matches, now, plannedMatches],
+  );
   const baseId = useId();
   const [closedDays, setClosedDays] = useState<Set<string>>(() => new Set());
   const ordenCompleto = useMemo(() => dias.flatMap((group) => group.matches), [dias]);
@@ -217,6 +283,7 @@ export function PicksBoard({
   );
 
   function set1x2(matchId: string, value: Pick1x2) {
+    if (planning) return;
     setPicks((prev) => ({
       ...prev,
       [matchId]: { ...prev[matchId], pick1x2: value, homeScore: null, awayScore: null },
@@ -226,6 +293,7 @@ export function PicksBoard({
   }
 
   function setScore(matchId: string, side: "home" | "away", raw: string) {
+    if (planning) return;
     const n = raw === "" ? null : Math.max(0, Math.min(30, Number(raw)));
     setPicks((prev) => ({
       ...prev,
@@ -260,6 +328,7 @@ export function PicksBoard({
   }
 
   async function guardar() {
+    if (planning) return;
     setSaving(true);
     setMsg(null);
     try {
@@ -302,20 +371,20 @@ export function PicksBoard({
     }
   }
 
-  const renderCard = (m: MatchLite, showDay: boolean) => (
+  const renderCard = (m: BoardMatch, showDay: boolean) => (
     <MatchCard
       key={m.id}
       m={m}
       now={now}
       slug={slug}
       scoringMode={scoringMode}
-      mine={picks[m.id]}
+      mine={planning ? undefined : picks[m.id]}
       distribution={distribution}
-      canEdit={canEdit}
-      canViewOthers={canViewOthers}
-      showMine={showMine}
+      canEdit={!planning && canEdit}
+      canViewOthers={!planning && canViewOthers}
+      showMine={!planning && showMine}
       showDay={showDay}
-      onBlocked={joinPrompt ? () => setJoinOpen(true) : undefined}
+      onBlocked={!planning && joinPrompt ? () => setJoinOpen(true) : undefined}
       inputs={inputs}
       onPick1x2={set1x2}
       onScore={setScore}
@@ -357,7 +426,7 @@ export function PicksBoard({
       {/* Barra de guardado: pegada abajo, encima del nav. (2026-09-18) Solo
           cuando hay cambios o un mensaje: un «Guardado 13/13» fijo tapaba 120 px
           de partidos sin pedir nada. Lo que falta ya lo dice la franja roja. */}
-      {canEdit && (dirty || saving || msg) && (
+      {!planning && canEdit && (dirty || saving || msg) && (
         <div className="sticky bottom-[88px] z-20 -mx-4 border-t border-border-default bg-bg-base px-4 pb-3 pt-3">
           {msg && (
             <p
@@ -385,7 +454,7 @@ export function PicksBoard({
         </div>
       )}
 
-      {!canEdit && lockedReason && (
+      {!planning && !canEdit && lockedReason && (
         // Con la polla abierta esto deja de ser un cartel y pasa a ser la
         // puerta: antes decía «Inscríbete para pronosticar» sin nada que tocar.
         joinPrompt ? (
@@ -402,7 +471,7 @@ export function PicksBoard({
         )
       )}
 
-      {joinPrompt && (
+      {!planning && joinPrompt && (
         <EntrarSheet open={joinOpen} onClose={() => setJoinOpen(false)} href={joinPrompt.href} entryPriceCop={joinPrompt.entryPriceCop} slug={slug} />
       )}
     </div>
@@ -420,7 +489,7 @@ export function PicksBoard({
 function MatchCard({
   m, now, slug, scoringMode, mine, distribution, canEdit, canViewOthers, showMine, showDay, inputs, onPick1x2, onScore, onJump, onBlocked,
 }: {
-  m: MatchLite;
+  m: BoardMatch;
   now: number;
   slug: string;
   scoringMode: "1x2" | "marcador";
@@ -438,11 +507,11 @@ function MatchCard({
   /** Sin inscripción: tocar un partido abre la hoja de pago en vez de no hacer nada. */
   onBlocked?: () => void;
 }) {
-  const cerrado = !canEditCasaMatch(m, now);
-  const started = hasCasaMatchStarted(m, now);
-  const editable = canEdit && !cerrado;
+  const cerrado = !m.planned && !canEditCasaMatch(m, now);
+  const started = !m.planned && hasCasaMatchStarted(m, now);
+  const editable = !m.planned && canEdit && !cerrado;
   // Se puede tocar aunque no esté inscrito: el toque abre la hoja de pago.
-  const invitando = !canEdit && !cerrado && Boolean(onBlocked);
+  const invitando = !m.planned && !canEdit && !cerrado && Boolean(onBlocked);
   const live = m.status === "live";
   const voided = Boolean(m.voided_at);
   const scored = Boolean(m.final_verified_at) || voided;
@@ -461,12 +530,14 @@ function MatchCard({
       ? `Nadie más puso ${clave}.`
       : `${marcadorDist.conteo?.[clave]} de ${marcadorDist.total} pusieron ${clave} (${Math.round(((marcadorDist.conteo?.[clave] ?? 0) / marcadorDist.total) * 100)}%).`
     : null;
-  const minute = live ? liveMinuteLabel(m) : "";
+  const minute = !m.planned && live ? liveMinuteLabel(m) : "";
   // Pasó la hora de inicio y la fuente todavía no reporta el partido: se dice, no se muestran guiones sueltos.
-  const waiting = !started && !finished && !voided && Date.parse(m.scheduled_at) <= now;
+  const waiting = !m.planned && !started && !finished && !voided && Date.parse(m.scheduled_at) <= now;
   const showButtons1x2 = scoringMode === "1x2" && !started && !finished;
 
-  const estado = voided ? (
+  const estado = m.planned ? (
+    <span className="text-text-muted">{m.groupLabel ? `${m.groupLabel} · ` : ""}Fecha por confirmar</span>
+  ) : voided ? (
     <span className="text-text-muted">Anulado · 0 puntos</span>
   ) : live ? (
     <span className="flex items-center gap-1.5 text-red-alert">
@@ -494,6 +565,12 @@ function MatchCard({
   const side = (which: "home" | "away") => {
     const name = which === "home" ? m.home_team : m.away_team;
     const flag = which === "home" ? m.home_team_flag : m.away_team_flag;
+    if (m.planned) return (
+      <div className="flex min-w-0 flex-col items-center gap-0.5 rounded-md py-0.5 text-center">
+        <UnknownTeamCrest className="h-[28px] w-[28px]" />
+        <span className="w-full text-[13px] font-semibold leading-tight text-text-primary [overflow-wrap:anywhere]">{shortTeam(name)}</span>
+      </div>
+    );
     return (
       <Link href={`/futbol/equipos/${which}.${m.id}`} aria-label={`Ver equipo: ${name}`} className="flex min-w-0 flex-col items-center gap-0.5 rounded-md py-0.5 text-center transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
         <TeamCrest team={name} src={flag} className="h-[28px] w-[28px] max-w-none shrink-0" />
@@ -508,7 +585,7 @@ function MatchCard({
   const showMineInline = showMine && (started || cerrado || finished) && !showButtons1x2;
 
   return (
-    <article className={`lp-card lp-match relative px-[12px] py-[10px] ${voided ? "opacity-70" : ""}`} aria-label={`${m.home_team} contra ${m.away_team}`}>
+    <article className={`lp-card lp-match relative px-[12px] py-[10px] ${voided ? "opacity-70" : ""}`} aria-label={m.planned ? m.planningLabel : `${m.home_team} contra ${m.away_team}`}>
       {/* La flecha al partido va fuera del flujo (esquina): su área de toque
           de 32 px no le suma alto a la línea. */}
       <div className="flex min-h-[20px] flex-wrap items-center justify-between gap-x-2 pr-[28px]">
@@ -534,10 +611,10 @@ function MatchCard({
               )}
             </span>
           )}
-          <Link href={`/futbol/partidos/${m.id}`} aria-label={`Ver partido: ${m.home_team} contra ${m.away_team}`} title="Ver partido"
+          {!m.planned && <Link href={`/futbol/partidos/${m.id}`} aria-label={`Ver partido: ${m.home_team} contra ${m.away_team}`} title="Ver partido"
             className="absolute right-[4px] top-[4px] grid h-[32px] w-[32px] place-items-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
             <ChevronRight aria-hidden="true" className="h-[16px] w-[16px] max-w-none" />
-          </Link>
+          </Link>}
         </span>
       </div>
 
@@ -545,7 +622,7 @@ function MatchCard({
         /* (2026-09-14) Pedido del dueño: el escudo con el nombre debajo ES el
            botón de cada equipo y «Empate» ocupa el lugar del «vs». Columnas con
            minmax(0,1fr): con texto ampliado el nombre baja de línea. */
-        <div role="group" aria-label={`Tu pronóstico: ${m.home_team} contra ${m.away_team}`} className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-[8px]">
+        <div role="group" aria-label={`Tu pronóstico: ${m.home_team} contra ${m.away_team}`} className={`mt-1 grid gap-[8px] ${m.planned ? "grid-cols-3" : "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"}`}>
           {opcionesDe(m).map((op) => {
             const elegido = mine?.pick1x2 === op.key;
             const equipo = op.key === "L" ? { name: m.home_team, flag: m.home_team_flag } : op.key === "V" ? { name: m.away_team, flag: m.away_team_flag } : null;
@@ -559,7 +636,7 @@ function MatchCard({
                 aria-label={equipo ? `Gana ${equipo.name}` : "Empate"}
                 className={[
                   "flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border px-1.5 py-1.5 text-center transition-colors",
-                  equipo ? "" : "px-3",
+                  equipo || m.planned ? "" : "px-3",
                   elegido
                     ? "border-gold bg-gold/15 text-gold"
                     : editable || invitando
@@ -570,11 +647,13 @@ function MatchCard({
               >
                 {equipo ? (
                   <>
-                    <TeamCrest team={equipo.name} src={equipo.flag} className="h-[28px] w-[28px] max-w-none shrink-0" />
+                    {m.planned
+                      ? <UnknownTeamCrest className="h-[28px] w-[28px]" />
+                      : <TeamCrest team={equipo.name} src={equipo.flag} className="h-[28px] w-[28px] max-w-none shrink-0" />}
                     <span className="w-full text-[13px] font-semibold leading-tight [overflow-wrap:anywhere]">{op.label}</span>
                   </>
                 ) : (
-                  <span className="text-[13px] font-semibold">Empate</span>
+                  <span className="max-w-full text-[13px] font-semibold [overflow-wrap:anywhere]">Empate</span>
                 )}
               </button>
             );

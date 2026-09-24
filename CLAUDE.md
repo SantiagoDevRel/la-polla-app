@@ -10,8 +10,11 @@
 
 `campaign_draft` en `casa_pollas` mantiene slots de planificación fuera de
 `matches`, acceso por lista de UUIDs administrativos y publicación bloqueada en
-SQL. `/admin/pollas/[id]/preview` y su imagen exigen ese acceso; no basta ocultar
-la tarjeta. La imagen vive en `casa-private-drafts` privado, nunca en `public/`
+SQL. Se ven desde POLLAS (`/inicio`) y abren el detalle normal `/polla/[slug]`, con
+Partidos/Tabla/Info, el mismo aviso de desempate y tarjetas con escudos `?` y fecha
+por confirmar. `/admin/pollas/[id]/preview` redirige al detalle tras validar acceso.
+La tarjeta y el detalle usan foto privada y gorro SVG, sin landing independiente.
+La imagen vive en `casa-private-drafts` privado, nunca en `public/`
 ni `prize-images`. `listAllPollas(actor)` debe recibir el actor para incluir los
 borradores autorizados; sin actor los excluye. Ver [docs/casa-private-campaigns.md](docs/casa-private-campaigns.md).
 

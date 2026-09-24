@@ -47,7 +47,7 @@ function Strong({ children }: { children: ReactNode }) {
 }
 
 /** Only the rules and scoring values configured for this polla are described. */
-export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold?: FixedPrizeThreshold | null }) {
+export function PollaInfo({ polla, threshold = null, schedulePending = false }: { polla: Rules; threshold?: FixedPrizeThreshold | null; schedulePending?: boolean }) {
   const money = polla.prize_kind !== "objeto";
   const minimo = money && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" ? polla.fixed_prize_cop : null;
   // Invitaciones: la polla solo dice si participa; el conteo es de la persona (migración 144).
@@ -100,6 +100,7 @@ export function PollaInfo({ polla, threshold = null }: { polla: Rules; threshold
 
     {polla.kind === "partidos" && <>
       <Rule id="cierre" icon={<Clock3 size={20} />} title="Hasta cuándo puedes pronosticar">
+        {schedulePending && <li><Strong>Fecha por confirmar.</Strong> Los horarios se mostrarán cuando se publique la programación.</li>}
         <li>Cada partido se cierra {LOCK_MINUTES} minutos antes de empezar.</li>
         <li>Desde ese momento no puedes agregar ni cambiar su pronóstico.</li>
         <li>El cierre de inscripciones no cambia ese plazo.</li>

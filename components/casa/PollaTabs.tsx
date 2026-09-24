@@ -35,9 +35,11 @@ interface Props {
    * En las pollas de dinero el empate se reparte, así que ahí sería ruido.
    */
   tiebreakByRegistration?: boolean;
+  /** A private draft keeps the normal tabs without calling participation APIs. */
+  staticMode?: boolean;
 }
 
-export function PollaTabs({ slug, firstLabel, children, info, initialRows, initialPrizes = [], finished = false, entryStatus, pollaStatus, userId, drawPending = false, tiebreakByRegistration = false }: Props) {
+export function PollaTabs({ slug, firstLabel, children, info, initialRows, initialPrizes = [], finished = false, entryStatus, pollaStatus, userId, drawPending = false, tiebreakByRegistration = false, staticMode = false }: Props) {
   const [tab, setTab] = useState(0);
   const [rows, setRows] = useState(initialRows);
   const [prizes, setPrizes] = useState(initialPrizes);
@@ -91,7 +93,7 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
   // Poll only while the table is visible. Keep drafts mounted in the other
   // panel; opening the table must never discard an unsaved prediction.
   useEffect(() => {
-    if (tab !== 1) return;
+    if (staticMode || tab !== 1) return;
     let active = true;
     let fetching = false;
     let controller: AbortController | undefined;
@@ -130,7 +132,7 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [tab, slug, revision, entryStatus, pollaStatus, drawPending, router]);
+  }, [tab, slug, revision, entryStatus, pollaStatus, drawPending, router, staticMode]);
 
   return (
     <section className="mt-5">
@@ -173,13 +175,13 @@ export function PollaTabs({ slug, firstLabel, children, info, initialRows, initi
           <h2 className="lp-display-sm max-w-full text-text-primary [overflow-wrap:anywhere]">Posiciones</h2>
           <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1">
             {info && <VerMasInfo section="premio" className="max-w-full text-left [overflow-wrap:anywhere]">Cómo se gana</VerMasInfo>}
-            <button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} aria-label={loading ? "Actualizando tabla" : "Actualizar tabla"} title="Actualizar"
+            {!staticMode && <button type="button" disabled={loading} onClick={() => setRevision(value => value + 1)} aria-label={loading ? "Actualizando tabla" : "Actualizar tabla"} title="Actualizar"
               className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-default disabled:opacity-50">
               <RefreshCw aria-hidden="true" className={`h-5 w-5 ${loading ? "motion-safe:animate-spin" : ""}`} />
-            </button>
+            </button>}
           </div>
         </div>
-        {error && <div role="alert" className="mb-3 rounded-lg border border-red-alert/40 bg-red-alert/10 p-3 text-sm text-text-primary">
+        {!staticMode && error && <div role="alert" className="mb-3 rounded-lg border border-red-alert/40 bg-red-alert/10 p-3 text-sm text-text-primary">
           <p>{error} Los datos anteriores se conservan.</p>
           <button type="button" onClick={() => setRevision(value => value + 1)} className="lp-btn lp-btn-ghost mt-2 min-h-11">Reintentar</button>
         </div>}

@@ -32,8 +32,10 @@ export type PollaCardDato = { label?: ReactNode; value?: ReactNode; tone?: keyof
  * vez de recortar letras. Lo que cambie entre tarjetas va en `topRight` o en
  * el dato, nunca en una fila nueva.
  */
-export function PollaCardBody({ name, tournaments, kind, muted = false, topRight, premioLabel, premio, objeto = false, dato, children }: {
+export function PollaCardBody({ name, nameDecoration, prizeVisual, tournaments, kind, muted = false, topRight, premioLabel, premio, objeto = false, dato, children }: {
   name: string;
+  nameDecoration?: ReactNode;
+  prizeVisual?: ReactNode;
   tournaments: readonly string[];
   kind: CasaPollaKind;
   /** Polla terminada: texto en gris. */
@@ -56,7 +58,7 @@ export function PollaCardBody({ name, tournaments, kind, muted = false, topRight
           el aviso ya no le deja al nombre cuatro letras de ancho (`4em`), el
           aviso baja a su propia línea: el nombre nunca desaparece. */}
       <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1">
-        <h3 title={name} className={`min-w-[4em] flex-1 truncate font-display text-[22px] leading-[1.25] tracking-[0.04em] ${tono}`}>{name}</h3>
+        <h3 title={name} className={`min-w-[4em] flex-1 truncate font-display text-[22px] leading-[1.25] tracking-[0.04em] ${nameDecoration ? "-mt-2 pt-2" : ""} ${tono}`}>{nameDecoration ?? name}</h3>
         {topRight && <div className="ml-auto flex shrink-0 items-center gap-3">{topRight}</div>}
       </div>
 
@@ -71,7 +73,8 @@ export function PollaCardBody({ name, tournaments, kind, muted = false, topRight
       <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2">
         <div className={`flex-1 basis-0 ${objeto ? "min-w-[8rem]" : "min-w-fit"}`}>
           <span className="lp-label block truncate">{premioLabel}</span>
-          <div className="mt-1 flex min-h-9 items-end">
+          <div className="mt-1 flex min-h-9 items-end gap-2">
+            {prizeVisual}
             {premio === null
               ? <span className="text-[15px] leading-none text-text-secondary">—</span>
               : objeto
