@@ -12,6 +12,8 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
+import { getPrivateCampaignBySlug } from "@/lib/casa/private-draft-query";
+import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
 import {
   getDistribution,
   getLeaderboard,
@@ -94,14 +96,19 @@ export default async function PollaPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const polla = await getPollaBySlug((await params).slug);
-  if (!polla || polla.status === "borrador" || polla.status === "anulada") notFound();
+  const slug = (await params).slug;
+  const publicPolla = await getPollaBySlug(slug);
+  const privateCampaign = !publicPolla && user
+    ? await getPrivateCampaignBySlug(slug, { id: user.id, is_admin: await isCurrentUserAdmin() })
+    : null;
+  const polla = publicPolla ?? privateCampaign?.polla;
+  if (!polla || (polla.status === "borrador" && !privateCampaign) || polla.status === "anulada") notFound();
 
   // ── Enlace de cortesía (migración 138) ──────────────────────────────────
   // El código lo guardó proxy.ts en una cookie httpOnly al abrir el enlace, así
   // que sigue acá después del login y del onboarding. Solo se lee: SQL decide
   // si esta persona lo puede usar (cuenta nueva, una vez, en esta polla).
-  const courtesyCode = validCourtesyCode((await cookies()).get(COURTESY_COOKIE)?.value);
+  const courtesyCode = privateCampaign ? null : validCourtesyCode((await cookies()).get(COURTESY_COOKIE)?.value);
   const cortesia: CourtesyPreview | null = courtesyCode
     ? await courtesyPreview(courtesyCode, user?.id ?? null).catch(() => null)
     : null;
@@ -151,8 +158,8 @@ export default async function PollaPage({
       // Lo que ganaría hoy cada líder si la polla terminara ahora (migración
       // 133). Si la lectura falla, la tabla sale sin esa línea.
       polla.kind === "rifa" ? Promise.resolve([]) : getProvisionalPrizes(polla.id).catch(() => []),
-      getReferralPollaView(user.id, polla.id),
-      referralHint ? getReferralInvitee(user.id, referralHint) : Promise.resolve(null),
+      privateCampaign ? Promise.resolve(null) : getReferralPollaView(user.id, polla.id),
+      !privateCampaign && referralHint ? getReferralInvitee(user.id, referralHint) : Promise.resolve(null),
     ]);
   const abierta = isPollaOpen(polla);
   const every = referralEvery(polla);
@@ -181,7 +188,7 @@ export default async function PollaPage({
     : null;
   // Cortesías que esta persona tiene para regalar en esta polla (migración 138).
   // Casi nadie tiene: la lista vuelve vacía y no se dibuja nada.
-  const misCortesias = (await listMyCourtesies(user.id).catch(() => []))
+  const misCortesias = (privateCampaign ? [] : await listMyCourtesies(user.id).catch(() => []))
     .filter((cortesia) => cortesia.slug === polla.slug);
   const canResumeProof = !abierta && polla.kind !== "rifa" && entry?.status === "pendiente" && !entry.proof_path
     ? (await getActiveProofs(polla.id, user.id)).some((proof) => proof.entry_id === entry.id) : false;
@@ -288,7 +295,7 @@ export default async function PollaPage({
               ayuda={every && codigo ? referralRule(every) : undefined}
             />
           )}
-          {isAdmin && canEditPolla(polla) && (
+          {isAdmin && !privateCampaign && canEditPolla(polla) && (
             <Link
               href={editorHref(polla.id)}
               aria-label="Editar polla"
@@ -300,18 +307,18 @@ export default async function PollaPage({
           )}
         </div>
         <div className="mt-3 flex flex-col items-start gap-2">
-          <h1 className={`lp-display w-full min-w-0 ${participa ? "text-[28px]" : "text-[34px]"} [overflow-wrap:anywhere]`}>{polla.name}</h1>
+          <h1 className={`lp-display w-full min-w-0 ${participa ? "text-[28px]" : "text-[34px]"} [overflow-wrap:anywhere]`}>{privateCampaign ? <SantaHatTitle>{polla.name}</SantaHatTitle> : polla.name}</h1>
           <Tape tone={estado.tone} className="max-w-full [overflow-wrap:anywhere]">
-            {estado.text}
+            {privateCampaign ? "Borrador privado" : estado.text}
           </Tape>
         </div>
         {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className={`${participa ? "mt-2" : "mt-3"} self-start`} />}
         <div className={`${participa ? "mt-3" : "mt-4"} ${objeto ? "grid grid-cols-2" : "flex flex-wrap"} gap-x-3 gap-y-4`}>
           <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : "min-w-0 flex-[1_1_min-content]"}>
-            {objeto && polla.prize_image_path && (
+            {objeto && (polla.prize_image_path || privateCampaign?.draft.image_path) && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={prizeImageUrl(polla.prize_image_path)}
+                src={privateCampaign ? `/api/casa/admin/pollas/${polla.id}/draft-image` : prizeImageUrl(polla.prize_image_path!)}
                 alt=""
                 aria-hidden="true"
                 className="h-14 w-14 max-w-none shrink-0 rounded-md object-cover"
@@ -324,7 +331,7 @@ export default async function PollaPage({
               </div>
             </div>
           </div>
-          <div className={objeto ? "min-w-0" : "min-w-0 flex-[1_1_min-content] border-l border-border-subtle pl-3"}>
+          <div className={objeto ? "col-span-2 min-w-0" : "min-w-0 flex-[1_1_min-content] border-l border-border-subtle pl-3"}>
             <Label>Entrada</Label>
             {/* «$0» se lee como una transferencia de cero pesos (migración 143). */}
             <div className="lp-money mt-1 break-words text-[32px] leading-none text-text-primary">
@@ -371,7 +378,7 @@ export default async function PollaPage({
         {/* Quien ya está inscrito ve el titular y abre el ejemplo con un toque:
             su hora de registro ya quedó, y el aviso entero tapaba los partidos. */}
         {polla.prize_kind === "objeto" && polla.kind !== "rifa" && (
-          <AvisoDesempate compact={participa} />
+          <AvisoDesempate compact={participa || Boolean(privateCampaign)} />
         )}
 
         {/* Llegó por un enlace de cortesía y todavía no está inscrito: activar el
@@ -506,8 +513,9 @@ export default async function PollaPage({
 
         <PollaTabs
           slug={polla.slug}
+          staticMode={Boolean(privateCampaign)}
           finished={partidosTerminados}
-          info={<PollaInfo polla={polla} threshold={threshold} />}
+          info={<PollaInfo polla={polla} threshold={threshold} schedulePending={Boolean(privateCampaign)} />}
           firstLabel={polla.kind === "manual" ? "Preguntas" : polla.kind === "rifa" ? "Sorteo" : "Partidos"}
           initialRows={tabla}
           initialPrizes={prizes}
@@ -550,9 +558,9 @@ export default async function PollaPage({
         )}
 
         {/* ── Los partidos ─────────────────────────────────────────────── */}
-        {polla.kind === "partidos" && matches.length > 0 && (
+        {polla.kind === "partidos" && (matches.length > 0 || privateCampaign) && (
           <div className="pt-4">
-            <PollaHighlights polla={polla.slug} className="mb-6" />
+            {!privateCampaign && <PollaHighlights polla={polla.slug} className="mb-6" />}
             <PicksBoard
               key={entry?.id ?? "sin-participacion"}
               slug={polla.slug}
@@ -560,10 +568,11 @@ export default async function PollaPage({
               entryNumber={entry?.entry_number ?? null}
               scoringMode={polla.scoring_mode ?? "1x2"}
               matches={matches as never}
+              plannedMatches={privateCampaign?.draft.slots}
               initialPicks={picksPorPartido}
               distribution={distribution}
               canEdit={inscrito && acceptsCasaMatchPicks(polla.status, polla.draw_pending)}
-              canViewOthers={participa || isAdmin || isPublicClosedPolla(polla)}
+              canViewOthers={!privateCampaign && (participa || isAdmin || isPublicClosedPolla(polla))}
               showMine={participa}
               lockedReason={
                 !acceptsCasaMatchPicks(polla.status, polla.draw_pending) ? "Esta polla ya no recibe pronósticos." : !inscrito
@@ -601,7 +610,7 @@ export default async function PollaPage({
           </>
         )}
 
-          {polla.kind === "partidos" && matches.length === 0 && (
+          {polla.kind === "partidos" && matches.length === 0 && !privateCampaign && (
             <StreetCard className="mt-4 p-5 text-center">
               <h2 className="lp-display-sm">Partidos por confirmar</h2>
               <p className="mt-2 text-sm text-text-secondary">El administrador publicará los partidos de esta polla aquí.</p>
@@ -629,7 +638,7 @@ export default async function PollaPage({
           />
         )}
 
-        {isAdmin && !polla.draw_pending && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/inicio" />}
+        {isAdmin && !privateCampaign && !polla.draw_pending && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/inicio" />}
       </div>
       {/* Aviso de invitaciones (2026-09-17): solo en la polla del aviso. */}
       {promo && <PromoInvitados promo={promo} />}

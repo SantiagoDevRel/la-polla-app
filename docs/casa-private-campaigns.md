@@ -7,12 +7,25 @@ no se insertan partidos ficticios en `matches` ni se crean pronósticos.
 
 ## Acceso y vista previa
 
-`/admin/pollas/[id]/preview` exige sesión, rol administrativo vigente y presencia
-del UUID del usuario en `campaign_draft.allowed_admin_ids`. La lista administrativa
+La navegación normal **POLLAS** (`/inicio`) muestra los borradores autorizados con
+el mismo `PollaCardBody` de las demás pollas, foto privada del premio y gorro SVG.
+`/polla/[slug]` reutiliza la pantalla habitual: `AvisoDesempate` compacto, pestañas
+Partidos/Tabla/Info y tarjetas de `PicksBoard`. El acceso exige sesión, rol
+administrativo vigente y presencia del UUID en `campaign_draft.allowed_admin_ids`.
+`/admin/pollas/[id]/preview` redirige a esa misma pantalla después del control de
+acceso; no hay una landing independiente. La lista administrativa
 filtra por la misma regla; solo devuelve un indicador `private_draft`, nunca la
 lista de acceso. Sin actor explícito, las consultas del bot excluyen las campañas.
 El editor habitual redirige a la vista previa. Las mutaciones operativas se bloquean
 en la API y con restricciones/triggers en PostgreSQL.
+
+`listPrivateCampaignPollas` y `getPrivateCampaignBySlug` son lecturas exclusivas del
+servidor, con filtro de allowlist en SQL y validación del contrato. Los getters
+públicos y las APIs de jugadores siguen excluyendo borradores. `PicksBoard` recibe
+`plannedMatches`: reutiliza su tarjeta, muestra escudos `?` y «Fecha por confirmar»,
+sin guardar, enlaces de partidos ficticios ni polling. `PollaTabs.staticMode`
+mantiene la tabla vacía sin consultar el leaderboard. `PollaInfo.schedulePending`
+explica la programación pendiente. Ninguna fecha provisional se presenta como real.
 
 La foto se almacena en el bucket **privado** `casa-private-drafts`, con ruta
 `<polla_id>/<archivo>`. `/api/casa/admin/pollas/[id]/draft-image` comprueba el mismo

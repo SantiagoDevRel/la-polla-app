@@ -15,6 +15,8 @@ import { PollaSection } from "@/components/casa/PollaSection";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
+import { listPrivateCampaignPollas } from "@/lib/casa/private-draft-query";
+import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { ArrowRight, CheckCircle2, Settings } from "lucide-react";
 import { cookies } from "next/headers";
@@ -37,7 +39,7 @@ import {
 import { isPollaOpen, isPublicClosedPolla, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
 import { entryPriceLabel, formatCop, timeLeft } from "@/lib/casa/format";
 import { premioLabel, premioValor } from "@/lib/casa/premio";
-import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
+import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
 import { PollaCardBody } from "@/components/casa/PollaCard";
 import { ScoringModeBadge } from "@/components/casa/ScoringModeBadge";
 import {
@@ -68,6 +70,7 @@ export default async function CasaPage() {
     // Invitaciones (migración 135): personas nuevas que todavía pueden decir quién las invitó.
     getReferralInvitee(user.id, referralHint),
   ]);
+  const privatePollas = await listPrivateCampaignPollas({ id: user.id, is_admin: isAdmin });
   const verInvitacion = Boolean(invitee?.can_set_referrer && !invitee.referrer
     && (invitee.hint || cookieStore.get(REFERRAL_DISMISS_COOKIE)?.value !== "1"));
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
@@ -87,7 +90,7 @@ export default async function CasaPage() {
   // primero, con desempate estable por id si dos cierran a la misma hora.
   const promoPolla = pickPromoPolla(abiertas);
   const [pots, pendientes, tournaments, pagos, promoView] = await Promise.all([
-    getPots(pollas.map((p) => p.id)),
+    getPots([...pollas, ...privatePollas].map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
     getPollaTournamentSlugs(pollas),
     // Prueba de pago (migración 133): qué pollas cerradas ya pagaron su premio.
@@ -140,6 +143,14 @@ export default async function CasaPage() {
 
         {/* El respaldo se suma por polla: la tarjeta ya no habla de cupos. */}
         <MyPollas initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
+
+        {privatePollas.length > 0 && (
+          <PollaSection id="pollas-privadas" kind="open" flat title="Borradores privados" count={privatePollas.length}>
+            <ul className="grid gap-3">
+              {privatePollas.map(polla => <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={resolveTournamentSlugs(polla, [])} />)}
+            </ul>
+          </PollaSection>
+        )}
 
         {/* Para entrar: sin desplegable. Si no hay ninguna y la persona ya juega
             en otra, la sección no se dibuja; el aviso de «pronto» es solo para
@@ -243,6 +254,11 @@ function PollaRow({
               - A la derecha, siempre: el cierre si está abierta; si no, los inscritos. */}
           <PollaCardBody
             name={polla.name}
+            nameDecoration={polla.private_draft ? <SantaHatTitle>{polla.name}</SantaHatTitle> : undefined}
+            prizeVisual={polla.private_draft ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`/api/casa/admin/pollas/${polla.id}/draft-image`} alt={`Premio: ${polla.prize_object}`} width={44} height={48} className="h-12 w-11 max-w-none shrink-0 rounded-sm object-cover" />
+            ) : undefined}
             tournaments={tournaments}
             kind={polla.kind}
             muted={closed}
@@ -269,13 +285,13 @@ function PollaRow({
               un adorno con forma de botón y no un segundo enlace anidado. La
               línea de arriba dice qué hay que acertar (2026-09-13: "no me queda
               claro cuándo una polla es de 1X2 o de marcadores"). */}
-          {abierta && (
+          {(abierta || polla.private_draft) && (
             <>
               <div className="mt-3 flex min-h-8 items-center">
                 <ScoringModeBadge mode={polla.scoring_mode} kind={polla.kind} />
               </div>
               <span aria-hidden="true" className="lp-btn lp-btn-ghost mt-3 w-full gap-2 !border-turf/50 !px-4 text-text-primary">
-                Entrar · {entryPriceLabel(polla.entry_price_cop)}
+                {polla.private_draft ? "Ver polla" : "Entrar"} · {entryPriceLabel(polla.entry_price_cop)}
                 <ArrowRight className="h-4 w-4 max-w-none shrink-0 text-turf" />
               </span>
             </>
