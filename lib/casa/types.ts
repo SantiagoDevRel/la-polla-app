@@ -57,6 +57,8 @@ export interface CasaPolla {
 
   status: CasaPollaStatus;
   draw_pending?: boolean;
+  /** Admin-list marker only. Campaign contents and access lists stay server-side. */
+  private_draft?: boolean;
   opens_at: string;
   closes_at: string;
   /**

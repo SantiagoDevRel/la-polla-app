@@ -18,6 +18,7 @@ import { getAuthenticatedUser } from "@/lib/auth/admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPayouts, getPot, getProvisionalPayouts, getSettlementReadiness } from "@/lib/casa/queries";
 import { signPayoutProofs } from "@/lib/casa/payout-proofs";
+import { getAdminPollaAccess } from "@/lib/casa/private-draft-query";
 import type { AdminPayoutRow, AdminPayoutStage, CasaSettlementReadiness } from "@/lib/casa/types";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
   if (!pollaId || !z.string().uuid().safeParse(pollaId).success) return privateJson({ error: "Polla inválida." }, 400);
 
   try {
+    if (!(await getAdminPollaAccess(pollaId, user))) return privateJson({ error: "No existe esa polla." }, 404);
     const db = createAdminClient();
     const { data: polla, error: pollaError } = await db
       .from("casa_pollas")

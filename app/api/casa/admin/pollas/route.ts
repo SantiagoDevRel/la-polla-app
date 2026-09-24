@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isCurrentUserAdmin, getAuthenticatedUser } from "@/lib/auth/admin";
+import { getAuthenticatedUser } from "@/lib/auth/admin";
 import { slugify } from "@/lib/casa/format";
 import { listAllPollas } from "@/lib/casa/queries";
 import { isCreatableTournament } from "@/lib/tournaments";
@@ -92,10 +92,11 @@ const schema = z.discriminatedUnion("kind", [
 ]);
 
 export async function GET() {
-  if (!(await isCurrentUserAdmin())) {
+  const user = await getAuthenticatedUser();
+  if (!user?.is_admin) {
     return NextResponse.json({ error: "Solo el admin." }, { status: 403 });
   }
-  return NextResponse.json({ pollas: await listAllPollas() });
+  return casaJson({ pollas: await listAllPollas(user) });
 }
 
 export async function POST(req: NextRequest) {

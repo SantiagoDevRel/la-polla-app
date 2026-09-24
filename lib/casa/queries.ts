@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { MATCH_COLUMNS } from "@/lib/db/columns";
 import { CASA_CONTRACT } from "./contract";
 import { hasCasaMatchStarted } from "./match-rules";
+import { canAccessCasaPolla } from "./private-drafts";
 import {
   CASA_ENTRY_COLUMNS,
   CASA_PICK_COLUMNS,
@@ -58,16 +59,19 @@ export async function listPublicPollas(): Promise<CasaPolla[]> {
 }
 
 /** Todas, incluidos borradores. Solo para el panel de admin / el bot. */
-export async function listAllPollas(): Promise<CasaPolla[]> {
+export async function listAllPollas(actor: { id: string; is_admin: boolean } | null = null): Promise<CasaPolla[]> {
   const db = createAdminClient();
   const { data, error } = await db
     .from("casa_pollas")
-    .select(CASA_POLLA_COLUMNS)
+    .select(`${CASA_POLLA_COLUMNS}, campaign_draft`)
     .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return withDrawState((data ?? []) as CasaPolla[]);
+  const visible = (data ?? []).filter((row) => canAccessCasaPolla(row, actor)).map(({ campaign_draft, ...polla }) => ({
+    ...polla, private_draft: campaign_draft != null,
+  }));
+  return withDrawState(visible as CasaPolla[]);
 }
 
 export async function getPollaBySlug(slug: string): Promise<CasaPolla | null> {

@@ -10,6 +10,7 @@ import { getAuthenticatedUser } from "@/lib/auth/admin";
 import { getPollaEditorState } from "@/lib/casa/editor-state";
 import { EditarPollaForm } from "@/components/casa/EditarPollaForm";
 import { HeroFrame, Label } from "@/components/street";
+import { getAdminPollaAccess } from "@/lib/casa/private-draft-query";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,9 @@ export default async function EditarPollaPage({ params }: { params: Promise<{ id
   if (!user) redirect(`/login?returnTo=/admin/pollas/${id}/editar`);
   if (!user.is_admin) redirect("/inicio");
 
+  const access = await getAdminPollaAccess(id, user);
+  if (!access) notFound();
+  if (access.privateDraft) redirect(`/admin/pollas/${id}/preview`);
   const state = await getPollaEditorState(id, user.id);
   if (!state) notFound();
 

@@ -16,7 +16,7 @@ export default async function CasaAdminPage() {
   if (!user) redirect("/login?returnTo=/admin/pollas");
   if (!user.is_admin) redirect("/inicio");
 
-  const pollas = await listAllPollas();
+  const pollas = await listAllPollas(user);
   const pots = await getPots(pollas.map((polla) => polla.id));
   const totalCasa = await getHouseTotal(pollas.map((polla) => polla.id));
   // Partidos suspendidos/aplazados/cancelados/abandonados sin decidir.
@@ -42,6 +42,7 @@ export default async function CasaAdminPage() {
         entry_price_cop: polla.entry_price_cop,
         referral_every: polla.referral_every ?? null,
         draw_pending: polla.draw_pending,
+        private_draft: polla.private_draft,
         // Con premio en dinero adjudicado, el panel muestra el pago a ganadores.
         settlement_outcome: polla.settlement_outcome ?? null,
         status: polla.status,
@@ -50,7 +51,7 @@ export default async function CasaAdminPage() {
         publication_mode: polla.publication_mode,
         label: pollaStatusLabel(polla),
         // Tuerca de edición hasta el cierre; SQL (migración 122) decide al guardar.
-        editable: canEditPolla(polla),
+        editable: !polla.private_draft && canEditPolla(polla),
       }))}
       pots={pots}
       totalCasa={totalCasa}
