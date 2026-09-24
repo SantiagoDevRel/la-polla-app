@@ -191,7 +191,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, rea
                         {!polla.private_draft && <ColaDePagos key={polla.id} pollaId={polla.id} refreshKey={revision} onReviewed={() => setRevision((value) => value + 1)} />}
                         {!polla.private_draft && <Link href={`/admin/pollas/pagos?pollaId=${polla.id}`} className="lp-btn lp-btn-ghost mt-4 w-full !text-[15px]">Ver pagos aprobados</Link>}
                         {/* Invitaciones (migración 135): los regalos se crean solos; remover es opcional. */}
-                        {referralEvery(polla) !== null && (
+                        {!polla.private_draft && referralEvery(polla) !== null && (
                           <RegalosPolla key={`regalos-${polla.id}`} pollaId={polla.id} every={referralEvery(polla)!} refreshKey={revision}
                             editable={polla.status === "abierta" || polla.status === "cerrada"} />
                         )}
