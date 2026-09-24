@@ -35,9 +35,13 @@ const fetchedAt = "2026-09-08T17:52:00Z";
 const selects: string[] = [];
 const tournamentsAsked: string[][] = [];
 const notFilters: string[] = [];
+const orFilters: string[] = [];
+const upperBounds: string[] = [];
 const chain = (result: object) => {
   const q: Record<string, unknown> = {};
-  for (const m of ["is", "gte", "lte", "limit", "eq", "or"]) q[m] = () => q;
+  for (const m of ["is", "gte", "limit", "eq"]) q[m] = () => q;
+  q.or = (value: string) => { orFilters.push(value); return q; };
+  q.lte = (column: string, value: string) => { upperBounds.push(`${column} ${value}`); return q; };
   q.not = (col: string, op: string, value: string) => { notFilters.push(`${col} ${op} ${value}`); return q; };
   q.select = (cols: string) => { selects.push(cols); return q; };
   q.in = (_col: string, values: string[]) => { tournamentsAsked.push(values); return q; };
@@ -105,6 +109,18 @@ describe("syncApiFootballLive", () => {
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
+  it('el lector de vivo no precarga fechas de encuentros que todavía no comienzan', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-24T18:44:00Z'));
+    try {
+      upperBounds.length = 0;
+      afRows([]);
+      await syncApiFootballLive();
+      expect(upperBounds).toContain('scheduled_at 2026-09-24T18:44:00.000Z');
+      expect(mocks.feed).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
   it('una fila live vieja sigue en la ventana hasta que el proveedor la cierre', async () => {
     notFilters.length = 0;
     afRows([row({ scheduled_at: '2026-09-08T12:00:00+00:00' })]);
@@ -142,5 +158,21 @@ describe('/api/matches/sync-live', () => {
     expect(res.status).toBe(401);
     expect(mocks.from).not.toHaveBeenCalled();
     expect(mocks.verify).not.toHaveBeenCalled();
+  });
+
+  it('sin vivo no consulta el proveedor de vivo, pero conserva la confirmación del último final', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-24T18:44:00Z'));
+    try {
+      orFilters.length = 0;
+      mocks.from.mockReturnValue(chain({ data: [], count: 0, error: null }));
+      const final = { match_id: 'last', status: 'verified', notes: 'Dos lecturas confirmadas' };
+      mocks.verify.mockResolvedValue([final]);
+      const response = await GET(request());
+      expect(orFilters[0]).toBe('status.eq.live,and(status.eq.scheduled,scheduled_at.gte.2026-09-24T18:14:00.000Z,scheduled_at.lte.2026-09-24T18:44:00.000Z)');
+      expect(mocks.feed).not.toHaveBeenCalled();
+      expect(mocks.verify).toHaveBeenCalledExactlyOnceWith();
+      expect(await response.json()).toMatchObject({ skipped: true, verifications: [final] });
+    } finally { vi.useRealTimers(); }
   });
 });

@@ -25,7 +25,8 @@ export async function syncApiFootballLive(): Promise<Set<string>> {
  const covered=new Set<string>();
  if (!await apiFootballProActive()) return covered;
  const admin=createAdminClient();
- const desde=new Date(Date.now()-8*3600000).toISOString(), hasta=new Date(Date.now()+30*60000).toISOString();
+ const desde=new Date(Date.now()-8*3600000).toISOString(), hasta=new Date().toISOString();
+ // El cron no precarga el vivo de partidos futuros: empieza desde el saque.
  // TODOS los partidos de los torneos activos en la ventana, estén o no en una
  // polla: nadie más los actualiza. El corte del 2026-09-13 dejó a Celta–Málaga
  // en «vivo, minuto 48» dos horas después. No cuesta cuota extra: el feed por

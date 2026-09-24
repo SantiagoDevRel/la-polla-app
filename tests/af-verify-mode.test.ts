@@ -67,6 +67,8 @@ describe("verify-final con API-Football", () => {
     expect(query.get('status')).toBe('in.(finished,live,scheduled)');
     expect(query.get('final_verified_at')).toBe('is.null');
     expect(query.getAll('scheduled_at')).toEqual(['lte.2026-09-24T20:27:00.000Z', 'gte.2026-09-17T20:27:00.000Z']);
+    expect(mocks.feed).not.toHaveBeenCalled();
+    expect(mocks.get).not.toHaveBeenCalled();
   });
 
   it('sin lectura del proveedor no escribe ni cierra', async () => {
