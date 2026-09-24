@@ -20,7 +20,7 @@ export async function getPrivateCampaign(id: string, actor: Actor) {
   if (!draft) return null;
   const { campaign_draft: _metadata, ...polla } = data;
   void _metadata;
-  return { polla: { ...polla, private_draft: true } as CasaPolla, draft };
+  return { polla: { ...polla, private_draft: true, private_draft_motion: Boolean(draft.motion) } as CasaPolla, draft };
 }
 
 /** The normal POLLAS screen includes only this admin's explicitly allowed drafts. */
@@ -35,7 +35,7 @@ export async function listPrivateCampaignPollas(actor: Actor): Promise<CasaPolla
   return (data ?? []).filter(row => canAccessCasaPolla(row, actor)).map(row => {
     const { campaign_draft: _metadata, ...polla } = row;
     void _metadata;
-    return { ...polla, private_draft: true } as CasaPolla;
+    return { ...polla, private_draft: true, private_draft_motion: Boolean(parseCasaPrivateDraft(_metadata)?.motion) } as CasaPolla;
   });
 }
 

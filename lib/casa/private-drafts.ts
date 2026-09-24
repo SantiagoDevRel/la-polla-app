@@ -27,6 +27,10 @@ export const casaPrivateDraftSchema = z.object({
   image_path: z.string().max(300).regex(/^[a-f0-9-]{36}\/[a-z0-9][a-z0-9._-]*\.(?:png|jpe?g|webp)$/i).nullable(),
   sources: z.array(z.object({ title: z.string().min(1).max(200), url: z.string().url().startsWith("https://") })).max(20),
   schedule_confirmed: z.literal(false),
+  motion: z.object({
+    video_path: z.string().max(300).regex(/^[a-f0-9-]{36}\/[a-z0-9][a-z0-9._-]*\.webm$/i),
+    animation_path: z.string().max(300).regex(/^[a-f0-9-]{36}\/[a-z0-9][a-z0-9._-]*\.webp$/i),
+  }).strict().optional(),
   presentation: z.object({
     competitionLabel: z.string().min(1).max(120),
     tagline: z.string().min(1).max(200),

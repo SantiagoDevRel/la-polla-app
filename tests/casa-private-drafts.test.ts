@@ -52,6 +52,34 @@ describe("private Casa campaign access", () => {
     }
   });
 
+  it("accepts optional motion assets as a complete local WebM/WebP pair", () => {
+    const motion = { video_path: `${allowed}/prize-loop.v1.webm`, animation_path: `${allowed}/prize-loop.v1.webp` };
+    expect(parseCasaPrivateDraft({ ...draft, motion })?.motion).toEqual(motion);
+    expect(parseCasaPrivateDraft({ ...draft, motion: {
+      video_path: `${allowed}/prize.WEBM`, animation_path: `${allowed}/prize.WEBP`,
+    } })).not.toBeNull();
+    expect(parseCasaPrivateDraft(draft)?.motion).toBeUndefined();
+    expect(parseCasaPrivateDraft({ ...draft, motion: { video_path: motion.video_path } })).toBeNull();
+    expect(parseCasaPrivateDraft({ ...draft, motion: { animation_path: motion.animation_path } })).toBeNull();
+    expect(parseCasaPrivateDraft({ ...draft, motion: { ...motion, externalUrl: "https://example.org/clip.webm" } })).toBeNull();
+  });
+
+  it("rejects external, nested, encoded and wrong-format motion asset paths", () => {
+    const motion = { video_path: `${allowed}/prize.webm`, animation_path: `${allowed}/prize.webp` };
+    for (const field of ["video_path", "animation_path"] as const) {
+      const ext = field === "video_path" ? "webm" : "webp";
+      for (const path of [
+        `https://example.org/prize.${ext}`, `../prize.${ext}`, `${allowed}/../prize.${ext}`,
+        `${allowed}/nested/prize.${ext}`, `${allowed}/%2e%2e%2fprize.${ext}`,
+        `${allowed}/prize.${ext}?download=1`, `${allowed}/prize.png`, `${allowed}/${"x".repeat(301)}.${ext}`,
+      ]) {
+        const invalid = { ...draft, motion: { ...motion, [field]: path } };
+        expect(parseCasaPrivateDraft(invalid), path).toBeNull();
+        expect(canAccessCasaPolla({ campaign_draft: invalid }, { id: allowed, is_admin: true }), path).toBe(false);
+      }
+    }
+  });
+
   it("validates private presentation copy without requiring campaign literals in the renderer", () => {
     const presentation = { competitionLabel: "Tournament finals", tagline: "A campaign for the fans",
       prizeCaption: "Configured prize", imageAlt: "Photograph of the configured prize" };
