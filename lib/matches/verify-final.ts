@@ -98,8 +98,10 @@ const READ_CLOCK_SKEW_MS = 30_000;
 interface AttemptState { attempts: number; last_attempt_at: string }
 
 /**
- * Candidates: in a polla (P2P or Casa), unverified, 105 min after kickoff,
- * last 7 days. Every status is resolved by API-Football alone:
+ * Candidates: in a polla (P2P or Casa), unverified, finished or 105 min after
+ * kickoff, last 7 days. A provider-confirmed finish needs no extra wall-clock
+ * delay; the two independent final observations still decide the result.
+ * Every status is resolved by API-Football alone:
  *   · d-1..d  → the shared daily feed (one reservation per date).
  *   · older, or linked but absent from its date feed → /fixtures?ids= in
  *     batches of 20 (loadFixturesByIds, reserved per fixture).
@@ -112,7 +114,8 @@ export async function verifyPendingFinals(): Promise<VerifyResult[]> {
     q
       .in("status", ["finished", "live", "scheduled"])
       .is("final_verified_at", null)
-      .lte("scheduled_at", new Date(Date.now() - 105 * 60000).toISOString())
+      .or(`status.eq.finished,scheduled_at.lte.${new Date(Date.now() - 105 * 60000).toISOString()}`)
+      .lte("scheduled_at", new Date().toISOString())
       .gte("scheduled_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
   );
   if (errores.length > 0) console.error("[verify-final] db query:", errores.join(" | "));

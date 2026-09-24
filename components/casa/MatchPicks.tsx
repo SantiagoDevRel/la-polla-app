@@ -36,8 +36,10 @@ interface Props {
   away: string;
   /** Cuántos pronosticaron (del reparto de porcentajes); null si no se sabe. */
   count?: number | null;
-  /** Una línea de contexto arriba de la lista («3 de 12 pusieron 2-1»). */
+  /** Contexto visible también con la lista cerrada («3 de 12 pusieron 2-1»). */
   summary?: string | null;
+  /** Cambia al verificar/anular el partido para cargar el orden ya puntuado. */
+  resultRevision?: string | null;
 }
 /** `retryable` only for network failures and server errors (status >= 500). */
 interface LoadError { message: string; retryable: boolean }
@@ -69,11 +71,16 @@ function pickText(row: Row, scoringMode: Props["scoringMode"], home: string, awa
   return row.pick1x2 === "L" ? shortTeam(home) : row.pick1x2 === "V" ? shortTeam(away) : row.pick1x2 === "E" ? "Empate" : "Sin pronóstico";
 }
 
-export function MatchPicks({ slug, matchId, scoringMode, home, away, count = null, summary = null }: Props) {
+export function MatchPicks({ slug, matchId, scoringMode, home, away, count = null, summary = null, resultRevision = null }: Props) {
   const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState<Row[]>([]);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const resultKey = `${slug}/${matchId}/${resultRevision ?? ""}`;
+  const [pagination, setPagination] = useState({ key: resultKey, page: 0 });
+  const [list, setList] = useState<{ key: string; rows: Row[]; hasMore: boolean }>({ key: resultKey, rows: [], hasMore: false });
+  // A newly verified result starts at page zero without closing the dropdown.
+  // Never append its scored order to rows fetched while the match was live.
+  const page = pagination.key === resultKey ? pagination.page : 0;
+  const rows = list.key === resultKey ? list.rows : [];
+  const hasMore = list.key === resultKey && list.hasMore;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<LoadError | null>(null);
   const [revision, setRevision] = useState(0);
@@ -90,11 +97,10 @@ export function MatchPicks({ slug, matchId, scoringMode, home, away, count = nul
         const data = await readPicks(response);
         if (controller.signal.aborted) return;
         // La página 0 reemplaza (reintento o reapertura); las demás se suman.
-        setRows((previous) => {
-          const merged = page === 0 ? data.rows : [...previous, ...data.rows];
-          return Array.from(new Map(merged.map((row) => [row.id, row])).values());
+        setList((previous) => {
+          const merged = page === 0 || previous.key !== resultKey ? data.rows : [...previous.rows, ...data.rows];
+          return { key: resultKey, rows: Array.from(new Map(merged.map((row) => [row.id, row])).values()), hasMore: data.hasMore };
         });
-        setHasMore(data.hasMore);
       } catch (cause) {
         if (controller.signal.aborted) return;
         // Parse or unexpected errors show a generic message, never their internals.
@@ -103,12 +109,12 @@ export function MatchPicks({ slug, matchId, scoringMode, home, away, count = nul
     }
     void load();
     return () => controller.abort();
-  }, [open, slug, matchId, page, revision]);
+  }, [open, slug, matchId, page, revision, resultKey]);
 
   const loadMore = useCallback(() => {
     if (loading || !hasMore || error) return;
-    setPage((value) => value + 1);
-  }, [loading, hasMore, error]);
+    setPagination({ key: resultKey, page: page + 1 });
+  }, [loading, hasMore, error, resultKey, page]);
 
   // Bajar dentro del desplegable trae la página siguiente; la página no se mueve.
   function onScroll() {
@@ -132,15 +138,15 @@ export function MatchPicks({ slug, matchId, scoringMode, home, away, count = nul
         <span>{label}</span>
         <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
+      {summary && <p className="mb-2 px-1 text-[13px] leading-[1.5] text-text-secondary [overflow-wrap:anywhere]">{summary}</p>}
       {open && (
         <div id={id}>
-          {summary && <p className="mb-1 px-1 text-[12px] text-text-muted">{summary}</p>}
           {error ? (
             <div role="alert" className="px-1 py-2 text-[13px]">
               <p className="text-text-secondary">{error.message}</p>
-              {error.retryable && <button type="button" className="lp-btn lp-btn-ghost mt-2 min-h-11 !text-[13px]" onClick={() => { setPage(0); setRevision((value) => value + 1); }}>Reintentar</button>}
+              {error.retryable && <button type="button" className="lp-btn lp-btn-ghost mt-2 min-h-11 !text-[13px]" onClick={() => { setPagination({ key: resultKey, page: 0 }); setRevision((value) => value + 1); }}>Reintentar</button>}
             </div>
-          ) : rows.length === 0 && loading ? (
+          ) : rows.length === 0 && (loading || list.key !== resultKey) ? (
             <div role="status" className="px-1 py-2"><span className="sr-only">Cargando pronósticos</span><div className="h-20 animate-pulse rounded-md bg-bg-elevated" /></div>
           ) : rows.length === 0 ? (
             <p className="rounded-md bg-bg-elevated p-3 text-[13px] text-text-secondary">Todavía no hay pronósticos de participantes con pago aprobado.</p>

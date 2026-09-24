@@ -6,6 +6,20 @@
 
 ## READ THIS FIRST
 
+### POLLA REGALO: correo Quentro y resultado rápido (2026-09-24, 149–150)
+
+Ver [docs/casa-quentro-results.md](docs/casa-quentro-results.md). El correo de
+entrega se pide solo a inscritos de `polla-regalo`, en `casa_prize_contacts`
+privado; nunca en `users.email` ni en rankings. El administrador ve únicamente
+el contacto del ganador calculado o adjudicado. No hay envío automático.
+`casa_object_result_v1` identifica el resultado al verificar todos los partidos,
+con los bloqueos y el desempate por registro de 142, sin adjudicar. El cliente
+consulta cada 30 segundos. El cierre sigue con dos lecturas de API-Football;
+una fila ya `finished` no espera el umbral de 105 minutos. Los puntos visibles
+se actualizan con los datos del servidor. La distribución del marcador queda
+fuera del desplegable y los pronósticos verificados se ordenan por puntos antes
+de paginar. Aplicar ambas migraciones antes del código.
+
 ### Borradores privados de campañas (2026-09-24, migraciones 146–148)
 
 `campaign_draft` en `casa_pollas` mantiene slots de planificación fuera de

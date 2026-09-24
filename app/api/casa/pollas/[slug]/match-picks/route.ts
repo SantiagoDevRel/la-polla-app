@@ -41,10 +41,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // The caller's own rows (`mine`) are recognised by their own entry ids,
     // already read above, so no user_id ever leaves the database for this.
     const start = parsed.data.page * PAGE_SIZE;
-    const { data, error } = await createAdminClient().from("casa_picks")
+    const scored = Boolean(match.final_verified_at || match.voided_at);
+    let picks = createAdminClient().from("casa_picks")
       .select("id, entry_id, pick_1x2, home_score, away_score, points_earned, users!inner(display_name, avatar_url), casa_entries!inner(status)")
-      .eq("polla_id", polla.id).eq("match_id", match.id).eq("casa_entries.status", "pagada")
-      .order("id", { ascending: true }).range(start, start + PAGE_SIZE);
+      .eq("polla_id", polla.id).eq("match_id", match.id).eq("casa_entries.status", "pagada");
+    // Order the full result before pagination, so every scoring pick comes
+    // before zero-point picks, including on later pages. Live picks keep their
+    // neutral order: unverified points must not reveal a provisional result.
+    if (scored) picks = picks.order("points_earned", { ascending: false, nullsFirst: false });
+    const { data, error } = await picks.order("id", { ascending: true }).range(start, start + PAGE_SIZE);
     if (error) throw error;
     const page = (data ?? []).slice(0, PAGE_SIZE);
     const myEntryIds = new Set([entry?.id, ...entries.map((item) => item.id)].filter((id): id is string => Boolean(id)));
@@ -58,14 +63,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
     // Los puntos solo cuando el resultado ya está verificado: antes, un 0 se
     // leería como «fallaste» cuando en realidad todavía no se puntuó.
-    const scored = Boolean(match.final_verified_at);
     const rows = page.map(row => {
       const player = Array.isArray(row.users) ? row.users[0] : row.users;
       return {
         id: row.id, displayName: player?.display_name ?? "Sin nombre", avatarUrl: player?.avatar_url ?? null,
         entryNumber: numbers.get(row.entry_id) ?? null,
         mine: myEntryIds.has(row.entry_id),
-        pointsEarned: scored ? row.points_earned ?? 0 : null,
+        pointsEarned: match.voided_at ? 0 : scored ? row.points_earned ?? 0 : null,
         pick1x2: polla.scoring_mode === "1x2" ? row.pick_1x2 : null,
         homeScore: polla.scoring_mode === "marcador" ? row.home_score : null,
         awayScore: polla.scoring_mode === "marcador" ? row.away_score : null,

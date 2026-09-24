@@ -55,6 +55,20 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 
 describe("verify-final con API-Football", () => {
+  it('consulta finales sin esperar 105 minutos, conservando el umbral para vivo y programados', async () => {
+    vi.setSystemTime(new Date('2026-09-24T20:27:00Z'));
+    mocks.matches.mockImplementation(async (admin, columns, filter) => {
+      await filter(admin.from('matches').select(columns));
+      return { filas: [], errores: [] };
+    });
+    await verifyPendingFinals();
+    const query = new URL(String(calls('/rest/v1/matches')[0][0])).searchParams;
+    expect(query.get('or')).toBe('(status.eq.finished,scheduled_at.lte.2026-09-24T18:42:00.000Z)');
+    expect(query.get('status')).toBe('in.(finished,live,scheduled)');
+    expect(query.get('final_verified_at')).toBe('is.null');
+    expect(query.getAll('scheduled_at')).toEqual(['lte.2026-09-24T20:27:00.000Z', 'gte.2026-09-17T20:27:00.000Z']);
+  });
+
   it('sin lectura del proveedor no escribe ni cierra', async () => {
     vi.setSystemTime(new Date('2026-09-08T20:00:00Z'));
     mocks.matches.mockResolvedValue({ filas: [row(FT, { status: 'live' })], errores: [] });

@@ -133,6 +133,36 @@ describe("Casa participant predictions privacy", () => {
     expect(body.rows.map((row: { entryNumber: number | null }) => row.entryNumber)).toEqual([1, 2, null]);
     expect(JSON.stringify(body)).not.toMatch(/entry_id|user_id|e-ana/);
   });
+  it("asks the database for scoring picks first across pages only after verification", async () => {
+    const rows = Array.from({ length: 21 }, (_, index) => ({
+      id: `pick-${index}`, entry_id: `entry-${index}`, home_score: 2, away_score: index < 3 ? 1 : 0,
+      points_earned: index < 3 ? 3 : 0, users: { display_name: `Jugador ${index}`, avatar_url: null },
+    }));
+    fetchDb.mockImplementation(async () => new Response(JSON.stringify(rows), { headers: { "Content-Type": "application/json" } }));
+    const before = await (await call(`match=${matchId}&page=1`)).json();
+    const liveUrl = new URL(String(fetchDb.mock.calls[0][0]));
+    expect(liveUrl.searchParams.get("order")).toBe("id.asc");
+    expect(before.rows.every((row: { pointsEarned: number | null }) => row.pointsEarned === null)).toBe(true);
+
+    mocks.matches.mockResolvedValue([{ id: matchId, scheduled_at: "2020-01-01T00:00:00Z", status: "finished", final_verified_at: "2026-09-24T20:00:00Z" }]);
+    const after = await (await call(`match=${matchId}&page=1`)).json();
+    const finalUrl = new URL(String(fetchDb.mock.calls[1][0]));
+    expect(finalUrl.searchParams.get("order")).toBe("points_earned.desc.nullslast,id.asc");
+    expect(finalUrl.searchParams.get("offset")).toBe("20");
+    expect(finalUrl.searchParams.get("limit")).toBe("21");
+    expect(after.rows.map((row: { pointsEarned: number }) => row.pointsEarned)).toEqual([3, 3, 3, ...Array(17).fill(0)]);
+    expect(after.hasMore).toBe(true);
+    expect(after.rows.some((row: { id: string }) => row.id === "pick-20")).toBe(false);
+  });
+  it("shows zero for a voided match and orders its scored rows before pagination", async () => {
+    mocks.matches.mockResolvedValue([{ id: matchId, scheduled_at: "2020-01-01T00:00:00Z", status: "cancelled", voided_at: "2026-09-24T20:00:00Z" }]);
+    fetchDb.mockResolvedValueOnce(new Response(JSON.stringify([
+      { id: "pick", entry_id: "entry", home_score: 2, away_score: 1, points_earned: 3, users: { display_name: "Jugador", avatar_url: null } },
+    ]), { headers: { "Content-Type": "application/json" } }));
+    const body = await (await call()).json();
+    expect(body.rows[0].pointsEarned).toBe(0);
+    expect(new URL(String(fetchDb.mock.calls[0][0])).searchParams.get("order")).toBe("points_earned.desc.nullslast,id.asc");
+  });
   it("allows an administrator to inspect started matches without an inscription", async () => {
     mocks.entry.mockResolvedValue(null); mocks.admin.mockResolvedValue(true);
     expect((await call()).status).toBe(200);

@@ -57,6 +57,10 @@ import { PollaInfo } from "@/components/casa/PollaInfo";
 import { EliminarPolla } from "@/components/casa/EliminarPolla";
 import { MisBoletas } from "@/components/casa/Boletas";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
+import { PrizeContact } from "@/components/casa/PrizeContact";
+import { PrizeContactAdmin } from "@/components/casa/PrizeContactAdmin";
+import { ObjectResult } from "@/components/casa/ObjectResult";
+import { isQuentroPolla } from "@/lib/casa/prize-contact";
 import { CompartirPolla } from "@/components/casa/CompartirPolla";
 import { Participaciones } from "@/components/casa/Participaciones";
 // Server Component: el texto sale de un módulo sin "use client" (ver el archivo).
@@ -365,6 +369,13 @@ export default async function PollaPage({
         {payouts.length > 0 && (
           <ResultadoPolla payouts={payouts} miUserId={user.id} totalCop={pot.prize_cop} proofUrls={proofUrls} />
         )}
+
+        {objeto && polla.kind !== "rifa" && payouts.length === 0 && polla.status !== "resuelta" &&
+          <ObjectResult key={polla.slug} slug={polla.slug} />}
+
+        {isQuentroPolla(polla) && bestEntry?.status === "pagada" &&
+          (polla.status !== "resuelta" || payouts.some((payout) => payout.user_id === user.id)) && <PrizeContact slug={polla.slug} />}
+        {isQuentroPolla(polla) && isAdmin && <PrizeContactAdmin pollaId={polla.id} />}
 
         {polla.settlement_outcome === "house_retained_zero_points" && <StreetCard className="mb-4 p-4">
           <h2 className="lp-display-sm">Polla finalizada</h2>
