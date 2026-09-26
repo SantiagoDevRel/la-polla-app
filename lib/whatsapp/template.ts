@@ -18,9 +18,8 @@ const GRAPH_API_VERSION = "v21.0";
  *
  * - "header": variables del header (image/video/text)
  * - "body": variables del body — array ordenado matchea {{1}}, {{2}}, etc.
- * - "button": parametros para botones URL dinamicos (no aplica si la URL del
- *    botón es estática como en nuestro caso). Lo dejamos disponible por si
- *    en el futuro queremos URL parametrizada.
+ * - "button": parametros para botones URL dinamicos (el slug de la polla en
+ *    las plantillas de avisos, ver lib/whatsapp/avisos.ts).
  */
 export type TemplateComponent =
   | { type: "body"; parameters: Array<{ type: "text"; text: string }> }
@@ -122,12 +121,13 @@ export function estimateTemplateCost(
   category: "marketing" | "utility" | "authentication" | "service",
 ): number {
   switch (category) {
+    // Tarifas Meta para destinos +57 (USD, revisadas 2026-09-26).
     case "utility":
-      return 0.005;
+      return 0.0008;
     case "marketing":
       return 0.0125;
     case "authentication":
-      return 0.0035;
+      return 0.0008;
     case "service":
       return 0;
     default:

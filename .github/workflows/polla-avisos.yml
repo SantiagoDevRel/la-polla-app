@@ -1,26 +1,19 @@
-# Daily match reminders cron.
+# Avisos de pollas por WhatsApp, cada hora.
 #
-# Pega POST a /api/cron/match-reminders todos los dias a las 13:00 UTC
-# (8:00 am Bogota, UTC-5). El endpoint verifica el bearer token con
-# requireCronSecret (lib/auth/cron-secret.ts) y manda template messages a
-# usuarios con partidos hoy. Con WhatsApp apagado responde
-# {"ok":true,"disabled":true} sin enviar nada.
+# Pega POST a /api/cron/polla-avisos al minuto 10 de cada hora. El endpoint
+# verifica el bearer token con requireCronSecret y avisa a los jugadores de
+# pollas que cierran en menos de 3 h y de pollas nuevas (una vez por persona y
+# polla). Con WhatsApp apagado responde {"ok":true,"disabled":true}.
 #
-# El paso falla si: la respuesta no es 2xx (un 307 a /login también es
-# fallo: hasta 2026-09-13 el middleware redirigía y el job quedaba verde),
-# el body no trae "ok": true, o curl pasa de 280 s. En el log solo se
-# imprimen contadores: el repo es público y el body puede traer user_id.
-# Sin --retry: los envíos no son idempotentes.
-#
-# workflow_dispatch permite triggear manual desde la UI de GitHub o
-# `gh workflow run match-reminders.yml` para testing.
+# El paso falla si la respuesta no es 2xx, el body no trae "ok": true o curl
+# pasa de 280 s. En el log solo se imprimen contadores (repo público).
+# Sin --retry: los envíos no son idempotentes a mitad de corrida.
 
-name: Match Reminders Daily
+name: Polla Avisos Hourly
 
 on:
   schedule:
-    # 13:00 UTC = 8:00 AM Bogota (Colombia, UTC-5, no DST)
-    - cron: "0 13 * * *"
+    - cron: "10 * * * *"
   workflow_dispatch: {}
 
 permissions: {}
@@ -30,11 +23,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  send-reminders:
+  send-avisos:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: POST a la API de reminders
+      - name: POST a la API de avisos
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           APP_URL: ${{ secrets.APP_URL }}
@@ -49,7 +42,7 @@ jobs:
           body_file="$(mktemp)"
           trap 'rm -f "$body_file"' EXIT
           status="$(curl -sS --max-time 280 -o "$body_file" -w '%{http_code}' -X POST \
-            "$APP_URL/api/cron/match-reminders" \
+            "$APP_URL/api/cron/polla-avisos" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json")"
           echo "HTTP status: $status"
@@ -62,4 +55,4 @@ jobs:
             echo "::error::La respuesta no trae \"ok\": true"
             exit 1
           fi
-          jq -c '{ok, disabled, sent, skipped, failed, capped, total_candidates, errors: ((.errors // []) | length)}' "$body_file"
+          jq -c '{ok, disabled, sent, skipped, failed, capped, closing, fresh, total_candidates, errors: ((.errors // []) | length)}' "$body_file"

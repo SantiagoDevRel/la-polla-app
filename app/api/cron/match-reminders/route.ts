@@ -1,13 +1,18 @@
-// app/api/cron/match-reminders/route.ts — Daily reminder cron.
+// app/api/cron/match-reminders/route.ts — Recordatorio diario de pronósticos.
 //
-// Disparado por GitHub Actions a las 13:00 UTC (8am Bogota). Para cada
-// user activo con partidos hoy en alguna polla (Bogota TZ) y sin
-// pronostico todavia, le manda un template "match_reminder_daily" que
-// el bot tiene aprobado en Meta.
+// Disparado por GitHub Actions a las 13:00 UTC (8am Bogotá). Para cada
+// persona inscrita (pagada, o en revisión con comprobante) en una polla Casa
+// de partidos con partidos HOY (Bogotá) que todavía se pueden pronosticar y
+// que no tienen pronóstico en esa participación, manda la plantilla
+// «lp_pronosticos_hoy» con el botón a /polla/<slug>. Un solo mensaje por persona
+// al día: si le faltan pronósticos en varias pollas, va la que tiene más
+// partidos pendientes (empate: la que juega primero).
 //
-// Idempotente: si por error el cron se llama dos veces el mismo dia,
-// no duplica envios — chequea wa_template_sends por user + template +
-// rango "hoy Bogota".
+// (2026-09-26) Antes leía el modelo P2P viejo (pollas/predictions) con la
+// plantilla match_reminder_daily; Casa es donde se juega ahora.
+//
+// Idempotente: una persona que ya recibió «lp_pronosticos_hoy» hoy (Bogotá) no
+// recibe otro, aunque el cron corra dos veces.
 //
 // Auth: header Authorization: Bearer ${CRON_SECRET}, vía requireCronSecret
 // (el middleware exime /api/cron/ del gate de sesión).
@@ -15,280 +20,160 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCronSecret } from "@/lib/auth/cron-secret";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  sendTemplateMessage,
-  estimateTemplateCost,
-  type TemplateComponent,
-} from "@/lib/whatsapp/template";
 import { whatsappOutboundEnabled } from "@/lib/whatsapp/outbound";
+import { canEditCasaMatch } from "@/lib/casa/match-rules";
+import { isLiveEntry } from "@/lib/casa/types";
+import {
+  RecipientBudget,
+  loadRecipients,
+  selectAllPages,
+  sendAviso,
+} from "@/lib/whatsapp/avisos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
-const TEMPLATE_NAME = "match_reminder_daily";
-const TEMPLATE_LANGUAGE = "es";
-const CATEGORY = "utility" as const;
+const TEMPLATE = "lp_pronosticos_hoy" as const;
 
-interface MatchToRemind {
-  match_id: string;
-  polla_id: string;
-  polla_name: string;
-  home_team: string;
-  away_team: string;
-  scheduled_at: string;
-}
-
-interface UserToRemind {
-  user_id: string;
-  display_name: string | null;
-  whatsapp_number: string | null;
-  matches: MatchToRemind[];
-}
+interface Pending { pollaId: string; slug: string; name: string; count: number; firstKickoff: string }
 
 export async function POST(request: NextRequest) {
-  // ─── Auth ───
   const denied = requireCronSecret(request);
   if (denied) return denied;
 
-  // Sin número propio no se envía nada ni se registran envíos fallidos.
   if (!whatsappOutboundEnabled()) {
     return NextResponse.json({ ok: true, disabled: true, sent: 0 });
   }
 
-  const admin = createAdminClient();
+  const db = createAdminClient();
+  const now = Date.now();
 
-  // ─── Bogota day window ───
-  // Calculamos el inicio y fin del "hoy" segun America/Bogota (UTC-5).
-  // Lo hacemos sin libs: tomar now en UTC, restar 5h para llevarlo a
-  // hora Bogota, agarrar el dia, y reconstruir el rango UTC.
-  const nowUtc = new Date();
-  const bogotaNow = new Date(nowUtc.getTime() - 5 * 60 * 60 * 1000);
-  const yyyy = bogotaNow.getUTCFullYear();
-  const mm = bogotaNow.getUTCMonth();
-  const dd = bogotaNow.getUTCDate();
-  // 00:00 Bogota = 05:00 UTC
-  const bogotaDayStartUtc = new Date(Date.UTC(yyyy, mm, dd, 5, 0, 0));
-  const bogotaDayEndUtc = new Date(bogotaDayStartUtc.getTime() + 24 * 60 * 60 * 1000);
+  // ─── «Hoy» en Bogotá (UTC-5, sin horario de verano) ───
+  const bogotaNow = new Date(now - 5 * 60 * 60 * 1000);
+  const dayStart = new Date(Date.UTC(
+    bogotaNow.getUTCFullYear(), bogotaNow.getUTCMonth(), bogotaNow.getUTCDate(), 5, 0, 0,
+  ));
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  // ─── Step 1: matches programados HOY (Bogota), aún no jugados ───
-  const { data: todaysMatches, error: matchesErr } = await admin
+  // ─── 1. Pollas Casa de partidos, publicadas y que aceptan pronósticos ───
+  const { data: pollaRows, error: pollasErr } = await db
+    .from("casa_pollas")
+    .select("id, slug, name")
+    .eq("kind", "partidos")
+    .in("status", ["abierta", "cerrada"])
+    .is("archived_at", null)
+    .neq("publication_mode", "oculta")
+    .lte("opens_at", new Date(now).toISOString());
+  if (pollasErr) return fail("pollas", pollasErr.message);
+  const pollas = new Map((pollaRows ?? []).map((p) => [p.id, p]));
+  if (pollas.size === 0) return done("Sin pollas activas");
+
+  // ─── 2. Partidos de hoy de esas pollas que todavía se pueden pronosticar ───
+  const links = await selectAllPages<{ polla_id: string; match_id: string }>((from, to) =>
+    db.from("casa_polla_matches").select("polla_id, match_id")
+      .in("polla_id", [...pollas.keys()]).is("voided_at", null).range(from, to));
+  const matchIds = [...new Set(links.map((l) => l.match_id))];
+  if (matchIds.length === 0) return done("Sin partidos en pollas activas");
+
+  const { data: matchRows, error: matchesErr } = await db
     .from("matches")
-    .select("id, home_team, away_team, scheduled_at, status, tournament")
-    .gte("scheduled_at", bogotaDayStartUtc.toISOString())
-    .lt("scheduled_at", bogotaDayEndUtc.toISOString())
-    .in("status", ["scheduled"]);
-
-  if (matchesErr) {
-    return NextResponse.json(
-      { error: "matches query failed", detail: matchesErr.message },
-      { status: 500 },
-    );
-  }
-
-  if (!todaysMatches || todaysMatches.length === 0) {
-    return NextResponse.json({
-      ok: true,
-      message: "Sin partidos hoy en Bogota TZ",
-      sent: 0,
-      skipped: 0,
-    });
-  }
-
-  // ─── Step 2: pollas activas que incluyen alguno de esos matches ───
-  // pollas.match_ids es array uuid; usamos overlap operator (&&).
-  const todaysMatchIds = todaysMatches.map((m) => m.id);
-  const { data: pollas } = await admin
-    .from("pollas")
-    .select("id, name, match_ids, status")
-    .eq("status", "active")
-    .overlaps("match_ids", todaysMatchIds);
-
-  if (!pollas || pollas.length === 0) {
-    return NextResponse.json({
-      ok: true,
-      message: "Hay partidos hoy pero ninguna polla activa los incluye",
-      sent: 0,
-      skipped: 0,
-    });
-  }
-
-  // Build polla_id → list of (match_id, polla_name) que aplican hoy.
-  const pollaIds = pollas.map((p) => p.id);
-  const matchById = new Map(
-    todaysMatches.map((m) => [
-      m.id,
-      { id: m.id, home_team: m.home_team, away_team: m.away_team, scheduled_at: m.scheduled_at },
-    ]),
+    .select("id, scheduled_at, status, elapsed, final_verified_at")
+    .gte("scheduled_at", dayStart.toISOString())
+    .lt("scheduled_at", dayEnd.toISOString());
+  if (matchesErr) return fail("matches", matchesErr.message);
+  // Se filtra por fecha en SQL y por pertenencia aquí: la lista de ids de todas
+  // las pollas activas no cabe en la URL.
+  const inPollas = new Set(matchIds);
+  const editable = new Map(
+    (matchRows ?? [])
+      .filter((m) => inPollas.has(m.id) && canEditCasaMatch({ ...m, voided_at: null }, now))
+      .map((m) => [m.id, m.scheduled_at as string]),
   );
+  if (editable.size === 0) return done("Sin partidos pronosticables hoy");
 
-  // ─── Step 3: participantes approved+paid de esas pollas ───
-  const { data: participants } = await admin
-    .from("polla_participants")
-    .select("user_id, polla_id")
-    .in("polla_id", pollaIds)
-    .eq("status", "approved")
-    .eq("paid", true);
-
-  if (!participants || participants.length === 0) {
-    return NextResponse.json({
-      ok: true,
-      message: "Sin participantes pagos en pollas con partidos hoy",
-      sent: 0,
-      skipped: 0,
-    });
+  const todayByPolla = new Map<string, string[]>();
+  for (const l of links) {
+    if (!editable.has(l.match_id)) continue;
+    todayByPolla.set(l.polla_id, [...(todayByPolla.get(l.polla_id) ?? []), l.match_id]);
   }
 
-  // ─── Step 4: predictions YA hechas para los matches de hoy ───
-  const userIds = Array.from(new Set(participants.map((p) => p.user_id)));
-  const { data: existingPreds } = await admin
-    .from("predictions")
-    .select("user_id, match_id")
-    .in("user_id", userIds)
-    .in("match_id", todaysMatchIds);
+  // ─── 3. Participaciones vivas en esas pollas ───
+  const entries = (await selectAllPages<{ id: string; polla_id: string; user_id: string; status: "pendiente" | "pagada" | "rechazada" | "anulada"; proof_path: string | null }>((from, to) =>
+    db.from("casa_entries").select("id, polla_id, user_id, status, proof_path")
+      .in("polla_id", [...todayByPolla.keys()]).in("status", ["pagada", "pendiente"])
+      .is("ticket_number", null).range(from, to)))
+    .filter(isLiveEntry);
+  if (entries.length === 0) return done("Nadie inscrito en pollas con partidos hoy");
 
-  const predicted = new Set(
-    (existingPreds ?? []).map((p) => `${p.user_id}|${p.match_id}`),
-  );
+  // ─── 4. Pronósticos ya hechos para los partidos de hoy ───
+  // Por lotes de 200 ids: la lista entera de uuids no cabe en la URL de PostgREST.
+  const picked = new Set<string>();
+  for (let i = 0; i < entries.length; i += 200) {
+    const batch = entries.slice(i, i + 200).map((e) => e.id);
+    const picks = await selectAllPages<{ entry_id: string; match_id: string }>((from, to) =>
+      db.from("casa_picks").select("entry_id, match_id")
+        .in("entry_id", batch).in("match_id", [...editable.keys()]).range(from, to));
+    for (const p of picks) picked.add(`${p.entry_id}|${p.match_id}`);
+  }
 
-  // ─── Step 5: armar lista de users → matches faltantes ───
-  // Para cada (user, polla, match) que matchee:
-  //   - el user no haya pronosticado ese match
-  //   - el match esté incluido en la polla
-  // Agrupamos por user para mandar 1 sola template aunque tenga
-  // matches en varias pollas.
-  const userToRemind = new Map<string, UserToRemind>();
-  for (const p of participants) {
-    const polla = pollas.find((pp) => pp.id === p.polla_id);
-    if (!polla) continue;
-    const matchIdsForThisPolla = (polla.match_ids ?? []).filter((mid: string) =>
-      todaysMatchIds.includes(mid),
-    );
-    for (const mid of matchIdsForThisPolla) {
-      if (predicted.has(`${p.user_id}|${mid}`)) continue;
-      const m = matchById.get(mid);
-      if (!m) continue;
-      if (!userToRemind.has(p.user_id)) {
-        userToRemind.set(p.user_id, {
-          user_id: p.user_id,
-          display_name: null,
-          whatsapp_number: null,
-          matches: [],
-        });
-      }
-      userToRemind.get(p.user_id)!.matches.push({
-        match_id: mid,
-        polla_id: polla.id,
-        polla_name: polla.name,
-        home_team: m.home_team,
-        away_team: m.away_team,
-        scheduled_at: m.scheduled_at,
-      });
+  // ─── 5. Por persona: la polla con más partidos sin pronóstico ───
+  const best = new Map<string, Pending>();
+  for (const entry of entries) {
+    const polla = pollas.get(entry.polla_id);
+    const today = todayByPolla.get(entry.polla_id) ?? [];
+    const missing = today.filter((mid) => !picked.has(`${entry.id}|${mid}`));
+    if (!polla || missing.length === 0) continue;
+    const firstKickoff = missing.map((mid) => editable.get(mid)!).sort()[0];
+    const candidate: Pending = { pollaId: polla.id, slug: polla.slug, name: polla.name, count: missing.length, firstKickoff };
+    const current = best.get(entry.user_id);
+    if (!current || candidate.count > current.count
+      || (candidate.count === current.count && candidate.firstKickoff < current.firstKickoff)) {
+      best.set(entry.user_id, candidate);
     }
   }
+  if (best.size === 0) return done("Todos ya pronosticaron los partidos de hoy");
 
-  if (userToRemind.size === 0) {
-    return NextResponse.json({
-      ok: true,
-      message: "Todos los users ya pronosticaron sus matches de hoy",
-      sent: 0,
-      skipped: 0,
-    });
-  }
-
-  // ─── Step 6: enriquecer con whatsapp_number + display_name ───
-  const usersInfo = await admin
-    .from("users")
-    .select("id, display_name, whatsapp_number")
-    .in("id", Array.from(userToRemind.keys()));
-  for (const u of usersInfo.data ?? []) {
-    const entry = userToRemind.get(u.id);
-    if (entry) {
-      entry.display_name = u.display_name;
-      entry.whatsapp_number = u.whatsapp_number;
-    }
-  }
-
-  // ─── Step 7: para cada user, dedup contra wa_template_sends del dia
-  //              de hoy (Bogota), y enviar si no esta marcado ───
-  const { data: sentToday } = await admin
-    .from("wa_template_sends")
-    .select("user_id")
-    .eq("template_name", TEMPLATE_NAME)
-    .gte("created_at", bogotaDayStartUtc.toISOString());
+  // ─── 6. Enviar (sin repetir en el día, respetando bajas y el tope diario) ───
+  const recipients = await loadRecipients(db, [...best.keys()]);
+  const { data: sentToday, error: sentErr } = await db
+    .from("wa_template_sends").select("user_id")
+    .eq("template_name", TEMPLATE).gte("created_at", dayStart.toISOString());
+  if (sentErr) return fail("wa_template_sends", sentErr.message);
   const alreadySent = new Set((sentToday ?? []).map((r) => r.user_id));
+  const budget = await RecipientBudget.load(db, now);
 
-  let sent = 0;
-  let skipped = 0;
-  let failed = 0;
-  const errors: Array<{ user_id: string; error: string }> = [];
-
-  for (const entry of Array.from(userToRemind.values())) {
-    if (!entry.whatsapp_number) {
-      skipped++;
-      continue;
-    }
-    if (alreadySent.has(entry.user_id)) {
-      skipped++;
-      continue;
-    }
-
-    // Build the body parameters.
-    // {{1}} = first name. {{2}} = count number ("3"). El template body
-    // tiene "tienes {{2}} pronósticos pendientes" → la palabra fija va
-    // afuera de la variable. Meta acepta variables que sean solo números
-    // sin problema y el body no termina con variable (regla de Meta).
-    const firstName = (entry.display_name ?? "parce").split(" ")[0];
-    const count = entry.matches.length;
-    const countText = String(count);
-
-    const components: TemplateComponent[] = [
-      {
-        type: "body",
-        parameters: [
-          { type: "text", text: firstName },
-          { type: "text", text: countText },
-        ],
-      },
-    ];
-
-    const result = await sendTemplateMessage(
-      entry.whatsapp_number,
-      TEMPLATE_NAME,
-      TEMPLATE_LANGUAGE,
-      components,
-    );
-
-    const cost = result.ok ? estimateTemplateCost(CATEGORY) : 0;
-    await admin.from("wa_template_sends").insert({
-      user_id: entry.user_id,
-      phone: entry.whatsapp_number,
-      template_name: TEMPLATE_NAME,
-      variables: { firstName, countText, matchCount: entry.matches.length },
-      meta_message_id: result.messageId ?? null,
-      status: result.ok ? "sent" : "failed",
-      error: result.error ?? null,
-      cost_usd: cost,
-      category: CATEGORY,
+  let sent = 0, skipped = 0, failed = 0, capped = 0;
+  const errors: string[] = [];
+  const ordered = [...best.entries()].sort((a, b) => a[1].firstKickoff.localeCompare(b[1].firstKickoff));
+  for (const [userId, pending] of ordered) {
+    const recipient = recipients.get(userId);
+    if (!recipient || alreadySent.has(userId)) { skipped++; continue; }
+    if (!budget.canSend(recipient.phone)) { capped++; continue; }
+    const result = await sendAviso(db, {
+      recipient,
+      template: TEMPLATE,
+      bodyParams: [recipient.firstName, pending.name, String(pending.count)],
+      pollaSlug: pending.slug,
+      variables: { pollaId: pending.pollaId, slug: pending.slug, count: pending.count },
     });
-
-    if (result.ok) {
-      sent++;
-    } else {
-      failed++;
-      errors.push({ user_id: entry.user_id, error: result.error ?? "unknown" });
-    }
+    if (result.optedOut) skipped++;
+    else if (result.ok) { sent++; budget.markSent(recipient.phone); }
+    else { failed++; errors.push((result.error ?? "unknown").slice(0, 120)); }
   }
 
   return NextResponse.json({
-    ok: true,
-    sent,
-    skipped,
-    failed,
-    total_candidates: userToRemind.size,
-    bogota_day_window: {
-      start: bogotaDayStartUtc.toISOString(),
-      end: bogotaDayEndUtc.toISOString(),
-    },
+    ok: true, sent, skipped, failed, capped,
+    total_candidates: best.size,
+    bogota_day_window: { start: dayStart.toISOString(), end: dayEnd.toISOString() },
     errors: errors.slice(0, 5),
   });
+}
+
+function done(message: string) {
+  return NextResponse.json({ ok: true, message, sent: 0, skipped: 0 });
+}
+
+function fail(what: string, detail: string) {
+  return NextResponse.json({ error: `${what} query failed`, detail }, { status: 500 });
 }

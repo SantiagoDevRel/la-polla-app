@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   whatsappOutboundEnabled: vi.fn(() => false),
 }));
 
+// match-reminders y polla-avisos importan lib/whatsapp/avisos (server-only).
+vi.mock("server-only", () => ({}));
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({ auth: { getUser: mocks.getUser } }),
 }));
@@ -32,6 +34,7 @@ import { POST as adminDiscrepancies } from "@/app/api/cron/admin-discrepancies-e
 import { POST as backupFreshness } from "@/app/api/cron/backup-freshness/route";
 import { POST as cleanupProofs } from "@/app/api/cron/cleanup-payout-proofs/route";
 import { POST as matchReminders } from "@/app/api/cron/match-reminders/route";
+import { POST as pollaAvisos } from "@/app/api/cron/polla-avisos/route";
 import { POST as telegramLoginBotProfile } from "@/app/api/cron/telegram-login-bot-profile/route";
 
 const SECRET = "test-cron-secret-0123456789";
@@ -42,6 +45,7 @@ const handlers = [
   ["backup-freshness", backupFreshness],
   ["cleanup-payout-proofs", cleanupProofs],
   ["match-reminders", matchReminders],
+  ["polla-avisos", pollaAvisos],
   ["telegram-login-bot-profile", telegramLoginBotProfile],
 ] as const;
 
