@@ -2241,11 +2241,45 @@ Where it matters most we use reply buttons:
 - `NEXT_PUBLIC_WHATSAPP_BOT_NUMBER` — bot's E.164 number (no plus). Sin
   valor por defecto: sin la variable no existe enlace al bot.
 
-⛔ **WhatsApp apagado (2026-09-13).** El número del bot ahora pertenece a
-otra app. La Polla no lo muestra ni envía desde él: login solo por SMS, sin
-enlaces `wa.me` al bot, y `lib/whatsapp/outbound.ts` convierte todo envío
-(texto, interactivo, template y el cron de recordatorios) en no-op salvo
-`WHATSAPP_OUTBOUND_ENABLED=true`. No reactivar sin un número propio.
+⛔ **WhatsApp apagado (2026-09-13).** El número viejo del bot pasó a otra app.
+Todo envío (texto, interactivo, plantilla y crons) sigue siendo no-op salvo
+`WHATSAPP_OUTBOUND_ENABLED=true` (`lib/whatsapp/outbound.ts`).
+
+✅ **Número propio (2026-09-26): +1 856-483-1652.** Comprado en Zernio (USD 3/mes,
+solo es la línea) y conectado por Embedded Signup a la WABA **«La Polla
+Colombiana»** `1067842242688502` del portfolio La Polla; phone_number_id
+`1363716976823726`. La app de Meta de La Polla (token de system user en
+`META_WA_ACCESS_TOKEN`) envía directo por Graph API y está suscrita a los
+webhooks de esa WABA: **Zernio no está en el camino de los mensajes.** Para
+encenderlo en prod: `META_WA_PHONE_NUMBER_ID=1363716976823726`,
+`NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=18564831652`, `WHATSAPP_OUTBOUND_ENABLED=true`.
+
+**Avisos que el bot envía primero** (`lib/whatsapp/avisos.ts`). Tres plantillas
+`es`, todas con botón URL `https://lapollacolombiana.com/polla/{{1}}` (slug Casa;
+nunca `/pollas/` ni `/unirse/`, que son el P2P viejo) y la frase final
+«Responde BAJA si no quieres más avisos»:
+
+| Plantilla | Cuerpo | Cron |
+|---|---|---|
+| `lp_pronosticos_hoy` | {{1}} nombre · {{2}} polla · {{3}} partidos de hoy sin pronóstico | `/api/cron/match-reminders`, diario 13:00 UTC |
+| `lp_polla_cierra` | {{1}} nombre · {{2}} polla · {{3}} «3 horas» | `/api/cron/polla-avisos`, cada hora |
+| `lp_polla_nueva` | {{1}} nombre · {{2}} polla | `/api/cron/polla-avisos`, cada hora |
+
+- Público de `polla-avisos`: quien ya tuvo una participación viva en Casa. Nunca
+  a quien ya está en esa polla; una vez por persona y polla (`wa_template_sends`,
+  `variables.pollaId`); pollas nuevas, como mucho una por persona cada 20 h.
+- **BAJA / ALTA** (y STOP) los atiende el webhook antes que cualquier otro flujo
+  y los guarda en `wa_avisos_opt_out` (migración 152, por teléfono, solo
+  service_role). Ningún cron le escribe a un número dado de baja.
+- **Tope de Meta:** TIER_250 = 250 destinatarios únicos en 24 h para mensajes que
+  inicia el negocio. `RecipientBudget` cuenta contra `wa_template_sends` y para en
+  `WHATSAPP_DAILY_RECIPIENT_CAP` (240 por defecto). Sube a 2.000 al verificar el
+  negocio o al llegar a 2.000 destinatarios únicos en 30 días.
+- Costo: se enviaron como UTILITY pero Meta reclasificó la primera tanda como
+  MARKETING (USD 0,0125 por mensaje a +57); se registra ese costo.
+- `match_reminder_daily` (la plantilla del número viejo) ya no se usa.
+- Pendiente: el bot conversacional (`router.ts`/`flows.ts`) todavía habla del
+  modelo P2P; el de Casa para jugadores es el de Telegram.
 
 ### Tone Rules (non-negotiable) — REESCRITAS 2026-09-02
 

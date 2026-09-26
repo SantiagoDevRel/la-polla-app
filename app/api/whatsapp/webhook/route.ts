@@ -27,6 +27,7 @@ import {
   processIncomingMessage,
   type IncomingMessage,
 } from "@/lib/whatsapp/router";
+import { isOptInText, isOptOutText, setOptOut } from "@/lib/whatsapp/avisos";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -108,6 +109,20 @@ async function dispatch(message: any, request: NextRequest): Promise<void> {
   //    in front of the router so users without a public.users row (mid-
   //    onboarding) can still recover via SMS fallback.
   if (type === "text" && textBody) {
+    // 0. BAJA / ALTA de los avisos (las plantillas lo ofrecen al final). Va
+    //    antes que todo: tiene que funcionar aunque el número no tenga cuenta.
+    if (isOptOutText(textBody) || isOptInText(textBody)) {
+      const optOut = isOptOutText(textBody);
+      await setOptOut(from, optOut);
+      await sendTextMessage(
+        from,
+        optOut
+          ? "Listo, no te enviaremos más avisos de pollas por WhatsApp. Si cambias de opinión, responde ALTA."
+          : "Listo, volverás a recibir los avisos de pollas por WhatsApp. Para dejar de recibirlos, responde BAJA.",
+      );
+      return;
+    }
+
     const lower = textBody.toLowerCase();
     if (LOGIN_KEYWORDS.some((kw) => lower.includes(kw))) {
       await replyWithMagicLink(from, request);
