@@ -6,6 +6,15 @@
 
 ## READ THIS FIRST
 
+### Partidos en el enlace público (2026-09-27)
+
+`/polla/[slug]` muestra también los partidos sin sesión: equipos, escudos y
+horarios de Colombia, conservando «hora por confirmar» y partidos anulados.
+Reutiliza `getPollaMatches` después de validar publicación; no consulta ni
+expone pronósticos o participantes para visitantes. El CTA conserva `returnTo`.
+Con sesión se mantiene el detalle habitual. `/casa/[slug]` sigue redirigiendo a
+`/polla/[slug]`. Se retiró la frase sobre celular y datos bancarios.
+
 ### Privacidad de pronósticos y frecuencia del vivo (2026-09-24, migración 151)
 
 La distribución de marcadores ajenos solo llega al cliente después del inicio
