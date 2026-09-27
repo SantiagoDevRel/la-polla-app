@@ -80,8 +80,13 @@ variables, plantillas ni registros.
 - Crear `lp_login_otp` devolvió Meta **10 / 2388185**, «This WhatsApp business
   account does not have permission to create message template». Se reprodujo
   tanto por Zernio como en el administrador directo de Meta.
-- La verificación del negocio figura `pending_submission` y el límite del
-  número es TIER_250. No se ha confirmado cuál requisito concreto desbloquea
+- La verificación del negocio figuraba `pending_submission`. Se retomó el
+  formulario de persona sin negocio registrado, con los datos y documentos
+  que el dueño ya había cargado, y se confirmó el dominio existente. El
+  2026-09-27 a las 20:43 UTC la API confirmó el cambio a **`pending`**: la
+  solicitud está enviada, todavía sin aprobación. El límite del número sigue
+  en TIER_250. El reintento posterior conservó el error **10 / 2388185**.
+  No se ha confirmado cuál requisito concreto desbloquea
   la creación de AUTHENTICATION. No confundir dominio verificado con negocio
   verificado ni mensajes de marketing entregados con OTP habilitado.
 - La integración queda **apagada**. No se ha entregado un OTP real ni activado
@@ -93,6 +98,29 @@ variables, plantillas ni registros.
   identificador del emisor y `WHATSAPP_OTP_ENABLED=false`. No se sobrescribió
   ninguna variable existente ni se desplegó/activó el cambio. La copia de la
   credencial está fuera del repositorio, bajo el directorio privado del dueño.
+
+## Alternativa consultada: enlace de acceso
+
+La revisión independiente con Claude y la consulta directa del 2026-09-27
+confirman que se pueden enviar respuestas de servicio durante las 24 horas
+posteriores a un mensaje del usuario. Eso no confirma que un enlace de
+autenticación esté exento del requisito de plantilla: la documentación de
+Meta exige AUTHENTICATION para contraseñas de un solo uso/códigos y no aclara
+expresamente el caso del enlace mágico. No anunciarlo como una alternativa
+aprobada ni disfrazar autenticación de marketing/utility.
+
+Fuentes: [política de WhatsApp](https://whatsappbusiness.com/policy/),
+[plantillas de autenticación](https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/authentication-templates/authentication-templates/),
+[respuestas de Zernio](https://docs.zernio.com/platforms/whatsapp/inbox).
+La falta de verificación es una causa probable del rechazo, no una explicación
+oficial confirmada del subcódigo. Tras la aprobación, reintentar la plantilla;
+si persiste, resolver la elegibilidad con el proveedor/Meta.
+
+El enlace histórico sigue apagado. Si se adopta, revisar antes el consumo en
+GET de `wa-magic`: una precarga puede consumirlo. Usar confirmación POST y
+abrir sesión únicamente en el navegador que canjea el enlace; no aprobar
+remotamente otra pestaña que haya iniciado el proceso. No hubo cambios de
+autenticación ni activación de enlaces en esta investigación.
 
 ## Verificación local
 
