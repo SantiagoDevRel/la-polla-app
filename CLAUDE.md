@@ -6,6 +6,17 @@
 
 ## READ THIS FIRST
 
+### Campañas SMS exclusivas de Santiago (2026-09-27, migración 153)
+
+`/admin/sms` y `/api/admin/sms-campaigns` exigen sesión, admin y el UUID privado
+`SMS_CAMPAIGN_OWNER_ID`: nunca nombre, teléfono del cliente ni otro administrador.
+Dos plantillas: apertura y cierre (hoy/mañana/en N días, verificado contra la fecha
+del envío). Colombia por defecto; selección masiva, exclusión por polla y
+excepciones. Revisión con costo real, segmentos y fecha Colombia antes de confirmar.
+Reserva atómica antes del POST; un timeout no se reintenta. Tablas separadas de
+OTP, RLS y RPCs solo service_role; acuses sc* en `/api/sms/ack`. No tocar pronósticos.
+Procedimiento, límites y conciliación: [docs/admin-sms-campaigns.md](docs/admin-sms-campaigns.md).
+
 ### Partidos en el enlace público (2026-09-27)
 
 `/polla/[slug]` muestra también los partidos sin sesión: equipos, escudos y

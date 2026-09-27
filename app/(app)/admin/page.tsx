@@ -35,6 +35,7 @@ import { HeroFrame, Label, SectionHead } from "@/components/street";
 import { useToast } from "@/components/ui/Toast";
 import UserDirectory from "@/components/admin/UserDirectory";
 import SmsSaldoCard from "@/components/admin/SmsSaldoCard";
+import SmsCampaignLink from "@/components/admin/SmsCampaignLink";
 
 interface Metricas {
   usuarios: number;
@@ -177,6 +178,7 @@ export default function AdminPage() {
           <Link href="/admin/cortesias" className="lp-btn lp-btn-ghost mt-2 w-full">
             Dar cortesías
           </Link>
+          <SmsCampaignLink />
         </div>
 
         <SmsSaldoCard />
