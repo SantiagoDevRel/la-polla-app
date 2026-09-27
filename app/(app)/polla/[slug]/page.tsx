@@ -42,7 +42,8 @@ import {
   type CasaPolla,
   type Pick1x2,
 } from "@/lib/casa/types";
-import { entryPriceLabel, formatCop, formatShortDate, prizeImageUrl, timeLeft } from "@/lib/casa/format";
+import { entryPriceLabel, formatCop, formatMatchTime, formatShortDate, prizeImageUrl, timeLeft } from "@/lib/casa/format";
+import { TeamCrest } from "@/components/match/TeamCrest";
 import { premioLabel } from "@/lib/casa/premio";
 import { getPollitoBase } from "@/lib/pollitos";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
@@ -126,18 +127,19 @@ export default async function PollaPage({
   // sin ninguna pista de qué le estaban compartiendo.
   //
   // Ahora ve una versión REDUCIDA. Lo que se muestra es exactamente lo que la
-  // casa ya está publicitando — torneo, nombre, pozo, entrada y cierre — y
-  // NADA más: cero tabla de posiciones, cero nombres, cero pronósticos. Esa
+  // casa ya está publicitando — torneo, nombre, pozo, entrada, cierre y
+  // partidos —: cero tabla de posiciones, cero participantes, cero pronósticos. Esa
   // línea la sostiene también el middleware, que solo abre `/polla/<slug>` y
   // deja `/inicio`, `/casa/admin` y `/polla/<slug>/pagar` pidiendo sesión.
   if (!user) {
-    const [potPublico, tournaments] = await Promise.all([
+    const [potPublico, tournaments, matches] = await Promise.all([
       getPot(polla.id),
       getPollaTournamentSlugs([polla]),
+      polla.kind === "partidos" ? getPollaMatches(polla.id) : Promise.resolve([]),
     ]);
     return (
       <PollaPublica polla={polla} pot={potPublico} slug={(await params).slug} tournaments={tournaments[polla.id] ?? []}
-        cortesia={cortesiaDeEstaPolla} />
+        cortesia={cortesiaDeEstaPolla} matches={matches} />
     );
   }
 
@@ -672,12 +674,14 @@ function PollaPublica({
   pot,
   slug,
   tournaments,
+  matches,
   cortesia = null,
 }: {
   polla: CasaPolla;
   pot: { prize_cop: number };
   slug: string;
   tournaments: string[];
+  matches: Awaited<ReturnType<typeof getPollaMatches>>;
   /** Cortesía del enlace que abrió (migración 138), si es de esta polla. */
   cortesia?: CourtesyPreview | null;
 }) {
@@ -753,10 +757,39 @@ function PollaPublica({
           <Link href={entrar} className={`lp-btn mt-5 w-full ${regalo ? "lp-btn-ghost" : "lp-btn-primary"}`}>
             {regalo ? "Ver la app" : abierta ? "Entrar a esta polla" : "Ver la app"}
           </Link>
-          <p className="mt-3 text-center text-[11px] text-text-muted">
-            Necesitas tu número de celular. No pedimos datos bancarios.
-          </p>
         </StreetCard>
+        {polla.kind === "partidos" && (
+          <section aria-label="Partidos de esta polla" className="mt-6">
+            <SectionHead title="Partidos" meta={`${matches.length} partidos`} />
+            <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">Horarios de Colombia</p>
+            {matches.length === 0 ? (
+              <StreetCard className="mt-3 p-4">
+                <p className="text-[15px] leading-relaxed text-text-secondary">Los partidos de esta polla aún no están publicados.</p>
+              </StreetCard>
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {matches.map((match) => (
+                  <li key={match.id}>
+                    <StreetCard className="p-4">
+                      <p className="text-[13px] leading-relaxed text-text-secondary">
+                        {formatMatchTime(match.scheduled_at, match.scheduled_at_confirmed ?? true)}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-4">
+                        {[{ name: match.home_team, flag: match.home_team_flag }, { name: match.away_team, flag: match.away_team_flag }].map((team, index) => (
+                          <div key={index} className="min-w-0 text-center">
+                            <TeamCrest team={team.name} src={team.flag} className="h-10 w-10" />
+                            <p className="mt-2 text-[15px] font-semibold leading-relaxed text-text-primary [overflow-wrap:anywhere]">{team.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {match.voided_at && <p className="mt-3 text-[13px] text-text-secondary">Anulado en esta polla · no suma puntos</p>}
+                    </StreetCard>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );
