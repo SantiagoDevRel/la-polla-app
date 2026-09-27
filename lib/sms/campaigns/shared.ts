@@ -61,4 +61,5 @@ export function selectAudience(users: AudienceUser[], filter: AudienceFilter, ex
 export const CAMPAIGN_STATES: Record<string, string> = {
   ready: "Revisión pendiente", dispatching: "Enviando · no repetir", scheduled: "Programado",
   accepted: "Aceptado por el proveedor", rejected: "Rechazado", unknown: "Pendiente de conciliación · no reenviar",
+  cancelled: "Cancelada",
 };

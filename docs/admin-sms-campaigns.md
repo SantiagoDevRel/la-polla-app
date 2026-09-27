@@ -105,3 +105,5 @@ texto que envuelve; el editor tiene doce filas; países y personas bajo demanda.
 
 Fuentes: [API LabsMobile](https://www.labsmobile.com/es/api-sms/versiones-api/http-rest-post-json),
 [Ley 2300 de 2023](https://normograma.crcom.gov.co/crc/compilacion/docs/ley_2300_2023.htm).
+
+Cancelaciones confirmadas en LabsMobile: migración 154, estado cancelled. Conserva destinatarios e historial, libera la reserva y el panel muestra Cancelada. La campaña del mediodía del 28-sep fue cancelada por orden del dueño; permanece únicamente la de las 18:55 Colombia para 448 personas.
