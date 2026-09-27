@@ -27,7 +27,8 @@ import {
   releaseGenerateAttempt,
   GENERATE_MAX_POR_HORA,
 } from "@/lib/auth/rate-limit";
-import { normalizePhone } from "@/lib/auth/phone";
+import { toE164 } from "@/lib/auth/phone";
+import { phoneOtpChannel, whatsappOtpConfigured } from "@/lib/auth/phone-otp-channel";
 import {
   CAPTCHA_FAILED_CODE,
   COUNTRY_NOT_ALLOWED_CODE,
@@ -82,11 +83,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Falta phone" }, { status: 400 });
   }
 
-  const phoneE164 = normalizePhone(phoneRaw);
+  const phoneE164 = toE164(phoneRaw);
   if (!phoneE164) {
     return NextResponse.json({ error: "Phone inválido" }, { status: 400 });
   }
   const phoneNormalized = phoneE164.replace(/\D/g, "");
+  const deliveryChannel = phoneOtpChannel();
+  const requestedChannel = (body as { deliveryChannel?: unknown }).deliveryChannel ?? "sms";
+  if (requestedChannel !== deliveryChannel) {
+    return NextResponse.json(
+      { error: "Actualiza la página para pedir tu código por el canal disponible." },
+      { status: 409 },
+    );
+  }
+  if (deliveryChannel === "whatsapp" && !whatsappOtpConfigured()) {
+    return NextResponse.json({ error: "El envío de códigos no está disponible. Inténtalo más tarde." }, { status: 503 });
+  }
   // Antes de rate limits y de Supabase: un país fuera de la lista no genera
   // código ni gasta un intento.
   if (!paisSmsPermitido(phoneNormalized)) {
@@ -157,7 +169,9 @@ export async function POST(request: NextRequest) {
     if (daily.blocked) {
       return NextResponse.json(
         {
-          error: DAILY_SMS_CAP_MESSAGE,
+          error: deliveryChannel === "whatsapp"
+            ? "Ya pediste los códigos permitidos hoy. Inténtalo mañana o escríbenos a soporte."
+            : DAILY_SMS_CAP_MESSAGE,
           code: DAILY_SMS_CAP_CODE,
           supportPath: SUPPORT_PATH,
         },
@@ -195,7 +209,7 @@ export async function POST(request: NextRequest) {
   // todavía no hay sesión.
   const auth = createAuthClient(ip);
   const { error } = await auth.signInWithOtp({
-    phone: phoneE164,
+    phone: phoneNormalized,
     options: forwardCaptchaToken
       ? { channel: "sms", captchaToken: forwardCaptchaToken }
       : { channel: "sms" },

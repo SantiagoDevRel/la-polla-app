@@ -18,6 +18,7 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 import FontScalePicker from "@/components/perfil/FontScalePicker";
+import WhatsAppPreference from "@/components/perfil/WhatsAppPreference";
 import PayoutDefaultEditor, { type PayoutMethod, type PayoutAccountType } from "@/components/perfil/PayoutDefaultEditor";
 import { formatPhone } from "@/lib/format-phone";
 
@@ -296,6 +297,7 @@ export default function PerfilPage() {
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />
+        <WhatsAppPreference />
 
         {/* La guia global de puntaje SE FUE de acá (2026-08-25).
             Mostraba la escalera del Mundial — marcador exacto / diferencia de

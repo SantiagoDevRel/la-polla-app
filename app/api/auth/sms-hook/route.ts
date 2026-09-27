@@ -1,4 +1,7 @@
 // app/api/auth/sms-hook/route.ts
+// 2026-09-27: WHATSAPP_OTP_ENABLED=true entrega el MISMO OTP por Zernio.
+// El nombre de esta ruta y verifyOtp(type: "sms") son contratos de Supabase;
+// no implican un segundo envío SMS. Configuración: docs/whatsapp-otp.md.
 // "Send SMS Hook" de Supabase Auth: acá NO se genera ni se valida el código.
 //
 // Supabase Auth solo sabe hablar de fábrica con Twilio, MessageBird, Vonage y
@@ -37,6 +40,8 @@ import { NextResponse } from "next/server";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { sendSms } from "@/lib/sms/labsmobile";
 import { paisSmsPermitido } from "@/lib/sms/paises";
+import { phoneOtpChannel } from "@/lib/auth/phone-otp-channel";
+import { sendWhatsAppOtp } from "@/lib/auth/whatsapp-otp";
 import {
   registrarEnvio,
   registrarFalloEnvio,
@@ -105,7 +110,8 @@ interface HookPayload {
  * TODO lo que no sea dígito y se exige forma de E.164 antes de despachar.
  */
 function phoneE164SinPlus(raw: string): string | null {
-  const digits = (raw ?? "").replace(/\D/g, "");
+  if (typeof raw !== "string") return null;
+  const digits = raw.replace(/^\+/, "");
   // ITU E.164: 8-15 dígitos en total, el indicativo no empieza por 0.
   if (!/^[1-9]\d{7,14}$/.test(digits)) return null;
   return digits;
@@ -139,7 +145,7 @@ export async function POST(request: Request) {
 
   const otp = payload.sms?.otp;
   const phone = phoneE164SinPlus(payload.user?.phone ?? "");
-  if (!otp || !phone) {
+  if (typeof otp !== "string" || !/^\d{6}$/.test(otp) || !phone) {
     console.error("[sms-hook] payload sin otp o con phone inválido");
     return NextResponse.json({ error: "payload incompleto" }, { status: 400 });
   }
@@ -151,6 +157,19 @@ export async function POST(request: Request) {
   if (!paisSmsPermitido(phone)) {
     console.warn(`[sms-hook] país no permitido tel=***${phone.slice(-4)}`);
     return NextResponse.json({ error: "país no disponible" }, { status: 400 });
+  }
+
+  // Supabase still generates, expires and verifies the OTP. Its signed SMS
+  // hook also delivers WhatsApp when explicitly enabled. Never trust a client
+  // channel or user_metadata here; never silently fall back after a WA error.
+  if (phoneOtpChannel() === "whatsapp") {
+    const webhookId = request.headers.get("webhook-id") ?? request.headers.get("svix-id") ?? "";
+    const result = await sendWhatsAppOtp(phone, otp, webhookId);
+    if (!result.ok) {
+      console.error(`[otp-hook] WhatsApp delivery failed: ${result.reason}`);
+      return NextResponse.json({ error: "no se pudo enviar el código por WhatsApp" }, { status: 503 });
+    }
+    return NextResponse.json({});
   }
 
   // Texto pedido por el dueño (2026-09-17), sin la advertencia de "no lo

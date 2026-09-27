@@ -167,8 +167,10 @@ function writeTelegramPending(value: TelegramPending | null) {
   }
 }
 
-function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
+function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired, deliveryChannel = "sms" }: LoginClientProps) {
   const t = useTranslations("Login");
+  const channelText = useTranslations("PhoneOtp");
+  const channelLabel = deliveryChannel === "whatsapp" ? "WhatsApp" : "SMS";
   const searchParams = useSearchParams();
   const telegramEnabled = Boolean(telegramBotUsername);
 
@@ -379,7 +381,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
       const res = await fetch("/api/auth/start-otp", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(token ? { phone, captchaToken: token } : { phone }),
+        body: JSON.stringify({ phone, deliveryChannel, ...(token ? { captchaToken: token } : {}) }),
       });
       // El token ya se usó (salga bien o mal): se pide uno nuevo.
       if (token) captcha.current?.reset();
@@ -387,11 +389,11 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
       if (!res.ok) {
         setError(
           json.code === DAILY_SMS_CAP_CODE
-            ? t("errDailySmsCap")
+            ? channelText("errDailySmsCap", { channel: channelLabel })
             : json.code === CAPTCHA_FAILED_CODE
               ? t("errCaptchaRejected")
               : json.code === COUNTRY_NOT_ALLOWED_CODE
-                ? t("errCountryNotAllowed")
+                ? channelText("errCountryNotAllowed", { channel: channelLabel })
                 : json.error || t("errSendFailed"),
         );
         return;
@@ -654,20 +656,20 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
     waiting: t("tgWaitTitle"),
     elsewhere: t("tgElsewhereTitle"),
     expired: t("tgExpiredTitle"),
-    sms_only: t("tgSmsOnlyTitle"),
+    sms_only: channelText("tgSmsOnlyTitle", { channel: channelLabel }),
     rate_limited: t("tgRateLimitedTitle"),
-    unavailable: t("tgSmsOnlyTitle"),
+    unavailable: channelText("tgSmsOnlyTitle", { channel: channelLabel }),
     error: t("tgErrorTitle"),
   }[telegram.phase];
 
   const telegramMessage = {
     opening: null,
     waiting: telegram.popupBlocked ? t("tgPopupBlocked") : null,
-    elsewhere: t("tgElsewhere"),
+    elsewhere: channelText("tgElsewhere", { channel: channelLabel }),
     expired: t("tgExpired"),
-    sms_only: t("tgErrSmsOnly"),
-    rate_limited: t("tgErrRateLimited"),
-    unavailable: t("tgErrUnavailable"),
+    sms_only: channelText("tgErrSmsOnly", { channel: channelLabel }),
+    rate_limited: channelText("tgErrRateLimited", { channel: channelLabel }),
+    unavailable: channelText("tgErrUnavailable", { channel: channelLabel }),
     error: telegram.error ?? t("tgErrGeneric"),
   }[telegram.phase];
 
@@ -773,7 +775,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
               <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
                 {error}
                 {/* Tope diario de SMS: la salida es soporte (WhatsApp está apagado). */}
-                {error === t("errDailySmsCap") && (
+                {error === channelText("errDailySmsCap", { channel: channelLabel }) && (
                   <a
                     href={SUPPORT_PATH}
                     className="block py-2.5 font-semibold text-text-primary underline underline-offset-2 hover:text-gold transition-colors"
@@ -809,7 +811,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
                 ) : (
                   <>
                     <MessageSquare className="w-5 h-5 shrink-0" aria-hidden="true" />
-                    {t("btnSms")}
+                    {channelText("btnSms", { channel: channelLabel })}
                   </>
                 )}
               </button>
@@ -836,10 +838,11 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
           </form>
 
           <p className="text-[10px] text-text-muted/70 text-center pt-1">
-            {t.rich("termsHint", {
+            {channelText.rich("termsHint", {
+              channel: channelLabel,
               link: (chunks) => (
                 <a
-                  href="/privacy#sms"
+                  href="/privacy"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline underline-offset-2 hover:text-text-secondary"
@@ -855,11 +858,11 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
       {step === "otp" && (
         <div className="w-full max-w-md rounded-2xl p-6 space-y-5 bg-bg-card/80 backdrop-blur-sm border border-border-subtle">
           <div className="text-center space-y-2">
-            <h2 className="font-display text-2xl text-gold tracking-wide">
+            <h2 className="font-display text-2xl leading-tight text-gold tracking-wide">
               {t("otpTitle")}
             </h2>
-            <p className="text-text-secondary text-sm">
-              {t("otpSentTo")}{" "}
+            <p className="text-text-secondary text-sm leading-normal">
+              {channelText("otpSentTo", { channel: channelLabel })}{" "}
               <span className="text-text-primary font-semibold [overflow-wrap:anywhere]">
                 {buildPhone()}
               </span>
@@ -871,7 +874,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
                 setOtp("");
                 setError(null);
               }}
-              className="inline-flex min-h-[44px] items-center px-3 text-xs text-gold/70 hover:text-gold transition-colors"
+              className="inline-flex min-h-[44px] items-center px-3 text-xs leading-normal text-gold/70 hover:text-gold transition-colors"
             >
               {t("otpChangePhone")}
             </button>
@@ -887,7 +890,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
               aria-label={t("otpTitle")}
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-              className="w-full px-4 py-4 rounded-xl outline-none text-center score-font text-[36px] tracking-[0.5em] [text-indent:0.5em] transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
+              className="w-full px-4 py-4 rounded-xl outline-none text-center score-font text-[36px] !tracking-normal [text-indent:0] transition-colors bg-bg-base border border-border-subtle text-text-primary placeholder:text-text-muted focus:border-gold/50"
               required
               autoFocus
               disabled={verifying}
@@ -931,7 +934,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
           {telegramEnabled && (
             <div className="space-y-3 border-t border-border-subtle pt-4">
               <p className="text-sm text-text-secondary text-center">
-                {t("tgDidntArrive")}
+                {channelText("tgDidntArrive", { channel: channelLabel })}
               </p>
               <button
                 type="button"
@@ -1034,7 +1037,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
                 </button>
                 <button type="button" onClick={backToSms} className={SECONDARY_BTN}>
                   <MessageSquare className="w-5 h-5 shrink-0" aria-hidden="true" />
-                  <span>{t("tgUseSms")}</span>
+                  <span>{channelText("tgUseSms", { channel: channelLabel })}</span>
                 </button>
               </>
             )}
@@ -1042,7 +1045,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
             {telegramSmsFirst && (
               <button type="button" onClick={backToSms} className={PRIMARY_BTN} style={PRIMARY_GLOW}>
                 <MessageSquare className="w-5 h-5 shrink-0" aria-hidden="true" />
-                <span>{t("tgUseSms")}</span>
+                <span>{channelText("tgUseSms", { channel: channelLabel })}</span>
               </button>
             )}
 
@@ -1073,19 +1076,22 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired 
 interface LoginClientProps {
   /** Usuario del bot de login de Telegram; null si el canal está apagado. */
   telegramBotUsername: string | null;
+  /** Public channel label only; credentials never leave the server. */
+  deliveryChannel?: "sms" | "whatsapp";
   /** Site key pública de Cloudflare Turnstile; null si la captcha no está configurada. */
   turnstileSiteKey: string | null;
   /** start-otp exige el token (SMS_CAPTCHA_ENFORCED): nunca enviar sin él. */
   smsCaptchaRequired: boolean;
 }
 
-export default function LoginClient({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired }: LoginClientProps) {
+export default function LoginClient({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired, deliveryChannel = "sms" }: LoginClientProps) {
   return (
     <Suspense fallback={<div className="min-h-screen" />}>
       <LoginInner
         telegramBotUsername={telegramBotUsername}
         turnstileSiteKey={turnstileSiteKey}
         smsCaptchaRequired={smsCaptchaRequired}
+        deliveryChannel={deliveryChannel}
       />
     </Suspense>
   );

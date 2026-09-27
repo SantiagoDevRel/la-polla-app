@@ -647,6 +647,37 @@ describe("POST /api/auth/start-otp", () => {
     });
   });
 
+  it("WhatsApp exige consentimiento del canal y configuración antes de gastar cupo", async () => {
+    process.env.WHATSAPP_OTP_ENABLED = "true";
+    const { POST } = await loadRoute();
+    expect((await POST(startRequest())).status).toBe(409);
+    expect(route.signInWithOtp).not.toHaveBeenCalled();
+    expect(route.checkAndRecordAttempt).not.toHaveBeenCalled();
+    delete process.env.ZERNIO_API_KEY;
+    const request = new NextRequest("https://example.test/api/auth/start-otp", {
+      method: "POST", body: JSON.stringify({ phone: "+573001112233", deliveryChannel: "whatsapp" }),
+    });
+    expect((await POST(request)).status).toBe(503);
+    expect(route.signInWithOtp).not.toHaveBeenCalled();
+  });
+
+  it("WhatsApp usa el OTP de Supabase y conserva el límite por teléfono", async () => {
+    process.env.WHATSAPP_OTP_ENABLED = "true";
+    process.env.ZERNIO_API_KEY = "test-only";
+    process.env.ZERNIO_WHATSAPP_ACCOUNT_ID = "a".repeat(24);
+    const { POST } = await loadRoute();
+    const request = () => new NextRequest("https://example.test/api/auth/start-otp", {
+      method: "POST", body: JSON.stringify({ phone: "+573001112233", deliveryChannel: "whatsapp" }),
+    });
+    expect((await POST(request())).status).toBe(200);
+    // "sms" is Supabase's phone-OTP type. The signed hook selects WhatsApp.
+    expect(route.signInWithOtp).toHaveBeenCalledWith({ phone: "573001112233", options: { channel: "sms" } });
+    route.signInWithOtp.mockClear();
+    route.checkDailySmsCap.mockResolvedValue({ blocked: true, remaining: 0 });
+    expect((await POST(request())).status).toBe(429);
+    expect(route.signInWithOtp).not.toHaveBeenCalled();
+  });
+
   it("límite por teléfono bloqueado: ni Supabase ni liberación", async () => {
     route.checkAndRecordAttempt.mockResolvedValue({ blocked: true, remaining: 0 });
     const { POST } = await loadRoute();

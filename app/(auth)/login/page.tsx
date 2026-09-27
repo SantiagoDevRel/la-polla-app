@@ -13,13 +13,18 @@
 // README → «Captcha de Auth (Turnstile)».
 import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { isSmsCaptchaEnforced } from "@/lib/auth/captcha";
+import { phoneOtpChannel } from "@/lib/auth/phone-otp-channel";
 import LoginClient from "./LoginClient";
+
+// The label and start-otp must read the same server-side rollout setting.
+export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
   const telegram = getTelegramLoginConfig();
   const turnstileSiteKey = (process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "").trim() || null;
   return (
     <LoginClient
+      deliveryChannel={phoneOtpChannel()}
       telegramBotUsername={telegram?.botUsername ?? null}
       turnstileSiteKey={turnstileSiteKey}
       smsCaptchaRequired={Boolean(turnstileSiteKey) && isSmsCaptchaEnforced()}

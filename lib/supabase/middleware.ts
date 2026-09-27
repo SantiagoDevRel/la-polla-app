@@ -41,6 +41,7 @@ const PUBLIC_NO_AUTH_PREFIXES = [
   "/soporte",
 ];
 const PUBLIC_NO_AUTH_EXACT = new Set([
+  "/api/whatsapp/zernio", // Authenticated by HMAC before parsing or touching the database.
   "/api/app-version", // Public build identity only; no auth or database access.
   "/sitemap.xml",
   "/robots.txt",

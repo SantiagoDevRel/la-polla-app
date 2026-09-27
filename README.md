@@ -1592,3 +1592,15 @@ servidor (`verifyCasaUpload`), el SQL 098 y el bucket no cambian.
   EXIF girado, foto del premio y HEIC ilegible).
 - Falta validar en dispositivos reales (iPhone Safari con HEIC y EXIF, Android
   de gama media con fotos de 50 MP) y la legibilidad con comprobantes reales.
+
+## OTP por WhatsApp (preparado, apagado)
+
+El bot se limita a enviar el código de seis dígitos generado por Supabase.
+Configuración, pruebas y bloqueo actual de Meta: [docs/whatsapp-otp.md](docs/whatsapp-otp.md).
+No activar hasta aprobar la plantilla AUTHENTICATION y verificar un login real.
+# Preferencias de WhatsApp
+
+BAJA cancela solo los avisos; ALTA o Perfil los activa explícitamente.
+La lista administrativa vive en `/admin/whatsapp`. Configuración del webhook
+firmado, migración 155 y pruebas: [docs/whatsapp-preferences.md](docs/whatsapp-preferences.md).
+Las campañas automáticas y el OTP no se activan con este cambio.

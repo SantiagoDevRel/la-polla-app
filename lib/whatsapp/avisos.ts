@@ -8,7 +8,8 @@
 //   - lp_polla_cierra  {{1}} nombre · {{2}} polla · {{3}} «3 horas» / «40 minutos»
 //   - lp_polla_nueva  {{1}} nombre · {{2}} polla
 // Las tres terminan en «Responde BAJA si no quieres más avisos»: el webhook
-// guarda la baja en wa_avisos_opt_out (migración 152) y aquí se respeta.
+// guarda la preferencia en wa_marketing_preferences (migración 155).
+// Solo se admiten destinatarios con consentimiento explícito vigente.
 //
 // Límite de Meta: TIER_250 = 250 destinatarios ÚNICOS por 24 h móviles en
 // mensajes que inicia el negocio. RecipientBudget lo cuenta contra
@@ -16,8 +17,10 @@
 // quedaría como fallo cobrado en nuestra bitácora).
 
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizePhone } from "@/lib/auth/phone";
+import { marketingAllowed, setMarketingPreference } from "./marketing-preferences";
 import {
   sendTemplateMessage,
   estimateTemplateCost,
@@ -93,7 +96,7 @@ export async function selectAllPages<T>(
 
 export async function loadOptedOutPhones(db: Db): Promise<Set<string>> {
   const rows = await selectAllPages<{ phone: string }>((from, to) =>
-    db.from("wa_avisos_opt_out").select("phone").range(from, to));
+    db.from("wa_marketing_preferences").select("phone").eq("enabled", false).order("phone").range(from, to));
   return new Set(rows.map((r) => r.phone));
 }
 
@@ -101,17 +104,17 @@ export async function setOptOut(phoneRaw: string, optedOut: boolean): Promise<vo
   const phone = normalizePhone(phoneRaw);
   if (!/^[0-9]{8,15}$/.test(phone)) return;
   const db = createAdminClient();
-  const { error } = optedOut
-    ? await db.from("wa_avisos_opt_out").upsert({ phone }, { onConflict: "phone", ignoreDuplicates: true })
-    : await db.from("wa_avisos_opt_out").delete().eq("phone", phone);
-  if (error) throw new Error(error.message);
+  await setMarketingPreference(db, { phone, enabled: !optedOut, source: "whatsapp",
+    eventId: `legacy:${randomUUID()}`, occurredAt: new Date().toISOString() });
 }
 
 /** Usuarios con número, sin baja. Clave = user_id. */
 export interface AvisoRecipient { userId: string; phone: string; firstName: string }
 
 export async function loadRecipients(db: Db, userIds: string[]): Promise<Map<string, AvisoRecipient>> {
-  const optOut = await loadOptedOutPhones(db);
+  const consented = await selectAllPages<{ phone: string }>((from, to) =>
+    db.from("wa_marketing_preferences").select("phone").eq("enabled", true).order("phone").range(from, to));
+  const optIn = new Set(consented.map(row => row.phone));
   const out = new Map<string, AvisoRecipient>();
   for (let i = 0; i < userIds.length; i += 300) {
     const { data, error } = await db
@@ -121,7 +124,7 @@ export async function loadRecipients(db: Db, userIds: string[]): Promise<Map<str
     if (error) throw new Error(error.message);
     for (const u of data ?? []) {
       const phone = normalizePhone(u.whatsapp_number ?? "");
-      if (!/^[0-9]{8,15}$/.test(phone) || optOut.has(phone)) continue;
+      if (!/^[1-9][0-9]{7,14}$/.test(phone) || !optIn.has(phone)) continue;
       out.set(u.id, { userId: u.id, phone, firstName: firstNameFor(u.display_name) });
     }
   }
@@ -165,9 +168,8 @@ export async function sendAviso(db: Db, input: {
 }): Promise<{ ok: boolean; error?: string; optedOut?: boolean }> {
   // La baja se vuelve a mirar justo antes de enviar: alguien pudo responder
   // BAJA mientras la corrida avanzaba con la lista que cargó al empezar.
-  const { data: optOut } = await db
-    .from("wa_avisos_opt_out").select("phone").eq("phone", input.recipient.phone).maybeSingle();
-  if (optOut) return { ok: false, optedOut: true };
+  // Fail closed on missing consent AND on a database error.
+  if (!(await marketingAllowed(db, input.recipient.phone))) return { ok: false, optedOut: true };
 
   const components: TemplateComponent[] = [
     { type: "body", parameters: input.bodyParams.map((text) => ({ type: "text" as const, text: cleanParam(text) })) },
