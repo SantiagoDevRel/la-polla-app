@@ -1257,6 +1257,12 @@ lista y no se vuelve a preguntar.
 
 ## Open ideas / pending decisions
 
+- (2026-09-27) Panel administrativo para campañas SMS: elegir polla, redactar,
+  seleccionar usuarios en masa o por país (Colombia por defecto), excluir grupos
+  con excepciones y enviar/programar. Viabilidad y propuesta documentadas en
+  `docs/admin-sms-campaigns.md`; implementación pendiente de decisión del dueño.
+  Reutilizar LabsMobile; país del número no equivale a ubicación física.
+
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
