@@ -86,6 +86,13 @@ variables, plantillas ni registros.
   verificado ni mensajes de marketing entregados con OTP habilitado.
 - La integración queda **apagada**. No se ha entregado un OTP real ni activado
   WhatsApp en producción. No se modificó la configuración del Auth productivo.
+- Se creó una clave Zernio restringida al perfil del emisor, con mensajería y
+  acceso a cuentas, sin facturación, publicidad ni gestión de claves/webhooks.
+  Su lectura de plantillas fue verificada con HTTP 200. Las tres variables
+  anteriores quedaron añadidas en Vercel Production: clave sensible,
+  identificador del emisor y `WHATSAPP_OTP_ENABLED=false`. No se sobrescribió
+  ninguna variable existente ni se desplegó/activó el cambio. La copia de la
+  credencial está fuera del repositorio, bajo el directorio privado del dueño.
 
 ## Verificación local
 
