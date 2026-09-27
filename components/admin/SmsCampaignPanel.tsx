@@ -81,7 +81,11 @@ export default function SmsCampaignPanel() {
     setBusy(true); setError("");
     try {
       const data = await post({ action: "send", id: preview.id, confirmed: true });
-      setNotice(`${CAMPAIGN_STATES[data.state] ?? data.state}. ${data.state === "scheduled" ? "El proveedor conserva la programación; puedes cerrar esta página." : "Consulta las confirmaciones en el historial."}`);
+      if (data.state === "unknown" || data.state === "rejected") {
+        setError(`${CAMPAIGN_STATES[data.state]}. ${data.state === "unknown" ? "Comprueba la referencia en LabsMobile antes de preparar otro envío." : "El proveedor rechazó la campaña. Revisa su referencia en el historial."}`);
+      } else {
+        setNotice(`${CAMPAIGN_STATES[data.state] ?? data.state}. ${data.state === "scheduled" ? "El proveedor conserva la programación; puedes cerrar esta página." : "Consulta las confirmaciones en el historial."}`);
+      }
       setPreview(null);
       await load();
     } catch (e) {
