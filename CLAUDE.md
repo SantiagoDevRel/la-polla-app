@@ -12,6 +12,9 @@ Decisión vigente: el bot entrega seis dígitos para login y atiende BAJA/ALTA
 para preferencias de marketing, sin menús ni pronósticos. La excepción de
 preferencias y la lista de consentimiento explícito están documentadas en
 `docs/whatsapp-preferences.md`; no activan campañas automáticas.
+Migración 156: el dueño confirmó consentimiento en términos de registro;
+importar móviles colombianos verificados y aplicar la regla al registro,
+sin sobrescribir BAJA ni otras preferencias. Fuente legacy/«Términos de registro».
 `docs/whatsapp-otp.md` prevalece sobre descripciones históricas de menús,
 pronósticos, enlaces mágicos y avisos. El código conserva Supabase Phone Auth
 y su hook firmado; `WHATSAPP_OTP_ENABLED` queda apagado hasta aprobar

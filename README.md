@@ -1601,6 +1601,8 @@ No activar hasta aprobar la plantilla AUTHENTICATION y verificar un login real.
 # Preferencias de WhatsApp
 
 BAJA cancela solo los avisos; ALTA o Perfil los activa explícitamente.
+La migración 156 incorpora los móviles colombianos verificados con consentimiento
+en términos confirmado por el dueño, sin sobrescribir ninguna preferencia previa.
 La lista administrativa vive en `/admin/whatsapp`. Configuración del webhook
 firmado, migración 155 y pruebas: [docs/whatsapp-preferences.md](docs/whatsapp-preferences.md).
 Las campañas automáticas y el OTP no se activan con este cambio.
