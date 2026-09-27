@@ -8,7 +8,10 @@
 
 ### WhatsApp OTP (2026-09-27)
 
-Decisión vigente: el bot SOLO entrega seis dígitos para login.
+Decisión vigente: el bot entrega seis dígitos para login y atiende BAJA/ALTA
+para preferencias de marketing, sin menús ni pronósticos. La excepción de
+preferencias y la lista de consentimiento explícito están documentadas en
+`docs/whatsapp-preferences.md`; no activan campañas automáticas.
 `docs/whatsapp-otp.md` prevalece sobre descripciones históricas de menús,
 pronósticos, enlaces mágicos y avisos. El código conserva Supabase Phone Auth
 y su hook firmado; `WHATSAPP_OTP_ENABLED` queda apagado hasta aprobar
@@ -3024,3 +3027,10 @@ El original válido siempre va como segundo candidato y `submitProof` prueba el
 siguiente ante UPLOAD_IN_PROGRESS/REQUEST_CONFLICT. Nunca marcar como fallado un
 intento guardado con la inscripción cerrada. Servidor, SQL y bucket sin cambios.
 Detalle en README → «Comprobantes comprimidos en el navegador».
+# Preferencias de WhatsApp (2026-09-27, migración 155)
+
+Excepción al silencio del bot: BAJA/ALTA gestiona consentimiento de marketing
+por el webhook firmado de Zernio. No reactivar el router histórico. Perfil y
+`/admin/whatsapp` comparten `wa_marketing_preferences`; ausencia de fila nunca
+es consentimiento. OTP y cuenta se conservan al darse de baja. Ver
+`docs/whatsapp-preferences.md`. Campañas automáticas siguen apagadas.

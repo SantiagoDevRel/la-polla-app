@@ -1055,5 +1055,19 @@
     "tgElsewhere": "El botón del bot se abrió en otro navegador (por ejemplo, el de Telegram) y la sesión quedó allá. Para entrar en este navegador, usa el {channel} o vuelve a intentar con Telegram.",
     "otpSentTo": "Código enviado por {channel} a",
     "termsHint": "Al continuar, aceptas nuestros <link>términos y condiciones</link> y recibir tu código de acceso por {channel}."
+  },
+  "WhatsAppPreference": {
+    "title": "Avisos por WhatsApp",
+    "description": "Recibe novedades de pollas y recordatorios en tu número verificado.",
+    "loading": "Cargando preferencia",
+    "enabled": "Avisos activados",
+    "disabled": "Avisos desactivados",
+    "unavailable": "Necesitas un teléfono verificado para recibir avisos.",
+    "saving": "Guardando…",
+    "turnOff": "Dejar de recibir avisos",
+    "turnOn": "Quiero recibir avisos",
+    "error": "No se pudo guardar o consultar tu preferencia. Inténtalo de nuevo.",
+    "retry": "Reintentar",
+    "help": "Puedes responder BAJA en WhatsApp cuando quieras. Tu cuenta y los códigos de acceso que solicites siguen disponibles."
   }
 }

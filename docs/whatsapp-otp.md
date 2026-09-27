@@ -1,5 +1,9 @@
 # WhatsApp: solo códigos de acceso
 
+Excepción posterior del mismo día: BAJA/ALTA y el control de Perfil administran
+el consentimiento de avisos, según `whatsapp-preferences.md`. No activan
+campañas automáticas ni el antiguo bot conversacional.
+
 Decisión del dueño, 2026-09-27: el bot entrega únicamente un OTP de seis
 dígitos solicitado desde `/login`. No conversa, no recibe pronósticos y no
 envía avisos de pollas. SMS/Telegram siguen disponibles según su configuración;

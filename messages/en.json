@@ -1055,5 +1055,19 @@
     "tgErrSmsOnly": "For your security, this number can only sign in with the {channel} code.",
     "tgSmsOnlyTitle": "SIGN IN WITH {channel}",
     "tgElsewhere": "The bot's button opened in another browser (for example, Telegram's) and the session stayed there. To sign in on this browser, use {channel} or try Telegram again."
+  },
+  "WhatsAppPreference": {
+    "title": "WhatsApp notifications",
+    "description": "Receive pool news and reminders at your verified phone number.",
+    "loading": "Loading preference",
+    "enabled": "Notifications enabled",
+    "disabled": "Notifications disabled",
+    "unavailable": "You need a verified phone number to receive notifications.",
+    "saving": "Saving…",
+    "turnOff": "Stop receiving notifications",
+    "turnOn": "I want to receive notifications",
+    "error": "Could not save or load your preference. Please try again.",
+    "retry": "Try again",
+    "help": "You can reply BAJA on WhatsApp at any time. Your account and login codes you request remain available."
   }
 }

@@ -179,6 +179,7 @@ export default function AdminPage() {
             Dar cortesías
           </Link>
           <SmsCampaignLink />
+          <Link href="/admin/whatsapp" className="lp-card block p-4 text-base font-semibold text-text-primary underline">Destinatarios de WhatsApp</Link>
         </div>
 
         <SmsSaldoCard />
