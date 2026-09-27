@@ -1041,5 +1041,19 @@
     "inAppIOS": "You are inside another app. Open it in Safari to install it.",
     "copyLink": "Copy link",
     "copyError": "We could not copy the link."
+  },
+  "PhoneOtp": {
+    "errDailySmsCap": "We already sent all the {channel} codes allowed today for this number. Try again tomorrow or contact support.",
+    "errCountryNotAllowed": "For now we only send {channel} codes to Colombia, the United States, Panama, Argentina, Peru, Chile, Brazil, Ecuador, Spain, Portugal and Belgium.",
+    "otpSentTo": "Code sent via {channel} to",
+    "termsHint": "By continuing, you accept our <link>terms and conditions</link> and receiving your sign-in code via {channel}.",
+    "btnSms": "Send code by {channel}",
+    "tgDidntArrive": "Didn't receive the code via {channel}?",
+    "tgUseSms": "Sign in with {channel}",
+    "tgErrRateLimited": "Too many Telegram attempts. Wait 15 minutes or sign in with {channel}.",
+    "tgErrUnavailable": "Telegram sign-in is not available right now. Use {channel}.",
+    "tgErrSmsOnly": "For your security, this number can only sign in with the {channel} code.",
+    "tgSmsOnlyTitle": "SIGN IN WITH {channel}",
+    "tgElsewhere": "The bot's button opened in another browser (for example, Telegram's) and the session stayed there. To sign in on this browser, use {channel} or try Telegram again."
   }
 }

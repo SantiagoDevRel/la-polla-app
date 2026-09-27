@@ -6,6 +6,16 @@
 
 ## READ THIS FIRST
 
+### WhatsApp OTP (2026-09-27)
+
+Decisión vigente: el bot SOLO entrega seis dígitos para login.
+`docs/whatsapp-otp.md` prevalece sobre descripciones históricas de menús,
+pronósticos, enlaces mágicos y avisos. El código conserva Supabase Phone Auth
+y su hook firmado; `WHATSAPP_OTP_ENABLED` queda apagado hasta aprobar
+AUTHENTICATION y probar un acceso real. Meta bloqueó crear la plantilla
+(10 / 2388185), también desde su panel. No declarar el login WhatsApp operativo.
+
+
 ### Campañas SMS exclusivas de Santiago (2026-09-27, migración 153)
 
 `/admin/sms` y `/api/admin/sms-campaigns` exigen sesión, admin y el UUID privado

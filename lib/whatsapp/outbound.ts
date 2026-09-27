@@ -1,11 +1,10 @@
-// lib/whatsapp/outbound.ts — Interruptor general de los envíos por WhatsApp.
-//
-// El número del bot ahora pertenece a otra app: La Polla no debe mandar
-// mensajes desde él ni mostrárselo a nadie. Todos los envíos (texto,
-// interactivos y templates) pasan por este chequeo y quedan apagados salvo
-// que se configure WHATSAPP_OUTBOUND_ENABLED=true con un número propio.
+// Legacy WhatsApp features are retained as code, but cannot send messages.
+// Login OTP delivery is isolated in lib/auth/whatsapp-otp.ts.
 export function whatsappOutboundEnabled(): boolean {
-  return process.env.WHATSAPP_OUTBOUND_ENABLED === "true";
+  // Owner decision 2026-09-27: WhatsApp only delivers six-digit login OTPs.
+  // Legacy menus, predictions and notifications must never be reactivated by
+  // an old environment variable. OTP uses lib/auth/whatsapp-otp.ts separately.
+  return false;
 }
 
 export const WHATSAPP_OUTBOUND_DISABLED = "WhatsApp outbound disabled";

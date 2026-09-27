@@ -28,6 +28,7 @@ import {
   type IncomingMessage,
 } from "@/lib/whatsapp/router";
 import { isOptInText, isOptOutText, setOptOut } from "@/lib/whatsapp/avisos";
+import { whatsappOutboundEnabled } from "@/lib/whatsapp/outbound";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -67,6 +68,10 @@ export async function POST(request: NextRequest) {
   if (!verifySignature(request, raw)) {
     return new NextResponse("invalid signature", { status: 403 });
   }
+
+  // OTP-only: acknowledge signed deliveries without routing incoming messages
+  // to the legacy interface (which can write predictions or create magic links).
+  if (!whatsappOutboundEnabled()) return NextResponse.json({ status: "ok" });
 
   let body: unknown;
   try {
