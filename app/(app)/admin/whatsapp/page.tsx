@@ -21,7 +21,7 @@ export default function WhatsAppAudiencePage() {
   return <main className="mx-auto w-full max-w-2xl space-y-5 px-4 py-6 pb-28">
     <Link href="/admin" className="inline-flex min-h-11 items-center text-sm leading-relaxed text-text-secondary underline hover:text-text-primary">Volver a administración</Link>
     <h1 className="font-display text-3xl leading-tight tracking-wide text-text-primary">Avisos por WhatsApp</h1>
-    <p className="text-base leading-relaxed text-text-secondary">Solo reciben avisos quienes los activaron en Perfil o escribieron ALTA. Quienes no han elegido no reciben marketing. Los códigos de acceso se gestionan aparte.</p>
+    <p className="text-base leading-relaxed text-text-secondary">Los celulares colombianos registrados tienen los avisos activos por el consentimiento de los términos. También se pueden activar en Perfil o con ALTA. BAJA siempre desactiva los avisos. Los códigos de acceso se gestionan aparte.</p>
     <div className="flex flex-wrap gap-2" aria-label="Filtrar destinatarios">
       {[true, false].map(value => <button key={String(value)} type="button" aria-pressed={enabled === value}
         onClick={() => { setEnabled(value); setPage(0); }}
@@ -40,7 +40,7 @@ export default function WhatsAppAudiencePage() {
           <Link href="/perfil" className="inline-flex min-h-11 items-center text-sm leading-snug underline">Ver preferencia en Perfil</Link>
         </div> : <ul className="space-y-3">{data.recipients.map(row => <li key={row.phone} className="lp-card space-y-1 p-4">
           <p className="break-all text-base leading-snug font-semibold tabular-nums text-text-primary">+{row.phone}</p>
-          <p className="text-sm leading-relaxed text-text-secondary">{row.source === "profile" ? "Desde Perfil" : row.source === "legacy" ? "Baja anterior" : "Desde WhatsApp"} · {new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "America/Bogota" }).format(new Date(row.changed_at))}</p>
+          <p className="text-sm leading-relaxed text-text-secondary">{row.source === "profile" ? "Desde Perfil" : row.source === "legacy" ? row.enabled ? "Términos de registro" : "Baja anterior" : "Desde WhatsApp"} · {new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "America/Bogota" }).format(new Date(row.changed_at))}</p>
         </li>)}</ul>}
         {(page > 0 || (page + 1) * 25 < data.total) && <div className="flex flex-wrap items-center justify-between gap-3">
           <button type="button" disabled={!page} onClick={() => setPage(p => p - 1)} className="min-h-11 cursor-pointer px-3 underline disabled:opacity-40">Anterior</button>

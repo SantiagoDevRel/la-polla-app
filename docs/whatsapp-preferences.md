@@ -6,8 +6,18 @@ los avisos; `ALTA` los activa. También puede cambiarlo desde **Perfil → Aviso
 por WhatsApp**. La lista privada está en **Administración → Destinatarios de
 WhatsApp** (`/admin/whatsapp`), con altas y bajas separadas y páginas de 25.
 
-Nadie queda suscrito por tener cuenta, iniciar sesión o haber participado.
-Solo una decisión explícita habilita marketing. Los envíos puntuales hechos
+El dueño confirmó el 2026-09-27 que los términos aceptados al registrarse
+incluyen consentimiento para avisos comerciales. La migración 156 importa
+los móviles colombianos verificados (`573` + nueve dígitos) sin preferencia.
+Registra `source=legacy` y `last_event_id=terms-owner-confirmed:20260927:…`;
+la fecha es la de importación, no una fecha inventada de aceptación individual.
+En administración aparecen como «Términos de registro». Ninguna BAJA ni elección
+previa se sobrescribe. Otros países requieren ALTA o activación en Perfil.
+El trigger aplica la regla a nuevos teléfonos colombianos, comprobando también
+teléfono confirmado en Supabase Auth. Un login posterior nunca reactiva BAJA.
+Si cambian los términos, revisar esta regla; la base es la confirmación del dueño.
+
+Los envíos puntuales hechos
 desde el panel de un proveedor también deben consultar esta preferencia;
 una herramienta externa no puede heredar automáticamente los filtros de la app.
 
@@ -69,6 +79,15 @@ npm run build
 `scripts/wa-preferences-check.sql` debe correrse dentro de `BEGIN` / `ROLLBACK`:
 comprueba altas, bajas, eventos repetidos/atrasados, empate de timestamps y
 permisos. No envía mensajes ni deja destinatarios de demostración.
+`scripts/wa-registration-consent-check.sql` comprueba país, verificación,
+idempotencia y conservación de BAJA, también con rollback.
+
+Plantilla `lp_polla_nueva_v2` (es, MARKETING): cuatro variables de cuerpo
+(nombre, polla, entrada y premio mínimo garantizado formateados), botón
+«Participar» con slug. Incluye saltos de línea, 🐥/👇 y énfasis en nombre/importes.
+La indicación BAJA es un FOOTER real. Solo usar con premio mínimo garantizado
+confirmado por SQL, nunca para un pozo proporcional u objeto. Requiere aprobación
+Meta. El cron histórico permanece apagado y conserva su plantilla/parametrización.
 
 Contrato visual: Outfit; título de preferencia 16/600, cuerpo y ayuda 14/400,
 estado 14/500 y control 14/600; interlineado relativo para texto al 200 %.
