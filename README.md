@@ -6,6 +6,16 @@ El modelo histórico de grupos privados permanece disponible.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
+## Campañas SMS (2026-09-27)
+
+Administración → Campañas SMS (`/admin/sms`), exclusivo de la cuenta verificada de
+Santiago. Plantillas de apertura y cierre configurable; Colombia por defecto,
+selección de destinatarios y excepciones; costo y texto revisados antes de enviar
+o programar en hora Colombia. Usa LabsMobile existente y conserva historial.
+
+Migración 153 + `SMS_CAMPAIGN_OWNER_ID` privado; sin configuración no se habilita.
+[Configuración, pruebas y operación](docs/admin-sms-campaigns.md).
+
 ## Android: descarga directa del APK (2026-09-22)
 
 **Versión 1.0.9 · versionCode 12 · Android 7.0/API 24 o superior.**

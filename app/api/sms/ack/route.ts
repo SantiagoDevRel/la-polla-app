@@ -32,6 +32,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { registrarAcuse } from "@/lib/sms/entregas";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
@@ -60,6 +61,17 @@ export async function GET(request: Request) {
   const subid = url.searchParams.get("subid");
   if (!subid) {
     console.warn("[sms-ack] callback sin subid");
+    return NextResponse.json({ ok: true });
+  }
+
+  if (/^sc[a-f0-9]{18}$/.test(subid)) {
+    const delivered = url.searchParams.get("acklevel") === "handset" && url.searchParams.get("status") === "ok";
+    const failed = url.searchParams.get("status") === "ko" || url.searchParams.get("acklevel") === "error";
+    const digits = (url.searchParams.get("msisdn") ?? "").replace(/\D/g, "");
+    if ((delivered || failed) && /^[0-9]{8,15}$/.test(digits)) {
+      const { error } = await createAdminClient().rpc("ack_sms_campaign", { p_subid: subid, p_phone: `+${digits}`, p_delivered: delivered });
+      if (error) return NextResponse.json({ error: "Acuse no guardado" }, { status: 503 });
+    }
     return NextResponse.json({ ok: true });
   }
 
