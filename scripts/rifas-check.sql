@@ -110,12 +110,11 @@ SELECT pg_temp.expect_fail($$SELECT public.rifa_reserve_v1((SELECT id FROM r),'7
 SELECT pg_temp.expect_fail($$INSERT INTO public.rifa_creators(user_id, granted_by) VALUES ('77777777-7777-4777-8777-0000000000c2','77777777-7777-4777-8777-0000000000c2')$$,
   '42501', 'A4 authenticated se da permiso por tabla');
 SELECT pg_temp.expect_fail($$SELECT count(*) FROM public.rifa_tickets$$, '42501', 'A4 authenticated lee boletas');
--- B (RLS) · la Privada solo la ve su creador...
-DO $$ BEGIN ASSERT (SELECT count(*) FROM public.rifas WHERE id = (SELECT id FROM r)) = 1, 'B1 el creador ve su Privada por RLS'; END $$;
-SELECT set_config('request.jwt.claims', '{"sub":"77777777-7777-4777-8777-0000000000b1","role":"authenticated"}', true);
-DO $$ BEGIN ASSERT (SELECT count(*) FROM public.rifas WHERE id = (SELECT id FROM r)) = 0, 'B1 un comprador NO ve la Privada por RLS'; END $$;
+-- B (RLS) · ningún cliente lee rifas por tabla, ni su propia rifa ni una Pública:
+-- la cuenta de pago solo sale por rifa_public_view_v1 a quien tiene números por pagar.
+SELECT pg_temp.expect_fail($$SELECT count(*) FROM public.rifas$$, '42501', 'B1 el creador lee rifas por tabla');
 SELECT set_config('request.jwt.claims', '{"sub":"77777777-7777-4777-8777-0000000000a1","role":"authenticated"}', true);
-DO $$ BEGIN ASSERT (SELECT count(*) FROM public.rifas WHERE id = (SELECT id FROM r)) = 1, 'B1 un admin ve la Privada por RLS'; END $$;
+SELECT pg_temp.expect_fail($$SELECT payment_account FROM public.rifas$$, '42501', 'B1 un admin lee cuentas por tabla');
 RESET ROLE;
 SET LOCAL ROLE anon;
 SELECT pg_temp.expect_fail($$SELECT count(*) FROM public.rifas$$, '42501', 'B1 anon lee rifas');
@@ -320,12 +319,19 @@ SELECT pg_temp.expect_fail($$SELECT public.rifa_offline_sale_v1('77777777-7777-4
   'RIFA_CLOSED', 'J2 vender por fuera después del cierre');
 SELECT pg_temp.expect_fail($$SELECT public.rifa_begin_proof_v1((SELECT id FROM r),'77777777-7777-4777-8777-0000000000b3',
   '88888888-8888-4888-8888-000000000004', repeat('e',64),'image/jpeg',500)$$, 'RIFA_CLOSED', 'J2 empezar un comprobante después del sorteo');
+-- J2b · después del sorteo el tablero queda congelado para el creador: solo aprobar.
+SELECT pg_temp.expect_fail(format($$SELECT public.rifa_unpay_proof_v1('77777777-7777-4777-8777-0000000000c1',%L,'Ya no')$$, (SELECT j->>'proof_id' FROM pf)),
+  'DRAW_LOCKED', 'J2b revertir un pago después del sorteo');
+SELECT pg_temp.expect_fail(format($$SELECT public.rifa_release_ticket_v1('77777777-7777-4777-8777-0000000000c1',%L,'x')$$,
+  (SELECT id FROM public.rifa_tickets WHERE rifa_id=(SELECT id FROM r) AND number=33 AND state<>'liberado')),
+  'DRAW_LOCKED', 'J2b liberar después del sorteo');
+-- J3 · reservado sin pago a la hora del sorteo = no vendido (no se puede pagar después).
 DO $$
 DECLARE d text;
 BEGIN
   d := pg_temp.expect_fail($q$SELECT public.rifa_set_result_v1('77777777-7777-4777-8777-0000000000c1',(SELECT id FROM r),33,NULL,NULL,NULL)$q$,
-    'PENDING_WINNER', 'J3 ganador con reserva sin pago');
-  ASSERT d LIKE 'El 33 está reservado%', 'J3 mensaje: ' || d;
+    'UNSOLD_CHOICE_REQUIRED', 'J3 ganador con reserva sin pago cuenta como no vendido');
+  ASSERT d LIKE 'El 33 no se vendió%', 'J3 mensaje: ' || d;
 END $$;
 SELECT pg_temp.expect_fail($$SELECT public.rifa_set_result_v1('77777777-7777-4777-8777-0000000000c1',(SELECT id FROM r),55,NULL,NULL,NULL)$$,
   'UNSOLD_CHOICE_REQUIRED', 'J4 número no vendido sin decisión');
@@ -337,6 +343,13 @@ DO $$ BEGIN
   ASSERT (SELECT lottery_name FROM public.rifas WHERE id=(SELECT id FROM r)) = 'Lotería de Medellín', 'J5 nueva lotería';
   ASSERT (SELECT count(*) FROM public.rifa_draws WHERE rifa_id=(SELECT id FROM r) AND outcome='volver_a_jugar' AND number=55) = 1, 'J5 historial';
 END $$;
+-- J5b · tope de 3 repeticiones.
+INSERT INTO public.rifa_draws (rifa_id, number, lottery_name, draw_at, outcome, created_by)
+SELECT (SELECT id FROM r), n, 'x', now() - interval '1 day', 'volver_a_jugar', '77777777-7777-4777-8777-0000000000c1' FROM (VALUES (90),(91)) v(n);
+UPDATE public.rifas SET draw_at = now() - interval '1 minute' WHERE id = (SELECT id FROM r);
+SELECT pg_temp.expect_fail($$SELECT public.rifa_set_result_v1('77777777-7777-4777-8777-0000000000c1',(SELECT id FROM r),56,'volver_a_jugar',now()+interval '3 days',NULL)$$,
+  'REPLAY_LIMIT', 'J5b cuarta repetición');
+DELETE FROM public.rifa_draws WHERE rifa_id = (SELECT id FROM r) AND number IN (90, 91);
 UPDATE public.rifas SET draw_at = now() - interval '1 minute' WHERE id = (SELECT id FROM r);
 SELECT public.rifa_set_result_v1('77777777-7777-4777-8777-0000000000c1', (SELECT id FROM r), 7, NULL, NULL, NULL);
 DO $$

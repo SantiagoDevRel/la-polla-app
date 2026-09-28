@@ -94,7 +94,7 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
             Comprobantes por revisar
             <span className="rounded-full bg-red-alert px-2 py-0.5 font-body text-[13px] font-semibold text-text-primary">{pending.length}</span>
           </h2>
-          {pending.map((p) => <ProofCard key={p.id} slug={slug} proof={p} busy={busy} act={act} />)}
+          {pending.map((p) => <ProofCard key={p.id} slug={slug} proof={p} busy={busy} act={act} locked={drawPassed} />)}
         </section>
       )}
 
@@ -130,7 +130,7 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
       {approved.length > 0 && !finished && (
         <details className="lp-card p-4">
           <summary className="flex min-h-11 cursor-pointer items-center text-[15px] font-semibold">Pagos aprobados en la app ({approved.length})</summary>
-          <div className="mt-2 space-y-2">{approved.map((p) => <ProofCard key={p.id} slug={slug} proof={p} busy={busy} act={act} />)}</div>
+          <div className="mt-2 space-y-2">{approved.map((p) => <ProofCard key={p.id} slug={slug} proof={p} busy={busy} act={act} locked={drawPassed} />)}</div>
         </details>
       )}
 
@@ -170,8 +170,10 @@ function Visibility({ rifa, busy, act }: { rifa: RifaCreatorView; busy: boolean;
   );
 }
 
-function ProofCard({ slug, proof, busy, act }: {
-  slug: string; proof: RifaCreatorView["proofs"][number]; busy: boolean;
+// locked: ya pasó el sorteo. Solo se aprueba; rechazar o revertir permitiría
+// quitarle el premio a quien ganó (SQL responde DRAW_LOCKED).
+function ProofCard({ slug, proof, busy, act, locked }: {
+  slug: string; proof: RifaCreatorView["proofs"][number]; busy: boolean; locked: boolean;
   act: (b: Action, ok?: string) => Promise<{ ok: boolean }>;
 }) {
   const [mode, setMode] = useState<null | "rechazar" | "revertir">(null);
@@ -202,10 +204,10 @@ function ProofCard({ slug, proof, busy, act }: {
         </div>
       ) : proof.state === "en_revision" ? (
         <div className="flex gap-2">
-          <button type="button" disabled={busy} onClick={() => setMode("rechazar")} className="lp-btn lp-btn-ghost flex-1">Rechazar</button>
+          {!locked && <button type="button" disabled={busy} onClick={() => setMode("rechazar")} className="lp-btn lp-btn-ghost flex-1">Rechazar</button>}
           <button type="button" disabled={busy} onClick={() => void act({ action: "aprobar", proofId: proof.id }, "Pago aprobado.")} className="lp-btn lp-btn-primary flex-1">Aprobar</button>
         </div>
-      ) : (
+      ) : locked ? null : (
         <button type="button" disabled={busy} onClick={() => setMode("revertir")} className="lp-btn lp-btn-ghost w-full">Revertir aprobación</button>
       )}
     </StreetCard>
@@ -437,14 +439,14 @@ function TicketDialog({ number, ticket, rifa, busy, act, onClose }: {
               <MessageCircle aria-hidden="true" className="h-5 w-5" /> Escribir por WhatsApp
             </a>
           )}
-          {rifa.status === "abierta" && ticket.origin === "fuera" && ticket.state === "reservado" && (
+          {!closedForSales && ticket.origin === "fuera" && ticket.state === "reservado" && (
             <button type="button" disabled={busy} onClick={() => void run({ action: "pagado", ticketId: ticket.id }, "Número pagado.")} className="lp-btn lp-btn-primary w-full">Marcar pagado</button>
           )}
-          {rifa.status === "abierta" && (ticket.state === "reservado" || (ticket.origin === "fuera" && ticket.state === "pagado")) && (
+          {!closedForSales && (ticket.state === "reservado" || (ticket.origin === "fuera" && ticket.state === "pagado")) && (
             <button type="button" disabled={busy} onClick={() => void run({ action: "liberar", ticketId: ticket.id }, "Número liberado.")} className="lp-btn lp-btn-ghost w-full">Liberar número</button>
           )}
           {ticket.state === "en_revision" && <p className="text-[13px] text-text-secondary">Revisa su comprobante en «Comprobantes por revisar».</p>}
-          {ticket.state === "pagado" && ticket.origin === "app" && rifa.status === "abierta" && (
+          {ticket.state === "pagado" && ticket.origin === "app" && !closedForSales && (
             <p className="text-[13px] text-text-secondary">Para revertir este pago usa «Pagos aprobados en la app».</p>
           )}
         </div>

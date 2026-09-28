@@ -242,27 +242,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.rifa_settings, public.rifa_creato
   public.rifa_proofs, public.rifa_tickets, public.rifa_draws, public.rifa_events, public.rifa_reports,
   public.rifa_visits, public.rifa_link_views, public.rifa_signups TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.rifa_events_id_seq TO service_role;
-GRANT SELECT ON public.rifas TO authenticated;
-
--- Función de la política en `private` (lección de la 124: si vive en public con
--- EXECUTE revocado, la tabla responde 42501 a authenticated).
-CREATE OR REPLACE FUNCTION private.rifa_viewer_is_admin()
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  SELECT coalesce((SELECT u.is_admin FROM public.users u WHERE u.id = auth.uid()), false)
-$$;
-REVOKE ALL ON FUNCTION private.rifa_viewer_is_admin() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION private.rifa_viewer_is_admin() TO authenticated, service_role;
-
--- Privada: solo creador y administradores. Oculta: solo creador y administradores.
-CREATE POLICY rifas_select_visible ON public.rifas FOR SELECT TO authenticated
-  USING (creator_id = auth.uid()
-    OR private.rifa_viewer_is_admin()
-    OR (visibility = 'publica' AND hidden_at IS NULL));
+-- Sin SELECT directo para clientes, ni siquiera en rifas: la cuenta de pago
+-- solo se entrega por rifa_public_view_v1 a quien tiene números por pagar, y
+-- el modo «solo por enlace» no admite un listado. Todo pasa por las RPC.
 
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['rifa_settings','rifa_creators','rifa_proofs','rifa_tickets','rifa_draws',
+  FOREACH t IN ARRAY ARRAY['rifa_settings','rifa_creators','rifas','rifa_proofs','rifa_tickets','rifa_draws',
     'rifa_events','rifa_reports','rifa_visits','rifa_link_views','rifa_signups'] LOOP
     EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL TO anon, authenticated USING (false) WITH CHECK (false)',
       t || '_deny_clients', t);
@@ -577,6 +564,9 @@ BEGIN
        SELECT 1 FROM public.rifa_tickets t WHERE t.rifa_id = p_rifa AND t.state <> 'liberado') THEN
     PERFORM public.rifa_fail('VISIBILITY_LOCKED');
   END IF;
+  IF p_visibility = 'publica' AND r.visibility = 'privada' AND NOT public.rifa_is_creator(p_actor) THEN
+    PERFORM public.rifa_fail('CREATOR_REQUIRED', NULL, '42501');
+  END IF;
   IF p_visibility <> r.visibility THEN
     UPDATE public.rifas SET visibility = p_visibility WHERE id = p_rifa;
     INSERT INTO public.rifa_events (rifa_id, actor_id, kind, detail)
@@ -701,6 +691,8 @@ BEGIN
   SELECT * INTO s FROM public.rifa_settings;
   r := public.rifa_lock(p_rifa);
   IF NOT public.rifa_can_view(r, p_buyer) THEN PERFORM public.rifa_fail('RIFA_NOT_FOUND', NULL, 'P0002'); END IF;
+  -- Una rifa oculta por administración no recibe más pagos.
+  IF r.hidden_at IS NOT NULL THEN PERFORM public.rifa_fail('RIFA_HIDDEN'); END IF;
   -- Después del sorteo no se empieza un comprobante nuevo: evita pagar solo si ganó.
   IF r.status <> 'abierta' OR now() >= r.draw_at THEN PERFORM public.rifa_fail('RIFA_CLOSED'); END IF;
   PERFORM public.rifa_sweep_expired(p_rifa);
@@ -753,6 +745,10 @@ BEGIN
   END IF;
   IF p.state = 'fallido' THEN PERFORM public.rifa_fail('ATTEMPT_REPLACED'); END IF;
   IF p.state <> 'subiendo' THEN PERFORM public.rifa_fail('ALREADY_REVIEWED'); END IF;
+  IF r.status <> 'abierta' THEN PERFORM public.rifa_fail('RIFA_FINISHED'); END IF;
+  IF r.hidden_at IS NOT NULL THEN PERFORM public.rifa_fail('RIFA_HIDDEN'); END IF;
+  -- La carga pudo empezar justo antes del sorteo (begin lo exige); se acepta
+  -- terminarla dentro de su ventana, que nunca pasa de upload_minutes.
   IF p.expires_at <= now() THEN
     PERFORM public.rifa_sweep_expired(p.rifa_id);
     PERFORM public.rifa_fail('UPLOAD_EXPIRED');
@@ -796,6 +792,10 @@ BEGIN
   PERFORM public.rifa_require_owner(r, p_actor);
   SELECT * INTO p FROM public.rifa_proofs WHERE id = p_proof FOR UPDATE;
   IF p.state <> 'en_revision' THEN PERFORM public.rifa_fail('ALREADY_REVIEWED'); END IF;
+  IF r.status <> 'abierta' THEN PERFORM public.rifa_fail('RIFA_FINISHED'); END IF;
+  -- Después del sorteo el creador ya conoce el número: solo puede aprobar.
+  -- Rechazar le permitiría quitarle el premio a quien ganó.
+  IF p_decision = 'rechazar' AND now() >= r.draw_at THEN PERFORM public.rifa_fail('DRAW_LOCKED'); END IF;
   IF p_decision = 'aprobar' THEN
     UPDATE public.rifa_proofs SET state = 'aprobado', reviewed_at = now(), reviewed_by = p_actor WHERE id = p_proof;
     UPDATE public.rifa_tickets SET state = 'pagado', paid_at = now(), paid_by = p_actor
@@ -827,6 +827,7 @@ BEGIN
   r := public.rifa_lock(p.rifa_id);
   PERFORM public.rifa_require_owner(r, p_actor);
   IF r.status <> 'abierta' THEN PERFORM public.rifa_fail('RIFA_FINISHED'); END IF;
+  IF now() >= r.draw_at THEN PERFORM public.rifa_fail('DRAW_LOCKED'); END IF;
   IF p_reason IS NULL OR char_length(btrim(p_reason)) < 3 THEN PERFORM public.rifa_fail('REASON_REQUIRED', NULL, '22023'); END IF;
   SELECT * INTO p FROM public.rifa_proofs WHERE id = p_proof FOR UPDATE;
   IF p.state <> 'aprobado' THEN PERFORM public.rifa_fail('NOT_APPROVED'); END IF;
@@ -875,6 +876,9 @@ BEGIN
   IF NOT FOUND THEN PERFORM public.rifa_fail('TICKET_NOT_FOUND', NULL, 'P0002'); END IF;
   r := public.rifa_lock(t.rifa_id);
   PERFORM public.rifa_require_owner(r, p_actor);
+  IF r.status <> 'abierta' THEN PERFORM public.rifa_fail('RIFA_FINISHED'); END IF;
+  -- Marcar pagado después del sorteo = elegir quién gana.
+  IF now() >= r.draw_at THEN PERFORM public.rifa_fail('DRAW_LOCKED'); END IF;
   SELECT * INTO t FROM public.rifa_tickets WHERE id = p_ticket FOR UPDATE;
   IF t.origin <> 'fuera' OR t.state <> 'reservado' THEN PERFORM public.rifa_fail('INVALID_TICKET_STATE'); END IF;
   UPDATE public.rifa_tickets SET state = 'pagado', paid_at = now(), paid_by = p_actor WHERE id = p_ticket;
@@ -894,6 +898,7 @@ BEGIN
   r := public.rifa_lock(t.rifa_id);
   PERFORM public.rifa_require_owner(r, p_actor);
   IF r.status <> 'abierta' THEN PERFORM public.rifa_fail('RIFA_FINISHED'); END IF;
+  IF now() >= r.draw_at THEN PERFORM public.rifa_fail('DRAW_LOCKED'); END IF;
   SELECT * INTO t FROM public.rifa_tickets WHERE id = p_ticket FOR UPDATE;
   IF NOT (t.state = 'reservado' OR (t.origin = 'fuera' AND t.state = 'pagado')) THEN
     PERFORM public.rifa_fail('INVALID_TICKET_STATE');
@@ -932,17 +937,23 @@ BEGIN
     VALUES (p_rifa, p_actor, t.buyer_id, 'resultado', jsonb_build_object('number', p_number, 'outcome', 'ganador'));
     RETURN jsonb_build_object('outcome', 'ganador', 'number', p_number, 'ticket_id', t.id);
   END IF;
-  IF FOUND THEN
-    PERFORM public.rifa_fail('PENDING_WINNER', CASE WHEN t.state = 'en_revision'
-      THEN format('El %s tiene un comprobante sin revisar. Apruébalo o recházalo primero.', public.rifa_fmt(p_number))
-      ELSE format('El %s está reservado sin pago confirmado. Márcalo como pagado o libéralo primero.', public.rifa_fmt(p_number)) END);
+  -- Comprobante enviado antes del sorteo y sin revisar: se resuelve primero
+  -- (después del sorteo solo se puede aprobar; si no llegó el pago, soporte).
+  IF FOUND AND t.state = 'en_revision' THEN
+    PERFORM public.rifa_fail('PENDING_WINNER',
+      format('El %s tiene un comprobante sin revisar. Apruébalo si recibiste el pago; si no lo recibiste, escríbenos desde «Reportar rifa».', public.rifa_fmt(p_number)));
   END IF;
+  -- Reservado sin pago a la hora del sorteo = no vendido. Se decide con lo
+  -- que estaba pagado al sorteo, no con lo que se marque después.
   -- El número no se vendió: nunca queda en silencio. El creador elige.
   IF p_unsold_action = 'desierta' THEN
     UPDATE public.rifas SET status = 'desierta', winning_number = p_number, resolved_at = now() WHERE id = p_rifa;
     INSERT INTO public.rifa_draws (rifa_id, number, lottery_name, draw_at, outcome, created_by)
     VALUES (p_rifa, p_number, r.lottery_name, r.draw_at, 'desierta', p_actor);
   ELSIF p_unsold_action = 'volver_a_jugar' THEN
+    IF (SELECT count(*) FROM public.rifa_draws d WHERE d.rifa_id = p_rifa AND d.outcome = 'volver_a_jugar') >= 3 THEN
+      PERFORM public.rifa_fail('REPLAY_LIMIT');
+    END IF;
     IF p_new_draw_at IS NULL OR p_new_draw_at < now() + interval '10 minutes' OR p_new_draw_at > now() + interval '180 days' THEN
       PERFORM public.rifa_fail('INVALID_DRAW_AT', NULL, '22023');
     END IF;

@@ -96,13 +96,21 @@ por color **y** por forma/ícono, y el lector de pantalla lo anuncia en palabras
   auditado), vende por fuera, libera, escribe el resultado y cambia la
   visibilidad. **Un administrador de La Polla no puede** (`CREATOR_ONLY`): puede
   ocultar la rifa y ver reportes.
-- Privada → Pública siempre; Pública → Privada solo sin números tomados.
+- Privada → Pública solo si el creador sigue habilitado; Pública → Privada solo
+  sin números tomados.
 - Después de `draw_at` no hay reservas, ventas por fuera ni comprobantes
-  **nuevos** (evita pagar solo si ganó); los pendientes se siguen revisando.
-- Resultado: solo después del sorteo. Si el número está pagado → ganador. Si
-  está reservado o en revisión → `PENDING_WINNER` (resolverlo primero). Si no se
-  vendió → el creador **debe** elegir `volver_a_jugar` (nueva fecha/lotería) o
+  **nuevos** (evita pagar solo si ganó). **El tablero queda congelado para el
+  creador (`DRAW_LOCKED`)**: ya conoce el número, así que solo puede **aprobar**
+  comprobantes en revisión; no puede rechazar, revertir, liberar ni marcar
+  pagada una venta por fuera. Sin esto podía quitarle el premio al ganador o
+  «vender» el número ganador después del sorteo (revisión de lógica, 28-sep).
+- Resultado: solo después del sorteo. Pagado → ganador. Con comprobante en
+  revisión → `PENDING_WINNER` (aprobarlo; si el pago no llegó, soporte vía
+  «Reportar rifa»). **Reservado sin pago a la hora del sorteo = no vendido.** Si
+  no se vendió (o está fuera del rango de la rifa) → el creador **debe** elegir
+  `volver_a_jugar` (nueva fecha/lotería, máximo 3 veces, `REPLAY_LIMIT`) o
   `desierta`; queda en el historial público. Nunca queda en silencio.
+- Una rifa oculta por administración no recibe comprobantes nuevos.
 - Quitar el permiso de creador impide crear rifas nuevas; las activas siguen.
 
 ## Decisiones por defecto (confirmar con el dueño)
@@ -131,8 +139,10 @@ Todas en `rifa_settings` (una fila; cambiar = un `UPDATE`, sin deploy):
 - Comprobantes en el bucket privado `rifa-proofs`; URL firmada de 5 min solo para
   el creador y el dueño del comprobante (ni un admin). Foto del premio en
   `rifa-media` privado; firma solo para quien puede ver la rifa.
-- RLS en todas las tablas nuevas; deny-all para `anon`/`authenticated` salvo
-  `SELECT` de `rifas` visibles (política con `private.rifa_viewer_is_admin()`).
+- RLS en todas las tablas nuevas, **deny-all para `anon`/`authenticated` en
+  todas, incluida `rifas`**: un `SELECT` directo exponía la cuenta de pago de
+  cada rifa Pública y armaba el listado que el modo «solo por enlace» prohíbe.
+  El servidor lee con service role y RPC.
 - `/rifa/<slug>` y `/rifas/*` son `NetworkOnly` en el service worker.
 - Ninguna imagen usa `next/image`.
 - Avisos: al comprador (aprobado/rechazado) y al creador (comprobante nuevo) por

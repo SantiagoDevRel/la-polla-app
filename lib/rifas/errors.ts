@@ -52,6 +52,8 @@ const MESSAGES: Record<string, string> = {
   UNSOLD_CHOICE_REQUIRED: "Ese número no se vendió. Elige qué pasa con la rifa.",
   RATE_LIMITED: "Enviaste muchos reportes hoy. Intenta mañana.",
   INVALID_PATH: "No se pudo guardar la foto.",
+  DRAW_LOCKED: "Después del sorteo solo puedes aprobar pagos. Si hay un problema, usa «Reportar rifa».",
+  REPLAY_LIMIT: "Esta rifa ya se volvió a jugar 3 veces. Marca el resultado como desierta.",
 };
 
 /** Errores cuyo DETAIL de SQL ya viene redactado con los números o cifras exactos. */

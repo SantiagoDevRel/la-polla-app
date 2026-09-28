@@ -106,12 +106,21 @@ describe("tablero", () => {
 
 describe("contrato estructural", () => {
   const migration = read("supabase/migrations/157_rifas_creadores.sql");
-  it("toda tabla nueva tiene RLS y deny-all para clientes (salvo la lectura de rifas visibles)", () => {
+  it("toda tabla nueva tiene RLS y deny-all para clientes, incluida rifas (cuenta de pago)", () => {
     const tables = [...migration.matchAll(/CREATE TABLE public\.(rifa[a-z_]*) \(/g)].map((m) => m[1]);
     expect(tables.length).toBeGreaterThanOrEqual(11);
     for (const t of tables) expect(migration).toContain(`ALTER TABLE public.${t} ENABLE ROW LEVEL SECURITY;`);
     expect(migration).toMatch(/REVOKE ALL ON public\.rifa_settings[\s\S]*FROM PUBLIC, anon, authenticated;/);
-    expect(migration).toContain("GRANT SELECT ON public.rifas TO authenticated;");
+    expect(migration).not.toMatch(/GRANT SELECT ON public\.rifas TO authenticated/);
+    expect(migration).toMatch(/ARRAY\['rifa_settings','rifa_creators','rifas',/);
+  });
+  it("después del sorteo el creador solo puede aprobar", () => {
+    for (const fn of ["rifa_unpay_proof_v1", "rifa_mark_offline_paid_v1", "rifa_release_ticket_v1"]) {
+      const body = migration.slice(migration.indexOf(`FUNCTION public.${fn}(`));
+      expect(body.slice(0, body.indexOf("END $$;"))).toContain("DRAW_LOCKED");
+    }
+    const review = migration.slice(migration.indexOf("FUNCTION public.rifa_review_proof_v1("));
+    expect(review.slice(0, review.indexOf("END $$;"))).toMatch(/p_decision = 'rechazar' AND now\(\) >= r\.draw_at[\s\S]*DRAW_LOCKED/);
   });
   it("todas las RPC de rifas se ejecutan solo desde el servidor", () => {
     expect(migration).toMatch(/proname LIKE 'rifa\\_%'[\s\S]*REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated[\s\S]*GRANT EXECUTE ON FUNCTION %s TO service_role/);
