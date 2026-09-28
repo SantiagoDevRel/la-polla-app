@@ -79,6 +79,8 @@ describe("plantillas de historia", () => {
   it("cada club tiene su pollito en el catálogo (sin camisetas inventadas)", () => {
     for (const club of STORY_CLUBS) {
       expect(existsSync(join(root, `public/pollitos/pollito_${club.key}_lider.webp`)), club.key).toBe(true);
+      // PNG horneado para next/og (satori no decodifica WebP).
+      expect(existsSync(join(root, `assets/rifas-story/pollito_${club.key}.png`)), `${club.key}.png`).toBe(true);
     }
     expect(storyClub("no-existe").key).toBe(STORY_CLUBS[0].key);
   });

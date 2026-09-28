@@ -386,7 +386,8 @@ SELECT public.rifa_reserve_v1((SELECT id FROM r2), '77777777-7777-4777-8777-0000
 DO $$ BEGIN
   ASSERT (SELECT revoked_by FROM public.rifa_creators WHERE user_id='77777777-7777-4777-8777-0000000000c1') = '77777777-7777-4777-8777-0000000000a1', 'A6 revoked_by';
   ASSERT EXISTS (SELECT 1 FROM public.rifa_events WHERE kind='creador_retirado'), 'A6 queda registro';
-  ASSERT (public.rifa_admin_creators_v1('77777777-7777-4777-8777-0000000000a1')->0->>'active_rifas')::int = 3, 'A6 lista de creadores con activas';
+  ASSERT (SELECT (x->>'active_rifas')::int FROM jsonb_array_elements(public.rifa_admin_creators_v1('77777777-7777-4777-8777-0000000000a1')) x
+          WHERE x->>'user_id' = '77777777-7777-4777-8777-0000000000c1') = 3, 'A6 lista de creadores con activas';
 END $$;
 
 -- ════════════════════════════════════════════════════════════════════════

@@ -6,6 +6,17 @@ El modelo histórico de grupos privados permanece disponible.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
+## Rifas de creadores (2026-09-28, migración 157, apagado)
+
+Un administrador habilita creadores desde `/admin/rifas`; cada creador arma sus
+rifas (hasta 100 números) desde Perfil → «Crear mi rifa», comparte `/rifa/<slug>`
+y aprueba los comprobantes. El dinero va directo a la cuenta del creador. Tablas
+propias `rifa_*` (no toca Casa), reserva atómica en SQL, vencimiento perezoso de
+30 min, Privada por defecto, pestañas POLLAS | RIFAS en `/inicio` e imagen para
+historia 1080×1920. **Todo detrás de `RIFAS_ENABLED` (apagado); la 157 no está
+aplicada en producción.** Detalle, decisiones, pruebas y stack local sin Docker:
+[docs/rifas.md](docs/rifas.md).
+
 ## Campañas SMS (2026-09-27)
 
 Administración → Campañas SMS (`/admin/sms`), exclusivo de la cuenta verificada de

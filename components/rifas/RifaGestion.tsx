@@ -420,7 +420,7 @@ function TicketDialog({ number, ticket, rifa, busy, act, onClose }: {
             <button type="submit" disabled={busy || name.trim().length < 2 || !/^\+[1-9]\d{7,14}$/.test(phone)} className="lp-btn lp-btn-primary w-full">
               {paid ? "Marcar pagado" : "Marcar reservado"}
             </button>
-            <p className="text-[12px] text-text-muted">No necesita cuenta. Si después se registra con ese celular, verá su número.</p>
+            <p className="text-[12px] text-text-muted">Anota solo datos que la persona te autorizó. No necesita cuenta: si después se registra con ese celular, verá su número.</p>
           </form>
         )
       ) : (

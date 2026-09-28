@@ -44,4 +44,5 @@ for f in "$ROOT"/supabase/migrations/*.sql; do
     [[ "${CONTINUE_ON_ERROR:-0}" == "1" ]] || exit 1
   fi
 done
+"${PSQL[@]}" -d "$DB" -f "$ROOT/scripts/local-pg/fixups/post.sql" >/dev/null
 [[ $fail == 0 ]] && echo "All migrations applied to $DB"
