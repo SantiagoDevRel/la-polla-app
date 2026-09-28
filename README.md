@@ -1617,3 +1617,35 @@ en términos confirmado por el dueño, sin sobrescribir ninguna preferencia prev
 La lista administrativa vive en `/admin/whatsapp`. Configuración del webhook
 firmado, migración 155 y pruebas: [docs/whatsapp-preferences.md](docs/whatsapp-preferences.md).
 Las campañas automáticas y el OTP no se activan con este cambio.
+# Plantillas de historia de rifas
+
+El registro `lib/rifas/story-templates/` ofrece doce imágenes verticales de
+1080×1920: `neutra`, `club`, `estadio`, `boleta`, `marcador`, `cuaderno`,
+`camiseta`, `pizarra`, `retro`, `premium`, `neon` y `confeti`. La ruta existente
+acepta `?plantilla=<clave>&club=<club>`; las claves desconocidas usan `neutra`.
+Solo `club` y `camiseta` cargan un pollito. El selector de la interfaz existente
+no cambia en esta entrega. Autorización, SQL y el flag `RIFAS_ENABLED` se conservan.
+
+```bash
+npx tsx scripts/render-story-templates.tsx
+npx vitest run tests/rifas-story-templates.test.ts
+npx tsc --noEmit
+```
+
+El script genera 48 PNG con datos ficticios en `tmp/story-templates/`: cuatro
+cantidades (10/25/50/100) por diseño, premios de dinero y texto, tomados y ganador.
+No requiere sesión, base de datos ni red. No versionar estos PNG.
+`boardLayout` admite 2–100 números, centra las filas incompletas y conserva
+casillas de al menos 70 px; una caja físicamente insuficiente lanza `RangeError`.
+Las áreas de las historias son 920×820 px (100 números: casillas de 74 px).
+
+Contrato tipográfico de la imagen: Bebas 400 para título (108–144 px, tracking
+positivo), nombre (hasta 56 px), cifras (55 % de la casilla) y metadatos (hasta
+42 px); Outfit 600 para premio en texto (hasta 44 px), etiquetas (22–24 px) y
+pie (19 px). Texto largo se distribuye sin truncar, usando avances de las fuentes
+locales y reduciendo el tamaño solo cuando la altura lo exige. Si cambian los TTF,
+regenerar `font-metrics.json` con `node scripts/rifas-story-font-metrics.cjs`.
+Satori recibe solo Bebas/Outfit y PNG locales; no hay fuentes ni imágenes remotas.
+Las tildes se conservan y las comillas/guiones tipográficos se normalizan; los
+glifos fuera de estos TTF latinos se representan con `?`, evitando las descargas
+automáticas de fuentes/emoji de next/og. El dato original no se modifica.

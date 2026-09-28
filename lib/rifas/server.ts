@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyRifaByTelegram } from "@/lib/telegram-player/notify";
 import { redactId } from "@/lib/log";
-import { rifaNumber, RIFA_SLUG_RE, type RifaCreatorView, type RifaMyList, type RifaPublicView } from "./shared";
+import { rifaNumber, RIFA_SLUG_RE, type RifaCreatorView, type RifaMyList, type RifaPublicView, type RifaTeam } from "./shared";
 import type { RpcError } from "./errors";
 
 export const RIFA_PROOF_BUCKET = "rifa-proofs";
@@ -46,8 +46,20 @@ export function getPublicView(slug: string, viewerId: string | null) {
   return rifaRpc<RifaPublicView>("rifa_public_view_v1", { p_slug: slug, p_viewer: viewerId });
 }
 
-export function getCreatorView(slug: string, actorId: string) {
-  return rifaRpc<RifaCreatorView>("rifa_creator_view_v1", { p_actor: actorId, p_slug: slug });
+/** Panel de la rifa + su equipo (creador y coadministradores, migración 158). */
+export async function getCreatorView(slug: string, actorId: string) {
+  const [view, team] = await Promise.all([
+    rifaRpc<RifaCreatorView>("rifa_creator_view_v1", { p_actor: actorId, p_slug: slug }),
+    rifaRpc<RifaTeam>("rifa_team_v1", { p_actor: actorId, p_slug: slug }),
+  ]);
+  if (view.error || !view.data) return view;
+  return { data: { ...view.data, team: team.data ?? { is_owner: false, owner_name: null, managers: [] } }, error: null };
+}
+
+/** ¿Opera la rifa? El creador o un coadministrador (SQL: rifa_is_manager). */
+export async function isRifaManager(rifaId: string, userId: string): Promise<boolean> {
+  const { data } = await rifaRpc<boolean>("rifa_is_manager", { p_rifa: rifaId, p_user: userId });
+  return data === true;
 }
 
 export function getMyRifas(userId: string) {

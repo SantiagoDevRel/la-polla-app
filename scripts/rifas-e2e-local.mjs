@@ -158,8 +158,8 @@ try {
   await page.getByLabel("¿Con qué lotería se juega?").fill("Astro Sol");
   await page.getByLabel("Número de cuenta o celular").fill("3001234567");
   await page.getByRole("button", { name: "Crear rifa" }).click();
-  await page.waitForURL(/\/rifa\/[a-z0-9]{8}\/gestionar$/);
-  const slug = page.url().match(/\/rifa\/([a-z0-9]{8})\//)[1];
+  await page.waitForURL(/\/rifa\/[a-z0-9-]+\/gestionar$/);
+  const slug = page.url().match(/\/rifa\/([a-z0-9-]+)\//)[1];
   log(`rifa creada: /rifa/${slug} (Privada)`);
 
   // 4 · Privada: el comprador no-admin recibe 404, también por la API

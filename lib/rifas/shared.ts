@@ -4,6 +4,7 @@
 // y la imagen de historia. Las cifras de dinero NO se calculan acá: vienen de
 // SQL (rifa_reserve_v1, rifa_creator_view_v1). Acá solo se escriben bonito.
 import { formatColombiaDateTime } from "@/lib/time/colombia";
+import { STORY_TEMPLATE_CATALOG } from "./story-templates/catalog";
 
 export type RifaBoardState = "libre" | "reservado" | "pagado";
 export type RifaTicketState = "reservado" | "en_revision" | "pagado";
@@ -114,7 +115,11 @@ export interface RifaCreatorView {
     payout_method: string | null; payout_account: string | null; payout_account_name: string | null; payout_account_type: string | null;
   } | null;
   events: Array<{ kind: string; detail: Record<string, unknown>; created_at: string }>;
+  /** Creador y coadministradores (migración 158). Lo agrega getCreatorView. */
+  team?: RifaTeam;
 }
+
+export interface RifaTeam { is_owner: boolean; owner_name: string | null; managers: Array<{ user_id: string; name: string | null }> }
 
 export interface RifaMyList {
   can_create: boolean;
@@ -136,7 +141,8 @@ export function rifaNumber(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-export const RIFA_SLUG_RE = /^[a-z0-9]{8}$/;
+/** Enlace de la rifa: legible desde el nombre (iphone-6, iphone-6-2) o el código de 8 de las primeras. */
+export const RIFA_SLUG_RE = /^(?=[a-z0-9-]{3,40}$)[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Sugerencias para «¿Con qué se juega?»; el campo es texto libre. */
 export const LOTTERY_SUGGESTIONS = [
@@ -187,8 +193,11 @@ export function displayPhone(phone: string | null): string {
  * colores de club salen de las camisetas del catálogo de pollitos
  * (docs/pollito-clubes.md): no se inventan camisetas ni se usan escudos.
  */
-export const STORY_TEMPLATES = ["neutra", "club"] as const;
+export const STORY_TEMPLATES = STORY_TEMPLATE_CATALOG.map((template) => template.key);
 export type StoryTemplate = (typeof STORY_TEMPLATES)[number];
+
+/** Opciones del selector de diseño en el panel (orden = orden en pantalla). */
+export const STORY_TEMPLATE_OPTIONS: ReadonlyArray<{ key: StoryTemplate; label: string; usesClub: boolean }> = STORY_TEMPLATE_CATALOG;
 
 export interface StoryClub { key: string; label: string; primary: string; secondary: string; ink: string }
 

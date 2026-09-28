@@ -163,15 +163,56 @@ Todas en `rifa_settings` (una fila; cambiar = un `UPDATE`, sin deploy):
 5. `/admin/rifas` → Embudo: visitas → cuentas nuevas → reservaron → pagaron →
    entraron a una polla (participación viva de Casa después del registro).
 
+## Coadministradores (migración 158)
+
+El creador suma a otra persona por el celular con el que entra a La Polla
+(panel → «Equipo»). Un coadministrador opera la rifa igual que el creador —
+comprobantes, ventas por fuera, liberar, resultado, visibilidad, imagen y foto
+del premio— porque `rifa_require_owner` acepta a `rifa_is_manager` (creador o
+fila en `rifa_managers`). No puede comprar en esa rifa, no suma ni quita a
+otros (`OWNER_ONLY`) y la rifa le aparece en «Mis rifas». El dinero sigue yendo a
+la cuenta de la rifa. Máximo 5. Quitarlo le quita el panel y la vista de la
+Privada. Prueba N de `scripts/rifas-check.sql`.
+
+## Enlaces legibles (158)
+
+El enlace sale del nombre: «iPhone 15 Pro» → `/rifa/iphone-15-pro`; si ya existe,
+`-2`, `-3`… (`rifa_slug_from_name`, sin tildes, 3–40 caracteres). Los códigos de
+8 caracteres de las primeras rifas siguen funcionando. La privacidad NO depende
+de que el enlace sea difícil de adivinar: una Privada la valida SQL por sesión.
+
+## Revisar un comprobante
+
+Tocar un número «En revisión» en el tablero del panel abre el comprobante ahí
+mismo (imagen privada por URL firmada de 5 min) con Aprobar y Rechazar. La lista
+«Comprobantes por revisar» también muestra la imagen. Después del sorteo solo
+aparece Aprobar (`DRAW_LOCKED`).
+
 ## Imagen para historia
 
-`GET /api/rifas/<slug>/historia?plantilla=neutra|club&club=<clave>`: PNG
+`GET /api/rifas/<slug>/historia?plantilla=<diseño>&club=<clave>`: PNG
 1080×1920, solo el creador. Nombre, premio, tablero con los tomados marcados
-(chulo sobre verde), fecha y hora en Colombia, lotería, valor y el enlace. Dos
-plantillas: **La Polla** (marca, oscuro y oro) y **Colores de club** (franjas de
-camiseta + pollito del catálogo de `docs/pollito-clubes.md`, **sin escudos**).
+(chulo sobre verde), fecha y hora en Colombia, lotería, valor y el enlace. Doce
+plantillas en `lib/rifas/story-templates`: `neutra`, `club`, `estadio`, `boleta`,
+`marcador`, `cuaderno`, `camiseta`, `pizarra`, `retro`, `premium`, `neon`, `confeti`.
+`neutra` es el respaldo de una clave desconocida. `club` y `camiseta` usan colores
+y pollito del catálogo de `docs/pollito-clubes.md`, **sin escudos**. El selector
+de gestión conserva sus dos opciones actuales; la ruta acepta las doce.
+El tablero adapta filas/casillas para 2–100 números; todas las variantes comparten
+`boardLayout`. El script `npx tsx scripts/render-story-templates.tsx` genera
+48 muestras con datos ficticios en `tmp/story-templates/`, sin DB ni red.
 Fuentes Bebas Neue y Outfit 600 en `assets/fonts` (OFL, licencias incluidas).
-Escudos a elección del creador y QR quedan como siguiente paso. Satori (next/og)
+Escudos a elección del creador y QR quedan como siguiente paso.
+
+**Guardar y compartir (28-sep):** el panel prepara el PNG apenas se elige el
+diseño y lo entrega con la Web Share API con archivo. «Guardar en fotos»
+comparte solo la imagen (iPhone ofrece «Guardar imagen» → carrete; Android,
+Fotos/Galería). «Compartir» manda la imagen y, si está marcado, el enlace en el
+texto (WhatsApp, Instagram…). El archivo se descarga antes del toque porque iOS
+exige que `share()` ocurra dentro del gesto. Sin Web Share de archivos (algunos
+navegadores de escritorio o WebView) se pide mantener presionada la vista previa.
+Antes era `<a download>`: en iPhone iba a Descargas y en producción fallaba
+porque `.vercelignore` no subía `assets/` (500 ENOENT, corregido en #164). Satori (next/og)
 no decodifica WebP: el logo y los pollitos van como PNG de paleta en
 `assets/rifas-story/` (`scripts/bake-rifa-story-assets.py`, ~410 KB).
 

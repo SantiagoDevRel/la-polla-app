@@ -37,6 +37,8 @@ const schema = z.discriminatedUnion("action", [
     unsold: z.enum(["volver_a_jugar", "desierta"]).nullable(),
     newDrawAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).nullable(), newLottery: z.string().trim().max(60).nullable() }),
   z.object({ action: z.literal("visibilidad"), visibility: z.enum(["privada", "publica"]) }),
+  z.object({ action: z.literal("coadmin_agregar"), phone: z.string().regex(/^\+[1-9]\d{7,14}$/) }),
+  z.object({ action: z.literal("coadmin_quitar"), userId: uuid }),
 ]);
 
 interface ReviewResult { buyer_id: string; numbers: number[]; rifa_name: string; rifa_slug: string; decision: string }
@@ -87,6 +89,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       const { data, error } = await rifaRpc("rifa_set_result_v1", { p_actor: actor, p_rifa: rifaId, p_number: b.number,
         p_unsold_action: b.unsold, p_new_draw_at: newDrawAt, p_new_lottery: b.newLottery });
       return error ? rifaError(error) : rifaJson({ ok: true, ...(data as object) });
+    }
+    case "coadmin_agregar": {
+      const { error } = await rifaRpc("rifa_add_manager_v1", { p_actor: actor, p_rifa: rifaId, p_phone: b.phone });
+      return error ? rifaError(error) : rifaJson({ ok: true });
+    }
+    case "coadmin_quitar": {
+      const { error } = await rifaRpc("rifa_remove_manager_v1", { p_actor: actor, p_rifa: rifaId, p_user: b.userId });
+      return error ? rifaError(error) : rifaJson({ ok: true });
     }
     case "visibilidad": {
       const { error } = await rifaRpc("rifa_set_visibility_v1", { p_actor: actor, p_rifa: rifaId, p_visibility: b.visibility });

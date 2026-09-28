@@ -6,16 +6,23 @@
 
 ## READ THIS FIRST
 
-### Rifas de creadores habilitados (2026-09-28, migración 157, APAGADO)
+### Rifas de creadores habilitados (2026-09-28, migraciones 157–158, EN PROD)
 
-`RIFAS_ENABLED` apagado por defecto: sin él no existe ninguna ruta, pestaña ni
-cookie de rifas. La 157 NO está aplicada en producción (requiere OK del dueño).
+`RIFAS_ENABLED=true` solo en Production (Vercel); sin él no existe ninguna ruta,
+pestaña ni cookie de rifas. 157 y 158 aplicadas en producción el 28-sep.
+Después del sorteo el tablero queda congelado para el creador (`DRAW_LOCKED`:
+solo aprobar). `rifas` es deny-all para clientes (la cuenta de pago no se lee por
+tabla). Coadministradores (158): el creador suma por celular a quien opera la rifa
+con él (`rifa_managers`, `rifa_is_manager` dentro de `rifa_require_owner`).
+La imagen se entrega con la hoja nativa (Web Share con archivo): «Guardar en
+fotos» y «Compartir»; nunca `<a download>` (iPhone lo manda a Descargas).
+`.vercelignore` es lista blanca: `assets/` tiene que estar (fuentes y pollitos).
 Tablas propias `rifa_*`: nunca escribir rifas de terceros en `casa_*` (dispararía
 referidos, guards v2, pozo 70/30 y la cola de recibos de la casa). Autoridad en
 SQL: RPC `rifa_*_v1` SECURITY DEFINER, EXECUTE solo service_role, actor = uuid de
 la sesión. Reserva atómica (`FOR UPDATE` de la rifa + índice único parcial de
-números vivos); vencimiento perezoso sin cron. Solo el CREADOR aprueba, vende por
-fuera, libera y escribe el resultado (ni un admin); el admin habilita creadores,
+números vivos); vencimiento perezoso sin cron. Solo el CREADOR (o sus
+coadministradores) aprueba, vende por fuera, libera y escribe el resultado (ni un admin); el admin habilita creadores,
 oculta rifas y ve reportes/embudo. Nombres y celulares de compradores solo en
 `rifa_creator_view_v1`. Decisiones configurables en la fila `rifa_settings`. Oculto
 en la app iOS. Imagen de historia: satori no lee WebP → PNG en `assets/rifas-story`.
