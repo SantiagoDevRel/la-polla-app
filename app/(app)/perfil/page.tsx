@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { InvitacionesPerfil } from "@/components/casa/InvitacionesPerfil";
+import { MisRifasPerfil } from "@/components/rifas/MisRifasPerfil";
 import { MisCortesias } from "@/components/casa/MisCortesias";
 
 import { useState, useEffect } from "react";
@@ -286,6 +287,10 @@ export default function PerfilPage() {
             juega. También salió «Actividad reciente»: no ayudaba a decidir
             nada. El perfil queda para la cuenta: datos, cobro, invitaciones
             y ajustes. */}
+
+        {/* Rifas de creadores (migración 157): solo si un administrador habilitó
+            esta cuenta como creadora. Sin permiso no se dibuja nada. */}
+        <MisRifasPerfil />
 
         {/* Invitaciones (migración 135). iOS: fuera, como el resto de promociones con premio. */}
         {!isIOSApp && <InvitacionesPerfil />}

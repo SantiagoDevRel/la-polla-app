@@ -15,9 +15,10 @@
 // haciendo que próximas visitas a chickenpicks.app vieran ES en vez de EN.
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
-import { courtesyCookieOptions, referralCookieOptions } from "@/lib/supabase/cookie-options";
+import { courtesyCookieOptions, referralCookieOptions, rifaLinkCookieOptions } from "@/lib/supabase/cookie-options";
 import { COURTESY_COOKIE, COURTESY_PARAM, validCourtesyCode } from "@/lib/casa/courtesies-shared";
 import { REFERRAL_COOKIE, REFERRAL_PARAM, validReferralCode } from "@/lib/casa/referrals-shared";
+import { RIFA_PAGE_RE, rifaLinkCookieValue } from "@/lib/rifas/link-cookie";
 
 type Locale = "es" | "en";
 
@@ -129,6 +130,20 @@ export async function proxy(request: NextRequest) {
   request.headers.set("x-locale", locale);
 
   const response = await updateSession(request);
+
+  // ── Rifas de creadores (migración 157): embudo rifa → cuenta ──────────
+  // Quien abre /rifa/<slug> SIN sesión queda marcado con lp_rifa (el primer
+  // enlace manda). Al entrar con su cuenta nueva, /api/rifas/<slug>/visto
+  // atribuye el registro a esa rifa si SQL confirma que la cuenta es posterior.
+  // Solo navegaciones: una imagen o un fetch no deja cookie.
+  const rifaMatch = RIFA_PAGE_RE.exec(request.nextUrl.pathname);
+  if (rifaMatch && process.env.RIFAS_ENABLED === "true" && request.method === "GET"
+    && (request.headers.get("sec-fetch-dest") ?? "document") === "document"
+    && !request.cookies.get("lp_rifa")
+    && !request.cookies.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"))) {
+    const value = rifaLinkCookieValue(rifaMatch[1]);
+    if (value) response.cookies.set("lp_rifa", value, rifaLinkCookieOptions());
+  }
 
   // Preview de UI iOS desde browser: ?ios=1 setea cookie sticky, ?ios=0
   // la limpia. En producción, el wrapper Capacitor iOS se detecta por

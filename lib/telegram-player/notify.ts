@@ -110,6 +110,20 @@ export function notifyPlayerReviewByTelegram(
   return sendToLinkedTelegram(db, notice.userId, reviewNoticeMessage(notice), client, "revisión");
 }
 
+/**
+ * Rifas de creadores (migración 157): aviso de texto plano con un botón a la
+ * rifa. El texto no lleva HTML propio: se escapa aquí.
+ */
+export function notifyRifaByTelegram(
+  db: SupabaseClient,
+  userId: string,
+  text: string,
+  button: { text: string; url: string },
+  client?: LoginBotClient,
+): Promise<boolean> {
+  return sendToLinkedTelegram(db, userId, { text: esc(text), buttons: [[button]] }, client, "rifa");
+}
+
 export interface ReferralGiftNotice {
   userId: string;
   /** Invitados con pago aprobado, en total. */

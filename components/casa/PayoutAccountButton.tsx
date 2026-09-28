@@ -12,7 +12,7 @@ interface Profile {
   default_payout_account_type: PayoutAccountType | null;
 }
 
-function AccountDialog({ onClose }: { onClose: () => void }) {
+function AccountDialog({ onClose, note, onSaved }: { onClose: () => void; note: string; onSaved?: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const id = useId();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -54,6 +54,7 @@ function AccountDialog({ onClose }: { onClose: () => void }) {
     if (!response.ok) throw new Error(data.error ?? "No se pudo guardar tu cuenta de pago.");
     setProfile(updated);
     setSaved(true);
+    onSaved?.();
   }
 
   return createPortal(
@@ -68,7 +69,7 @@ function AccountDialog({ onClose }: { onClose: () => void }) {
             <X size={20} aria-hidden />
           </button>
         </div>
-        <p className="mb-4 text-[15px] leading-relaxed text-text-secondary">Si ganas, enviaremos el dinero a esta cuenta. También queda guardada en tu perfil.</p>
+        <p className="mb-4 text-[15px] leading-relaxed text-text-secondary">{note}</p>
         {error ? <div role="alert" className="space-y-3 text-[15px]">
           <p>{error}</p><button type="button" className="lp-btn lp-btn-ghost" onClick={() => setRevision(value => value + 1)}>Reintentar</button>
         </div> : !profile ? <div role="status" className="space-y-3"><span className="sr-only">Cargando tu cuenta de pago</span><div className="h-12 animate-pulse rounded-md bg-bg-elevated" /><div className="h-28 animate-pulse rounded-md bg-bg-elevated" /></div> : (
@@ -82,10 +83,18 @@ function AccountDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function PayoutAccountButton() {
+const CASA_NOTE = "Si ganas, enviaremos el dinero a esta cuenta. También queda guardada en tu perfil.";
+
+/**
+ * `note` cambia quién paga: en Casa paga La Polla; en las rifas de creadores
+ * (migración 157) paga quien creó la rifa. `onSaved` avisa para refrescar.
+ */
+export function PayoutAccountButton({ note = CASA_NOTE, label = "Llenar o revisar mi cuenta de pago", onSaved, className = "lp-btn lp-btn-ghost mt-3 w-full" }: {
+  note?: string; label?: string; onSaved?: () => void; className?: string;
+} = {}) {
   const [open, setOpen] = useState(false);
   return <>
-    <button type="button" onClick={() => setOpen(true)} className="lp-btn lp-btn-ghost mt-3 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary">Llenar o revisar mi cuenta de pago</button>
-    {open && <AccountDialog onClose={() => setOpen(false)} />}
+    <button type="button" onClick={() => setOpen(true)} className={`${className} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary`}>{label}</button>
+    {open && <AccountDialog note={note} onSaved={onSaved} onClose={() => setOpen(false)} />}
   </>;
 }
