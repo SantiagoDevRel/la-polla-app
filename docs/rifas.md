@@ -183,11 +183,17 @@ aparece Aprobar (`DRAW_LOCKED`).
 
 ## Imagen para historia
 
-`GET /api/rifas/<slug>/historia?plantilla=neutra|club&club=<clave>`: PNG
+`GET /api/rifas/<slug>/historia?plantilla=<diseño>&club=<clave>`: PNG
 1080×1920, solo el creador. Nombre, premio, tablero con los tomados marcados
-(chulo sobre verde), fecha y hora en Colombia, lotería, valor y el enlace. Dos
-plantillas: **La Polla** (marca, oscuro y oro) y **Colores de club** (franjas de
-camiseta + pollito del catálogo de `docs/pollito-clubes.md`, **sin escudos**).
+(chulo sobre verde), fecha y hora en Colombia, lotería, valor y el enlace. Doce
+plantillas en `lib/rifas/story-templates`: `neutra`, `club`, `estadio`, `boleta`,
+`marcador`, `cuaderno`, `camiseta`, `pizarra`, `retro`, `premium`, `neon`, `confeti`.
+`neutra` es el respaldo de una clave desconocida. `club` y `camiseta` usan colores
+y pollito del catálogo de `docs/pollito-clubes.md`, **sin escudos**. El selector
+de gestión conserva sus dos opciones actuales; la ruta acepta las doce.
+El tablero adapta filas/casillas para 2–100 números; todas las variantes comparten
+`boardLayout`. El script `npx tsx scripts/render-story-templates.tsx` genera
+48 muestras con datos ficticios en `tmp/story-templates/`, sin DB ni red.
 Fuentes Bebas Neue y Outfit 600 en `assets/fonts` (OFL, licencias incluidas).
 Escudos a elección del creador y QR quedan como siguiente paso.
 

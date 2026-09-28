@@ -4,10 +4,8 @@
 // premio, el tablero con los números tomados marcados, fecha, lotería, valor y
 // el enlace para comprar. NUNCA nombres ni celulares: SQL solo entrega los
 // números tomados.
-// Plantillas (siempre con la marca La Polla):
-//   neutra → fondo oscuro de la marca, logo del pollito.
-//   club   → colores de camiseta y pollito del catálogo (docs/pollito-clubes.md).
-//            Sin escudos oficiales: solo colores y pollito.
+// Registro: lib/rifas/story-templates (12 diseños, respaldo neutra).
+// Solo usesClub carga pollito del catálogo, sin escudos oficiales.
 // Fuentes de la marca (Bebas Neue + Outfit 600) en assets/fonts, OFL.
 // Runtime Node: lee fuentes y pollitos del disco (sin fetch a sí mismo). Los
 // pollitos van como PNG en assets/rifas-story porque satori no decodifica WebP.
@@ -16,8 +14,8 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { rifaError, rifaJson, RIFA_DISABLED, RIFA_UNAUTHORIZED } from "@/lib/rifas/errors";
 import { getRifaViewer, rifaRpc, rifasEnabled, validSlug } from "@/lib/rifas/server";
-import { storyClub, STORY_TEMPLATES, type StoryTemplate } from "@/lib/rifas/shared";
-import { STORY_H, STORY_W, storyElement, type StoryData } from "@/lib/rifas/story";
+import { storyClub } from "@/lib/rifas/shared";
+import { STORY_H, STORY_W, getStoryTemplate, renderStory, type StoryData } from "@/lib/rifas/story-templates";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -38,7 +36,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
 
   const url = new URL(request.url);
   const templateParam = url.searchParams.get("plantilla");
-  const template: StoryTemplate = (STORY_TEMPLATES as readonly string[]).includes(templateParam ?? "") ? (templateParam as StoryTemplate) : "neutra";
+  const template = getStoryTemplate(templateParam);
   const club = storyClub(url.searchParams.get("club"));
   const appHost = (process.env.NEXT_PUBLIC_APP_URL ?? "https://lapollacolombiana.com").replace(/^https?:\/\//, "").replace(/\/$/, "");
 
@@ -47,10 +45,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     readFile(join(process.cwd(), "assets/fonts/Outfit-SemiBold-latin.ttf")),
     // PNG horneados (scripts/bake-rifa-story-assets.py): satori no decodifica WebP.
     asset("assets/rifas-story/logo.png", "image/png"),
-    template === "club" ? asset(`assets/rifas-story/pollito_${club.key}.png`, "image/png") : Promise.resolve(null),
+    template.usesClub ? asset(`assets/rifas-story/pollito_${club.key}.png`, "image/png") : Promise.resolve(null),
   ]);
 
-  return new ImageResponse(storyElement({ r, template, club, appHost, logo, pollito }), {
+  return new ImageResponse(renderStory(template.key, { r, club, appHost, logo, pollito }), {
     width: STORY_W, height: STORY_H,
     fonts: [
       { name: "Bebas", data: bebas, weight: 400, style: "normal" },

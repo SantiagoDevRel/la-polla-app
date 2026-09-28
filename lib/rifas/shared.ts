@@ -4,6 +4,7 @@
 // y la imagen de historia. Las cifras de dinero NO se calculan acá: vienen de
 // SQL (rifa_reserve_v1, rifa_creator_view_v1). Acá solo se escriben bonito.
 import { formatColombiaDateTime } from "@/lib/time/colombia";
+import { STORY_TEMPLATE_CATALOG } from "./story-templates/catalog";
 
 export type RifaBoardState = "libre" | "reservado" | "pagado";
 export type RifaTicketState = "reservado" | "en_revision" | "pagado";
@@ -191,7 +192,7 @@ export function displayPhone(phone: string | null): string {
  * colores de club salen de las camisetas del catálogo de pollitos
  * (docs/pollito-clubes.md): no se inventan camisetas ni se usan escudos.
  */
-export const STORY_TEMPLATES = ["neutra", "club"] as const;
+export const STORY_TEMPLATES = STORY_TEMPLATE_CATALOG.map((template) => template.key);
 export type StoryTemplate = (typeof STORY_TEMPLATES)[number];
 
 /** Opciones del selector de diseño en el panel (orden = orden en pantalla). */
