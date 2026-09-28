@@ -153,6 +153,13 @@ export async function updateSession(request: NextRequest) {
   const isCasaPollaPublica =
     /^\/polla\/[^/]+$/.test(path);
 
+  // `/rifa/<slug>` (migración 157): el enlace que el creador comparte por
+  // WhatsApp. Sin sesión se ve el tablero (estados, nunca nombres) y al elegir
+  // un número se pide el registro. Solo el código de 8 caracteres: la gestión
+  // `/rifa/<slug>/gestionar` y `/rifas/crear` siguen pidiendo sesión. Una
+  // Privada responde 404 sin sesión (SQL: rifa_public_view_v1).
+  const isRifaPublica = /^\/rifa\/[a-z0-9]{8}$/.test(path);
+
   // These routes handle their own auth (cron secret, webhook signature, etc.)
   const isApiWebhook =
     path.startsWith("/api/whatsapp/webhook") ||
@@ -183,8 +190,11 @@ export async function updateSession(request: NextRequest) {
   const isCasaJsonApi = /^\/api\/casa\/pollas\/[^/]+\/(leaderboard|tickets|award|join|picks|match-picks|prize-contact|object-result)\/?$/.test(path)
     || path === "/api/casa/highlights" || path === "/api/casa/mis-pollas" || path === "/api/casa/en-vivo"
     || path === "/api/casa/referidos" || path === "/api/casa/cortesias"
-    || path.startsWith("/api/casa/admin/");
-  if (!user && !isPublicRoute && !isApiWebhook && !isCasaPollaPublica && !isCasaJsonApi) {
+    || path.startsWith("/api/casa/admin/")
+    // Rifas (157): cada handler valida su sesión y responde JSON 401; la foto
+    // del premio y el tablero de una Pública se leen sin sesión.
+    || path === "/api/rifas" || path.startsWith("/api/rifas/");
+  if (!user && !isPublicRoute && !isApiWebhook && !isCasaPollaPublica && !isRifaPublica && !isCasaJsonApi) {
     const url = request.nextUrl.clone();
     const original = path + request.nextUrl.search;
     url.pathname = "/login";

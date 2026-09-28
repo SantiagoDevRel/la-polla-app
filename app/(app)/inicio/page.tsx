@@ -12,6 +12,10 @@ import { listMyPollas } from "@/lib/casa/my-pollas";
 import { listMyLiveMatches } from "@/lib/casa/live";
 import Image from "next/image";
 import { PollaSection } from "@/components/casa/PollaSection";
+import { PollasRifasTabs } from "@/components/rifas/PollasRifasTabs";
+import { RifasTab } from "@/components/rifas/RifasTab";
+import { getMyRifas, rifasEnabled } from "@/lib/rifas/server";
+import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
@@ -52,12 +56,26 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function CasaPage() {
+export default async function CasaPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?returnTo=/inicio");
+
+  // Rifas de creadores (migración 157): pestañas POLLAS | RIFAS, solo con el
+  // flag y fuera de la app iOS. La pestaña RIFAS no carga nada de las pollas.
+  const conRifas = rifasEnabled() && !(await isIOSAppRequest());
+  if (conRifas && (await searchParams).tab === "rifas") {
+    const { data: rifas } = await getMyRifas(user.id);
+    return (
+      <div className="pb-28">
+        <PollasRifasTabs active="rifas" />
+        {rifas ? <RifasTab data={rifas} />
+          : <p role="alert" className="px-4 text-[15px] text-text-secondary">No se pudieron cargar tus rifas. Actualiza la página.</p>}
+      </div>
+    );
+  }
 
   const cookieStore = await cookies();
   const referralHint = validReferralCode(cookieStore.get(REFERRAL_COOKIE)?.value);
@@ -119,6 +137,7 @@ export default async function CasaPage() {
       {/* Se monta siempre (aunque hoy no haya nada): se refresca solo cada 30 s
           y aparece cuando un partido arranca, sin recargar la página. Vacío no
           dibuja nada, ni su espacio. */}
+      {conRifas && <PollasRifasTabs active="pollas" />}
       <LiveNow initialRows={enVivo} />
 
       {/* ── Hero: la plata en juego ───────────────────────────────────── */}

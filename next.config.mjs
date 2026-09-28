@@ -64,6 +64,12 @@ const nextConfig = {
   // Keep framework chrome out of visual regression screenshots and prevent
   // the dev-tools badge from covering controls near the bottom-left corner.
   devIndicators: false,
+  // La imagen de historia de rifas lee fuentes y pollitos del disco con una
+  // ruta armada en runtime (pollito_${club}); el trazado automático no la ve
+  // y en Vercel la función quedaría sin esos archivos.
+  outputFileTracingIncludes: {
+    "/api/rifas/\\[slug\\]/historia": ["./assets/fonts/**", "./assets/rifas-story/**"],
+  },
   async redirects() {
     return [{ source: '/pollas/crear', destination: '/casa', permanent: false }];
   },

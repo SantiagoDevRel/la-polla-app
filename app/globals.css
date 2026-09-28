@@ -672,3 +672,62 @@ h2[tabindex="-1"]:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .lp-humo > span { animation: none; }
 }
+
+/* ── Rifas de creadores (migración 157): tablero de números ─────────────────
+   Cada estado se distingue por color Y por forma (ícono en la esquina y tipo de
+   borde), no solo por color. Celda cuadrada con cifra en px fijos y sin
+   text-size-adjust: con el texto del teléfono ampliado el número no revienta la
+   rejilla de 10 columnas a 320 px (la leyenda sí crece y envuelve). */
+.lp-rifa-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+}
+@media (max-width: 359px) { .lp-rifa-grid { gap: 3px; } }
+.lp-rifa-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  font-family: var(--font-display), 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  font-feature-settings: "tnum";
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+button.lp-rifa-cell { cursor: pointer; }
+button.lp-rifa-cell:active { transform: scale(0.94); }
+button.lp-rifa-cell:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button.lp-rifa-cell:disabled { cursor: default; }
+@media (min-width: 400px) { .lp-rifa-cell { font-size: 18px; } }
+.lp-rifa-libre { background: var(--text-primary); color: var(--bg-base); }
+.lp-rifa-reservado {
+  background: color-mix(in srgb, var(--turf) 42%, var(--text-primary));
+  color: var(--bg-base);
+  border: 2px dashed var(--turf-dim);
+}
+.lp-rifa-revision {
+  background: color-mix(in srgb, var(--turf) 42%, var(--text-primary));
+  color: var(--bg-base);
+  border: 2px dotted var(--bg-base);
+}
+.lp-rifa-pagado { background: var(--turf-dim); color: var(--text-primary); border-color: var(--turf-dim); }
+.lp-rifa-sel { background: var(--amber); color: var(--bg-base); border-color: var(--text-primary); }
+.lp-rifa-mio { box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--text-primary); }
+.lp-rifa-ganador { box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--gold); }
+.lp-rifa-icon {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 9px;
+  height: 9px;
+  stroke-width: 3;
+}
+@media (min-width: 400px) { .lp-rifa-icon { width: 11px; height: 11px; top: 2px; right: 2px; } }

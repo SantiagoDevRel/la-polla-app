@@ -6,6 +6,24 @@
 
 ## READ THIS FIRST
 
+### Rifas de creadores habilitados (2026-09-28, migración 157, APAGADO)
+
+`RIFAS_ENABLED` apagado por defecto: sin él no existe ninguna ruta, pestaña ni
+cookie de rifas. La 157 NO está aplicada en producción (requiere OK del dueño).
+Tablas propias `rifa_*`: nunca escribir rifas de terceros en `casa_*` (dispararía
+referidos, guards v2, pozo 70/30 y la cola de recibos de la casa). Autoridad en
+SQL: RPC `rifa_*_v1` SECURITY DEFINER, EXECUTE solo service_role, actor = uuid de
+la sesión. Reserva atómica (`FOR UPDATE` de la rifa + índice único parcial de
+números vivos); vencimiento perezoso sin cron. Solo el CREADOR aprueba, vende por
+fuera, libera y escribe el resultado (ni un admin); el admin habilita creadores,
+oculta rifas y ve reportes/embudo. Nombres y celulares de compradores solo en
+`rifa_creator_view_v1`. Decisiones configurables en la fila `rifa_settings`. Oculto
+en la app iOS. Imagen de historia: satori no lee WebP → PNG en `assets/rifas-story`.
+Pruebas: `scripts/rifas-check.sql`, `scripts/rifas-concurrency-check.mjs`,
+`tests/rifas-*.test.ts`, `scripts/rifas-e2e-local.mjs`. Base local sin Docker de
+Supabase: `scripts/local-pg/` (fixups para objetos que prod creó a mano). Detalle:
+[docs/rifas.md](docs/rifas.md).
+
 ### WhatsApp OTP (2026-09-27)
 
 Decisión vigente: el bot entrega seis dígitos para login y atiende BAJA/ALTA

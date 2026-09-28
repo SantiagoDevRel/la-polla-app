@@ -53,6 +53,13 @@ export function referralCookieOptions(
   return onboardingCookieOptions(nodeEnv);
 }
 
+/** lp_rifa: rifa abierta sin sesión (migración 157), 30 días, solo servidor. */
+export function rifaLinkCookieOptions(
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+) {
+  return onboardingCookieOptions(nodeEnv);
+}
+
 /** lp_cortesia: código del enlace de cortesía (migración 138), 30 días, solo servidor. */
 export function courtesyCookieOptions(
   nodeEnv: string | undefined = process.env.NODE_ENV,

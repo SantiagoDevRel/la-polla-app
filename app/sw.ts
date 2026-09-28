@@ -69,6 +69,9 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   // Mismo trato para los nombres nuevos (2026-09-18): /inicio ya está arriba.
   /^\/polla(\/|$)/,
   /^\/futbol(\/|$)/,
+  // Rifas de creadores (migración 157): tablero con reservas que vencen,
+  // cuenta de pago y comprobantes. Un tablero cacheado vende un número tomado.
+  /^\/rifas?(\/|$)/,
 ];
 
 const serwist = new Serwist({

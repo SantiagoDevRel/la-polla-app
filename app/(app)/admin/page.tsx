@@ -36,6 +36,7 @@ import { useToast } from "@/components/ui/Toast";
 import UserDirectory from "@/components/admin/UserDirectory";
 import SmsSaldoCard from "@/components/admin/SmsSaldoCard";
 import SmsCampaignLink from "@/components/admin/SmsCampaignLink";
+import { RifasAdminLink } from "@/components/admin/RifasAdminLink";
 
 interface Metricas {
   usuarios: number;
@@ -178,6 +179,8 @@ export default function AdminPage() {
           <Link href="/admin/cortesias" className="lp-btn lp-btn-ghost mt-2 w-full">
             Dar cortesías
           </Link>
+          {/* Rifas de creadores (migración 157): solo con RIFAS_ENABLED. */}
+          <RifasAdminLink />
           <SmsCampaignLink />
           <Link href="/admin/whatsapp" className="lp-card block p-4 text-base font-semibold text-text-primary underline">Destinatarios de WhatsApp</Link>
         </div>
