@@ -16,6 +16,9 @@
 !/tsconfig.json
 !/css.d.ts
 !/proxy.ts
+# Fuentes y pollitos que la imagen de historia de rifas lee del disco en runtime
+# (sin esto la función responde 500: ENOENT /var/task/assets/fonts/...).
+!/assets
 # Los clips -lite son los usados en producción. Los masters quedan en el repo
 # como fuente de edición, pero no necesitan viajar en cada upload de Vercel.
 /public/videos/nuevo-background.mp4
