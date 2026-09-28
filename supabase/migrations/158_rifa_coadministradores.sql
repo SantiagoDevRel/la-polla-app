@@ -84,6 +84,9 @@ BEGIN
   v_base := btrim(regexp_replace(v_base, '[^a-z0-9]+', '-', 'g'), '-');
   v_base := btrim(left(v_base, 34), '-');
   IF char_length(v_base) < 3 THEN v_base := 'rifa'; END IF;
+  -- Dos rifas con el mismo nombre al mismo tiempo: la segunda espera a que la
+  -- primera confirme y toma el sufijo siguiente (lock hasta el fin de la transacción).
+  PERFORM pg_advisory_xact_lock(hashtext('rifa_slug:' || v_base));
   v_slug := v_base;
   WHILE EXISTS (SELECT 1 FROM public.rifas WHERE slug = v_slug) LOOP
     n := n + 1;

@@ -60,6 +60,21 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
     }
   }, [slug, refresh, showToast]);
 
+  // Compradores, coadministradores y reservas que vencen cambian el tablero sin
+  // pasar por este panel: se refresca al volver a la pestaña y cada 30 s mientras
+  // está visible. Así la imagen para compartir nunca queda con números viejos.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    const timer = window.setInterval(onVisible, 30_000);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [refresh]);
+
   const byNumber = useMemo(() => new Map(rifa.tickets.map((t) => [t.number, t])), [rifa.tickets]);
   const cells: BoardCell[] = useMemo(() => Array.from({ length: rifa.number_count }, (_, n) => {
     const t = byNumber.get(n);
