@@ -28,6 +28,7 @@
 --   K · privacidad: la vista pública nunca trae nombres ni celulares
 --   L · ocultar (admin) y reportar
 --   M · embudo: atribución de cuentas nuevas
+--   N · coadministradores (158): solo el creador los suma; operan y ven la Privada; no compran
 \set ON_ERROR_STOP on
 BEGIN;
 
@@ -441,5 +442,37 @@ DO $$ BEGIN
 END $$;
 SELECT pg_temp.expect_fail($$SELECT public.rifa_funnel_v1('77777777-7777-4777-8777-0000000000b1')$$, 'ADMIN_REQUIRED', 'M3 embudo solo admin');
 
-\echo 'rifas-check: OK (A–M)'
+-- ════════════════════════════════════════════════════════════════════════
+-- N · coadministradores (migración 158)
+-- ════════════════════════════════════════════════════════════════════════
+CREATE TEMP TABLE rn AS SELECT id, slug FROM public.rifas WHERE name = 'Cuarta rifa';
+SELECT pg_temp.expect_fail($$SELECT public.rifa_add_manager_v1('77777777-7777-4777-8777-0000000000b1',(SELECT id FROM rn),'+573190000005')$$,
+  'OWNER_ONLY', 'N1 alguien que no creó la rifa suma coadministradores');
+SELECT pg_temp.expect_fail($$SELECT public.rifa_add_manager_v1('77777777-7777-4777-8777-0000000000c1',(SELECT id FROM rn),'+573199999999')$$,
+  'USER_NOT_FOUND', 'N1 celular sin cuenta');
+SELECT pg_temp.expect_fail($$SELECT public.rifa_add_manager_v1('77777777-7777-4777-8777-0000000000c1',(SELECT id FROM rn),'+573190000002')$$,
+  'ALREADY_MANAGER', 'N1 el creador no se suma a sí mismo');
+SELECT public.rifa_add_manager_v1('77777777-7777-4777-8777-0000000000c1', (SELECT id FROM rn), '+573190000005');
+DO $$ BEGIN
+  ASSERT public.rifa_creator_view_v1('77777777-7777-4777-8777-0000000000b2', (SELECT slug FROM rn))->>'slug' = (SELECT slug FROM rn),
+    'N2 el coadministrador abre el panel';
+  ASSERT public.rifa_public_view_v1((SELECT slug FROM rn), '77777777-7777-4777-8777-0000000000b2')->>'slug' = (SELECT slug FROM rn),
+    'N2 el coadministrador ve la Privada';
+  ASSERT (public.rifa_team_v1('77777777-7777-4777-8777-0000000000b2', (SELECT slug FROM rn))->>'is_owner')::boolean = false, 'N2 no es dueño';
+  ASSERT jsonb_array_length(public.rifa_team_v1('77777777-7777-4777-8777-0000000000c1', (SELECT slug FROM rn))->'managers') = 1, 'N2 equipo';
+  ASSERT EXISTS (SELECT 1 FROM jsonb_array_elements(public.rifa_my_list_v1('77777777-7777-4777-8777-0000000000b2')->'created') x
+                 WHERE x->>'slug' = (SELECT slug FROM rn)), 'N2 aparece en Mis rifas del coadministrador';
+END $$;
+SELECT pg_temp.expect_fail($$SELECT public.rifa_reserve_v1((SELECT id FROM rn),'77777777-7777-4777-8777-0000000000b2',ARRAY[9])$$,
+  'CREATOR_CANNOT_BUY', 'N3 el coadministrador no compra');
+SELECT pg_temp.expect_fail($$SELECT public.rifa_add_manager_v1('77777777-7777-4777-8777-0000000000b2',(SELECT id FROM rn),'+573190000006')$$,
+  'OWNER_ONLY', 'N3 el coadministrador no suma a otros');
+SELECT public.rifa_offline_sale_v1('77777777-7777-4777-8777-0000000000b2', (SELECT id FROM rn), 9, 'Venta del coadmin', '+573190000096', false);
+SELECT public.rifa_remove_manager_v1('77777777-7777-4777-8777-0000000000c1', (SELECT id FROM rn), '77777777-7777-4777-8777-0000000000b2');
+SELECT pg_temp.expect_fail($$SELECT public.rifa_creator_view_v1('77777777-7777-4777-8777-0000000000b2',(SELECT slug FROM rn))$$,
+  'CREATOR_ONLY', 'N4 al quitarlo pierde el panel');
+SELECT pg_temp.expect_fail($$SELECT public.rifa_public_view_v1((SELECT slug FROM rn),'77777777-7777-4777-8777-0000000000b2')$$,
+  'RIFA_NOT_FOUND', 'N4 y deja de ver la Privada');
+
+\echo 'rifas-check: OK (A–N)'
 ROLLBACK;

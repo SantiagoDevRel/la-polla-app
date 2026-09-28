@@ -114,7 +114,11 @@ export interface RifaCreatorView {
     payout_method: string | null; payout_account: string | null; payout_account_name: string | null; payout_account_type: string | null;
   } | null;
   events: Array<{ kind: string; detail: Record<string, unknown>; created_at: string }>;
+  /** Creador y coadministradores (migración 158). Lo agrega getCreatorView. */
+  team?: RifaTeam;
 }
+
+export interface RifaTeam { is_owner: boolean; owner_name: string | null; managers: Array<{ user_id: string; name: string | null }> }
 
 export interface RifaMyList {
   can_create: boolean;
@@ -189,6 +193,12 @@ export function displayPhone(phone: string | null): string {
  */
 export const STORY_TEMPLATES = ["neutra", "club"] as const;
 export type StoryTemplate = (typeof STORY_TEMPLATES)[number];
+
+/** Opciones del selector de diseño en el panel (orden = orden en pantalla). */
+export const STORY_TEMPLATE_OPTIONS: Array<{ key: StoryTemplate; label: string; usesClub: boolean }> = [
+  { key: "neutra", label: "La Polla", usesClub: false },
+  { key: "club", label: "Colores de club", usesClub: true },
+];
 
 export interface StoryClub { key: string; label: string; primary: string; secondary: string; ink: string }
 

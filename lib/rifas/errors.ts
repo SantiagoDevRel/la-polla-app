@@ -53,12 +53,16 @@ const MESSAGES: Record<string, string> = {
   RATE_LIMITED: "Enviaste muchos reportes hoy. Intenta mañana.",
   INVALID_PATH: "No se pudo guardar la foto.",
   DRAW_LOCKED: "Después del sorteo solo puedes aprobar pagos. Si hay un problema, usa «Reportar rifa».",
+  OWNER_ONLY: "Solo quien creó la rifa puede cambiar su equipo.",
+  ALREADY_MANAGER: "Esa persona ya administra esta rifa.",
+  MAX_MANAGERS: "La rifa ya tiene 5 coadministradores.",
+  MANAGER_HAS_NUMBERS: "Esa persona tiene números en esta rifa. Libéralos antes de sumarla al equipo.",
   REPLAY_LIMIT: "Esta rifa ya se volvió a jugar 3 veces. Marca el resultado como desierta.",
 };
 
 /** Errores cuyo DETAIL de SQL ya viene redactado con los números o cifras exactos. */
 const DETAILED = new Set(["NUMBER_TAKEN", "MAX_PENDING_NUMBERS", "MAX_ACTIVE_RIFAS", "PENDING_WINNER", "UNSOLD_CHOICE_REQUIRED"]);
-const FORBIDDEN = new Set(["CREATOR_ONLY", "ADMIN_REQUIRED", "CREATOR_REQUIRED"]);
+const FORBIDDEN = new Set(["CREATOR_ONLY", "OWNER_ONLY", "ADMIN_REQUIRED", "CREATOR_REQUIRED"]);
 
 export interface RpcError { message?: string; code?: string; details?: string | null }
 

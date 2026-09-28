@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { matchesImageSignature } from "@/lib/casa/payout-proofs";
 import { rifaError, rifaJson, RIFA_DISABLED, RIFA_UNAUTHORIZED } from "@/lib/rifas/errors";
-import { getPublicView, getRifaViewer, RIFA_MEDIA_BUCKET, rifaRpc, rifasEnabled, signedRifaFile, validSlug } from "@/lib/rifas/server";
+import { getPublicView, getRifaViewer, isRifaManager, RIFA_MEDIA_BUCKET, rifaRpc, rifasEnabled, signedRifaFile, validSlug } from "@/lib/rifas/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   if (!validSlug(slug)) return rifaJson({ error: "No encontrado." }, 404);
   const db = createAdminClient();
   const { data: rifa } = await db.from("rifas").select("id, creator_id, prize_image_path").eq("slug", slug).maybeSingle();
-  if (!rifa || rifa.creator_id !== viewer.id) return rifaJson({ error: "Solo quien creó la rifa puede hacer esto." }, 403);
+  if (!rifa || !(await isRifaManager(rifa.id, viewer.id))) return rifaJson({ error: "Solo quien administra la rifa puede hacer esto." }, 403);
 
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");

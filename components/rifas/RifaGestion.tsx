@@ -6,7 +6,7 @@
 // marcar pagado, liberar, resultado y visibilidad. Aquí solo se muestran los
 // datos y se piden confirmaciones. Nombres y celulares de compradores solo se
 // ven en este panel (el tablero público y la imagen de historia no los tienen).
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Download, Eye, Image as ImageIcon, MessageCircle, Share2, Trophy } from "lucide-react";
 import PhoneInput from "@/components/ui/PhoneInput";
@@ -19,8 +19,8 @@ import { formatCop } from "@/lib/casa/format";
 import { formatColombiaDateTime, toColombiaDateTimeInput } from "@/lib/time/colombia";
 import { ImagePreparationError, PRIZE_IMAGE_PREPARE_OPTIONS, prepareImageUpload } from "@/lib/casa/prepare-proof";
 import {
-  displayPhone, drawLabel, PAYMENT_METHOD_LABEL, rifaNumber, rifaShareText, STORY_CLUBS, whatsappChatUrl, whatsappShareUrl,
-  type RifaCreatorTicket, type RifaCreatorView,
+  displayPhone, drawLabel, PAYMENT_METHOD_LABEL, rifaNumber, rifaShareText, STORY_CLUBS, STORY_TEMPLATE_OPTIONS, whatsappChatUrl, whatsappShareUrl,
+  type RifaCreatorTicket, type RifaCreatorView, type RifaTeam, type StoryTemplate,
 } from "@/lib/rifas/shared";
 
 type Action = Record<string, unknown> & { action: string };
@@ -111,6 +111,7 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
 
       <SharePanel rifa={rifa} shareUrl={shareUrl} />
       <PrizePhoto slug={slug} hasImage={rifa.has_prize_image} onDone={refresh} />
+      {rifa.team && <TeamPanel team={rifa.team} busy={busy} act={act} />}
 
       {rifa.tickets.length > 0 && (
         <details className="lp-card group p-4">
@@ -188,6 +189,12 @@ function ProofCard({ slug, proof, busy, act, locked }: {
         <p className="lp-money text-[20px] leading-none">{formatCop(proof.amount_cop)}</p>
       </div>
       <p className="text-[13px] text-text-secondary">Números {proof.numbers.map(rifaNumber).join(", ")}</p>
+      {proof.state === "en_revision" && (
+        // Imagen privada: la ruta valida sesión y redirige a una URL firmada de 5 min.
+        // eslint-disable-next-line @next/next/no-img-element -- archivo privado, tamaño real
+        <img src={`/api/rifas/${slug}/comprobante/${proof.id}`} alt={`Comprobante de ${proof.buyer_name ?? "comprador"}`}
+          loading="lazy" className="max-h-[60dvh] w-full rounded-lg border border-border-subtle bg-bg-base object-contain" />
+      )}
       <a href={`/api/rifas/${slug}/comprobante/${proof.id}`} target="_blank" rel="noopener noreferrer" className="lp-btn lp-btn-ghost w-full">
         <Eye aria-hidden="true" className="h-5 w-5" /> Ver comprobante
       </a>
@@ -292,45 +299,165 @@ function ResultSection({ rifa, busy, act, drawPassed }: {
   );
 }
 
+type ShareState = "loading" | "ready" | "error";
+
+/**
+ * Imagen de historia: se genera en el servidor y se entrega con la hoja nativa
+ * del celular (Web Share API con archivo). «Guardar en fotos» comparte solo la
+ * imagen, así iPhone muestra «Guardar imagen» (va al carrete, no a Descargas) y
+ * Android ofrece Fotos/Galería. «Compartir» manda la imagen y, si se elige, el
+ * enlace en el texto (WhatsApp, Instagram, etc.). Donde el navegador no
+ * comparte archivos se pide mantener presionada la vista previa para guardarla.
+ * El archivo se prepara ANTES del toque: iOS exige que share() ocurra dentro
+ * del gesto del usuario, sin una descarga en medio.
+ */
 function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: string }) {
-  const [template, setTemplate] = useState<"neutra" | "club">("neutra");
+  const [template, setTemplate] = useState<StoryTemplate>("neutra");
   const [club, setClub] = useState(STORY_CLUBS[0].key);
+  const [withLink, setWithLink] = useState(true);
+  const [file, setFile] = useState<File | null>(null);
+  const [state, setState] = useState<ShareState>("loading");
+  const [preview, setPreview] = useState<string | null>(null);
+  const [manual, setManual] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const { showToast } = useToast();
   const text = rifaShareText(rifa, shareUrl, formatCop(rifa.price_cop));
-  const storyHref = `/api/rifas/${rifa.slug}/historia?plantilla=${template}${template === "club" ? `&club=${club}` : ""}`;
+  const option = STORY_TEMPLATE_OPTIONS.find((t) => t.key === template) ?? STORY_TEMPLATE_OPTIONS[0];
+  // La imagen cambia cuando cambian los números tomados: la versión evita una copia vieja.
+  const version = rifa.tickets.map((t) => `${t.number}${t.state[0]}`).join(".") + rifa.status;
+  const storyHref = `/api/rifas/${rifa.slug}/historia?plantilla=${template}${option.usesClub ? `&club=${club}` : ""}&v=${encodeURIComponent(version)}`;
+
+  useEffect(() => {
+    let alive = true;
+    setState("loading");
+    setFile(null);
+    fetch(storyHref, { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(String(res.status));
+        const blob = await res.blob();
+        if (!alive) return;
+        setFile(new File([blob], `rifa-${rifa.slug}.png`, { type: "image/png" }));
+        setState("ready");
+      })
+      .catch(() => { if (alive) setState("error"); });
+    return () => { alive = false; };
+  }, [storyHref, rifa.slug, attempt]);
+
+  useEffect(() => {
+    if (!file) { setPreview(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  async function share(includeText: boolean) {
+    if (!file) return;
+    const data: ShareData = includeText && withLink ? { files: [file], text } : { files: [file] };
+    if (typeof navigator !== "undefined" && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share(data);
+      } catch (e) {
+        if ((e as DOMException)?.name !== "AbortError") showToast("No se pudo abrir el menú para compartir.", "error");
+      }
+      return;
+    }
+    setManual(true);
+  }
+
   return (
     <StreetCard className="space-y-3 p-4">
       <h2 className="lp-display-sm text-[22px]">Compartir</h2>
       <a href={whatsappShareUrl(text)} target="_blank" rel="noopener noreferrer" className="lp-btn lp-btn-ghost w-full">
-        <Share2 aria-hidden="true" className="h-5 w-5" /> Enviar por WhatsApp
+        <MessageCircle aria-hidden="true" className="h-5 w-5" /> Enviar enlace por WhatsApp
       </a>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span id="copiar-enlace-rifa" className="min-w-0 text-[13px] text-text-secondary [overflow-wrap:anywhere]">{shareUrl}</span>
         <CopiarDato valor={shareUrl} etiqueta="enlace-rifa" nombre="enlace de la rifa" />
       </div>
       <Link href={`/rifa/${rifa.slug}`} className="inline-flex min-h-11 items-center text-[13px] font-semibold text-text-secondary underline-offset-4 hover:text-text-primary hover:underline">Ver como comprador</Link>
-      <div className="space-y-2 border-t border-border-subtle pt-3">
+      <div className="space-y-3 border-t border-border-subtle pt-3">
         <p className="text-[15px] font-semibold">Imagen para historia</p>
-        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Plantilla">
-          {(["neutra", "club"] as const).map((t) => (
-            <button key={t} type="button" role="radio" aria-checked={template === t} onClick={() => setTemplate(t)}
-              className={`min-h-11 rounded-xl border px-3 text-[15px] transition-colors ${template === t ? "border-text-primary bg-bg-elevated text-text-primary" : "border-border-default text-text-secondary hover:border-gold/30"}`}>
-              {t === "neutra" ? "La Polla" : "Colores de club"}
-            </button>
-          ))}
+        <div>
+          <label htmlFor="plantilla-historia" className="block text-[13px] text-text-secondary">Diseño</label>
+          <select id="plantilla-historia" value={template} onChange={(e) => setTemplate(e.target.value as StoryTemplate)} className="lp-input mt-1 w-full">
+            {STORY_TEMPLATE_OPTIONS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
         </div>
-        {template === "club" && (
-          <>
+        {option.usesClub && (
+          <div>
             <label htmlFor="club-historia" className="block text-[13px] text-text-secondary">Club</label>
-            <select id="club-historia" value={club} onChange={(e) => setClub(e.target.value)} className="lp-input w-full">
+            <select id="club-historia" value={club} onChange={(e) => setClub(e.target.value)} className="lp-input mt-1 w-full">
               {STORY_CLUBS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
             </select>
-          </>
+          </div>
         )}
-        <a href={storyHref} download={`rifa-${rifa.slug}.png`} className="lp-btn lp-btn-ghost w-full">
-          <Download aria-hidden="true" className="h-5 w-5" /> Descargar imagen
-        </a>
+        <div className="flex justify-center rounded-lg border border-border-subtle bg-bg-base p-2">
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element -- imagen generada (blob), tamaño real
+            <img src={preview} alt="Vista previa de la imagen para historia" className="h-auto max-h-[420px] w-auto max-w-full rounded" />
+          ) : (
+            <div className="flex aspect-[9/16] h-[320px] items-center justify-center p-4 text-center text-[13px] text-text-muted">
+              {state === "error" ? "No se pudo preparar la imagen." : "Preparando la imagen…"}
+            </div>
+          )}
+        </div>
+        {state === "error" && (
+          <button type="button" onClick={() => setAttempt((n) => n + 1)} className="lp-btn lp-btn-ghost w-full">Reintentar</button>
+        )}
+        <label className="flex min-h-11 items-center gap-2 text-[15px]">
+          <input type="checkbox" checked={withLink} onChange={(e) => setWithLink(e.target.checked)} /> Incluir el enlace al compartir
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" disabled={state !== "ready"} onClick={() => void share(false)} className="lp-btn lp-btn-ghost">
+            <Download aria-hidden="true" className="h-5 w-5" /> Guardar en fotos
+          </button>
+          <button type="button" disabled={state !== "ready"} onClick={() => void share(true)} className="lp-btn lp-btn-primary">
+            <Share2 aria-hidden="true" className="h-5 w-5" /> Compartir
+          </button>
+        </div>
+        {manual && (
+          <p className="rounded-lg border border-border-subtle p-3 text-[13px] text-text-secondary">
+            Este navegador no abre el menú para compartir. Mantén presionada la imagen y elige «Guardar imagen» o «Agregar a Fotos».
+          </p>
+        )}
         <p className="text-[12px] text-text-muted">Muestra los números tomados, nunca nombres ni celulares.</p>
       </div>
+    </StreetCard>
+  );
+}
+
+function TeamPanel({ team, busy, act }: { team: RifaTeam; busy: boolean; act: (b: Action, ok?: string) => Promise<{ ok: boolean }> }) {
+  const [phone, setPhone] = useState("");
+  const onPhone = useCallback((v: string) => setPhone(v), []);
+  return (
+    <StreetCard className="space-y-3 p-4">
+      <h2 className="lp-display-sm text-[22px]">Equipo</h2>
+      <p className="text-[13px] text-text-secondary">
+        Quienes administran la rifa revisan comprobantes, anotan ventas y comparten. El dinero sigue llegando a la cuenta de la rifa.
+      </p>
+      <ul className="space-y-1">
+        <li className="flex min-h-11 items-center justify-between gap-2 text-[15px]">
+          <span className="min-w-0 [overflow-wrap:anywhere]">{team.owner_name ?? "Creador"}</span>
+          <span className="text-[13px] text-text-muted">Creador</span>
+        </li>
+        {team.managers.map((m) => (
+          <li key={m.user_id} className="flex min-h-11 items-center justify-between gap-2 text-[15px]">
+            <span className="min-w-0 [overflow-wrap:anywhere]">{m.name ?? "Coadministrador"}</span>
+            {team.is_owner ? (
+              <button type="button" disabled={busy} onClick={() => void act({ action: "coadmin_quitar", userId: m.user_id }, "Coadministrador quitado.")}
+                className="lp-btn lp-btn-ghost !min-h-11 !px-4 text-[13px]">Quitar</button>
+            ) : <span className="text-[13px] text-text-muted">Coadministrador</span>}
+          </li>
+        ))}
+      </ul>
+      {team.is_owner && (
+        <form className="space-y-2 border-t border-border-subtle pt-3"
+          onSubmit={(e) => { e.preventDefault(); void act({ action: "coadmin_agregar", phone }, "Coadministrador agregado."); }}>
+          <p className="text-[13px] text-text-secondary">Agregar por el celular con el que entra a La Polla</p>
+          <PhoneInput onChange={onPhone} />
+          <button type="submit" disabled={busy || !/^\+[1-9]\d{7,14}$/.test(phone)} className="lp-btn lp-btn-ghost w-full">Agregar al equipo</button>
+        </form>
+      )}
     </StreetCard>
   );
 }
@@ -390,6 +517,7 @@ function TicketDialog({ number, ticket, rifa, busy, act, onClose }: {
   }, []);
   const close = () => dialog.current?.close();
   const closedForSales = rifa.status !== "abierta" || new Date(rifa.draw_at).getTime() <= Date.now();
+  const ticketProof = ticket?.proof_id ? rifa.proofs.find((p) => p.id === ticket.proof_id && p.state !== "rechazado") ?? null : null;
 
   async function run(body: Action, ok: string) {
     const res = await act(body, ok);
@@ -445,9 +573,9 @@ function TicketDialog({ number, ticket, rifa, busy, act, onClose }: {
           {!closedForSales && (ticket.state === "reservado" || (ticket.origin === "fuera" && ticket.state === "pagado")) && (
             <button type="button" disabled={busy} onClick={() => void run({ action: "liberar", ticketId: ticket.id }, "Número liberado.")} className="lp-btn lp-btn-ghost w-full">Liberar número</button>
           )}
-          {ticket.state === "en_revision" && <p className="text-[13px] text-text-secondary">Revisa su comprobante en «Comprobantes por revisar».</p>}
-          {ticket.state === "pagado" && ticket.origin === "app" && !closedForSales && (
-            <p className="text-[13px] text-text-secondary">Para revertir este pago usa «Pagos aprobados en la app».</p>
+          {ticketProof && (
+            <ProofCard slug={rifa.slug} proof={ticketProof} busy={busy} act={async (b, ok) => { const r = await act(b, ok); if (r.ok) close(); return r; }}
+              locked={closedForSales} />
           )}
         </div>
       )}
