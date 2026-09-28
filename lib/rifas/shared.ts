@@ -196,10 +196,7 @@ export const STORY_TEMPLATES = STORY_TEMPLATE_CATALOG.map((template) => template
 export type StoryTemplate = (typeof STORY_TEMPLATES)[number];
 
 /** Opciones del selector de diseño en el panel (orden = orden en pantalla). */
-export const STORY_TEMPLATE_OPTIONS: Array<{ key: StoryTemplate; label: string; usesClub: boolean }> = [
-  { key: "neutra", label: "La Polla", usesClub: false },
-  { key: "club", label: "Colores de club", usesClub: true },
-];
+export const STORY_TEMPLATE_OPTIONS: ReadonlyArray<{ key: StoryTemplate; label: string; usesClub: boolean }> = STORY_TEMPLATE_CATALOG;
 
 export interface StoryClub { key: string; label: string; primary: string; secondary: string; ink: string }
 
