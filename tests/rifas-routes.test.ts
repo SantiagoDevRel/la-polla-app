@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/rifas/server", () => ({
   ...mocks,
-  validSlug: (s: string) => /^[a-z0-9]{8}$/.test(s),
+  validSlug: (s: string) => /^(?=[a-z0-9-]{3,40}$)[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s),
   RIFA_PROOF_BUCKET: "rifa-proofs",
   RIFA_MEDIA_BUCKET: "rifa-media",
   RIFA_LINK_COOKIE: "lp_rifa",

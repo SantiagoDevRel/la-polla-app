@@ -155,10 +155,10 @@ export async function updateSession(request: NextRequest) {
 
   // `/rifa/<slug>` (migración 157): el enlace que el creador comparte por
   // WhatsApp. Sin sesión se ve el tablero (estados, nunca nombres) y al elegir
-  // un número se pide el registro. Solo el código de 8 caracteres: la gestión
+  // un número se pide el registro. Solo el enlace de la rifa (158: legible): la gestión
   // `/rifa/<slug>/gestionar` y `/rifas/crear` siguen pidiendo sesión. Una
   // Privada responde 404 sin sesión (SQL: rifa_public_view_v1).
-  const isRifaPublica = /^\/rifa\/[a-z0-9]{8}$/.test(path);
+  const isRifaPublica = /^\/rifa\/(?=[a-z0-9-]{3,40}$)[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path);
 
   // These routes handle their own auth (cron secret, webhook signature, etc.)
   const isApiWebhook =

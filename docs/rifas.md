@@ -174,6 +174,13 @@ otros (`OWNER_ONLY`) y la rifa le aparece en «Mis rifas». El dinero sigue yend
 la cuenta de la rifa. Máximo 5. Quitarlo le quita el panel y la vista de la
 Privada. Prueba N de `scripts/rifas-check.sql`.
 
+## Enlaces legibles (158)
+
+El enlace sale del nombre: «iPhone 15 Pro» → `/rifa/iphone-15-pro`; si ya existe,
+`-2`, `-3`… (`rifa_slug_from_name`, sin tildes, 3–40 caracteres). Los códigos de
+8 caracteres de las primeras rifas siguen funcionando. La privacidad NO depende
+de que el enlace sea difícil de adivinar: una Privada la valida SQL por sesión.
+
 ## Revisar un comprobante
 
 Tocar un número «En revisión» en el tablero del panel abre el comprobante ahí

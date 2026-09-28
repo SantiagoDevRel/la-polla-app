@@ -50,6 +50,11 @@ describe("cookie lp_rifa (embudo rifa → cuenta)", () => {
   it("solo la página pública de la rifa, no la gestión", () => {
     expect(RIFA_PAGE_RE.test("/rifa/abcd2345")).toBe(true);
     expect(RIFA_PAGE_RE.test("/rifa/abcd2345/gestionar")).toBe(false);
+    expect(RIFA_PAGE_RE.test("/rifa/iphone-6")).toBe(true);
+    expect(RIFA_PAGE_RE.test("/rifa/iphone-6-2")).toBe(true);
+    for (const bad of ["/rifa/Iphone", "/rifa/-iphone", "/rifa/iphone-", "/rifa/a--b", "/rifa/ab", "/rifa/a.b", `/rifa/${"a".repeat(41)}`]) {
+      expect(RIFA_PAGE_RE.test(bad)).toBe(false);
+    }
   });
 });
 
@@ -131,7 +136,7 @@ describe("contrato estructural", () => {
   });
   it("la página pública es solo /rifa/<slug>; la gestión sigue con sesión", () => {
     const mw = read("lib/supabase/middleware.ts");
-    expect(mw).toContain("const isRifaPublica = /^\\/rifa\\/[a-z0-9]{8}$/.test(path);");
+    expect(mw).toContain("const isRifaPublica = /^\\/rifa\\/(?=[a-z0-9-]{3,40}$)[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path);");
   });
   it("el service worker nunca cachea rifas", () => {
     expect(read("app/sw.ts")).toContain("/^\\/rifas?(\\/|$)/");

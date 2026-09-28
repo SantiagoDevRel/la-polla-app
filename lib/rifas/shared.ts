@@ -141,7 +141,8 @@ export function rifaNumber(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-export const RIFA_SLUG_RE = /^[a-z0-9]{8}$/;
+/** Enlace de la rifa: legible desde el nombre (iphone-6, iphone-6-2) o el código de 8 de las primeras. */
+export const RIFA_SLUG_RE = /^(?=[a-z0-9-]{3,40}$)[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Sugerencias para «¿Con qué se juega?»; el campo es texto libre. */
 export const LOTTERY_SUGGESTIONS = [

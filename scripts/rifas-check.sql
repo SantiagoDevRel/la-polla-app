@@ -96,7 +96,7 @@ CREATE TEMP TABLE r AS SELECT (public.rifa_create_v1('77777777-7777-4777-8777-00
 GRANT SELECT ON r TO authenticated;
 DO $$ BEGIN
   ASSERT (SELECT visibility FROM public.rifas WHERE id = (SELECT id FROM r)) = 'privada', 'A3 Privada por defecto';
-  ASSERT (SELECT slug FROM public.rifas WHERE id = (SELECT id FROM r)) ~ '^[a-z0-9]{8}$', 'A3 slug';
+  ASSERT (SELECT slug FROM public.rifas WHERE id = (SELECT id FROM r)) = 'boleta-sur-clasico', 'A3 enlace legible desde el nombre (sin tildes)';
 END $$;
 
 -- A4 · un cliente con la anon key o con sesión NO ejecuta las RPC (la API es el único camino).
@@ -468,6 +468,20 @@ SELECT pg_temp.expect_fail($$SELECT public.rifa_reserve_v1((SELECT id FROM rn),'
 SELECT pg_temp.expect_fail($$SELECT public.rifa_add_manager_v1('77777777-7777-4777-8777-0000000000b2',(SELECT id FROM rn),'+573190000006')$$,
   'OWNER_ONLY', 'N3 el coadministrador no suma a otros');
 SELECT public.rifa_offline_sale_v1('77777777-7777-4777-8777-0000000000b2', (SELECT id FROM rn), 9, 'Venta del coadmin', '+573190000096', false);
+SELECT pg_temp.expect_fail($$SELECT public.rifa_offline_sale_v1('77777777-7777-4777-8777-0000000000b2',(SELECT id FROM rn),10,'Yo mismo','+573190000005',true)$$,
+  'TEAM_CANNOT_BUY', 'N3 el coadministrador no se vende por fuera a su celular');
+SELECT pg_temp.expect_fail($$SELECT public.rifa_offline_sale_v1('77777777-7777-4777-8777-0000000000b2',(SELECT id FROM rn),10,'La creadora','+573190000002',true)$$,
+  'TEAM_CANNOT_BUY', 'N3 ni al celular de la creadora');
+-- N3b · publicar depende del permiso de la CREADORA (revocado en A6), no de quien opera.
+SELECT pg_temp.expect_fail($$SELECT public.rifa_set_visibility_v1('77777777-7777-4777-8777-0000000000b2',(SELECT id FROM rn),'publica')$$,
+  'CREATOR_REQUIRED', 'N3b un coadministrador no publica la rifa de una creadora sin permiso');
+-- N5 · enlaces legibles y únicos.
+DO $$ BEGIN
+  ASSERT public.rifa_slug_from_name('Boleta Sur clásico') = 'boleta-sur-clasico-2', 'N5 repetido → -2';
+  ASSERT public.rifa_slug_from_name('¡¡ÑOÑO!! iPhone 15 Pro Max') = 'nono-iphone-15-pro-max', 'N5 sin tildes ni signos';
+  ASSERT public.rifa_slug_from_name('!!') = 'rifa', 'N5 sin letras';
+  ASSERT char_length(public.rifa_slug_from_name(repeat('camiseta ', 20))) <= 40, 'N5 largo';
+END $$;
 SELECT public.rifa_remove_manager_v1('77777777-7777-4777-8777-0000000000c1', (SELECT id FROM rn), '77777777-7777-4777-8777-0000000000b2');
 SELECT pg_temp.expect_fail($$SELECT public.rifa_creator_view_v1('77777777-7777-4777-8777-0000000000b2',(SELECT slug FROM rn))$$,
   'CREATOR_ONLY', 'N4 al quitarlo pierde el panel');

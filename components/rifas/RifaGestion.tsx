@@ -8,7 +8,7 @@
 // ven en este panel (el tablero público y la imagen de historia no los tienen).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Download, Eye, Image as ImageIcon, MessageCircle, Share2, Trophy } from "lucide-react";
+import { Eye, Image as ImageIcon, MessageCircle, Share2, Trophy } from "lucide-react";
 import PhoneInput from "@/components/ui/PhoneInput";
 import { useToast } from "@/components/ui/Toast";
 import { ColombiaDateTimeField } from "@/components/casa/ColombiaDateTimeField";
@@ -19,7 +19,7 @@ import { formatCop } from "@/lib/casa/format";
 import { formatColombiaDateTime, toColombiaDateTimeInput } from "@/lib/time/colombia";
 import { ImagePreparationError, PRIZE_IMAGE_PREPARE_OPTIONS, prepareImageUpload } from "@/lib/casa/prepare-proof";
 import {
-  displayPhone, drawLabel, PAYMENT_METHOD_LABEL, rifaNumber, rifaShareText, STORY_CLUBS, STORY_TEMPLATE_OPTIONS, whatsappChatUrl, whatsappShareUrl,
+  displayPhone, drawLabel, PAYMENT_METHOD_LABEL, rifaNumber, rifaShareText, STORY_CLUBS, STORY_TEMPLATE_OPTIONS, whatsappChatUrl,
   type RifaCreatorTicket, type RifaCreatorView, type RifaTeam, type StoryTemplate,
 } from "@/lib/rifas/shared";
 
@@ -323,15 +323,18 @@ function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: strin
   const { showToast } = useToast();
   const text = rifaShareText(rifa, shareUrl, formatCop(rifa.price_cop));
   const option = STORY_TEMPLATE_OPTIONS.find((t) => t.key === template) ?? STORY_TEMPLATE_OPTIONS[0];
-  // La imagen cambia cuando cambian los números tomados: la versión evita una copia vieja.
-  const version = rifa.tickets.map((t) => `${t.number}${t.state[0]}`).join(".") + rifa.status;
+  // La imagen cambia con los números tomados, el sorteo (volver a jugar cambia fecha y
+  // lotería) y el resultado: la versión evita compartir una copia vieja.
+  const version = [rifa.tickets.map((t) => `${t.number}${t.state[0]}`).join("."), rifa.status, rifa.draw_at,
+    rifa.lottery_name, rifa.winning_number ?? "", rifa.name].join("|");
   const storyHref = `/api/rifas/${rifa.slug}/historia?plantilla=${template}${option.usesClub ? `&club=${club}` : ""}&v=${encodeURIComponent(version)}`;
 
   useEffect(() => {
     let alive = true;
+    const ctrl = new AbortController();
     setState("loading");
     setFile(null);
-    fetch(storyHref, { cache: "no-store" })
+    fetch(storyHref, { cache: "no-store", signal: ctrl.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
         const blob = await res.blob();
@@ -340,7 +343,7 @@ function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: strin
         setState("ready");
       })
       .catch(() => { if (alive) setState("error"); });
-    return () => { alive = false; };
+    return () => { alive = false; ctrl.abort(); };
   }, [storyHref, rifa.slug, attempt]);
 
   useEffect(() => {
@@ -367,9 +370,6 @@ function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: strin
   return (
     <StreetCard className="space-y-3 p-4">
       <h2 className="lp-display-sm text-[22px]">Compartir</h2>
-      <a href={whatsappShareUrl(text)} target="_blank" rel="noopener noreferrer" className="lp-btn lp-btn-ghost w-full">
-        <MessageCircle aria-hidden="true" className="h-5 w-5" /> Enviar enlace por WhatsApp
-      </a>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span id="copiar-enlace-rifa" className="min-w-0 text-[13px] text-text-secondary [overflow-wrap:anywhere]">{shareUrl}</span>
         <CopiarDato valor={shareUrl} etiqueta="enlace-rifa" nombre="enlace de la rifa" />
@@ -409,7 +409,7 @@ function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: strin
         </label>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" disabled={state !== "ready"} onClick={() => void share(false)} className="lp-btn lp-btn-ghost">
-            <Download aria-hidden="true" className="h-5 w-5" /> Guardar en fotos
+            <ImageIcon aria-hidden="true" className="h-5 w-5" /> Guardar en fotos
           </button>
           <button type="button" disabled={state !== "ready"} onClick={() => void share(true)} className="lp-btn lp-btn-primary">
             <Share2 aria-hidden="true" className="h-5 w-5" /> Compartir

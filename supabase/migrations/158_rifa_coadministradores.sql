@@ -9,6 +9,14 @@
 --   * El coadministrador tiene los mismos permisos de operación que el creador
 --     (rifa_require_owner), ve la rifa aunque sea Privada y no puede comprar.
 --   * Se suma a «Mis rifas» del coadministrador.
+--   * Publicar (Privada → Pública) exige que el CREADOR siga habilitado,
+--     opere quien opere (auditoría codex, 29-sep).
+--   * Nadie del equipo tiene números: ni por la app ni por venta por fuera a
+--     su celular.
+--
+-- Enlaces legibles (pedido del dueño): /rifa/iphone-6 en vez de /rifa/mwrikpci.
+-- Se arma del nombre, sin tildes, y si ya existe se le agrega -2, -3…
+-- Los enlaces de 8 caracteres ya creados siguen funcionando.
 --
 -- Las funciones de la 157 se redefinen completas (rifa_require_owner,
 -- rifa_can_view) o con reemplazo puntual fail-closed (reserva, vista pública,
@@ -62,6 +70,28 @@ BEGIN
     SELECT 1 FROM public.rifa_tickets t WHERE t.rifa_id = p_rifa.id AND t.buyer_id = p_viewer AND t.state <> 'liberado');
 END $$;
 
+-- ─── Enlaces legibles ────────────────────────────────────────────────────────
+ALTER TABLE public.rifas DROP CONSTRAINT IF EXISTS rifas_slug_check;
+ALTER TABLE public.rifas ADD CONSTRAINT rifas_slug_check
+  CHECK (char_length(slug) BETWEEN 3 AND 40 AND slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$');
+
+CREATE OR REPLACE FUNCTION public.rifa_slug_from_name(p_name text)
+RETURNS text LANGUAGE plpgsql VOLATILE SET search_path = public, pg_temp AS $$
+DECLARE v_base text; v_slug text; n int := 1;
+BEGIN
+  v_base := lower(translate(coalesce(p_name, ''), 'ÁÀÄÂÉÈËÊÍÌÏÎÓÒÖÔÚÙÜÛÑáàäâéèëêíìïîóòöôúùüûñ',
+                                                  'AAAAEEEEIIIIOOOOUUUUNaaaaeeeeiiiioooouuuun'));
+  v_base := btrim(regexp_replace(v_base, '[^a-z0-9]+', '-', 'g'), '-');
+  v_base := btrim(left(v_base, 34), '-');
+  IF char_length(v_base) < 3 THEN v_base := 'rifa'; END IF;
+  v_slug := v_base;
+  WHILE EXISTS (SELECT 1 FROM public.rifas WHERE slug = v_slug) LOOP
+    n := n + 1;
+    v_slug := v_base || '-' || n;
+  END LOOP;
+  RETURN v_slug;
+END $$;
+
 -- Reemplazos puntuales (fail-closed) sobre el texto vivo de la 157.
 DO $$
 DECLARE
@@ -75,7 +105,20 @@ DECLARE
      'v_is_creator := p_viewer IS NOT NULL AND public.rifa_is_manager(r.id, p_viewer);'],
     ['public.rifa_my_list_v1(uuid)',
      'FROM public.rifas r WHERE r.creator_id = p_user), ''[]''::jsonb),',
-     'FROM public.rifas r WHERE public.rifa_is_manager(r.id, p_user)), ''[]''::jsonb),']
+     'FROM public.rifas r WHERE public.rifa_is_manager(r.id, p_user)), ''[]''::jsonb),'],
+    ['public.rifa_set_visibility_v1(uuid,uuid,text)',
+     'AND NOT public.rifa_is_creator(p_actor) THEN',
+     'AND NOT public.rifa_is_creator(r.creator_id) THEN'],
+    ['public.rifa_offline_sale_v1(uuid,uuid,integer,text,text,boolean)',
+     'PERFORM public.rifa_fail(''INVALID_PHONE'', NULL, ''22023''); END IF;',
+     'PERFORM public.rifa_fail(''INVALID_PHONE'', NULL, ''22023''); END IF;
+  IF p_phone = public.rifa_user_phone(r.creator_id) OR EXISTS (SELECT 1 FROM public.rifa_managers m
+       WHERE m.rifa_id = p_rifa AND public.rifa_user_phone(m.user_id) = p_phone) THEN
+    PERFORM public.rifa_fail(''TEAM_CANNOT_BUY'');
+  END IF;'],
+    ['public.rifa_create_v1(uuid,text,text,bigint,text,integer,integer,text,text,timestamp with time zone,text,text,text,text)',
+     'v_slug := public.rifa_new_slug();',
+     'v_slug := public.rifa_slug_from_name(p_name);']
   ];
   i int;
 BEGIN
@@ -118,7 +161,8 @@ BEGIN
   IF v_user = r.creator_id THEN PERFORM public.rifa_fail('ALREADY_MANAGER'); END IF;
   IF (SELECT count(*) FROM public.rifa_managers WHERE rifa_id = p_rifa) >= 5 THEN PERFORM public.rifa_fail('MAX_MANAGERS'); END IF;
   -- Un coadministrador no puede tener números a su nombre en la misma rifa.
-  IF EXISTS (SELECT 1 FROM public.rifa_tickets t WHERE t.rifa_id = p_rifa AND t.buyer_id = v_user AND t.state <> 'liberado') THEN
+  IF EXISTS (SELECT 1 FROM public.rifa_tickets t WHERE t.rifa_id = p_rifa AND t.state <> 'liberado'
+               AND (t.buyer_id = v_user OR t.buyer_phone = p_phone)) THEN
     PERFORM public.rifa_fail('MANAGER_HAS_NUMBERS');
   END IF;
   INSERT INTO public.rifa_managers (rifa_id, user_id, added_by) VALUES (p_rifa, v_user, p_actor)

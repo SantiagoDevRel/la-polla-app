@@ -53,6 +53,7 @@ const MESSAGES: Record<string, string> = {
   RATE_LIMITED: "Enviaste muchos reportes hoy. Intenta mañana.",
   INVALID_PATH: "No se pudo guardar la foto.",
   DRAW_LOCKED: "Después del sorteo solo puedes aprobar pagos. Si hay un problema, usa «Reportar rifa».",
+  TEAM_CANNOT_BUY: "Ese celular es de alguien que administra la rifa. El equipo no compra números.",
   OWNER_ONLY: "Solo quien creó la rifa puede cambiar su equipo.",
   ALREADY_MANAGER: "Esa persona ya administra esta rifa.",
   MAX_MANAGERS: "La rifa ya tiene 5 coadministradores.",
