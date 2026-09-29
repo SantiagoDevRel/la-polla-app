@@ -70,6 +70,9 @@ export interface Treatment {
   prizeFirst?: boolean; backdrop?: ReactNode; ornament?: ReactNode;
 }
 
+/** X de número tomado: rojo de alerta de la marca (#FF3D57), un poco más profundo para leerse sobre casillas claras. */
+const TAKEN_X = "#E5243B";
+
 export function StoryBoard({ r, theme }: { r: StoryProps["r"]; theme: Treatment }) {
   const layout = boardLayout(r.number_count, BOARD_W, BOARD_H);
   const taken = new Set(r.taken);
@@ -84,19 +87,19 @@ export function StoryBoard({ r, theme }: { r: StoryProps["r"]; theme: Treatment 
           const n = start + col;
           const occupied = taken.has(n);
           const winner = r.status === "resuelta" && r.winning_number === n;
-          const small = Math.max(26, Math.floor(layout.fontSize * 0.67));
-          const rounding = Math.min(theme.radius ?? 12, layout.cellSize / 2);
+          // Tomado: el número se sigue leyendo y encima va una X roja trazada a mano
+          // (pedido del dueño: «se ve más aesthetic» que el chulo verde).
           return <div key={n} data-number={n} data-taken={occupied} data-winner={winner} style={{ display: "flex",
             alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0,
             width: layout.cellSize, height: layout.cellSize, borderRadius: theme.radius ?? 12,
-            background: occupied ? "#E4F5EB" : (theme.cell ?? PAPER),
-            border: winner ? `5px solid ${GOLD}` : `2px solid ${occupied ? "#127743" : (theme.cellBorder ?? "#CFD5DE")}` }}>
-            <span style={{ ...display, fontSize: occupied ? small : layout.fontSize,
-              color: occupied ? "#105C35" : (theme.cellInk ?? INK), letterSpacing: 1,
-              ...(occupied ? { position: "absolute", top: Math.max(3, rounding * 0.22), left: Math.max(7, rounding * 0.48) } as const : {}) }}>{rifaNumber(n)}</span>
-            {occupied && <svg width={layout.cellSize * 0.48} height={layout.cellSize * 0.48} viewBox="0 0 24 24"
-              style={{ position: "absolute", right: 4, bottom: 3 }}>
-              <path d="M4 12.5l5 5L20 6.5" fill="none" stroke="#127743" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+            background: theme.cell ?? PAPER,
+            border: winner ? `5px solid ${GOLD}` : `2px solid ${theme.cellBorder ?? "#CFD5DE"}` }}>
+            <span style={{ ...display, fontSize: layout.fontSize, color: theme.cellInk ?? INK, letterSpacing: 1,
+              opacity: occupied && !winner ? 0.55 : 1 }}>{rifaNumber(n)}</span>
+            {occupied && !winner && <svg width={layout.cellSize * 0.78} height={layout.cellSize * 0.78} viewBox="0 0 24 24"
+              style={{ position: "absolute", left: layout.cellSize * 0.11, top: layout.cellSize * 0.11 }}>
+              <path d="M5 4.6 L19.2 19.4 M19.4 4.4 L4.8 19.2" fill="none" stroke={TAKEN_X} strokeWidth="2.6"
+                strokeLinecap="round" strokeLinejoin="round" />
             </svg>}
           </div>;
         })}
@@ -150,7 +153,7 @@ export function StoryFrame(props: StoryProps, theme: Treatment) {
       alignItems: "center", justifyContent: "center" }}>
       {r.status === "resuelta" && r.winning_number !== null
         ? <span style={{ ...display, fontSize: 46, color: PAPER, background: INK, padding: "0 24px", borderRadius: 12 }}>GANADOR {rifaNumber(r.winning_number)}</span>
-        : <span style={{ fontSize: 24, color: muted }}>Los números con chulo ya están tomados</span>}
+        : <span style={{ fontSize: 24, color: muted }}>Los números con X ya están tomados</span>}
     </div>
     <div style={{ display: "flex", position: "absolute", top: 1602, left: 60, width: 960, height: 164,
       background: theme.panel ?? "#131B2B", borderRadius: 18, padding: "16px 20px", gap: 24, ...theme.footerStyle }}>

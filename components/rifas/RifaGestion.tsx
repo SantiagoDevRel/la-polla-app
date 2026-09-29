@@ -392,11 +392,21 @@ function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: strin
       <Link href={`/rifa/${rifa.slug}`} className="inline-flex min-h-11 items-center text-[13px] font-semibold text-text-secondary underline-offset-4 hover:text-text-primary hover:underline">Ver como comprador</Link>
       <div className="space-y-3 border-t border-border-subtle pt-3">
         <p className="text-[15px] font-semibold">Imagen para historia</p>
-        <div>
-          <label htmlFor="plantilla-historia" className="block text-[13px] text-text-secondary">Diseño</label>
-          <select id="plantilla-historia" value={template} onChange={(e) => setTemplate(e.target.value as StoryTemplate)} className="lp-input mt-1 w-full">
-            {STORY_TEMPLATE_OPTIONS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-          </select>
+        {/* Miniaturas estáticas (public/plantillas-rifa, scripts/bake-rifa-story-thumbnails.tsx):
+            se ven todas al instante; la imagen real con los números de esta rifa se arma abajo. */}
+        <div role="radiogroup" aria-label="Diseño" className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          {STORY_TEMPLATE_OPTIONS.map((t) => {
+            const selected = template === t.key;
+            return (
+              <button key={t.key} type="button" role="radio" aria-checked={selected} onClick={() => setTemplate(t.key)}
+                className={`flex min-w-0 flex-col items-center gap-1 rounded-lg border p-1.5 transition-colors ${selected ? "border-text-primary bg-bg-elevated" : "border-border-subtle hover:border-gold/30"}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- miniatura estática en su tamaño real */}
+                <img src={`/plantillas-rifa/${t.key}.webp`} alt="" width={216} height={384} loading="lazy" decoding="async"
+                  className="aspect-[9/16] h-auto w-full rounded" />
+                <span className={`w-full text-center text-[13px] leading-tight [overflow-wrap:anywhere] ${selected ? "font-semibold text-text-primary" : "text-text-secondary"}`}>{t.label}</span>
+              </button>
+            );
+          })}
         </div>
         {option.usesClub && (
           <div>
