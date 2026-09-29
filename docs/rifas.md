@@ -192,7 +192,7 @@ aparece Aprobar (`DRAW_LOCKED`).
 
 `GET /api/rifas/<slug>/historia?plantilla=<diseño>&club=<clave>`: PNG
 1080×1920, solo el creador. Nombre, premio, tablero con los tomados marcados
-(chulo sobre verde), fecha y hora en Colombia, lotería, valor y el enlace. Doce
+(X roja sobre el número, 29-sep), fecha y hora en Colombia, lotería, valor y el enlace. Doce
 plantillas en `lib/rifas/story-templates`: `neutra`, `club`, `estadio`, `boleta`,
 `marcador`, `cuaderno`, `camiseta`, `pizarra`, `retro`, `premium`, `neon`, `confeti`.
 `neutra` es el respaldo de una clave desconocida. `club` y `camiseta` usan colores
@@ -203,6 +203,10 @@ El tablero adapta filas/casillas para 2–100 números; todas las variantes comp
 48 muestras con datos ficticios en `tmp/story-templates/`, sin DB ni red.
 Fuentes Bebas Neue y Outfit 600 en `assets/fonts` (OFL, licencias incluidas).
 Escudos a elección del creador y QR quedan como siguiente paso.
+
+**Selector con miniaturas (29-sep):** cada diseño se ve como una miniatura
+estática de 216×384 en `public/plantillas-rifa/<clave>.webp` (~12 KB, sin render en
+el servidor). Tras cambiar una plantilla: `npx tsx scripts/bake-rifa-story-thumbnails.tsx`.
 
 **Guardar y compartir (28-sep):** el panel prepara el PNG apenas se elige el
 diseño y lo entrega con la Web Share API con archivo. «Guardar en fotos»

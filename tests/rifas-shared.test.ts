@@ -11,6 +11,7 @@ import {
 import { parseRifaLinkCookie, RIFA_PAGE_RE, rifaLinkCookieValue } from "@/lib/rifas/link-cookie";
 import { rifaErrorMessage, rifaErrorStatus } from "@/lib/rifas/errors";
 import { RifaBoard } from "@/components/rifas/RifaBoard";
+import { STORY_TEMPLATE_CATALOG } from "@/lib/rifas/story-templates/catalog";
 
 const root = process.cwd();
 const read = (p: string) => readFileSync(join(root, p), "utf8");
@@ -118,6 +119,15 @@ describe("contrato estructural", () => {
     expect(migration).toMatch(/REVOKE ALL ON public\.rifa_settings[\s\S]*FROM PUBLIC, anon, authenticated;/);
     expect(migration).not.toMatch(/GRANT SELECT ON public\.rifas TO authenticated/);
     expect(migration).toMatch(/ARRAY\['rifa_settings','rifa_creators','rifas',/);
+  });
+  it("en la imagen, los números tomados llevan una X roja (no el chulo)", () => {
+    const common = readFileSync(join(process.cwd(), "lib/rifas/story-templates/common.tsx"), "utf8");
+    expect(common).toContain('const TAKEN_X = "#E5243B";');
+    expect(common).toContain("Los números con X ya están tomados");
+    expect(common).not.toContain("M4 12.5l5 5L20 6.5");
+  });
+  it("cada plantilla tiene su miniatura estática", () => {
+    for (const t of STORY_TEMPLATE_CATALOG) expect(existsSync(join(process.cwd(), `public/plantillas-rifa/${t.key}.webp`))).toBe(true);
   });
   it("después del sorteo el creador solo puede aprobar", () => {
     for (const fn of ["rifa_unpay_proof_v1", "rifa_mark_offline_paid_v1", "rifa_release_ticket_v1"]) {
