@@ -1313,8 +1313,7 @@ Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
 - **Rifas de creadores (2026-09-29).** En prod (157–158, PRs #163–#166). Falta
-  que el dueño decida: (1) revisión legal (Coljuegos) antes de abrir rifas
-  Públicas; (2) confirmar valores por defecto: listado solo por enlace,
+  que el dueño confirme los valores por defecto: listado solo por enlace,
   reserva de 30 min, gratis para el creador, 3 rifas activas por creador.
   Detalle en docs/rifas.md.
 
