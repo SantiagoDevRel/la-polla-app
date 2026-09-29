@@ -394,20 +394,24 @@ function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: strin
         <p className="text-[15px] font-semibold">Imagen para historia</p>
         {/* Miniaturas estáticas (public/plantillas-rifa, scripts/bake-rifa-story-thumbnails.tsx):
             se ven todas al instante; la imagen real con los números de esta rifa se arma abajo. */}
-        <div role="radiogroup" aria-label="Diseño" className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        {/* Radios nativos: flechas, un solo Tab y foco en el elegido, sin código propio. */}
+        <fieldset className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          <legend className="sr-only">Diseño</legend>
           {STORY_TEMPLATE_OPTIONS.map((t) => {
             const selected = template === t.key;
             return (
-              <button key={t.key} type="button" role="radio" aria-checked={selected} onClick={() => setTemplate(t.key)}
-                className={`flex min-w-0 flex-col items-center gap-1 rounded-lg border p-1.5 transition-colors ${selected ? "border-text-primary bg-bg-elevated" : "border-border-subtle hover:border-gold/30"}`}>
+              <label key={t.key}
+                className={`flex min-w-0 cursor-pointer flex-col items-center gap-1 rounded-lg border p-1.5 transition-colors focus-within:ring-2 focus-within:ring-gold/60 ${selected ? "border-text-primary bg-bg-elevated" : "border-border-subtle hover:border-gold/30"}`}>
+                <input type="radio" name="plantilla-historia" value={t.key} checked={selected}
+                  onChange={() => setTemplate(t.key)} className="sr-only" />
                 {/* eslint-disable-next-line @next/next/no-img-element -- miniatura estática en su tamaño real */}
                 <img src={`/plantillas-rifa/${t.key}.webp`} alt="" width={216} height={384} loading="lazy" decoding="async"
                   className="aspect-[9/16] h-auto w-full rounded" />
                 <span className={`w-full text-center text-[13px] leading-tight [overflow-wrap:anywhere] ${selected ? "font-semibold text-text-primary" : "text-text-secondary"}`}>{t.label}</span>
-              </button>
+              </label>
             );
           })}
-        </div>
+        </fieldset>
         {option.usesClub && (
           <div>
             <label htmlFor="club-historia" className="block text-[13px] text-text-secondary">Club</label>
