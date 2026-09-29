@@ -76,7 +76,7 @@
       "browserslist": "4.28.9"
     },
     "brace-expansion": "1.1.18",
-    "fast-uri": "3.1.6",
+    "fast-uri": "^3.1.8",
     "postcss-selector-parser": "6.1.4",
     "posthog-js": {
       "fflate": "0.4.9"
