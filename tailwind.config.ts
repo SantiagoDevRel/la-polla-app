@@ -38,6 +38,7 @@ const config: Config = {
         amber: "rgb(var(--amber-rgb) / <alpha-value>)",
         "amber-dim": "var(--amber-dim)",
         turf: "rgb(var(--turf-rgb) / <alpha-value>)",
+        whatsapp: "rgb(var(--whatsapp-rgb) / <alpha-value>)",
         "turf-dim": "var(--turf-dim)",
         "red-alert": "rgb(var(--red-alert-rgb) / <alpha-value>)",
 

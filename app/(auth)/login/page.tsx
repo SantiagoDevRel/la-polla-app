@@ -1,8 +1,6 @@
 // app/(auth)/login/page.tsx — Server wrapper del login.
-// Decide en el servidor si el canal de Telegram está completo (token, secreto
-// del webhook y usuario del bot) y solo entonces le pasa el usuario del bot al
-// cliente, que lo usa para mostrar «Entrar con Telegram». Ningún secreto cruza
-// al navegador; el deep link con el nonce lo arma /api/auth/telegram/request.
+// Ofrece SMS, contraseña opcional y WhatsApp según configuración del servidor.
+// Telegram permanece oculto por decisión del dueño; su backend se conserva.
 // Toda la UI vive en LoginClient.tsx. NEXT_PUBLIC_* queda incrustado en el
 // build: activar o cambiar el bot exige redeploy.
 //
@@ -11,21 +9,23 @@
 // Con SMS_CAPTCHA_ENFORCED=true start-otp verifica el token con
 // CLOUDFLARE_TURNSTILE_SECRET_KEY y el cliente ya no envía sin token.
 // README → «Captcha de Auth (Turnstile)».
-import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { isSmsCaptchaEnforced } from "@/lib/auth/captcha";
 import { phoneOtpChannel } from "@/lib/auth/phone-otp-channel";
+import { phonePasswordEnabled } from "@/lib/auth/password-config";
+import { getWhatsAppLoginHref } from "@/lib/auth/whatsapp-login";
 import LoginClient from "./LoginClient";
 
 // The label and start-otp must read the same server-side rollout setting.
 export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
-  const telegram = getTelegramLoginConfig();
   const turnstileSiteKey = (process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "").trim() || null;
   return (
     <LoginClient
+      passwordLoginEnabled={phonePasswordEnabled()}
+      whatsappLoginHref={getWhatsAppLoginHref()}
       deliveryChannel={phoneOtpChannel()}
-      telegramBotUsername={telegram?.botUsername ?? null}
+      telegramBotUsername={null}
       turnstileSiteKey={turnstileSiteKey}
       smsCaptchaRequired={Boolean(turnstileSiteKey) && isSmsCaptchaEnforced()}
     />

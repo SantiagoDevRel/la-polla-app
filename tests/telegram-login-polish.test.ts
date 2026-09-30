@@ -661,35 +661,26 @@ describe("overlays skip the single-use link page", () => {
   });
 });
 
-// ── 6. SMS primario, Telegram secundario ────────────────────────────────
-describe("/login keeps SMS first and Telegram second", () => {
+// ── 6. WhatsApp primero, SMS alternativo y Telegram oculto ──────────────
+describe("/login offers WhatsApp first and hides Telegram", () => {
   const source = readSource("app/(auth)/login/LoginClient.tsx");
 
-  it("phone step: gold SMS submit first, Telegram as a secondary button below", () => {
+  it("phone step keeps SMS available after the WhatsApp option", () => {
     const input = source.slice(source.indexOf('{step === "input" && ('), source.indexOf('{step === "otp" && ('));
-    const sms = input.indexOf('{t("btnSms")}');
-    const telegram = input.indexOf('onClick={() => void startTelegram("input")}');
+    const sms = input.indexOf('channelText("btnSms",');
     expect(sms).toBeGreaterThan(0);
-    expect(telegram).toBeGreaterThan(sms);
-    expect(input.slice(input.lastIndexOf("<button", sms), sms)).toMatch(/type="submit"[\s\S]*bg-gold/);
-    expect(input.slice(telegram, telegram + 120)).toContain("className={SECONDARY_BTN}");
+    expect(input.indexOf("<WhatsAppLoginButton")).toBeLessThan(input.indexOf("<form"));
+    expect(input.slice(input.lastIndexOf("<button", sms), sms)).toMatch(/type="submit"[\s\S]*SECONDARY_BTN/);
   });
 
-  it("code step: «¿No te llegó el SMS?» and the Telegram button after the verify form", async () => {
-    const otp = source.slice(source.indexOf('{step === "otp" && ('), source.indexOf('{step === "telegram" && ('));
-    const verify = otp.indexOf('t("otpVerify")');
-    const didnt = otp.indexOf('{t("tgDidntArrive")}');
-    const telegram = otp.indexOf('onClick={() => void startTelegram("otp")}');
-    expect(verify).toBeGreaterThan(0);
-    expect(didnt).toBeGreaterThan(verify);
-    expect(telegram).toBeGreaterThan(didnt);
-    expect(otp.slice(telegram, telegram + 120)).toContain("className={SECONDARY_BTN}");
-
-    const es = (await import("@/messages/es.json")).default.Login;
-    const en = (await import("@/messages/en.json")).default.Login;
-    expect(es.tgDidntArrive).toBe("¿No te llegó el SMS?");
-    expect(es.tgUseTelegram).toBe("Entrar con Telegram");
-    expect(en.tgDidntArrive).toBe("Didn't get the text message?");
-    expect(en.tgUseTelegram).toBe("Sign in with Telegram");
+  it("server disables Telegram in both steps even with configured credentials", async () => {
+    vi.stubEnv("TELEGRAM_LOGIN_BOT_TOKEN", BOT_TOKEN);
+    vi.stubEnv("TELEGRAM_LOGIN_WEBHOOK_SECRET", "x".repeat(40));
+    vi.stubEnv("NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME", "LaPollaLoginBot");
+    vi.stubGlobal("React", await import("react"));
+    try {
+      const LoginPage = (await import("@/app/(auth)/login/page")).default;
+      expect(LoginPage().props.telegramBotUsername).toBeNull();
+    } finally { vi.unstubAllGlobals(); }
   });
 });

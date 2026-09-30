@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { setMarketingPreference } from "@/lib/whatsapp/marketing-preferences";
 import { confirmPreference, parsePreferenceEvent, verifyZernioSignature } from "@/lib/whatsapp/zernio-preferences";
+import { replyWithWhatsAppLogin } from "@/lib/auth/whatsapp-login";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,10 @@ export async function POST(request: NextRequest) {
   if (payload.event === "webhook.test") return NextResponse.json({ ok: true });
   try {
     const event = parsePreferenceEvent(payload, process.env.ZERNIO_WHATSAPP_ACCOUNT_ID);
-    if (!event) return NextResponse.json({ ok: true, ignored: true });
+    if (!event) {
+      const login = await replyWithWhatsAppLogin(payload);
+      return NextResponse.json({ ok: true, ignored: login === "ignored", limited: login === "limited" });
+    }
     const db = createAdminClient();
     const state = await setMarketingPreference(db, { ...event, source: "whatsapp" });
     // Late delivery still saves BAJA, but must not send outside the service window.
