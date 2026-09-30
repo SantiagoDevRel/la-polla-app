@@ -22,6 +22,8 @@ Después del perfil se ofrece crear contraseña opcional de seis dígitos; login
 permite usarla y recuperarla por SMS. Scrypt+pepper privado, RLS deny-all y
 reservas atómicas por celular/IP; nunca password público de GoTrue. Migración160,
 `PHONE_PASSWORD_ENABLED`, `AUTH_PIN_PEPPER`; ver `docs/phone-password.md`.
+Perfil ofrece crear/cambiar mediante `/set-password?returnTo=%2Fperfil`, con
+sesión vigente de cualquier canal y regreso a Perfil; reutiliza el mismo guardado.
 
 ### Rifas de creadores habilitados (2026-09-28, migraciones 157–158, EN PROD)
 

@@ -20,6 +20,7 @@ import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 import FontScalePicker from "@/components/perfil/FontScalePicker";
 import WhatsAppPreference from "@/components/perfil/WhatsAppPreference";
+import PasswordAccess from "@/components/perfil/PasswordAccess";
 import PayoutDefaultEditor, { type PayoutMethod, type PayoutAccountType } from "@/components/perfil/PayoutDefaultEditor";
 import { formatPhone } from "@/lib/format-phone";
 
@@ -299,6 +300,8 @@ export default function PerfilPage() {
             cupos; si no tiene, el componente no dibuja nada. Fuera de iOS por el
             mismo criterio que las invitaciones. */}
         {!isIOSApp && <MisCortesias />}
+
+        <PasswordAccess />
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />

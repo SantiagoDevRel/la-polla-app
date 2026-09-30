@@ -1613,7 +1613,9 @@ sesión. Configuración, migración159 y pruebas:
 [docs/whatsapp-login-link.md](docs/whatsapp-login-link.md).
 
 El registro también ofrece una **contraseña opcional de seis dígitos**, con
-recuperación explícita por SMS. Configuración privada, límites y migración160:
+recuperación explícita por SMS. En **Perfil → Contraseña** puedes crearla por
+primera vez o cambiarla después de ingresar por WhatsApp, SMS o contraseña.
+Configuración privada, límites y migración160:
 [docs/phone-password.md](docs/phone-password.md).
 
 El bot se limita a enviar el código de seis dígitos generado por Supabase.

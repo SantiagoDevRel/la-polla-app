@@ -753,7 +753,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
               />
             </motion.div>
             <h1
-              className="font-display text-5xl leading-tight tracking-wide [overflow-wrap:anywhere]"
+              className="-mx-4 font-display text-5xl leading-tight tracking-wide [overflow-wrap:anywhere]"
               style={{
                 color: "var(--gold)",
 
@@ -761,9 +761,6 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
             >
               {t("brand")}
             </h1>
-            <p className="text-text-muted text-sm leading-normal">
-              {t("tagline")}
-            </p>
           </div>
 
           {preview && (
