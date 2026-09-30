@@ -6,6 +6,21 @@
 
 ## READ THIS FIRST
 
+### Enlace de WhatsApp y contraseña opcional (2026-09-30)
+
+El dueño eligió recuperar el acceso por enlace ante el bloqueo de la plantilla
+OTP de Meta y quitar Telegram de las opciones visibles del login.
+`/api/whatsapp/zernio` responde a mensajes entrantes firmados con
+un botón a `/login/whatsapp`; GET solo confirma y POST canjea el hash una vez.
+Número propio de Zernio, flag independiente `WHATSAPP_LOGIN_ENABLED`, migración159.
+ALTA/BAJA conservan prioridad. No reactivar outbound/bot antiguos ni OTP sin
+plantilla AUTHENTICATION aprobada. Ver `docs/whatsapp-login-link.md`.
+
+Después del perfil se ofrece crear contraseña opcional de seis dígitos; login
+permite usarla y recuperarla por SMS. Scrypt+pepper privado, RLS deny-all y
+reservas atómicas por celular/IP; nunca password público de GoTrue. Migración160,
+`PHONE_PASSWORD_ENABLED`, `AUTH_PIN_PEPPER`; ver `docs/phone-password.md`.
+
 ### Rifas de creadores habilitados (2026-09-28, migraciones 157–158, EN PROD)
 
 `RIFAS_ENABLED=true` solo en Production (Vercel); sin él no existe ninguna ruta,

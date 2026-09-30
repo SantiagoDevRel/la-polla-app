@@ -14,12 +14,13 @@ import flags from "react-phone-number-input/flags";
 import { useLocale, useTranslations } from "next-intl";
 
 interface PhoneInputProps {
+  inputId?: string;
   onChange: (value: string) => void;
   /** Si se pasa, el selector solo ofrece estos países (el primero es el inicial). */
   countries?: readonly CountryCode[];
 }
 
-export default function PhoneInput({ onChange, countries: allowed }: PhoneInputProps) {
+export default function PhoneInput({ onChange, countries: allowed, inputId }: PhoneInputProps) {
   const t = useTranslations("Phone");
   const locale = useLocale();
   const intlTag = locale === "en" ? "en-US" : "es-CO";
@@ -114,27 +115,30 @@ export default function PhoneInput({ onChange, countries: allowed }: PhoneInputP
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <div className="flex rounded-xl overflow-hidden border border-border-subtle focus-within:border-gold/50 transition-colors">
+      <div className="flex flex-wrap rounded-xl overflow-hidden border border-border-subtle focus-within:border-gold/50 transition-colors">
         {/* Botón de país */}
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-1.5 px-3 py-3 border-r border-border-subtle hover:bg-bg-card-hover transition-colors shrink-0 bg-bg-elevated"
+          aria-label={`${getCountryName(country)} +${callingCode}`}
+          aria-expanded={open}
+          className="flex flex-wrap items-center justify-center gap-1.5 px-3 py-3 border-r border-border-subtle hover:bg-bg-card-hover transition-colors min-w-0 max-w-full bg-bg-elevated"
         >
-          <Flag country={country} className="w-6 h-4 inline-block" />
-          <span className="text-sm font-medium text-text-primary">+{callingCode}</span>
-          <svg className={`w-3 h-3 text-text-muted transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <Flag country={country} className="w-6 h-4 inline-block max-w-none shrink-0" />
+          <span className="text-sm font-medium text-text-primary min-w-0 [overflow-wrap:anywhere]">+{callingCode}</span>
+          <svg className={`w-3 h-3 shrink-0 text-text-muted transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
 
         {/* Input de número */}
         <input
+          id={inputId}
           type="tel"
           value={localNumber}
           onChange={(e) => setLocalNumber(e.target.value.replace(/\D/g, ""))}
           placeholder={t("samplePlaceholder")}
-          className="flex-1 px-3 py-3 outline-none text-lg min-w-0 bg-bg-base text-text-primary placeholder:text-text-muted/50"
+          className="flex-[1_1_10ch] w-full px-3 py-3 outline-none text-lg min-w-0 bg-bg-base text-text-primary placeholder:text-text-muted/50"
           required
         />
       </div>
@@ -175,7 +179,7 @@ export default function PhoneInput({ onChange, countries: allowed }: PhoneInputP
                     }`}
                   >
                     <Flag country={c} className="w-6 h-4 inline-block shrink-0" />
-                    <span className={`text-sm truncate flex-1 ${isSelected ? "text-gold font-medium" : "text-text-primary"}`}>
+                    <span className={`text-sm min-w-0 [overflow-wrap:anywhere] flex-1 ${isSelected ? "text-gold font-medium" : "text-text-primary"}`}>
                       {getCountryName(c)}
                     </span>
                     <span className="text-sm text-text-muted shrink-0">+{code}</span>

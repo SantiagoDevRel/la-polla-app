@@ -1606,6 +1606,15 @@ servidor (`verifyCasaUpload`), el SQL 098 y el bucket no cambian.
 
 ## OTP por WhatsApp (preparado, apagado)
 
+Acceso por **enlace de WhatsApp**: la persona escribe Hola al número propio de
+Zernio y recibe un enlace personal de diez minutos; una confirmación abre la
+sesión. Configuración, migración159 y pruebas:
+[docs/whatsapp-login-link.md](docs/whatsapp-login-link.md).
+
+El registro también ofrece una **contraseña opcional de seis dígitos**, con
+recuperación explícita por SMS. Configuración privada, límites y migración160:
+[docs/phone-password.md](docs/phone-password.md).
+
 El bot se limita a enviar el código de seis dígitos generado por Supabase.
 Configuración, pruebas y bloqueo actual de Meta: [docs/whatsapp-otp.md](docs/whatsapp-otp.md).
 No activar hasta aprobar la plantilla AUTHENTICATION y verificar un login real.

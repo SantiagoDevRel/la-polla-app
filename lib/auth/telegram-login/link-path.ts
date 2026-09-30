@@ -12,5 +12,5 @@ export const LOGIN_LINK_PATH = "/login/telegram";
 
 export function isLoginLinkPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
-  return pathname === LOGIN_LINK_PATH || pathname.startsWith(`${LOGIN_LINK_PATH}/`);
+  return [LOGIN_LINK_PATH, "/login/whatsapp"].some(path => pathname === path || pathname.startsWith(`${path}/`));
 }

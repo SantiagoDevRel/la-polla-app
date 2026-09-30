@@ -9,7 +9,7 @@ export function verifyZernioSignature(raw: string, signature: string | null, sec
   return timingSafeEqual(Buffer.from(signature, "hex"), createHmac("sha256", secret).update(raw).digest());
 }
 
-const received = z.object({
+export const zernioIncomingMessage = z.object({
   id: z.string().min(1).max(200), event: z.literal("message.received"),
   account: z.object({ accountId: z.string().regex(/^[a-f0-9]{24}$/) }),
   conversation: z.object({ id: z.string().regex(/^[a-f0-9]{24}$/) }),
@@ -17,11 +17,12 @@ const received = z.object({
     platform: z.literal("whatsapp"), direction: z.literal("incoming"),
     text: z.string().nullable(), sentAt: z.iso.datetime({ offset: true }),
     sender: z.object({ phoneNumber: z.string().nullable().optional(), id: z.string(), businessScopedUserId: z.string().optional() }),
+    metadata: z.object({ standby: z.boolean().optional() }).optional(),
   }),
 });
 
 export function parsePreferenceEvent(payload: unknown, accountId: string | undefined) {
-  const parsed = received.safeParse(payload);
+  const parsed = zernioIncomingMessage.safeParse(payload);
   if (!parsed.success || !accountId || parsed.data.account.accountId !== accountId) return null;
   const { message } = parsed.data;
   if (!message.text || (!isOptOutText(message.text) && !isOptInText(message.text))) return null;

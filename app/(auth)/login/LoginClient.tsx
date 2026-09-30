@@ -4,7 +4,7 @@
 //   • Send OTP corre server-side (/api/auth/start-otp → signInWithOtp)
 //   • Verify OTP corre server-side (/api/auth/verify-otp) para que las cookies
 //     queden persistidas via Set-Cookie HttpOnly — fix del bug iOS Safari.
-// El SMS es la vía principal (input → otp). Sin contraseña.
+// El SMS es la vía principal (input → otp), con contraseña opcional de seis dígitos.
 //
 // Alternativa: Telegram v2 (2026-09-13, migración 119). Si page.tsx recibe el
 // bot de login configurado, el paso del teléfono y el del código ofrecen
@@ -29,9 +29,9 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, MessageSquare, Loader2, Send } from "lucide-react";
+import { ArrowLeft, MessageSquare, MessageCircle, KeyRound, Loader2, Send } from "lucide-react";
 import axios from "axios";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
 import {
   CAPTCHA_FAILED_CODE,
@@ -167,7 +167,10 @@ function writeTelegramPending(value: TelegramPending | null) {
   }
 }
 
-function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired, deliveryChannel = "sms" }: LoginClientProps) {
+function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired, deliveryChannel = "sms", passwordLoginEnabled = false, whatsappLoginHref = null }: LoginClientProps) {
+  const en = useLocale() === "en";
+  const [passwordMode, setPasswordMode] = useState(false);
+  const [password, setPassword] = useState("");
   const t = useTranslations("Login");
   const channelText = useTranslations("PhoneOtp");
   const channelLabel = deliveryChannel === "whatsapp" ? "WhatsApp" : "SMS";
@@ -306,7 +309,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
       typeof window !== "undefined"
         ? safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY))
         : null;
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !newUser) {
       window.sessionStorage.removeItem(RETURN_TO_KEY);
     }
     window.location.href = newUser ? "/onboarding" : rt || "/inicio";
@@ -411,6 +414,23 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
     } finally {
       setSending(false);
     }
+  }
+
+  async function handlePasswordLogin(e: React.FormEvent) {
+    e.preventDefault(); setError(null);
+    if (!/^\d{6}$/.test(password)) { setError(en ? "Enter your 6-digit password." : "Escribe tu contraseña de 6 dígitos."); return; }
+    setSending(true);
+    try {
+      const response = await fetch("/api/auth/login-password", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: buildPhone(), password, returnTo: safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY)) }), credentials: "include" });
+      const body = await response.json();
+      if (!response.ok) { setError(body.error || (en ? "Could not sign in. Try SMS." : "No pudimos iniciar sesión. Puedes entrar por SMS.")); return; }
+      setPassword("");
+      const destination = safeReturnTo(body.redirectTo) || "/inicio";
+      if (destination !== "/onboarding") window.sessionStorage.removeItem(RETURN_TO_KEY);
+      window.location.assign(destination);
+    } catch { setError(en ? "Could not sign in. Try SMS." : "No pudimos iniciar sesión. Puedes entrar por SMS."); }
+    finally { setSending(false); }
   }
 
   async function handleVerifyOtp(e: React.FormEvent) {
@@ -724,7 +744,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
               />
             </motion.div>
             <h1
-              className="font-display text-5xl tracking-wide"
+              className="font-display text-5xl tracking-wide [overflow-wrap:anywhere]"
               style={{
                 color: "var(--gold)",
 
@@ -760,7 +780,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
             </div>
           )}
 
-          <form onSubmit={handleSendOtp} className="space-y-4">
+          <form onSubmit={passwordMode ? handlePasswordLogin : handleSendOtp} className="space-y-4">
             <div>
               <label
                 htmlFor="phone"
@@ -768,8 +788,14 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
               >
                 {t("phoneLabel")}
               </label>
-              <PhoneInput onChange={setPhoneE164} countries={PAISES_SMS} />
+              <PhoneInput inputId="phone" onChange={setPhoneE164} countries={PAISES_SMS} />
             </div>
+
+            {passwordMode && <div className="space-y-1.5">
+              <label htmlFor="login-password" className="block text-sm font-medium text-text-secondary">{en ? "6-digit password" : "Contraseña de 6 dígitos"}</label>
+              <input id="login-password" type="password" inputMode="numeric" autoComplete="current-password" pattern="[0-9]{6}" maxLength={6} required
+                value={password} onChange={e => setPassword(e.target.value.replace(/\D/g, ""))} className="lp-input w-full text-base" />
+            </div>}
 
             {error && (
               <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
@@ -787,7 +813,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
             )}
 
             <div className="grid grid-cols-1 gap-3">
-              {turnstileSiteKey && (
+              {!passwordMode && turnstileSiteKey && (
                 <SmsCaptcha
                   ref={captcha}
                   siteKey={turnstileSiteKey}
@@ -797,8 +823,8 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
               )}
               <button
                 type="submit"
-                disabled={sending || cooldownRemaining > 0}
-                className="bg-gold text-bg-base font-bold py-3.5 px-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base leading-snug inline-flex items-center justify-center gap-2 text-center break-words min-h-[48px]"
+                disabled={sending || (!passwordMode && cooldownRemaining > 0)}
+                className="bg-gold text-bg-base font-bold py-3.5 px-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-base leading-snug inline-flex flex-wrap items-center justify-center gap-2 text-center break-words min-h-[48px]"
                 style={{ boxShadow: "0 0 20px rgba(255, 215, 0, 0.15)" }}
               >
                 {sending ? (
@@ -806,17 +832,33 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
                     <Loader2 className="w-5 h-5 shrink-0 animate-spin" />
                     {t("btnSending")}
                   </>
+                ) : passwordMode ? (
+                  <><KeyRound className="w-5 h-5 shrink-0" aria-hidden="true" /><span className="min-w-0 [overflow-wrap:anywhere]">{en ? "Sign in" : "Entrar"}</span></>
                 ) : cooldownRemaining > 0 ? (
                   <>{t("btnWaitSeconds", { seconds: cooldownRemaining })}</>
                 ) : (
                   <>
                     <MessageSquare className="w-5 h-5 shrink-0" aria-hidden="true" />
-                    {channelText("btnSms", { channel: channelLabel })}
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{channelText("btnSms", { channel: channelLabel })}</span>
                   </>
                 )}
               </button>
 
             </div>
+
+            {passwordLoginEnabled && <button type="button" className={GHOST_BTN} disabled={sending} onClick={() => {
+              if (passwordMode) {
+                const destination = safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY)) || "/inicio";
+                if (!destination.startsWith("/set-password")) {
+                  window.sessionStorage.setItem(RETURN_TO_KEY, `/set-password?returnTo=${encodeURIComponent(destination)}`);
+                }
+              }
+              setPasswordMode(!passwordMode); setPassword(""); setError(null);
+            }}>{passwordMode ? (en ? "Forgot your password? Sign in by SMS" : "¿Olvidaste tu contraseña? Entrar por SMS") : (en ? "Sign in with password" : "Entrar con contraseña")}</button>}
+
+            {whatsappLoginHref && <a href={whatsappLoginHref} className={`${SECONDARY_BTN} flex-wrap`}>
+              <MessageCircle className="w-5 h-5 shrink-0" aria-hidden="true" /><span className="min-w-0 [overflow-wrap:anywhere]">{en ? "Sign in with WhatsApp" : "Entrar con WhatsApp"}</span>
+            </a>}
 
             {telegramEnabled && (
               <div className="space-y-3">
@@ -930,6 +972,10 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
               <ArrowLeft className="w-4 h-4 shrink-0" /> {t("otpResend")}
             </button>
           </form>
+
+          {whatsappLoginHref && <a href={whatsappLoginHref} className={`${SECONDARY_BTN} flex-wrap`}>
+            <MessageCircle className="w-5 h-5 shrink-0" aria-hidden="true" /><span className="min-w-0 [overflow-wrap:anywhere]">{en ? "Sign in with WhatsApp" : "Entrar con WhatsApp"}</span>
+          </a>}
 
           {telegramEnabled && (
             <div className="space-y-3 border-t border-border-subtle pt-4">
@@ -1074,6 +1120,8 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
 }
 
 interface LoginClientProps {
+  passwordLoginEnabled?: boolean;
+  whatsappLoginHref?: string | null;
   /** Usuario del bot de login de Telegram; null si el canal está apagado. */
   telegramBotUsername: string | null;
   /** Public channel label only; credentials never leave the server. */
@@ -1084,10 +1132,12 @@ interface LoginClientProps {
   smsCaptchaRequired: boolean;
 }
 
-export default function LoginClient({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired, deliveryChannel = "sms" }: LoginClientProps) {
+export default function LoginClient({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired, deliveryChannel = "sms", passwordLoginEnabled = false, whatsappLoginHref = null }: LoginClientProps) {
   return (
     <Suspense fallback={<div className="min-h-screen" />}>
       <LoginInner
+        passwordLoginEnabled={passwordLoginEnabled}
+        whatsappLoginHref={whatsappLoginHref}
         telegramBotUsername={telegramBotUsername}
         turnstileSiteKey={turnstileSiteKey}
         smsCaptchaRequired={smsCaptchaRequired}

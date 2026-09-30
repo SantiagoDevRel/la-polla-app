@@ -52,12 +52,18 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
+  const [passwordEnabled, setPasswordEnabled] = useState(false);
 
   useEffect(() => {
     async function checkProfile() {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const [authResult, config] = await Promise.all([
+          supabase.auth.getUser(),
+          fetch("/api/auth/password", { cache: "no-store" }).then(r => r.json()).catch(() => null),
+        ]);
+        const { data: { user } } = authResult;
+        setPasswordEnabled(config?.enabled === true);
 
         if (!user) {
           router.push("/login");
@@ -123,7 +129,8 @@ export default function OnboardingPage() {
       if (typeof window !== "undefined") {
         window.sessionStorage.removeItem("lp_returnTo");
       }
-      router.push(rt || "/inicio");
+      const destination = rt || "/inicio";
+      router.push(passwordEnabled ? `/set-password?returnTo=${encodeURIComponent(destination)}` : destination);
     } catch {
       setError(t("errSaveProfile"));
     } finally {
