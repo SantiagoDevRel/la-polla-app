@@ -15,11 +15,34 @@ export const zernioIncomingMessage = z.object({
   conversation: z.object({ id: z.string().regex(/^[a-f0-9]{24}$/) }),
   message: z.object({
     platform: z.literal("whatsapp"), direction: z.literal("incoming"),
-    text: z.string().nullable(), sentAt: z.iso.datetime({ offset: true }),
-    sender: z.object({ phoneNumber: z.string().nullable().optional(), id: z.string(), businessScopedUserId: z.string().optional() }),
-    metadata: z.object({ standby: z.boolean().optional() }).optional(),
+    text: z.string().nullable().optional(), sentAt: z.iso.datetime({ offset: true }),
+    sender: z.object({ phoneNumber: z.string().nullable().optional(), id: z.string().min(1).max(200), businessScopedUserId: z.string().min(1).max(200).optional() }),
+    metadata: z.object({ standby: z.boolean().optional() }).nullable().optional(),
   }),
+  // Zernio puts WhatsApp metadata on the event, outside message.
+  metadata: z.object({
+    standby: z.boolean().optional(),
+    contactsOrigin: z.enum(["contact_request", "other"]).optional(),
+    contacts: z.array(z.object({
+      phones: z.array(z.object({ phone: z.string().optional(), wa_id: z.string().optional() })).optional(),
+    })).optional(),
+  }).nullable().optional(),
 });
+
+/** Only a provider-identified sender or Meta's own-number share proves identity. */
+export function zernioVerifiedPhone(event: z.infer<typeof zernioIncomingMessage>): string | null {
+  const sender = event.message.sender;
+  const phone = toE164(sender.phoneNumber ?? (!sender.businessScopedUserId ? sender.id : undefined));
+  if (phone) return phone;
+  const metadata = event.metadata;
+  if (metadata?.contactsOrigin !== "contact_request" || metadata.contacts?.length !== 1) return null;
+  const phones = metadata.contacts[0].phones;
+  // A manually shared address-book card, text, username or BSUID is never a phone.
+  if (phones?.length !== 1) return null;
+  const ownNumber = toE164(phones[0].wa_id);
+  if (!ownNumber || (phones[0].phone && toE164(phones[0].phone) !== ownNumber)) return null;
+  return ownNumber;
+}
 
 export function parsePreferenceEvent(payload: unknown, accountId: string | undefined) {
   const parsed = zernioIncomingMessage.safeParse(payload);
@@ -27,7 +50,7 @@ export function parsePreferenceEvent(payload: unknown, accountId: string | undef
   const { message } = parsed.data;
   if (!message.text || (!isOptOutText(message.text) && !isOptInText(message.text))) return null;
   // phoneNumber is authoritative. Do not mistake a BSUID for a phone number.
-  const phone = toE164(message.sender.phoneNumber ?? (!message.sender.businessScopedUserId ? message.sender.id : undefined));
+  const phone = zernioVerifiedPhone(parsed.data);
   if (!phone) throw new Error("Missing phone identity for preference");
   if (Date.parse(message.sentAt) > Date.now() + 5 * 60_000) throw new Error("Future message timestamp");
   return { phone: normalizePhone(phone), enabled: isOptInText(message.text),

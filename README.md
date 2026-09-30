@@ -1611,6 +1611,9 @@ logo y mensaje prellenado «dame el link para entrar a la polla». La persona lo
 envía al número propio de Zernio y recibe un enlace personal de diez minutos; una confirmación abre la
 sesión. Configuración, migración159 y pruebas:
 [docs/whatsapp-login-link.md](docs/whatsapp-login-link.md).
+Si WhatsApp oculta el teléfono por usar username, el bot pide compartir el
+número propio mediante el botón nativo y entrega el enlace al recibirlo.
+Nunca autentica con números escritos ni contactos elegidos de la agenda.
 
 El registro también ofrece una **contraseña opcional de seis dígitos**, con
 recuperación explícita por SMS. En **Perfil → Contraseña** puedes crearla por

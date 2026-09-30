@@ -9,6 +9,19 @@ No pide copiar códigos. Login ofrece WhatsApp primero, seguido de SMS
 y contraseña; Telegram se quitó de las opciones por decisión del dueño.
 ALTA/BAJA conservan prioridad y sus preferencias; no se reactiva el bot antiguo.
 
+Usuarios con username (corrección 1-oct-2026): Meta puede entregar solo un
+BSUID y omitir el teléfono. El bot responde en la misma conversación con
+`request_contact_info`, el botón nativo para compartir el número propio.
+La respuesta firmada con `metadata.contactsOrigin=contact_request` y un único
+`phones[].wa_id` válido permite emitir el enlace. Una tarjeta de la agenda,
+un número escrito o un BSUID nunca prueban propiedad. Zernio incorpora el
+número compartido al contacto; no hay tablas nuevas ni cambios de cuentas.
+`metadata` vive en la raíz del evento; se respeta `standby` antes de responder.
+El límite de cinco enlaces por hora ahora explica cómo usar el último enlace
+o entrar mediante SMS/contraseña, en lugar de dejar a la persona sin respuesta.
+Contrato del proveedor: [OpenAPI de Zernio](https://docs.zernio.com/api/openapi),
+`sendInboxMessage` e `InboxMessageReceivedWebhook`.
+
 Aplicar `159_whatsapp_login_link.sql`. Configuración privada del servidor:
 
 ```dotenv
@@ -43,6 +56,6 @@ nuevo. Desde1-oct-2026 Meta cambia la tarifa de mensajes de servicio: revisar
 [precios oficiales](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing)
 antes de prometer envíos ilimitados gratuitos.
 
-Checks: `npm test -- tests/whatsapp-login-link.test.ts tests/whatsapp-preferences.test.ts`,
+Checks: `npm test -- tests/whatsapp-login-link.test.ts tests/whatsapp-username-login.test.ts tests/whatsapp-preferences.test.ts`,
 `npm run build`, `scripts/whatsapp-login-check.sql` (rollback), revisión real del
 botón, confirmación, cookies y rechazo del segundo uso. Sin tokens/PII en logs.
