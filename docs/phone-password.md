@@ -6,6 +6,12 @@ Al completar nombre y pollito, el registro ofrece **Crear contraseña** y
 existente y abre `/set-password` para crear otra, sin exigir la anterior.
 Un login normal por SMS no muestra esa pantalla. No hay un gate nuevo.
 
+Perfil ofrece **Contraseña → Crear o cambiar contraseña** mientras el canal
+está habilitado. Reutiliza `/set-password?returnTo=%2Fperfil` y el endpoint
+existente: guarda la primera contraseña o reemplaza la anterior y vuelve a
+Perfil. Sirve con una sesión obtenida por WhatsApp, SMS o contraseña; no exige
+recordar la anterior. No se añade otra tabla, credencial ni proveedor.
+
 Activación: aplicar `160_optional_phone_password.sql`; configurar un secreto
 aleatorio `AUTH_PIN_PEPPER` de al menos 32 caracteres y
 `PHONE_PASSWORD_ENABLED=true`, ambos solo servidor. Sin configuración completa,

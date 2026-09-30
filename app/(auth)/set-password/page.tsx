@@ -6,7 +6,7 @@ import { safeReturnTo } from "@/lib/auth/safe-return-to";
 import PasswordSetup from "@/components/auth/PasswordSetup";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Crear contraseña", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Contraseña", robots: { index: false, follow: false } };
 
 export default async function SetPasswordPage({ searchParams }: { searchParams: Promise<{ returnTo?: string }> }) {
   const params = await searchParams;
@@ -16,5 +16,5 @@ export default async function SetPasswordPage({ searchParams }: { searchParams: 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   if (!phonePasswordEnabled()) redirect(returnTo);
-  return <PasswordSetup returnTo={returnTo} />;
+  return <PasswordSetup returnTo={returnTo} manage={returnTo === "/perfil"} />;
 }
