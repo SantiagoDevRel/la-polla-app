@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const event = parsePreferenceEvent(payload, process.env.ZERNIO_WHATSAPP_ACCOUNT_ID);
     if (!event) {
       const login = await replyWithWhatsAppLogin(payload);
-      return NextResponse.json({ ok: true, ignored: login === "ignored", limited: login === "limited" });
+      return NextResponse.json({ ok: true, ignored: login === "ignored", limited: login === "limited", contactRequested: login === "contact_requested" });
     }
     const db = createAdminClient();
     const state = await setMarketingPreference(db, { ...event, source: "whatsapp" });

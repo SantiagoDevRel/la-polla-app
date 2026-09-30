@@ -78,7 +78,13 @@ describe("signed incoming WhatsApp login", () => {
     expect(db.rpc.mock.calls[0][1]).toEqual(db.rpc.mock.calls[1][1]);
     expect(m.fetch.mock.calls[0][1].headers["Idempotency-Key"]).toBe(m.fetch.mock.calls[1][1].headers["Idempotency-Key"]);
   });
-  it.each(["limited", "ignored"])("does not send when reservation is %s", async result => {
+  it("explains the hourly limit without sending another login token", async () => {
+    const db = database(); db.rpc.mockResolvedValue({ data: "limited", error: null }); m.admin.mockReturnValue(db);
+    expect(await replyWithWhatsAppLogin(incoming())).toBe("limited");
+    expect(JSON.parse(m.fetch.mock.calls[0][1].body).message).toContain("cinco enlaces");
+    expect(JSON.parse(m.fetch.mock.calls[0][1].body).interactive).toBeUndefined();
+  });
+  it.each(["ignored"])("does not send when reservation is %s", async result => {
     const db = database(); db.rpc.mockResolvedValue({ data: result, error: null }); m.admin.mockReturnValue(db);
     expect(await replyWithWhatsAppLogin(incoming())).toBe(result); expect(m.fetch).not.toHaveBeenCalled();
   });

@@ -17,6 +17,10 @@ un botón a `/login/whatsapp`; GET solo confirma y POST canjea el hash una vez.
 Número propio de Zernio, flag independiente `WHATSAPP_LOGIN_ENABLED`, migración159.
 ALTA/BAJA conservan prioridad. No reactivar outbound/bot antiguos ni OTP sin
 plantilla AUTHENTICATION aprobada. Ver `docs/whatsapp-login-link.md`.
+Username sin teléfono: responder con `request_contact_info`; aceptar el número
+solo del remitente o de una tarjeta propia con `metadata.contactsOrigin=contact_request`
+y un único `wa_id` válido. Metadata va en la raíz, no dentro de `message`.
+No convertir BSUID/username ni números escritos en identidad de acceso.
 
 Después del perfil se ofrece crear contraseña opcional de seis dígitos; login
 permite usarla y recuperarla por SMS. Scrypt+pepper privado, RLS deny-all y
