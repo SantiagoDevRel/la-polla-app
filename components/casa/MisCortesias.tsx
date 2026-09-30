@@ -12,6 +12,7 @@ import { SectionHead, Tape } from "@/components/street";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
+import ProfileSectionHeading from "@/components/perfil/ProfileSectionHeading";
 import { shareLink } from "@/lib/casa/share-link";
 import {
   COURTESY_FINE_PRINT,
@@ -89,12 +90,14 @@ export function MisCortesias({
   initial = null,
   mostrarPolla = true,
   titulo = "Cortesías para regalar",
+  profileStyle = false,
 }: {
   /** Las cortesías ya leídas en el servidor (pantalla de la polla). */
   initial?: MyCourtesy[] | null;
   /** En la polla el nombre ya está en el encabezado: no se repite en cada fila. */
   mostrarPolla?: boolean;
   titulo?: string;
+  profileStyle?: boolean;
 }) {
   const [cortesias, setCortesias] = useState<MyCourtesy[] | null>(initial);
   const [error, setError] = useState(false);
@@ -127,8 +130,9 @@ export function MisCortesias({
   const disponibles = (cortesias ?? []).filter(isCourtesyLive).length;
 
   return (
-    <section className="mt-6">
-      <SectionHead title={titulo} meta={cortesias === null ? undefined : `${disponibles} sin usar`} />
+    <section className={profileStyle ? "lp-card space-y-3 border-amber/20 p-4 hover:border-amber/40" : "mt-6"}>
+      {profileStyle ? <ProfileSectionHeading icon={Ticket} tone="tickets" title={titulo} meta={cortesias === null ? undefined : `${disponibles} sin usar`} />
+        : <SectionHead title={titulo} meta={cortesias === null ? undefined : `${disponibles} sin usar`} />}
       {cortesias === null ? (
         <div role="status" className="space-y-2">
           <span className="sr-only">Cargando cortesías...</span>

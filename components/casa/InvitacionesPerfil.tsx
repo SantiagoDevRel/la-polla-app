@@ -20,6 +20,7 @@ import { CopiarDato } from "./CopiarDato";
 import { QuienTeInvito } from "./QuienTeInvito";
 import { shareLink } from "@/lib/casa/share-link";
 import { useToast } from "@/components/ui/Toast";
+import ProfileSectionHeading from "@/components/perfil/ProfileSectionHeading";
 
 type Data = { profile: ReferralProfile; invitee: ReferralInviteeState };
 
@@ -56,14 +57,9 @@ export function InvitacionesPerfil() {
 
   return (
     <div className="space-y-3">
-      <section aria-labelledby="perfil-invitaciones" className="lp-card space-y-3 p-4">
-        <div className="flex items-start gap-3">
-          <Gift aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-turf" />
-          <div className="min-w-0">
-            <h2 id="perfil-invitaciones" className="text-[15px] font-semibold text-text-primary">Invita y gana cupos</h2>
-            <p className="mt-1 text-[13px] text-text-secondary">{every === 1 ? "1 invitado" : `${every} invitados`} = 1 cupo gratis en la polla que quieras.*</p>
-          </div>
-        </div>
+      <section aria-labelledby="perfil-invitaciones" className="lp-card space-y-3 border-turf/20 p-4 hover:border-turf/40">
+        <ProfileSectionHeading icon={Gift} tone="gifts" id="perfil-invitaciones" title="Invita y gana cupos" />
+        <p className="text-[13px] leading-relaxed text-text-secondary">{every === 1 ? "1 invitado" : `${every} invitados`} = 1 cupo gratis en la polla que quieras.*</p>
         {/* La barrita: un punto por invitado que ya pagó, camino al próximo cupo. */}
         <div>
           <div className="flex items-center gap-2">

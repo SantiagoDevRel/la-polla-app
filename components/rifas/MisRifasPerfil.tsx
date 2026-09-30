@@ -7,8 +7,8 @@
 // se dibuja nada. Fuera de la app iOS (rifas con dinero: App Store 5.3).
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Plus } from "lucide-react";
-import { SectionHead } from "@/components/street";
+import { ChevronRight, Plus, Ticket } from "lucide-react";
+import ProfileSectionHeading from "@/components/perfil/ProfileSectionHeading";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { drawLabel, type RifaMyList } from "@/lib/rifas/shared";
 
@@ -29,8 +29,8 @@ export function MisRifasPerfil() {
   if (isIOSApp || !data || (!data.can_create && data.created.length === 0)) return null;
 
   return (
-    <section aria-label="Mis rifas" className="lp-card p-4">
-      <SectionHead title="Mis rifas" meta={data.created.length ? `${data.created.length}` : undefined} />
+    <section aria-label="Mis rifas" className="lp-card space-y-3 border-amber/20 p-4 hover:border-amber/40">
+      <ProfileSectionHeading icon={Ticket} tone="tickets" title="Mis rifas" meta={data.created.length ? `${data.created.length}` : undefined} />
       {data.can_create && (
         <Link href="/rifas/crear" className="lp-btn lp-btn-ghost w-full">
           <Plus aria-hidden="true" className="h-5 w-5" /> Crear mi rifa

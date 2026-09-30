@@ -18,8 +18,9 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
-import { CreditCard, Pencil, Check } from "lucide-react";
+import { Banknote, Pencil, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
+import ProfileSectionHeading from "./ProfileSectionHeading";
 
 export type PayoutMethod = "nequi" | "bancolombia" | "otro";
 export type PayoutAccountType = "ahorros" | "corriente";
@@ -163,12 +164,10 @@ export default function PayoutDefaultEditor({
   // ── VIEW MODE ───────────────────────────────────────────────────────
   if (mode === "view" && hasInitial) {
     return (
-      <section className="rounded-2xl p-4 lp-card flex items-center gap-3">
-        <CreditCard className="w-5 h-5 text-gold flex-shrink-0" />
+      <section className="rounded-2xl border-gold/20 p-4 lp-card space-y-3 hover:border-gold/40">
+        <ProfileSectionHeading icon={Banknote} tone="money" title={t("editorTitle")} />
+        <div className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase tracking-wide text-text-muted">
-            {t("editorTitle")}
-          </p>
           <p
             className="text-[15px] font-semibold leading-normal text-text-primary tabular-nums [overflow-wrap:anywhere]"
           >
@@ -188,16 +187,15 @@ export default function PayoutDefaultEditor({
         >
           <Pencil className="w-4 h-4 text-text-secondary" />
         </button>
+        </div>
       </section>
     );
   }
 
   // ── EDIT MODE ───────────────────────────────────────────────────────
   return (
-    <section className="rounded-2xl p-5 lp-card space-y-3">
-      <h3 className="flex items-center gap-2 text-[15px] font-semibold leading-normal text-text-primary">
-        <CreditCard className="h-5 w-5 shrink-0 text-gold" /> {t("editorTitle")}
-      </h3>
+    <section className="rounded-2xl border-gold/20 p-5 lp-card space-y-3 hover:border-gold/40">
+      <ProfileSectionHeading icon={Banknote} tone="money" title={t("editorTitle")} />
 
       <div className="flex flex-wrap gap-1.5">
         {METHOD_OPTIONS.filter((m) => !allowedMethods || allowedMethods.includes(m.id)).map((m) => (

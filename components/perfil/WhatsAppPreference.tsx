@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
+import ProfileSectionHeading from "./ProfileSectionHeading";
 
 export default function WhatsAppPreference() {
   const t = useTranslations("WhatsAppPreference");
@@ -27,10 +28,8 @@ export default function WhatsAppPreference() {
       setState(await r.json());
     } catch { setError(true); } finally { setSaving(false); }
   }
-  return <section className="lp-card space-y-3 p-4" aria-labelledby="wa-preference-title">
-    <h2 id="wa-preference-title" className="flex items-center gap-2 text-base font-semibold leading-snug text-text-primary">
-      <MessageCircle className="h-5 w-5 shrink-0" aria-hidden="true" />{t("title")}
-    </h2>
+  return <section className="lp-card space-y-3 border-whatsapp/20 p-4 hover:border-whatsapp/40" aria-labelledby="wa-preference-title">
+    <ProfileSectionHeading icon={MessageCircle} tone="whatsapp" id="wa-preference-title" title={t("title")} />
     <p className="text-sm leading-relaxed text-text-secondary">{t("description")}</p>
     {!state && !error && <div className="h-12 animate-pulse rounded-xl bg-bg-elevated" role="status" aria-label={t("loading")} />}
     {state && <>

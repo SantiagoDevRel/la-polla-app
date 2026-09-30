@@ -11,6 +11,7 @@
 import { useState, type FormEvent } from "react";
 import { Check, UserPlus } from "lucide-react";
 import UserAvatar from "@/components/ui/UserAvatar";
+import ProfileSectionHeading from "@/components/perfil/ProfileSectionHeading";
 import { casaPost } from "@/lib/casa/upload-client";
 import { REFERRAL_DISMISS_COOKIE, normalizeReferralCode } from "@/lib/casa/referrals-shared";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
@@ -80,8 +81,8 @@ export function QuienTeInvito({ initial, variant }: { initial: ReferralInviteeSt
   // Perfil con el invitador ya fijo: solo el dato.
   if (!canSet && referrer) {
     return (
-      <div className="lp-card p-4">
-        <span className="lp-label">Te invitó</span>
+      <div className={variant === "perfil" ? "lp-card space-y-3 border-turf/20 p-4 hover:border-turf/40" : "lp-card p-4"}>
+        {variant === "perfil" ? <ProfileSectionHeading icon={UserPlus} tone="gifts" title="Te invitó" /> : <span className="lp-label">Te invitó</span>}
         <div className="mt-2"><Persona person={referrer} /></div>
       </div>
     );
@@ -94,13 +95,14 @@ export function QuienTeInvito({ initial, variant }: { initial: ReferralInviteeSt
   const secondary = "lp-btn lp-btn-ghost min-h-11 flex-[1_0_auto] !px-4 text-[15px]";
 
   return (
-    <section aria-labelledby={`quien-invito-${variant}`} className="lp-card p-4">
+    <section aria-labelledby={`quien-invito-${variant}`} className={variant === "perfil" ? "lp-card border-turf/20 p-4 hover:border-turf/40" : "lp-card p-4"}>
+      {variant === "perfil" && <ProfileSectionHeading icon={UserPlus} tone="gifts" id={`quien-invito-${variant}`} title={referrer ? "Te invitó" : hint ? "¿Te invitó esta persona?" : "¿Alguien te invitó?"} />}
       <div className="flex items-start gap-3">
-        <UserPlus aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-text-secondary" />
+        {variant !== "perfil" && <UserPlus aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-text-secondary" />}
         <div className="min-w-0 flex-1">
-          <h2 id={`quien-invito-${variant}`} className="text-[15px] font-semibold leading-snug text-text-primary">
+          {variant !== "perfil" && <h2 id={`quien-invito-${variant}`} className="text-[15px] font-semibold leading-snug text-text-primary">
             {referrer ? "Te invitó" : hint ? "¿Te invitó esta persona?" : "¿Alguien te invitó?"}
-          </h2>
+          </h2>}
 
           {referrer && (
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">

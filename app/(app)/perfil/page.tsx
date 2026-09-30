@@ -11,7 +11,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useTranslations } from "next-intl";
-import { X } from "lucide-react";
+import { History, LogOut, UserRoundX, X } from "lucide-react";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
@@ -283,6 +283,8 @@ export default function PerfilPage() {
           />
         )}
 
+        <PasswordAccess />
+
         {/* (2026-09-19, pedido del dueño) «Mis pollas» y «Terminadas» salieron de
             acá: se repetían tal cual en Pollas (/inicio), que es donde se
             juega. También salió «Actividad reciente»: no ayudaba a decidir
@@ -299,9 +301,7 @@ export default function PerfilPage() {
         {/* Cortesías para regalar (migración 138). Solo aparece si la casa le dio
             cupos; si no tiene, el componente no dibuja nada. Fuera de iOS por el
             mismo criterio que las invitaciones. */}
-        {!isIOSApp && <MisCortesias />}
-
-        <PasswordAccess />
+        {!isIOSApp && <MisCortesias profileStyle />}
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />
@@ -343,22 +343,25 @@ export default function PerfilPage() {
             inalcanzable, que en la práctica es lo mismo que perderlo. */}
         <Link
           href="/pollas"
-          className="flex min-h-11 w-full items-center justify-center rounded-xl border border-border-default py-3 font-medium text-text-secondary transition-colors hover:border-gold hover:text-gold"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-profile-text/20 py-3 font-medium text-profile-text transition-colors hover:border-profile-text hover:bg-profile-text/5"
         >
+          <History className="h-5 w-5 shrink-0" aria-hidden="true" />
           {t("oldPollas")}
         </Link>
 
         {/* Logout */}
         <button onClick={handleLogout}
-          className="w-full py-3 rounded-xl font-medium transition-colors text-red-alert border border-red-dim hover:bg-red-dim">
+          className="flex w-full items-center justify-center gap-2 py-3 rounded-xl font-medium transition-colors text-red-alert border border-red-dim hover:bg-red-dim">
+          <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" />
           {t("logout")}
         </button>
 
         {/* Eliminar cuenta — Apple 5.1.1(v). Borrado self-service in-app. */}
         <button
           onClick={() => setShowDeleteConfirm(true)}
-          className="min-h-11 w-full py-2.5 text-sm font-medium text-text-muted transition-colors hover:text-red-alert"
+          className="flex min-h-11 w-full items-center justify-center gap-2 py-2.5 text-sm font-medium text-text-muted transition-colors hover:text-red-alert"
         >
+          <UserRoundX className="h-4 w-4 shrink-0" aria-hidden="true" />
           {t("deleteAccount")}
         </button>
 
