@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useLocale } from "next-intl";
 import { KeyRound } from "lucide-react";
+import ProfileSectionHeading from "./ProfileSectionHeading";
 
 export default function PasswordAccess() {
   const en = useLocale() === "en";
@@ -22,16 +23,15 @@ export default function PasswordAccess() {
     return () => controller.abort();
   }, [attempt]);
   if (enabled === false) return null;
-  return <section className="lp-card space-y-3 p-4" aria-labelledby="profile-password-title">
-    <h2 id="profile-password-title" className="flex items-center gap-2 text-base font-semibold leading-snug text-text-primary">
-      <KeyRound className="h-5 w-5 shrink-0" aria-hidden="true" />{en ? "Password" : "Contraseña"}
-    </h2>
+  return <section className="lp-card space-y-3 border-profile-security/40 bg-profile-security/10 p-4 hover:border-profile-security/60" aria-labelledby="profile-password-title">
+    <ProfileSectionHeading icon={KeyRound} tone="security" id="profile-password-title" title={en ? "Password" : "Contraseña"} />
     <p className="text-sm leading-relaxed text-text-secondary">{en
-      ? "Create a 6-digit password or change the one you use to sign in. If you forget it, you can sign in by WhatsApp or SMS."
-      : "Crea una contraseña de 6 dígitos o cambia la que usas para ingresar. Si la olvidas, puedes entrar por WhatsApp o SMS."}</p>
+      ? "Sign in with 6 digits. Create or change your password here."
+      : "Entra con 6 dígitos. Crea o cambia tu contraseña aquí."}</p>
     {enabled && <Link href="/set-password?returnTo=%2Fperfil"
-      className="flex min-h-11 w-full items-center justify-center rounded-full border border-border-default px-4 py-3 text-center text-sm font-semibold leading-snug text-text-primary transition-colors hover:bg-bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold">
-      {en ? "Create or change password" : "Crear o cambiar contraseña"}
+      className="flex min-h-11 w-full flex-wrap items-center justify-center gap-2 rounded-full bg-profile-security px-4 py-3 text-center text-sm font-semibold leading-snug text-bg-base transition-all hover:brightness-110 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-profile-security">
+      <KeyRound className="h-5 w-5 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1 basis-32 [overflow-wrap:anywhere]">{en ? "Create or change password" : "Crear o cambiar contraseña"}</span>
     </Link>}
     {enabled === null && !error && <div className="h-12 animate-pulse rounded-xl bg-bg-elevated" role="status" aria-label={en ? "Loading" : "Cargando"} />}
     {error && <div role="alert" className="space-y-2 text-sm leading-relaxed text-red-alert">

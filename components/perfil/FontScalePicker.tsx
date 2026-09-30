@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { Type } from "lucide-react";
 import { useTranslations } from "next-intl";
+import ProfileSectionHeading from "./ProfileSectionHeading";
 import {
   applyScale,
   getStoredScale,
@@ -40,15 +41,12 @@ export default function FontScalePicker() {
   }
 
   return (
-    <section className="lp-card p-3.5">
-      <div className="mb-2.5 flex items-center gap-1.5 text-[13px] font-bold text-text-primary">
-        <Type className="h-3.5 w-3.5 text-text-secondary" aria-hidden="true" />
-        {t("fontSizeLabel")}
-      </div>
+    <section className="lp-card space-y-3 border-profile-text/20 p-4 hover:border-profile-text/40">
+      <ProfileSectionHeading icon={Type} tone="text" title={t("fontSizeLabel")} />
       <div
         role="radiogroup"
         aria-label={t("fontSizeLabel")}
-        className="flex gap-2"
+        className="flex flex-wrap gap-2"
       >
         {OPTIONS.map((opt) => {
           const active = scale === opt.value;
@@ -59,10 +57,10 @@ export default function FontScalePicker() {
               role="radio"
               aria-checked={active}
               onClick={() => pick(opt.value)}
-              className={`flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-xl border px-2 text-[13px] leading-none transition-all ${
+              className={`flex min-h-11 flex-1 basis-16 cursor-pointer items-center justify-center rounded-xl border px-2 text-[13px] leading-none transition-all ${
                 active
-                  ? "border-gold/40 bg-gold/10 font-bold text-gold"
-                  : "border-border-subtle bg-bg-elevated font-medium text-text-primary hover:border-gold/30"
+                  ? "border-profile-text/40 bg-profile-text/10 font-bold text-profile-text"
+                  : "border-border-subtle bg-bg-elevated font-medium text-text-primary hover:border-profile-text/30"
               }`}
             >
               {opt.label}

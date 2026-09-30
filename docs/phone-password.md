@@ -6,7 +6,8 @@ Al completar nombre y pollito, el registro ofrece **Crear contraseña** y
 existente y abre `/set-password` para crear otra, sin exigir la anterior.
 Un login normal por SMS no muestra esa pantalla. No hay un gate nuevo.
 
-Perfil ofrece **Contraseña → Crear o cambiar contraseña** mientras el canal
+Perfil ofrece **Contraseña → Crear o cambiar contraseña** justo debajo de
+**Cuenta para cobrar**, con una llave y un botón violeta, mientras el canal
 está habilitado. Reutiliza `/set-password?returnTo=%2Fperfil` y el endpoint
 existente: guarda la primera contraseña o reemplaza la anterior y vuelve a
 Perfil. Sirve con una sesión obtenida por WhatsApp, SMS o contraseña; no exige
