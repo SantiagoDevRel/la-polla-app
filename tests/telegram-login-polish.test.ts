@@ -661,15 +661,16 @@ describe("overlays skip the single-use link page", () => {
   });
 });
 
-// ── 6. SMS primario, Telegram secundario ────────────────────────────────
-describe("/login keeps SMS first and hides Telegram", () => {
+// ── 6. WhatsApp primero, SMS alternativo y Telegram oculto ──────────────
+describe("/login offers WhatsApp first and hides Telegram", () => {
   const source = readSource("app/(auth)/login/LoginClient.tsx");
 
-  it("phone step keeps the primary SMS submit", () => {
+  it("phone step keeps SMS available after the WhatsApp option", () => {
     const input = source.slice(source.indexOf('{step === "input" && ('), source.indexOf('{step === "otp" && ('));
     const sms = input.indexOf('channelText("btnSms",');
     expect(sms).toBeGreaterThan(0);
-    expect(input.slice(input.lastIndexOf("<button", sms), sms)).toMatch(/type="submit"[\s\S]*bg-gold/);
+    expect(input.indexOf("<WhatsAppLoginButton")).toBeLessThan(input.indexOf("<form"));
+    expect(input.slice(input.lastIndexOf("<button", sms), sms)).toMatch(/type="submit"[\s\S]*SECONDARY_BTN/);
   });
 
   it("server disables Telegram in both steps even with configured credentials", async () => {

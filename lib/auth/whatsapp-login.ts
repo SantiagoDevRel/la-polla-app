@@ -30,7 +30,7 @@ export function whatsappLoginAllowed(phone: string): boolean {
 }
 export function getWhatsAppLoginHref(): string | null {
   const c = config();
-  return c?.enabled ? `https://wa.me/${normalizePhone(c.number)}?text=Hola` : null;
+  return c?.enabled ? `https://wa.me/${normalizePhone(c.number)}?text=${encodeURIComponent("dame el link para entrar a la polla")}` : null;
 }
 
 /** Call only after the Zernio webhook's raw-body HMAC has been checked. */

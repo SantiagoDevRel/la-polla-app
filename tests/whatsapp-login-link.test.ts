@@ -42,7 +42,9 @@ afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe("signed incoming WhatsApp login", () => {
   it("keeps test rollout out of public login", () => {
     expect(getWhatsAppLoginHref()).toBeNull(); vi.stubEnv("WHATSAPP_LOGIN_ENABLED", "true");
-    expect(getWhatsAppLoginHref()).toBe("https://wa.me/18564831652?text=Hola");
+    const url = new URL(getWhatsAppLoginHref()!);
+    expect(url.origin + url.pathname).toBe("https://wa.me/18564831652");
+    expect(url.searchParams.get("text")).toBe("dame el link para entrar a la polla");
   });
   it("fails closed with feature or credentials absent", async () => {
     vi.stubEnv("WHATSAPP_LOGIN_TEST_PHONE", ""); await replyWithWhatsAppLogin(incoming());

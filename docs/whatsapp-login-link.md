@@ -1,9 +1,11 @@
 # Acceso por enlace de WhatsApp
 
 Decisión del dueño, 30-sep-2026: recuperar el acceso por enlace personal.
-La persona escribe **Hola** u otro mensaje a **+1 856 483 1652**, el número
+El botón principal verde del login, con logo de WhatsApp, prellena
+**dame el link para entrar a la polla** a **+1 856 483 1652**, el número
 propio conectado en Zernio; recibe **Haz clic para entrar**, confirma su número
-enmascarado y abre la sesión. No pide copiar códigos. Login ofrece SMS, WhatsApp
+enmascarado y abre la sesión. También responde a Hola u otro mensaje.
+No pide copiar códigos. Login ofrece WhatsApp primero, seguido de SMS
 y contraseña; Telegram se quitó de las opciones por decisión del dueño.
 ALTA/BAJA conservan prioridad y sus preferencias; no se reactiva el bot antiguo.
 

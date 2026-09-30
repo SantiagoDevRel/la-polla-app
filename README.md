@@ -1606,8 +1606,9 @@ servidor (`verifyCasaUpload`), el SQL 098 y el bucket no cambian.
 
 ## OTP por WhatsApp (preparado, apagado)
 
-Acceso por **enlace de WhatsApp**: la persona escribe Hola al número propio de
-Zernio y recibe un enlace personal de diez minutos; una confirmación abre la
+Acceso por **enlace de WhatsApp**: primera opción del login, botón verde con su
+logo y mensaje prellenado «dame el link para entrar a la polla». La persona lo
+envía al número propio de Zernio y recibe un enlace personal de diez minutos; una confirmación abre la
 sesión. Configuración, migración159 y pruebas:
 [docs/whatsapp-login-link.md](docs/whatsapp-login-link.md).
 

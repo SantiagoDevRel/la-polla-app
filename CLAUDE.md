@@ -10,6 +10,8 @@
 
 El dueño eligió recuperar el acceso por enlace ante el bloqueo de la plantilla
 OTP de Meta y quitar Telegram de las opciones visibles del login.
+WhatsApp es la primera opción: botón verde con su logo y mensaje prellenado
+«dame el link para entrar a la polla». SMS y contraseña quedan como alternativas.
 `/api/whatsapp/zernio` responde a mensajes entrantes firmados con
 un botón a `/login/whatsapp`; GET solo confirma y POST canjea el hash una vez.
 Número propio de Zernio, flag independiente `WHATSAPP_LOGIN_ENABLED`, migración159.
