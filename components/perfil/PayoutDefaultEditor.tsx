@@ -9,7 +9,10 @@
 //   - bancolombia:  número de cuenta + nombre como aparece en el
 //                   banco. Sonnet usa el nombre para verificar
 //                   screenshots.
-//   - otro:         número/llave + nombre como aparece. Mismo motivo.
+//   - llave:        llave Bre-B (letras, números y @). Sin nombre.
+//   - otro:         banco + cuenta, dos campos alfanuméricos que se
+//                   guardan juntos («Banco · cuenta», ver
+//                   lib/payout/account-format.ts).
 //
 // Comportamiento:
 //   - Si ya hay cuenta seteada → modo VIEW: muestra resumen + lápiz.
@@ -21,8 +24,18 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { Banknote, Pencil, Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 import ProfileSectionHeading from "./ProfileSectionHeading";
+import {
+  joinOtherBank,
+  onlyDigits,
+  payoutAccountError,
+  sanitizeBankAccount,
+  sanitizeBankName,
+  sanitizeLlave,
+  splitOtherBank,
+  type PayoutMethodId,
+} from "@/lib/payout/account-format";
 
-export type PayoutMethod = "nequi" | "bancolombia" | "otro";
+export type PayoutMethod = PayoutMethodId;
 export type PayoutAccountType = "ahorros" | "corriente";
 
 interface Props {
@@ -62,13 +75,6 @@ export default function PayoutDefaultEditor({
   }>>(
     () => [
       {
-        id: "nequi",
-        label: t("methodNequi"),
-        accountPlaceholder: t("placeholderPhoneExample"),
-        needsName: false,
-        needsAccountType: false,
-      },
-      {
         id: "bancolombia",
         label: t("methodBancolombia"),
         accountPlaceholder: t("placeholderAccount"),
@@ -76,11 +82,25 @@ export default function PayoutDefaultEditor({
         needsAccountType: true,
       },
       {
+        id: "nequi",
+        label: t("methodNequi"),
+        accountPlaceholder: t("placeholderPhoneExample"),
+        needsName: false,
+        needsAccountType: false,
+      },
+      {
+        id: "llave",
+        label: t("methodLlave"),
+        accountPlaceholder: t("placeholderLlave"),
+        needsName: false,
+        needsAccountType: false,
+      },
+      {
         id: "otro",
         label: t("methodOtro"),
-        accountPlaceholder: t("placeholderBankCombo"),
-        needsName: true,
-        needsAccountType: true,
+        accountPlaceholder: t("placeholderOtherAccount"),
+        needsName: false,
+        needsAccountType: false,
       },
     ],
     [t],
@@ -89,6 +109,7 @@ export default function PayoutDefaultEditor({
     () => ({
       nequi: t("methodNequi"),
       bancolombia: t("methodBancolombia"),
+      llave: t("methodLlave"),
       otro: t("methodOtro"),
     }),
     [t],
@@ -103,8 +124,10 @@ export default function PayoutDefaultEditor({
 
   const hasInitial = !!(initialMethod && initialAccount);
   const [mode, setMode] = useState<"view" | "edit">(hasInitial ? "view" : "edit");
-  const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "nequi");
-  const [account, setAccount] = useState(initialAccount ?? "");
+  const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "bancolombia");
+  const initialOther = splitOtherBank(initialMethod === "otro" ? initialAccount : null);
+  const [account, setAccount] = useState(initialMethod === "otro" ? initialOther.account : initialAccount ?? "");
+  const [bank, setBank] = useState(initialOther.bank);
   const [accountName, setAccountName] = useState(initialAccountName ?? "");
   const [accountType, setAccountType] = useState<PayoutAccountType | null>(
     initialAccountType ?? null,
@@ -114,18 +137,41 @@ export default function PayoutDefaultEditor({
 
   useEffect(() => {
     if (mode === "edit" && saving === false) return;
-    setMethod(initialMethod ?? "nequi");
-    setAccount(initialAccount ?? "");
-    setAccountName(initialAccountName ?? "");
-    setAccountType(initialAccountType ?? null);
+    resetToInitial();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMethod, initialAccount, initialAccountName, initialAccountType]);
+
+  function resetToInitial() {
+    const other = splitOtherBank(initialMethod === "otro" ? initialAccount : null);
+    setMethod(initialMethod ?? "bancolombia");
+    setAccount(initialMethod === "otro" ? other.account : initialAccount ?? "");
+    setBank(other.bank);
+    setAccountName(initialAccountName ?? "");
+    setAccountType(initialAccountType ?? null);
+  }
+
+  function changeMethod(next: PayoutMethod) {
+    if (next === method) return;
+    setMethod(next);
+    // Cada método tiene su propio formato: no arrastrar lo escrito.
+    setAccount("");
+    setBank("");
+  }
+
+  function sanitizeAccount(value: string): string {
+    if (method === "nequi" || method === "bancolombia") return onlyDigits(value);
+    if (method === "llave") return sanitizeLlave(value);
+    return sanitizeBankAccount(value);
+  }
 
   const cur = METHOD_OPTIONS.find((m) => m.id === method)!;
   const needsName = cur.needsName;
   const needsAccountType = cur.needsAccountType;
+  const finalAccount = method === "otro" ? joinOtherBank(bank, account) : account.trim();
+  const formatError = account.trim() ? payoutAccountError(method, finalAccount) : null;
   const canSave =
     !!account.trim() &&
+    !formatError &&
     !saving &&
     (!needsName || accountName.trim().length >= 2) &&
     (!needsAccountType || accountType !== null);
@@ -137,7 +183,7 @@ export default function PayoutDefaultEditor({
     try {
       const finalName = needsName ? accountName.trim() : null;
       const finalType = needsAccountType ? accountType : null;
-      await onSave(method, account.trim(), finalName, finalType);
+      await onSave(method, finalAccount, finalName, finalType);
       setMode("view");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : tProfile("errSavePayout"));
@@ -147,15 +193,16 @@ export default function PayoutDefaultEditor({
   }
 
   function startEdit() {
-    if (allowedMethods && !allowedMethods.includes(method)) setMethod(allowedMethods[0] ?? "nequi");
+    if (allowedMethods && !allowedMethods.includes(method)) setMethod(allowedMethods[0] ?? "bancolombia");
     setMode("edit");
   }
 
   async function clearAccount() {
     if (!onClear) return;
     await onClear();
-    setMethod("nequi");
+    setMethod("bancolombia");
     setAccount("");
+    setBank("");
     setAccountName("");
     setAccountType(null);
     setMode("edit");
@@ -197,12 +244,12 @@ export default function PayoutDefaultEditor({
     <section className="rounded-2xl border-gold/20 p-5 lp-card space-y-3 hover:border-gold/40">
       <ProfileSectionHeading icon={Banknote} tone="money" title={t("editorTitle")} />
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="grid grid-cols-2 gap-1.5">
         {METHOD_OPTIONS.filter((m) => !allowedMethods || allowedMethods.includes(m.id)).map((m) => (
           <button
             key={m.id}
             type="button"
-            onClick={() => setMethod(m.id)}
+            onClick={() => changeMethod(m.id)}
             aria-pressed={method === m.id}
             className={`min-h-11 cursor-pointer rounded-full border px-3 py-1.5 text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${
                 method === m.id
@@ -215,17 +262,42 @@ export default function PayoutDefaultEditor({
         ))}
       </div>
 
+      {method === "otro" ? (
+        <div className="space-y-2">
+          <label htmlFor={`${id}-bank`} className="block text-[15px] font-medium text-text-primary">{t("labelBank")}</label>
+          <input
+            id={`${id}-bank`}
+            type="text"
+            value={bank}
+            onChange={(e) => setBank(sanitizeBankName(e.target.value))}
+            placeholder={t("placeholderBank")}
+            autoComplete="off"
+            maxLength={60}
+            className="lp-input min-w-0 text-[15px]"
+          />
+        </div>
+      ) : null}
+
       <label htmlFor={`${id}-account`} className="block text-[15px] font-medium text-text-primary">
-        {method === "nequi" ? t("placeholderPhone") : t("placeholderAccount")}
+        {method === "nequi" ? t("placeholderPhone") : method === "llave" ? t("labelLlave") : t("placeholderAccount")}
       </label>
       <input
         id={`${id}-account`}
         type="text"
+        inputMode={method === "nequi" || method === "bancolombia" ? "numeric" : "text"}
+        autoCapitalize="off"
+        autoComplete="off"
+        spellCheck={false}
         value={account}
-        onChange={(e) => setAccount(e.target.value)}
+        onChange={(e) => setAccount(sanitizeAccount(e.target.value))}
         placeholder={cur.accountPlaceholder}
+        maxLength={method === "nequi" ? 10 : method === "llave" ? 60 : 40}
+        aria-describedby={formatError ? `${id}-format` : undefined}
         className="lp-input min-w-0 text-[15px]"
       />
+      {formatError ? (
+        <p id={`${id}-format`} className="text-[13px] text-text-secondary">{formatError}</p>
+      ) : null}
 
       {needsAccountType ? (
         <div className="flex flex-wrap gap-1.5">
@@ -275,9 +347,7 @@ export default function PayoutDefaultEditor({
           <button
             type="button"
             onClick={() => {
-              setMethod(initialMethod ?? "nequi");
-              setAccount(initialAccount ?? "");
-              setAccountName(initialAccountName ?? "");
+              resetToInitial();
               setMode("view");
             }}
             className="min-h-11 rounded-xl border border-border-subtle px-3 py-2 text-sm text-text-secondary transition-colors hover:border-text-secondary/40"

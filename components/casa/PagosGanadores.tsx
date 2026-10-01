@@ -26,7 +26,7 @@ import { formatCop, formatShortDate } from "@/lib/casa/format";
 import { ImagePreparationError, PRIZE_IMAGE_PREPARE_OPTIONS, prepareImageUpload } from "@/lib/casa/prepare-proof";
 import type { AdminPayoutRow, AdminPayoutStage, CasaSettlementReadiness } from "@/lib/casa/types";
 
-const METODO: Record<string, string> = { nequi: "Nequi", bancolombia: "Bancolombia", otro: "Otro medio" };
+const METODO: Record<string, string> = { nequi: "Nequi", bancolombia: "Bancolombia", llave: "Llave", otro: "Otro banco" };
 const TIPO: Record<string, string> = { ahorros: "ahorros", corriente: "corriente" };
 
 /** «16 sep · 3:40 p. m.», en hora de Colombia. */
