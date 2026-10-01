@@ -143,7 +143,7 @@ export function PollaInfo({ polla, threshold = null, schedulePending = false }: 
 
     {money
       ? <Rule id="cobro" icon={<Wallet size={20} />} title="Cómo recibes tu premio si ganas" extra={<PayoutAccountButton />}>
-        <li>Si ganas, te enviamos el dinero a tu Nequi o a tu cuenta de Bancolombia.</li>
+        <li>Si ganas, te enviamos el dinero a la cuenta que registres: Bancolombia, Nequi, llave u otro banco.</li>
         <li>Registra tu cuenta de pago para que el pago no se demore.</li>
       </Rule>
       : <Rule id="cobro" icon={<Wallet size={20} />} title="Cómo recibes tu premio">

@@ -75,7 +75,7 @@ function AccountDialog({ onClose, note, onSaved }: { onClose: () => void; note: 
         </div> : !profile ? <div role="status" className="space-y-3"><span className="sr-only">Cargando tu cuenta de pago</span><div className="h-12 animate-pulse rounded-md bg-bg-elevated" /><div className="h-28 animate-pulse rounded-md bg-bg-elevated" /></div> : (
           <PayoutDefaultEditor initialMethod={profile.default_payout_method} initialAccount={profile.default_payout_account}
             initialAccountName={profile.default_payout_account_name} initialAccountType={profile.default_payout_account_type}
-            allowedMethods={["nequi", "bancolombia"]} onSave={save} />
+            onSave={save} />
         )}
         {saved && <p role="status" className="mt-3 text-[15px] text-turf">Tu cuenta de pago quedó guardada.</p>}
       </div>
