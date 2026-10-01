@@ -11,7 +11,7 @@ import WinnerPayoutModal, { type PayoutMethod } from "@/components/polla/WinnerP
 import LoserPayoutModal from "@/components/polla/LoserPayoutModal";
 import PayoutBanner from "@/components/polla/PayoutBanner";
 import WinnerPayoutCard, { type WinnerRow } from "@/components/polla/WinnerPayoutCard";
-import PayoutDefaultEditor from "@/components/perfil/PayoutDefaultEditor";
+import PayoutDefaultEditor, { type PayoutMethod as ProfilePayoutMethod } from "@/components/perfil/PayoutDefaultEditor";
 
 type Scenario =
   | "winner_collects"
@@ -31,7 +31,7 @@ export default function PayoutPreviewPage() {
   const [winnerAccount, setWinnerAccount] = useState<string | null>(null);
   const [loserPaid, setLoserPaid] = useState(false);
 
-  const [profileMethod, setProfileMethod] = useState<PayoutMethod | null>(null);
+  const [profileMethod, setProfileMethod] = useState<ProfilePayoutMethod | null>(null);
   const [profileAccount, setProfileAccount] = useState<string | null>(null);
 
   // Escenarios para el WinnerPayoutCard preview (Tabla post-ended)
@@ -172,7 +172,7 @@ export default function PayoutPreviewPage() {
         pollaName={FAKE_POLLA}
         position={1}
         prizeAmount={84000}
-        initialMethod={profileMethod ?? undefined}
+        initialMethod={profileMethod === "llave" ? undefined : profileMethod ?? undefined}
         initialAccount={profileAccount ?? undefined}
         onSubmit={(m, a) => {
           setWinnerMethod(m);

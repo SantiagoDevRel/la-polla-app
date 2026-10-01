@@ -912,7 +912,13 @@
     "saveShort": "Save",
     "delete": "Delete",
     "accountTypeAhorros": "Savings",
-    "accountTypeCorriente": "Checking"
+    "accountTypeCorriente": "Checking",
+    "methodLlave": "Key",
+    "labelLlave": "Your key",
+    "placeholderLlave": "E.g. @juan123",
+    "labelBank": "Bank",
+    "placeholderBank": "E.g. Davivienda",
+    "placeholderOtherAccount": "Account number"
   },
   "Banners": {
     "unpaidHeadlineOne": "Make your payment to start predicting",

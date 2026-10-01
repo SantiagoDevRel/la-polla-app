@@ -912,7 +912,13 @@
     "saveShort": "Guardar",
     "delete": "Borrar",
     "accountTypeAhorros": "Ahorros",
-    "accountTypeCorriente": "Corriente"
+    "accountTypeCorriente": "Corriente",
+    "methodLlave": "Llave",
+    "labelLlave": "Tu llave",
+    "placeholderLlave": "Ej: @juan123",
+    "labelBank": "Banco",
+    "placeholderBank": "Ej: Davivienda",
+    "placeholderOtherAccount": "Número de cuenta"
   },
   "Banners": {
     "unpaidHeadlineOne": "Haz tu pago para empezar a pronosticar",

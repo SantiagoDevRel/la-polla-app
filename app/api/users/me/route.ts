@@ -8,6 +8,7 @@ import { onboardingCookieOptions } from "@/lib/supabase/cookie-options";
 import { linkReferralFromCookie } from "@/lib/casa/referrals";
 import { REFERRAL_COOKIE } from "@/lib/casa/referrals-shared";
 import { z } from "zod";
+import { PAYOUT_METHODS, payoutAccountError } from "@/lib/payout/account-format";
 import {
   DISPLAY_NAME_MAX,
   DISPLAY_NAME_MIN,
@@ -15,10 +16,8 @@ import {
   needsName,
 } from "@/lib/users/needs-name";
 
-// Solo 3 métodos soportados: nequi, bancolombia, otro. Removidos
-// daviplata + transfiya — el verifier AI se simplifica con menos
-// variantes y hay menor riesgo de mismatch.
-const PAYOUT_METHODS = ["nequi", "bancolombia", "otro"] as const;
+// Métodos y formato por método: lib/payout/account-format.ts (el mismo
+// que usa el editor de /perfil).
 const PAYOUT_ACCOUNT_TYPES = ["ahorros", "corriente"] as const;
 
 const updateSchema = z.object({
@@ -144,12 +143,17 @@ export async function PATCH(request: NextRequest) {
       const account = parsed.data.default_payout_account ?? null;
       const name = parsed.data.default_payout_account_name ?? null;
       const accountType = parsed.data.default_payout_account_type ?? null;
+      if (method && account) {
+        const formatError = payoutAccountError(method, account);
+        if (formatError) return NextResponse.json({ error: formatError }, { status: 400 });
+      }
       updateData.default_payout_method = method;
       updateData.default_payout_account = account;
-      // Para nequi forzamos name y type a null — Nequi solo se identifica
-      // por celular y no tiene ahorros/corriente.
-      updateData.default_payout_account_name = method === "nequi" ? null : name;
-      updateData.default_payout_account_type = method === "nequi" ? null : accountType;
+      // Solo Bancolombia lleva titular y tipo de cuenta. Nequi y llave se
+      // identifican por sí solas; «otro» guarda banco + cuenta en account.
+      const isBank = method === "bancolombia";
+      updateData.default_payout_account_name = isBank ? name : null;
+      updateData.default_payout_account_type = isBank ? accountType : null;
       updateData.default_payout_set_at = account
         ? new Date().toISOString()
         : null;
