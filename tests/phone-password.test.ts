@@ -9,6 +9,7 @@ vi.mock("@/lib/auth/login-event", () => ({ recordLoginEvent: mocks.event }));
 import { hashPhonePassword, validPhonePassword, verifyPhonePassword } from "@/lib/auth/phone-password";
 import { POST as login } from "@/app/api/auth/login-password/route";
 import { POST as setPassword } from "@/app/api/auth/password/route";
+import { GET as passwordStatus } from "@/app/api/auth/password/status/route";
 
 function request(body: unknown, headers: Record<string, string> = {}) {
   return new NextRequest("https://example.test/api/auth/login-password", { method: "POST", body: JSON.stringify(body),
@@ -28,6 +29,37 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("private six-digit password", () => {
+  it("requires authentication before reading password status", async () => {
+    mocks.user.mockResolvedValueOnce({ data: { user: null }, error: null });
+    const response = await passwordStatus();
+    expect(response.status).toBe(401);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+  it("reports only existence for the verified owner and their current phone", async () => {
+    const db = database(null); mocks.admin.mockReturnValue(db);
+    expect(await (await passwordStatus()).json()).toEqual({ enabled: true, hasPassword: false });
+    db.query.maybeSingle.mockResolvedValue({ data: { user_id: "owner-id" }, error: null });
+    expect(await (await passwordStatus()).json()).toEqual({ enabled: true, hasPassword: true });
+    expect(db.query.select).toHaveBeenCalledWith("user_id");
+    expect(db.query.eq).toHaveBeenCalledWith("user_id", "owner-id");
+    expect(db.query.eq).toHaveBeenCalledWith("phone_number", "573001234567");
+  });
+  it("keeps disabled status and unverified phones away from the credential table", async () => {
+    vi.stubEnv("PHONE_PASSWORD_ENABLED", "false");
+    expect(await (await passwordStatus()).json()).toEqual({ enabled: false });
+    vi.stubEnv("PHONE_PASSWORD_ENABLED", "true");
+    mocks.user.mockResolvedValueOnce({ data: { user: { id: "owner-id", phone: "573001234567" } }, error: null });
+    expect(await (await passwordStatus()).json()).toEqual({ enabled: true, hasPassword: false });
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+  it("does not mistake a failed status lookup for a missing password", async () => {
+    const db = database(null); mocks.admin.mockReturnValue(db);
+    db.query.maybeSingle.mockResolvedValue({ data: null, error: { message: "Database unavailable" } });
+    const response = await passwordStatus();
+    expect(response.status).toBe(503);
+    expect(await response.json()).not.toHaveProperty("hasPassword");
+  });
   it("preserves leading zeroes and rejects other formats", () => {
     expect(validPhonePassword("012345")).toBe(true);
     for (const value of [123456, "12345", "1234567", "abcdef", "123 45"]) expect(validPhonePassword(value)).toBe(false);

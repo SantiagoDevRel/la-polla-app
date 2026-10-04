@@ -29,6 +29,14 @@ reservas atómicas por celular/IP; nunca password público de GoTrue. Migración
 Perfil ofrece crear/cambiar mediante `/set-password?returnTo=%2Fperfil`, con
 sesión vigente de cualquier canal y regreso a Perfil; reutiliza el mismo guardado.
 
+**Claridad y recuperación (2026-10-04):** Perfil consulta el estado autenticado
+`/api/auth/password/status` y distingue sin contraseña / creada con Crear / Cambiar.
+Solo se consulta existencia por usuario verificado y celular actual, nunca hash.
+Mostrar/Ocultar funciona mientras se escribe, en creación, confirmación e ingreso.
+«¿Olvidaste tu contraseña?» ofrece WhatsApp primero y SMS alternativo. WhatsApp
+mantiene su enlace y luego Perfil; SMS mantiene su verificación y abre el formulario.
+El dueño autoriza integrar y desplegar PRs después de nuestra revisión y verificación.
+
 ### Rifas de creadores habilitados (2026-09-28, migraciones 157–158, EN PROD)
 
 `RIFAS_ENABLED=true` solo en Production (Vercel); sin él no existe ninguna ruta,
@@ -136,8 +144,10 @@ borradores; sin actor los excluye. Ver [docs/casa-private-campaigns.md](docs/cas
 **Lectura administrativa (2026-10-04, decisión del dueño):** cualquier admin puede
 ver y abrir todas las ocultas. `listHiddenAdminPollas` incluye sin archivar
 `status=borrador` o `publication_mode=oculta`, pagina y distingue campañas de
-pollas normales. Borradores privados siempre aparece para admins como desplegable,
-abierto si tiene pollas; vacío ofrece «No hay pollas ocultas». Campañas abren el
+pollas normales. Solo incluye las que aún pasan `canEditPolla`: sin vencidas,
+cerradas, finalizadas o desempate en curso. Filtra estado/cierre también en SQL.
+Borradores privados siempre aparece para admins como desplegable, comprimido por
+defecto incluso con contenido; vacío ofrece «No hay pollas ocultas». Campañas abren el
 detalle y normales el editor. Los getters privados admiten cualquier admin;
 jugadores/anónimos siguen excluidos. La metadata y los RPC de escritura conservan
 su lista histórica; no editar datos ni permisos SQL para cambiar la lectura.
@@ -1344,13 +1354,10 @@ lista y no se vuelve a preguntar.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
-- (2026-10-04) Perfil / contraseña: propuesta pendiente de acuerdo. Distinguir
-  sin contraseña / contraseña creada y Crear / Cambiar, con Mostrar/Ocultar
-  mientras se escribe. Con sesión ya se cambia sin recordar la anterior;
-  fuera de sesión, proponer WhatsApp primero y SMS alternativo antes de crear otra.
-- (2026-10-04) Borradores privados: el dueño aprobó desplegable y que cualquier
-  admin vea/abra todas las ocultas. Implementación verificada en esta rama;
-  pendiente publicación. No requiere migraciones ni cambios de filas.
+- (2026-10-04) Contraseña y ajuste de Borradores privados aprobados: cambios de
+  esta rama pendientes de publicación. Contraseña distingue Crear/Cambiar y
+  recuperación WhatsApp/SMS; borradores excluye vencidas y empieza comprimido.
+  El acceso de cualquier admin ya se publicó en PR #176; no requiere migraciones.
 
 - **Rifas de creadores (2026-09-29).** En prod (157–158, PRs #163–#166). Falta
   que el dueño confirme los valores por defecto: listado solo por enlace,
