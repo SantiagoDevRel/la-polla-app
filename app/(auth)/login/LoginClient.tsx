@@ -29,7 +29,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, MessageSquare, KeyRound, Loader2, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageSquare, KeyRound, Loader2, Send } from "lucide-react";
 import axios from "axios";
 import { useTranslations, useLocale } from "next-intl";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
@@ -863,12 +863,16 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
 
             </div>
 
-            {passwordLoginEnabled && <button type="button" className={GHOST_BTN} disabled={sending} onClick={() => {
+            {passwordLoginEnabled && <button type="button" className={`${passwordMode ? GHOST_BTN : SECONDARY_BTN} flex-wrap`} disabled={sending} onClick={() => {
               if (passwordMode) {
                 setStep("recovery"); setPassword(""); setError(null); return;
               }
               setPasswordMode(true); setPassword(""); setError(null);
-            }}>{passwordMode ? (en ? "Forgot your password?" : "¿Olvidaste tu contraseña?") : (en ? "Sign in with password" : "Entrar con contraseña")}</button>}
+            }}>
+              <KeyRound className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <span className="min-w-min flex-1">{passwordMode ? (en ? "Forgot your password?" : "¿Olvidaste tu contraseña?") : (en ? "Sign in with password" : "Entrar con contraseña")}</span>
+              {!passwordMode && <ArrowRight className="h-5 w-5 shrink-0" aria-hidden="true" />}
+            </button>}
 
             {telegramEnabled && (
               <div className="space-y-3">
