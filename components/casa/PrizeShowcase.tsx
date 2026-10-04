@@ -5,8 +5,9 @@ import { Camera, Pause, Play, RotateCw, X } from "lucide-react";
 import { animate as animateValue, motion, useMotionValue } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { HorizontalPrize } from "./HorizontalPrize";
+import { PrizeTurntable, type TurntableMedia } from "./PrizeTurntable";
 
-export type PrizeMedia = { front: string; back: string; poster?: string; video: string; animation: string };
+export type PrizeMedia = { front: string; back: string; poster?: string; video: string; animation: string; turntable?: TurntableMedia };
 export type PrizePhoto = { src: string; label: string; alt: string };
 
 function useAutomaticPrizeMotion(box: RefObject<HTMLDivElement | null>) {
@@ -28,63 +29,57 @@ function useAutomaticPrizeMotion(box: RefObject<HTMLDivElement | null>) {
 }
 
 /** Asset URLs are supplied by the caller's private media boundary. No reads or writes. */
-export function PrizeMotion({ media, label, view = "turn", paused = false, interactive = false, onPausedChange, className }: {
+export function PrizeMotion({ media, label, view = "turn", paused = false, interactive = false, onPausedChange, onTurnStart, className }: {
   media: PrizeMedia; label: string; view?: "turn" | "front" | "back"; paused?: boolean;
-  interactive?: boolean; onPausedChange?: (paused: boolean) => void; className?: string;
+  interactive?: boolean; onPausedChange?: (paused: boolean) => void; onTurnStart?: () => void; className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
-  const animation = useRef<HTMLImageElement>(null);
+  const angle = useMotionValue(0);
   const automatic = useAutomaticPrizeMotion(box);
   const [mode, setMode] = useState<"still" | "video" | "animation">("still");
   const [failed, setFailed] = useState<string | null>(null);
   const [animationFailed, setAnimationFailed] = useState<string | null>(null);
   const [interactionPaused, setInteractionPaused] = useState(false);
   const [holding, setHolding] = useState(false);
-  const [frozenAnimation, setFrozenAnimation] = useState<string | null>(null);
   const isPaused = paused || interactionPaused;
   const playing = automatic && !isPaused && !holding && view === "turn";
   const active = view !== "turn" || animationFailed === media.animation ? "still" : mode === "video" && failed === media.video ? "animation" : mode;
 
   useEffect(() => {
-    if (!automatic) return;
+    if (view === "front") angle.set(0);
+    if (view === "back") angle.set(180);
+  }, [angle, view]);
+  useEffect(() => {
+    if (!media.turntable || !playing) return;
+    const start = angle.get();
+    const spin = animateValue(angle, [start, start + 360], { duration: 6, repeat: Infinity, ease: "linear" });
+    return () => spin.stop();
+  }, [angle, media.turntable, playing]);
+
+  useEffect(() => {
+    if (!automatic || media.turntable) return;
     const webkit = /AppleWebKit/.test(navigator.userAgent) && !/(Chrome|Chromium|Edg|OPR)\//.test(navigator.userAgent);
     setMode(webkit ? "animation" : "video");
-  }, [automatic]);
+  }, [automatic, media.turntable]);
   useEffect(() => {
     const element = video.current;
     if (!element || active !== "video") return;
     if (playing) void element.play().catch(() => {});
     else element.pause();
   }, [active, playing, media.video]);
-  useEffect(() => {
-    if (active !== "animation" || playing) { setFrozenAnimation(null); return; }
-    const element = animation.current;
-    if (!element?.complete || !element.naturalWidth) { setFrozenAnimation(media.poster ?? media.front); return; }
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = element.naturalWidth; canvas.height = element.naturalHeight;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("No canvas context");
-      context.drawImage(element, 0, 0);
-      setFrozenAnimation(canvas.toDataURL("image/png"));
-    } catch { setFrozenAnimation(media.poster ?? media.front); }
-  }, [active, playing, media.front, media.poster]);
 
   const setPaused = (next: boolean) => { if (onPausedChange) onPausedChange(next); else setInteractionPaused(next); };
-  const visual = <>
+  const visual = media.turntable ? <PrizeTurntable media={media.turntable} angle={angle} label={label} poster={view === "back" ? media.back : media.front} /> : <>
     {active === "video" ? <video ref={video} src={media.video} poster={media.poster ?? media.front} aria-label={label} autoPlay={playing} muted loop playsInline preload="none"
       draggable={false} className="h-full w-full select-none object-contain" onError={() => setFailed(media.video)} /> :
       // eslint-disable-next-line @next/next/no-img-element
-      <img ref={animation} src={active === "animation" ? media.animation : view === "back" ? media.back : view === "turn" ? media.poster ?? media.front : media.front} alt={label} width={512} height={512} draggable={false}
-        className={cn("h-full w-full select-none object-contain", active === "animation" && !playing && "invisible")}
+      <img src={active === "animation" && playing ? media.animation : view === "back" ? media.back : view === "turn" ? media.poster ?? media.front : media.front} alt={label} width={512} height={512} draggable={false}
+        className="h-full w-full select-none object-contain"
         onError={active === "animation" ? () => setAnimationFailed(media.animation) : undefined} />}
-    {active === "animation" && !playing &&
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={frozenAnimation ?? media.poster ?? media.front} alt="" aria-hidden="true" width={512} height={512} draggable={false} className="absolute inset-0 h-full w-full select-none object-contain" />}
   </>;
   return <div ref={box} className={cn("relative", className)}>
-    {interactive ? <HorizontalPrize label={`Mover ${label}`} paused={isPaused} onPausedChange={setPaused} onHoldingChange={setHolding} className="h-full w-full">
+    {interactive && media.turntable ? <HorizontalPrize label={`Girar ${label}`} angle={angle} paused={isPaused} onPausedChange={setPaused} onHoldingChange={next => { setHolding(next); if (next) onTurnStart?.(); }} className="h-full w-full">
       {visual}
     </HorizontalPrize> : visual}
   </div>;
@@ -105,29 +100,46 @@ const FIVE_BILL_POSITIONS = [
 ];
 
 /** Ten real banknote images; the monetary label remains supplied by SQL/caller. */
-export function CashPrizeVisual({ banknote, compact = false, interactive = false }: { banknote: string; compact?: boolean; interactive?: boolean }) {
+export function CashPrizeVisual({ banknote, back, turntable, poster, compact = false, interactive = false }: {
+  banknote: string; back?: string; turntable?: TurntableMedia; poster?: string; compact?: boolean; interactive?: boolean;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const automatic = useAutomaticPrizeMotion(box);
   const [paused, setPaused] = useState(false);
   const [holding, setHolding] = useState(false);
   const y = useMotionValue(0);
   const rotate = useMotionValue(0);
+  const angle = useMotionValue(0);
   useEffect(() => {
     if (!automatic || paused || holding) return;
     const options = { duration: 6, repeat: Infinity, ease: "easeInOut" as const };
     const bounce = animateValue(y, [y.get(), compact ? -1 : -7, y.get()], options);
     const tilt = animateValue(rotate, [rotate.get(), compact ? 1 : 2, rotate.get()], options);
-    return () => { bounce.stop(); tilt.stop(); };
-  }, [automatic, compact, holding, paused, rotate, y]);
-  const visual = <motion.div className="absolute inset-0 [perspective:800px]" style={{ y, rotate }}>
+    const start = angle.get();
+    const spin = back || turntable ? animateValue(angle, [start, start + 360], { duration: 8, repeat: Infinity, ease: "linear" }) : null;
+    return () => { bounce.stop(); tilt.stop(); spin?.stop(); };
+  }, [angle, automatic, back, compact, holding, paused, rotate, turntable, y]);
+  const visual = turntable ? <motion.div className="absolute inset-0" style={{ y, rotate }}>
+    <PrizeTurntable media={turntable} angle={angle} label="Diez billetes colombianos de cien mil pesos" poster={poster ?? banknote} />
+  </motion.div> : <motion.div className="absolute inset-0 [transform-style:preserve-3d]" style={{ y, rotate, rotateY: angle }}>
       {BILL_POSITIONS.map((position, index) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img key={position} data-banknote={index + 1} data-bill-group={compact ? index < 5 ? "upper" : "lower" : undefined} src={banknote} alt="" aria-hidden="true" width={862} height={373}
-          draggable={false} className={cn("absolute left-[18%] w-[64%] max-w-none select-none origin-bottom rounded-[2px] border border-border-strong shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)]", compact ? index < 5 ? "top-[24%]" : "top-[61%]" : "top-[10%]", compact ? FIVE_BILL_POSITIONS[index % 5] : position)} />
+        <span key={position} data-banknote={index + 1} data-bill-group={compact ? index < 5 ? "upper" : "lower" : undefined} aria-hidden="true"
+          className={cn("absolute left-[18%] aspect-[720/312] w-[64%] max-w-none origin-bottom [transform-style:preserve-3d]", compact ? index < 5 ? "top-[24%]" : "top-[61%]" : "top-[10%]", compact ? FIVE_BILL_POSITIONS[index % 5] : position)}>
+          <motion.span className="absolute inset-0 [transform-style:preserve-3d]" style={{ z: index * 0.2 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img data-bill-face="front" src={banknote} alt="" width={720} height={312} draggable={false}
+            className="absolute inset-0 h-full w-full max-w-none select-none rounded-[2px] border border-border-strong shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] [backface-visibility:hidden] [transform:translateZ(0.1px)]" />
+          {back && <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img data-bill-face="back" src={back} alt="" width={720} height={310} draggable={false}
+              className="absolute inset-0 h-full w-full max-w-none select-none rounded-[2px] border border-border-strong shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] [backface-visibility:hidden] [transform:rotateY(180deg)_translateZ(0.1px)]" />
+          </>}
+          </motion.span>
+        </span>
       ))}
     </motion.div>;
-  return <div ref={box} role={interactive ? undefined : "img"} aria-label={interactive ? undefined : "Diez billetes colombianos de cien mil pesos"} className={cn("relative mx-auto w-full max-w-[360px]", compact ? "aspect-[7/8]" : "aspect-[360/260]")}>
-    {interactive ? <HorizontalPrize label="Mover el millón: diez billetes de cien mil pesos" paused={paused} onPausedChange={setPaused} onHoldingChange={setHolding} className="absolute inset-0">
+  return <div ref={box} role={interactive && (back || turntable) ? undefined : "img"} aria-label={interactive && (back || turntable) ? undefined : "Diez billetes colombianos de cien mil pesos"} className={cn("relative mx-auto w-full max-w-[360px] [perspective:800px]", compact ? "aspect-[7/8]" : "aspect-[360/260]")}>
+    {interactive && (back || turntable) ? <HorizontalPrize label="Girar el millón: diez billetes de cien mil pesos" angle={angle} paused={paused} onPausedChange={setPaused} onHoldingChange={setHolding} className="absolute inset-0 [transform-style:preserve-3d]">
       {visual}
     </HorizontalPrize> : visual}
   </div>;
@@ -142,8 +154,8 @@ export function JerseyPrizeShowcase({ media, photos }: { media: PrizeMedia; phot
   return <section aria-label="Camiseta de James Rodríguez" className="overflow-hidden rounded-xl border border-border-default bg-bg-card/80 backdrop-blur-sm">
     <div className="relative bg-gradient-to-b from-turf/10 via-bg-card/40 to-bg-card/80 px-4 pt-5">
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-[20%] top-[15%] h-[180px] rounded-full bg-turf/10 blur-3xl" />
-      <PrizeMotion media={media} label={view === "back" ? "Espalda de la camiseta: James, número 23" : "Camiseta de Nacional de James Rodríguez"} view={view} paused={paused} interactive onPausedChange={setPaused} className="mx-auto h-[300px] w-full max-w-[360px]" />
-      <p className="mt-3 text-center text-[13px] font-normal leading-[1.5] text-text-secondary">Arrastra hacia los lados. Toca para pausar o reanudar.</p>
+      <PrizeMotion media={media} label={view === "back" ? "Espalda de la camiseta: James, número 23" : "Camiseta de Nacional de James Rodríguez"} view={view} paused={paused} interactive onPausedChange={setPaused} onTurnStart={() => setView("turn")} className="mx-auto h-[300px] w-full max-w-[360px]" />
+      <p className="mt-3 text-center text-[13px] font-normal leading-[1.5] text-text-secondary">Arrastra para darle la vuelta. Al soltar, sigue girando.</p>
       <div className="mt-3 flex flex-wrap items-center justify-center gap-2 pb-5">
         {([['turn', 'Giro', RotateCw], ['front', 'Frente', null], ['back', 'Espalda', null]] as const).map(([key, label, Icon]) =>
           <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)} className={cn("flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-[15px] font-medium transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold", view === key ? "border-border-strong bg-bg-elevated text-text-primary" : "border-border-subtle text-text-secondary")}>

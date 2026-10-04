@@ -267,7 +267,7 @@ function PollaRow({
             prizeVisual={localPrize?.kind === "jersey" ? (
               <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" interactive className="relative z-20 h-16 w-14 shrink-0" />
             ) : localPrize?.kind === "cash" ? (
-              <span className="relative z-20 flex h-16 w-14 shrink-0 items-center"><CashPrizeVisual banknote={localPrize.banknote} compact interactive /></span>
+              <span className="relative z-20 flex h-16 w-14 shrink-0 items-center"><CashPrizeVisual banknote={localPrize.banknote} back={localPrize.back} poster={localPrize.poster} turntable={localPrize.turntable} compact interactive /></span>
             ) : polla.private_draft ? (
               <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} />
             ) : undefined}

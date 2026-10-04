@@ -1333,9 +1333,14 @@ lista y no se vuelve a preguntar.
 ## Open ideas / pending decisions
 
 - **Premios táctiles (2026-10-04).** El dueño aprobó el diseño y autorizó
-  arrastre horizontal con dedo o mouse y pausa de los premios en localhost.
-  Implementado y verificado en menú, hero y visor; touch emulado y scroll
-  vertical en Chrome, sin control 3D libre. Pendientes la revisión del dueño,
+  controlar el giro con dedo o mouse en localhost. Rechazó el desplazamiento
+  lateral y que quedara pausado al soltar: exige dar la vuelta (180°) y seguir
+  girando desde la pose alcanzada. Usa los 144 renders de la camiseta y ambas
+  caras de los billetes, sin control 3D libre. El dinero usa papel curvado con
+  cantos en un render nativo; los planos CSS anteriores desaparecían a 90°.
+  Revisar ambos sentidos e invertir dirección sin soltar; la captura táctil
+  implícita de un hijo no debe terminar el gesto al transferirla al visor.
+  Pendientes la revisión del dueño,
   el iPhone físico y la autorización de publicación remota.
 
 Items que el usuario mencionó y NO descartó. Remové entradas solo

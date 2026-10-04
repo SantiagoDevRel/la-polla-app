@@ -331,7 +331,7 @@ export default async function PollaPage({
                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-3">
                   {localPrize.kind === "jersey" ? (
                     <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" interactive className="h-24 w-20 shrink-0" />
-                  ) : <div className="w-20 shrink-0"><CashPrizeVisual banknote={localPrize.banknote} compact interactive /></div>}
+                  ) : <div className="w-20 shrink-0"><CashPrizeVisual banknote={localPrize.banknote} back={localPrize.back} poster={localPrize.poster} turntable={localPrize.turntable} compact interactive /></div>}
                   <div className={`lp-money text-[32px] leading-none text-gold ${localPrize.kind === "jersey" ? "min-w-[min(100%,8rem)] flex-1 [overflow-wrap:anywhere]" : "whitespace-nowrap"}`}>
                     {localPrize.kind === "jersey" ? localPrize.title : formatCop(pot.prize_cop)}
                   </div>

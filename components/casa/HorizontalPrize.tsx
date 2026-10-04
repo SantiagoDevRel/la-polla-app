@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
-import { motion, useMotionValue } from "framer-motion";
+import { useMotionValueEvent, type MotionValue } from "framer-motion";
 import { cn } from "@/lib/cn";
 
-type Gesture = { id: number; startX: number; startY: number; origin: number; paused: boolean; dragging: boolean };
+type Gesture = { id: number; startX: number; startY: number; origin: number; width: number; dragging: boolean };
 
-/** A small horizontal movement; vertical scrolling and pinch zoom stay native. */
-export function HorizontalPrize({ children, label, paused, onPausedChange, onHoldingChange, className }: {
+/** Horizontal dragging controls the viewing angle; the prize stays in place. */
+export function HorizontalPrize({ children, label, angle, paused, onPausedChange, onHoldingChange, className }: {
   children: ReactNode;
   label: string;
+  angle: MotionValue<number>;
   paused: boolean;
   onPausedChange: (paused: boolean) => void;
   onHoldingChange: (holding: boolean) => void;
@@ -17,24 +18,18 @@ export function HorizontalPrize({ children, label, paused, onPausedChange, onHol
 }) {
   const box = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
-  const x = useMotionValue(0);
-  const limit = useRef(14);
   const [position, setPosition] = useState(0);
   const [holding, setHolding] = useState(false);
   const finish = useRef<(pointerId: number, cancelled: boolean) => void>(() => {});
 
-  const move = (next: number) => {
-    const value = Math.max(-limit.current, Math.min(limit.current, next));
-    x.set(value);
-    setPosition(Math.round(value / limit.current * 100));
-  };
+  useMotionValueEvent(angle, "change", value => setPosition((Math.round(((value % 360 + 360) % 360) / 2.5) * 2.5) % 360));
   const hold = (next: boolean) => { setHolding(next); onHoldingChange(next); };
   finish.current = (pointerId, cancelled) => {
     const current = gesture.current;
     if (!current || current.id !== pointerId) return;
     gesture.current = null;
     hold(false);
-    if (!cancelled) onPausedChange(current.dragging ? true : !current.paused);
+    if (!cancelled) onPausedChange(false);
     if (box.current?.hasPointerCapture(pointerId)) box.current.releasePointerCapture(pointerId);
   };
 
@@ -48,8 +43,8 @@ export function HorizontalPrize({ children, label, paused, onPausedChange, onHol
 
   const begin = (event: PointerEvent<HTMLDivElement>) => {
     if (!event.isPrimary || event.button !== 0 || gesture.current) return;
-    limit.current = Math.max(1, Math.min(36, event.currentTarget.clientWidth * 0.25));
-    gesture.current = { id: event.pointerId, startX: event.clientX, startY: event.clientY, origin: x.get(), paused, dragging: false };
+    gesture.current = { id: event.pointerId, startX: event.clientX, startY: event.clientY,
+      origin: angle.get(), width: Math.max(1, event.currentTarget.clientWidth), dragging: false };
     hold(true);
   };
   const drag = (event: PointerEvent<HTMLDivElement>) => {
@@ -62,31 +57,29 @@ export function HorizontalPrize({ children, label, paused, onPausedChange, onHol
       if (Math.abs(dx) < 5 || Math.abs(dx) <= Math.abs(dy)) return;
       current.dragging = true;
       event.currentTarget.setPointerCapture(event.pointerId);
-      onPausedChange(true);
     }
     event.preventDefault();
-    move(current.origin + dx);
+    angle.set(current.origin + dx / current.width * 360);
   };
 
   return <div ref={box} role="slider" tabIndex={0} aria-label={label} aria-orientation="horizontal"
-    aria-valuemin={-100} aria-valuemax={100} aria-valuenow={position}
-    aria-valuetext={`${position === 0 ? "Centrado" : position < 0 ? "A la izquierda" : "A la derecha"}. ${paused || holding ? "Pausado" : "En movimiento"}. Flechas para mover; Enter o espacio para pausar o reanudar.`}
-    data-prize-interaction="horizontal" data-prize-paused={paused || holding} data-prize-position={position}
+    aria-valuemin={0} aria-valuemax={360} aria-valuenow={position}
+    aria-valuetext={`${position} grados. ${paused || holding ? "Pausado" : "En movimiento"}. Arrastra para girar; al soltar continúa. Flechas para girar, Inicio para el frente y Fin para la espalda.`}
+    data-prize-interaction="rotate-y" data-prize-paused={paused || holding} data-prize-angle={position}
     className={cn("relative min-h-11 min-w-11 select-none rounded-md outline-none [touch-action:pan-y_pinch-zoom] focus-visible:ring-2 focus-visible:ring-gold", holding ? "cursor-grabbing" : "cursor-grab", className)}
     onPointerDown={begin} onPointerMove={drag}
     onPointerUp={event => finish.current(event.pointerId, false)}
     onPointerCancel={event => finish.current(event.pointerId, true)}
-    onLostPointerCapture={event => finish.current(event.pointerId, true)}
+    onLostPointerCapture={event => { if (event.target === event.currentTarget) finish.current(event.pointerId, true); }}
     onClick={event => { event.preventDefault(); event.stopPropagation(); }}
     onDragStart={event => event.preventDefault()}
     onKeyDown={event => {
-      if (!["ArrowLeft", "ArrowRight", "Home", " ", "Enter"].includes(event.key)) return;
+      if (!["ArrowLeft", "ArrowRight", "Home", "End", " ", "Enter"].includes(event.key)) return;
       event.preventDefault(); event.stopPropagation();
-      limit.current = Math.max(1, Math.min(36, event.currentTarget.clientWidth * 0.25));
       if (event.key === " " || event.key === "Enter") { if (!event.repeat) onPausedChange(!paused); return; }
       onPausedChange(true);
-      move(event.key === "Home" ? 0 : x.get() + (event.key === "ArrowLeft" ? -4 : 4));
+      angle.set(event.key === "Home" ? 0 : event.key === "End" ? 180 : angle.get() + (event.key === "ArrowLeft" ? -15 : 15));
     }}>
-    <motion.div className="h-full w-full" style={{ x }}>{children}</motion.div>
+    {children}
   </div>;
 }

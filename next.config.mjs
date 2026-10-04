@@ -76,9 +76,11 @@ const nextConfig = {
   async rewrites() {
     // Local visual review: original photos and renders never enter public/.
     if (!localStorageCsp) return [];
-    return ['james-v2-front.png', 'james-v2-back.png', 'james-v2-poster.png',
+    const atlas = ['james', 'cash'].flatMap(prize => [192, 512].flatMap(size => Array.from({ length: 24 }, (_, page) =>
+      `${prize}-v3-atlas-${size}-${String(page).padStart(2, '0')}.webp`)));
+    return [...atlas, 'james-v2-front.png', 'james-v2-back.png', 'james-v2-poster.png',
       'james-v2-turntable.webm', 'james-v2-turntable.webp', 'james-real-front.jpg',
-      'james-real-back.jpg', 'billete-100000.webp', 'billete-100000-clean.webp'].map(file => ({
+      'james-real-back.jpg', 'cash-v3-front.png', 'billete-100000.webp', 'billete-100000-clean.webp', 'billete-100000-back-clean.webp'].map(file => ({
         source: `/__local-prize-media/${file}`,
         destination: `http://127.0.0.1:3002/assets/${file}`,
       }));

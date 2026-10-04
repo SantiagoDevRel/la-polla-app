@@ -1670,9 +1670,14 @@ automáticas de fuentes/emoji de next/og. El dato original no se modifica.
 `components/casa/PrizeShowcase.tsx` ofrece giro de camiseta, frente/espalda,
 fotos originales ampliables y diez billetes animados: en miniatura, dos grupos
 de cinco centrados con el texto del premio. Recibe las
-URLs desde el consumidor; no consulta ni modifica datos. El giro usa WebM
-transparente en Chrome, WebP animado en WebKit y una imagen fija con movimiento
-reducido, ahorro de datos o error. Las fotos originales permiten revisar el
+URLs desde el consumidor; no consulta ni modifica datos. El giro controlable
+usa los 144 renders transparentes originales, cada 2,5°, empaquetados en 24
+páginas WebP por tamaño: 192 px en miniaturas y 512 px en el visor. Canvas
+dibuja la pose seleccionada sin desplazar ni deformar la camiseta; el cache
+conserva tres páginas por visor y carga las cercanas bajo demanda. WebM/WebP
+siguen disponibles para consumidores sin atlas. Movimiento reducido o ahorro
+de datos detienen el giro automático; el gesto manual sigue disponible.
+Las fotos originales permiten revisar el
 autógrafo: el giro es una reconstrucción, no una captura exacta del premio.
 
 La revisión usa las pantallas reales `/inicio` y `/polla/[slug]` con copias
@@ -1690,33 +1695,51 @@ clásico (oriental o sur)», compartido por Inicio y el detalle, sin cambiar
 el registro original. La camiseta v2 conserva la altura, reduce el ancho
 12 % y oscurece la firma en el material del render, sin editar las fotos.
 
-Con `interactive`, los dos premios admiten arrastre horizontal limitado con
-mouse o dedo. Presionar congela la animación; soltar tras arrastrar conserva
-la pausa. Un toque pausa o reanuda; las flechas mueven y Home centra. El gesto conserva
-scroll vertical y zoom. Los controles del menú son hermanos del enlace de la
-tarjeta. El botón del panel de la camiseta comparte el estado de pausa.
+Con `interactive`, arrastrar con mouse o dedo controla el ángulo del giro:
+media anchura del visor equivale a 180°. Presionar detiene el giro; al soltar
+continúa automáticamente desde la pose alcanzada. La camiseta permanece en
+su sitio. Las flechas giran 15°; Home muestra el frente y End la espalda,
+con pausa explícita para inspeccionar. El gesto conserva scroll vertical y
+zoom. Los controles del menú son hermanos del enlace de la tarjeta. El botón
+del panel de la camiseta comparte el estado de pausa.
+
+Los billetes usan un render nativo de diez objetos de papel con curvatura,
+espesor y cantos: 144 poses y el mismo visor de atlas. Conservan los dos
+grupos de cinco y admiten el mismo gesto y reanudación. El modelo sigue
+visible de canto a 90° y 270°, evitando la desaparición y el filtrado de
+los planos CSS anteriores. Sin atlas, el consumidor conserva el modo
+anterior de imágenes; sin reverso, muestra solo el frente automático.
 
 `billete-100000-clean.webp` quita la sobreimpresión «ESPECIMEN» mediante
 image_gen, conservando el archivo original. PNG, prompt y verificación:
 `C:/Users/STZTR/Downloads/la-polla-premios-20261004/media/banknote-clean/report.json`.
+El reverso usa la [referencia del Banco de la República](https://www.banrep.gov.co/billetes/100-mil/images/100000/reverso100000.jpg),
+con la misma edición de la sobreimpresión y originales conservados:
+`media/banknote-back/report.json`. El microtexto tapado es una reconstrucción,
+no un facsímil. Manifest de poses, tamaños y hashes:
+`media/james-shirt-v3-atlas/manifest.json` y `media/cash-v3/full-render-manifest.json`.
+Estos archivos viven en la carpeta local de revisión de Downloads.
 
 ```powershell
 node C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/server.mjs
 node C:/Users/STZTR/Downloads/la-polla-premios-20261004/run-real-app.mjs
 # http://premios.localhost:3004/inicio — servidor limitado a esta máquina
 node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-real.mjs
-node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-touch.mjs
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-rotation.mjs
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-bidirectional-rotation.mjs
 ```
 
 La sesión sintética de revisión está en un hostname propio para no reemplazar
 cookies de otras sesiones locales. El seed y su registro de custodia viven en
 Downloads; no se ejecutan contra producción.
 
-Validación: build de Next, TypeScript, lint y 20 estados de las pantallas reales
-en Chrome aislado (320/390/768/1440 px), cifras SQL → DOM, fuentes cargadas,
-texto al 200 % y fotos. Otros 15 estados comprueban tarjetas en
-320/359/360/390/768/1440 px, asset servido idéntico, arrastre y pausa con mouse,
-teclado, touch emulado, scroll vertical y movimiento reducido. Cero errores
-de página o desbordamientos. Safari/iPhone físico y publicación remota quedan
-sin probar. Evidencia en `real-verification.json` y `touch-verification.json`
-dentro de la carpeta local de revisión.
+Validación: build de Next, TypeScript, lint y pantallas reales en Chrome aislado
+(320/390/768/1440 px), cifras SQL → DOM, fuentes cargadas, texto al 200 % y fotos.
+Gesto revisado en 320/359/360/390/768/1440 px: poses 0/90/180/270°, reanudación
+al soltar, mouse, teclado, touch emulado, scroll vertical y movimiento reducido.
+La verificación bidireccional invierte el arrastre dos veces dentro del mismo
+gesto, desde el frente y la espalda. El modelo de dinero conserva diez objetos
+en todas sus poses; ver hojas de ángulos intermedios en `media/cash-v3/`.
+Safari/iPhone físico y publicación remota quedan sin probar. Reportes locales:
+`real-verification.json`, `rotation-verification.json` y
+`bidirectional-rotation-verification.json`.
