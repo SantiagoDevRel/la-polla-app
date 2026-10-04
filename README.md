@@ -1616,8 +1616,10 @@ número propio mediante el botón nativo y entrega el enlace al recibirlo.
 Nunca autentica con números escritos ni contactos elegidos de la agenda.
 
 El registro también ofrece una **contraseña opcional de seis dígitos**, con
-recuperación explícita por SMS. En **Perfil → Contraseña** puedes crearla por
-primera vez o cambiarla después de ingresar por WhatsApp, SMS o contraseña.
+recuperación por WhatsApp primero y SMS como alternativa. **Perfil → Contraseña**
+muestra si tienes una creada y ofrece Crear/Cambiar. Ambos formularios permiten
+Mostrar/Ocultar mientras escribes; la anterior no se recupera. Puedes cambiarla
+sin recordarla después de ingresar por WhatsApp, SMS o contraseña.
 Configuración privada, límites y migración160:
 [docs/phone-password.md](docs/phone-password.md).
 
@@ -1668,8 +1670,9 @@ automáticas de fuentes/emoji de next/og. El dato original no se modifica.
 ## Borradores privados en Inicio (2026-10-04)
 
 Para administradores, la sección siempre aparece con contador y desplegable.
-Incluye todas las pollas sin archivar con estado borrador o publicación oculta;
-empieza abierta si tiene contenido. Cualquier administrador puede leer las
+Incluye las pollas sin archivar con estado borrador o publicación oculta que aún
+puedan editarse; excluye vencidas, cerradas y finalizadas. Siempre empieza
+comprimida. Cualquier administrador puede leer las
 campañas y sus imágenes privadas. Las ocultas normales abren el editor existente.
 Reglas de lectura y escritura: [docs/casa-private-campaigns.md](docs/casa-private-campaigns.md).
 

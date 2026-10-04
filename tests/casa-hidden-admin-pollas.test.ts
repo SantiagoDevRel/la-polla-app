@@ -17,7 +17,7 @@ const draft = {
     label: "Final", home_label: "Local por confirmar", away_label: "Visitante por confirmar",
     home_team: null, away_team: null, scheduled_at: null, match_id: null }],
 };
-const pool = { id: "draft", slug: "oculta", name: "Polla oculta", status: "borrador", publication_mode: "oculta", campaign_draft: null };
+const pool = { id: "draft", slug: "oculta", name: "Polla oculta", status: "borrador", publication_mode: "oculta", campaign_draft: null, closes_at: "2099-01-01T00:00:00Z" };
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
 
 beforeEach(() => {
@@ -51,8 +51,28 @@ describe("hidden pollas on the administrator's home screen", () => {
     const params = new URL(String(dbFetch.mock.calls[0][0])).searchParams;
     expect(params.get("or")).toBe("(status.eq.borrador,publication_mode.eq.oculta)");
     expect(params.get("archived_at")).toBe("is.null");
+    expect(params.get("status")).toBe("in.(borrador,abierta)");
+    expect(params.get("closes_at")).toMatch(/^gt\./);
     expect(params.get("select")).not.toContain("*");
     expect(params.has("campaign_draft")).toBe(false);
+  });
+
+  it("excludes expired, closed, final and blocked pollas while preserving future drafts", async () => {
+    const now = new Date("2026-10-04T13:00:00Z");
+    dbFetch.mockResolvedValueOnce(response([
+      pool,
+      { ...pool, id: "future-campaign", campaign_draft: draft },
+      { ...pool, id: "expired", closes_at: "2026-10-04T12:59:59Z" },
+      { ...pool, id: "boundary", closes_at: now.toISOString() },
+      { ...pool, id: "closed", status: "cerrada" },
+      { ...pool, id: "settled", status: "resuelta" },
+      { ...pool, id: "void", status: "anulada" },
+      { ...pool, id: "draw", draw_pending: true },
+      { ...pool, id: "settlement", settled_at: now.toISOString() },
+      { ...pool, id: "invalid-date", closes_at: "unknown" },
+    ]));
+    expect((await listHiddenAdminPollas(actor, now)).map(row => row.id)).toEqual(["draft", "future-campaign"]);
+    expect(new URL(String(dbFetch.mock.calls[0][0])).searchParams.get("closes_at")).toBe(`gt.${now.toISOString()}`);
   });
 
   it("reads beyond the PostgREST page limit without losing hidden pollas", async () => {

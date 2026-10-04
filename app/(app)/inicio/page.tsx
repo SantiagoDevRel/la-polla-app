@@ -165,7 +165,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
         <MyPollas initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
 
         {isAdmin && (
-          <PollaSection id="pollas-privadas" kind="open" title="Borradores privados" count={privatePollas.length} defaultOpen={privatePollas.length > 0}>
+          <PollaSection id="pollas-privadas" kind="open" title="Borradores privados" count={privatePollas.length} defaultOpen={false}>
             {privatePollas.length > 0 ? (
               <ul className="grid gap-3">
                 {privatePollas.map(polla => <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? resolveTournamentSlugs(polla, [])} hidden />)}

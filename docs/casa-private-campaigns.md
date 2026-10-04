@@ -8,9 +8,12 @@ no se insertan partidos ficticios en `matches` ni se crean pronósticos.
 ## Acceso y vista previa
 
 Desde el 2026-10-04, **Borradores privados** aparece siempre para administradores
-en `/inicio`, con contador y desplegable: empieza abierto si hay ocultas y cerrado
-si no hay. Incluye toda polla sin archivar con `status=borrador` o
-`publication_mode=oculta`, no solo campañas. Las normales abren su editor
+en `/inicio`, con contador y desplegable, siempre comprimido al cargar.
+Incluye pollas sin archivar con `status=borrador` o `publication_mode=oculta`
+que aún estén dentro de su ventana administrativa: `canEditPolla` excluye vencidas,
+cerradas, finalizadas y desempates en curso. También filtra estado y cierre en SQL.
+No cambia ni elimina filas; los históricos siguen en Administración.
+Las normales abren su editor
 administrativo; las campañas abren el detalle habitual. Cualquier administrador
 vigente puede leer las campañas, aunque no esté en su lista histórica de acceso.
 
