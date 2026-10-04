@@ -1669,6 +1669,12 @@ automáticas de fuentes/emoji de next/og. El dato original no se modifica.
 
 ## Vista local de premios (2026-10-04)
 
+Producción: el usuario autorizó desplegar y publicar ambas pollas. El catálogo
+permanente y los archivos versionados están descritos en
+[Premios giratorios](docs/premios-giratorios.md). Las pantallas usan ahora
+`components/casa/prize-media.ts` y `/prizes/v3-30099c32d6c6/`; el adaptador local
+y los siguientes reportes conservan la evidencia de la revisión previa.
+
 `components/casa/PrizeShowcase.tsx` ofrece giro de camiseta, frente/espalda,
 fotos originales ampliables y diez billetes animados: en miniatura, dos grupos
 de cinco centrados con el texto del premio. Recibe las
@@ -1685,10 +1691,10 @@ autógrafo: el giro es una reconstrucción, no una captura exacta del premio.
 La revisión usa las pantallas reales `/inicio` y `/polla/[slug]` con copias
 nuevas en Supabase Docker: nombres, premios, precios, fechas y 22 partidos de
 POLLA JAMES y OFIGOLAZO4. Las copias locales simulan el estado abierto; las
-originales de producción siguen en `borrador/oculta`. No se copiaron personas,
+originales de producción se conservaron en `borrador/oculta` durante esa revisión. No se copiaron personas,
 inscripciones ni pronósticos. La cuenta de pago local es ficticia.
 
-`components/casa/local-prize-media.ts` y el rewrite de medios solo se activan
+El adaptador `components/casa/local-prize-media.ts` y el rewrite de medios solo se activan
 con `CASA_LOCAL_TEST=1` y Supabase en loopback. Los archivos permanecen en
 `C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/assets/`, fuera de
 `public/`. Miniaturas de 56×64 px en Inicio; premio en el hero y fotos bajo
@@ -1742,7 +1748,7 @@ al soltar, mouse, teclado, touch emulado, scroll vertical y movimiento reducido.
 La verificación bidireccional invierte el arrastre dos veces dentro del mismo
 gesto, desde el frente y la espalda. El modelo de dinero conserva diez objetos
 en todas sus poses; ver hojas de ángulos intermedios en `media/cash-v3/`.
-Safari/iPhone físico y publicación remota quedan sin probar. Reportes locales:
+La revisión local no incluyó Safari/iPhone físico ni publicación remota. Reportes locales:
 `real-verification.json`, `rotation-verification.json` y
 `bidirectional-rotation-verification.json`.
 

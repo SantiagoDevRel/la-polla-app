@@ -23,7 +23,7 @@ import { listHiddenAdminPollas } from "@/lib/casa/private-draft-query";
 import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
 import { CampaignPrizeMedia } from "@/components/casa/CampaignPrizeMedia";
 import { CashPrizeVisual, PrizeMotion } from "@/components/casa/PrizeShowcase";
-import { localPrizeMedia } from "@/components/casa/local-prize-media";
+import { pollaPrizeMedia } from "@/components/casa/prize-media";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { ArrowRight, CheckCircle2, EyeOff, Settings } from "lucide-react";
 import { cookies } from "next/headers";
@@ -257,7 +257,7 @@ function PollaRow({
   const estado = hidden ? { text: "Oculta", tone: "mute" as const } : pollaStatusLabel(polla);
   const abierta = isPollaOpen(polla);
   const premioPagado = Boolean(payout && payout.total > 0 && payout.paid === payout.total);
-  const localPrize = localPrizeMedia(polla.id);
+  const localPrize = pollaPrizeMedia(polla.id);
 
   const cardHref = hidden && !polla.private_draft ? editorHref(polla.id) : `/polla/${polla.slug}`;
   // Prize controls sit beside the card link, never inside it.

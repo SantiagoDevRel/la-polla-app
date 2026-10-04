@@ -16,7 +16,7 @@ import { getPrivateCampaignBySlug } from "@/lib/casa/private-draft-query";
 import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
 import { CampaignPrizeMedia } from "@/components/casa/CampaignPrizeMedia";
 import { CashPrizeVisual, JerseyPrizeShowcase, PrizeMotion } from "@/components/casa/PrizeShowcase";
-import { localPrizeMedia } from "@/components/casa/local-prize-media";
+import { pollaPrizeMedia } from "@/components/casa/prize-media";
 import {
   getDistribution,
   getLeaderboard,
@@ -254,7 +254,7 @@ export default async function PollaPage({
   }
 
   const objeto = polla.prize_kind === "objeto";
-  const localPrize = localPrizeMedia(polla.id);
+  const localPrize = pollaPrizeMedia(polla.id);
   // Entrada gratis (migración 143): no hay nada que transferir ni comprobante
   // que subir, así que la puerta es un botón «Unirme», no la pantalla de pago.
   const gratis = polla.entry_price_cop === 0 && polla.kind !== "rifa";
