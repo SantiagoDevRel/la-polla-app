@@ -1354,10 +1354,6 @@ lista y no se vuelve a preguntar.
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 
-- (2026-10-04) Contraseña y ajuste de Borradores privados aprobados: cambios de
-  esta rama pendientes de publicación. Contraseña distingue Crear/Cambiar y
-  recuperación WhatsApp/SMS; borradores excluye vencidas y empieza comprimido.
-  El acceso de cualquier admin ya se publicó en PR #176; no requiere migraciones.
 
 - **Rifas de creadores (2026-09-29).** En prod (157–158, PRs #163–#166). Falta
   que el dueño confirme los valores por defecto: listado solo por enlace,
