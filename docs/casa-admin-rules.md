@@ -12,6 +12,11 @@ goles de un solo equipo son casos excluyentes. Para ganar por puntos se requiere
 al menos un punto; el mayor puntaje gana. Un empate en dinero divide todo el pozo,
 incluidos los pesos de redondeo. Los objetos mantienen su desempate documentado.
 
+En todas las pollas con premio en objeto que usan desempate, `AvisoDesempate`
+empieza colapsado: título y flecha visibles; la regla y el ejemplo se abren al
+pulsar. Aplica tanto al participante como a quien aún no se inscribe y al enlace
+compartido. No cambia el criterio de desempate ni el reparto.
+
 **¿Cómo me pagan?** abre un diálogo que reutiliza el editor de la cuenta personal
 y `/api/users/me`, con Nequi y Bancolombia. Solo el dueño consulta/edita su cuenta;
 los pronósticos de otros nunca incluyen sus datos bancarios.

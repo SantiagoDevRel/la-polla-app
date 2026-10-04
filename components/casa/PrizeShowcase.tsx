@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
-import { Camera, Pause, Play, RotateCw, X } from "lucide-react";
+import { X } from "lucide-react";
 import { animate as animateValue, motion, useMotionValue } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { HorizontalPrize } from "./HorizontalPrize";
@@ -146,43 +146,27 @@ export function CashPrizeVisual({ banknote, back, turntable, poster, compact = f
 }
 
 export function JerseyPrizeShowcase({ media, photos }: { media: PrizeMedia; photos: readonly PrizePhoto[] }) {
-  const [view, setView] = useState<"turn" | "front" | "back">("turn");
-  const [paused, setPaused] = useState(false);
   const [photo, setPhoto] = useState(0);
   const dialog = useRef<HTMLDialogElement>(null);
   const id = useId();
   return <section aria-label="Camiseta de James Rodríguez" className="overflow-hidden rounded-xl border border-border-default bg-bg-card/80 backdrop-blur-sm">
-    <div className="relative bg-gradient-to-b from-turf/10 via-bg-card/40 to-bg-card/80 px-4 pt-5">
+    <div className="relative bg-gradient-to-b from-turf/10 via-bg-card/40 to-bg-card/80 px-4 py-5">
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-[20%] top-[15%] h-[180px] rounded-full bg-turf/10 blur-3xl" />
-      <PrizeMotion media={media} label={view === "back" ? "Espalda de la camiseta: James, número 23" : "Camiseta de Nacional de James Rodríguez"} view={view} paused={paused} interactive onPausedChange={setPaused} onTurnStart={() => setView("turn")} className="mx-auto h-[300px] w-full max-w-[360px]" />
-      <p className="mt-3 text-center text-[13px] font-normal leading-[1.5] text-text-secondary">Arrastra para darle la vuelta. Al soltar, sigue girando.</p>
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-2 pb-5">
-        {([['turn', 'Giro', RotateCw], ['front', 'Frente', null], ['back', 'Espalda', null]] as const).map(([key, label, Icon]) =>
-          <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)} className={cn("flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-[15px] font-medium transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold", view === key ? "border-border-strong bg-bg-elevated text-text-primary" : "border-border-subtle text-text-secondary")}>
-            {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />}{label}
-          </button>)}
-        {view === "turn" && <button type="button" onClick={() => setPaused(!paused)} aria-label={paused ? "Reanudar giro" : "Pausar giro"} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-border-subtle text-text-secondary transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
-          {paused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
-        </button>}
-      </div>
+      <PrizeMotion media={media} label="Camiseta de Nacional de James Rodríguez" interactive className="mx-auto h-[300px] w-full max-w-[360px]" />
     </div>
-    <div className="border-t border-border-subtle p-4">
-      <h2 className="font-display text-[20px] font-normal leading-none tracking-[0.04em]">Fotos del premio real</h2>
-      <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,12ch),1fr))] gap-3">
-        {photos.map((item, index) => <button key={item.src} type="button" onClick={() => { setPhoto(index); dialog.current?.showModal(); }} className="group cursor-pointer overflow-hidden rounded-md border border-border-default text-left transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
+    <div aria-label="Fotos originales de la camiseta" tabIndex={0} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain border-t border-border-subtle p-4 [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold">
+        {photos.map((item, index) => <button key={item.src} type="button" aria-label={`Ampliar: ${item.alt}`} onClick={() => { setPhoto(index); dialog.current?.showModal(); }} className="group w-[calc(100%-1rem)] shrink-0 snap-start cursor-pointer overflow-hidden rounded-md border border-border-default transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item.src} alt={item.alt} width={1368} height={1824} loading="lazy" className="aspect-[4/3] w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
-          <span className="flex min-h-11 items-center gap-2 px-3 py-2 text-[13px] leading-[1.5] text-text-primary"><Camera className="h-4 w-4 shrink-0" aria-hidden="true" /><span className="min-w-0 [overflow-wrap:anywhere]">{item.label}</span></span>
+          <img src={item.src} alt={item.alt} width={1536} height={2048} loading="lazy" draggable={false} className="aspect-[3/4] w-full select-none object-contain transition-transform duration-200 group-hover:scale-[1.01]" />
         </button>)}
-      </div>
     </div>
     <dialog ref={dialog} aria-labelledby={id} onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }} className="fixed inset-0 m-auto max-h-[94dvh] w-[calc(100%-24px)] max-w-[720px] overflow-y-auto rounded-xl border border-border-strong bg-bg-card p-0 text-text-primary backdrop:bg-bg-base/85 backdrop:backdrop-blur-sm">
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border-default bg-bg-card px-4 py-2">
-        <h2 id={id} className="text-[15px] font-semibold leading-[1.45]">{photos[photo]?.label} · Foto original</h2>
+      <div className="sticky top-0 z-10 flex items-center justify-end gap-3 border-b border-border-default bg-bg-card px-4 py-2">
+        <h2 id={id} className="sr-only">{photos[photo]?.alt}</h2>
         <button type="button" autoFocus onClick={() => dialog.current?.close()} aria-label="Cerrar foto" className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"><X className="h-5 w-5" aria-hidden="true" /></button>
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={photos[photo]?.src} alt={photos[photo]?.alt} width={1368} height={1824} className="h-auto w-full object-contain" />
+      <img src={photos[photo]?.src} alt={photos[photo]?.alt} width={1536} height={2048} className="h-auto w-full object-contain" />
     </dialog>
   </section>;
 }
