@@ -2,12 +2,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-/**
- * (2026-09-18) Pedido del dueño: la regla del desempate va resaltada en amarillo
- * en la mitad de la polla, con el peso de «Ya estás dentro», no en la letra
- * menuda de la Info. El empate arriba es el caso normal en modo marcador —
- * OFIGOLAZO, con 43 inscritos, terminó con tres personas empatadas.
- */
+// El título del desempate permanece visible; la regla completa y el ejemplo
+// se abren al pulsar, también antes de inscribirse y en el enlace compartido.
 import { AvisoDesempate } from "@/components/casa/AvisoDesempate";
 
 const html = renderToStaticMarkup(createElement(AvisoDesempate));
@@ -15,7 +11,7 @@ const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
 describe("aviso de desempate", () => {
   it("dice la regla completa", () => {
-    expect(text).toContain("En caso de empate, el premio se le dará a la persona que se haya registrado antes en esta polla");
+    expect(text).toContain("En caso de empate, el premio se le dará a la persona que se haya registrado primero en esta polla");
   });
 
   it("explica con el ejemplo de las horas, en letra pequeña", () => {
@@ -25,10 +21,16 @@ describe("aviso de desempate", () => {
     expect(html).toMatch(/text-\[13px\][^"]*"[^>]*>\s*(\{?\/\*|Si alguien)/);
   });
 
-  it("va en amarillo y se anuncia como nota, no como alerta", () => {
-    expect(html).toContain('role="note"');
-    expect(html).toContain("text-gold");
-    expect(html).toContain("bg-gold/10");
+  it.each([false, true])("empieza colapsado con título y flecha (compact=%s)", (compact) => {
+    const markup = renderToStaticMarkup(createElement(AvisoDesempate, { compact }));
+    const details = markup.match(/^<details\b[^>]*>/)?.[0];
+    const summary = markup.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/)?.[1];
+
+    expect(details).toBeDefined();
+    expect(details).not.toMatch(/\sopen(?:\s|=|>)/);
+    expect(summary).toContain("Si hay empate, gana quien se registró primero en esta polla");
+    expect(summary).toContain("lucide-chevron-down");
+    expect(summary).not.toContain("Si alguien se registró");
   });
 
   it("no mete el nombre del premio en la frase", () => {

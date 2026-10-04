@@ -87,7 +87,7 @@ import { InvitaYGana } from "@/components/casa/InvitaYGana";
 import { PromoInvitados } from "@/components/casa/PromoInvitados";
 import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
 import { VerMasInfo } from "@/components/casa/VerMasInfo";
-import { Plus, Settings, Ticket } from "lucide-react";
+import { Camera, ChevronDown, Plus, Settings, Ticket } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -382,8 +382,12 @@ export default async function PollaPage({
 
       <div className="px-4 pt-4">
         {localPrize?.kind === "jersey" && (
-          <details className="mb-4">
-            <summary className="flex min-h-11 cursor-pointer items-center rounded-full border border-border-subtle px-4 text-[15px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">Ver camiseta y fotos</summary>
+          <details className="group/prize mb-4">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-full border border-border-strong bg-bg-elevated/90 px-4 py-3 text-[15px] font-semibold leading-[1.45] text-text-primary shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)] transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold [&::-webkit-details-marker]:hidden">
+              <Camera aria-hidden="true" className="h-5 w-5 shrink-0" />
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">Ver camiseta y fotos</span>
+              <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 transition-transform duration-200 group-open/prize:rotate-180" />
+            </summary>
             <div className="mt-3"><JerseyPrizeShowcase media={localPrize.media} photos={localPrize.photos} /></div>
           </details>
         )}

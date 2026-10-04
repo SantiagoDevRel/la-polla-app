@@ -21,6 +21,14 @@ es una reconstrucción visual. Las fotos no tienen EXIF/GPS ni metadata personal
 Los billetes parten de referencias del Banco de la República; el microtexto
 tapado por la sobreimpresión es una reconstrucción.
 
+«Ver camiseta y fotos» es un desplegable cerrado con cámara y flecha. Al abrirlo,
+la camiseta gira automáticamente y mantiene el arrastre; no hay instrucciones
+ni botones de poses. Las fotos originales conservan su encuadre completo en un
+carrusel horizontal: frente/autógrafo primero y dorsal después, grandes y sin
+subtítulos. Se pueden ampliar con clic y cerrar con Escape o el botón de cierre.
+El aviso de desempate de todas las pollas con objeto también empieza cerrado:
+título y flecha visibles, regla completa y ejemplo al abrirlo.
+
 ## Archivos y caché
 
 Los 106 archivos aprobados están en `public/prizes/v3-30099c32d6c6/`: atlas,
