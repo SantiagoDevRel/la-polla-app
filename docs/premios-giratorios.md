@@ -38,19 +38,32 @@ Las variables para verificar el build viven fuera de la carpeta desplegable.
 
 ## Publicación
 
-El usuario autorizó producción y publicación de ambas pollas el 4 de octubre
-de 2026. Usar el endpoint administrativo existente, contrato v2: actualizar
-solo `prizeObject` de James con el texto aprobado y después la acción
-`publicacion`, `mode: ahora`. No crear pollas, inscripciones o pronósticos,
-ni cambiar precios, fechas, partidos, cuentas de cobro o protocolos operativos.
+Ambas pollas quedaron publicadas el 4 de octubre de 2026, después de la
+autorización del usuario y del despliegue Ready
+`dpl_3pqLon3EC6p72CoNYchC9b8cghi6`.
+[PR #180](https://github.com/SantiagoDevRel/la-polla-app/pull/180), integrado en
+`main` como `129bc5999ff514d38699e52518b1390e330f8c09`.
 
-UUID James: `e5e5719d-bdaf-407d-bf8d-b856338709a9`.
-UUID OFIGOLAZO4: `05f83cb8-d16d-42fd-a6b8-a0840c9b0cf9`.
+- [POLLA JAMES](https://lapollacolombiana.com/polla/polla-james):
+  `e5e5719d-bdaf-407d-bf8d-b856338709a9`.
+- [OFIGOLAZO4](https://lapollacolombiana.com/polla/ofigolazo4):
+  `05f83cb8-d16d-42fd-a6b8-a0840c9b0cf9`.
+
+El endpoint administrativo existente, contrato v2, respondió 200 al actualizar
+`prizeObject` de James a «Camiseta James firmada + boleta clásico (oriental o sur)»
+y a las dos acciones `publicacion`, `mode: ahora`. La lectura posterior confirmó
+`status: abierta` y `publication_mode: ahora` en ambas. Se conservaron precios,
+fechas, partidos y cuentas de cobro; no se crearon inscripciones ni pronósticos.
 
 ## Validación
 
-Build de Next con configuración de producción, TypeScript, lint, pruebas de
-borradores y recorrido visual de Inicio/detalles. Revisar 320, 390, 768 y
-1440 px, texto al 200 %, fuentes, fotos y giro en ambos sentidos. Verificar
-las respuestas de medios y que ambas filas de billetes sigan visibles durante
-el giro. Touch se verifica por emulación en Chrome; iPhone físico pendiente.
+Pasaron el build de Next con configuración de producción, TypeScript, lint y
+las pruebas de borradores. La evidencia visual local cubre Inicio y detalles
+a 320, 390, 768 y 1440 px, texto al 200 %, fuentes, fotos y giro en ambos
+sentidos, incluso al invertir la dirección sin soltar y reanudar al liberar.
+Las dos filas de billetes permanecen visibles durante el giro.
+
+En producción, los 106 medios respondieron 200 con MIME, tamaño, SHA-256 y
+caché immutable correctos; siete rutas sensibles no devolvieron 200.
+Touch se verificó por emulación en Chrome. No se realizó una prueba en
+iPhone físico.
