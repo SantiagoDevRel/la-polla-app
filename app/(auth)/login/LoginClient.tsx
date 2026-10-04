@@ -29,7 +29,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, MessageSquare, KeyRound, Loader2, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageSquare, KeyRound, Loader2, Send } from "lucide-react";
 import axios from "axios";
 import { useTranslations, useLocale } from "next-intl";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
@@ -41,6 +41,7 @@ import {
 } from "@/lib/auth/otp-codes";
 import { prefersSameTab } from "@/lib/auth/telegram-login/open-mode";
 import SmsCaptcha, { type SmsCaptchaHandle, type SmsCaptchaStatus } from "@/components/auth/SmsCaptcha";
+import PasswordInput from "@/components/auth/PasswordInput";
 import TournamentBadge from "@/components/shared/TournamentBadge";
 import PhoneInput from "@/components/ui/PhoneInput";
 import { PAISES_SMS } from "@/lib/sms/paises";
@@ -66,7 +67,7 @@ const RETURN_TO_KEY = "lp_returnTo";
 const OTP_COOLDOWN_MS = 60_000;
 const OTP_COOLDOWN_KEY = "lp_otp_cooldown_until";
 
-type Step = "input" | "otp" | "telegram";
+type Step = "input" | "otp" | "telegram" | "recovery";
 
 // Espera de Telegram. En teléfonos con poca memoria el navegador puede recargar
 // la pestaña al volver de Telegram: se guarda el deep link y el vencimiento
@@ -180,6 +181,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
   const en = useLocale() === "en";
   const [passwordMode, setPasswordMode] = useState(false);
   const [password, setPassword] = useState("");
+  const recoveryHeading = useRef<HTMLHeadingElement>(null);
   const t = useTranslations("Login");
   const channelText = useTranslations("PhoneOtp");
   const channelLabel = deliveryChannel === "whatsapp" ? "WhatsApp" : "SMS";
@@ -195,6 +197,9 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
   }, []);
 
   const [step, setStep] = useState<Step>("input");
+  useEffect(() => {
+    if (step === "recovery") recoveryHeading.current?.focus();
+  }, [step]);
   // Paso al que vuelve «Cancelar» desde la espera de Telegram.
   const [telegramReturnStep, setTelegramReturnStep] = useState<"input" | "otp">("input");
   const [telegram, setTelegram] = useState<TelegramState>(TELEGRAM_IDLE);
@@ -806,11 +811,8 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
               <PhoneInput inputId="phone" onChange={setPhoneE164} countries={PAISES_SMS} />
             </div>
 
-            {passwordMode && <div className="space-y-1.5">
-              <label htmlFor="login-password" className="block text-sm leading-normal font-medium text-text-secondary">{en ? "6-digit password" : "Contraseña de 6 dígitos"}</label>
-              <input id="login-password" type="password" inputMode="numeric" autoComplete="current-password" pattern="[0-9]{6}" maxLength={6} required
-                value={password} onChange={e => setPassword(e.target.value.replace(/\D/g, ""))} className="lp-input w-full text-base" />
-            </div>}
+            {passwordMode && <PasswordInput id="login-password" label={en ? "6-digit password" : "Contraseña de 6 dígitos"}
+              value={password} onChange={setPassword} autoComplete="current-password" disabled={sending} />}
 
             {error && (
               <p className="text-red-alert text-sm text-center bg-red-dim rounded-xl p-2.5">
@@ -861,15 +863,16 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
 
             </div>
 
-            {passwordLoginEnabled && <button type="button" className={GHOST_BTN} disabled={sending} onClick={() => {
+            {passwordLoginEnabled && <button type="button" className={`${passwordMode ? GHOST_BTN : SECONDARY_BTN} flex-wrap`} disabled={sending} onClick={() => {
               if (passwordMode) {
-                const destination = safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY)) || "/inicio";
-                if (!destination.startsWith("/set-password")) {
-                  window.sessionStorage.setItem(RETURN_TO_KEY, `/set-password?returnTo=${encodeURIComponent(destination)}`);
-                }
+                setStep("recovery"); setPassword(""); setError(null); return;
               }
-              setPasswordMode(!passwordMode); setPassword(""); setError(null);
-            }}>{passwordMode ? (en ? "Forgot your password? Sign in by SMS" : "¿Olvidaste tu contraseña? Entrar por SMS") : (en ? "Sign in with password" : "Entrar con contraseña")}</button>}
+              setPasswordMode(true); setPassword(""); setError(null);
+            }}>
+              <KeyRound className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <span className="min-w-min flex-1">{passwordMode ? (en ? "Forgot your password?" : "¿Olvidaste tu contraseña?") : (en ? "Sign in with password" : "Entrar con contraseña")}</span>
+              {!passwordMode && <ArrowRight className="h-5 w-5 shrink-0" aria-hidden="true" />}
+            </button>}
 
             {telegramEnabled && (
               <div className="space-y-3">
@@ -906,6 +909,37 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
             })}
           </p>
         </div>
+      )}
+
+      {step === "recovery" && (
+        <section className={LOGIN_CARD} aria-labelledby="password-recovery-title">
+          <KeyRound className="mx-auto h-6 w-6 text-text-secondary" aria-hidden="true" />
+          <div className="space-y-2 text-center">
+            <h1 ref={recoveryHeading} id="password-recovery-title" tabIndex={-1} className={`${LOGIN_TITLE} -mx-4 leading-tight`}>
+              {en ? "RECOVER PASSWORD" : "RECUPERAR CONTRASEÑA"}
+            </h1>
+            <p className="text-sm leading-relaxed text-text-secondary">{en
+              ? "Sign in again with your account's WhatsApp or SMS number. Then you can change your password in Profile."
+              : "Vuelve a ingresar con el WhatsApp o el SMS del celular de tu cuenta. Después puedes cambiar tu contraseña en Perfil."}</p>
+          </div>
+          <div className="space-y-3">
+            {whatsappLoginHref && <WhatsAppLoginButton href={whatsappLoginHref} en={en} />}
+            <button type="button" className={whatsappLoginHref ? SECONDARY_BTN : PRIMARY_BTN} onClick={() => {
+              const destination = safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY)) || "/perfil";
+              if (!destination.startsWith("/set-password")) {
+                window.sessionStorage.setItem(RETURN_TO_KEY, `/set-password?returnTo=${encodeURIComponent(destination)}`);
+              }
+              setPasswordMode(false); setStep("input"); setError(null);
+            }}>
+              <MessageSquare className="h-5 w-5 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{en ? "Sign in by SMS" : "Entrar por SMS"}</span>
+            </button>
+          </div>
+          <button type="button" className={GHOST_BTN} onClick={() => { setStep("input"); setError(null); }}>
+            <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{en ? "Back to sign in" : "Volver al ingreso"}</span>
+          </button>
+        </section>
       )}
 
       {step === "otp" && (

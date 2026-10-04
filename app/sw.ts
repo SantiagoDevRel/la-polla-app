@@ -43,6 +43,7 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   // El panel administra acceso y muestra datos personales del directorio.
   /^\/admin(\/|$)/,
   /\/login/,
+  /^\/set-password(\/|$)/,
   /\/invites\/polla\//,
   /\/onboarding/,
   // Kill-switch: si un user queda atrapado con un SW corrupto/viejo,
