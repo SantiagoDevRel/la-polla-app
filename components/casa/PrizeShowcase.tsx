@@ -47,6 +47,12 @@ const BILL_POSITIONS = [
   "rotate-[12deg] translate-x-[8%] translate-y-[1%]", "rotate-[20deg] translate-x-[14%] translate-y-[3%]",
   "rotate-[28deg] translate-x-[20%] translate-y-[7%]", "rotate-[36deg] translate-x-[26%] translate-y-[12%]",
 ];
+const FIVE_BILL_POSITIONS = [
+  "-rotate-[20deg] -translate-x-[14%] translate-y-[3%]",
+  "-rotate-[10deg] -translate-x-[7%] translate-y-[1%]", "rotate-0",
+  "rotate-[10deg] translate-x-[7%] translate-y-[1%]",
+  "rotate-[20deg] translate-x-[14%] translate-y-[3%]",
+];
 
 /** Ten real banknote images; the monetary label remains supplied by SQL/caller. */
 export function CashPrizeVisual({ banknote, compact = false }: { banknote: string; compact?: boolean }) {
@@ -61,12 +67,12 @@ export function CashPrizeVisual({ banknote, compact = false }: { banknote: strin
     observer.observe(box.current); reduced.addEventListener("change", sync); document.addEventListener("visibilitychange", sync);
     return () => { observer.disconnect(); reduced.removeEventListener("change", sync); document.removeEventListener("visibilitychange", sync); };
   }, []);
-  return <div ref={box} role="img" aria-label="Diez billetes colombianos de cien mil pesos" className={cn("relative mx-auto w-full max-w-[360px]", compact ? "aspect-[360/240]" : "aspect-[360/260]")}>
-    <motion.div className="absolute inset-0 [perspective:800px]" animate={animate ? { y: [0, -7, 0], rotate: [-2, 2, -2] } : { y: 0, rotate: 0 }} transition={animate ? { duration: 6, repeat: Infinity, ease: "easeInOut" } : { duration: 0 }}>
+  return <div ref={box} role="img" aria-label="Diez billetes colombianos de cien mil pesos" className={cn("relative mx-auto w-full max-w-[360px]", compact ? "aspect-[7/8]" : "aspect-[360/260]")}>
+    <motion.div className="absolute inset-0 [perspective:800px]" animate={animate ? { y: [0, compact ? -1 : -7, 0], rotate: compact ? [-1, 1, -1] : [-2, 2, -2] } : { y: 0, rotate: 0 }} transition={animate ? { duration: 6, repeat: Infinity, ease: "easeInOut" } : { duration: 0 }}>
       {BILL_POSITIONS.map((position, index) => (
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={position} data-banknote={index + 1} src={banknote} alt="" aria-hidden="true" width={862} height={373}
-          className={cn("absolute left-[18%] top-[10%] w-[64%] max-w-none origin-bottom rounded-[2px] border border-border-strong shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)]", position)} />
+        <img key={position} data-banknote={index + 1} data-bill-group={compact ? index < 5 ? "upper" : "lower" : undefined} src={banknote} alt="" aria-hidden="true" width={862} height={373}
+          className={cn("absolute left-[18%] w-[64%] max-w-none origin-bottom rounded-[2px] border border-border-strong shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)]", compact ? index < 5 ? "top-[24%]" : "top-[61%]" : "top-[10%]", compact ? FIVE_BILL_POSITIONS[index % 5] : position)} />
       ))}
     </motion.div>
   </div>;

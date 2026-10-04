@@ -1,7 +1,7 @@
 import "server-only";
 import type { PrizeMedia, PrizePhoto } from "./PrizeShowcase";
 
-type LocalPrize = { kind: "jersey"; media: PrizeMedia; photos: readonly PrizePhoto[] }
+type LocalPrize = { kind: "jersey"; title: string; media: PrizeMedia; photos: readonly PrizePhoto[] }
   | { kind: "cash"; banknote: string };
 
 /** Visual review only: these files stay on this machine, outside public/. */
@@ -11,6 +11,7 @@ export function localPrizeMedia(id: string): LocalPrize | null {
   const base = "/__local-prize-media/";
   if (id === "e5e5719d-bdaf-407d-bf8d-b856338709a9") return {
     kind: "jersey",
+    title: "Camiseta James firmada + boleta clásico (oriental o sur)",
     media: { front: `${base}james-v2-front.png`, back: `${base}james-v2-back.png`, poster: `${base}james-v2-poster.png`,
       video: `${base}james-v2-turntable.webm`, animation: `${base}james-v2-turntable.webp` },
     photos: [

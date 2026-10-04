@@ -324,27 +324,39 @@ export default async function PollaPage({
         </div>
         {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className={`${participa ? "mt-2" : "mt-3"} self-start`} />}
         <div className={`${participa ? "mt-3" : "mt-4"} ${objeto ? "grid grid-cols-2" : "flex flex-wrap"} gap-x-3 gap-y-4`}>
-          <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : localPrize?.kind === "cash" ? "flex min-w-0 flex-[1_1_min-content] flex-wrap items-center gap-3" : "min-w-0 flex-[1_1_min-content]"}>
-            {localPrize?.kind === "jersey" ? (
-              <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" className="h-24 w-20 shrink-0" />
-            ) : localPrize?.kind === "cash" ? (
-              <div className="w-20 shrink-0"><CashPrizeVisual banknote={localPrize.banknote} compact /></div>
-            ) : objeto && (polla.prize_image_path || privateCampaign?.draft.image_path) && (
-              privateCampaign ? <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} className="h-20 w-16" /> :
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={prizeImageUrl(polla.prize_image_path!)}
-                alt=""
-                aria-hidden="true"
-                className="h-14 w-14 max-w-none shrink-0 rounded-md object-cover"
-              />
-            )}
-            <div className="min-w-0">
-              <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
-              <div className={`lp-money mt-1 text-[32px] leading-none text-gold ${objeto ? "[overflow-wrap:anywhere]" : localPrize?.kind === "cash" ? "whitespace-nowrap" : "break-words"}`}>
-                {objeto ? polla.prize_object : formatCop(pot.prize_cop)}
+          <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : localPrize?.kind === "cash" ? "min-w-0 flex-[1_1_max-content]" : "min-w-0 flex-[1_1_min-content]"}>
+            {localPrize ? (
+              <div className="w-full min-w-0">
+                <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
+                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-3">
+                  {localPrize.kind === "jersey" ? (
+                    <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" className="h-24 w-20 shrink-0" />
+                  ) : <div className="w-20 shrink-0"><CashPrizeVisual banknote={localPrize.banknote} compact /></div>}
+                  <div className={`lp-money text-[32px] leading-none text-gold ${localPrize.kind === "jersey" ? "min-w-[min(100%,8rem)] flex-1 [overflow-wrap:anywhere]" : "whitespace-nowrap"}`}>
+                    {localPrize.kind === "jersey" ? localPrize.title : formatCop(pot.prize_cop)}
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <>
+                {objeto && (polla.prize_image_path || privateCampaign?.draft.image_path) && (
+                  privateCampaign ? <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} className="h-20 w-16" /> :
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={prizeImageUrl(polla.prize_image_path!)}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-14 w-14 max-w-none shrink-0 rounded-md object-cover"
+                  />
+                )}
+                <div className="min-w-0">
+                  <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
+                  <div className={`lp-money mt-1 text-[32px] leading-none text-gold ${objeto ? "[overflow-wrap:anywhere]" : "break-words"}`}>
+                    {objeto ? polla.prize_object : formatCop(pot.prize_cop)}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           <div className={objeto ? "col-span-2 min-w-0" : "min-w-0 flex-[1_1_min-content] border-l border-border-subtle pl-3"}>
             <Label>Entrada</Label>
@@ -543,7 +555,7 @@ export default async function PollaPage({
           slug={polla.slug}
           staticMode={Boolean(privateCampaign)}
           finished={partidosTerminados}
-          info={<PollaInfo polla={polla} threshold={threshold} schedulePending={Boolean(privateCampaign)} />}
+          info={<PollaInfo polla={localPrize?.kind === "jersey" ? { ...polla, prize_object: localPrize.title } : polla} threshold={threshold} schedulePending={Boolean(privateCampaign)} />}
           firstLabel={polla.kind === "manual" ? "Preguntas" : polla.kind === "rifa" ? "Sorteo" : "Partidos"}
           initialRows={tabla}
           initialPrizes={prizes}

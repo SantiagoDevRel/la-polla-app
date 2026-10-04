@@ -299,7 +299,7 @@ function PollaRow({
                   {premioPagado ? "Pagado" : `Pagado ${payout.paid} de ${payout.total}`}
                 </span>
               : premioLabel()}
-            premio={premioValor({ ...polla, prize_cop: pot?.prize_cop ?? 0 })}
+            premio={localPrize?.kind === "jersey" ? localPrize.title : premioValor({ ...polla, prize_cop: pot?.prize_cop ?? 0 })}
             objeto={polla.prize_kind === "objeto"}
             dato={abierta
               ? { label: "Cierra en", value: timeLeft(polla.closes_at), tone: "gold" }

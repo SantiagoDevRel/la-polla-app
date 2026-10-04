@@ -24,7 +24,8 @@ export type PollaCardDato = { label?: ReactNode; value?: ReactNode; tone?: keyof
  *   1. Nombre       una línea; si no cabe, se corta con «…».
  *   2. Torneos      una fila; más de seis se resumen en «+N».
  *   3. Premio | Dato  dos columnas. El premio en objeto va en letra de texto
- *                   y máximo dos líneas, en la MISMA caja que la cifra. El
+ *                   y máximo dos líneas; con imagen conserva el texto completo
+ *                   y centra la animación con el premio. El
  *                   dato (cierre, inscritos) vive siempre a la derecha.
  *
  * El nombre y el premio completos se leen dentro de la polla. Los altos son
@@ -70,23 +71,23 @@ export function PollaCardBody({ name, nameDecoration, prizeVisual, tournaments, 
           su texto; el dato no se encoge. Solo si el texto ampliado del teléfono
           ya no le deja al premio su ancho mínimo, el dato baja — y `ml-auto` lo
           mantiene a la derecha (antes caía a la izquierda). */}
-      <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2">
+      <div className={`mt-3 flex flex-wrap gap-x-3 gap-y-2 ${prizeVisual ? "items-start" : "items-end"}`}>
         <div className={`flex-1 basis-0 ${objeto ? "min-w-[8rem]" : "min-w-fit"}`}>
           <span className="lp-label block truncate">{premioLabel}</span>
-          <div className={`mt-1 flex min-h-9 items-end gap-2 ${prizeVisual && !objeto ? "flex-wrap" : ""}`}>
+          <div className={`mt-1 flex gap-2 ${prizeVisual ? "min-h-20 items-center" : "min-h-9 items-end"} ${prizeVisual && !objeto ? "flex-wrap" : ""}`}>
             {prizeVisual}
             {premio === null
               ? <span className="text-[15px] leading-none text-text-secondary">—</span>
               : objeto
-                ? <span title={premio} className={`line-clamp-2 text-[15px] font-semibold leading-[1.2] max-[359px]:text-[13px] ${tono} [overflow-wrap:anywhere]`}>{premio}</span>
+                ? <span title={premio} className={`${prizeVisual ? "min-w-0" : "line-clamp-2"} text-[15px] font-semibold leading-[1.2] max-[359px]:text-[13px] ${tono} [overflow-wrap:anywhere]`}>{premio}</span>
                 : <span className={`lp-money text-[24px] leading-none ${tono}`}>{premio}</span>}
           </div>
         </div>
         {dato && (dato.label || dato.value) && (
           <div className="ml-auto max-w-full shrink-0 text-right">
             <span className="lp-label block min-h-[1.5em] whitespace-nowrap">{dato.label}</span>
-            {/* Misma caja que el premio: las dos etiquetas quedan a la misma altura y los dos valores sobre la misma base. */}
-            <div className="mt-1 flex min-h-9 items-end justify-end">
+            {/* Misma caja que el premio: etiquetas alineadas y valores centrados cuando hay animación. */}
+            <div className={`mt-1 flex justify-end ${prizeVisual ? "min-h-20 items-center" : "min-h-9 items-end"}`}>
               {dato.value && <span className={`whitespace-nowrap text-[15px] font-semibold leading-[1.2] ${TONOS[dato.tone ?? "secondary"]}`}>{dato.value}</span>}
             </div>
           </div>

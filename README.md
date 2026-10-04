@@ -1668,7 +1668,8 @@ automáticas de fuentes/emoji de next/og. El dato original no se modifica.
 ## Vista local de premios (2026-10-04)
 
 `components/casa/PrizeShowcase.tsx` ofrece giro de camiseta, frente/espalda,
-fotos originales ampliables y un abanico animado de diez billetes. Recibe las
+fotos originales ampliables y diez billetes animados: en miniatura, dos grupos
+de cinco centrados con el texto del premio. Recibe las
 URLs desde el consumidor; no consulta ni modifica datos. El giro usa WebM
 transparente en Chrome, WebP animado en WebKit y una imagen fija con movimiento
 reducido, ahorro de datos o error. Las fotos originales permiten revisar el
@@ -1684,7 +1685,9 @@ inscripciones ni pronósticos. La cuenta de pago local es ficticia.
 con `CASA_LOCAL_TEST=1` y Supabase en loopback. Los archivos permanecen en
 `C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/assets/`, fuera de
 `public/`. Miniaturas de 56×64 px en Inicio; premio en el hero y fotos bajo
-«Ver camiseta y fotos». La camiseta v2 conserva la altura, reduce el ancho
+«Ver camiseta y fotos». El título local es «Camiseta James firmada + boleta
+clásico (oriental o sur)», compartido por Inicio y el detalle, sin cambiar
+el registro original. La camiseta v2 conserva la altura, reduce el ancho
 12 % y oscurece la firma en el material del render, sin editar las fotos.
 
 ```powershell
