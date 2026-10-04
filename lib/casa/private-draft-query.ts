@@ -12,7 +12,6 @@ export async function getPrivateCampaign(id: string, actor: Actor) {
   const { data, error } = await createAdminClient().from("casa_pollas")
     .select(`${CASA_POLLA_COLUMNS}, campaign_draft`)
     .eq("id", id).eq("status", "borrador").eq("publication_mode", "oculta")
-    .contains("campaign_draft", { allowed_admin_ids: [actor.id] })
     .is("archived_at", null).maybeSingle();
   if (error) throw error;
   if (!data || !canAccessCasaPolla(data, actor)) return null;
@@ -23,20 +22,28 @@ export async function getPrivateCampaign(id: string, actor: Actor) {
   return { polla: { ...polla, private_draft: true, private_draft_motion: Boolean(draft.motion) } as CasaPolla, draft };
 }
 
-/** The normal POLLAS screen includes only this admin's explicitly allowed drafts. */
-export async function listPrivateCampaignPollas(actor: Actor): Promise<CasaPolla[]> {
+/** All unarchived hidden pollas, including ordinary drafts, for a verified admin. */
+export async function listHiddenAdminPollas(actor: Actor): Promise<CasaPolla[]> {
   if (!actor?.is_admin) return [];
-  const { data, error } = await createAdminClient().from("casa_pollas")
-    .select(`${CASA_POLLA_COLUMNS}, campaign_draft`)
-    .eq("status", "borrador").eq("publication_mode", "oculta")
-    .contains("campaign_draft", { allowed_admin_ids: [actor.id] })
-    .is("archived_at", null).order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).filter(row => canAccessCasaPolla(row, actor)).map(row => {
-    const { campaign_draft: _metadata, ...polla } = row;
-    void _metadata;
-    return { ...polla, private_draft: true, private_draft_motion: Boolean(parseCasaPrivateDraft(_metadata)?.motion) } as CasaPolla;
-  });
+  const db = createAdminClient();
+  const pollas: CasaPolla[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await db.from("casa_pollas")
+      .select(`${CASA_POLLA_COLUMNS}, campaign_draft`)
+      .or("status.eq.borrador,publication_mode.eq.oculta")
+      .is("archived_at", null)
+      .order("created_at", { ascending: false }).order("id", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      if (!canAccessCasaPolla(row, actor)) continue;
+      const { campaign_draft: metadata, ...polla } = row;
+      pollas.push({ ...polla, private_draft: metadata !== null,
+        private_draft_motion: Boolean(parseCasaPrivateDraft(metadata)?.motion) } as CasaPolla);
+    }
+    if (!data || data.length < pageSize) return pollas;
+  }
 }
 
 /** Private fallback for the normal detail page; player APIs keep their public getter. */
@@ -44,8 +51,7 @@ export async function getPrivateCampaignBySlug(slug: string, actor: Actor) {
   if (!actor?.is_admin) return null;
   const { data, error } = await createAdminClient().from("casa_pollas")
     .select("id").eq("slug", slug).eq("status", "borrador")
-    .eq("publication_mode", "oculta").is("archived_at", null)
-    .contains("campaign_draft", { allowed_admin_ids: [actor.id] }).maybeSingle();
+    .eq("publication_mode", "oculta").is("archived_at", null).maybeSingle();
   if (error) throw error;
   return data ? getPrivateCampaign(data.id, actor) : null;
 }

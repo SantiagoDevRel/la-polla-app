@@ -19,11 +19,11 @@ import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
-import { listPrivateCampaignPollas } from "@/lib/casa/private-draft-query";
+import { listHiddenAdminPollas } from "@/lib/casa/private-draft-query";
 import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
 import { CampaignPrizeMedia } from "@/components/casa/CampaignPrizeMedia";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
-import { ArrowRight, CheckCircle2, Settings } from "lucide-react";
+import { ArrowRight, CheckCircle2, EyeOff, Settings } from "lucide-react";
 import { cookies } from "next/headers";
 import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
 import { PromoInvitados } from "@/components/casa/PromoInvitados";
@@ -89,7 +89,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
     // Invitaciones (migración 135): personas nuevas que todavía pueden decir quién las invitó.
     getReferralInvitee(user.id, referralHint),
   ]);
-  const privatePollas = await listPrivateCampaignPollas({ id: user.id, is_admin: isAdmin });
+  const privatePollas = await listHiddenAdminPollas({ id: user.id, is_admin: isAdmin });
   const verInvitacion = Boolean(invitee?.can_set_referrer && !invitee.referrer
     && (invitee.hint || cookieStore.get(REFERRAL_DISMISS_COOKIE)?.value !== "1"));
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
@@ -111,7 +111,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
   const [pots, pendientes, tournaments, pagos, promoView] = await Promise.all([
     getPots([...pollas, ...privatePollas].map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
-    getPollaTournamentSlugs(pollas),
+    getPollaTournamentSlugs([...pollas, ...privatePollas]),
     // Prueba de pago (migración 133): qué pollas cerradas ya pagaron su premio.
     getPayoutProgress(cerradas.filter((p) => p.status === "resuelta").map((p) => p.id))
       .catch((): Record<string, { total: number; paid: number }> => ({})),
@@ -121,7 +121,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
 
   // (2026-09-18) Mis pollas y Para entrar ya no son desplegables: salen de una.
-  // Solo Terminadas se pliega, porque es historial.
+  // Terminadas y los borradores administrativos conservan su desplegable.
 
   // El número grande de arriba: todo lo que hay repartible ahora mismo.
   const enJuego = abiertas.reduce((sum, p) => sum + (pots[p.id]?.prize_cop ?? 0), 0);
@@ -164,11 +164,19 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
         {/* El respaldo se suma por polla: la tarjeta ya no habla de cupos. */}
         <MyPollas initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
 
-        {privatePollas.length > 0 && (
-          <PollaSection id="pollas-privadas" kind="open" flat title="Borradores privados" count={privatePollas.length}>
-            <ul className="grid gap-3">
-              {privatePollas.map(polla => <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={resolveTournamentSlugs(polla, [])} />)}
-            </ul>
+        {isAdmin && (
+          <PollaSection id="pollas-privadas" kind="open" title="Borradores privados" count={privatePollas.length} defaultOpen={privatePollas.length > 0}>
+            {privatePollas.length > 0 ? (
+              <ul className="grid gap-3">
+                {privatePollas.map(polla => <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? resolveTournamentSlugs(polla, [])} hidden />)}
+              </ul>
+            ) : (
+              <StreetCard className="p-5 text-center">
+                <EyeOff aria-hidden="true" className="mx-auto mb-2 h-6 w-6 text-text-secondary" />
+                <p className="lp-display-sm text-text-primary">No hay pollas ocultas</p>
+                <Link href="/admin/pollas/crear" className="lp-btn lp-btn-ghost mt-3">Crear polla</Link>
+              </StreetCard>
+            )}
           </PollaSection>
         )}
 
@@ -228,6 +236,7 @@ function PollaRow({
   payout,
   participated = false,
   closed = false,
+  hidden = false,
 }: {
   polla: CasaPolla;
   pot?: { prize_cop: number; paid_entries: number };
@@ -240,8 +249,10 @@ function PollaRow({
   participated?: boolean;
   /** Sección Pollas cerradas: tono gris translúcido. */
   closed?: boolean;
+  /** Borrador u oculta: las pollas normales abren el editor administrativo. */
+  hidden?: boolean;
 }) {
-  const estado = pollaStatusLabel(polla);
+  const estado = hidden ? { text: "Oculta", tone: "mute" as const } : pollaStatusLabel(polla);
   const abierta = isPollaOpen(polla);
   const premioPagado = Boolean(payout && payout.total > 0 && payout.paid === payout.total);
 
@@ -260,7 +271,7 @@ function PollaRow({
           <Settings className="h-5 w-5" aria-hidden="true" />
         </Link>
       )}
-      <Link href={`/polla/${polla.slug}`} className="block">
+      <Link href={hidden && !polla.private_draft ? editorHref(polla.id) : `/polla/${polla.slug}`} className="block">
         {/* Cerrada = gris translúcido y logos desaturados: se lee como polla
             terminada sin perder contraste de lectura. */}
         <StreetCard className={`p-4 transition-colors hover:border-border-strong ${closed ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : "bg-bg-elevated"}`}>
@@ -304,13 +315,13 @@ function PollaRow({
               un adorno con forma de botón y no un segundo enlace anidado. La
               línea de arriba dice qué hay que acertar (2026-09-13: "no me queda
               claro cuándo una polla es de 1X2 o de marcadores"). */}
-          {(abierta || polla.private_draft) && (
+          {(abierta || hidden || polla.private_draft) && (
             <>
               <div className="mt-3 flex min-h-8 items-center">
                 <ScoringModeBadge mode={polla.scoring_mode} kind={polla.kind} />
               </div>
               <span aria-hidden="true" className="lp-btn lp-btn-ghost mt-3 w-full gap-2 !border-turf/50 !px-4 text-text-primary">
-                {polla.private_draft ? "Ver polla" : "Entrar"} · {entryPriceLabel(polla.entry_price_cop)}
+                {hidden || polla.private_draft ? "Ver polla" : "Entrar"} · {entryPriceLabel(polla.entry_price_cop)}
                 <ArrowRight className="h-4 w-4 max-w-none shrink-0 text-turf" />
               </span>
             </>

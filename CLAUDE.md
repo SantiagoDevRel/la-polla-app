@@ -118,7 +118,7 @@ de paginar. Aplicar ambas migraciones antes del código.
 ### Borradores privados de campañas (2026-09-24, migraciones 146–148)
 
 `campaign_draft` en `casa_pollas` mantiene slots de planificación fuera de
-`matches`, acceso por lista de UUIDs administrativos y publicación bloqueada en
+`matches` y publicación bloqueada en
 SQL. Se ven desde POLLAS (`/inicio`) y abren el detalle normal `/polla/[slug]`, con
 Partidos/Tabla/Info, el mismo aviso de desempate y tarjetas con escudos `?` y fecha
 por confirmar. `/admin/pollas/[id]/preview` redirige al detalle tras validar acceso.
@@ -126,12 +126,21 @@ La tarjeta y el detalle usan `CampaignPrizeMedia` (giro WebM transparente,
 WebP animado en WebKit y poster para movimiento reducido/ahorro de datos) y gorro
 SVG sobre la N de «navideña», sin landing independiente. Los títulos numerados
 conservan visible el sufijo #1/#2 en las tarjetas. Todos los medios viven en `casa-private-drafts`
-privado, nunca en `public/` ni `prize-images`; el endpoint valida la misma ACL para
+privado, nunca en `public/` ni `prize-images`; el endpoint valida rol admin y metadata para
 poster, video y animación. La 147 permite ajustar solo el precio del borrador
 vacío mediante un RPC con comparación del precio anterior, sin abrir el editor
 ni la publicación. La 148 permite renombrarlo con comparación del nombre anterior;
 el cambio no puede combinarse con precio, metadata ni acceso. `listAllPollas(actor)` debe recibir el actor para incluir los
-borradores autorizados; sin actor los excluye. Ver [docs/casa-private-campaigns.md](docs/casa-private-campaigns.md).
+borradores; sin actor los excluye. Ver [docs/casa-private-campaigns.md](docs/casa-private-campaigns.md).
+
+**Lectura administrativa (2026-10-04, decisión del dueño):** cualquier admin puede
+ver y abrir todas las ocultas. `listHiddenAdminPollas` incluye sin archivar
+`status=borrador` o `publication_mode=oculta`, pagina y distingue campañas de
+pollas normales. Borradores privados siempre aparece para admins como desplegable,
+abierto si tiene pollas; vacío ofrece «No hay pollas ocultas». Campañas abren el
+detalle y normales el editor. Los getters privados admiten cualquier admin;
+jugadores/anónimos siguen excluidos. La metadata y los RPC de escritura conservan
+su lista histórica; no editar datos ni permisos SQL para cambiar la lectura.
 
 ### Menos texto: la pantalla se entiende sin leer (2026-09-18)
 
@@ -1334,6 +1343,14 @@ lista y no se vuelve a preguntar.
 
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
+
+- (2026-10-04) Perfil / contraseña: propuesta pendiente de acuerdo. Distinguir
+  sin contraseña / contraseña creada y Crear / Cambiar, con Mostrar/Ocultar
+  mientras se escribe. Con sesión ya se cambia sin recordar la anterior;
+  fuera de sesión, proponer WhatsApp primero y SMS alternativo antes de crear otra.
+- (2026-10-04) Borradores privados: el dueño aprobó desplegable y que cualquier
+  admin vea/abra todas las ocultas. Implementación verificada en esta rama;
+  pendiente publicación. No requiere migraciones ni cambios de filas.
 
 - **Rifas de creadores (2026-09-29).** En prod (157–158, PRs #163–#166). Falta
   que el dueño confirme los valores por defecto: listado solo por enlace,
