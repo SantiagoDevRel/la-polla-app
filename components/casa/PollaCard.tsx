@@ -73,7 +73,7 @@ export function PollaCardBody({ name, nameDecoration, prizeVisual, tournaments, 
       <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2">
         <div className={`flex-1 basis-0 ${objeto ? "min-w-[8rem]" : "min-w-fit"}`}>
           <span className="lp-label block truncate">{premioLabel}</span>
-          <div className="mt-1 flex min-h-9 items-end gap-2">
+          <div className={`mt-1 flex min-h-9 items-end gap-2 ${prizeVisual && !objeto ? "flex-wrap" : ""}`}>
             {prizeVisual}
             {premio === null
               ? <span className="text-[15px] leading-none text-text-secondary">—</span>

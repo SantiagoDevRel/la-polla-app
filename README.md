@@ -1674,17 +1674,30 @@ transparente en Chrome, WebP animado en WebKit y una imagen fija con movimiento
 reducido, ahorro de datos o error. Las fotos originales permiten revisar el
 autógrafo: el giro es una reconstrucción, no una captura exacta del premio.
 
-La revisión de POLLA JAMES y OFIGOLAZO4 vive únicamente en
-`C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/`, con sus medios
-fuera del directorio público del repo. No está conectada a las rutas de
-producción. Ambas pollas siguen en `borrador` con publicación `oculta`.
+La revisión usa las pantallas reales `/inicio` y `/polla/[slug]` con copias
+nuevas en Supabase Docker: nombres, premios, precios, fechas y 22 partidos de
+POLLA JAMES y OFIGOLAZO4. Las copias locales simulan el estado abierto; las
+originales de producción siguen en `borrador/oculta`. No se copiaron personas,
+inscripciones ni pronósticos. La cuenta de pago local es ficticia.
+
+`components/casa/local-prize-media.ts` y el rewrite de medios solo se activan
+con `CASA_LOCAL_TEST=1` y Supabase en loopback. Los archivos permanecen en
+`C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/assets/`, fuera de
+`public/`. Miniaturas de 56×64 px en Inicio; premio en el hero y fotos bajo
+«Ver camiseta y fotos». La camiseta v2 conserva la altura, reduce el ancho
+12 % y oscurece la firma en el material del render, sin editar las fotos.
 
 ```powershell
 node C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/server.mjs
-# http://127.0.0.1:3002/ — servidor limitado a esta máquina
-node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify.cjs
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/run-real-app.mjs
+# http://premios.localhost:3004/inicio — servidor limitado a esta máquina
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-real.mjs
 ```
 
+La sesión sintética de revisión está en un hostname propio para no reemplazar
+cookies de otras sesiones locales. El seed y su registro de custodia viven en
+Downloads; no se ejecutan contra producción.
+
 Validación: build de Next, TypeScript, lint y Chrome aislado en 320/390/768/1440
-px, texto y viewport al 200 %, originales, pausa y fallbacks. Safari/iPhone
-real y la integración con medios privados de producción quedan sin probar.
+px, cifras SQL → DOM, altura de tarjetas, texto al 200 %, fotos y movimiento
+reducido. Safari/iPhone real y publicación remota quedan sin probar.

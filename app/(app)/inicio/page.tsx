@@ -22,6 +22,8 @@ import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { listPrivateCampaignPollas } from "@/lib/casa/private-draft-query";
 import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
 import { CampaignPrizeMedia } from "@/components/casa/CampaignPrizeMedia";
+import { CashPrizeVisual, PrizeMotion } from "@/components/casa/PrizeShowcase";
+import { localPrizeMedia } from "@/components/casa/local-prize-media";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { ArrowRight, CheckCircle2, Settings } from "lucide-react";
 import { cookies } from "next/headers";
@@ -244,6 +246,7 @@ function PollaRow({
   const estado = pollaStatusLabel(polla);
   const abierta = isPollaOpen(polla);
   const premioPagado = Boolean(payout && payout.total > 0 && payout.paid === payout.total);
+  const localPrize = localPrizeMedia(polla.id);
 
   return (
     <li className="relative min-w-0">
@@ -275,7 +278,11 @@ function PollaRow({
           <PollaCardBody
             name={polla.name}
             nameDecoration={polla.private_draft ? <SantaHatTitle compact>{polla.name}</SantaHatTitle> : undefined}
-            prizeVisual={polla.private_draft ? (
+            prizeVisual={localPrize?.kind === "jersey" ? (
+              <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" className="h-16 w-14 shrink-0" />
+            ) : localPrize?.kind === "cash" ? (
+              <span className="flex h-16 w-14 shrink-0 items-center"><CashPrizeVisual banknote={localPrize.banknote} compact /></span>
+            ) : polla.private_draft ? (
               <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} />
             ) : undefined}
             tournaments={tournaments}

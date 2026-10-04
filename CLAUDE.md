@@ -1332,6 +1332,11 @@ lista y no se vuelve a preguntar.
 
 ## Open ideas / pending decisions
 
+- **Premios táctiles (2026-10-04).** Después de revisar la primera versión en
+  localhost, permitir arrastrar la camiseta y los billetes sobre el eje
+  horizontal para moverlos o detener el giro. Sin control 3D libre; pendiente
+  de la aprobación del dueño de la versión visual inicial.
+
 Items que el usuario mencionó y NO descartó. Remové entradas solo
 cuando el user diga sí/no explícito o se haya completado.
 

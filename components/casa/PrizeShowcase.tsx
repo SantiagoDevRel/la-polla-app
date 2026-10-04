@@ -94,7 +94,6 @@ export function JerseyPrizeShowcase({ media, photos }: { media: PrizeMedia; phot
     </div>
     <div className="border-t border-border-subtle p-4">
       <h2 className="font-display text-[20px] font-normal leading-none tracking-[0.04em]">Fotos del premio real</h2>
-      <p className="mt-2 text-[13px] leading-[1.5] text-text-secondary">Mira el autógrafo y la espalda en las fotos originales.</p>
       <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,12ch),1fr))] gap-3">
         {photos.map((item, index) => <button key={item.src} type="button" onClick={() => { setPhoto(index); dialog.current?.showModal(); }} className="group cursor-pointer overflow-hidden rounded-md border border-border-default text-left transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">
           {/* eslint-disable-next-line @next/next/no-img-element */}

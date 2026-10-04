@@ -73,6 +73,16 @@ const nextConfig = {
   async redirects() {
     return [{ source: '/pollas/crear', destination: '/casa', permanent: false }];
   },
+  async rewrites() {
+    // Local visual review: original photos and renders never enter public/.
+    if (!localStorageCsp) return [];
+    return ['james-v2-front.png', 'james-v2-back.png', 'james-v2-poster.png',
+      'james-v2-turntable.webm', 'james-v2-turntable.webp', 'james-real-front.jpg',
+      'james-real-back.jpg', 'billete-100000.webp'].map(file => ({
+        source: `/__local-prize-media/${file}`,
+        destination: `http://127.0.0.1:3002/assets/${file}`,
+      }));
+  },
   images: {
     // Whitelist explícita de los hosts que servimos via next/image.
     // hostname: "**" actuaba como proxy abierto bajo nuestra cuota Vercel
