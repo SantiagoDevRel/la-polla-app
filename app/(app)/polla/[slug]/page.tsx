@@ -300,7 +300,7 @@ export default async function PollaPage({
               slug={polla.slug}
               nombre={polla.name}
               entradaCop={polla.entry_price_cop}
-              premio={premioCompartir(polla, pot.prize_cop)}
+              premio={premioCompartir(localPrize?.kind === "jersey" ? { ...polla, prize_object: localPrize.title } : polla, pot.prize_cop)}
               codigo={codigo}
               ayuda={every && codigo ? referralRule(every) : undefined}
             />
@@ -328,11 +328,11 @@ export default async function PollaPage({
             {localPrize ? (
               <div className="w-full min-w-0">
                 <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
-                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-3">
+                <div className={`mt-1 flex min-w-0 flex-wrap items-center ${localPrize.kind === "jersey" ? "gap-2" : "gap-3"}`}>
                   {localPrize.kind === "jersey" ? (
-                    <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" interactive className="h-24 w-20 shrink-0" />
+                    <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" interactive className="h-24 w-20 shrink-0 max-[359px]:h-20 max-[359px]:w-16" />
                   ) : <div className="w-20 shrink-0"><CashPrizeVisual banknote={localPrize.banknote} back={localPrize.back} poster={localPrize.poster} turntable={localPrize.turntable} compact interactive /></div>}
-                  <div className={`lp-money text-[32px] leading-none text-gold ${localPrize.kind === "jersey" ? "min-w-[min(100%,8rem)] flex-1 [overflow-wrap:anywhere]" : "whitespace-nowrap"}`}>
+                  <div className={`lp-money text-gold ${localPrize.kind === "jersey" ? "min-w-[min(100%,8rem)] flex-1 text-[22px] !leading-[1.15] max-[389px]:text-[20px] max-[359px]:text-[18px] [overflow-wrap:anywhere]" : "text-[32px] leading-none whitespace-nowrap"}`}>
                     {localPrize.kind === "jersey" ? localPrize.title : formatCop(pot.prize_cop)}
                   </div>
                 </div>
@@ -715,6 +715,7 @@ function PollaPublica({
   cortesia?: CourtesyPreview | null;
 }) {
   const abierta = isPollaOpen(polla);
+  const localPrize = pollaPrizeMedia(polla.id);
   const entrar = `/login?returnTo=${encodeURIComponent(`/polla/${slug}`)}`;
   // Le regalaron un cupo: eso manda sobre el precio de la entrada. El cupo se
   // activa DESPUÉS de crear la cuenta, porque solo es para personas nuevas.
@@ -730,8 +731,8 @@ function PollaPublica({
         {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className="mt-3 self-start" />}
         <div className="mt-3">
           <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
-          <div className="lp-money mt-0.5 text-[40px] leading-none text-gold">
-            {polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
+          <div className={`lp-money mt-0.5 text-gold ${localPrize?.kind === "jersey" ? "text-[22px] !leading-[1.15]" : "text-[40px] leading-none"}`}>
+            {localPrize?.kind === "jersey" ? localPrize.title : polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
           </div>
           {polla.prize_kind !== "objeto" && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
             <p className="mt-1 text-[13px] text-text-secondary">Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</p>
@@ -780,7 +781,7 @@ function PollaPublica({
           </div>
 
           <p className="mt-4 border-t border-border-subtle pt-4 text-[13px] leading-relaxed text-text-secondary">
-            {polla.prize_kind === "objeto" ? `Participas por ${polla.prize_object}. El premio no se divide ni se convierte en dinero.` : polla.kind === "rifa" ? "Participas con tu boleta en el sorteo anunciado." : "El pozo se reparte entre quienes obtienen el mayor puntaje."}
+            {polla.prize_kind === "objeto" ? `Participas por ${localPrize?.kind === "jersey" ? localPrize.title : polla.prize_object}. El premio no se divide ni se convierte en dinero.` : polla.kind === "rifa" ? "Participas con tu boleta en el sorteo anunciado." : "El pozo se reparte entre quienes obtienen el mayor puntaje."}
           </p>
 
           <Link href={entrar} className={`lp-btn mt-5 w-full ${regalo ? "lp-btn-ghost" : "lp-btn-primary"}`}>
