@@ -19,6 +19,6 @@ export function localPrizeMedia(id: string): LocalPrize | null {
       { src: `${base}james-real-back.jpg`, label: "James · número 23", alt: "Foto original de la espalda de la camiseta, James número 23" },
     ],
   };
-  if (id === "05f83cb8-d16d-42fd-a6b8-a0840c9b0cf9") return { kind: "cash", banknote: `${base}billete-100000.webp` };
+  if (id === "05f83cb8-d16d-42fd-a6b8-a0840c9b0cf9") return { kind: "cash", banknote: `${base}billete-100000-clean.webp` };
   return null;
 }

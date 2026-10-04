@@ -248,25 +248,11 @@ function PollaRow({
   const premioPagado = Boolean(payout && payout.total > 0 && payout.paid === payout.total);
   const localPrize = localPrizeMedia(polla.id);
 
-  return (
-    <li className="relative min-w-0">
-      {/* min-w-0: el nombre va en una línea con «…»; sin esto la celda de la
-          grilla crece hasta el nombre entero y la página se desborda. */}
-      {/* La tuerca va fuera del enlace de la tarjeta: un enlace dentro de otro no es válido. */}
-      {editable && (
-        <Link
-          href={editorHref(polla.id)}
-          aria-label={`Editar ${polla.name}`}
-          title="Editar polla"
-          className="absolute right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-border-default bg-bg-card text-text-secondary transition-colors duration-200 hover:border-border-strong hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-95"
-        >
-          <Settings className="h-5 w-5" aria-hidden="true" />
-        </Link>
-      )}
-      <Link href={`/polla/${polla.slug}`} className="block">
-        {/* Cerrada = gris translúcido y logos desaturados: se lee como polla
-            terminada sin perder contraste de lectura. */}
-        <StreetCard className={`p-4 transition-colors hover:border-border-strong ${closed ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : "bg-bg-elevated"}`}>
+  // The local prize controls sit beside the card link, never inside it.
+  const card = (
+        <StreetCard className={`relative p-4 transition-colors hover:border-border-strong ${closed ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : "bg-bg-elevated"}`}>
+          {localPrize && <Link href={`/polla/${polla.slug}`} aria-label={`${abierta ? "Entrar a" : "Ver"} ${polla.name}`}
+            className="absolute inset-0 z-10 cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" />}
           {/* (2026-09-19) Mismo molde que Mis pollas (PollaCard.tsx): todas las
               tarjetas de una lista miden lo mismo, escriba lo que escriba el
               administrador. Lo que cambia va en un lugar fijo, no en filas nuevas:
@@ -279,9 +265,9 @@ function PollaRow({
             name={polla.name}
             nameDecoration={polla.private_draft ? <SantaHatTitle compact>{polla.name}</SantaHatTitle> : undefined}
             prizeVisual={localPrize?.kind === "jersey" ? (
-              <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" className="h-16 w-14 shrink-0" />
+              <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" interactive className="relative z-20 h-16 w-14 shrink-0" />
             ) : localPrize?.kind === "cash" ? (
-              <span className="flex h-16 w-14 shrink-0 items-center"><CashPrizeVisual banknote={localPrize.banknote} compact /></span>
+              <span className="relative z-20 flex h-16 w-14 shrink-0 items-center"><CashPrizeVisual banknote={localPrize.banknote} compact interactive /></span>
             ) : polla.private_draft ? (
               <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} />
             ) : undefined}
@@ -323,7 +309,21 @@ function PollaRow({
             </>
           )}
         </StreetCard>
-      </Link>
+  );
+
+  return (
+    <li className="relative min-w-0">
+      {editable && (
+        <Link href={editorHref(polla.id)} aria-label={`Editar ${polla.name}`} title="Editar polla"
+          className="absolute right-3 top-3 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-border-default bg-bg-card text-text-secondary transition-colors duration-200 hover:border-border-strong hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold active:scale-95">
+          <Settings className="h-5 w-5" aria-hidden="true" />
+        </Link>
+      )}
+      {localPrize ? (
+        <div data-local-prize-card={polla.slug} className="relative">
+          {card}
+        </div>
+      ) : <Link href={`/polla/${polla.slug}`} className="block">{card}</Link>}
     </li>
   );
 }

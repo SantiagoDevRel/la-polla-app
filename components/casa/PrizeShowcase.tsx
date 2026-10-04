@@ -1,42 +1,92 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { Camera, Pause, Play, RotateCw, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { animate as animateValue, motion, useMotionValue } from "framer-motion";
 import { cn } from "@/lib/cn";
+import { HorizontalPrize } from "./HorizontalPrize";
 
 export type PrizeMedia = { front: string; back: string; poster?: string; video: string; animation: string };
 export type PrizePhoto = { src: string; label: string; alt: string };
 
-/** Asset URLs are supplied by the caller's private media boundary. No reads or writes. */
-export function PrizeMotion({ media, label, view = "turn", paused = false, className }: {
-  media: PrizeMedia; label: string; view?: "turn" | "front" | "back"; paused?: boolean; className?: string;
-}) {
-  const box = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<"still" | "video" | "animation">("still");
-  const [failed, setFailed] = useState<string | null>(null);
-  const [animationFailed, setAnimationFailed] = useState<string | null>(null);
+function useAutomaticPrizeMotion(box: RefObject<HTMLDivElement | null>) {
+  const [active, setActive] = useState(false);
   useEffect(() => {
-    if (!box.current || paused || view !== "turn") return;
+    if (!box.current) return;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     const connection = (navigator as Navigator & { connection?: EventTarget & { saveData?: boolean } }).connection;
-    const webkit = /AppleWebKit/.test(navigator.userAgent) && !/(Chrome|Chromium|Edg|OPR)\//.test(navigator.userAgent);
     let visible = false;
-    const sync = () => setMode(visible && !document.hidden && !reduced.matches && !connection?.saveData ? webkit ? "animation" : "video" : "still");
+    const sync = () => setActive(visible && !document.hidden && !reduced.matches && !connection?.saveData);
     const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; sync(); });
     observer.observe(box.current);
     reduced.addEventListener("change", sync);
     connection?.addEventListener("change", sync);
     document.addEventListener("visibilitychange", sync);
     return () => { observer.disconnect(); reduced.removeEventListener("change", sync); connection?.removeEventListener("change", sync); document.removeEventListener("visibilitychange", sync); };
-  }, [paused, view, media.video]);
-  const active = paused || view !== "turn" || animationFailed === media.animation ? "still" : mode === "video" && failed === media.video ? "animation" : mode;
-  return <div ref={box} className={cn("relative", className)}>
-    {active === "video" ? <video src={media.video} poster={media.poster ?? media.front} aria-label={label} autoPlay muted loop playsInline preload="none"
-      className="h-full w-full object-contain" onError={() => setFailed(media.video)} /> :
+  }, [box]);
+  return active;
+}
+
+/** Asset URLs are supplied by the caller's private media boundary. No reads or writes. */
+export function PrizeMotion({ media, label, view = "turn", paused = false, interactive = false, onPausedChange, className }: {
+  media: PrizeMedia; label: string; view?: "turn" | "front" | "back"; paused?: boolean;
+  interactive?: boolean; onPausedChange?: (paused: boolean) => void; className?: string;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const video = useRef<HTMLVideoElement>(null);
+  const animation = useRef<HTMLImageElement>(null);
+  const automatic = useAutomaticPrizeMotion(box);
+  const [mode, setMode] = useState<"still" | "video" | "animation">("still");
+  const [failed, setFailed] = useState<string | null>(null);
+  const [animationFailed, setAnimationFailed] = useState<string | null>(null);
+  const [interactionPaused, setInteractionPaused] = useState(false);
+  const [holding, setHolding] = useState(false);
+  const [frozenAnimation, setFrozenAnimation] = useState<string | null>(null);
+  const isPaused = paused || interactionPaused;
+  const playing = automatic && !isPaused && !holding && view === "turn";
+  const active = view !== "turn" || animationFailed === media.animation ? "still" : mode === "video" && failed === media.video ? "animation" : mode;
+
+  useEffect(() => {
+    if (!automatic) return;
+    const webkit = /AppleWebKit/.test(navigator.userAgent) && !/(Chrome|Chromium|Edg|OPR)\//.test(navigator.userAgent);
+    setMode(webkit ? "animation" : "video");
+  }, [automatic]);
+  useEffect(() => {
+    const element = video.current;
+    if (!element || active !== "video") return;
+    if (playing) void element.play().catch(() => {});
+    else element.pause();
+  }, [active, playing, media.video]);
+  useEffect(() => {
+    if (active !== "animation" || playing) { setFrozenAnimation(null); return; }
+    const element = animation.current;
+    if (!element?.complete || !element.naturalWidth) { setFrozenAnimation(media.poster ?? media.front); return; }
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = element.naturalWidth; canvas.height = element.naturalHeight;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("No canvas context");
+      context.drawImage(element, 0, 0);
+      setFrozenAnimation(canvas.toDataURL("image/png"));
+    } catch { setFrozenAnimation(media.poster ?? media.front); }
+  }, [active, playing, media.front, media.poster]);
+
+  const setPaused = (next: boolean) => { if (onPausedChange) onPausedChange(next); else setInteractionPaused(next); };
+  const visual = <>
+    {active === "video" ? <video ref={video} src={media.video} poster={media.poster ?? media.front} aria-label={label} autoPlay={playing} muted loop playsInline preload="none"
+      draggable={false} className="h-full w-full select-none object-contain" onError={() => setFailed(media.video)} /> :
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={active === "animation" ? media.animation : view === "back" ? media.back : view === "turn" ? media.poster ?? media.front : media.front} alt={label} width={512} height={512}
-        className="h-full w-full object-contain" onError={active === "animation" ? () => setAnimationFailed(media.animation) : undefined} />}
+      <img ref={animation} src={active === "animation" ? media.animation : view === "back" ? media.back : view === "turn" ? media.poster ?? media.front : media.front} alt={label} width={512} height={512} draggable={false}
+        className={cn("h-full w-full select-none object-contain", active === "animation" && !playing && "invisible")}
+        onError={active === "animation" ? () => setAnimationFailed(media.animation) : undefined} />}
+    {active === "animation" && !playing &&
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={frozenAnimation ?? media.poster ?? media.front} alt="" aria-hidden="true" width={512} height={512} draggable={false} className="absolute inset-0 h-full w-full select-none object-contain" />}
+  </>;
+  return <div ref={box} className={cn("relative", className)}>
+    {interactive ? <HorizontalPrize label={`Mover ${label}`} paused={isPaused} onPausedChange={setPaused} onHoldingChange={setHolding} className="h-full w-full">
+      {visual}
+    </HorizontalPrize> : visual}
   </div>;
 }
 
@@ -55,26 +105,31 @@ const FIVE_BILL_POSITIONS = [
 ];
 
 /** Ten real banknote images; the monetary label remains supplied by SQL/caller. */
-export function CashPrizeVisual({ banknote, compact = false }: { banknote: string; compact?: boolean }) {
+export function CashPrizeVisual({ banknote, compact = false, interactive = false }: { banknote: string; compact?: boolean; interactive?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
-  const [animate, setAnimate] = useState(false);
+  const automatic = useAutomaticPrizeMotion(box);
+  const [paused, setPaused] = useState(false);
+  const [holding, setHolding] = useState(false);
+  const y = useMotionValue(0);
+  const rotate = useMotionValue(0);
   useEffect(() => {
-    if (!box.current) return;
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-    let visible = false;
-    const sync = () => setAnimate(visible && !document.hidden && !reduced.matches);
-    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; sync(); });
-    observer.observe(box.current); reduced.addEventListener("change", sync); document.addEventListener("visibilitychange", sync);
-    return () => { observer.disconnect(); reduced.removeEventListener("change", sync); document.removeEventListener("visibilitychange", sync); };
-  }, []);
-  return <div ref={box} role="img" aria-label="Diez billetes colombianos de cien mil pesos" className={cn("relative mx-auto w-full max-w-[360px]", compact ? "aspect-[7/8]" : "aspect-[360/260]")}>
-    <motion.div className="absolute inset-0 [perspective:800px]" animate={animate ? { y: [0, compact ? -1 : -7, 0], rotate: compact ? [-1, 1, -1] : [-2, 2, -2] } : { y: 0, rotate: 0 }} transition={animate ? { duration: 6, repeat: Infinity, ease: "easeInOut" } : { duration: 0 }}>
+    if (!automatic || paused || holding) return;
+    const options = { duration: 6, repeat: Infinity, ease: "easeInOut" as const };
+    const bounce = animateValue(y, [y.get(), compact ? -1 : -7, y.get()], options);
+    const tilt = animateValue(rotate, [rotate.get(), compact ? 1 : 2, rotate.get()], options);
+    return () => { bounce.stop(); tilt.stop(); };
+  }, [automatic, compact, holding, paused, rotate, y]);
+  const visual = <motion.div className="absolute inset-0 [perspective:800px]" style={{ y, rotate }}>
       {BILL_POSITIONS.map((position, index) => (
         // eslint-disable-next-line @next/next/no-img-element
         <img key={position} data-banknote={index + 1} data-bill-group={compact ? index < 5 ? "upper" : "lower" : undefined} src={banknote} alt="" aria-hidden="true" width={862} height={373}
-          className={cn("absolute left-[18%] w-[64%] max-w-none origin-bottom rounded-[2px] border border-border-strong shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)]", compact ? index < 5 ? "top-[24%]" : "top-[61%]" : "top-[10%]", compact ? FIVE_BILL_POSITIONS[index % 5] : position)} />
+          draggable={false} className={cn("absolute left-[18%] w-[64%] max-w-none select-none origin-bottom rounded-[2px] border border-border-strong shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)]", compact ? index < 5 ? "top-[24%]" : "top-[61%]" : "top-[10%]", compact ? FIVE_BILL_POSITIONS[index % 5] : position)} />
       ))}
-    </motion.div>
+    </motion.div>;
+  return <div ref={box} role={interactive ? undefined : "img"} aria-label={interactive ? undefined : "Diez billetes colombianos de cien mil pesos"} className={cn("relative mx-auto w-full max-w-[360px]", compact ? "aspect-[7/8]" : "aspect-[360/260]")}>
+    {interactive ? <HorizontalPrize label="Mover el millón: diez billetes de cien mil pesos" paused={paused} onPausedChange={setPaused} onHoldingChange={setHolding} className="absolute inset-0">
+      {visual}
+    </HorizontalPrize> : visual}
   </div>;
 }
 
@@ -87,7 +142,8 @@ export function JerseyPrizeShowcase({ media, photos }: { media: PrizeMedia; phot
   return <section aria-label="Camiseta de James Rodríguez" className="overflow-hidden rounded-xl border border-border-default bg-bg-card/80 backdrop-blur-sm">
     <div className="relative bg-gradient-to-b from-turf/10 via-bg-card/40 to-bg-card/80 px-4 pt-5">
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-[20%] top-[15%] h-[180px] rounded-full bg-turf/10 blur-3xl" />
-      <PrizeMotion media={media} label={view === "back" ? "Espalda de la camiseta: James, número 23" : "Camiseta de Nacional de James Rodríguez"} view={view} paused={paused} className="mx-auto h-[300px] w-full max-w-[360px]" />
+      <PrizeMotion media={media} label={view === "back" ? "Espalda de la camiseta: James, número 23" : "Camiseta de Nacional de James Rodríguez"} view={view} paused={paused} interactive onPausedChange={setPaused} className="mx-auto h-[300px] w-full max-w-[360px]" />
+      <p className="mt-3 text-center text-[13px] font-normal leading-[1.5] text-text-secondary">Arrastra hacia los lados. Toca para pausar o reanudar.</p>
       <div className="mt-3 flex flex-wrap items-center justify-center gap-2 pb-5">
         {([['turn', 'Giro', RotateCw], ['front', 'Frente', null], ['back', 'Espalda', null]] as const).map(([key, label, Icon]) =>
           <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)} className={cn("flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-[15px] font-medium transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold", view === key ? "border-border-strong bg-bg-elevated text-text-primary" : "border-border-subtle text-text-secondary")}>

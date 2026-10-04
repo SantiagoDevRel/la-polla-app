@@ -78,7 +78,7 @@ const nextConfig = {
     if (!localStorageCsp) return [];
     return ['james-v2-front.png', 'james-v2-back.png', 'james-v2-poster.png',
       'james-v2-turntable.webm', 'james-v2-turntable.webp', 'james-real-front.jpg',
-      'james-real-back.jpg', 'billete-100000.webp'].map(file => ({
+      'james-real-back.jpg', 'billete-100000.webp', 'billete-100000-clean.webp'].map(file => ({
         source: `/__local-prize-media/${file}`,
         destination: `http://127.0.0.1:3002/assets/${file}`,
       }));

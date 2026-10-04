@@ -1690,17 +1690,33 @@ clásico (oriental o sur)», compartido por Inicio y el detalle, sin cambiar
 el registro original. La camiseta v2 conserva la altura, reduce el ancho
 12 % y oscurece la firma en el material del render, sin editar las fotos.
 
+Con `interactive`, los dos premios admiten arrastre horizontal limitado con
+mouse o dedo. Presionar congela la animación; soltar tras arrastrar conserva
+la pausa. Un toque pausa o reanuda; las flechas mueven y Home centra. El gesto conserva
+scroll vertical y zoom. Los controles del menú son hermanos del enlace de la
+tarjeta. El botón del panel de la camiseta comparte el estado de pausa.
+
+`billete-100000-clean.webp` quita la sobreimpresión «ESPECIMEN» mediante
+image_gen, conservando el archivo original. PNG, prompt y verificación:
+`C:/Users/STZTR/Downloads/la-polla-premios-20261004/media/banknote-clean/report.json`.
+
 ```powershell
 node C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/server.mjs
 node C:/Users/STZTR/Downloads/la-polla-premios-20261004/run-real-app.mjs
 # http://premios.localhost:3004/inicio — servidor limitado a esta máquina
 node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-real.mjs
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-touch.mjs
 ```
 
 La sesión sintética de revisión está en un hostname propio para no reemplazar
 cookies de otras sesiones locales. El seed y su registro de custodia viven en
 Downloads; no se ejecutan contra producción.
 
-Validación: build de Next, TypeScript, lint y Chrome aislado en 320/390/768/1440
-px, cifras SQL → DOM, altura de tarjetas, texto al 200 %, fotos y movimiento
-reducido. Safari/iPhone real y publicación remota quedan sin probar.
+Validación: build de Next, TypeScript, lint y 20 estados de las pantallas reales
+en Chrome aislado (320/390/768/1440 px), cifras SQL → DOM, fuentes cargadas,
+texto al 200 % y fotos. Otros 15 estados comprueban tarjetas en
+320/359/360/390/768/1440 px, asset servido idéntico, arrastre y pausa con mouse,
+teclado, touch emulado, scroll vertical y movimiento reducido. Cero errores
+de página o desbordamientos. Safari/iPhone físico y publicación remota quedan
+sin probar. Evidencia en `real-verification.json` y `touch-verification.json`
+dentro de la carpeta local de revisión.
