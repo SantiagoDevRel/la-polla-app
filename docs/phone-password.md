@@ -21,13 +21,16 @@ responde `private, no-store`; sin sesión devuelve 401. Un error muestra reinten
 nunca «No tienes una contraseña creada». El GET público anterior conserva solo
 la disponibilidad del canal.
 
-Perfil distingue «No tienes una contraseña creada» de «Ya tienes una contraseña
-creada». El formulario también distingue crear/cambiar. Mostrar/Ocultar permite
+Perfil muestra un check verde junto a «Ya tienes una contraseña» y explica cómo
+cambiarla si no la recuerdas, sin ingresar la anterior. Sin credencial, muestra
+un ícono de crear junto a «Aún no tienes una contraseña creada» y el botón
+«Crear contraseña». Crear/Cambiar y «Entrar con contraseña» llevan llave y flecha.
+El formulario también distingue crear/cambiar. Mostrar/Ocultar permite
 revisar cada campo mientras se escribe, incluida la confirmación y el login;
 no recupera la contraseña anterior. Se conserva en memoria hasta guardar o salir.
 
-Tipografía: se reutiliza Perfil (Outfit 16/600 para título, 14 px para estado,
-ayuda y controles) y login (Bebas 24/400 para título, Outfit 14 para ayuda/labels,
+Tipografía: se reutiliza Perfil (Outfit 16/600 para título, 14/600 para estado y
+controles, 14/400 con interlineado 1,625 para ayuda) y login (Bebas 24/400 para título, Outfit 14 para ayuda/labels,
 16 para inputs/acción principal). Los controles admiten wrapping y texto al 200 %.
 
 Activación: aplicar `160_optional_phone_password.sql`; configurar un secreto
