@@ -7,13 +7,20 @@ no se insertan partidos ficticios en `matches` ni se crean pronósticos.
 
 ## Acceso y vista previa
 
-La navegación normal **POLLAS** (`/inicio`) muestra los borradores autorizados con
+Desde el 2026-10-04, **Borradores privados** aparece siempre para administradores
+en `/inicio`, con contador y desplegable: empieza abierto si hay ocultas y cerrado
+si no hay. Incluye toda polla sin archivar con `status=borrador` o
+`publication_mode=oculta`, no solo campañas. Las normales abren su editor
+administrativo; las campañas abren el detalle habitual. Cualquier administrador
+vigente puede leer las campañas, aunque no esté en su lista histórica de acceso.
+
+La navegación normal **POLLAS** (`/inicio`) muestra las campañas con
 el mismo `PollaCardBody` de las demás pollas, foto privada del premio y gorro SVG
 sobre la N de «navideña». Los títulos numerados conservan #1/#2 visible aunque
 el resto del nombre se recorte en la tarjeta; dentro se lee el título completo.
 `/polla/[slug]` reutiliza la pantalla habitual: `AvisoDesempate` compacto, pestañas
 Partidos/Tabla/Info y tarjetas de `PicksBoard`. El acceso exige sesión, rol
-administrativo vigente y presencia del UUID en `campaign_draft.allowed_admin_ids`.
+administrativo vigente y metadata válida de campaña.
 `/admin/pollas/[id]/preview` redirige a esa misma pantalla después del control de
 acceso; no hay una landing independiente. La lista administrativa
 filtra por la misma regla; solo devuelve un indicador `private_draft`, nunca la
@@ -21,8 +28,9 @@ lista de acceso. Sin actor explícito, las consultas del bot excluyen las campa�
 El editor habitual redirige a la vista previa. Las mutaciones operativas se bloquean
 en la API y con restricciones/triggers en PostgreSQL.
 
-`listPrivateCampaignPollas` y `getPrivateCampaignBySlug` son lecturas exclusivas del
-servidor, con filtro de allowlist en SQL y validación del contrato. Los getters
+`listHiddenAdminPollas` y `getPrivateCampaignBySlug` son lecturas exclusivas del
+servidor, con control de administrador previo y validación del contrato. El listado
+pagina de 500 en 500 y no entrega `campaign_draft` al cliente. Los getters
 públicos y las APIs de jugadores siguen excluyendo borradores. `PicksBoard` recibe
 `plannedMatches`: reutiliza su tarjeta, muestra escudos `?` y «Fecha por confirmar»,
 sin guardar, enlaces de partidos ficticios ni polling. `PollaTabs.staticMode`
@@ -86,7 +94,9 @@ mismo UPDATE. UUID, slug y relaciones se conservan; no se habilita el editor gen
 
 ## Verificación
 
-`npm test -- tests/casa-private-drafts.test.ts` verifica parsing y acceso.
+`npm test -- tests/casa-private-drafts.test.ts tests/casa-hidden-admin-pollas.test.ts`
+verifica parsing, acceso de cualquier administrador, exclusión de jugadores,
+listado de ocultas normales/campañas, paginación y errores.
 `scripts/casa-private-drafts-check.sql` corre exclusivamente contra Supabase local
 en Docker, dentro de una transacción con rollback. Comprueba RLS, ACL, bloqueo de
 publicación/inscripciones/matches y compatibilidad con pollas normales.
@@ -97,7 +107,7 @@ RPC, también dentro de una transacción con rollback.
 del nombre anterior, acceso por actor, bloqueo de cambios combinados y
 compatibilidad con los RPC de precio/metadata, igualmente con rollback local.
 
-La comprobación de integración cubre HTML y RSC, listado y detalle administrativos,
-imagen privada y rechazo de publicación para tres admins autorizados, un admin
-excluido, un jugador y un anónimo. La vista se inspecciona en móvil, tamaño medio,
-escritorio y texto ampliado antes de entregar.
+La lista histórica `allowed_admin_ids` permanece en la metadata y en los controles
+SQL de escritura/RLS. Esta actualización amplía las lecturas administrativas de
+la aplicación mediante sus helpers de servidor; no cambia los RPC de edición.
+Los scripts SQL conservan sus comprobaciones de permisos de escritura.

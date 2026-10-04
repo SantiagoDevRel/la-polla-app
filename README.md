@@ -1664,3 +1664,16 @@ Satori recibe solo Bebas/Outfit y PNG locales; no hay fuentes ni imágenes remot
 Las tildes se conservan y las comillas/guiones tipográficos se normalizan; los
 glifos fuera de estos TTF latinos se representan con `?`, evitando las descargas
 automáticas de fuentes/emoji de next/og. El dato original no se modifica.
+
+## Borradores privados en Inicio (2026-10-04)
+
+Para administradores, la sección siempre aparece con contador y desplegable.
+Incluye todas las pollas sin archivar con estado borrador o publicación oculta;
+empieza abierta si tiene contenido. Cualquier administrador puede leer las
+campañas y sus imágenes privadas. Las ocultas normales abren el editor existente.
+Reglas de lectura y escritura: [docs/casa-private-campaigns.md](docs/casa-private-campaigns.md).
+
+```bash
+npm test -- tests/casa-hidden-admin-pollas.test.ts tests/casa-private-drafts.test.ts
+npm run build
+```

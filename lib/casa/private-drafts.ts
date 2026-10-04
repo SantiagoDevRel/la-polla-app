@@ -56,10 +56,10 @@ export function parseCasaPrivateDraft(value: unknown): CasaPrivateDraft | null {
   return result.success ? result.data : null;
 }
 
-/** Service-role reads must select campaign_draft explicitly. Missing data fails closed. */
+/** All verified admins may read drafts; missing or malformed metadata fails closed. */
 export function canAccessCasaPolla(polla: { campaign_draft?: unknown }, user: CasaDraftViewer): boolean {
   if (polla.campaign_draft === null) return true;
   if (!user?.is_admin) return false;
   const draft = parseCasaPrivateDraft(polla.campaign_draft);
-  return draft !== null && draft.allowed_admin_ids.includes(user.id);
+  return draft !== null;
 }

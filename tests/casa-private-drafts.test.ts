@@ -15,9 +15,9 @@ const draft = {
 };
 
 describe("private Casa campaign access", () => {
-  it("admits only an explicitly selected administrator", () => {
+  it("admits every verified administrator and excludes players and anonymous viewers", () => {
     expect(canAccessCasaPolla({ campaign_draft: draft }, { id: allowed, is_admin: true })).toBe(true);
-    expect(canAccessCasaPolla({ campaign_draft: draft }, { id: other, is_admin: true })).toBe(false);
+    expect(canAccessCasaPolla({ campaign_draft: draft }, { id: other, is_admin: true })).toBe(true);
     expect(canAccessCasaPolla({ campaign_draft: draft }, { id: allowed, is_admin: false })).toBe(false);
     expect(canAccessCasaPolla({ campaign_draft: draft }, null)).toBe(false);
   });
@@ -26,15 +26,15 @@ describe("private Casa campaign access", () => {
     const viewer = { id: allowed, is_admin: true };
     expect(canAccessCasaPolla({}, viewer)).toBe(false);
     expect(canAccessCasaPolla({ campaign_draft: {} }, viewer)).toBe(false);
-    expect(canAccessCasaPolla({ campaign_draft: { ...draft, allowed_admin_ids: [other] } }, viewer)).toBe(false);
+    expect(canAccessCasaPolla({ campaign_draft: { ...draft, allowed_admin_ids: [other] } }, viewer)).toBe(true);
     expect(canAccessCasaPolla({ campaign_draft: null }, null)).toBe(true);
   });
 
-  it("accepts all three explicitly selected accounts without authorizing a fourth", () => {
+  it("permits an administrator absent from the historical campaign allowlist", () => {
     const third = "00000000-0000-4000-8000-000000000003";
     const value = { ...draft, allowed_admin_ids: [allowed, other, third] };
     expect(canAccessCasaPolla({ campaign_draft: value }, { id: third, is_admin: true })).toBe(true);
-    expect(canAccessCasaPolla({ campaign_draft: value }, { id: "00000000-0000-4000-8000-000000000004", is_admin: true })).toBe(false);
+    expect(canAccessCasaPolla({ campaign_draft: value }, { id: "00000000-0000-4000-8000-000000000004", is_admin: true })).toBe(true);
   });
 
   it("does not silently turn planning slots into real fixtures or guessed dates", () => {
