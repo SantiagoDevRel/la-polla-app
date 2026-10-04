@@ -1664,3 +1664,27 @@ Satori recibe solo Bebas/Outfit y PNG locales; no hay fuentes ni imágenes remot
 Las tildes se conservan y las comillas/guiones tipográficos se normalizan; los
 glifos fuera de estos TTF latinos se representan con `?`, evitando las descargas
 automáticas de fuentes/emoji de next/og. El dato original no se modifica.
+
+## Vista local de premios (2026-10-04)
+
+`components/casa/PrizeShowcase.tsx` ofrece giro de camiseta, frente/espalda,
+fotos originales ampliables y un abanico animado de diez billetes. Recibe las
+URLs desde el consumidor; no consulta ni modifica datos. El giro usa WebM
+transparente en Chrome, WebP animado en WebKit y una imagen fija con movimiento
+reducido, ahorro de datos o error. Las fotos originales permiten revisar el
+autógrafo: el giro es una reconstrucción, no una captura exacta del premio.
+
+La revisión de POLLA JAMES y OFIGOLAZO4 vive únicamente en
+`C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/`, con sus medios
+fuera del directorio público del repo. No está conectada a las rutas de
+producción. Ambas pollas siguen en `borrador` con publicación `oculta`.
+
+```powershell
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/server.mjs
+# http://127.0.0.1:3002/ — servidor limitado a esta máquina
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify.cjs
+```
+
+Validación: build de Next, TypeScript, lint y Chrome aislado en 320/390/768/1440
+px, texto y viewport al 200 %, originales, pausa y fallbacks. Safari/iPhone
+real y la integración con medios privados de producción quedan sin probar.
