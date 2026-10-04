@@ -73,6 +73,18 @@ const nextConfig = {
   async redirects() {
     return [{ source: '/pollas/crear', destination: '/casa', permanent: false }];
   },
+  async rewrites() {
+    // Local visual review: original photos and renders never enter public/.
+    if (!localStorageCsp) return [];
+    const atlas = ['james', 'cash'].flatMap(prize => [192, 512].flatMap(size => Array.from({ length: 24 }, (_, page) =>
+      `${prize}-v3-atlas-${size}-${String(page).padStart(2, '0')}.webp`)));
+    return [...atlas, 'james-v2-front.png', 'james-v2-back.png', 'james-v2-poster.png',
+      'james-v2-turntable.webm', 'james-v2-turntable.webp', 'james-real-front.jpg',
+      'james-real-back.jpg', 'cash-v3-front.png', 'billete-100000.webp', 'billete-100000-clean.webp', 'billete-100000-back-clean.webp'].map(file => ({
+        source: `/__local-prize-media/${file}`,
+        destination: `http://127.0.0.1:3002/assets/${file}`,
+      }));
+  },
   images: {
     // Whitelist explícita de los hosts que servimos via next/image.
     // hostname: "**" actuaba como proxy abierto bajo nuestra cuota Vercel
@@ -94,6 +106,11 @@ const nextConfig = {
   },
   async headers() {
     return [
+      {
+        // Content-versioned prizes load on demand and never enter the precache.
+        source: "/prizes/v3-30099c32d6c6/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       // iOS Universal Links — el archivo apple-app-site-association NO tiene
       // extensión, así que Next lo serviría como octet-stream. Apple exige
       // Content-Type: application/json y acceso público sin redirect (el

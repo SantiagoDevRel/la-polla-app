@@ -20,7 +20,7 @@
 
 import { ChevronDown, Trophy } from "lucide-react";
 
-const REGLA = "En caso de empate, el premio se le dará a la persona que se haya registrado antes en esta polla";
+const REGLA = "En caso de empate, el premio se le dará a la persona que se haya registrado primero en esta polla";
 
 function Ejemplo() {
   return (

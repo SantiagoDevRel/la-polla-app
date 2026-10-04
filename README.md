@@ -1667,6 +1667,91 @@ Las tildes se conservan y las comillas/guiones tipográficos se normalizan; los
 glifos fuera de estos TTF latinos se representan con `?`, evitando las descargas
 automáticas de fuentes/emoji de next/og. El dato original no se modifica.
 
+## Vista local de premios (2026-10-04)
+
+Producción: el usuario autorizó desplegar y publicar ambas pollas. El catálogo
+permanente y los archivos versionados están descritos en
+[Premios giratorios](docs/premios-giratorios.md). Las pantallas usan ahora
+`components/casa/prize-media.ts` y `/prizes/v3-30099c32d6c6/`; el adaptador local
+y los siguientes reportes conservan la evidencia de la revisión previa.
+
+`components/casa/PrizeShowcase.tsx` ofrece giro de camiseta, frente/espalda,
+fotos originales ampliables y diez billetes animados: en miniatura, dos grupos
+de cinco centrados con el texto del premio. Recibe las
+URLs desde el consumidor; no consulta ni modifica datos. El giro controlable
+usa los 144 renders transparentes originales, cada 2,5°, empaquetados en 24
+páginas WebP por tamaño: 192 px en miniaturas y 512 px en el visor. Canvas
+dibuja la pose seleccionada sin desplazar ni deformar la camiseta; el cache
+conserva tres páginas por visor y carga las cercanas bajo demanda. WebM/WebP
+siguen disponibles para consumidores sin atlas. Movimiento reducido o ahorro
+de datos detienen el giro automático; el gesto manual sigue disponible.
+Las fotos originales permiten revisar el
+autógrafo: el giro es una reconstrucción, no una captura exacta del premio.
+
+La revisión usa las pantallas reales `/inicio` y `/polla/[slug]` con copias
+nuevas en Supabase Docker: nombres, premios, precios, fechas y 22 partidos de
+POLLA JAMES y OFIGOLAZO4. Las copias locales simulan el estado abierto; las
+originales de producción se conservaron en `borrador/oculta` durante esa revisión. No se copiaron personas,
+inscripciones ni pronósticos. La cuenta de pago local es ficticia.
+
+El adaptador `components/casa/local-prize-media.ts` y el rewrite de medios solo se activan
+con `CASA_LOCAL_TEST=1` y Supabase en loopback. Los archivos permanecen en
+`C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/assets/`, fuera de
+`public/`. Miniaturas de 56×64 px en Inicio; premio en el hero y fotos bajo
+«Ver camiseta y fotos». El título local es «Camiseta James firmada + boleta
+clásico (oriental o sur)», compartido por Inicio y el detalle, sin cambiar
+el registro original. La camiseta v2 conserva la altura, reduce el ancho
+12 % y oscurece la firma en el material del render, sin editar las fotos.
+
+Con `interactive`, arrastrar con mouse o dedo controla el ángulo del giro:
+media anchura del visor equivale a 180°. Presionar detiene el giro; al soltar
+continúa automáticamente desde la pose alcanzada. La camiseta permanece en
+su sitio. Las flechas giran 15°; Home muestra el frente y End la espalda,
+con pausa explícita para inspeccionar. El gesto conserva scroll vertical y
+zoom. Los controles del menú son hermanos del enlace de la tarjeta. El botón
+del panel de la camiseta comparte el estado de pausa.
+
+Los billetes usan un render nativo de diez objetos de papel con curvatura,
+espesor y cantos: 144 poses y el mismo visor de atlas. Conservan los dos
+grupos de cinco y admiten el mismo gesto y reanudación. El modelo sigue
+visible de canto a 90° y 270°, evitando la desaparición y el filtrado de
+los planos CSS anteriores. Sin atlas, el consumidor conserva el modo
+anterior de imágenes; sin reverso, muestra solo el frente automático.
+
+`billete-100000-clean.webp` quita la sobreimpresión «ESPECIMEN» mediante
+image_gen, conservando el archivo original. PNG, prompt y verificación:
+`C:/Users/STZTR/Downloads/la-polla-premios-20261004/media/banknote-clean/report.json`.
+El reverso usa la [referencia del Banco de la República](https://www.banrep.gov.co/billetes/100-mil/images/100000/reverso100000.jpg),
+con la misma edición de la sobreimpresión y originales conservados:
+`media/banknote-back/report.json`. El microtexto tapado es una reconstrucción,
+no un facsímil. Manifest de poses, tamaños y hashes:
+`media/james-shirt-v3-atlas/manifest.json` y `media/cash-v3/full-render-manifest.json`.
+Estos archivos viven en la carpeta local de revisión de Downloads.
+
+```powershell
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/preview/server.mjs
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/run-real-app.mjs
+# http://premios.localhost:3004/inicio — servidor limitado a esta máquina
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-real.mjs
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-rotation.mjs
+node C:/Users/STZTR/Downloads/la-polla-premios-20261004/verify-bidirectional-rotation.mjs
+```
+
+La sesión sintética de revisión está en un hostname propio para no reemplazar
+cookies de otras sesiones locales. El seed y su registro de custodia viven en
+Downloads; no se ejecutan contra producción.
+
+Validación: build de Next, TypeScript, lint y pantallas reales en Chrome aislado
+(320/390/768/1440 px), cifras SQL → DOM, fuentes cargadas, texto al 200 % y fotos.
+Gesto revisado en 320/359/360/390/768/1440 px: poses 0/90/180/270°, reanudación
+al soltar, mouse, teclado, touch emulado, scroll vertical y movimiento reducido.
+La verificación bidireccional invierte el arrastre dos veces dentro del mismo
+gesto, desde el frente y la espalda. El modelo de dinero conserva diez objetos
+en todas sus poses; ver hojas de ángulos intermedios en `media/cash-v3/`.
+La revisión local no incluyó Safari/iPhone físico ni publicación remota. Reportes locales:
+`real-verification.json`, `rotation-verification.json` y
+`bidirectional-rotation-verification.json`.
+
 ## Borradores privados en Inicio (2026-10-04)
 
 Para administradores, la sección siempre aparece con contador y desplegable.
