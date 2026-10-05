@@ -121,6 +121,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   setLoginEnv(false);
 });
 
@@ -757,6 +758,7 @@ describe("webhook route", () => {
   });
 
   it("processes the update with the right secret and always answers 200", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://lapollacolombiana.com");
     setLoginEnv(true);
     const fetchStub = vi.fn().mockResolvedValue(Response.json({ ok: true, result: {} }));
     vi.stubGlobal("fetch", fetchStub);
