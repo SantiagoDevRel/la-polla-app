@@ -164,7 +164,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
         {verInvitacion && invitee && <QuienTeInvito initial={invitee} variant="casa" />}
 
         {/* El respaldo se suma por polla: la tarjeta ya no habla de cupos. */}
-        <MyPollas initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
+        <MyPollas prizeVisuals={Object.fromEntries(enJuegoMias.map(p => [p.id, prizePreview(p.id)]))} initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
 
         {isAdmin && (
           <PollaSection id="pollas-privadas" kind="open" title="Borradores privados" count={privatePollas.length} defaultOpen={false}>
@@ -230,6 +230,18 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
   );
 }
 
+/** Keep the same prize rendering before and after joining a pool. */
+function prizePreview(id: string) {
+  const prize = pollaPrizeMedia(id);
+  if (prize?.kind === "jersey") return (
+    <PrizeMotion media={prize.media} label="Camiseta de James Rodríguez girando" interactive className="relative z-20 h-16 w-14 shrink-0" />
+  );
+  if (prize?.kind === "cash") return (
+    <span className="relative z-20 flex h-16 w-14 shrink-0 items-center"><CashPrizeVisual banknote={prize.banknote} back={prize.back} poster={prize.poster} turntable={prize.turntable} compact interactive /></span>
+  );
+  return null;
+}
+
 function PollaRow({
   polla,
   pot,
@@ -276,13 +288,9 @@ function PollaRow({
           <PollaCardBody
             name={polla.name}
             nameDecoration={polla.private_draft ? <SantaHatTitle compact>{polla.name}</SantaHatTitle> : undefined}
-            prizeVisual={localPrize?.kind === "jersey" ? (
-              <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" interactive className="relative z-20 h-16 w-14 shrink-0" />
-            ) : localPrize?.kind === "cash" ? (
-              <span className="relative z-20 flex h-16 w-14 shrink-0 items-center"><CashPrizeVisual banknote={localPrize.banknote} back={localPrize.back} poster={localPrize.poster} turntable={localPrize.turntable} compact interactive /></span>
-            ) : polla.private_draft ? (
+            prizeVisual={prizePreview(polla.id) ?? (polla.private_draft ? (
               <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} />
-            ) : undefined}
+            ) : undefined)}
             tournaments={tournaments}
             kind={polla.kind}
             muted={closed}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { ChevronRight, Search, Ticket } from "lucide-react";
@@ -33,8 +33,10 @@ const searchKey = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, 
  * aviso ya no abre una fila propia debajo, que hacía más alta a la polla con
  * pendientes: va junto al nombre, donde las demás llevan la flecha.
  */
-export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, split = false, flat = false, pendingByPolla = {} }: {
+export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, split = false, flat = false, pendingByPolla = {}, prizeVisuals = {} }: {
   initialPollas?: MyCasaPolla[]; defaultOpen?: boolean;
+  /** Server-rendered prize previews for the joined pools on Inicio. */
+  prizeVisuals?: Record<string, ReactNode>;
   /**
    * Inicio (2026-09-18): sin desplegable. Las pollas en las que estás salen de
    * una arriba; si no estás en ninguna, la sección no se dibuja (la pantalla
@@ -66,10 +68,10 @@ export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false
 
   const retry = () => setAttempt(n => n + 1);
   if (flat && pollas && pollas.length === 0 && !error) return null;
-  if (!split) return <MyPollasSection id="mis-pollas" kind="mine" flat={flat} pollas={pollas} error={error} retry={retry} defaultOpen={defaultOpen} activeOnly={activeOnly} pendingByPolla={pendingByPolla} />;
+  if (!split) return <MyPollasSection id="mis-pollas" kind="mine" flat={flat} pollas={pollas} error={error} retry={retry} defaultOpen={defaultOpen} activeOnly={activeOnly} pendingByPolla={pendingByPolla} prizeVisuals={prizeVisuals} />;
   return <div className="space-y-3">
-    <MyPollasSection id="mis-pollas" kind="mine" compact activeOnly pollas={pollas?.filter(p => !isFinished(p))} error={error} retry={retry} defaultOpen={defaultOpen} pendingByPolla={pendingByPolla} />
-    <MyPollasSection id="mis-pollas-cerradas" kind="closed" compact pollas={pollas?.filter(isFinished)} error={error} retry={retry} defaultOpen={false} pendingByPolla={pendingByPolla} />
+    <MyPollasSection id="mis-pollas" kind="mine" compact activeOnly pollas={pollas?.filter(p => !isFinished(p))} error={error} retry={retry} defaultOpen={defaultOpen} pendingByPolla={pendingByPolla} prizeVisuals={prizeVisuals} />
+    <MyPollasSection id="mis-pollas-cerradas" kind="closed" compact pollas={pollas?.filter(isFinished)} error={error} retry={retry} defaultOpen={false} pendingByPolla={pendingByPolla} prizeVisuals={prizeVisuals} />
   </div>;
 }
 
@@ -106,9 +108,9 @@ export function siguientePaso(polla: MyCasaPolla, fallback: number, en: boolean)
   return null;
 }
 
-function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOnly = false, compact = false, flat = false, pendingByPolla }: {
+function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOnly = false, compact = false, flat = false, pendingByPolla, prizeVisuals }: {
   id: string; kind: "mine" | "closed"; pollas?: MyCasaPolla[]; error: boolean; retry: () => void;
-  defaultOpen: boolean; activeOnly?: boolean; compact?: boolean; flat?: boolean; pendingByPolla: Record<string, number>;
+  defaultOpen: boolean; activeOnly?: boolean; compact?: boolean; flat?: boolean; pendingByPolla: Record<string, number>; prizeVisuals: Record<string, ReactNode>;
 }) {
   const en = useLocale() === "en";
   const closedList = kind === "closed";
@@ -151,13 +153,15 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
               : { value: en ? "In play" : "En juego" };
             return <li key={polla.id}>
               {/* Toda la tarjeta es el enlace: un toque, sin elegir cupo antes de entrar. */}
-              <Link
-                href={`/polla/${polla.slug}`}
-                className={`lp-card block p-4 transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${finished ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : `bg-bg-elevated border-l-[3px] ${paso?.tono === "urgente" ? "border-l-red-alert" : paso?.tono === "espera" ? "border-l-amber" : "border-l-turf"}`} ${paso?.tono === "urgente" ? "border-red-alert/50" : ""}`}
+              <div
+                className={`lp-card relative block p-4 transition-colors hover:border-border-strong ${finished ? "bg-text-primary/[0.04] [&_img]:grayscale [&_img]:opacity-70" : `bg-bg-elevated border-l-[3px] ${paso?.tono === "urgente" ? "border-l-red-alert" : paso?.tono === "espera" ? "border-l-amber" : "border-l-turf"}`} ${paso?.tono === "urgente" ? "border-red-alert/50" : ""}`}
               >
                 {/* Un premio en objeto muestra el objeto: «POZO $0» hacía ver una
                     polla que regala entradas como una que no reparte nada. */}
+                <Link href={`/polla/${polla.slug}`} aria-label={`${en ? "Open" : "Ver"} ${polla.name}`}
+                  className="absolute inset-0 z-10 cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" />
                 <PollaCardBody
+                  prizeVisual={prizeVisuals[polla.id]}
                   name={polla.name}
                   tournaments={polla.tournaments}
                   kind={polla.kind}
@@ -177,7 +181,7 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
                       : <ChevronRight aria-hidden="true" className="h-5 w-5 max-w-none shrink-0 text-text-secondary" />}
                   </>}
                 />
-              </Link>
+              </div>
             </li>;
           })}
         </ul>
