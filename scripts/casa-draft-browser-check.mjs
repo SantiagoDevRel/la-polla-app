@@ -41,7 +41,7 @@ const content=mode==='creator'?<CrearPollaForm/>:mode==='free'?<UnirmeGratis slu
 createRoot(document.getElementById('root')!).render(<ToastProvider><main className="mx-auto max-w-3xl px-4 py-6"><h1 className="lp-display-sm mb-4">{mode==='creator'?'Crear polla':mode==='free'?'Polla regalo':'Pronósticos'}</h1>{content}</main></ToastProvider>);
 `);
 const server = await createServer({
-  root, configFile: false, logLevel: 'error', cacheDir: path.join(root, '.cache'),
+  root, publicDir: path.join(repo, 'public'), configFile: false, logLevel: 'error', cacheDir: path.join(root, '.cache'),
   oxc: { jsx: { runtime: 'automatic' } },
   resolve: { alias: { '@': repo, 'next/navigation': path.join(root, 'navigation.ts'), 'next/link': path.join(root, 'link.tsx') }, dedupe: ['react', 'react-dom'] },
   plugins: [{ name: 'built-static', configureServer(vite) {
