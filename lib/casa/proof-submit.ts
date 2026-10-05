@@ -43,6 +43,7 @@ export interface ProofSubmitDeps {
   readRecord: () => string | null;
   writeRecord: (value: string) => void;
   newRequestId: () => string;
+  onRetry?: () => void;
 }
 
 export interface ProofSubmitInput {
@@ -116,12 +117,39 @@ async function submitCandidate(
   deps: ProofSubmitDeps,
 ): Promise<{ attemptId: string; entryNumber: number | null }> {
   const save = () => { try { deps.writeRecord(JSON.stringify(record)); } catch { /* Retry within this render still works. */ } };
-  const begin = async () => (await deps.post({
-    action: "begin", requestId: record.requestId, ticketNumber,
-    sha256: candidate.sha256, contentType: candidate.contentType, bytes: candidate.bytes,
-    ...(entryNumber === undefined ? {} : { entryNumber }),
-  })) as BeginResult;
+  const begin = async () => {
+    const result = await deps.post({
+      action: "begin", requestId: record.requestId, ticketNumber,
+      sha256: candidate.sha256, contentType: candidate.contentType, bytes: candidate.bytes,
+      ...(entryNumber === undefined ? {} : { entryNumber }),
+    }) as BeginResult;
+    if (!result?.attempt_id || !["uploading", "confirmed"].includes(result.state)
+      || (result.state === "uploading" && !result.upload)) {
+      throw new Error("No pudimos verificar el envío. Reintenta con el mismo comprobante.");
+    }
+    return result;
+  };
   const done = (result: BeginResult) => ({ attemptId: result.attempt_id, entryNumber: result.entry_number ?? null });
+
+  const uploadAndConfirm = async (result: BeginResult) => {
+    if (result.state === "confirmed") return done(result);
+    for (let retry = 0; retry < 3; retry += 1) {
+      // Storage can finish writing even when its response is lost. Only the
+      // server's byte/digest verification decides whether to upload again.
+      try { if (result.upload) await deps.upload(result.upload, candidate.blob); } catch { /* Confirm the immutable path. */ }
+      try {
+        const confirmed = await deps.post({ action: "confirm", attemptId: result.attempt_id }) as BeginResult;
+        if (confirmed?.state !== "confirmed" || confirmed.attempt_id !== result.attempt_id) {
+          throw new Error("No pudimos verificar el envío. Reintenta con el mismo comprobante.");
+        }
+        return done({ ...result, ...confirmed });
+      } catch (cause) {
+        if (errorCode(cause) !== "UPLOAD_NOT_READY" || retry === 2) throw cause;
+        deps.onRetry?.();
+      }
+    }
+    throw new Error("No pudimos verificar el envío. Reintenta con el mismo comprobante.");
+  };
 
   save();
   let begun: BeginResult | undefined;
@@ -137,13 +165,8 @@ async function submitCandidate(
   }
   if (!begun) throw new Error("No se pudo iniciar la carga.");
   record.attemptId = begun.attempt_id; save();
-  if (begun.state === "confirmed") return done(begun);
-
-  if (begun.upload) await deps.upload(begun.upload, candidate.blob);
-  // A timed-out upload may have succeeded. Verification resolves that ambiguity.
   try {
-    await deps.post({ action: "confirm", attemptId: begun.attempt_id });
-    return done(begun);
+    return await uploadAndConfirm(begun);
   } catch (cause) {
     if (errorCode(cause) !== "UPLOAD_MISMATCH") throw cause;
   }
@@ -151,7 +174,5 @@ async function submitCandidate(
   record.requestId = deps.newRequestId(); delete record.attemptId; save();
   const replacement = await begin();
   record.attemptId = replacement.attempt_id; save();
-  if (replacement.upload) await deps.upload(replacement.upload, candidate.blob);
-  await deps.post({ action: "confirm", attemptId: replacement.attempt_id });
-  return done(replacement);
+  return uploadAndConfirm(replacement);
 }

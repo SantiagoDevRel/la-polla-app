@@ -96,28 +96,34 @@ export type ConfirmProofResult =
  * Verifica el archivo (si el intento no estaba confirmado), confirma en SQL y,
  * si la confirmación es nueva, avisa a los administradores. El aviso es mejor
  * esfuerzo: el comprobante ya quedó en la cola de revisión aunque falle.
+ * La web programa los avisos después de responder; el bot los espera.
  */
 export async function confirmCasaProof(
   db: SupabaseClient,
   polla: Pick<CasaPolla, "id" | "name" | "slug" | "prize_kind" | "prize_object">,
   userId: string,
   attempt: OwnedAttempt,
+  scheduleNotifications?: (notify: () => Promise<void>) => void,
 ): Promise<ConfirmProofResult> {
   if (attempt.state !== "confirmed") {
     try {
       await verifyCasaUpload(PROOF_BUCKET, attempt.proof_path, attempt);
     } catch (error) {
+      const code = (error as { code?: string } | null)?.code;
+      const transportError = error instanceof TypeError || (error instanceof Error
+        && ["AbortError", "TimeoutError"].includes(error.name));
       return {
         ok: false,
         stage: "verify",
-        message: error instanceof Error ? error.message : "No se pudo verificar la carga.",
-        code: (error as { code?: string }).code,
+        message: transportError ? "No pudimos verificar el comprobante por un problema de conexión. Conserva la imagen e intenta de nuevo."
+          : error instanceof Error ? error.message : "No se pudo verificar la carga.",
+        code: code === "UPLOAD_MISMATCH" ? code : "UPLOAD_NOT_READY",
       };
     }
   }
   const { data, error } = await db.rpc("casa_confirm_entry_proof_v2", { p_attempt_id: attempt.id, p_user_id: userId, p_contract: CASA_CONTRACT });
   if (error) return { ok: false, stage: "rpc", error };
-  const entryNumber = await notifyProofToAdmins(db, polla, userId, attempt, Boolean(data?.changed));
+  const entryNumber = await notifyProofToAdmins(db, polla, userId, attempt, Boolean(data?.changed), scheduleNotifications);
   return { ok: true, data: { ...data, entry_number: entryNumber } };
 }
 
@@ -128,6 +134,7 @@ async function notifyProofToAdmins(
   userId: string,
   attempt: OwnedAttempt,
   changed: boolean,
+  scheduleNotifications?: (notify: () => Promise<void>) => void,
 ): Promise<number | null> {
   let entryNumber: number | null = null;
   try {
@@ -135,24 +142,30 @@ async function notifyProofToAdmins(
       .eq("id", attempt.entry_id).eq("user_id", userId).single();
     entryNumber = entry?.entry_number ?? null;
     if (!changed || !entry) return entryNumber;
-    const [{ data: profile }, pot] = await Promise.all([
-      db.from("users").select("display_name").eq("id", userId).maybeSingle(),
-      getPot(polla.id, attempt.entry_id),
-    ]);
-    const userName = profile?.display_name ?? "Sin nombre";
-    await Promise.all([
-      notifyNewProof({
-        entryId: attempt.entry_id, attemptId: attempt.id, pollaName: polla.name, pollaSlug: polla.slug,
-        userName, amountCop: entry.amount_cop,
-        proofPath: attempt.proof_path, ticketNumber: entry.ticket_number, entryNumber: entry.entry_number ?? null,
-        potAfterCop: pot.projected_prize_cop ?? pot.prize_cop,
-        prizeKind: polla.prize_kind, prizeObject: polla.prize_object,
-      }),
-      notifyProofWatchers(db, {
-        pollaName: polla.name, userName, amountCop: entry.amount_cop,
-        ticketNumber: entry.ticket_number, entryNumber: entry.entry_number ?? null,
-      }),
-    ]);
+    const notify = async () => {
+      try {
+        const [{ data: profile }, pot] = await Promise.all([
+          db.from("users").select("display_name").eq("id", userId).maybeSingle(),
+          getPot(polla.id, attempt.entry_id),
+        ]);
+        const userName = profile?.display_name ?? "Sin nombre";
+        await Promise.all([
+          notifyNewProof({
+            entryId: attempt.entry_id, attemptId: attempt.id, pollaName: polla.name, pollaSlug: polla.slug,
+            userName, amountCop: entry.amount_cop,
+            proofPath: attempt.proof_path, ticketNumber: entry.ticket_number, entryNumber: entry.entry_number ?? null,
+            potAfterCop: pot.projected_prize_cop ?? pot.prize_cop,
+            prizeKind: polla.prize_kind, prizeObject: polla.prize_object,
+          }),
+          notifyProofWatchers(db, {
+            pollaName: polla.name, userName, amountCop: entry.amount_cop,
+            ticketNumber: entry.ticket_number, entryNumber: entry.entry_number ?? null,
+          }),
+        ]);
+      } catch { console.warn("[casa/join] Comprobante confirmado; aviso administrativo pendiente de consulta en la cola."); }
+    };
+    if (scheduleNotifications) scheduleNotifications(notify);
+    else await notify();
   } catch { console.warn("[casa/join] Comprobante confirmado; aviso administrativo pendiente de consulta en la cola."); }
   return entryNumber;
 }

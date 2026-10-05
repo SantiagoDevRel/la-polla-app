@@ -125,7 +125,12 @@ function harness(responses: (body: Record<string, unknown>) => unknown, initial:
   const calls: Record<string, unknown>[] = [];
   const uploads: string[] = [];
   const deps: ProofSubmitDeps = {
-    post: vi.fn(async (body) => { calls.push(body); return responses(body); }),
+    post: vi.fn(async (body) => {
+      calls.push(body);
+      const result = await responses(body);
+      return body.action === "confirm" && (result as { ok?: boolean })?.ok === true
+        ? { state: "confirmed", attempt_id: body.attemptId, ...result as object } : result;
+    }),
     upload: vi.fn(async (_upload, blob) => { uploads.push(await blob.text()); return null; }),
     readRecord: () => stored,
     writeRecord: (value) => { stored = value; },
@@ -245,6 +250,50 @@ describe("submitProof", () => {
     h.deps.readRecord = () => { throw new Error("denied"); };
     h.deps.writeRecord = () => { throw new Error("denied"); };
     await expect(submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null }, h.deps)).resolves.toEqual({ attemptId: uuid(7), sha256: sha("a"), entryNumber: null });
+  });
+
+  it("confirms a stored file even when its upload response was lost", async () => {
+    const h = harness((body) => body.action === "begin" ? { attempt_id: uuid(8), state: "uploading", upload } : { ok: true });
+    h.deps.upload = vi.fn().mockRejectedValue(new TypeError("Load failed"));
+    await expect(submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null }, h.deps)).resolves.toMatchObject({ attemptId: uuid(8) });
+    expect(h.calls.map((call) => call.action)).toEqual(["begin", "confirm"]);
+    expect(h.deps.upload).toHaveBeenCalledOnce();
+  });
+
+  it("reuploads an incomplete file with the same attempt, without replacing the entry", async () => {
+    let confirms = 0;
+    const h = harness((body) => {
+      if (body.action === "begin") return { attempt_id: uuid(8), state: "uploading", upload };
+      if (confirms++ === 0) throw fail("UPLOAD_NOT_READY");
+      return { ok: true };
+    });
+    h.deps.onRetry = vi.fn();
+    await submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null }, h.deps);
+    expect(h.calls.map((call) => call.action)).toEqual(["begin", "confirm", "confirm"]);
+    expect(h.calls.slice(1).every((call) => call.attemptId === uuid(8))).toBe(true);
+    expect(h.uploads).toEqual(["a", "a"]);
+    expect(h.deps.onRetry).toHaveBeenCalledOnce();
+  });
+
+  it("does not claim success or release the entry when storage remains unavailable", async () => {
+    const h = harness((body) => {
+      if (body.action === "begin") return { attempt_id: uuid(8), state: "uploading", upload };
+      throw fail("UPLOAD_NOT_READY");
+    });
+    await expect(submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null }, h.deps)).rejects.toMatchObject({ code: "UPLOAD_NOT_READY" });
+    expect(h.uploads).toHaveLength(3);
+    expect(h.calls.filter((call) => call.action === "begin")).toHaveLength(1);
+    expect(h.calls.some((call) => call.action === "fail")).toBe(false);
+    expect(h.stored()).toMatchObject({ attemptId: uuid(8) });
+  });
+
+  it("rejects an invalid begin or confirmation instead of reporting a registered payment", async () => {
+    const badBegin = harness(() => ({ ok: true }));
+    await expect(submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null }, badBegin.deps)).rejects.toThrow("verificar el envío");
+    expect(badBegin.uploads).toHaveLength(0);
+    const badConfirm = harness((body) => body.action === "begin" ? { attempt_id: uuid(8), state: "uploading", upload } : { error: "Unreadable" });
+    await expect(submitProof({ sourceSha256: sha("b"), candidates: [compressed], ticketNumber: null }, badConfirm.deps)).rejects.toThrow("verificar el envío");
+    expect(badConfirm.calls.some((call) => call.action === "fail")).toBe(false);
   });
 });
 

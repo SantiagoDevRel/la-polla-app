@@ -2,6 +2,7 @@
 // The server steps (begin / confirm / fail) live in lib/casa/proof-server.ts,
 // shared with the Telegram player bot.
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { linkReferralFromCookie } from "@/lib/casa/referrals";
@@ -63,7 +64,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const { data, error } = await failCasaProof(db, { attemptId: attempt.id, userId: user.id });
     return error ? casaError(error) : casaJson({ ok: true, changed: data });
   }
-  const confirmed = await confirmCasaProof(db, polla, user.id, attempt);
+  const confirmed = await confirmCasaProof(db, polla, user.id, attempt, (notify) => after(notify));
   if (!confirmed.ok) {
     return confirmed.stage === "verify"
       ? casaJson({ error: confirmed.message, code: confirmed.code }, 409)
