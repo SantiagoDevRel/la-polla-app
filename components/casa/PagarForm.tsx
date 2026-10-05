@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SelectorBoleta } from "./Boletas";
-import { casaPost, uploadSignedFile } from "@/lib/casa/upload-client";
+import { casaConnectionError, casaPost, uploadSignedFile } from "@/lib/casa/upload-client";
 import { ImagePreparationError, prepareImageUpload, type PreparedImage } from "@/lib/casa/prepare-proof";
 import { submitProof } from "@/lib/casa/proof-submit";
 import { Label, StreetCard } from "@/components/street";
@@ -43,6 +43,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
   // Cada selección recibe un turno: si la persona elige otra imagen mientras
   // se prepara la anterior, el resultado viejo se descarta.
   const selectionRef = useRef(0);
+  const sendingRef = useRef(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [prepared, setPrepared] = useState<PreparedImage | null>(null);
   const [preparando, setPreparando] = useState(false);
@@ -50,6 +51,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
   const [ticket, setTicket] = useState(initialTicket);
   const [revision, setRevision] = useState(0);
   const [enviando, setEnviando] = useState(false);
+  const [recuperando, setRecuperando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
   const [registrado, setRegistrado] = useState<number | null>(null);
@@ -79,6 +81,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
   }
 
   async function enviar() {
+    if (sendingRef.current || listo) return;
     if (!prepared) {
       setError("Sube el comprobante de la transferencia.");
       return;
@@ -88,7 +91,9 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       return;
     }
 
+    sendingRef.current = true;
     setEnviando(true);
+    setRecuperando(false);
     setError(null);
     try {
       const url = `/api/casa/pollas/${slug}/join`;
@@ -102,11 +107,12 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         preserveStoredAttempt: resumeOnly,
         entryNumber: esRifa ? undefined : entryNumber ?? null,
       }, {
-        post: (body) => casaPost(url, body),
+        post: (body) => casaPost(url, body, { retrySafe: true, onRetry: () => setRecuperando(true) }),
         upload: (upload, blob) => uploadSignedFile(upload, blob),
         readRecord: () => sessionStorage.getItem(key),
         writeRecord: (value) => sessionStorage.setItem(key, value),
         newRequestId: () => crypto.randomUUID(),
+        onRetry: () => setRecuperando(true),
       });
       // Registrado: la próxima participación nueva empieza su propio intento.
       // Si alguien vuelve a elegir el mismo comprobante, SQL lo rechaza en vez
@@ -119,9 +125,11 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       setTimeout(() => router.push(`/polla/${slug}${result.entryNumber ? `?p=${result.entryNumber}` : ""}`), 1600);
     } catch (cause) {
       setRevision((n) => n + 1);
-      setError(cause instanceof Error ? cause.message : "Error de conexión. Intenta de nuevo.");
+      setError(cause instanceof TypeError ? casaConnectionError().message : cause instanceof Error ? cause.message : casaConnectionError().message);
     } finally {
+      sendingRef.current = false;
       setEnviando(false);
+      setRecuperando(false);
     }
   }
 
@@ -204,7 +212,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       )}
 
       {error && (
-        <p className="mt-3 border border-red-alert/40 bg-red-alert/10 p-2 text-center text-[13px] text-red-alert">
+        <p role="alert" className="mt-3 border border-red-alert/40 bg-red-alert/10 p-2 text-center text-[13px] text-red-alert">
           {error}
           <span className="mt-2 block">Si ya transferiste, no repitas el pago. <a href="/soporte" className="underline">Pide ayuda en Soporte</a>.</span>
         </p>
@@ -216,8 +224,9 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         disabled={enviando || preparando || !prepared}
         className="lp-btn lp-btn-primary mt-4 w-full"
       >
-        {enviando ? "Enviando..." : "Enviar el comprobante"}
+        {enviando ? recuperando ? "Verificando el envío..." : "Enviando..." : error ? "Reintentar envío" : "Enviar el comprobante"}
       </button>
+      {recuperando && <p role="status" className="mt-2 text-center text-[13px] text-text-secondary">Estamos recuperando el envío. Conserva esta pantalla abierta.</p>}
     </StreetCard>
   );
 }

@@ -1575,6 +1575,32 @@ docker exec -i supabase_db_la-polla psql -U postgres -v ON_ERROR_STOP=1 < script
 $env:CASA_ORIGIN="http://localhost:3107"; node scripts/casa-multi-entries-browser-check.mjs
 ```
 
+### Receipt upload recovery (2026-10-05)
+
+`PagarForm` retries interrupted receipt requests with the same request and
+attempt IDs. After an uncertain Storage response, the server checks the stored
+file's size and SHA-256 before reporting success. A missing upload can be retried
+three times against the same immutable path; a connection error keeps the image
+available for a manual retry. Other mutations do not opt into these retries.
+
+Signed uploads send the image bytes directly using the server-issued Storage
+token. Requests have explicit deadlines, and the form prevents concurrent
+submissions. Receipt confirmation returns before best-effort Telegram notices
+run through Next.js `after`; Telegram's own confirmation flow remains awaited.
+Receiving a receipt still means pending payment review, not payment approval.
+No database migration or provider plan change is required.
+
+```powershell
+npm.cmd test -- tests/casa-proof-image.test.ts tests/casa-upload-client.test.ts tests/casa-proof-server.test.ts
+npm.cmd run typecheck
+npm.cmd run build
+```
+
+Regression coverage includes lost begin/upload/confirmation responses, partial
+uploads, bounded offline retries, digest mismatches, ownership checks and
+notification failures. Browser verification used local Supabase with external
+messaging blocked, at 320/768/1280 px and 100/200% text size.
+
 ### Comprobantes comprimidos en el navegador (2026-09-13)
 
 `components/casa/PagarForm.tsx` prepara la imagen UNA vez al elegirla
