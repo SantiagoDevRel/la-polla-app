@@ -1,0 +1,76 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Application and browser checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:59999
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-test-only-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-test-only-service-key
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3101
+      NEXT_TELEMETRY_DISABLED: '1'
+      SPORTSDB_HIGHLIGHTS_ENABLED: 'false'
+      API_FOOTBALL_FINALS_ENABLED: 'false'
+      WHATSAPP_OUTBOUND_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install pinned offline secret scanner
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/trufflehog.tar.gz"
+          curl --fail --location --retry 2 https://github.com/trufflesecurity/trufflehog/releases/download/v3.96.0/trufflehog_3.96.0_linux_amd64.tar.gz --output "$archive"
+          echo "7105f1cd6577f058a9e39d0578f1a99c8a1e481e4d3512cd8a09acfe22a0fdc0  $archive" | sha256sum --check
+          mkdir "$RUNNER_TEMP/secret-scanner"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/secret-scanner" trufflehog
+          echo "TRUFFLEHOG_PATH=$RUNNER_TEMP/secret-scanner/trufflehog" >> "$GITHUB_ENV"
+      - run: npm run validate
+      - run: npm test
+      - run: npm run test:secrets
+      - run: npm run build
+      - run: npm run test:casa:browser
+      - name: Public accessibility checks
+        run: npm run test:e2e -- --grep 'a11y:|página traducida'
+
+  sql:
+    name: Isolated migration and RLS checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pull the pinned PostgreSQL image before the isolated run
+        run: docker pull public.ecr.aws/supabase/postgres:17.6.1.159
+      - run: node scripts/check-casa-sql.mjs
+
+  gate:
+    name: Quality gate
+    if: always()
+    needs: [app, sql]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every check to pass
+        env:
+          APP_RESULT: ${{ needs.app.result }}
+          SQL_RESULT: ${{ needs.sql.result }}
+        run: test "$APP_RESULT" = success && test "$SQL_RESULT" = success

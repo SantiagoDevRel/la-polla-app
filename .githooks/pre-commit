@@ -1,0 +1,4 @@
+#!/bin/sh
+# Preserve GIT_INDEX_FILE: partial commits and worktrees can select another index.
+repo=$(git rev-parse --show-toplevel) || exit 2
+exec node "$repo/scripts/staged-secret-scan.mjs" --repo "$repo"

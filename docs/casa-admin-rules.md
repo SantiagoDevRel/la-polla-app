@@ -371,12 +371,11 @@ Corrige hallazgos de revisión sobre 104 y 106. No cambia filas existentes,
 - **Abandono y alerta de anulación: reemplazados por la 108.** La anulación
   automática y la alerta `casa_match_void_pending` ya no existen; esos estados
   abren un caso en Issues (ver «Partidos con novedades»).
-- **Balance con pozo fijo.** `prize_cop` conserva el compromiso configurado. Solo
-  `house_cop` cambia: borrador/oculta, anulada o `house_retained_zero_points` →
-  recaudado; resuelta con premios → recaudado menos lo pagado; el resto (abierta,
-  programada, cerrada) → recaudado menos el premio fijo. El pozo proporcional no cambia.
-  *(Actualizado por 109: el premio fijo es un mínimo que crece con el excedente y
-  una programada todavía no publicada tampoco resta el premio. Ver «Premios».)*
+- **House balance (migrations 109, 125, 162).** `prize_cop` retains the configured
+  prize formula. For either pot mode, hidden/unpublished, void, and
+  `house_retained_zero_points` outcomes report retained gross; settled pools with
+  payouts report gross minus actual payouts. Active published pools report gross
+  minus the current prize. Fixed prizes follow the guarantee/growth rules above.
 - **Aplazado y reprogramado.** Un partido que quedó `cancelled` sin minutos jugados
   vuelve a admitir pronósticos, con el bloqueo de cinco minutos sobre su nueva hora.
   Espejo en `canEditCasaMatch`.

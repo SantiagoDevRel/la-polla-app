@@ -32,6 +32,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useDraftSave } from "@/lib/casa/use-draft-save";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { TeamCrest } from "@/components/match/TeamCrest";
 import { PctBar } from "@/components/street";
@@ -230,7 +231,7 @@ export function PicksBoard({
   const [joinOpen, setJoinOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
-  const [dirty, setDirty] = useState(false);
+  const { dirty, changed, snapshot, acknowledge } = useDraftSave();
   const [now, setNow] = useState(() => Date.now());
   const router = useRouter();
   const inputs = useRef(new Map<string, HTMLInputElement | null>());
@@ -293,7 +294,7 @@ export function PicksBoard({
       ...prev,
       [matchId]: { ...prev[matchId], pick1x2: value, homeScore: null, awayScore: null },
     }));
-    setDirty(true);
+    changed();
     setMsg(null);
   }
 
@@ -308,7 +309,7 @@ export function PicksBoard({
         awayScore: side === "away" ? n : (prev[matchId]?.awayScore ?? null),
       },
     }));
-    setDirty(true);
+    changed();
     setMsg(null);
   }
 
@@ -334,6 +335,7 @@ export function PicksBoard({
 
   async function guardar() {
     if (planning) return;
+    const sentRevision = snapshot();
     setSaving(true);
     setMsg(null);
     try {
@@ -357,7 +359,10 @@ export function PicksBoard({
         setMsg({ text: json.error ?? "No se pudo guardar.", bad: true });
         return;
       }
-      setDirty(false);
+      if (!acknowledge(sentRevision)) {
+        setMsg({ text: "Guardamos el envío anterior. Tienes cambios nuevos sin guardar.", bad: true });
+        return;
+      }
       // No decir "quedaste con todo marcado" si faltan partidos: la persona
       // se iba tranquila y el domingo descubria que tenia 5 en blanco.
       const faltan = matches.length - marcados;

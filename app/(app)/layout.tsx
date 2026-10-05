@@ -94,7 +94,7 @@ async function contarPendientes(
   if (matchIds.length === 0) return 0;
   const { data: matches } = await admin
     .from("matches")
-    .select("id, status, elapsed, scheduled_at, final_verified_at")
+    .select("id, status, elapsed, scheduled_at, scheduled_at_confirmed, final_verified_at")
     .in("id", matchIds);
   const porId = new Map((matches ?? []).map((m: { id: string }) => [m.id, m]));
   const hechos = new Set((picks ?? []).map((p: { entry_id: string; match_id: string }) => `${p.entry_id}:${p.match_id}`));

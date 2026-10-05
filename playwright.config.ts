@@ -38,6 +38,8 @@ export default defineConfig({
     timeout: 300_000,
   },
   projects: [
+    { name: "narrow", use: { viewport: { width: 320, height: 900 } } },
+    { name: "medium", use: { viewport: { width: 768, height: 900 } } },
     {
       name: "desktop",
       use: {

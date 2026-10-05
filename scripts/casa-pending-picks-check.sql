@@ -14,8 +14,8 @@
 --       el partido, pero la persona NO aparece en casa_leaderboard
 --   B · el admin aprueba después del partido: aparece con esos puntos, sin
 --       recalcular nada a mano
---   C · un segundo registro de la misma persona en la misma polla es imposible
---       (casa_entries_one_per_user)
+--   C · the same entry number cannot be registered twice (migration 131 permits
+--       additional entries with distinct numbers).
 --   D · pago rechazado: sigue sin contar en la tabla aunque tenga puntos
 
 BEGIN;
@@ -23,15 +23,17 @@ SELECT set_config('app.casa_contract', '2', true);
 
 DO $$
 DECLARE
-  admin_id uuid := (SELECT id FROM public.users WHERE is_admin LIMIT 1);
-  players uuid[] := ARRAY(SELECT id FROM public.users WHERE NOT is_admin ORDER BY created_at LIMIT 2);
+  admin_id uuid := gen_random_uuid();
+  players uuid[] := ARRAY[gen_random_uuid(),gen_random_uuid()];
   p uuid; m uuid;
   e1 uuid; a1 uuid; e2 uuid; a2 uuid;
   pts integer; n integer; total integer;
 BEGIN
-  IF admin_id IS NULL OR array_length(players, 1) < 2 THEN
-    RAISE EXCEPTION 'Se necesitan un admin y dos usuarios locales para esta prueba';
-  END IF;
+  -- Synthetic users only; the test must not depend on existing local accounts.
+  INSERT INTO public.users(id,whatsapp_number,display_name,is_admin)
+  VALUES(admin_id,'+1671'||substr(replace(admin_id::text,'-',''),1,10),'Pending admin fixture',true),
+    (players[1],'+1672'||substr(replace(players[1]::text,'-',''),1,10),'Pending player one',false),
+    (players[2],'+1673'||substr(replace(players[2]::text,'-',''),1,10),'Pending player two',false);
 
   INSERT INTO public.casa_pollas (slug, name, kind, scoring_mode, tournament, entry_price_cop, house_cut_pct, points_result,
     status, opens_at, closes_at, created_by, payout_method, payout_account, close_mode)
@@ -55,12 +57,13 @@ BEGIN
     VALUES (e2, players[2], gen_random_uuid(), 'confirmed', 'casa/test/' || e2 || '.jpg', now()) RETURNING id INTO a2;
   UPDATE public.casa_entries SET proof_path = 'casa/test/' || e2 || '.jpg', proof_uploaded_at = now(), current_proof_attempt_id = a2 WHERE id = e2;
 
-  -- C · no hay segunda inscripción de la misma persona.
+  -- C: duplicate entry number is rejected; distinct numbers remain supported.
   BEGIN
-    INSERT INTO public.casa_entries (polla_id, user_id, status, amount_cop) VALUES (p, players[1], 'pendiente', 10000);
+    INSERT INTO public.casa_entries (polla_id, user_id, status, amount_cop, entry_number)
+      SELECT p, players[1], 'pendiente', 10000, entry_number FROM public.casa_entries WHERE id=e1;
     RAISE EXCEPTION 'C falló: se creó una segunda inscripción';
   EXCEPTION WHEN unique_violation THEN
-    RAISE NOTICE 'C ok: casa_entries_one_per_user impide la doble inscripción';
+    RAISE NOTICE 'C ok: duplicate entry number rejected';
   END;
 
   -- Pronostican mientras el pago está en revisión (los dos aciertan).

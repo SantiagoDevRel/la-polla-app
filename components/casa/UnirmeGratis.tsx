@@ -55,7 +55,7 @@ export function UnirmeGratis({ slug, nombre, premio }: {
       </p>
       {premio && <p className="mt-2 text-[15px] leading-relaxed text-text-secondary">Se juega <strong className="font-semibold text-text-primary">{premio}</strong>.</p>}
       <button type="button" onClick={unirme} disabled={entrando || listo} className="lp-btn lp-btn-primary mt-4 w-full">
-        {listo ? "Ya estás dentro" : entrando ? "Entrando..." : "Unirme · es gratis"}
+        {listo ? "Ya estás dentro" : entrando ? "Entrando..." : "Entrar gratis"}
       </button>
     </StreetCard>
   );

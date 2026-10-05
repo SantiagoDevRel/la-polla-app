@@ -9,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
 import { isCreatableTournament } from "@/lib/tournaments";
 import { refreshTournamentSchedule } from "@/lib/matches/refresh-schedule";
+import { colombiaDateKey } from "@/lib/time/colombia";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
       "id, home_team, away_team, home_team_flag, away_team_flag, scheduled_at, scheduled_at_confirmed, match_day",
     )
     .eq("tournament", tournament)
-    .gt("scheduled_at", new Date().toISOString());
+    .or(`scheduled_at.gt.${new Date().toISOString()},and(scheduled_at_confirmed.eq.false,scheduled_at.gte.${colombiaDateKey(new Date())}T00:00:00Z)`);
   if (hasta) query = query.lt("scheduled_at", hasta);
   const { data, error } = await query
     .order("scheduled_at", { ascending: true })
