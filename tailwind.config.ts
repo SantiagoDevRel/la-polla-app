@@ -21,22 +21,6 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/tournaments.ts", // Shared light treatments for league logos.
   ],
-  // The patched selector parser emits these previously absent group variants.
-  // Preserve the pre-security-update UI, including hover/open states. Removing
-  // an entry is an intentional visual change and requires browser verification.
-  blocklist: [
-    "group-open/prize:rotate-180",
-    "group-open:rotate-180",
-    "group-hover:translate-x-0.5",
-    "group-hover:scale-110",
-    "group-hover:scale-[1.01]",
-    "group-hover:scale-[1.04]",
-    "group-hover:bg-white/25",
-    "group-hover:text-gold",
-    "group-hover:underline",
-    "group-hover:ring-gold/60",
-    "motion-safe:group-hover:scale-110",
-  ],
   theme: {
     extend: {
       colors: {

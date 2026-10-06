@@ -15,9 +15,6 @@ Brace expansion keeps compatible patched generations (1.1.21 and 5.0.12).
 Sharp 0.35.5 includes the patched native SVG library, librsvg 2.63.2;
 the native-library regression runs on Windows and Linux CI.
 These patches preserve the current UI and manual Save.
-Tailwind's explicit compatibility blocklist preserves the previously generated
-CSS, including hover/open states, with the patched selector parser. Review
-removing these entries as a separate visual change.
 `npm audit --omit=dev` reports no known vulnerabilities. The development-only
 `braces` 3.0.3 [upstream advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
 has no published patch. It consumes repository-controlled build patterns,
