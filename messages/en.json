@@ -4,6 +4,9 @@
     "description": "The weekend football pool. Every week we post pools for the Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Champions League, Libertadores and Liga BetPlay. Join, pick, and 70% of the pot goes to the winners."
   },
   "Common": {
+    "retry": "Retry",
+    "loginAgain": "Sign in again",
+    "reviewAccount": "Review account",
     "loading": "Loading...",
     "back": "Back",
     "saving": "Saving...",

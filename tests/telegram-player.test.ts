@@ -262,49 +262,51 @@ describe("saveCasaPicks — same rules for the web and the bot", () => {
   const Q2 = "22222222-2222-4222-8222-222222222222";
   const OPT_Q2 = "33333333-3333-4333-8333-333333333333";
 
-  function fakeDb() {
-    const upsert = vi.fn().mockResolvedValue({ error: null });
-    const from = vi.fn((table: string) => {
-      if (table === "casa_questions") return { select: () => ({ eq: () => Promise.resolve({ data: [{ id: Q1, resolved_at: null }, { id: Q2, resolved_at: null }], error: null }) }) };
-      if (table === "casa_options") return { select: () => ({ in: () => Promise.resolve({ data: [{ id: OPT_Q2, question_id: Q2 }], error: null }) }) };
-      if (table === "casa_picks") return { upsert };
-      throw new Error(`tabla inesperada ${table}`);
+  function fakeDb(entry = { id: "e1", status: "pagada", proof_path: "x" }) {
+    const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
+      if (name === "casa_my_entry_v2") return { data: entry, error: null };
+      if (name !== "casa_save_picks_v1") throw new Error("Unexpected RPC " + name);
+      const p = (args.p_picks as Array<Record<string, unknown>>)[0];
+      const id = p.matchId ?? p.questionId;
+      const rejected = p.questionId === Q1 && p.optionId === OPT_Q2 ? "La opción no pertenece a esta pregunta."
+        : p.matchId === MATCH ? "Este partido ya cerró sus pronósticos."
+        : p.matchId ? "Ese partido no pertenece a la polla." : null;
+      return { data: { ok: true, requestId: args.p_request_id, revision: 1, guardados: rejected ? 0 : 1,
+        avisos: rejected ? [rejected] : [], results: [{ targetId: id, status: rejected ? "rejected" : "saved",
+          ...(rejected ? { error: rejected } : { values: p }) }] }, error: null };
     });
-    return { from, upsert };
+    return { rpc, from: vi.fn(() => { throw new Error("A player save must not bypass the authoritative RPC"); }) };
   }
 
-  it("does not save without a paid entry or a proof in review", async () => {
-    const db = fakeDb();
-    queries.getMyEntry.mockResolvedValue({ id: "e1", status: "pendiente", proof_path: null });
-    queries.getPollaMatches.mockResolvedValue([]);
+  it("does not call the writer without a paid entry or proof in review", async () => {
+    const db = fakeDb({ id: "e1", status: "pendiente", proof_path: "" });
     const result = await saveCasaPicks(polla, "user-1", [{ questionId: Q1, freeText: "x" }], db as never);
     expect(result).toEqual({ ok: false, status: 403, error: "Primero tienes que inscribirte a la polla." });
-    expect(db.upsert).not.toHaveBeenCalled();
+    expect(db.rpc).toHaveBeenCalledTimes(1);
+    expect(db.from).not.toHaveBeenCalled();
   });
 
-  it("rejects an option that belongs to another question", async () => {
+  it("surfaces transactional option rejection and uses the same owner-scoped writer for valid answers", async () => {
     const db = fakeDb();
-    queries.getMyEntry.mockResolvedValue({ id: "e1", status: "pagada", proof_path: "x" });
-    queries.getPollaMatches.mockResolvedValue([]);
     const result = await saveCasaPicks(polla, "user-1", [{ questionId: Q1, optionId: OPT_Q2 }], db as never);
-    expect(result).toEqual({ ok: false, status: 400, error: "Una opción no pertenece a su pregunta." });
-    expect(db.upsert).not.toHaveBeenCalled();
-
-    const ok = await saveCasaPicks(polla, "user-1", [{ questionId: Q2, optionId: OPT_Q2 }], db as never);
-    expect(ok).toEqual({ ok: true, guardados: 1, avisos: [] });
-    expect(db.upsert).toHaveBeenCalledWith([expect.objectContaining({ entry_id: "e1", user_id: "user-1", question_id: Q2, option_id: OPT_Q2 })], { onConflict: "entry_id,question_id" });
+    expect(result).toEqual({ ok: false, status: 400, error: "La opción no pertenece a esta pregunta." });
+    const accepted = await saveCasaPicks(polla, "user-1", [{ questionId: Q2, optionId: OPT_Q2 }], db as never);
+    expect(accepted).toMatchObject({ ok: true, guardados: 1, avisos: [] });
+    expect(db.rpc).toHaveBeenCalledWith("casa_save_picks_v1", expect.objectContaining({
+      p_polla_id: POLLA, p_user_id: "user-1", p_entry_id: "e1", p_expected_revision: null,
+      p_picks: [expect.objectContaining({ questionId: Q2, optionId: OPT_Q2 })],
+    }));
+    expect(db.from).not.toHaveBeenCalled();
   });
 
-  it("a closed or started match is never saved, and a match from another polla is refused", async () => {
+  it("does not tell legacy callers a rejected match was saved", async () => {
     const db = fakeDb();
     const matches = { ...polla, kind: "partidos" as const, scoring_mode: "1x2" as const };
-    queries.getMyEntry.mockResolvedValue({ id: "e1", status: "pagada", proof_path: "x" });
-    queries.getPollaMatches.mockResolvedValue([{ id: MATCH, scheduled_at: new Date(Date.now() + 60_000).toISOString(), status: "scheduled", voided_at: null, final_verified_at: null }]);
     const soon = await saveCasaPicks(matches, "user-1", [{ matchId: MATCH, pick1x2: "L" }], db as never);
     expect(soon).toMatchObject({ ok: false, status: 400 });
     const foreign = await saveCasaPicks(matches, "user-1", [{ matchId: "44444444-4444-4444-8444-444444444444", pick1x2: "L" }], db as never);
-    expect(foreign).toEqual({ ok: false, status: 400, error: "Un partido no pertenece a esta polla." });
-    expect(db.upsert).not.toHaveBeenCalled();
+    expect(foreign).toEqual({ ok: false, status: 400, error: "Ese partido no pertenece a la polla." });
+    expect(db.from).not.toHaveBeenCalled();
   });
 });
 

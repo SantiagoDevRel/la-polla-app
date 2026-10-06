@@ -19,7 +19,7 @@ import { useTranslations } from "next-intl";
 import ReportProblemBubble from "@/components/shared/ReportProblemBubble";
 import InstallAppBubble from "@/components/shared/InstallAppBubble";
 
-export default function BrandHeader() {
+export default function BrandHeader({ ownerId }: { ownerId: string | null }) {
   const t = useTranslations("Brand");
   const part1 = t("wordmarkPart1");
   const part2 = t("wordmarkPart2");
@@ -96,7 +96,7 @@ export default function BrandHeader() {
             burbujas — el wordmark clipea (overflow-hidden), los botones no. */}
         <div className="flex flex-shrink-0 items-center gap-2">
           <InstallAppBubble />
-          <ReportProblemBubble />
+          <ReportProblemBubble ownerId={ownerId} />
         </div>
       </div>
     </header>

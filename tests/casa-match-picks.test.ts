@@ -39,18 +39,26 @@ describe("Casa match save after inscription closure", () => {
     mocks.polla.mockResolvedValue({ id: pollaId, status: "cerrada", kind: "partidos", scoring_mode: "marcador", closes_at: "2020-01-01T00:00:00Z" });
     mocks.entry.mockResolvedValue({ id: "entry", status: "pagada" });
     mocks.matches.mockResolvedValue([{ id: matchId, scheduled_at: new Date(Date.now() + 3_600_000).toISOString(), status: "scheduled" }]);
-    fetchDb.mockImplementation(async () => new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } }));
+    fetchDb.mockImplementation(async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      const data = path.endsWith("casa_my_entry_v2") ? { id: "entry", status: "pagada" }
+        : { ok: true, requestId: JSON.parse(String(init?.body)).p_request_id, revision: 1, guardados: 1, avisos: [],
+          results: [{ targetId: matchId, status: "saved", values: { homeScore: 2, awayScore: 1 } }] };
+      return Response.json(data);
+    });
     const response = await save();
     expect(response.status).toBe(200);
     const writes = fetchDb.mock.calls.filter(([, init]) => init?.method === "POST");
-    expect(writes).toHaveLength(1);
-    expect(new URL(String(writes[0][0])).pathname).toBe("/rest/v1/casa_picks");
-    expect(JSON.parse(String(writes[0][1]?.body))[0]).toMatchObject({ entry_id: "entry", user_id: userId, polla_id: pollaId, match_id: matchId });
+    const mutations = writes.filter(([url]) => new URL(String(url)).pathname.endsWith("casa_save_picks_v1"));
+    expect(mutations).toHaveLength(1);
+    expect(JSON.parse(String(mutations[0][1]?.body))).toMatchObject({ p_entry_id: "entry", p_user_id: userId, p_polla_id: pollaId,
+      p_expected_revision: null, p_picks: [{ matchId, homeScore: 2, awayScore: 1 }] });
+    expect(writes.some(([url]) => new URL(String(url)).pathname === "/rest/v1/casa_picks")).toBe(false);
   });
   it.each(["resuelta", "anulada", "borrador"])("does not write to a %s polla", async status => {
     mocks.polla.mockResolvedValue({ id: pollaId, kind: "partidos", status });
     expect((await save()).status).toBe(status === "borrador" ? 404 : 409);
-    expect(mocks.db).not.toHaveBeenCalled();
+    expect(fetchDb).not.toHaveBeenCalled();
   });
 });
 

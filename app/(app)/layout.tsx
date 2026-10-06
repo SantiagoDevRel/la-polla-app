@@ -24,11 +24,13 @@ import type { CasaPollaStatus } from "@/lib/casa/types";
 
 export const dynamic = "force-dynamic";
 
-async function getNavContext(): Promise<{ isAdmin: boolean; pollasPending: number }> {
+async function getNavContext(): Promise<{ isAdmin: boolean; pollasPending: number; ownerId: string | null }> {
+  let ownerId: string | null = null;
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { isAdmin: false, pollasPending: 0 };
+    if (!user) return { isAdmin: false, pollasPending: 0, ownerId };
+    ownerId = user.id;
 
     const admin = createAdminClient();
 
@@ -45,9 +47,9 @@ async function getNavContext(): Promise<{ isAdmin: boolean; pollasPending: numbe
     // casa_entries/casa_picks (el modelo nuevo), no sobre el P2P viejo.
     const pollasPending = await contarPendientes(admin, user.id);
 
-    return { isAdmin: perfil?.is_admin === true, pollasPending };
+    return { isAdmin: perfil?.is_admin === true, pollasPending, ownerId };
   } catch {
-    return { isAdmin: false, pollasPending: 0 };
+    return { isAdmin: false, pollasPending: 0, ownerId };
   }
 }
 
@@ -141,7 +143,7 @@ export default async function AppLayout({
     redirect("/onboarding");
   }
 
-  const { isAdmin, pollasPending } = await getNavContext();
+  const { isAdmin, pollasPending, ownerId } = await getNavContext();
 
   return (
     <ToastProvider>
@@ -157,7 +159,7 @@ export default async function AppLayout({
       <FontScaleApplier />
       <AppBackground />
       <div className="relative z-10 pb-[110px] mx-auto max-w-[480px] w-full">
-        <BrandHeader />
+        <BrandHeader ownerId={ownerId} />
         {/* (2026-09-19, segunda tanda de «menos texto») La cinta que rodaba «…el
             alargue no cuenta» en TODAS las pantallas se quitó: era texto en
             movimiento que nadie lee y la regla ya vive en Info → «Qué marcador

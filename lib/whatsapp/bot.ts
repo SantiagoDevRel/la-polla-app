@@ -42,6 +42,7 @@ interface ButtonAction {
 // without a resolved user keep working via the fallback lookup.
 export interface SendOpts {
   userId?: string;
+  signal?: AbortSignal;
 }
 
 // ─── Public API ───
@@ -52,7 +53,7 @@ export async function sendTextMessage(to: string, text: string, opts?: SendOpts)
     to,
     type: "text",
     text: { body: text },
-  });
+  }, opts?.signal);
   if (response) await logMessage(to, "outbound", "text", text, opts);
   return response;
 }
@@ -79,7 +80,7 @@ export async function sendButtonMessage(
       body: { text: body },
       action: { buttons: buttonActions },
     },
-  });
+  }, opts?.signal);
   if (response) await logMessage(to, "outbound", "interactive_button", `${header}: ${body}`, opts);
   return response;
 }
@@ -111,7 +112,7 @@ export async function sendListMessage(
         sections: [{ title: "Opciones", rows }],
       },
     },
-  });
+  }, opts?.signal);
   if (response) await logMessage(to, "outbound", "interactive_list", `${header}: ${body}`, opts);
   return response;
 }
@@ -123,7 +124,7 @@ export async function sendWhatsAppMessage(to: string, text: string, opts?: SendO
 
 // ─── Internal ───
 
-async function callMetaAPI(payload: Record<string, unknown>) {
+async function callMetaAPI(payload: Record<string, unknown>, signal?: AbortSignal) {
   if (!whatsappOutboundEnabled()) {
     console.warn(`[WA] ${WHATSAPP_OUTBOUND_DISABLED} — skip send`);
     return null;
@@ -131,6 +132,7 @@ async function callMetaAPI(payload: Record<string, unknown>) {
   const { token, url } = getWhatsAppConfig();
   try {
     return await axios.post(url, payload, {
+      ...(signal ? { signal } : {}),
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -161,21 +163,23 @@ async function logMessage(
     if (!userId) {
       // maybeSingle: phone may have no users row yet (mid-onboarding). single()
       // would throw on 0 rows and spam the logs for every unknown-user message.
-      const { data: user } = await supabase
+      let lookup = supabase
         .from("users")
         .select("id")
-        .eq("whatsapp_number", phone)
-        .maybeSingle();
+        .eq("whatsapp_number", phone);
+      if (opts?.signal) lookup = lookup.abortSignal(opts.signal);
+      const { data: user } = await lookup.maybeSingle();
       userId = user?.id ?? null;
     }
 
-    await supabase.from("whatsapp_messages").insert({
+    const write = supabase.from("whatsapp_messages").insert({
       user_id: userId,
       direction,
       message_type: messageType,
       content: content.slice(0, 1000),
       status: "delivered",
     });
+    await (opts?.signal ? write.abortSignal(opts.signal) : write);
   } catch (err) {
     console.error("[WA] Error logging message:", err);
   }

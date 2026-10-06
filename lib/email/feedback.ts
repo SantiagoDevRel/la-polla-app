@@ -3,7 +3,7 @@
 // dueño de la cuenta sin verificar dominio — suficiente para alertas
 // internas. Cuando mandemos email a usuarios reales, hay que verificar
 // dominio propio y mover RESEND_FROM_EMAIL.
-import { Resend } from "resend";
+import { Resend, type CreateEmailRequestOptions } from "resend";
 
 interface SendFeedbackEmailArgs {
   to: string;
@@ -11,6 +11,7 @@ interface SendFeedbackEmailArgs {
   message: string;
   pageUrl: string | null;
   userAgent: string | null;
+  signal?: AbortSignal;
 }
 
 export async function sendFeedbackEmail({
@@ -19,6 +20,7 @@ export async function sendFeedbackEmail({
   message,
   pageUrl,
   userAgent,
+  signal,
 }: SendFeedbackEmailArgs) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -43,5 +45,9 @@ export async function sendFeedbackEmail({
     message,
   ].join("\n");
 
-  return resend.emails.send({ from, to, subject, text });
+  // The installed SDK forwards POST request options to fetch unchanged.
+  const options: CreateEmailRequestOptions & { signal?: AbortSignal } = { signal };
+  const result = await resend.emails.send({ from, to, subject, text }, options);
+  if (result.error) throw new Error("[email] Feedback notice was not accepted.");
+  return result;
 }

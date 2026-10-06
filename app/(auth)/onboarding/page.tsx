@@ -2,12 +2,11 @@
 // Step 1: "¿Cómo te llamas?" → Step 2: "Elige tu pollito"
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
-import { createClient } from "@/lib/supabase/client";
 import {
   POLLITO_TYPES,
   DEFAULT_POLLITO,
@@ -17,6 +16,16 @@ import {
 import FootballLoader from "@/components/ui/FootballLoader";
 import { needsName } from "@/lib/users/needs-name";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
+import { requestJson } from "@/lib/http/json-request";
+import { retryProfilePatch, loadProfile, saveProfilePatch, type PendingProfileMutation } from "@/lib/users/profile-client";
+
+function returnDestination() {
+  try {
+    const destination = safeReturnTo(window.sessionStorage.getItem("lp_returnTo"));
+    window.sessionStorage.removeItem("lp_returnTo");
+    return destination || "/inicio";
+  } catch { return "/inicio"; }
+}
 
 function StepDots({
   total,
@@ -53,54 +62,57 @@ export default function OnboardingPage() {
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
   const [passwordEnabled, setPasswordEnabled] = useState(false);
+  const [checkAttempt, setCheckAttempt] = useState(0);
+  const [checkIssue, setCheckIssue] = useState<{ error: string; kind: string; code?: string } | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionChanged, setSessionChanged] = useState(false);
+  const [confirmationPending, setConfirmationPending] = useState(false);
+  const [latestSaved, setLatestSaved] = useState<string | null>(null);
+  const pendingPatch = useRef<PendingProfileMutation | null>(null);
+  const finishLock = useRef(false);
+  const ownerId = useRef<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     async function checkProfile() {
-      try {
-        const supabase = createClient();
-        const [authResult, config] = await Promise.all([
-          supabase.auth.getUser(),
-          fetch("/api/auth/password", { cache: "no-store" }).then(r => r.json()).catch(() => null),
+        setChecking(true);
+        setCheckIssue(null);
+        const [result, config] = await Promise.all([
+          loadProfile(ownerId.current ?? undefined),
+          requestJson("/api/auth/password", { method: "GET" },
+            (value): value is { enabled: boolean } => !!value && typeof value === "object" && "enabled" in value && typeof value.enabled === "boolean"),
         ]);
-        const { data: { user } } = authResult;
-        setPasswordEnabled(config?.enabled === true);
-
-        if (!user) {
-          router.push("/login");
+        if (!active) return;
+        setPasswordEnabled(config.ok && config.data.enabled);
+        if (!result.ok) {
+          setCheckIssue(result);
+          setChecking(false);
           return;
         }
-
-        const { data: profile } = await supabase
-          .from("users")
-          .select("display_name, whatsapp_number, avatar_url")
-          .eq("id", user.id)
-          .single();
-
-        const nameOk = profile && !needsName(profile.display_name);
-        const pollitoOk = !!profile?.avatar_url;
+        const profile = result.data;
+        ownerId.current ??= profile.id;
+        const nameOk = !needsName(profile.display_name);
+        const pollitoOk = !!profile.avatar_url;
 
         if (nameOk && pollitoOk) {
-          const rt = typeof window !== "undefined"
-            ? window.sessionStorage.getItem("lp_returnTo")
-            : null;
-          if (rt) window.sessionStorage.removeItem("lp_returnTo");
-          router.push(rt || "/inicio");
+          router.push(returnDestination());
+          setChecking(false);
           return;
         }
 
         // Pre-fill what we already have and jump to the missing step.
         if (nameOk) {
-          setName(profile!.display_name as string);
+          setName(profile.display_name as string);
           setStep(2);
         }
-      } catch {
-        // If anything fails, just show the form
-      } finally {
+        if (profile.avatar_url && POLLITO_TYPES.some(pollito => pollito.id === profile.avatar_url)) {
+          setSelectedPollito(profile.avatar_url);
+        }
         setChecking(false);
-      }
     }
     checkProfile();
-  }, [router]);
+    return () => { active = false; };
+  }, [router, checkAttempt]);
 
   function handleNameSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -114,27 +126,37 @@ export default function OnboardingPage() {
   }
 
   async function handleFinish() {
+    if (finishLock.current) return;
+    if (!ownerId.current) return;
+    finishLock.current = true;
     setError("");
+    setLatestSaved(null);
+    setSessionExpired(false);
+    setSessionChanged(false);
     setLoading(true);
     try {
-      await axios.patch("/api/users/me", {
-        display_name: name.trim(),
-        avatar_url: selectedPollito,
-      });
+      const patch = { display_name: name.trim(), avatar_url: selectedPollito };
+      const result = pendingPatch.current ? await retryProfilePatch(pendingPatch.current) : await saveProfilePatch(patch, ownerId.current);
+      if (!result.ok) {
+        if (result.pending) { pendingPatch.current = result.pending; setConfirmationPending(true); }
+        else { pendingPatch.current = null; setConfirmationPending(false); }
+        setSessionExpired(result.kind === "auth");
+        setSessionChanged(result.code === "SESSION_CHANGED");
+        setError(result.error);
+        if (result.code === "PROFILE_CHANGED" && result.latestProfile) setLatestSaved(`${result.latestProfile.display_name ?? "Sin nombre"} · ${POLLITO_TYPES.find(pollito => pollito.id === result.latestProfile?.avatar_url)?.label ?? "Sin pollito"}`);
+        return;
+      }
+      pendingPatch.current = null;
+      setConfirmationPending(false);
       // safeReturnTo: solo paths internos — cierra open redirect vía
       // sessionStorage envenenado (hallazgo codex 2026-06-11).
-      const rt = typeof window !== "undefined"
-        ? safeReturnTo(window.sessionStorage.getItem("lp_returnTo"))
-        : null;
-      if (typeof window !== "undefined") {
-        window.sessionStorage.removeItem("lp_returnTo");
-      }
-      const destination = rt || "/inicio";
+      const destination = returnDestination();
       router.push(passwordEnabled ? `/set-password?returnTo=${encodeURIComponent(destination)}` : destination);
     } catch {
-      setError(t("errSaveProfile"));
+      setError("No pudimos continuar. Conservamos tu nombre y tu pollito.");
     } finally {
       setLoading(false);
+      finishLock.current = false;
     }
   }
 
@@ -144,6 +166,17 @@ export default function OnboardingPage() {
         <div className="flex flex-col items-center gap-2">
           <FootballLoader />
           <p className="text-text-muted text-sm">{tc("loading")}</p>
+        </div>
+      </div>
+    );
+  }
+  if (checkIssue) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-sm space-y-4 text-center">
+          <p role="alert" className="text-text-secondary">{checkIssue.error}</p>
+          <button type="button" onClick={() => setCheckAttempt(value => value + 1)} className="min-h-11 rounded-xl border border-border-subtle px-4 py-2 text-text-primary transition-colors hover:bg-bg-elevated">{tc("retry")}</button>
+          {(checkIssue.kind === "auth" || checkIssue.code === "SESSION_CHANGED") && <Link href={checkIssue.code === "SESSION_CHANGED" ? "/perfil" : "/login?returnTo=%2Fonboarding"} target="_blank" rel="noopener noreferrer" className="block min-h-11 rounded-xl border border-border-subtle px-4 py-2 text-text-primary">{tc(checkIssue.code === "SESSION_CHANGED" ? "reviewAccount" : "loginAgain")}</Link>}
         </div>
       </div>
     );
@@ -315,6 +348,7 @@ export default function OnboardingPage() {
                 <button
                   key={p.id}
                   type="button"
+                  disabled={loading || confirmationPending}
                   className="min-w-0"
                   onClick={() => setSelectedPollito(p.id)}
                   style={{
@@ -351,14 +385,17 @@ export default function OnboardingPage() {
           </div>
 
           {error && (
-            <p style={{ color: "#ff3d57", fontSize: 13, textAlign: "center", background: "rgba(255,61,87,0.1)", borderRadius: 10, padding: 8 }}>
+            <p role="alert" style={{ color: "#ff3d57", fontSize: 13, textAlign: "center", background: "rgba(255,61,87,0.1)", borderRadius: 10, padding: 8 }}>
               {error}
             </p>
           )}
+          {latestSaved && <p className="text-[13px] leading-normal text-text-secondary [overflow-wrap:anywhere]">Datos guardados: {latestSaved}</p>}
+          {(sessionExpired || sessionChanged) && <Link href={sessionChanged ? "/perfil" : "/login?returnTo=%2Fonboarding"} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-border-subtle px-4 py-2 text-text-primary">{tc(sessionChanged ? "reviewAccount" : "loginAgain")}</Link>}
 
           <div style={{ display: "flex", gap: 8 }}>
             <button
               type="button"
+              disabled={loading || confirmationPending}
               onClick={() => setStep(1)}
               style={{
                 flex: 1,
@@ -394,7 +431,7 @@ export default function OnboardingPage() {
                 boxShadow: "0 0 20px rgba(255, 215, 0, 0.15)",
               }}
             >
-              {loading ? tc("saving") : t("finish")}
+              {loading ? tc("saving") : confirmationPending ? tc("retry") : t("finish")}
             </button>
           </div>
         </div>

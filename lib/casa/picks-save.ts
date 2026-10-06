@@ -16,9 +16,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getMyEntry, getMyEntryByNumber, getPollaMatches } from "./queries";
+import { CASA_ENTRY_COLUMNS, type CasaEntry } from "./types";
+import { isPickSaveAck, normalizedPick, type PickSaveAck, type PickSaveOperation, type PickSaveState } from "./picks-protocol";
+import { randomUUID } from "node:crypto";
 import { isPollaOpen, type CasaPolla } from "./types";
-import { acceptsCasaMatchPicks, canEditCasaMatch } from "./match-rules";
+import { acceptsCasaMatchPicks } from "./match-rules";
 
 export const casaPickSchema = z
   .object({
@@ -38,13 +40,22 @@ export const casaPicksBodySchema = z.object({
   picks: z.array(casaPickSchema).min(1).max(60),
   /** Participación a la que van los pronósticos (migración 131). Ausente = la principal. */
   entryNumber: z.number().int().min(1).max(50).optional(),
+  entryId: z.string().uuid().optional(),
+  requestId: z.string().uuid().optional(),
+  expectedRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
+}).refine(b => (b.requestId === undefined) === (b.expectedRevision === undefined), {
+  message: "La confirmación del envío está incompleta.",
+}).refine(b => b.requestId === undefined || b.entryId !== undefined, {
+  message: "La participación del envío está incompleta.",
+}).refine(b => new Set(b.picks.map(p => p.matchId ?? p.questionId)).size === b.picks.length, {
+  message: "Un pronóstico no puede repetirse en el mismo envío.",
 });
 
 export type CasaPickInput = z.infer<typeof casaPickSchema>;
 
 export type SaveCasaPicksResult =
-  | { ok: true; guardados: number; avisos: string[] }
-  | { ok: false; status: 400 | 403 | 409 | 500; error: string };
+  | PickSaveAck
+  | { ok: false; status: 400 | 403 | 409 | 500 | 503; error: string; conflict?: boolean; retryable?: boolean };
 
 type PollaForPicks = Pick<CasaPolla, "id" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "scoring_mode" | "draw_pending">;
 
@@ -58,134 +69,63 @@ export function entryCanPick(entry: { status: string; proof_path: string | null 
   return Boolean(entry && (entry.status === "pagada" || (entry.status === "pendiente" && entry.proof_path)));
 }
 
+
+/** Every entry lookup uses the injected database and explicit owner scope. */
+export async function getOwnedPickEntry(pollaId: string, userId: string, db: SupabaseClient, entryNumber?: number): Promise<CasaEntry | null> {
+  if (entryNumber === undefined) {
+    const { data, error } = await db.rpc("casa_my_entry_v2", { p_polla_id: pollaId, p_user_id: userId });
+    if (error) throw error;
+    return data as CasaEntry | null;
+  }
+  const { data, error } = await db.from("casa_entries").select(CASA_ENTRY_COLUMNS)
+    .eq("polla_id", pollaId).eq("user_id", userId).is("ticket_number", null)
+    .eq("entry_number", entryNumber).or("origin.eq.compra,status.eq.pagada").maybeSingle();
+  if (error) throw error;
+  return data as CasaEntry | null;
+}
+
+export async function getPickSaveState(pollaId: string, userId: string, entryId: string, db: SupabaseClient = createAdminClient()): Promise<PickSaveState | null> {
+  const { data, error } = await db.rpc("casa_pick_save_state_v1", { p_polla_id: pollaId, p_user_id: userId, p_entry_id: entryId });
+  if (error) throw error;
+  return data ? { ...data, entryId, ownerId: userId } as PickSaveState : null;
+}
+
 export async function saveCasaPicks(
-  polla: PollaForPicks,
-  userId: string,
-  picks: CasaPickInput[],
-  db: SupabaseClient = createAdminClient(),
-  entryNumber?: number,
+  polla: PollaForPicks, userId: string, picks: CasaPickInput[],
+  db: SupabaseClient = createAdminClient(), entryNumber?: number,
+  operation?: Pick<PickSaveOperation, "requestId" | "expectedRevision" | "entryId">,
 ): Promise<SaveCasaPicksResult> {
   if (!userId) return { ok: false, status: 403, error: "Primero tienes que inscribirte a la polla." };
-  if (polla.status === "borrador") return { ok: false, status: 409, error: "Esta polla ya cerró. Los pronósticos quedaron como estaban." };
-  if (!pollaAcceptsPicks(polla)) {
-    return { ok: false, status: 409, error: "Esta polla ya cerró. Los pronósticos quedaron como estaban." };
-  }
-
-  // Con varias participaciones cada una guarda sus propios pronósticos. Sin
-  // número (bot de Telegram) se usa la principal, como con una sola inscripción.
-  const entry = entryNumber === undefined
-    ? await getMyEntry(polla.id, userId)
-    : await getMyEntryByNumber(polla.id, userId, entryNumber);
-  if (!entryCanPick(entry)) {
-    return {
-      ok: false,
-      status: 403,
-      error: entryNumber === undefined || !entry
-        ? "Primero tienes que inscribirte a la polla."
-        : "Este cupo todavía no tiene un comprobante en revisión o aprobado.",
-    };
-  }
-  const entryId = entry!.id;
-
-  // ── qué partidos siguen abiertos ───────────────────────────────────────
-  const matches = await getPollaMatches(polla.id);
-  const abiertos = new Set(matches.filter((m) => canEditCasaMatch(m)).map((m: { id: string }) => m.id));
-  const deLaPolla = new Set(matches.map((m: { id: string }) => m.id));
-
-  const { data: preguntas } = await db
-    .from("casa_questions")
-    .select("id, resolved_at")
-    .eq("polla_id", polla.id);
-  const preguntasAbiertas = new Set(
-    (preguntas ?? [])
-      .filter((q: { resolved_at: string | null }) => q.resolved_at === null)
-      .map((q: { id: string }) => q.id),
-  );
-
-  // Una opción tiene que ser de SU pregunta: un id de otra pregunta nunca
-  // sumaría, pero tampoco debe quedar guardado como si fuera una respuesta.
-  const optionIds = picks.map((p) => p.optionId).filter((id): id is string => Boolean(id));
-  const optionQuestion = new Map<string, string>();
-  if (optionIds.length > 0 && preguntasAbiertas.size > 0) {
-    const { data: options, error } = await db
-      .from("casa_options")
-      .select("id, question_id")
-      .in("question_id", Array.from(preguntasAbiertas));
-    if (error) {
-      console.error("[casa/picks] opciones:", error.message);
-      return { ok: false, status: 500, error: "No pude guardar." };
+  if (!operation && !pollaAcceptsPicks(polla)) return { ok: false, status: 409, error: "Esta polla ya cerró. Los pronósticos quedaron como estaban." };
+  try {
+    const entry = await getOwnedPickEntry(polla.id, userId, db, entryNumber);
+    if (!entry || (operation?.entryId && operation.entryId !== entry.id)) {
+      return { ok: false, status: 403, error: "La sesión o el cupo cambió. Vuelve a abrir esta polla para guardar." };
     }
-    for (const o of (options ?? []) as Array<{ id: string; question_id: string }>) optionQuestion.set(o.id, o.question_id);
-  }
-
-  const filas = [];
-  const rechazados: string[] = [];
-
-  for (const p of picks) {
-    if (p.matchId) {
-      if (!deLaPolla.has(p.matchId)) {
-        rechazados.push("Un partido no pertenece a esta polla.");
-        continue;
-      }
-      if (!abiertos.has(p.matchId)) {
-        rechazados.push("Un partido ya cerró sus pronósticos (5 minutos antes del inicio) o fue anulado.");
-        continue;
-      }
-      // En modo 1X2 solo importa la opcion; en marcador, los dos numeros.
-      if (polla.scoring_mode === "1x2" && !p.pick1x2) continue;
-      if (polla.scoring_mode === "marcador" && (p.homeScore == null || p.awayScore == null)) continue;
-    } else if (p.questionId) {
-      if (!preguntasAbiertas.has(p.questionId)) {
-        rechazados.push("Una pregunta ya fue resuelta.");
-        continue;
-      }
-      if (p.optionId && optionQuestion.get(p.optionId) !== p.questionId) {
-        rechazados.push("Una opción no pertenece a su pregunta.");
-        continue;
-      }
-    }
-
-    filas.push({
-      entry_id: entryId,
-      polla_id: polla.id,
-      user_id: userId,
-      match_id: p.matchId ?? null,
-      question_id: p.questionId ?? null,
-      pick_1x2: polla.scoring_mode === "1x2" ? (p.pick1x2 ?? null) : null,
-      home_score: polla.scoring_mode === "marcador" ? (p.homeScore ?? null) : null,
-      away_score: polla.scoring_mode === "marcador" ? (p.awayScore ?? null) : null,
-      option_id: p.optionId ?? null,
-      free_text: p.freeText ?? null,
-      updated_at: new Date().toISOString(),
+    // Versioned requests reach SQL even after closure so completed operations
+    // can return their original confirmation. Legacy calls keep their preflight.
+    if (!operation && !entryCanPick(entry)) return { ok: false, status: 403, error: "Primero tienes que inscribirte a la polla." };
+    const input = picks.map(p => ({ ...normalizedPick(p), ...(p.matchId ? { matchId: p.matchId } : { questionId: p.questionId }) }));
+    const requestId = operation?.requestId ?? randomUUID();
+    const { data, error } = await db.rpc("casa_save_picks_v1", {
+      p_polla_id: polla.id, p_user_id: userId, p_entry_id: entry.id,
+      p_request_id: requestId, p_expected_revision: operation?.expectedRevision ?? null, p_picks: input,
     });
-  }
-
-  if (filas.length === 0) {
-    return { ok: false, status: 400, error: rechazados[0] ?? "No había nada para guardar." };
-  }
-
-  // Dos upserts: los indices unicos son parciales (uno para partidos, otro
-  // para preguntas), asi que PostgREST necesita saber cual usar en cada caso.
-  const dePartidos = filas.filter((f) => f.match_id);
-  const dePreguntas = filas.filter((f) => f.question_id);
-
-  for (const [lote, onConflict, etiqueta] of [
-    [dePartidos, "entry_id,match_id", "partidos"],
-    [dePreguntas, "entry_id,question_id", "preguntas"],
-  ] as const) {
-    if (lote.length === 0) continue;
-    const { error } = await db.from("casa_picks").upsert(lote, { onConflict });
     if (error) {
-      if (["55000", "55P03"].includes(error.code)) return { ok: false, status: 409, error: error.message };
-      console.error(`[casa/picks] upsert ${etiqueta}:`, error.message);
-      return { ok: false, status: 500, error: "No pude guardar." };
+      if (["55P03", "40P01", "57014"].includes(error.code)) return {
+        ok: false, status: 503, retryable: true, error: "La polla se está actualizando. Conservamos tus cambios; puedes volver a comprobarlos.",
+      };
+      if (error.code === "42501") return { ok: false, status: 403, error: "Primero tienes que inscribirte a la polla." };
+      if (error.code === "22023") return { ok: false, status: 400, error: "El envío no es válido. Conservamos tus cambios." };
+      if (error.code === "55000") return { ok: false, status: 409, error: error.message === "OPERATIONS_PAUSED"
+        ? "La polla se está actualizando. Conservamos tus cambios." : "Esta polla ya no recibe pronósticos. Los anteriores se conservaron." };
+      return { ok: false, status: 500, error: "No pudimos confirmar el guardado. Conservamos tus cambios." };
     }
+    if (data?.ok === false && data.conflict === true) return { ok: false, status: 409, conflict: true, error: "Hay pronósticos más recientes. Revisa tus cambios antes de volver a guardar." };
+    if (!isPickSaveAck(data) || data.requestId !== requestId) return { ok: false, status: 500, error: "No pudimos confirmar el guardado. Conservamos tus cambios." };
+    if (!operation && data.guardados === 0) return { ok: false, status: 400, error: data.avisos[0] ?? "No había nada para guardar." };
+    return data;
+  } catch {
+    return { ok: false, status: 500, error: "No pudimos confirmar el guardado. Conservamos tus cambios." };
   }
-
-  return {
-    ok: true,
-    guardados: filas.length,
-    // filter en vez de spread de un Set: target ES5 (ver tsconfig).
-    avisos: rechazados.filter((a, i) => rechazados.indexOf(a) === i),
-  };
 }

@@ -7,7 +7,7 @@ import { InvitacionesPerfil } from "@/components/casa/InvitacionesPerfil";
 import { MisRifasPerfil } from "@/components/rifas/MisRifasPerfil";
 import { MisCortesias } from "@/components/casa/MisCortesias";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useTranslations } from "next-intl";
@@ -23,63 +23,111 @@ import WhatsAppPreference from "@/components/perfil/WhatsAppPreference";
 import PasswordAccess from "@/components/perfil/PasswordAccess";
 import PayoutDefaultEditor, { type PayoutMethod, type PayoutAccountType } from "@/components/perfil/PayoutDefaultEditor";
 import { formatPhone } from "@/lib/format-phone";
+import { retryProfilePatch, loadProfile, saveProfilePatch, type PersistedProfile, type ProfilePatch, type PendingProfileMutation } from "@/lib/users/profile-client";
 
-interface UserProfile {
-  display_name: string;
-  whatsapp_number: string;
-  avatar_url: string | null;
-  is_admin?: boolean;
-  default_payout_method: PayoutMethod | null;
-  default_payout_account: string | null;
-  default_payout_account_name: string | null;
-  default_payout_account_type: PayoutAccountType | null;
-}
+type ProfileOperation = "name" | "avatar" | "payout" | "clear";
+type ProfileIssue = { error: string; kind: "auth" | "rejected" | "uncertain"; code?: string; latestProfile?: PersistedProfile };
 
 export default function PerfilPage() {
   const t = useTranslations("Perfil");
   const tCommon = useTranslations("Common");
+  const tOnboarding = useTranslations("Onboarding");
   const isIOSApp = useIsIOSApp();
   const router = useRouter();
   const { showToast } = useToast();
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<PersistedProfile | null>(null);
   const [editName, setEditName] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [loadIssue, setLoadIssue] = useState<ProfileIssue | null>(null);
+  const [saveIssue, setSaveIssue] = useState<ProfileIssue | null>(null);
+  const [mutationBusy, setMutationBusy] = useState(false);
+  const [confirmationPending, setConfirmationPending] = useState(false);
+  const [payoutRevision, setPayoutRevision] = useState(0);
+  const mutationLock = useRef(false);
+  const ownerId = useRef<string | null>(null);
+  const pendingMutation = useRef<{ operation: ProfileOperation; mutation: PendingProfileMutation } | null>(null);
   // Account deletion (Apple 5.1.1(v)): confirm modal + delete flow.
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteIssue, setDeleteIssue] = useState<ProfileIssue | null>(null);
 
   useEffect(() => {
+    let active = true;
     async function load() {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data } = await axios.get("/api/users/me");
-
-        if (data.profile) {
-          setProfile(data.profile);
-          setEditName(data.profile.display_name);
-        }
-      } catch { /* silently fail */ } finally { setLoading(false); }
+      setLoading(true);
+      setLoadIssue(null);
+      const result = await loadProfile(ownerId.current ?? undefined);
+      if (!active) return;
+      if (result.ok) {
+        ownerId.current ??= result.data.id;
+        setProfile(result.data);
+        setEditName(result.data.display_name ?? "");
+      } else setLoadIssue(result);
+      setLoading(false);
     }
     load();
-  }, []);
+    return () => { active = false; };
+  }, [loadAttempt]);
+
+  async function updateProfile(operation: ProfileOperation, patch: ProfilePatch) {
+    if (mutationLock.current) throw new Error(tCommon("saving"));
+    if (!ownerId.current) throw new Error(t("errLoading"));
+    if (pendingMutation.current && pendingMutation.current.operation !== operation) {
+      throw new Error(saveIssue?.error ?? "No pudimos confirmar el guardado. Reintenta para comprobarlo.");
+    }
+    mutationLock.current = true;
+    setMutationBusy(true);
+    setSaveIssue(null);
+    try {
+      const result = pendingMutation.current
+        ? await retryProfilePatch(pendingMutation.current.mutation)
+        : await saveProfilePatch(patch, ownerId.current);
+      if (!result.ok) {
+        if (result.pending) {
+          pendingMutation.current = { operation, mutation: result.pending };
+          setConfirmationPending(true);
+        } else { pendingMutation.current = null; setConfirmationPending(false); }
+        setSaveIssue(result);
+        if (result.code === "PROFILE_CHANGED" && result.latestProfile) setProfile(result.latestProfile);
+        throw new Error(result.error);
+      }
+      pendingMutation.current = null;
+      setConfirmationPending(false);
+      setProfile(result.data);
+      return result.data;
+    } finally {
+      mutationLock.current = false;
+      setMutationBusy(false);
+    }
+  }
+
+  async function retryPendingSave() {
+    const pending = pendingMutation.current;
+    if (!pending) return;
+    try {
+      const saved = await updateProfile(pending.operation, pending.mutation.patch);
+      if (pending.operation === "name") { setEditName(saved.display_name ?? ""); setIsEditing(false); }
+      if (pending.operation === "avatar") setShowAvatarPicker(false);
+      if (pending.operation === "payout" || pending.operation === "clear") setPayoutRevision(value => value + 1);
+      showToast(t(pending.operation === "name" ? "toastNameUpdated" : pending.operation === "avatar" ? "toastChickenUpdated" : pending.operation === "clear" ? "toastPayoutCleared" : "toastPayoutSaved"), "success");
+    } catch { /* The actionable issue remains on screen; the draft stays intact. */ }
+  }
 
   async function handleSaveName() {
     if (editName.trim().length < 2) { showToast(t("errMinChars"), "error"); return; }
     setSaving(true);
     try {
-      await axios.patch("/api/users/me", { display_name: editName.trim() });
-      setProfile((prev) => prev ? { ...prev, display_name: editName.trim() } : prev);
+      const saved = await updateProfile("name", { display_name: editName.trim() });
+      setEditName(saved.display_name ?? "");
       setIsEditing(false);
       showToast(t("toastNameUpdated"), "success");
-    } catch { showToast(t("errUpdateName"), "error"); } finally { setSaving(false); }
+    } catch { /* Preserve the name and show the actionable save issue below. */ } finally { setSaving(false); }
   }
 
   async function handleLogout() {
@@ -89,17 +137,21 @@ export default function PerfilPage() {
   }
 
   async function handleDeleteAccount() {
+    if (!ownerId.current) return;
     setDeleting(true);
+    setDeleteIssue(null);
     try {
-      await axios.post("/api/users/me/delete");
+      await axios.post("/api/users/me/delete", { expected_user_id: ownerId.current });
       // El endpoint ya cerro la sesion server-side; cerramos tambien el
       // cliente para limpiar cualquier cookie/estado local y mandamos a login.
       const supabase = createClient();
       await supabase.auth.signOut().catch(() => {});
       showToast(t("deleteSuccess"), "success");
       router.push("/login");
-    } catch {
-      showToast(t("deleteError"), "error");
+    } catch (cause) {
+      if (axios.isAxiosError(cause) && cause.response?.data?.code === "SESSION_CHANGED") {
+        setDeleteIssue({ kind: "rejected", code: "SESSION_CHANGED", error: cause.response.data.error });
+      } else showToast(t("deleteError"), "error");
       setDeleting(false);
     }
   }
@@ -107,11 +159,10 @@ export default function PerfilPage() {
   async function handleAvatarChange(pollitoId: string) {
     setSavingAvatar(true);
     try {
-      await axios.patch("/api/users/me", { avatar_url: pollitoId });
-      setProfile((prev) => prev ? { ...prev, avatar_url: pollitoId } : prev);
+      await updateProfile("avatar", { avatar_url: pollitoId });
       setShowAvatarPicker(false);
       showToast(t("toastChickenUpdated"), "success");
-    } catch { showToast(t("errUpdateChicken"), "error"); } finally { setSavingAvatar(false); }
+    } catch { /* Keep the picker open until the persisted selection is confirmed. */ } finally { setSavingAvatar(false); }
   }
 
   async function handlePayoutSave(
@@ -120,58 +171,35 @@ export default function PerfilPage() {
     accountName: string | null,
     accountType: PayoutAccountType | null,
   ) {
-    try {
-      await axios.patch("/api/users/me", {
+      await updateProfile("payout", {
         default_payout_method: method,
         default_payout_account: account,
         default_payout_account_name: accountName,
         default_payout_account_type: accountType,
       });
-      setProfile((prev) =>
-        prev
-          ? {
-              ...prev,
-              default_payout_method: method,
-              default_payout_account: account,
-              default_payout_account_name: accountName,
-              default_payout_account_type: accountType,
-            }
-          : prev,
-      );
       showToast(t("toastPayoutSaved"), "success");
-    } catch (err) {
-      const e = err as { response?: { data?: { error?: string } } };
-      showToast(e.response?.data?.error || t("errSavePayout"), "error");
-    }
   }
 
   async function handlePayoutClear() {
-    try {
-      await axios.patch("/api/users/me", {
+      await updateProfile("clear", {
         default_payout_method: null,
         default_payout_account: null,
         default_payout_account_name: null,
         default_payout_account_type: null,
       });
-      setProfile((prev) =>
-        prev
-          ? {
-              ...prev,
-              default_payout_method: null,
-              default_payout_account: null,
-              default_payout_account_name: null,
-              default_payout_account_type: null,
-            }
-          : prev,
-      );
       showToast(t("toastPayoutCleared"), "success");
-    } catch {
-      showToast(t("errClearPayout"), "error");
-    }
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="flex flex-col items-center gap-2"><FootballLoader /><p className="text-text-muted">{t("loading")}</p></div></div>;
-  if (!profile) return <div className="min-h-screen flex items-center justify-center"><p className="text-text-muted">{t("errLoading")}</p></div>;
+  if (!profile) return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="max-w-sm space-y-4 text-center">
+        <p role="alert" className="text-text-secondary">{loadIssue?.error ?? t("errLoading")}</p>
+        <button type="button" onClick={() => setLoadAttempt(value => value + 1)} className="min-h-11 rounded-xl border border-border-subtle px-4 py-2 text-text-primary transition-colors hover:bg-bg-elevated">{tCommon("retry")}</button>
+        {(loadIssue?.kind === "auth" || loadIssue?.code === "SESSION_CHANGED") && <Link href={loadIssue?.code === "SESSION_CHANGED" ? "/perfil" : "/login?returnTo=%2Fperfil"} target="_blank" rel="noopener noreferrer" className="block min-h-11 rounded-xl border border-border-subtle px-4 py-2 text-text-primary">{tCommon(loadIssue?.code === "SESSION_CHANGED" ? "reviewAccount" : "loginAgain")}</Link>}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen">
@@ -182,16 +210,25 @@ export default function PerfilPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 space-y-6 -mt-1">
+        {saveIssue && (
+          <div role="alert" className="space-y-3 rounded-xl border border-red-alert/30 bg-red-dim p-3">
+            <p className="text-[13px] leading-normal text-text-primary">{saveIssue.error}</p>
+            {saveIssue.code === "PROFILE_CHANGED" && saveIssue.latestProfile && <p className="text-[13px] leading-normal text-text-secondary [overflow-wrap:anywhere]">Datos guardados: {saveIssue.latestProfile.display_name} · {saveIssue.latestProfile.default_payout_account ?? "Sin cuenta de pago"}</p>}
+            {confirmationPending && <button type="button" onClick={retryPendingSave} disabled={mutationBusy} className="min-h-11 rounded-xl border border-border-subtle px-4 py-2 text-text-primary transition-colors hover:bg-bg-elevated disabled:opacity-50">{mutationBusy ? tCommon("loading") : tCommon("retry")}</button>}
+            {(saveIssue.kind === "auth" || saveIssue.code === "SESSION_CHANGED") && <Link href={saveIssue.code === "SESSION_CHANGED" ? "/perfil" : "/login?returnTo=%2Fperfil"} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-xl border border-border-subtle px-4 py-2 text-text-primary">{tCommon(saveIssue.code === "SESSION_CHANGED" ? "reviewAccount" : "loginAgain")}</Link>}
+          </div>
+        )}
         {/* Avatar + name */}
         <div className="flex flex-col items-center">
           <button
             type="button"
+            disabled={mutationBusy || confirmationPending}
             onClick={() => setShowAvatarPicker(!showAvatarPicker)}
             className="relative mb-3 cursor-pointer group"
           >
             <UserAvatar
               avatarUrl={profile.avatar_url}
-              displayName={profile.display_name}
+              displayName={profile.display_name ?? ""}
               size="xl"
               className="ring-2 ring-gold/30 group-hover:ring-gold/60 transition-all"
             />
@@ -213,7 +250,7 @@ export default function PerfilPage() {
                     <button
                       key={p.id}
                       type="button"
-                      disabled={savingAvatar}
+                      disabled={savingAvatar || mutationBusy || confirmationPending}
                       onClick={() => handleAvatarChange(p.id)}
                       className={`w-full min-h-[60px] cursor-pointer flex flex-col items-center gap-1 rounded-lg p-2 border-2 transition-all ${
                         isSelected
@@ -233,24 +270,26 @@ export default function PerfilPage() {
           )}
 
           {isEditing ? (
-            <div className="flex items-center gap-2 w-full max-w-xs">
-              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus
-                className="min-h-11 flex-1 rounded-lg border border-border-medium bg-bg-elevated px-3 py-2 text-center text-text-primary outline-none focus:border-gold" />
-              <button onClick={handleSaveName} disabled={saving}
-                className="min-h-11 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg-base">
+            <div className="flex flex-wrap items-center gap-2 w-full max-w-xs">
+              <input type="text" aria-label={tOnboarding("namePlaceholder")} value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus disabled={mutationBusy || confirmationPending}
+                className="min-h-11 min-w-0 basis-24 flex-1 rounded-lg border border-border-medium bg-bg-elevated px-3 py-2 text-center text-text-primary outline-none focus:border-gold" />
+              <button onClick={handleSaveName} disabled={saving || mutationBusy || confirmationPending}
+                className="min-h-11 shrink-0 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg-base">
                 {saving ? "..." : "OK"}
               </button>
               <button
                 type="button"
+                disabled={mutationBusy || confirmationPending}
                 aria-label={tCommon("cancel")}
-                onClick={() => { setIsEditing(false); setEditName(profile.display_name); }}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-sm text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-primary"
+                onClick={() => { setIsEditing(false); setEditName(profile.display_name ?? ""); }}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-primary"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           ) : (
             <button
+              disabled={mutationBusy || confirmationPending}
               onClick={() => setIsEditing(true)}
               className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-1 text-text-primary transition-colors hover:bg-bg-elevated/50"
             >
@@ -262,7 +301,7 @@ export default function PerfilPage() {
             <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="5" y="2" width="14" height="20" rx="2" /><circle cx="12" cy="17" r="1" />
             </svg>
-            {formatPhone(profile.whatsapp_number)}
+            {formatPhone(profile.whatsapp_number ?? "")}
           </p>
         </div>
 
@@ -274,6 +313,9 @@ export default function PerfilPage() {
             data financiera sensible (cuenta bancaria) en el iOS app. */}
         {!isIOSApp && (
           <PayoutDefaultEditor
+            key={payoutRevision}
+            errorsHandledExternally
+            disabled={mutationBusy || confirmationPending}
             initialMethod={profile.default_payout_method ?? undefined}
             initialAccount={profile.default_payout_account ?? undefined}
             initialAccountName={profile.default_payout_account_name ?? undefined}
@@ -384,6 +426,10 @@ export default function PerfilPage() {
             <p className="text-sm text-text-secondary leading-relaxed">
               {t("deleteConfirmBody")}
             </p>
+            {deleteIssue && <div role="alert" className="space-y-3 text-sm text-text-secondary">
+              <p>{deleteIssue.error}</p>
+              <Link href="/perfil" target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-border-subtle px-4 py-2">{tCommon("reviewAccount")}</Link>
+            </div>}
             <div className="flex flex-col gap-2 pt-1">
               <button
                 onClick={handleDeleteAccount}

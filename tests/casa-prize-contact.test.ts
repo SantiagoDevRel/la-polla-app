@@ -62,7 +62,7 @@ describe("private Quentro contact", () => {
     mocks.admin.mockReturnValue({ from: vi.fn().mockReturnValueOnce(contact).mockReturnValueOnce(payout) });
     const result = await GET(read(), context);
     expect(result.headers.get("cache-control")).toBe("private, no-store");
-    expect(await result.json()).toEqual({ email: "owner@example.com", winner: false, editable: true });
+    expect(await result.json()).toEqual({ owner_id: "self", email: "owner@example.com", winner: false, editable: true, revision: 0, request_id: null });
     for (const q of [contact, payout]) {
       expect(q.eq).toHaveBeenCalledWith("polla_id", QUENTRO_POLLA_ID);
       expect(q.eq).toHaveBeenCalledWith("user_id", "self");
@@ -74,7 +74,91 @@ describe("private Quentro contact", () => {
     mocks.admin.mockReturnValue({ rpc });
     const result = await POST(write({ email: "owner@example.com", confirmation: "owner@example.com" }), context);
     expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ owner_id: "self", email: "owner@example.com", winner: false, editable: true });
     expect(rpc).toHaveBeenCalledWith("casa_save_prize_contact", { p_polla_id: QUENTRO_POLLA_ID, p_user_id: "self", p_email: "owner@example.com" });
+  });
+
+  it("blocks a retained draft from another account before application data access", async () => {
+    const request = write({ email: "owner@example.com", confirmation: "owner@example.com" });
+    request.headers.set("X-Casa-Owner", "previous-owner");
+    const response = await POST(request, context);
+    expect(response.status).toBe(412);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toMatchObject({ code: "SESSION_CHANGED" });
+    expect(mocks.polla).not.toHaveBeenCalled(); expect(mocks.admin).not.toHaveBeenCalled();
+  });
+
+  it("recognizes another account on verification before participant or contact access", async () => {
+    const request = read(); request.headers.set("X-Casa-Owner", "previous-owner");
+    const response = await GET(request, context);
+    expect(response.status).toBe(412); expect(await response.json()).toMatchObject({ code: "SESSION_CHANGED" });
+    expect(mocks.polla).not.toHaveBeenCalled(); expect(mocks.admin).not.toHaveBeenCalled();
+  });
+
+  it("returns authoritative contact revision and request identity on owner-scoped reads", async () => {
+    const requestId = "91b95911-724a-4dd3-bf5f-8c3ca740f72b";
+    const contact = query({ email: "owner@example.com", save_revision: 3, last_request_id: requestId });
+    mocks.admin.mockReturnValue({ from: vi.fn().mockReturnValueOnce(contact).mockReturnValueOnce(query(null)) });
+    expect(await (await GET(read(), context)).json()).toEqual({ owner_id: "self", email: "owner@example.com", winner: false,
+      editable: true, revision: 3, request_id: requestId });
+    expect(contact.select).toHaveBeenCalledWith("email, save_revision, last_request_id");
+  });
+
+  it("uses the CAS writer for a new request while preserving the old request path", async () => {
+    const requestId = "91b95911-724a-4dd3-bf5f-8c3ca740f72b";
+    const acknowledgement = { email: "owner@example.com", winner: false, editable: true, revision: 1, request_id: requestId };
+    const rpc = vi.fn().mockResolvedValue({ data: acknowledgement, error: null }); mocks.admin.mockReturnValue({ rpc });
+    const response = await POST(write({ email: "owner@example.com", confirmation: "owner@example.com", requestId, expectedRevision: 0 }), context);
+    expect(response.status).toBe(200); expect(await response.json()).toEqual({ ...acknowledgement, owner_id: "self" });
+    expect(rpc).toHaveBeenCalledWith("casa_save_prize_contact_v2", { p_polla_id: QUENTRO_POLLA_ID, p_user_id: "self", p_email: "owner@example.com",
+      p_request_id: requestId, p_expected_revision: 0 });
+  });
+
+  it("does not discard partial metadata or mismatched confirmation before the CAS write", async () => {
+    const requestId = "91b95911-724a-4dd3-bf5f-8c3ca740f72b";
+    for (const body of [
+      { email: "owner@example.com", confirmation: "owner@example.com", requestId },
+      { email: "owner@example.com", confirmation: "owner@example.com", expectedRevision: 0 },
+      { email: "owner@example.com", confirmation: "wrong@example.com", requestId, expectedRevision: 0 },
+      { email: "owner@example.com", confirmation: "owner@example.com", requestId, expectedRevision: -1 },
+      { email: "owner@example.com", confirmation: "owner@example.com", requestId, expectedRevision: 0, user_id: "other" },
+    ]) expect((await POST(write(body), context)).status).toBe(400);
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+
+  it("maps a newer contact to a structured conflict without claiming success", async () => {
+    mocks.admin.mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data: { ok: false, conflict: true, revision: 2 }, error: null }) });
+    const response = await POST(write({ email: "owner@example.com", confirmation: "owner@example.com",
+      requestId: "91b95911-724a-4dd3-bf5f-8c3ca740f72b", expectedRevision: 0 }), context);
+    expect(response.status).toBe(409); expect(await response.json()).toMatchObject({ code: "PRIZE_CONTACT_CHANGED" });
+  });
+
+  it("never reports an unadvanced revision or another request receipt as a successful write", async () => {
+    const requestId = "91b95911-724a-4dd3-bf5f-8c3ca740f72b";
+    for (const data of [
+      { email: "owner@example.com", winner: false, editable: true, revision: 0, request_id: requestId },
+      { email: "owner@example.com", winner: false, editable: true, revision: 1, request_id: "91b95911-724a-4dd3-bf5f-8c3ca740f72c" },
+    ]) {
+      mocks.admin.mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data, error: null }) });
+      expect((await POST(write({ email: "owner@example.com", confirmation: "owner@example.com", requestId, expectedRevision: 0 }), context)).status).toBe(503);
+    }
+  });
+
+  it("returns a stable code for request reuse without leaking the SQL error", async () => {
+    mocks.admin.mockReturnValue({ rpc: vi.fn().mockResolvedValue({ error: { message: "PRIZE_REQUEST_REUSED" } }) });
+    const response = await POST(write({ email: "owner@example.com", confirmation: "owner@example.com",
+      requestId: "91b95911-724a-4dd3-bf5f-8c3ca740f72b", expectedRevision: 0 }), context);
+    expect(response.status).toBe(400); expect(await response.json()).toEqual({ code: "PRIZE_REQUEST_REUSED",
+      error: "No pudimos enviar este intento. Revisa ambos correos y vuelve a guardar." });
+  });
+
+  it("never treats a missing or contradictory RPC acknowledgement as a successful save", async () => {
+    for (const data of [null, {}, { email: "different@example.com", winner: false, editable: true }, { email: "owner@example.com", winner: false }]) {
+      mocks.admin.mockReturnValue({ rpc: vi.fn().mockResolvedValue({ data, error: null }) });
+      const response = await POST(write({ email: "owner@example.com", confirmation: "owner@example.com" }), context);
+      expect(response.status).toBe(503);
+      expect(await response.text()).not.toContain("invalid_save_ack");
+    }
   });
 
   it("refuses mismatched confirmation and simple form requests before DB access", async () => {

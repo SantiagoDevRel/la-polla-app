@@ -25,14 +25,27 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const {
-      data: { user },
+      data: { user }, error: authError,
     } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (authError || !user) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
+    }
+
+    // A confirmation opened under account A must never delete account B after
+    // another tab changes the session. Old clients must reopen the current UI.
+    let body: unknown;
+    try { body = await request.json(); } catch {
+      return NextResponse.json({ error: "Vuelve a abrir tu perfil para confirmar la cuenta." }, { status: 428, headers: { "Cache-Control": "private, no-store" } });
+    }
+    if (typeof body !== "object" || body === null || !("expected_user_id" in body) || typeof body.expected_user_id !== "string") {
+      return NextResponse.json({ error: "Vuelve a abrir tu perfil para confirmar la cuenta." }, { status: 428, headers: { "Cache-Control": "private, no-store" } });
+    }
+    if (body.expected_user_id !== user.id) {
+      return NextResponse.json({ code: "SESSION_CHANGED", error: "La cuenta cambió. Revisa tu cuenta antes de continuar." }, { status: 412, headers: { "Cache-Control": "private, no-store" } });
     }
 
     const admin = createAdminClient();
@@ -109,7 +122,7 @@ export async function POST() {
       console.error("[delete-account] users delete failed:", delErr);
       return NextResponse.json(
         { error: "No se pudo eliminar la cuenta. Intenta de nuevo." },
-        { status: 500 },
+        { status: 500, headers: { "Cache-Control": "private, no-store" } },
       );
     }
 
@@ -127,14 +140,14 @@ export async function POST() {
     await supabase.auth.signOut().catch(() => {});
 
     // 5. Limpiar la cookie lp_onb (HttpOnly, el cliente no puede borrarla).
-    const response = NextResponse.json({ success: true });
+    const response = NextResponse.json({ success: true }, { headers: { "Cache-Control": "private, no-store" } });
     response.cookies.delete("lp_onb");
     return response;
   } catch (error) {
     console.error("[delete-account] unexpected error:", error);
     return NextResponse.json(
       { error: "Error al eliminar la cuenta" },
-      { status: 500 },
+      { status: 500, headers: { "Cache-Control": "private, no-store" } },
     );
   }
 }

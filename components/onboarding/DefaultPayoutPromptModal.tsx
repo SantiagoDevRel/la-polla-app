@@ -14,6 +14,7 @@
 import { useMemo, useState } from "react";
 import { CreditCard, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 
 export type PayoutMethod = "nequi" | "bancolombia" | "otro";
 
@@ -28,6 +29,12 @@ interface Props {
     accountName: string | null,
   ) => Promise<void> | void;
   onSkip: () => void;
+  error?: string | null;
+  latestSaved?: string | null;
+  sessionExpired?: boolean;
+  sessionChanged?: boolean;
+  confirmationPending?: boolean;
+  disabled?: boolean;
 }
 
 export default function DefaultPayoutPromptModal({
@@ -37,6 +44,12 @@ export default function DefaultPayoutPromptModal({
   initialAccountName,
   onSubmit,
   onSkip,
+  error,
+  latestSaved,
+  sessionExpired = false,
+  sessionChanged = false,
+  confirmationPending = false,
+  disabled = false,
 }: Props) {
   const t = useTranslations("Payout");
   const tCommon = useTranslations("Common");
@@ -62,7 +75,7 @@ export default function DefaultPayoutPromptModal({
   const cur = METHOD_OPTIONS.find((m) => m.id === method)!;
   const needsName = cur.needsName;
   const canSave =
-    !!account.trim() && !saving && (!needsName || accountName.trim().length >= 2);
+    !!account.trim() && !saving && !disabled && (!needsName || accountName.trim().length >= 2);
 
   async function handleSubmit() {
     if (!canSave) return;
@@ -80,6 +93,7 @@ export default function DefaultPayoutPromptModal({
       <div className="relative w-full max-w-sm bg-bg-card border border-gold/30 rounded-2xl p-5 shadow-[0_0_40px_rgba(255,215,0,0.18)] animate-fade-in">
         <button
           type="button"
+          disabled={saving || disabled}
           onClick={onSkip}
           className="absolute top-3 right-3 text-text-muted hover:text-text-primary transition-colors p-1"
           aria-label={tCommon("close")}
@@ -104,6 +118,7 @@ export default function DefaultPayoutPromptModal({
             <button
               key={m.id}
               type="button"
+              disabled={saving || disabled || confirmationPending}
               onClick={() => setMethod(m.id)}
               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
                 method === m.id
@@ -118,6 +133,7 @@ export default function DefaultPayoutPromptModal({
 
         <input
           type="text"
+          disabled={saving || disabled || confirmationPending}
           value={account}
           onChange={(e) => setAccount(e.target.value)}
           placeholder={cur.accountPlaceholder}
@@ -128,12 +144,16 @@ export default function DefaultPayoutPromptModal({
         {needsName ? (
           <input
             type="text"
+            disabled={saving || disabled || confirmationPending}
             value={accountName}
             onChange={(e) => setAccountName(e.target.value)}
             placeholder={t("placeholderFullName")}
             className="w-full bg-bg-elevated border border-border-subtle rounded-xl px-4 py-3 text-[14px] text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/30 mb-2"
           />
         ) : null}
+        {error && <p role="alert" className="mb-3 text-[13px] leading-normal text-red-alert">{error}</p>}
+        {latestSaved && <p className="mb-3 text-[13px] leading-normal text-text-secondary [overflow-wrap:anywhere]">Cuenta guardada: {latestSaved}</p>}
+        {(sessionExpired || sessionChanged) && <Link href={sessionChanged ? "/perfil" : "/login?returnTo=%2Finicio"} target="_blank" rel="noopener noreferrer" className="mb-3 flex min-h-11 items-center justify-center rounded-xl border border-border-subtle px-4 py-2 text-text-primary">{tCommon(sessionChanged ? "reviewAccount" : "loginAgain")}</Link>}
 
         <p className="text-[11px] text-text-muted text-center mb-3">
           {needsName ? t("nameWarning") : t("nequiHint")}
@@ -146,11 +166,12 @@ export default function DefaultPayoutPromptModal({
           disabled={!canSave}
           className="w-full bg-gold text-bg-base font-display text-base tracking-wide py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(255,215,0,0.2)]"
         >
-          {saving ? t("saving") : t("save")}
+          {saving ? t("saving") : confirmationPending ? tCommon("retry") : t("save")}
         </button>
 
         <button
           type="button"
+          disabled={saving || disabled}
           onClick={onSkip}
           className="w-full mt-2 text-[12px] text-text-muted hover:text-text-secondary transition-colors py-2"
         >

@@ -5,17 +5,19 @@
 // pide el mensaje — nada más para no agregar fricción.
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MessageSquareWarning, Send, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/Toast";
+import { submitFeedback, type FeedbackInput } from "@/lib/feedback/submit";
 
 interface Props {
   className?: string;
+  ownerId: string | null;
 }
 
-export default function ReportProblemBubble({ className = "" }: Props) {
+export default function ReportProblemBubble({ className = "", ownerId }: Props) {
   const t = useTranslations("Report");
   const tCommon = useTranslations("Common");
   const [open, setOpen] = useState(false);
@@ -23,6 +25,11 @@ export default function ReportProblemBubble({ className = "" }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [accountChanged, setAccountChanged] = useState(false);
+  const sending = useRef(false);
+  const attempt = useRef<FeedbackInput | null>(null);
+  const draftOwner = useRef(ownerId);
   const { showToast } = useToast();
 
   // Portal target only exists client-side. Avoids SSR mismatch.
@@ -50,37 +57,41 @@ export default function ReportProblemBubble({ className = "" }: Props) {
 
   async function submit() {
     const trimmed = message.trim();
-    if (trimmed.length < 1 || submitting) return;
+    if (trimmed.length < 1 || sending.current) return;
+    if (!draftOwner.current) {
+      setError("Necesitas iniciar sesión. Conservamos tu mensaje aquí."); setSessionExpired(true); return;
+    }
+    sending.current = true;
     setSubmitting(true);
     setError(null);
+    setSessionExpired(false);
+    setAccountChanged(false);
     try {
       const pageUrl =
         typeof window !== "undefined"
           ? window.location.pathname + window.location.search
           : null;
 
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, pageUrl }),
-      });
-      if (!res.ok) {
+      if (!attempt.current || attempt.current.message !== trimmed || attempt.current.pageUrl !== pageUrl) {
+        attempt.current = { message: trimmed, pageUrl, requestId: crypto.randomUUID(), ownerId: draftOwner.current };
+      }
+      const result = await submitFeedback(attempt.current);
+      if (!result.ok) {
         // Inline error: el toast queda tapado por el modal (z-index), por
         // eso lo mostramos dentro del propio modal mientras siga abierto.
-        if (res.status === 401) {
-          setError(t("errAuth"));
-        } else {
-          setError(t("errSend"));
-        }
+        setSessionExpired(result.kind === "auth"); setAccountChanged(result.kind === "account");
+        setError(result.error);
         return;
       }
       // Cerramos primero, después el toast — así el toast queda visible.
       setMessage("");
+      attempt.current = null;
       setOpen(false);
       showToast(t("successToast"), "success");
     } catch {
-      setError(t("errNetwork"));
+      setError("No pudimos confirmar el envío. Conservamos tu mensaje para reintentar.");
     } finally {
+      sending.current = false;
       setSubmitting(false);
     }
   }
@@ -143,6 +154,11 @@ export default function ReportProblemBubble({ className = "" }: Props) {
                 role="alert"
               >
                 {error}
+                {(sessionExpired || accountChanged) && <a
+                  href={accountChanged ? "/perfil" : `/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="mt-2 block min-h-11 content-center font-medium text-text-primary underline"
+                >{accountChanged ? "Revisar cuenta en Perfil" : "Iniciar sesión y volver a este reporte"}</a>}
               </div>
             )}
 

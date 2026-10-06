@@ -33,6 +33,7 @@ import {
   getProvisionalPrizes,
 } from "@/lib/casa/queries";
 import { signPayoutProofs } from "@/lib/casa/payout-proofs";
+import { getPickSaveState } from "@/lib/casa/picks-save";
 import { PruebasDePago } from "@/components/casa/PruebasDePago";
 import {
   DEFAULT_MAX_ENTRIES_PER_USER,
@@ -183,8 +184,16 @@ export default async function PollaPage({
   const etiqueta = multiple && entry?.entry_number ? `Cupo ${entry.entry_number} · ` : "";
   // Todos los pronósticos de la persona: los del cupo elegido van al tablero y el
   // resto sirve para avisar qué cupos todavía tienen partidos sin pronóstico.
-  const allPicks = polla.kind === "rifa" || !entry ? [] : await getMyPicks(polla.id, user.id);
-  const picks = allPicks.filter((p) => p.entry_id === entry?.id);
+  const [allPicks, pickState] = polla.kind === "rifa" || !entry ? [[], null] : await Promise.all([
+    getMyPicks(polla.id, user.id), getPickSaveState(polla.id, user.id, entry.id),
+  ]);
+  // Revision and selected values come from one SQL snapshot, so another tab's
+  // save cannot pair a newer revision with an older displayed pick.
+  const picks = pickState ? Object.entries(pickState.picks).map(([id, value]) => ({
+    match_id: polla.kind === "partidos" ? id : null, question_id: polla.kind === "manual" ? id : null,
+    pick_1x2: value.pick1x2 ?? null, home_score: value.homeScore ?? null, away_score: value.awayScore ?? null,
+    option_id: value.optionId ?? null, free_text: value.freeText ?? null, points_earned: value.pointsEarned ?? null,
+  })) : allPicks.filter((p) => p.entry_id === entry?.id);
   const nowMs = Date.now();
   const editables = polla.kind === "partidos" && acceptsCasaMatchPicks(polla.status, polla.draw_pending)
     ? (matches as Array<Parameters<typeof canEditCasaMatch>[0] & { id: string }>).filter((m) => canEditCasaMatch(m, nowMs)).map((m) => m.id)
@@ -456,7 +465,7 @@ export default async function PollaPage({
         )}
 
         {mostrarEntrar && !activarCortesia && !usarCupo && (gratis ? (
-          <UnirmeGratis slug={polla.slug} nombre={polla.name} premio={objeto ? polla.prize_object : null} />
+          <UnirmeGratis slug={polla.slug} nombre={polla.name} premio={objeto ? polla.prize_object : null} ownerId={user.id} />
         ) : (
           <ParaParticipar
             polla={polla}
@@ -608,8 +617,11 @@ export default async function PollaPage({
             <PicksBoard
               key={entry?.id ?? "sin-participacion"}
               slug={polla.slug}
-              joinPrompt={!inscrito && abierta ? { href: `/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`, entryPriceCop: polla.entry_price_cop } : undefined}
+              joinPrompt={!inscrito && abierta ? { href: `/polla/${polla.slug}/pagar${retomar ? `?participacion=${retomar}` : ""}`, entryPriceCop: polla.entry_price_cop, ownerId: user.id } : undefined}
               entryNumber={entry?.entry_number ?? null}
+              ownerId={user.id}
+              entryId={entry?.id}
+              initialRevision={pickState?.revision}
               scoringMode={polla.scoring_mode ?? "1x2"}
               matches={matches as never}
               plannedMatches={privateCampaign?.draft.slots}
@@ -640,6 +652,9 @@ export default async function PollaPage({
                 key={entry?.id ?? "sin-participacion"}
                 slug={polla.slug}
                 entryNumber={entry?.entry_number ?? null}
+                ownerId={user.id}
+                entryId={entry?.id}
+                initialRevision={pickState?.revision}
                 questions={questions}
                 initialPicks={picksPorPregunta}
                 distribution={distribution}

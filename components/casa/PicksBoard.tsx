@@ -32,7 +32,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useDraftSave } from "@/lib/casa/use-draft-save";
+import { usePickSave } from "@/lib/casa/use-pick-save";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { TeamCrest } from "@/components/match/TeamCrest";
 import { PctBar } from "@/components/street";
@@ -129,6 +129,9 @@ interface Props {
   slug: string;
   /** Participación que se está editando (migración 131). Sin número = la principal. */
   entryNumber?: number | null;
+  ownerId?: string;
+  entryId?: string;
+  initialRevision?: number;
   scoringMode: "1x2" | "marcador";
   matches: MatchLite[];
   /** Presence selects a static draft: no payments, predictions, stats or refreshes. */
@@ -148,7 +151,7 @@ interface Props {
    * vez de un botón muerto, sube la hoja «paga para guardar tu pronóstico».
    * El bloqueo va después de mirar, no al entrar.
    */
-  joinPrompt?: { href: string; entryPriceCop: number };
+  joinPrompt?: { href: string; entryPriceCop: number; ownerId: string };
 }
 
 const REFRESH_INTERVAL_MS = 30_000;
@@ -164,8 +167,8 @@ function isPendingResult(match: Pick<RefreshTiming, "final_verified_at" | "voide
 }
 
 /** A refresh preserves drafts, but a verified result must show the saved pick and fresh SQL points. */
-export function pickForDisplay(match: Pick<RefreshTiming, "final_verified_at" | "voided_at">, draft: BoardPick | undefined, saved: BoardPick | undefined) {
-  return isPendingResult(match) ? draft : saved;
+export function pickForDisplay(match: Pick<RefreshTiming, "final_verified_at" | "voided_at">, draft: BoardPick | undefined, saved: BoardPick | undefined, editable = true) {
+  return isPendingResult(match) && editable ? draft : saved;
 }
 
 /**
@@ -214,7 +217,7 @@ function horaDe(m: BoardMatch): string {
 
 export function PicksBoard({
   slug,
-  entryNumber,
+  entryNumber, ownerId, entryId, initialRevision,
   scoringMode,
   matches,
   plannedMatches,
@@ -227,11 +230,12 @@ export function PicksBoard({
   joinPrompt,
 }: Props) {
   const planning = plannedMatches !== undefined;
-  const [picks, setPicks] = useState(initialPicks);
   const [joinOpen, setJoinOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
-  const { dirty, changed, snapshot, acknowledge } = useDraftSave();
+  const { picks: pickValues, saved: savedValues, changed, save: guardar, discard, dirty, saving, uncertain, sessionExpired, msg } = usePickSave({
+    slug, entryNumber, ownerId, entryId, initialRevision, initialPicks, targetIds: matches.map(m => m.id), kind: "match",
+  });
+  const picks = pickValues as Record<string, BoardPick>;
+  const saved = savedValues as Record<string, BoardPick>;
   const [now, setNow] = useState(() => Date.now());
   const router = useRouter();
   const inputs = useRef(new Map<string, HTMLInputElement | null>());
@@ -290,27 +294,15 @@ export function PicksBoard({
 
   function set1x2(matchId: string, value: Pick1x2) {
     if (planning) return;
-    setPicks((prev) => ({
-      ...prev,
-      [matchId]: { ...prev[matchId], pick1x2: value, homeScore: null, awayScore: null },
-    }));
-    changed();
-    setMsg(null);
+    changed(matchId, { ...picks[matchId], pick1x2: value, homeScore: null, awayScore: null });
   }
 
   function setScore(matchId: string, side: "home" | "away", raw: string) {
     if (planning) return;
     const n = raw === "" ? null : Math.max(0, Math.min(30, Number(raw)));
-    setPicks((prev) => ({
-      ...prev,
-      [matchId]: {
-        pick1x2: null,
-        homeScore: side === "home" ? n : (prev[matchId]?.homeScore ?? null),
-        awayScore: side === "away" ? n : (prev[matchId]?.awayScore ?? null),
-      },
-    }));
-    changed();
-    setMsg(null);
+    changed(matchId, { pick1x2: null,
+      homeScore: side === "home" ? n : (picks[matchId]?.homeScore ?? null),
+      awayScore: side === "away" ? n : (picks[matchId]?.awayScore ?? null) });
   }
 
   /** Auto-jump: local → visitante → local del próximo partido editable; al final cierra el teclado. */
@@ -333,53 +325,7 @@ export function PicksBoard({
     });
   }
 
-  async function guardar() {
-    if (planning) return;
-    const sentRevision = snapshot();
-    setSaving(true);
-    setMsg(null);
-    try {
-      const payload = matches
-        .filter((m) => picks[m.id] && canEditCasaMatch(m))
-        .map((m) => ({
-          matchId: m.id,
-          pick1x2: picks[m.id]?.pick1x2 ?? null,
-          homeScore: picks[m.id]?.homeScore ?? null,
-          awayScore: picks[m.id]?.awayScore ?? null,
-        }));
-
-      const res = await fetch(`/api/casa/pollas/${slug}/picks`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entryNumber ? { picks: payload, entryNumber } : { picks: payload }),
-      });
-      const json = await res.json();
-
-      if (!res.ok) {
-        setMsg({ text: json.error ?? "No se pudo guardar.", bad: true });
-        return;
-      }
-      if (!acknowledge(sentRevision)) {
-        setMsg({ text: "Guardamos el envío anterior. Tienes cambios nuevos sin guardar.", bad: true });
-        return;
-      }
-      // No decir "quedaste con todo marcado" si faltan partidos: la persona
-      // se iba tranquila y el domingo descubria que tenia 5 en blanco.
-      const faltan = matches.length - marcados;
-      setMsg({
-        text: json.avisos?.length
-          ? `Guardado. ${json.avisos[0]}`
-          : faltan > 0
-            ? `Guardado ${marcados} de ${matches.length}. Te faltan ${faltan}.`
-            : "Guardado. No te falta ningún partido.",
-        bad: faltan > 0,
-      });
-    } catch {
-      setMsg({ text: "Error de conexión. Intenta de nuevo.", bad: true });
-    } finally {
-      setSaving(false);
-    }
-  }
+  const confirmados = matches.filter(m => hasPick(scoringMode, saved[m.id])).length;
 
   const renderCard = (m: BoardMatch, showDay: boolean) => (
     <MatchCard
@@ -388,7 +334,7 @@ export function PicksBoard({
       now={now}
       slug={slug}
       scoringMode={scoringMode}
-      mine={planning ? undefined : pickForDisplay(m, picks[m.id], initialPicks[m.id])}
+      mine={planning ? undefined : pickForDisplay(m, picks[m.id], m.final_verified_at || m.voided_at ? initialPicks[m.id] ?? saved[m.id] : saved[m.id], !m.planned && canEdit && canEditCasaMatch(m, now))}
       distribution={distribution}
       canEdit={!planning && canEdit}
       canViewOthers={!planning && canViewOthers}
@@ -403,7 +349,7 @@ export function PicksBoard({
   );
 
   return (
-    <div data-app-update-blocked={dirty || saving} className="space-y-4">
+    <div data-app-update-blocked={dirty || saving || uncertain} className="space-y-4">
       {/* ── Los partidos, en orden de empezada ───────────────────────────
           Un solo recorrido, de arriba abajo. El día es apenas un separador;
           dentro de cada uno el orden es la hora de inicio y no cambia nunca. */}
@@ -436,7 +382,7 @@ export function PicksBoard({
       {/* Barra de guardado: pegada abajo, encima del nav. (2026-09-18) Solo
           cuando hay cambios o un mensaje: un «Guardado 13/13» fijo tapaba 120 px
           de partidos sin pedir nada. Lo que falta ya lo dice la franja roja. */}
-      {!planning && canEdit && (dirty || saving || msg) && (
+      {!planning && (canEdit || dirty || uncertain) && (dirty || saving || msg || uncertain) && (
         <div className="sticky bottom-[88px] z-20 -mx-4 border-t border-border-default bg-bg-base px-4 pb-3 pt-3">
           {msg && (
             <p
@@ -452,15 +398,17 @@ export function PicksBoard({
           <button
             type="button"
             onClick={guardar}
-            disabled={saving || !dirty}
+            disabled={saving || (!dirty && !uncertain)}
             className="lp-btn lp-btn-primary w-full"
           >
             {saving
               ? "Guardando..."
-              : dirty
-                ? `Guardar (${marcados}/${matches.length})`
-                : `Guardado ${marcados}/${matches.length}`}
+              : uncertain ? "Comprobar guardado"
+                : dirty ? `Guardar (${marcados}/${matches.length})`
+                : `Guardado ${confirmados}/${matches.length}`}
           </button>
+          {sessionExpired && <a href={`/login?returnTo=${encodeURIComponent(`/polla/${slug}${entryNumber ? `?p=${entryNumber}` : ""}`)}`} target="_blank" rel="noopener noreferrer" className="lp-btn mt-2 w-full border border-border-default">Ingresar de nuevo</a>}
+          {dirty && !uncertain && !saving && <button type="button" onClick={discard} className="mt-2 min-h-11 w-full text-[13px] text-text-secondary underline">Descartar cambios sin guardar</button>}
         </div>
       )}
 
@@ -482,7 +430,7 @@ export function PicksBoard({
       )}
 
       {!planning && joinPrompt && (
-        <EntrarSheet open={joinOpen} onClose={() => setJoinOpen(false)} href={joinPrompt.href} entryPriceCop={joinPrompt.entryPriceCop} slug={slug} />
+        <EntrarSheet open={joinOpen} onClose={() => setJoinOpen(false)} href={joinPrompt.href} entryPriceCop={joinPrompt.entryPriceCop} slug={slug} ownerId={joinPrompt.ownerId} />
       )}
     </div>
   );
