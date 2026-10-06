@@ -5,6 +5,7 @@
 // lo más grande de la pantalla y lo único en el acento.
 
 import Link from "next/link";
+import { Fragment } from "react";
 import { PollaHighlights } from "@/components/highlights/PollaHighlights";
 import { MyPollas } from "@/components/casa/MyPollas";
 import { LiveNow } from "@/components/casa/LiveNow";
@@ -145,10 +146,15 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
       {/* ── Hero: la plata en juego ───────────────────────────────────── */}
       {/* (2026-09-18) El hero baja de 228 a 136 px: la cifra sigue siendo el
           gancho, pero no se come medio pantallazo antes de la primera polla. */}
-      <HeroFrame height="h-[136px]">
+      <HeroFrame height="min-h-[136px]" className="flex flex-col justify-end">
         <Label>En juego</Label>
-        <div className="lp-money mt-1 text-[44px] leading-[0.9] text-gold">
-          {formatCop(enJuego)}
+        <div className="lp-money mt-1 min-w-0 text-[44px] leading-[0.9] text-gold [overflow-wrap:anywhere]">
+          {formatCop(enJuego).split(".").map((group, index, groups) => (
+            <Fragment key={index}>
+              {`${group}${index < groups.length - 1 ? "." : ""}`}
+              {index < groups.length - 1 ? <wbr /> : null}
+            </Fragment>
+          ))}
         </div>
         {abiertas.length > 0 && (
           <p className="mt-2 text-[13px] text-text-secondary">
