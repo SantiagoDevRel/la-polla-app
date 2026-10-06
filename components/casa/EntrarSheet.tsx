@@ -22,7 +22,7 @@ import { formatCop } from "@/lib/casa/format";
 import { joinFreePolla } from "@/lib/casa/join-free";
 import { useToast } from "@/components/ui/Toast";
 
-export function EntrarSheet({ open, onClose, href, entryPriceCop, slug }: {
+export function EntrarSheet({ open, onClose, href, entryPriceCop, slug, ownerId }: {
   open: boolean;
   onClose: () => void;
   href: string;
@@ -33,11 +33,16 @@ export function EntrarSheet({ open, onClose, href, entryPriceCop, slug }: {
    * pronosticando sin cambiar de pantalla.
    */
   slug?: string;
+  ownerId?: string;
 }) {
   const gratis = entryPriceCop === 0 && Boolean(slug);
   const router = useRouter();
   const { showToast } = useToast();
   const [entrando, setEntrando] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [accountChanged, setAccountChanged] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submitting = useRef(false);
   const reduce = useReducedMotion();
   const dialog = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
@@ -123,23 +128,34 @@ export function EntrarSheet({ open, onClose, href, entryPriceCop, slug }: {
                 type="button"
                 disabled={entrando}
                 onClick={async () => {
+                  if (accountChanged) { router.push("/perfil"); return; }
+                  if (sessionExpired) { router.push(`/login?returnTo=${encodeURIComponent(`/polla/${slug}`)}`); return; }
+                  if (submitting.current) return;
+                  submitting.current = true;
                   setEntrando(true);
-                  const result = await joinFreePolla(slug!);
+                  setError(null);
+                  const result = await joinFreePolla(slug!, ownerId);
+                  submitting.current = false;
                   setEntrando(false);
-                  if (!result.ok) { showToast(result.error, "error"); router.refresh(); return; }
+                  if (!result.ok) {
+                    setError(result.error); setSessionExpired(result.kind === "auth"); setAccountChanged(result.kind === "account");
+                    if (result.kind === "rejected") router.refresh();
+                    return;
+                  }
                   showToast("Listo, ya estás dentro. Guarda tu pronóstico.", "success");
                   close();
                   router.refresh();
                 }}
                 className="lp-btn lp-btn-primary mt-5 w-full !px-4"
               >
-                {entrando ? "Entrando..." : "Entrar gratis"}
+                {entrando ? "Entrando..." : accountChanged ? "Revisar cuenta" : sessionExpired ? "Iniciar sesión" : "Entrar gratis"}
               </button>
             ) : (
               <Link href={href} className="lp-btn lp-btn-primary mt-5 w-full !px-4">
                 Pagar la entrada · {formatCop(entryPriceCop)}
               </Link>
             )}
+            {error && <p role="alert" className="mt-3 text-[13px] leading-relaxed text-red-alert">{error}</p>}
             <button type="button" onClick={close} className="lp-btn lp-btn-ghost mt-2 w-full">
               Seguir mirando
             </button>

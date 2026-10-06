@@ -10,33 +10,43 @@
 // Un clic, nunca solo: nadie entra a una polla sin pedirlo. El servidor es
 // idempotente, así que un doble toque no crea dos cupos.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Ticket } from "lucide-react";
 import { StreetCard } from "@/components/street";
 import { useToast } from "@/components/ui/Toast";
 import { joinFreePolla } from "@/lib/casa/join-free";
 
-export function UnirmeGratis({ slug, nombre, premio }: {
+export function UnirmeGratis({ slug, nombre, premio, ownerId }: {
   slug: string;
   nombre: string;
   /** El objeto que se juega, cuando el premio no es dinero. */
   premio?: string | null;
+  ownerId: string;
 }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [entrando, setEntrando] = useState(false);
   const [listo, setListo] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [accountChanged, setAccountChanged] = useState(false);
+  const submitting = useRef(false);
 
   async function unirme() {
+    if (accountChanged) { router.push("/perfil"); return; }
+    if (sessionExpired) { router.push(`/login?returnTo=${encodeURIComponent(`/polla/${slug}`)}`); return; }
+    if (submitting.current) return;
+    submitting.current = true;
     setEntrando(true);
-    const result = await joinFreePolla(slug);
+    const result = await joinFreePolla(slug, ownerId);
+    submitting.current = false;
     setEntrando(false);
     if (!result.ok) {
       showToast(result.error, "error");
+      setSessionExpired(result.kind === "auth"); setAccountChanged(result.kind === "account");
       // El servidor ya sabe por qué no se pudo (cerró, no es gratis): al
       // recargar, la pantalla muestra el estado real en vez de este botón.
-      router.refresh();
+      if (result.kind === "rejected") router.refresh();
       return;
     }
     setListo(true);
@@ -55,7 +65,7 @@ export function UnirmeGratis({ slug, nombre, premio }: {
       </p>
       {premio && <p className="mt-2 text-[15px] leading-relaxed text-text-secondary">Se juega <strong className="font-semibold text-text-primary">{premio}</strong>.</p>}
       <button type="button" onClick={unirme} disabled={entrando || listo} className="lp-btn lp-btn-primary mt-4 w-full">
-        {listo ? "Ya estás dentro" : entrando ? "Entrando..." : "Entrar gratis"}
+        {listo ? "Ya estás dentro" : entrando ? "Entrando..." : accountChanged ? "Revisar cuenta" : sessionExpired ? "Iniciar sesión" : "Entrar gratis"}
       </button>
     </StreetCard>
   );

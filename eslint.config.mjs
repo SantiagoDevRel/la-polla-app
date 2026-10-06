@@ -25,6 +25,7 @@ export default defineConfig([
   },
   globalIgnores([
     ".next/**",
+    ".next-casa-local-*/**",
     "android/**",
     "coverage/**",
     "design-handoff/**",

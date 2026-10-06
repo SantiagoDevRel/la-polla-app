@@ -10,30 +10,34 @@
 // default_payout_account} — ya seteado en route.ts.
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import axios from "axios";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { retryProfilePatch, loadProfile, saveProfilePatch, type PendingProfileMutation } from "@/lib/users/profile-client";
 import DefaultPayoutPromptModal, {
   type PayoutMethod,
 } from "@/components/onboarding/DefaultPayoutPromptModal";
 
 const SESSION_KEY = "default-payout-prompt-skipped";
 
-interface MeResponse {
-  profile: {
-    default_payout_method: PayoutMethod | null;
-    default_payout_account: string | null;
-  } | null;
-}
-
 export default function DefaultPayoutPrompt() {
   const [open, setOpen] = useState(false);
   const [hasDefault, setHasDefault] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionChanged, setSessionChanged] = useState(false);
+  const [confirmationPending, setConfirmationPending] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [latestSaved, setLatestSaved] = useState<string | null>(null);
+  const ownerId = useRef<string | null>(null);
+  const pendingPatch = useRef<PendingProfileMutation | null>(null);
+  const savingLock = useRef(false);
 
   const load = useCallback(async () => {
     try {
-      const { data } = await axios.get<MeResponse>("/api/users/me");
+      const result = await loadProfile(ownerId.current ?? undefined);
+      if (!result.ok) return; // An optional prompt must not imply a missing account after a failed read.
+      ownerId.current ??= result.data.id;
       const has =
-        !!data.profile?.default_payout_method && !!data.profile?.default_payout_account;
+        !!result.data.default_payout_method && !!result.data.default_payout_account;
       setHasDefault(has);
       if (!has && typeof window !== "undefined") {
         const skipped = window.sessionStorage.getItem(SESSION_KEY) === "1";
@@ -53,16 +57,38 @@ export default function DefaultPayoutPrompt() {
     account: string,
     accountName: string | null,
   ) {
+    if (savingLock.current || !ownerId.current) return;
+    savingLock.current = true;
+    setSaving(true);
+    setError(null);
+    setLatestSaved(null);
+    setSessionExpired(false);
+    setSessionChanged(false);
     try {
-      await axios.patch("/api/users/me", {
+      const patch = {
         default_payout_method: method,
         default_payout_account: account,
         default_payout_account_name: accountName,
-      });
+      };
+      const result = pendingPatch.current
+        ? await retryProfilePatch(pendingPatch.current)
+        : await saveProfilePatch(patch, ownerId.current);
+      if (!result.ok) {
+        if (result.pending) { pendingPatch.current = result.pending; setConfirmationPending(true); }
+        else { pendingPatch.current = null; setConfirmationPending(false); }
+        setError(result.error);
+        setSessionExpired(result.kind === "auth");
+        setSessionChanged(result.code === "SESSION_CHANGED");
+        if (result.code === "PROFILE_CHANGED" && result.latestProfile) setLatestSaved(result.latestProfile.default_payout_account ?? "Sin cuenta de pago");
+        return;
+      }
+      pendingPatch.current = null;
+      setConfirmationPending(false);
       setHasDefault(true);
       setOpen(false);
-    } catch {
-      /* swallow — modal queda abierto para reintento */
+    } finally {
+      savingLock.current = false;
+      setSaving(false);
     }
   }
 
@@ -81,6 +107,12 @@ export default function DefaultPayoutPrompt() {
   return (
     <DefaultPayoutPromptModal
       open={open}
+      error={error}
+      latestSaved={latestSaved}
+      sessionExpired={sessionExpired}
+      sessionChanged={sessionChanged}
+      confirmationPending={confirmationPending}
+      disabled={saving}
       onSubmit={save}
       onSkip={skip}
     />

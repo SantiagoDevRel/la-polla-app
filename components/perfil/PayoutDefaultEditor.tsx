@@ -51,6 +51,9 @@ interface Props {
   ) => Promise<void> | void;
   onClear?: () => Promise<void> | void;
   allowedMethods?: readonly PayoutMethod[];
+  disabled?: boolean;
+  forceEdit?: boolean;
+  errorsHandledExternally?: boolean;
 }
 
 export default function PayoutDefaultEditor({
@@ -61,6 +64,9 @@ export default function PayoutDefaultEditor({
   onSave,
   onClear,
   allowedMethods,
+  disabled = false,
+  forceEdit = false,
+  errorsHandledExternally = false,
 }: Props) {
   const id = useId();
   const t = useTranslations("Payout");
@@ -123,7 +129,7 @@ export default function PayoutDefaultEditor({
   );
 
   const hasInitial = !!(initialMethod && initialAccount);
-  const [mode, setMode] = useState<"view" | "edit">(hasInitial ? "view" : "edit");
+  const [mode, setMode] = useState<"view" | "edit">(hasInitial && !forceEdit ? "view" : "edit");
   const [method, setMethod] = useState<PayoutMethod>(initialMethod ?? "bancolombia");
   const initialOther = splitOtherBank(initialMethod === "otro" ? initialAccount : null);
   const [account, setAccount] = useState(initialMethod === "otro" ? initialOther.account : initialAccount ?? "");
@@ -136,7 +142,7 @@ export default function PayoutDefaultEditor({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (mode === "edit" && saving === false) return;
+    if (mode === "edit") return;
     resetToInitial();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMethod, initialAccount, initialAccountName, initialAccountType]);
@@ -173,6 +179,7 @@ export default function PayoutDefaultEditor({
     !!account.trim() &&
     !formatError &&
     !saving &&
+    !disabled &&
     (!needsName || accountName.trim().length >= 2) &&
     (!needsAccountType || accountType !== null);
 
@@ -186,7 +193,7 @@ export default function PayoutDefaultEditor({
       await onSave(method, finalAccount, finalName, finalType);
       setMode("view");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : tProfile("errSavePayout"));
+      if (!errorsHandledExternally) setError(cause instanceof Error ? cause.message : tProfile("errSavePayout"));
     } finally {
       setSaving(false);
     }
@@ -198,14 +205,22 @@ export default function PayoutDefaultEditor({
   }
 
   async function clearAccount() {
-    if (!onClear) return;
-    await onClear();
-    setMethod("bancolombia");
-    setAccount("");
-    setBank("");
-    setAccountName("");
-    setAccountType(null);
-    setMode("edit");
+    if (!onClear || saving || disabled) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onClear();
+      setMethod("bancolombia");
+      setAccount("");
+      setBank("");
+      setAccountName("");
+      setAccountType(null);
+      setMode("edit");
+    } catch (cause) {
+      if (!errorsHandledExternally) setError(cause instanceof Error ? cause.message : tProfile("errClearPayout"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   // ── VIEW MODE ───────────────────────────────────────────────────────
@@ -228,6 +243,7 @@ export default function PayoutDefaultEditor({
         </div>
         <button
           type="button"
+          disabled={disabled || saving}
           onClick={startEdit}
           aria-label={t("editorAriaEdit")}
           className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-border-subtle transition-colors hover:border-gold/50 hover:bg-gold/5"
@@ -244,14 +260,15 @@ export default function PayoutDefaultEditor({
     <section className="rounded-2xl border-gold/20 p-5 lp-card space-y-3 hover:border-gold/40">
       <ProfileSectionHeading icon={Banknote} tone="money" title={t("editorTitle")} />
 
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,max(5em,calc((100%_-_0.375rem)/2))),1fr))] gap-1.5">
         {METHOD_OPTIONS.filter((m) => !allowedMethods || allowedMethods.includes(m.id)).map((m) => (
           <button
             key={m.id}
             type="button"
+            disabled={disabled || saving}
             onClick={() => changeMethod(m.id)}
             aria-pressed={method === m.id}
-            className={`min-h-11 cursor-pointer rounded-full border px-3 py-1.5 text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${
+            className={`min-h-11 min-w-0 cursor-pointer rounded-full border px-2 py-1.5 text-[15px] [overflow-wrap:anywhere] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${
                 method === m.id
                 ? "bg-bg-elevated text-text-primary border-text-secondary"
                 : "bg-bg-elevated text-text-secondary border-border-subtle hover:border-gold/40"
@@ -268,6 +285,7 @@ export default function PayoutDefaultEditor({
           <input
             id={`${id}-bank`}
             type="text"
+            disabled={disabled || saving}
             value={bank}
             onChange={(e) => setBank(sanitizeBankName(e.target.value))}
             placeholder={t("placeholderBank")}
@@ -284,6 +302,7 @@ export default function PayoutDefaultEditor({
       <input
         id={`${id}-account`}
         type="text"
+        disabled={disabled || saving}
         inputMode={method === "nequi" || method === "bancolombia" ? "numeric" : "text"}
         autoCapitalize="off"
         autoComplete="off"
@@ -305,6 +324,7 @@ export default function PayoutDefaultEditor({
             <button
               key={accType}
               type="button"
+              disabled={disabled || saving}
               onClick={() => setAccountType(accType)}
               aria-pressed={accountType === accType}
               className={`min-h-11 cursor-pointer rounded-full border px-3 py-1.5 text-[15px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary ${
@@ -325,6 +345,7 @@ export default function PayoutDefaultEditor({
         <input
           id={`${id}-name`}
           type="text"
+          disabled={disabled || saving}
           value={accountName}
           onChange={(e) => setAccountName(e.target.value)}
           placeholder={t("placeholderNameSimple")}
@@ -346,6 +367,7 @@ export default function PayoutDefaultEditor({
         {hasInitial ? (
           <button
             type="button"
+            disabled={disabled || saving}
             onClick={() => {
               resetToInitial();
               setMode("view");
@@ -358,6 +380,7 @@ export default function PayoutDefaultEditor({
         {hasInitial && onClear ? (
           <button
             type="button"
+            disabled={disabled || saving}
             onClick={clearAccount}
             className="min-h-11 rounded-xl border border-border-subtle px-3 py-2 text-sm text-text-muted transition-colors hover:border-red-alert/40 hover:text-red-alert"
           >

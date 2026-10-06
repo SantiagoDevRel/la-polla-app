@@ -6,6 +6,8 @@ Paid entries use payment proofs; $0 gift pools enroll immediately through
 
 Agent instructions: [AGENTS.md](AGENTS.md). Current security, timing, gifts, and
 delivery checks: [urgent/high fixes](docs/urgent-high-fixes.md), migrations 161–163.
+Manual save confirmations, revision guards, session recovery and bounded requests:
+[save reliability](docs/save-reliability.md), migrations 164–166.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 

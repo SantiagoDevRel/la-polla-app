@@ -9,8 +9,8 @@
 // Preguntas de texto libre: se escribe y ya. El match contra la respuesta
 // correcta lo hace SQL, insensible a mayúsculas y espacios.
 
-import { useMemo, useState } from "react";
-import { useDraftSave } from "@/lib/casa/use-draft-save";
+import { useMemo } from "react";
+import { usePickSave } from "@/lib/casa/use-pick-save";
 import { Label, PctBar, Tape } from "@/components/street";
 import type { CasaDistribution, CasaQuestion } from "@/lib/casa/types";
 
@@ -18,6 +18,9 @@ interface Props {
   slug: string;
   /** Participación que se está editando (migración 131). Sin número = la principal. */
   entryNumber?: number | null;
+  ownerId?: string;
+  entryId?: string;
+  initialRevision?: number;
   questions: CasaQuestion[];
   /** respuestas actuales del usuario, por question_id */
   initialPicks: Record<string, { optionId: string | null; freeText: string | null }>;
@@ -28,17 +31,16 @@ interface Props {
 
 export function QuestionsBoard({
   slug,
-  entryNumber,
+  entryNumber, ownerId, entryId, initialRevision,
   questions,
   initialPicks,
   distribution,
   canEdit,
   lockedReason,
 }: Props) {
-  const [picks, setPicks] = useState(initialPicks);
-  const [saving, setSaving] = useState(false);
-  const { dirty, changed, snapshot, acknowledge } = useDraftSave();
-  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  const { picks, saved, changed, save: guardar, discard, dirty, saving, uncertain, sessionExpired, msg } = usePickSave({
+    slug, entryNumber, ownerId, entryId, initialRevision, initialPicks, targetIds: questions.map(q => q.id), kind: "question",
+  });
 
   const respondidas = useMemo(
     () =>
@@ -50,66 +52,24 @@ export function QuestionsBoard({
   );
 
   function elegirOpcion(questionId: string, optionId: string) {
-    setPicks((prev) => ({ ...prev, [questionId]: { optionId, freeText: null } }));
-    changed();
-    setMsg(null);
+    changed(questionId, { optionId, freeText: null });
   }
 
   function escribir(questionId: string, texto: string) {
-    setPicks((prev) => ({
-      ...prev,
-      [questionId]: { optionId: null, freeText: texto },
-    }));
-    changed();
-    setMsg(null);
+    changed(questionId, { optionId: null, freeText: texto });
   }
 
-  async function guardar() {
-    const sentRevision = snapshot();
-    setSaving(true);
-    setMsg(null);
-    try {
-      const payload = questions
-        .filter((q) => picks[q.id]?.optionId || picks[q.id]?.freeText?.trim())
-        .map((q) => ({
-          questionId: q.id,
-          optionId: picks[q.id]?.optionId ?? null,
-          freeText: picks[q.id]?.freeText?.trim() || null,
-        }));
-
-      if (payload.length === 0) {
-        setMsg({ text: "Todavía no respondiste nada.", bad: true });
-        return;
-      }
-
-      const res = await fetch(`/api/casa/pollas/${slug}/picks`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(entryNumber ? { picks: payload, entryNumber } : { picks: payload }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setMsg({ text: json.error ?? "No se pudo guardar.", bad: true });
-        return;
-      }
-      if (acknowledge(sentRevision)) setMsg({ text: "Guardado." });
-      else setMsg({ text: "Guardamos el envío anterior. Tienes cambios nuevos sin guardar.", bad: true });
-    } catch {
-      setMsg({ text: "Error de conexión.", bad: true });
-    } finally {
-      setSaving(false);
-    }
-  }
+  const confirmadas = questions.filter(q => saved[q.id]?.optionId || saved[q.id]?.freeText?.trim()).length;
 
   return (
-    <div data-app-update-blocked={dirty || saving}>
+    <div data-app-update-blocked={dirty || saving || uncertain}>
       <ul className="space-y-px">
         {questions.map((q) => {
           const resuelta = q.resolved_at != null;
           const editable = canEdit && !resuelta;
           const dist = distribution.preguntas?.[q.id];
           const total = dist?.total ?? 0;
-          const mine = picks[q.id];
+          const mine = editable ? picks[q.id] : saved[q.id];
 
           return (
             <li key={q.id} className="bg-bg-card p-4">
@@ -158,7 +118,7 @@ export function QuestionsBoard({
                             !editable ? "cursor-not-allowed opacity-70" : "",
                           ].join(" ")}
                         >
-                          <span className="min-w-0 truncate">{op.label}</span>
+                          <span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{op.label}</span>
                           {total > 0 && (
                             <span className="lp-money shrink-0 text-[12px] text-text-muted">
                               {Math.round(pct)}%
@@ -199,7 +159,7 @@ export function QuestionsBoard({
         })}
       </ul>
 
-      {canEdit && (
+      {(canEdit || dirty || uncertain) && (
         <div className="sticky bottom-[88px] z-20 mt-4 border-t border-border-default bg-bg-base px-4 pb-3 pt-3">
           {msg && (
             <p
@@ -215,15 +175,17 @@ export function QuestionsBoard({
           <button
             type="button"
             onClick={guardar}
-            disabled={saving || !dirty}
+            disabled={saving || (!dirty && !uncertain)}
             className="lp-btn lp-btn-primary w-full"
           >
             {saving
               ? "Guardando..."
-              : dirty
-                ? `Guardar (${respondidas}/${questions.length})`
-                : `Guardado ${respondidas}/${questions.length}`}
+              : uncertain ? "Comprobar guardado"
+                : dirty ? `Guardar (${respondidas}/${questions.length})`
+                : `Guardado ${confirmadas}/${questions.length}`}
           </button>
+          {sessionExpired && <a href={`/login?returnTo=${encodeURIComponent(`/polla/${slug}${entryNumber ? `?p=${entryNumber}` : ""}`)}`} target="_blank" rel="noopener noreferrer" className="lp-btn mt-2 w-full border border-border-default">Ingresar de nuevo</a>}
+          {dirty && !uncertain && !saving && <button type="button" onClick={discard} className="mt-2 min-h-11 w-full text-[13px] text-text-secondary underline">Descartar cambios sin guardar</button>}
         </div>
       )}
 

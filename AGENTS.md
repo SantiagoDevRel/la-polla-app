@@ -88,7 +88,11 @@ See [verification and changes](docs/urgent-high-fixes.md).
   their numbered-ticket flow; a free gift pool is not a raffle.
 - Pending paid entries with submitted proof may predict; unpaid reservations cannot.
   Rejected/void entries must remain recoverable. Match and manual drafts use revision
-  acknowledgements: response A must not claim a newer edit B was saved.
+  acknowledgements: response A must not claim a newer edit B was saved. Manual
+  saving remains the action; do not enable autosave implicitly. New pick writes
+  use `casa_save_picks_v1`, stable request UUIDs, entry scope and SQL revisions.
+  Readback must fence uncertain writes before allowing newer edits. Profile and
+  Quentro have matching version guards. [Save protocol](docs/save-reliability.md).
 - Score all valid picks, including pending payments; the leaderboard counts paid
   entries only. Approval reveals previously earned points without recalculation.
 - Other players' picks stay private until real match start or question edit lock.

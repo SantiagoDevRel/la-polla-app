@@ -4,6 +4,9 @@
     "description": "La polla del fin de semana. Cada semana subimos las pollas de Premier, La Liga, Serie A, Bundesliga, Ligue 1, Champions, Libertadores y BetPlay. Entras, pronosticas y compites por el pozo."
   },
   "Common": {
+    "retry": "Reintentar",
+    "loginAgain": "Ingresar de nuevo",
+    "reviewAccount": "Revisar cuenta",
     "loading": "Cargando...",
     "back": "Atrás",
     "saving": "Guardando...",
