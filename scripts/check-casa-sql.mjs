@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { checkPickSaveConcurrency } from './local-pg/pick-save-concurrency.mjs';
+import { checkPasswordSaveConcurrency } from './local-pg/password-save-concurrency.mjs';
 const repo=fileURLToPath(new URL('..',import.meta.url));
 const name=`la-polla-check-${randomUUID()}`;
 const image='public.ecr.aws/supabase/postgres:17.6.1.159';
@@ -41,10 +42,11 @@ try {
   }
   sql(read('scripts/local-pg/fixups/post.sql'));
   sql("SELECT public.casa_transition_mode((SELECT mode FROM public.casa_operation_control WHERE singleton),'v2');");
-  for(const file of ['casa-provisional-timing-check.sql','casa-terminal-balance-check.sql','casa-free-entry-check.sql','casa-rls-check.sql','casa-picks-privacy-check.sql','casa-pending-picks-check.sql','casa-pick-save-check.sql','user-form-save-check.sql']) {
+  for(const file of ['casa-provisional-timing-check.sql','casa-terminal-balance-check.sql','casa-free-entry-check.sql','casa-rls-check.sql','casa-picks-privacy-check.sql','casa-pending-picks-check.sql','casa-pick-save-check.sql','user-form-save-check.sql','password-save-check.sql']) {
     sql(read(`scripts/${file}`)); console.log(`PASS ${file}`);
   }
   await checkPickSaveConcurrency(container);
+  await checkPasswordSaveConcurrency(container);
   console.log('PASS full migration replay and Casa regressions in isolated PostgreSQL');
 } finally {
   if(container && /^[a-f0-9]{64}$/.test(container))docker(['rm','--force',container]);

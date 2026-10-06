@@ -20,6 +20,9 @@ const withSerwist = withSerwistInit({
   // No SW en development — el rebuild constante deja entradas precache
   // huérfanas y empezás a debuggear cosas que no son tuyas.
   disable: process.env.NODE_ENV === "development",
+  // Registration can be rejected by browser policy or an interrupted download.
+  // The app handles that optional promise without breaking active forms.
+  register: false,
   // Reload de pestañas que estaban cargadas cuando vuelve la conexión.
   reloadOnOnline: false,
   // Install the shell first. Preloading the whole public directory downloaded

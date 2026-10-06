@@ -1,6 +1,14 @@
 // Public build identity, frozen into both the client and version endpoint.
 export const APP_BUILD_ID = process.env.NEXT_PUBLIC_APP_BUILD_ID ?? 'development';
 
+/** PWA installation is optional; a rejected registration cannot block a form. */
+export async function registerAppWorker(): Promise<void> {
+  try {
+    const client = (window as Window & { serwist?: { register: () => Promise<unknown> } }).serwist;
+    if ('serviceWorker' in navigator) await client?.register();
+  } catch { /* Browser policy/offline: the current app remains usable. */ }
+}
+
 export async function fetchAppVersion(): Promise<string> {
   const response = await fetch(`/api/app-version?t=${Date.now()}`, {
     cache: 'no-store', signal: AbortSignal.timeout(10_000),

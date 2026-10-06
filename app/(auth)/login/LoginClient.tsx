@@ -33,6 +33,10 @@ import { ArrowLeft, ArrowRight, MessageSquare, KeyRound, Loader2, Send } from "l
 import axios from "axios";
 import { useTranslations, useLocale } from "next-intl";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
+import { loginRequest, readLoginStorage, writeLoginStorage } from "@/lib/auth/login-request";
+import { loadProfile } from "@/lib/users/profile-client";
+import { needsName } from "@/lib/users/needs-name";
+import { normalizePhone } from "@/lib/auth/phone";
 import {
   CAPTCHA_FAILED_CODE,
   COUNTRY_NOT_ALLOWED_CODE,
@@ -66,6 +70,7 @@ const RETURN_TO_KEY = "lp_returnTo";
 // accidental rapid taps from the same browser.
 const OTP_COOLDOWN_MS = 60_000;
 const OTP_COOLDOWN_KEY = "lp_otp_cooldown_until";
+const OTP_PENDING_KEY = "lp_otp_pending";
 
 type Step = "input" | "otp" | "telegram" | "recovery";
 
@@ -211,6 +216,9 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
   // country selector defaults to Colombia but accepts any country
   // Twilio Verify supports.
   const [phoneE164, setPhoneE164] = useState("");
+  const otpPhone = useRef("");
+  const loginBusy = useRef(false);
+  const returnTo = useRef<string | null>(null);
   const [otp, setOtp] = useState("");
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -226,14 +234,27 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
   // step navigation). If the stored timestamp is in the past, clean it.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const raw = window.sessionStorage.getItem(OTP_COOLDOWN_KEY);
+    const raw = readLoginStorage(OTP_COOLDOWN_KEY);
     if (!raw) return;
     const ts = Number.parseInt(raw, 10);
-    if (Number.isFinite(ts) && ts > Date.now()) {
+    if (Number.isFinite(ts) && ts > Date.now() && ts <= Date.now() + OTP_COOLDOWN_MS) {
       setCooldownUntil(ts);
     } else {
-      window.sessionStorage.removeItem(OTP_COOLDOWN_KEY);
+      writeLoginStorage(OTP_COOLDOWN_KEY, null);
     }
+  }, []);
+
+  // Do not force another paid code when a browser reloads while waiting for it.
+  useEffect(() => {
+    try {
+      const pending = JSON.parse(readLoginStorage(OTP_PENDING_KEY) || "null");
+      if (pending && /^\+[1-9]\d{7,14}$/.test(pending.phone) &&
+          typeof pending.sentAt === "number" && pending.sentAt <= Date.now() && Date.now() - pending.sentAt < 10 * 60_000) {
+        otpPhone.current = pending.phone;
+        setPhoneE164(pending.phone);
+        setStep("otp");
+      } else writeLoginStorage(OTP_PENDING_KEY, null);
+    } catch { writeLoginStorage(OTP_PENDING_KEY, null); }
   }, []);
 
   // Retomar la espera de Telegram si la pestaña se recargó al volver de la app.
@@ -259,7 +280,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
     if (cooldownUntil <= Date.now()) {
       setCooldownUntil(null);
       if (typeof window !== "undefined") {
-        window.sessionStorage.removeItem(OTP_COOLDOWN_KEY);
+        writeLoginStorage(OTP_COOLDOWN_KEY, null);
       }
       return;
     }
@@ -277,8 +298,8 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
   // con sesión válida (tile de "más visitados" de Chrome, bookmark, tab
   // restaurado, link viejo) destruía la sesión en todos los dispositivos
   // → "me pide login cada vez" (reportado por Fede/Lady). El caso real de
-  // cambio de cuenta queda cubierto: verify-otp y wa-magic hacen signOut
-  // server-side justo antes de mintear la sesión nueva, y además el
+  // cambio de cuenta queda cubierto: verifyOtp reemplaza las cookies
+  // server-side cuando confirma la sesión nueva, y además el
   // middleware redirige usuarios autenticados fuera de /login.
 
   // Capturar returnTo + cargar preview de polla si viene de invite link.
@@ -288,13 +309,14 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
   useEffect(() => {
     const rt = safeReturnTo(searchParams.get("returnTo"));
     if (rt && typeof window !== "undefined") {
-      window.sessionStorage.setItem(RETURN_TO_KEY, rt);
+      writeLoginStorage(RETURN_TO_KEY, rt);
     }
     const stored =
       rt ??
       (typeof window !== "undefined"
-        ? safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY))
+        ? safeReturnTo(readLoginStorage(RETURN_TO_KEY))
         : null);
+    returnTo.current = stored;
     if (!stored) return;
     const slugMatch = stored.match(/^\/(?:pollas|unirse)\/([^/?#]+)/);
     const tokenMatch = stored.match(/^\/invites\/polla\/([^/?#]+)/);
@@ -321,12 +343,13 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
   const goAfterLogin = useCallback((newUser: boolean) => {
     const rt =
       typeof window !== "undefined"
-        ? safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY))
+        ? returnTo.current || safeReturnTo(readLoginStorage(RETURN_TO_KEY))
         : null;
     if (typeof window !== "undefined" && !newUser) {
-      window.sessionStorage.removeItem(RETURN_TO_KEY);
+      writeLoginStorage(RETURN_TO_KEY, null);
     }
-    window.location.href = newUser ? "/onboarding" : rt || "/inicio";
+    writeLoginStorage(OTP_PENDING_KEY, null);
+    window.location.href = newUser ? `/onboarding${rt ? `?returnTo=${encodeURIComponent(rt)}` : ""}` : rt || "/inicio";
   }, []);
 
   // PhoneInput emits an E.164 string already (e.g. "+573001234567")
@@ -355,6 +378,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
+    if (loginBusy.current) return;
     setError(null);
     // Block re-sends while the per-browser cooldown is active. Even if
     // the user clicks fast, the disabled state on the button covers the
@@ -370,6 +394,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
       setError(t("errInvalidPhone"));
       return;
     }
+    if (navigator.onLine === false) { setError(t("errNetwork")); return; }
     // Con captcha: esperar el token si el widget sigue trabajando o pide la
     // casilla. Si el widget falló: con captcha obligatoria se pide reintentar;
     // sin ella, se envía sin token y decide Supabase.
@@ -389,20 +414,17 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
         return;
       }
     }
+    loginBusy.current = true;
     setSending(true);
     try {
       // Server-side: /api/auth/start-otp decide si dispara Supabase
       // (que llama Twilio) o si es un phone admin del bypass list,
       // en cuyo caso devuelve ok sin gastar Twilio. El cliente no se
       // entera de la diferencia — UX idéntica.
-      const res = await fetch("/api/auth/start-otp", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ phone, deliveryChannel, ...(token ? { captchaToken: token } : {}) }),
-      });
+      const res = await loginRequest("/api/auth/start-otp", { phone, deliveryChannel, ...(token ? { captchaToken: token } : {}) });
       // El token ya se usó (salga bien o mal): se pide uno nuevo.
       if (token) captcha.current?.reset();
-      const json = await res.json().catch(() => ({}));
+      const json = res.body;
       if (!res.ok) {
         setError(
           json.code === DAILY_SMS_CAP_CODE
@@ -411,73 +433,98 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
               ? t("errCaptchaRejected")
               : json.code === COUNTRY_NOT_ALLOWED_CODE
                 ? channelText("errCountryNotAllowed", { channel: channelLabel })
-                : json.error || t("errSendFailed"),
+                : typeof json.error === "string" ? json.error : t("errSendFailed"),
         );
         return;
       }
+      if (json.ok !== true) throw new Error("Invalid login acknowledgement");
       // Arm the cooldown only after a successful send — failures don't
       // result in an SMS, so it would be unfair to lock the user out.
       const until = Date.now() + OTP_COOLDOWN_MS;
       setCooldownUntil(until);
       if (typeof window !== "undefined") {
-        window.sessionStorage.setItem(OTP_COOLDOWN_KEY, String(until));
+        writeLoginStorage(OTP_COOLDOWN_KEY, String(until));
       }
+      otpPhone.current = phone;
+      writeLoginStorage(OTP_PENDING_KEY, JSON.stringify({ phone, sentAt: Date.now() }));
       setStep("otp");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("errNetwork"));
+    } catch {
+      // A timeout is not proof of non-delivery. Let the person use a code
+      // that arrived instead of immediately spending another send.
+      const until = Date.now() + OTP_COOLDOWN_MS;
+      setCooldownUntil(until);
+      writeLoginStorage(OTP_COOLDOWN_KEY, String(until));
+      otpPhone.current = phone;
+      writeLoginStorage(OTP_PENDING_KEY, JSON.stringify({ phone, sentAt: Date.now() }));
+      setStep("otp");
+      setError(en ? "We could not confirm delivery. If a code arrives, enter it here. Otherwise, wait a minute and request another." : "No pudimos confirmar el envío. Si te llega un código, escríbelo aquí. Si no llega, espera un minuto y pide otro.");
     } finally {
+      if (token) captcha.current?.reset();
+      loginBusy.current = false;
       setSending(false);
     }
   }
 
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault(); setError(null);
+    if (loginBusy.current) return;
     if (!/^\d{6}$/.test(password)) { setError(en ? "Enter your 6-digit password." : "Escribe tu contraseña de 6 dígitos."); return; }
+    loginBusy.current = true;
     setSending(true);
     try {
-      const response = await fetch("/api/auth/login-password", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: buildPhone(), password, returnTo: safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY)) }), credentials: "include" });
-      const body = await response.json();
-      if (!response.ok) { setError(body.error || (en ? "Could not sign in. Try SMS." : "No pudimos iniciar sesión. Puedes entrar por SMS.")); return; }
+      const response = await loginRequest("/api/auth/login-password", { phone: buildPhone(), password, returnTo: returnTo.current || safeReturnTo(readLoginStorage(RETURN_TO_KEY)) });
+      const body = response.body;
+      if (!response.ok) { setError(typeof body.error === "string" ? body.error : (en ? "Could not sign in. Try SMS." : "No pudimos iniciar sesión. Puedes entrar por SMS.")); return; }
+      if (body.ok !== true) throw new Error("Invalid login acknowledgement");
       setPassword("");
-      const destination = safeReturnTo(body.redirectTo) || "/inicio";
-      if (destination !== "/onboarding") window.sessionStorage.removeItem(RETURN_TO_KEY);
+      const destination = safeReturnTo(typeof body.redirectTo === "string" ? body.redirectTo : null) || "/inicio";
+      if (!destination.startsWith("/onboarding")) writeLoginStorage(RETURN_TO_KEY, null);
+      writeLoginStorage(OTP_PENDING_KEY, null);
       window.location.assign(destination);
-    } catch { setError(en ? "Could not sign in. Try SMS." : "No pudimos iniciar sesión. Puedes entrar por SMS."); }
-    finally { setSending(false); }
+    } catch {
+      const profile = await loadProfile();
+      if (profile.ok && normalizePhone(profile.data.whatsapp_number || "") === normalizePhone(buildPhone())) {
+        setPassword("");
+        goAfterLogin(needsName(profile.data.display_name) || !profile.data.avatar_url);
+      } else setError(en ? "Could not confirm sign-in. You can retry or use SMS." : "No pudimos confirmar el ingreso. Puedes reintentar o entrar por SMS.");
+    }
+    finally { loginBusy.current = false; setSending(false); }
   }
 
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
+    if (loginBusy.current) return;
     setError(null);
     if (otp.length !== 6) {
       setError(t("errOtpLength"));
       return;
     }
+    loginBusy.current = true;
     setVerifying(true);
     try {
-      const phone = buildPhone();
+      const phone = otpPhone.current || buildPhone();
       // Server-side: persiste cookies via Set-Cookie HttpOnly (crítico
       // para iOS Safari, donde verifyOtp en el browser deja la sesión
       // en memory pero pierde cookies y al navegar parece no logueado).
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, token: otp }),
-        credentials: "include",
-      });
+      const res = await loginRequest("/api/auth/verify-otp", { phone, token: otp });
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        setError(body?.error ?? t("errOtpInvalid"));
+        setError(typeof res.body.error === "string" ? res.body.error : t("errOtpInvalid"));
         return;
       }
-      const body = (await res.json()) as { newUser?: boolean };
+      const body = res.body;
+      if (body.ok !== true || typeof body.newUser !== "boolean") throw new Error("Invalid login acknowledgement");
       goAfterLogin(Boolean(body?.newUser));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("errNetwork"));
+    } catch {
+      // The session cookie may have arrived before the response body failed.
+      // Confirm the actual account before treating a consumed code as a failure.
+      const profile = await loadProfile();
+      if (profile.ok && normalizePhone(profile.data.whatsapp_number || "") === normalizePhone(otpPhone.current || buildPhone())) {
+        goAfterLogin(needsName(profile.data.display_name) || !profile.data.avatar_url);
+      } else {
+        setError(en ? "We could not confirm sign-in. Your code is kept here; try verifying again when your connection returns." : "No pudimos confirmar el ingreso. Conservamos tu código; vuelve a verificar cuando regrese tu conexión.");
+      }
     } finally {
+      loginBusy.current = false;
       setVerifying(false);
     }
   }
@@ -808,7 +855,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
               >
                 {t("phoneLabel")}
               </label>
-              <PhoneInput inputId="phone" onChange={setPhoneE164} countries={PAISES_SMS} />
+              <PhoneInput inputId="phone" initialValue={phoneE164} onChange={setPhoneE164} countries={PAISES_SMS} />
             </div>
 
             {passwordMode && <PasswordInput id="login-password" label={en ? "6-digit password" : "Contraseña de 6 dígitos"}
@@ -925,9 +972,10 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
           <div className="space-y-3">
             {whatsappLoginHref && <WhatsAppLoginButton href={whatsappLoginHref} en={en} />}
             <button type="button" className={whatsappLoginHref ? SECONDARY_BTN : PRIMARY_BTN} onClick={() => {
-              const destination = safeReturnTo(window.sessionStorage.getItem(RETURN_TO_KEY)) || "/perfil";
+              const destination = returnTo.current || safeReturnTo(readLoginStorage(RETURN_TO_KEY)) || "/perfil";
               if (!destination.startsWith("/set-password")) {
-                window.sessionStorage.setItem(RETURN_TO_KEY, `/set-password?returnTo=${encodeURIComponent(destination)}`);
+                returnTo.current = `/set-password?returnTo=${encodeURIComponent(destination)}`;
+                writeLoginStorage(RETURN_TO_KEY, returnTo.current);
               }
               setPasswordMode(false); setStep("input"); setError(null);
             }}>
@@ -951,12 +999,14 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
             <p className="text-text-secondary text-sm leading-normal">
               {channelText("otpSentTo", { channel: channelLabel })}{" "}
               <span className="text-text-primary font-semibold [overflow-wrap:anywhere]">
-                {buildPhone()}
+                {otpPhone.current || buildPhone()}
               </span>
             </p>
             <button
               type="button"
+              disabled={verifying}
               onClick={() => {
+                writeLoginStorage(OTP_PENDING_KEY, null);
                 setStep("input");
                 setOtp("");
                 setError(null);
@@ -1007,7 +1057,9 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
 
             <button
               type="button"
+              disabled={verifying}
               onClick={() => {
+                writeLoginStorage(OTP_PENDING_KEY, null);
                 setStep("input");
                 setOtp("");
                 setError(null);

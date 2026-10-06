@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { RefreshCw, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { APP_BUILD_ID, autoUpdateKey, canAutoUpdate, fetchAppVersion, refreshApp } from '@/lib/app-update';
+import { APP_BUILD_ID, autoUpdateKey, canAutoUpdate, fetchAppVersion, refreshApp, registerAppWorker } from '@/lib/app-update';
 
 export function AppUpdateButton() {
   const en = useLocale() === 'en';
@@ -27,6 +27,7 @@ export default function SWAutoReload() {
   const pathname = usePathname();
   const [available, setAvailable] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  useEffect(() => { void registerAppWorker(); }, []);
   useEffect(() => {
     let mounted = true, checking = false, edited = false, interacted = false;
     const edit = (event: Event) => {

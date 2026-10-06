@@ -134,6 +134,7 @@ export function QuestionsBoard({
                 <div>
                   <input
                     type="text"
+                    aria-label={q.prompt}
                     maxLength={120}
                     disabled={!editable}
                     value={mine?.freeText ?? ""}

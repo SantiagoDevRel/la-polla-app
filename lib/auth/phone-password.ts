@@ -14,10 +14,17 @@ function derive(password: string, salt: string): Promise<Buffer> {
     (error, key) => error ? reject(error) : resolve(key)));
 }
 
-export async function hashPhonePassword(password: string) {
+export async function hashPhonePassword(password: string, salt = randomBytes(16).toString("hex")) {
   if (!validPhonePassword(password)) throw new Error("invalid_password");
-  const salt = randomBytes(16).toString("hex");
+  if (!/^[a-f0-9]{32}$/.test(salt)) throw new Error("invalid_salt");
   return { salt, password_hash: (await derive(password, salt)).toString("hex") };
+}
+
+/** Stable per-owner/request salt makes a retry comparable without storing a PIN. */
+export function phonePasswordRequestSalt(userId: string, requestId: string): string {
+  const pepper = process.env.AUTH_PIN_PEPPER ?? "";
+  if (pepper.length < 32) throw new Error("password_not_configured");
+  return createHmac("sha256", pepper).update(`password-write-salt:${userId}:${requestId}`).digest("hex").slice(0, 32);
 }
 
 export async function verifyPhonePassword(password: string, credential: { salt: string; password_hash: string } | null) {

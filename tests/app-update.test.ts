@@ -1,10 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { autoUpdateKey, canAutoUpdate, fetchAppVersion, refreshApp } from '@/lib/app-update';
+import { autoUpdateKey, canAutoUpdate, fetchAppVersion, refreshApp, registerAppWorker } from '@/lib/app-update';
 import { GET } from '@/app/api/app-version/route';
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('deployment updates', () => {
+  it('keeps forms usable when worker registration is rejected', async () => {
+    const register = vi.fn().mockRejectedValue(new Error('Browser policy blocked registration'));
+    vi.stubGlobal('window', { serwist: { register } });
+    vi.stubGlobal('navigator', { serviceWorker: {} });
+    await expect(registerAppWorker()).resolves.toBeUndefined();
+    expect(register).toHaveBeenCalledOnce();
+  });
+  it('does not require worker support or a development worker client', async () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('navigator', {});
+    await expect(registerAppWorker()).resolves.toBeUndefined();
+    vi.stubGlobal('navigator', { serviceWorker: {} });
+    await expect(registerAppWorker()).resolves.toBeUndefined();
+  });
   it('only updates on entry and preserves edits, with a per-build loop guard', () => {
     const storage = { getItem: vi.fn().mockReturnValue(null) };
     expect(canAutoUpdate('a', 'b', true, false, storage)).toBe(true);

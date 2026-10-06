@@ -35,7 +35,9 @@ export function SplashScreen() {
     if (typeof window === "undefined" || skip) return;
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const alreadySeen = sessionStorage.getItem(SEEN_KEY) === "1";
+    let alreadySeen: boolean;
+    try { alreadySeen = window.sessionStorage.getItem(SEEN_KEY) === "1"; }
+    catch { return; } // Optional animation must not block registration in private browsers.
     if (reduce || alreadySeen) return;
 
     setPhase("playing");

@@ -1,59 +1,33 @@
-# Contraseña opcional de seis dígitos
+﻿# Optional six-digit phone password
 
-Al completar nombre y pollito, el registro ofrece **Crear contraseña** y
-**Omitir por ahora**. Login conserva SMS y añade **Entrar con contraseña**.
-**¿Olvidaste tu contraseña?** ofrece WhatsApp primero y SMS como alternativa.
-WhatsApp usa el enlace de acceso existente: después, en Perfil puedes cambiarla.
-SMS verifica el celular por el flujo existente y abre `/set-password` para crear
-otra, sin exigir la anterior. Un login normal por SMS no muestra esa pantalla.
+Registration offers a six-digit password after the user completes their profile. SMS and WhatsApp remain available. Profile links to `/set-password?returnTo=%2Fperfil` to create or change the password without requiring the previous password.
 
-Perfil ofrece **Contraseña → Crear contraseña / Cambiar contraseña** justo debajo de
-**Cuenta para cobrar**, con una llave y un botón violeta, mientras el canal
-está habilitado. Reutiliza `/set-password?returnTo=%2Fperfil` y el endpoint
-existente: guarda la primera contraseña o reemplaza la anterior y vuelve a
-Perfil. Sirve con una sesión obtenida por WhatsApp, SMS o contraseña; no exige
-recordar la anterior. No se añade otra tabla, credencial ni proveedor.
+Forgot-password recovery offers WhatsApp first and SMS as an alternative. WhatsApp uses the existing access link; the user can then change their password in Profile. The recovery SMS flow opens `/set-password` after verifying the phone. Ordinary SMS login does not open password setup.
 
-El estado autenticado sale de `GET /api/auth/password/status`: solo devuelve si
-el canal está habilitado y si el usuario verificado tiene una credencial para
-su celular actual. Consulta únicamente `user_id`, filtra UUID y celular, y
-responde `private, no-store`; sin sesión devuelve 401. Un error muestra reintento,
-nunca «No tienes una contraseña creada». El GET público anterior conserva solo
-la disponibilidad del canal.
+Profile places the password action below the payout account while the channel is enabled. An existing credential shows a green check and a change action; an absent credential shows a create action. Setup also distinguishes creating and changing. Show/Hide controls expose only the currently entered values, including confirmation and login; they never recover the stored password. Values remain in memory until saving or leaving.
 
-Perfil muestra un check verde junto a «Ya tienes una contraseña» y explica cómo
-cambiarla si no la recuerdas, sin ingresar la anterior. Sin credencial, muestra
-un ícono de crear junto a «Aún no tienes una contraseña creada» y el botón
-«Crear contraseña». Crear/Cambiar y «Entrar con contraseña» llevan llave y flecha.
-El formulario también distingue crear/cambiar. Mostrar/Ocultar permite
-revisar cada campo mientras se escribe, incluida la confirmación y el login;
-no recupera la contraseña anterior. Se conserva en memoria hasta guardar o salir.
+Typography reuses existing role tokens: Profile uses Outfit 16/600 for headings, 14/600 for status and controls, and 14/400 with 1.625 line height for help. Login uses Bebas 24/400 for headings, Outfit 14 for help and labels, and 16 for inputs and the primary action. Essential controls wrap and remain usable at 200% text size.
 
-Tipografía: se reutiliza Perfil (Outfit 16/600 para título, 14/600 para estado y
-controles, 14/400 con interlineado 1,625 para ayuda) y login (Bebas 24/400 para título, Outfit 14 para ayuda/labels,
-16 para inputs/acción principal). Los controles admiten wrapping y texto al 200 %.
+Enable the channel with server-only `PHONE_PASSWORD_ENABLED=true` and a random `AUTH_PIN_PEPPER` of at least 32 characters. Apply migrations `160_optional_phone_password.sql` and `167_phone_password_write_revisions.sql` before deploying the corresponding application code. Changing the pepper invalidates existing passwords; preserve it during ordinary deployments.
 
-Activación: aplicar `160_optional_phone_password.sql`; configurar un secreto
-aleatorio `AUTH_PIN_PEPPER` de al menos 32 caracteres y
-`PHONE_PASSWORD_ENABLED=true`, ambos solo servidor. Sin configuración completa,
-el canal y la oferta de registro permanecen apagados. Cambiar el pepper requiere
-que las personas creen otra contraseña entrando por SMS; no rotarlo a ciegas.
+Credentials use scrypt (N=32768, r=8, p=1) and an independent pepper. New setup writes derive a 16-byte salt from a server-keyed HMAC of the authenticated owner and request UUID. This salt is stable only for retries of that operation, allowing an exact replay without storing the plaintext password. Different owners and operations have distinct salts. Previously stored random salts and hashes remain valid.
 
-La credencial usa scrypt (N=32768, r=8, p=1), salt aleatorio de 16 bytes y pepper
-independiente. `phone_password_credentials` tiene RLS deny-all y permisos solo
-service_role; los clientes no leen hashes. No se crea una contraseña en GoTrue:
-su endpoint público permitiría saltarse el límite específico para seis dígitos.
-La sesión reutiliza `startSessionForVerifiedPhone`, valida que el usuario resuelto
-sea el dueño de la credencial y registra un evento de login.
+`phone_password_credentials` has deny-all RLS and service-role-only access. Password login does not create a public GoTrue password: that would bypass the dedicated six-digit-password attempt limits. It reuses the verified-phone session flow and checks that the resulting user owns the credential. Invalid OTP attempts preserve the current session.
 
-Reservas atómicas, antes del hash: cinco intentos por celular en 15 minutos,
-20 en 24 horas y 50 por IP en 15 minutos. La IP se guarda como HMAC. La RPC falla
-cerrada, conserva intentos y serializa ambos límites con advisory locks.
-El código nunca guarda la contraseña en logs, cookies ni storage del navegador.
-Crear/cambiar exige sesión verificada y origen del request comprobado; el celular
-y UUID vienen de `auth.getUser()`, nunca del formulario.
+## Saving and retrying
 
-Pruebas: `npm test -- tests/phone-password.test.ts tests/profile-password.test.ts`,
-`scripts/phone-password-check.sql` (transacción con rollback) y
-`node scripts/phone-password-concurrency-check.mjs` (solo PostgreSQL local).
-Los límites quedan separados de SMS y no agregan envíos ni servicios pagos.
+The authenticated status endpoint returns channel availability, credential presence for the current verified phone, owner UUID and credential revision. It filters by the authenticated UUID, enumerates columns and uses `private, no-store`. Errors remain retryable and never imply that a password is absent.
+
+The setup POST includes `expected_user_id`, `request_id` and `expected_revision`. The route checks the session and same-origin proof before calling service-only `phone_password_save_v1`. The transaction locks the owner, rechecks the verified phone, rejects stale revisions and deduplicates exact request replays. Reusing a request UUID with a different payload is rejected. Contention has a two-second lock deadline.
+
+A request timeout can occur after commit. The form retains its digits in memory, freezes editing and retries the same operation. An exact acknowledgement must match the owner, request UUID and next revision before navigating. A stale-operation conflict requires a fresh authenticated status read before another deliberate save. Session changes and old open forms require refreshing the page. Passwords are never written to browser storage or logs.
+
+Migration 167 appends metadata without replacing credentials. During a rolling deployment, old unfenced writes remain allowed only until that owner receives their first fenced write. Every old write increments the revision, invalidating stale new requests. After the first fenced write, late unfenced writes are rejected. This compatibility window does not allow an old request to overwrite a credential protected by the new protocol.
+
+## Validation
+
+Run `npm test -- tests/phone-password.test.ts tests/profile-password.test.ts tests/phone-session-reliability.test.ts` and `node scripts/check-casa-sql.mjs`. The latter replays every migration in a fresh network-isolated PostgreSQL container and checks idempotence, stale writes, verified-phone ownership, rolling deployment compatibility and real concurrent transactions. It never connects to an existing database.
+
+Existing attempt-limit regressions remain available in `scripts/phone-password-check.sql` (transaction with rollback) and `node scripts/phone-password-concurrency-check.mjs` (local PostgreSQL only). These complement the new credential-write checks and do not send provider messages.
+
+Login attempt reservations remain separate from SMS: five per phone in 15 minutes, 20 per phone in 24 hours and 50 per IP in 15 minutes. IPs are stored as HMACs. Provider messages are mocked in browser regressions; local fixture accounts exercise the actual database and session chain without sending SMS or email.

@@ -4,6 +4,12 @@ Manual **Guardar** remains the player action. Existing layouts, pool rules,
 gift entry, payment proof, and provisional fixture behavior are preserved.
 This change does not enable autosave or modify historical P2P predictions.
 
+Score inputs retain keyboard focus while typing so values 10–30 can be entered
+without splitting digits across teams. Enter advances to the next editable score.
+Manual text questions use their prompt as an accessible input label.
+Below 640 px, 1X2 choices use full-width rows with the crest beside the label.
+Wider screens keep three equal columns. Enlarged labels retain enough width.
+
 ## Picks: migration 164
 
 `saveCasaPicks` is the shared web/Telegram writer. It calls `casa_save_picks_v1`;
@@ -70,3 +76,5 @@ new network-isolated container, prove stale-write rejection and simultaneous pla
 and retain administrative exclusion. Browser regressions use real React components,
 compiled CSS/fonts and synthetic requests; they do not alter real accounts.
 Inspect 320/768/1280 px, breakpoint edges and 200% text, including recovery states.
+The browser journal also covers every 1X2 choice, edits during an in-flight save,
+offline-before-write recovery, synchronous double clicks and two-digit keyboard entry.

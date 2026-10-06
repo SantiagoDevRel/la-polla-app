@@ -40,7 +40,8 @@ export function CapacitorAppUpdate() {
     }
 
     // User already said "Después" this session — don't pester.
-    if (window.sessionStorage.getItem(DISMISS_KEY) === "1") return;
+    try { if (window.sessionStorage.getItem(DISMISS_KEY) === "1") return; }
+    catch { return; } // An optional update prompt must never crash the active form.
 
     import("@capawesome/capacitor-app-update")
       .then(({ AppUpdate }) =>
@@ -76,7 +77,8 @@ export function CapacitorAppUpdate() {
 
   function handleDismiss() {
     if (typeof window !== "undefined") {
-      window.sessionStorage.setItem(DISMISS_KEY, "1");
+      try { window.sessionStorage.setItem(DISMISS_KEY, "1"); }
+      catch { /* Dismiss remains usable when browser storage is unavailable. */ }
     }
     setShow(false);
   }

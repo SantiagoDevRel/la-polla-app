@@ -8,6 +8,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import {
   getCountries,
   getCountryCallingCode,
+  parsePhoneNumber,
   type Country as CountryCode,
 } from "react-phone-number-input";
 import flags from "react-phone-number-input/flags";
@@ -18,9 +19,10 @@ interface PhoneInputProps {
   onChange: (value: string) => void;
   /** Si se pasa, el selector solo ofrece estos países (el primero es el inicial). */
   countries?: readonly CountryCode[];
+  initialValue?: string;
 }
 
-export default function PhoneInput({ onChange, countries: allowed, inputId }: PhoneInputProps) {
+export default function PhoneInput({ onChange, countries: allowed, inputId, initialValue = "" }: PhoneInputProps) {
   const t = useTranslations("Phone");
   const locale = useLocale();
   const intlTag = locale === "en" ? "en-US" : "es-CO";
@@ -46,8 +48,9 @@ export default function PhoneInput({ onChange, countries: allowed, inputId }: Ph
     return <FlagComponent title={getCountryName(country)} {...(className ? { className } : {})} />;
   }
 
-  const [country, setCountry] = useState<CountryCode>(allowed?.[0] ?? "CO");
-  const [localNumber, setLocalNumber] = useState("");
+  const initialPhone = parsePhoneNumber(initialValue);
+  const [country, setCountry] = useState<CountryCode>(() => initialPhone?.country && (!allowed || allowed.includes(initialPhone.country)) ? initialPhone.country : allowed?.[0] ?? "CO");
+  const [localNumber, setLocalNumber] = useState(() => initialPhone?.nationalNumber ?? "");
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -136,7 +139,24 @@ export default function PhoneInput({ onChange, countries: allowed, inputId }: Ph
           id={inputId}
           type="tel"
           value={localNumber}
-          onChange={(e) => setLocalNumber(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => {
+            const raw = e.target.value;
+            // A pasted international number already contains its country code.
+            // Do not prepend the currently selected code a second time.
+            const international = raw.trim().startsWith("+");
+            const pasted = international ? parsePhoneNumber(raw) : undefined;
+            if (international && (!pasted?.country || (allowed && !allowed.includes(pasted.country)))) {
+              e.currentTarget.setCustomValidity(locale === "en" ? "Choose a supported country and enter a valid phone number." : "Elige un país disponible y escribe un número válido.");
+              setLocalNumber(raw);
+              return;
+            }
+            e.currentTarget.setCustomValidity("");
+            if (pasted?.country && (!allowed || allowed.includes(pasted.country))) {
+              setCountry(pasted.country);
+              setLocalNumber(pasted.nationalNumber);
+            } else setLocalNumber(raw.replace(/\D/g, ""));
+          }}
+          autoComplete="tel-national"
           placeholder={t("samplePlaceholder")}
           className="flex-[1_1_10ch] w-full px-3 py-3 outline-none text-lg min-w-0 bg-bg-base text-text-primary placeholder:text-text-muted/50"
           required

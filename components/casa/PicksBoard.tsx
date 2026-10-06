@@ -305,7 +305,7 @@ export function PicksBoard({
       awayScore: side === "away" ? n : (picks[matchId]?.awayScore ?? null) });
   }
 
-  /** Auto-jump: local → visitante → local del próximo partido editable; al final cierra el teclado. */
+  /** Enter: local → visitante → local del próximo partido editable; al final cierra el teclado. */
   function saltarDesde(matchId: string, side: "home" | "away") {
     if (side === "home") {
       inputs.current.get(`${matchId}:away`)?.focus();
@@ -580,7 +580,7 @@ function MatchCard({
         /* (2026-09-14) Pedido del dueño: el escudo con el nombre debajo ES el
            botón de cada equipo y «Empate» ocupa el lugar del «vs». Columnas con
            minmax(0,1fr): con texto ampliado el nombre baja de línea. */
-        <div role="group" aria-label={`Tu pronóstico: ${m.home_team} contra ${m.away_team}`} className={`mt-1 grid gap-[8px] ${m.planned ? "grid-cols-3" : "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"}`}>
+        <div role="group" aria-label={`Tu pronóstico: ${m.home_team} contra ${m.away_team}`} className={`mt-1 grid gap-[8px] ${m.planned ? "grid-cols-3" : "grid-cols-1 sm:grid-cols-3"}`}>
           {opcionesDe(m).map((op) => {
             const elegido = mine?.pick1x2 === op.key;
             const equipo = op.key === "L" ? { name: m.home_team, flag: m.home_team_flag } : op.key === "V" ? { name: m.away_team, flag: m.away_team_flag } : null;
@@ -593,7 +593,8 @@ function MatchCard({
                 aria-pressed={elegido}
                 aria-label={equipo ? `Gana ${equipo.name}` : "Empate"}
                 className={[
-                  "flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border px-1.5 py-1.5 text-center transition-colors",
+                  "flex min-h-[56px] min-w-0 items-center gap-2 rounded-md border px-3 py-1.5 transition-colors",
+                  m.planned ? "flex-col justify-center text-center" : "flex-row justify-start text-left sm:flex-col sm:justify-center sm:text-center",
                   equipo || m.planned ? "" : "px-3",
                   elegido
                     ? "border-gold bg-gold/15 text-gold"
@@ -608,7 +609,7 @@ function MatchCard({
                     {m.planned
                       ? <UnknownTeamCrest className="h-[28px] w-[28px]" />
                       : <TeamCrest team={equipo.name} src={equipo.flag} className="h-[28px] w-[28px] max-w-none shrink-0" />}
-                    <span className="w-full text-[13px] font-semibold leading-tight [overflow-wrap:anywhere]">{op.label}</span>
+                    <span className="min-w-0 text-[13px] font-semibold leading-tight [overflow-wrap:anywhere]">{op.label}</span>
                   </>
                 ) : (
                   <span className="max-w-full text-[13px] font-semibold [overflow-wrap:anywhere]">Empate</span>
@@ -644,11 +645,14 @@ function MatchCard({
                     max={30}
                     value={(sideKey === "home" ? mine?.homeScore : mine?.awayScore) ?? ""}
                     onFocus={(e) => e.currentTarget.select()}
-                    onChange={(e) => {
-                      onScore(m.id, sideKey, e.target.value);
-                      // Un dígito completa la casilla: salta a la siguiente.
-                      // Para 10 o más, se vuelve a tocar la casilla y se agrega el segundo.
-                      if (e.target.value.length === 1) onJump(m.id, sideKey);
+                    onChange={(e) => onScore(m.id, sideKey, e.target.value)}
+                    onKeyDown={(e) => {
+                      // Typing must stay in this field, including scores 10–30.
+                      // Enter explicitly advances to the next editable score.
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onJump(m.id, sideKey);
+                      }
                     }}
                     aria-label={`Goles de ${sideKey === "home" ? m.home_team : m.away_team}`}
                     className={`lp-input lp-money !h-[44px] !w-[44px] shrink-0 !px-0 text-center text-[22px] [-webkit-text-size-adjust:none] ${!tengoPick ? "!border-red-alert/60" : ""}`}

@@ -24,6 +24,7 @@ interface Props {
 export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
   const [cupos, setCupos] = useState(1);
   const [registrados, setRegistrados] = useState<Array<number | null>>([]);
+  const [enviando, setEnviando] = useState<Record<number, boolean>>({});
   const options = Array.from({ length: Math.max(1, Math.min(available, 10)) }, (_, i) => i + 1);
   const primero = registrados.find((n): n is number => n != null);
 
@@ -36,7 +37,7 @@ export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
         <select
           id="cuantos-cupos"
           value={cupos}
-          disabled={registrados.length > 0}
+          disabled={registrados.length > 0 || Object.values(enviando).some(Boolean)}
           onChange={(e) => setCupos(Number(e.target.value))}
           className="lp-input mt-2 min-h-12 w-full cursor-pointer text-[15px] disabled:cursor-default disabled:opacity-60"
         >
@@ -68,6 +69,7 @@ export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
           entryNumber={null}
           slot={{ index: n, total: cupos }}
           onRegistered={(entryNumber) => setRegistrados((prev) => [...prev, entryNumber])}
+          onSendingChange={(sending) => setEnviando((prev) => ({ ...prev, [n]: sending }))}
         />
       ))}
 

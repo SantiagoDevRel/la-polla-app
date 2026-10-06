@@ -14,17 +14,17 @@ import {
   getPollitoByPosition,
 } from "@/lib/pollitos";
 import FootballLoader from "@/components/ui/FootballLoader";
-import { needsName } from "@/lib/users/needs-name";
+import { needsName, isValidDisplayName } from "@/lib/users/needs-name";
+import { readLoginStorage, writeLoginStorage } from "@/lib/auth/login-request";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
 import { requestJson } from "@/lib/http/json-request";
 import { retryProfilePatch, loadProfile, saveProfilePatch, type PendingProfileMutation } from "@/lib/users/profile-client";
 
 function returnDestination() {
-  try {
-    const destination = safeReturnTo(window.sessionStorage.getItem("lp_returnTo"));
-    window.sessionStorage.removeItem("lp_returnTo");
-    return destination || "/inicio";
-  } catch { return "/inicio"; }
+  const destination = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"))
+    || safeReturnTo(readLoginStorage("lp_returnTo"));
+  writeLoginStorage("lp_returnTo", null);
+  return destination || "/inicio";
 }
 
 function StepDots({
@@ -122,6 +122,10 @@ export default function OnboardingPage() {
       setError(t("errNameMin"));
       return;
     }
+    if (!isValidDisplayName(trimmed)) {
+      setError("Escribe tu nombre, no tu número de celular.");
+      return;
+    }
     setStep(2);
   }
 
@@ -217,7 +221,7 @@ export default function OnboardingPage() {
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); setError(""); }}
               placeholder={t("namePlaceholder")}
               autoFocus
               maxLength={50}
@@ -392,7 +396,7 @@ export default function OnboardingPage() {
           {latestSaved && <p className="text-[13px] leading-normal text-text-secondary [overflow-wrap:anywhere]">Datos guardados: {latestSaved}</p>}
           {(sessionExpired || sessionChanged) && <Link href={sessionChanged ? "/perfil" : "/login?returnTo=%2Fonboarding"} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center justify-center rounded-xl border border-border-subtle px-4 py-2 text-text-primary">{tc(sessionChanged ? "reviewAccount" : "loginAgain")}</Link>}
 
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, position: "sticky", bottom: 0, zIndex: 1, background: "var(--bg-card)", paddingTop: 12, paddingBottom: 4, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
             <button
               type="button"
               disabled={loading || confirmationPending}

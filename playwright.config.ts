@@ -26,9 +26,11 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    // Keep the browser gate on the same webpack path used by `npm run dev`
-    // and production builds. Serwist's Next integration is webpack-based.
-    command: `npm run dev -- --port ${port}`,
+    // CI verifies the completed webpack build. Local development can reuse
+    // its normal server; recovery checks can opt into a stable production app.
+    command: process.env.PLAYWRIGHT_PRODUCTION === "true"
+      ? `npm run start -- --port ${port}`
+      : `npm run dev -- --port ${port}`,
     // A service unrelated to La Polla once occupied the old port and still
     // answered 200 at `/`, so Playwright silently tested the wrong app. A
     // real app route makes the readiness check specific to this project.

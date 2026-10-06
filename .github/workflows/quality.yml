@@ -23,6 +23,7 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ci-test-only-service-key
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3101
       NEXT_TELEMETRY_DISABLED: '1'
+      PLAYWRIGHT_PRODUCTION: 'true'
       SPORTSDB_HIGHLIGHTS_ENABLED: 'false'
       API_FOOTBALL_FINALS_ENABLED: 'false'
       WHATSAPP_OUTBOUND_ENABLED: 'false'
@@ -49,6 +50,8 @@ jobs:
       - run: npm run test:casa:browser
       - name: Public accessibility checks
         run: npm run test:e2e -- --grep 'a11y:|página traducida'
+      - name: Registration and app recovery checks
+        run: npm run test:e2e -- e2e/login-reliability.spec.ts e2e/storage-unavailable.spec.ts e2e/welcome-network-failure.spec.ts e2e/app-update.spec.ts
 
   sql:
     name: Isolated migration and RLS checks

@@ -35,15 +35,20 @@ interface Props {
    */
   slot?: { index: number; total: number };
   onRegistered?: (entryNumber: number | null) => void;
+  onSendingChange?: (sending: boolean) => void;
 }
 
-export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false, entryNumber, slot, onRegistered }: Props) {
+export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false, entryNumber, slot, onRegistered, onSendingChange }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   // Cada selección recibe un turno: si la persona elige otra imagen mientras
   // se prepara la anterior, el resultado viejo se descarta.
   const selectionRef = useRef(0);
   const sendingRef = useRef(false);
+  const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keep the request identity across manual retries even when private browsing
+  // or a full storage quota prevents sessionStorage from accepting the record.
+  const proofRecordsRef = useRef(new Map<string, string>());
   const [fileName, setFileName] = useState<string | null>(null);
   const [prepared, setPrepared] = useState<PreparedImage | null>(null);
   const [preparando, setPreparando] = useState(false);
@@ -57,6 +62,10 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
   const [registrado, setRegistrado] = useState<number | null>(null);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  useEffect(() => () => {
+    selectionRef.current += 1;
+    if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
+  }, []);
 
   async function elegir(f: File | null) {
     if (!f) return;
@@ -92,6 +101,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
     }
 
     sendingRef.current = true;
+    onSendingChange?.(true);
     setEnviando(true);
     setRecuperando(false);
     setError(null);
@@ -109,8 +119,15 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       }, {
         post: (body) => casaPost(url, body, { retrySafe: true, onRetry: () => setRecuperando(true) }),
         upload: (upload, blob) => uploadSignedFile(upload, blob),
-        readRecord: () => sessionStorage.getItem(key),
-        writeRecord: (value) => sessionStorage.setItem(key, value),
+        readRecord: () => {
+          const memory = proofRecordsRef.current.get(key);
+          if (memory) return memory;
+          try { return sessionStorage.getItem(key); } catch { return null; }
+        },
+        writeRecord: (value) => {
+          proofRecordsRef.current.set(key, value);
+          try { sessionStorage.setItem(key, value); } catch { /* Memory preserves manual retries. */ }
+        },
         newRequestId: () => crypto.randomUUID(),
         onRetry: () => setRecuperando(true),
       });
@@ -118,16 +135,18 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       // Si alguien vuelve a elegir el mismo comprobante, SQL lo rechaza en vez
       // de devolver en silencio la participación anterior.
       try { sessionStorage.removeItem(key); } catch { /* Storage may be disabled. */ }
+      proofRecordsRef.current.delete(key);
       setListo(true);
       setRegistrado(result.entryNumber);
       if (onRegistered) { onRegistered(result.entryNumber); return; }
       // Un respiro para que se lea la confirmación antes de volver.
-      setTimeout(() => router.push(`/polla/${slug}${result.entryNumber ? `?p=${result.entryNumber}` : ""}`), 1600);
+      navigationTimerRef.current = setTimeout(() => router.push(`/polla/${slug}${result.entryNumber ? `?p=${result.entryNumber}` : ""}`), 1600);
     } catch (cause) {
       setRevision((n) => n + 1);
       setError(cause instanceof TypeError ? casaConnectionError().message : cause instanceof Error ? cause.message : casaConnectionError().message);
     } finally {
       sendingRef.current = false;
+      onSendingChange?.(false);
       setEnviando(false);
       setRecuperando(false);
     }

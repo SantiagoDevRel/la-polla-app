@@ -265,8 +265,9 @@ export async function updateSession(request: NextRequest) {
         (needsName(profile.display_name) || !profile.avatar_url)
       ) {
         const url = request.nextUrl.clone();
+        const destination = safeReturnTo(path + request.nextUrl.search);
         url.pathname = "/onboarding";
-        url.search = "";
+        url.search = destination ? `?returnTo=${encodeURIComponent(destination)}` : "";
         return redirectWithCookies(url, supabaseResponse);
       }
 
