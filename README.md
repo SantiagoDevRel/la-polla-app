@@ -9,6 +9,19 @@ delivery checks: [urgent/high fixes](docs/urgent-high-fixes.md), migrations 161�
 Manual save confirmations, revision guards, session recovery and bounded requests:
 [save reliability](docs/save-reliability.md), migrations 164–166.
 
+Security dependency baseline (2026-10-06): Next.js and its ESLint config
+16.3.6, DOMPurify 3.4.16, source-map-js 1.2.2 and selector parser 7.1.6.
+Brace expansion keeps compatible patched generations (1.1.21 and 5.0.12).
+These patches preserve the current UI and manual Save.
+`npm audit --omit=dev` reports no known vulnerabilities. The development-only
+`braces` 3.0.3 [upstream advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
+has no published patch. It consumes repository-controlled build patterns,
+does not appear in production route traces, and remains visible in the full
+audit; do not use it with untrusted patterns or force a Tailwind major upgrade.
+PostHog's unused product-tour assets embed an older sanitizer; existing remote
+add-ons stay disabled in `app/providers.tsx`. Update the SDK's vendor bundle
+before enabling those features; an npm override does not patch vendor copies.
+
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
 ## Creator raffles (migration 157, feature gated)
