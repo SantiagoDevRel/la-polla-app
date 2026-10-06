@@ -12,6 +12,8 @@ Manual save confirmations, revision guards, session recovery and bounded request
 Security dependency baseline (2026-10-06): Next.js and its ESLint config
 16.3.6, DOMPurify 3.4.16, source-map-js 1.2.2 and selector parser 7.1.6.
 Brace expansion keeps compatible patched generations (1.1.21 and 5.0.12).
+Sharp 0.35.5 includes the patched native SVG library, librsvg 2.63.2;
+the native-library regression runs on Windows and Linux CI.
 These patches preserve the current UI and manual Save.
 `npm audit --omit=dev` reports no known vulnerabilities. The development-only
 `braces` 3.0.3 [upstream advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
