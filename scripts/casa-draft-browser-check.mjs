@@ -241,8 +241,8 @@ async function inspectVisual(page,mode) {
 }
 try {
   await server.listen();
-  // Chromium comes with Playwright in CI; Windows uses the existing Chrome.
-  browser=await chromium.launch({...process.platform==='win32'?{channel:'chrome'}:{},headless:true});
+  // Use installed Chrome on every platform, matching the project's E2E gate.
+  browser=await chromium.launch({channel:'chrome',headless:true});
   for(const mode of modes) {
     if(mode==='creator') {
       await runCase('provisional-creator',mode,'',async({page})=>{
