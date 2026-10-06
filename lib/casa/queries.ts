@@ -1,10 +1,7 @@
-// lib/casa/queries.ts — acceso a datos de la polla centralizada.
-//
-// Todo pasa por `createAdminClient()` (service_role) porque en este proyecto
-// `auth.uid()` NO propaga al contexto de PostgREST — ver el TODO de
-// auth.uid() en CLAUDE.md. Eso obliga a filtrar por `user_id` A MANO en cada
-// lectura que dependa del usuario. Las funciones de acá lo hacen siempre; si
-// agregás una nueva, el filtro explicito no es opcional.
+// Casa reads retain the service-client architecture and explicit authorization.
+// User-scoped reads must filter by user_id; service_role bypasses RLS.
+// The historical auth.uid() diagnosis was RLS recursion, fixed in migration 022.
+// See AGENTS.md and docs/auth-uid-handoff.md before changing the access model.
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MATCH_COLUMNS } from "@/lib/db/columns";
@@ -335,7 +332,7 @@ export async function listPollasConPicksPendientes(
 ): Promise<Array<{ polla: CasaPolla; faltan: number; total: number; entryNumber: number | null }>> {
   const db = createAdminClient();
 
-  // Filtro explicito por user_id ademas de RLS — ver el TODO de auth.uid().
+  // Explicit user scope is required because this service client bypasses RLS.
   const { data: entries } = await db
     .from("casa_entries")
     .select("id, polla_id, entry_number")

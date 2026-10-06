@@ -7,6 +7,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/admin", () => ({ isCurrentUserAdmin: mocks.admin, getAuthenticatedUser: mocks.user }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.db }));
 vi.mock("@/lib/matches/refresh-schedule", () => ({ refreshTournamentSchedule: mocks.refresh }));
+vi.mock("@/lib/casa/private-draft-query", () => ({ getAdminPollaAccess: async () => ({ privateDraft: false }) }));
 
 import { GET } from "@/app/api/casa/admin/matches/route";
 import { POST } from "@/app/api/casa/admin/pollas/route";
@@ -61,7 +62,8 @@ describe("admin calendar window", () => {
     expect(call(0).pathname).toBe("/rest/v1/matches");
     expect(q.get("select")).toBe("id,home_team,away_team,home_team_flag,away_team_flag,scheduled_at,scheduled_at_confirmed,match_day");
     expect(q.get("tournament")).toBe("eq.premier_2025");
-    expect(q.getAll("scheduled_at")).toEqual([`gt.${now.toISOString()}`, `lt.${new Date(now.getTime() + 10 * day).toISOString()}`]);
+    expect(q.getAll("scheduled_at")).toEqual([`lt.${new Date(now.getTime() + 10 * day).toISOString()}`]);
+    expect(q.get("or")).toBe(`(scheduled_at.gt.${now.toISOString()},and(scheduled_at_confirmed.eq.false,scheduled_at.gte.2026-09-13T00:00:00Z))`);
     expect(q.get("limit")).toBe("1000");
     expect(mocks.refresh).toHaveBeenCalledExactlyOnceWith("premier_2025");
   });
@@ -72,14 +74,15 @@ describe("admin calendar window", () => {
     dbFetch.mockResolvedValueOnce(response([{ id: matchIds[0] }]));
     const res = await calendar(`tournament=premier_2025&${query}`);
     expect((await res.json()).dias).toBe(expected);
-    expect(call(0).searchParams.getAll("scheduled_at")[1]).toBe(`lt.${new Date(now.getTime() + expected * day).toISOString()}`);
+    expect(call(0).searchParams.getAll("scheduled_at")[0]).toBe(`lt.${new Date(now.getTime() + expected * day).toISOString()}`);
   });
 
   it("todo=1 reads every upcoming fixture without an upper bound and skips the next-match lookup", async () => {
     dbFetch.mockResolvedValueOnce(response([]));
     const res = await calendar("tournament=premier_2025&todo=1&dias=5");
     expect(await res.json()).toMatchObject({ matches: [], dias: null, todo: true, nextMatch: null });
-    expect(call(0).searchParams.getAll("scheduled_at")).toEqual([`gt.${now.toISOString()}`]);
+    expect(call(0).searchParams.getAll("scheduled_at")).toEqual([]);
+    expect(call(0).searchParams.get("or")).toContain(`scheduled_at.gt.${now.toISOString()}`);
     expect(call(0).searchParams.get("limit")).toBe("1000");
     expect(dbFetch).toHaveBeenCalledTimes(1);
   });

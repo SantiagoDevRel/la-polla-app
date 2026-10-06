@@ -97,7 +97,7 @@ async function addPendingPicks(pollas: MyCasaPolla[], entryIds: Map<string, { po
     if (linksError || picksError) return;
     const matchIds = [...new Set((links ?? []).map((l) => l.match_id))];
     if (matchIds.length === 0) return;
-    const { data: matches, error } = await db.from("matches").select("id, status, elapsed, scheduled_at, final_verified_at").in("id", matchIds);
+    const { data: matches, error } = await db.from("matches").select("id, status, elapsed, scheduled_at, scheduled_at_confirmed, final_verified_at").in("id", matchIds);
     if (error) return;
     const byMatch = new Map((matches ?? []).map((m) => [m.id, m]));
     const done = new Set((picks ?? []).map((p) => `${p.entry_id}:${p.match_id}`));

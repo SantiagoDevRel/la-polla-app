@@ -79,6 +79,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   for (const k of ENV_KEYS) {
     if (ORIGINAL_ENV[k] === undefined) delete process.env[k];
@@ -447,6 +448,7 @@ const telegramMethods = (fetchStub: ReturnType<typeof vi.fn>) =>
 
 describe("webhook: profile sync after an authenticated update", () => {
   it("runs once per version across updates, after the bot's own answer", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://lapollacolombiana.com");
     setLoginEnv(true);
     const fetchStub = vi.fn(async () => Response.json({ ok: true, result: true }));
     vi.stubGlobal("fetch", fetchStub);
@@ -682,5 +684,5 @@ describe("/login offers WhatsApp first and hides Telegram", () => {
       const LoginPage = (await import("@/app/(auth)/login/page")).default;
       expect(LoginPage().props.telegramBotUsername).toBeNull();
     } finally { vi.unstubAllGlobals(); }
-  });
+  }, 30_000);
 });

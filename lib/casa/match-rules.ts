@@ -4,6 +4,7 @@ export const CASA_MATCH_LOCK_MS = 5 * 60_000;
 
 export interface CasaMatchTiming {
   scheduled_at: string;
+  scheduled_at_confirmed?: boolean;
   status?: string;
   elapsed?: number | null;
   live_status_detail?: string | null;
@@ -15,7 +16,7 @@ export interface CasaMatchTiming {
 export function hasCasaMatchStarted(match: CasaMatchTiming, now = Date.now()) {
   if (match.voided_at) return true;
   if (["STATUS_SUSPENDED", "SUSPENDED", "SUSP", "STATUS_INTERRUPTED", "INTERRUPTED", "INT"].includes((match.live_status_detail ?? "").toUpperCase()) && !(match.elapsed && match.elapsed > 0)) return false;
-  return new Date(match.scheduled_at).getTime() <= now &&
+  return (match.scheduled_at_confirmed === false || new Date(match.scheduled_at).getTime() <= now) &&
     (match.status === "live" || match.status === "finished" ||
       (match.status === "cancelled" && (match.elapsed ?? 0) > 0));
 }
@@ -28,8 +29,8 @@ export function hasCasaMatchStarted(match: CasaMatchTiming, now = Date.now()) {
 export function canEditCasaMatch(match: CasaMatchTiming, now = Date.now()) {
   const notStarted = match.status === "scheduled" ||
     (match.status === "cancelled" && (match.elapsed ?? 0) === 0);
-  return !match.voided_at && !match.final_verified_at && notStarted &&
-    new Date(match.scheduled_at).getTime() - CASA_MATCH_LOCK_MS > now;
+  return !match.voided_at && !match.final_verified_at && notStarted && !(match.elapsed && match.elapsed > 0) &&
+    (match.scheduled_at_confirmed === false || new Date(match.scheduled_at).getTime() - CASA_MATCH_LOCK_MS > now);
 }
 
 export function acceptsCasaMatchPicks(status: CasaPollaStatus, drawPending?: boolean) {

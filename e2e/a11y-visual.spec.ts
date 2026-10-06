@@ -27,7 +27,8 @@ const A11Y_PAGES = [
 ] as const;
 
 for (const { path, name } of VISUAL_PAGES) {
-  test(`visual: ${name}`, async ({ page }) => {
+  test(`visual: ${name}`, async ({ page }, testInfo) => {
+    test.skip(!["desktop", "mobile"].includes(testInfo.project.name), "Windows baselines cover desktop and Pixel 7; other widths run accessibility checks.");
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(path);
     await page.evaluate(() => document.fonts.ready.then(() => undefined));

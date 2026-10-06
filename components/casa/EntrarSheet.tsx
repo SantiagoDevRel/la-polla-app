@@ -133,7 +133,7 @@ export function EntrarSheet({ open, onClose, href, entryPriceCop, slug }: {
                 }}
                 className="lp-btn lp-btn-primary mt-5 w-full !px-4"
               >
-                {entrando ? "Entrando..." : "Unirme · es gratis"}
+                {entrando ? "Entrando..." : "Entrar gratis"}
               </button>
             ) : (
               <Link href={href} className="lp-btn lp-btn-primary mt-5 w-full !px-4">

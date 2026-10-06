@@ -6,6 +6,11 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypeScript,
   {
+    files: ["scripts/bake-og-image.cjs"],
+    // CommonJS scripts use require() by definition; application TS stays ESM.
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  {
     rules: {
       // These rules target React Compiler adoption. The app still runs on
       // supported React 18, where effects intentionally hydrate browser and

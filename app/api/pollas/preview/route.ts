@@ -7,11 +7,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const reply = (body: unknown, status = 200) => NextResponse.json(body, {
+  status, headers: { "Cache-Control": "private, no-store" },
+});
+
 export async function GET(request: NextRequest) {
   const slug = request.nextUrl.searchParams.get("slug");
   const token = request.nextUrl.searchParams.get("token");
   if (!slug && !token) {
-    return NextResponse.json({ error: "slug o token requerido" }, { status: 400 });
+    return reply({ error: "slug o token requerido" }, 400);
   }
 
   const admin = createAdminClient();
@@ -20,16 +24,17 @@ export async function GET(request: NextRequest) {
     .select(
       "id, slug, name, description, tournament, buy_in_amount, type, status, created_by, match_ids, payment_mode, admin_payment_instructions, join_code"
     );
-  const { data: polla, error } = slug
-    ? await query.eq("slug", slug).maybeSingle()
-    : await query.eq("invite_token", token!).maybeSingle();
+  // When both are supplied, the token must belong to this exact pool.
+  if (slug) query.eq("slug", slug);
+  if (token) query.eq("invite_token", token);
+  const { data: polla, error } = await query.maybeSingle();
 
   if (error) {
     console.error("[pollas/preview] failed:", error);
-    return NextResponse.json({ error: "Error consultando polla" }, { status: 500 });
+    return reply({ error: "Error consultando polla" }, 500);
   }
   if (!polla) {
-    return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
+    return reply({ error: "Polla no encontrada" }, 404);
   }
 
   // Count paid+approved participants. The invite preview uses this for the
@@ -38,7 +43,7 @@ export async function GET(request: NextRequest) {
   // on creation so they count from day one.
   const { count, error: countError } = await admin
     .from("polla_participants")
-    .select("*", { head: true, count: "exact" })
+    .select("id", { head: true, count: "exact" })
     .eq("polla_id", polla.id)
     .eq("status", "approved")
     .eq("paid", true);
@@ -83,7 +88,7 @@ export async function GET(request: NextRequest) {
     ...publicPolla
   } = polla;
   void _createdBy;
-  return NextResponse.json({
+  return reply({
     polla: token
       ? { ...publicPolla, join_code, admin_payment_instructions }
       : publicPolla,

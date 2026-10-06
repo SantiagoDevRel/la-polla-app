@@ -10,6 +10,7 @@
 // correcta lo hace SQL, insensible a mayúsculas y espacios.
 
 import { useMemo, useState } from "react";
+import { useDraftSave } from "@/lib/casa/use-draft-save";
 import { Label, PctBar, Tape } from "@/components/street";
 import type { CasaDistribution, CasaQuestion } from "@/lib/casa/types";
 
@@ -36,7 +37,7 @@ export function QuestionsBoard({
 }: Props) {
   const [picks, setPicks] = useState(initialPicks);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const { dirty, changed, snapshot, acknowledge } = useDraftSave();
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
 
   const respondidas = useMemo(
@@ -50,7 +51,7 @@ export function QuestionsBoard({
 
   function elegirOpcion(questionId: string, optionId: string) {
     setPicks((prev) => ({ ...prev, [questionId]: { optionId, freeText: null } }));
-    setDirty(true);
+    changed();
     setMsg(null);
   }
 
@@ -59,11 +60,12 @@ export function QuestionsBoard({
       ...prev,
       [questionId]: { optionId: null, freeText: texto },
     }));
-    setDirty(true);
+    changed();
     setMsg(null);
   }
 
   async function guardar() {
+    const sentRevision = snapshot();
     setSaving(true);
     setMsg(null);
     try {
@@ -90,8 +92,8 @@ export function QuestionsBoard({
         setMsg({ text: json.error ?? "No se pudo guardar.", bad: true });
         return;
       }
-      setDirty(false);
-      setMsg({ text: "Guardado." });
+      if (acknowledge(sentRevision)) setMsg({ text: "Guardado." });
+      else setMsg({ text: "Guardamos el envío anterior. Tienes cambios nuevos sin guardar.", bad: true });
     } catch {
       setMsg({ text: "Error de conexión.", bad: true });
     } finally {

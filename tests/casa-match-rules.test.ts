@@ -5,6 +5,15 @@ const now = Date.parse("2026-09-13T18:00:00Z");
 const scheduled = (minutes: number, status = "scheduled") => ({ scheduled_at: new Date(now + minutes * 60_000).toISOString(), status });
 
 describe("Casa match windows", () => {
+  it("does not use a provisional midnight as a deadline, then applies the confirmed cutoff", () => {
+    const provisional = { ...scheduled(-60), scheduled_at_confirmed: false };
+    expect(canEditCasaMatch(provisional, now)).toBe(true);
+    expect(canEditCasaMatch({ ...provisional, scheduled_at_confirmed: true }, now)).toBe(false);
+    expect(canEditCasaMatch({ ...provisional, elapsed: 1 }, now)).toBe(false);
+    expect(canEditCasaMatch({ ...provisional, status: "live" }, now)).toBe(false);
+    expect(canEditCasaMatch({ ...provisional, final_verified_at: new Date(now).toISOString() }, now)).toBe(false);
+    expect(canEditCasaMatch({ ...provisional, voided_at: new Date(now).toISOString() }, now)).toBe(false);
+  });
   it("locks at exactly five minutes while allowing later matches after inscriptions close", () => {
     expect(acceptsCasaMatchPicks("cerrada")).toBe(true);
     expect(canEditCasaMatch(scheduled(6), now)).toBe(true);

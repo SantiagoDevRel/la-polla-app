@@ -6,6 +6,7 @@ vi.mock("@/lib/casa/review-notify", () => ({ notifyCasaReview: mocks.notifyRevie
 vi.mock("@/lib/auth/admin", () => ({ getAuthenticatedUser: mocks.user }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.db }));
 vi.mock("@/lib/telegram/notify", () => ({ signedProofUrl: vi.fn() }));
+vi.mock("@/lib/casa/private-draft-query", () => ({ getAdminPollaAccess: async () => ({ privateDraft: false }) }));
 import { PATCH } from "@/app/api/casa/admin/pollas/[id]/route";
 import { POST } from "@/app/api/casa/admin/entries/route";
 const id = "00000000-0000-4000-8000-000000000001";

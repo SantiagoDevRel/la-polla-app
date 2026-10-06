@@ -1,21 +1,25 @@
 # La Polla ⚽🇨🇴
 
-App de pollas de fútbol. La Casa publica las pollas disponibles; los participantes
-se inscriben con un comprobante de pago, pronostican y compiten en el ranking.
-El modelo histórico de grupos privados permanece disponible.
+Football pools: La Casa publishes pools, players enroll, predict, and compete.
+Paid entries use payment proofs; $0 gift pools enroll immediately through
+**Entrar gratis**, without proof or admin review. Historical private pools remain.
+
+Agent instructions: [AGENTS.md](AGENTS.md). Current security, timing, gifts, and
+delivery checks: [urgent/high fixes](docs/urgent-high-fixes.md), migrations 161–163.
 
 Producción: **[lapollacolombiana.com](https://lapollacolombiana.com)**
 
-## Rifas de creadores (2026-09-28, migración 157, apagado)
+## Creator raffles (migration 157, feature gated)
 
-Un administrador habilita creadores desde `/admin/rifas`; cada creador arma sus
-rifas (hasta 100 números) desde Perfil → «Crear mi rifa», comparte `/rifa/<slug>`
-y aprueba los comprobantes. El dinero va directo a la cuenta del creador. Tablas
-propias `rifa_*` (no toca Casa), reserva atómica en SQL, vencimiento perezoso de
-30 min, Privada por defecto, pestañas POLLAS | RIFAS en `/inicio` e imagen para
-historia 1080×1920. **Todo detrás de `RIFAS_ENABLED` (apagado); la 157 no está
-aplicada en producción.** Detalle, decisiones, pruebas y stack local sin Docker:
-[docs/rifas.md](docs/rifas.md).
+Admins allowlist creators in `/admin/rifas`. Creators build raffles of up to 100
+numbers from their profile, share `/rifa/<slug>`, and review proofs; payment goes
+to the creator's account. Separate `rifa_*` tables preserve Casa. Reservations
+expire lazily after 30 minutes; link-only listing is the default.
+
+Migration 157 is registered in the existing production database (verified
+2026-10-05). Feature activation still depends on `RIFAS_ENABLED`; installing
+the schema does not enable it. Historical rollout notes in [docs/rifas.md](docs/rifas.md)
+must not be read as the current flag state. This fix does not change rollout flags.
 
 ## Campañas SMS (2026-09-27)
 
@@ -667,13 +671,13 @@ usuario decida — no asumas que pagar está OK. Mismo principio en
 ## Stack
 
 - **Next.js 16** App Router + TypeScript
-- **Supabase** (PostgreSQL + Auth + RLS) — phone+password con OTP de WhatsApp solo en el primer login
-- **Meta WhatsApp Cloud API** — bot conversacional para predecir/ver tabla, OTP de signup, recovery de clave
+- **Supabase** (PostgreSQL + Auth + RLS) — server-configured phone OTP and optional six-digit password; see [password rollout](docs/phone-password.md).
+- **WhatsApp** — optional configured login link/OTP channel. Legacy conversational outbound stays off unless explicitly configured; do not infer activation from retained code.
 - **API-Football** — única fuente de calendario, vivo y resultados (desde 2026-09-13)
-- **Cloudflare Turnstile** — captcha del envío de SMS en `/login`; la valida Supabase Auth
+- **Cloudflare Turnstile** — optional OTP CAPTCHA; activation requires matching app and Supabase settings.
 - **Tailwind CSS** + **Framer Motion** + **lucide-react**
 - **@serwist/next** — PWA instalable + service worker
-- **Vitest** — unit tests (111 cubriendo helpers críticos)
+- **Vitest / Playwright / PostgreSQL** — unit, browser, accessibility, and isolated SQL/RLS checks.
 - **Vercel** — deploy target con auto-deploy desde `main`
 
 ## Primeros pasos
@@ -721,7 +725,7 @@ API_FOOTBALL_KEY=
 CRON_SECRET=
 
 # App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3001
 # WhatsApp: apagado. El número anterior del bot ahora es de otra app.
 # Solo con un número propio: WHATSAPP_OUTBOUND_ENABLED=true y
 # NEXT_PUBLIC_WHATSAPP_BOT_NUMBER=<E.164 sin +>.
@@ -745,16 +749,20 @@ Aplicar todo `supabase/migrations/*.sql` en orden. Si usas Supabase CLI: `supaba
 ### 4. Correr en local
 
 ```bash
-npm run dev
+npm run dev -- --port 3001
 ```
 
-Abre [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3001](http://localhost:3001).
 
 ### Validación pre-commit (manual)
 
 ```bash
 npm run validate    # tsc --noEmit && eslint .
-npm test            # vitest unit tests (111 tests)
+npm test            # bounded Vitest workers
+npm run build       # Next route/bundle checks
+npm run test:secrets # installed TruffleHog, TRUFFLEHOG_PATH
+npm run test:casa:sql # disposable Docker PostgreSQL, synthetic rollback fixtures
+npm run test:casa:browser # installed Chrome; build first for real CSS/fonts
 ```
 
 ---
@@ -763,12 +771,11 @@ npm test            # vitest unit tests (111 tests)
 
 ### Auth
 
-- **Login por SMS (principal)**: número → `/api/auth/start-otp` (Supabase `signInWithOtp`, hoy Twilio Verify) → código → `/api/auth/verify-otp` deja la sesión en cookies `sb-<ref>-auth-token` (`Secure` en producción, `SameSite=Lax`, host-only; sin `HttpOnly` porque el cliente del navegador lee la sesión; ver «Cookies de sesión»). Sin contraseña. Usuarios nuevos pasan por `/onboarding` (nombre + pollito).
+- **Current login:** `/login` reads the server-controlled OTP channel (`WHATSAPP_OTP_ENABLED`), optional six-digit password (`PHONE_PASSWORD_ENABLED`), and configured WhatsApp login link. New users complete name/avatar onboarding. OTP verification sets host-only Supabase cookies. [Password and recovery contract](docs/phone-password.md).
 - **SMS por LabsMobile (preparado, apagado)**: `app/api/auth/sms-hook` es el Send SMS Hook de Supabase Auth. Supabase genera y valida el código; el hook solo lo entrega con `lib/sms/labsmobile.ts` (SMS plano, nunca el endpoint 2FA del proveedor) y lo registra en `sms_entregas` (migración 088). LabsMobile avisa la entrega en `/api/sms/ack`, protegido con `SMS_ACK_SECRET`. Mientras `hook_send_sms_enabled=false`, Supabase sigue enviando por Twilio Verify.
-- **Orden en `/login`**: primero **Enviar código por SMS** (botón primario); debajo, **Entrar con Telegram** (secundario, no necesita el número). En el paso del código SMS: «¿No te llegó el SMS?» + **Entrar con Telegram**.
-- **Login por Telegram (v2, 2026-09-13, migración 119)**: sin códigos. Ver la sección siguiente.
+- **Telegram:** the login button is hidden by owner decision. The backend below is retained for compatibility; this documentation does not authorize reactivation.
 
-#### Login por Telegram (v2)
+#### Retained Telegram implementation (not offered on the login screen)
 
 Bot **público y separado** del panel de admin. v1 (código de 6 dígitos que la persona copiaba en la web) se retiró por feedback del dueño: no se entendía y el botón «Compartir mi número» quedaba escondido en Telegram Web. El dueño pidió un enlace de un solo uso que dure 5 minutos y abra una sola sesión.
 
@@ -1245,8 +1252,8 @@ Guía completa: [docs/backup-restore.md](docs/backup-restore.md).
 
 ## Pendiente / Roadmap
 
-- **`auth.uid()` raíz** — el JWT de SSR no llega al PostgREST → `auth.uid()` devuelve NULL. El workaround: 46 archivos usan `createAdminClient()` con filtros `.eq("user_id", user.id)` manuales. Ver `docs/auth-uid-handoff.md`.
-- Optional: husky pre-commit hook + GitHub Actions CI cuando entren colaboradores.
+- **Auth incident resolved:** migration 022 fixed recursive RLS policies. The original JWT propagation diagnosis was disproved. Existing service-client queries retain explicit authorization and scopes; changing that architecture requires a separate audit. [Historical investigation](docs/auth-uid-handoff.md).
+- **Delivery checks:** portable staged-secret hook and Quality CI are included. Require the aggregate `Quality gate` on `main`; verify branch enforcement independently from workflow success. [Commands and scope](docs/urgent-high-fixes.md).
 
 ---
 

@@ -27,11 +27,14 @@ const rows: CasaLeaderboardRow[] = [
   },
 ];
 
-const render = (tiebreakByRegistration: boolean) => renderToStaticMarkup(createElement(PollaTabs, {
+const render = (tiebreakByRegistration: boolean) => {
+  const props = {
   slug: "polla-regalo", firstLabel: "Partidos", initialRows: rows,
   entryStatus: null, pollaStatus: "abierta" as const, userId: "u1",
   tiebreakByRegistration, children: null,
-}));
+  };
+  return renderToStaticMarkup(createElement(PollaTabs, props));
+};
 
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 

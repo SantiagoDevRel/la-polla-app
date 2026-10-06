@@ -97,6 +97,7 @@ export function CrearPollaForm() {
   const primerKickoff = useMemo(() => {
     if (seleccion.length === 0) return null;
     const elegidos = seleccion
+      .filter((m) => m.scheduled_at_confirmed !== false)
       .map((m) => new Date(m.scheduled_at).getTime())
       .filter((t) => Number.isFinite(t));
     return elegidos.length ? Math.min(...elegidos) : null;
@@ -594,7 +595,7 @@ export function CrearPollaForm() {
             })}
           </div>
 
-          {closeMode === "auto" ? (
+          {closeMode === "auto" && !(seleccion.length > 0 && primerKickoff === null) ? (
             // Con partidos de hora por confirmar no se muestra una hora exacta:
             // el cierre usa la hora provisional y se ajusta solo (migración 118).
             <p className="mt-2 text-[12px] leading-relaxed text-text-secondary">
@@ -619,13 +620,18 @@ export function CrearPollaForm() {
           ) : (
             <>
               <ColombiaDateTimeField
-                label="Cierre de inscripciones"
+                label={closeMode === "auto" ? "Cierre de respaldo" : "Cierre de inscripciones"}
                 value={closesAt}
                 onChange={(value) => {
                   cierreTocado.current = true;
                   setClosesAt(value);
                 }}
               />
+              {closeMode === "auto" && (
+                <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
+                  Aún no hay horas confirmadas. Usa este cierre hasta que el calendario confirme una hora; entonces se ajustará automáticamente. Los pronósticos siguen abiertos mientras el partido no haya empezado.
+                </p>
+              )}
               {cierreTarde ? (
                 // No es un error que impida publicar: es una decisión válida
                 // (dejar entrar gente el domingo aunque el sábado ya se jugó).
@@ -719,7 +725,7 @@ export function CrearPollaForm() {
                   {provisionalesElegidos === 1
                     ? "Elegiste 1 partido con hora por confirmar."
                     : `Elegiste ${provisionalesElegidos} partidos con hora por confirmar.`}{" "}
-                  El cierre usa la hora provisional y se ajusta solo cuando el calendario la confirme.
+                  Las horas provisionales no adelantan el cierre. Se ajusta cuando el calendario confirme una hora.
                 </p>
               )}
               {seleccion.length > 0 && (

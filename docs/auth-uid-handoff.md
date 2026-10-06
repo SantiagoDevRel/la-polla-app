@@ -1,11 +1,14 @@
 # Handoff: `auth.uid()` propagation fix
 
-> **STATUS: RESUELTO 2026-04-26.** Ver sección "Resolución" al final.
-> El diagnóstico inicial era erróneo. El bug NO era propagación de JWT —
-> era recursión infinita en RLS. Migración 022 lo arregla.
->
-> Lo que sigue es el doc original (preservado por contexto histórico)
-> seguido de la sección "Resolución" con el verdadero root cause.
+> **Resolved 2026-04-26:** migration 022 fixed recursive RLS policies.
+> The original JWT propagation diagnosis below was disproved; it is historical
+> investigation material, not an active incident or instruction to bypass RLS.
+> See the final resolution and the current contract in [AGENTS.md](../AGENTS.md).
+> `scripts/casa-rls-check.sql` checks distinct authenticated identities and private
+> row isolation locally. It does not validate hosted GoTrue, SSR cookies, or every
+> production policy. Existing service-client reads still require explicit scopes.
+
+## Historical investigation (superseded diagnosis)
 
 ## El problema en 1 párrafo
 
