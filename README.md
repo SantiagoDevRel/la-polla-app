@@ -15,6 +15,11 @@ after lost responses. Onboarding preserves the requested pool/payment destinatio
 Receipt retries retain their identity when browser storage is unavailable; cup counts
 cannot change during uploads. Optional splash/update prompts tolerate blocked storage.
 
+The home screen starts with active and available pools, without a referral-code prompt.
+Payment keeps the per-entry amount, account copy button, cup selector, and proof upload
+in one card. Prize breakdown and optional referral codes expand below that card.
+Each cup still requires its own transfer and proof; upload and recovery rules are unchanged.
+
 Security dependency baseline (2026-10-06): Next.js and its ESLint config
 16.3.6, DOMPurify 3.4.16, source-map-js 1.2.2 and selector parser 7.1.6.
 Brace expansion keeps compatible patched generations (1.1.21 and 5.0.12).

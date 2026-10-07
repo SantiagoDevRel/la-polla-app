@@ -7,7 +7,7 @@
 // selector no suma un solo pago: abre una tarjeta de comprobante por cupo, y
 // cada una se registra y se aprueba por separado.
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { formatCop } from "@/lib/casa/format";
@@ -21,9 +21,11 @@ interface Props {
   available: number;
   /** Ya tiene cupos: el texto habla de cupos adicionales. */
   another: boolean;
+  embedded?: boolean;
+  paymentDetails?: ReactNode;
 }
 
-export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
+export function CuposForm({ slug, entryPriceCop, available, another, embedded = false, paymentDetails }: Props) {
   const hydrated = useHydrated();
   const [cupos, setCupos] = useState(1);
   const [registrados, setRegistrados] = useState<Array<number | null>>([]);
@@ -33,11 +35,11 @@ export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <label htmlFor="cuantos-cupos" className="block text-[15px] font-semibold text-text-primary">
-          {another ? "¿Cuántos cupos más quieres?" : "¿Cuántos cupos quieres en esta polla?"}
+          {another ? "Cupos adicionales" : "Cupos"}
         </label>
-        <div className="relative mt-2">
+        <div className="relative min-w-[7rem] flex-1">
         <select
           id="cuantos-cupos"
           value={cupos}
@@ -51,24 +53,17 @@ export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
         </select>
         <ChevronDown aria-hidden="true" size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary" />
         </div>
-        <p className="mt-2 text-[13px] text-text-secondary">
-          Cada cupo lleva sus propios pronósticos.
-          {available > 1 && ` Máximo ${available}${another ? " más" : ""}.`}
+        <p className="w-full text-[13px] leading-relaxed text-text-secondary">
+          {cupos === 1 ? "Una transferencia y un comprobante por cupo." : `${cupos} transferencias de ${formatCop(entryPriceCop)}, cada una con su comprobante.`}
         </p>
       </div>
 
-      <div role="note" className="border border-gold/40 bg-gold/10 p-3">
-        <p className="lp-label text-gold">Una transferencia por cupo</p>
-        <p className="mt-1 text-[15px] leading-relaxed text-text-primary">
-          Cada cupo debe tener su propia transferencia de {formatCop(entryPriceCop)}
-          {cupos > 1 && <> — {cupos} transferencias separadas, no una de {formatCop(entryPriceCop * cupos)}</>}.
-          Sube un comprobante por cupo.
-        </p>
-      </div>
+      {paymentDetails}
 
       {options.slice(0, cupos).map((n) => (
         <PagarForm
           key={n}
+          embedded={embedded}
           slug={slug}
           esRifa={false}
           ticketCount={null}
