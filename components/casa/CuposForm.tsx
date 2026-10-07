@@ -55,7 +55,6 @@ export function CuposForm({ slug, entryPriceCop, available, another, embedded = 
         </div>
         <p className="w-full text-[13px] leading-relaxed text-text-secondary">
           {cupos === 1 ? "Una transferencia y un comprobante por cupo." : `${cupos} transferencias de ${formatCop(entryPriceCop)}, cada una con su comprobante.`}
-          {available > 1 && ` Máximo ${available}${another ? " más" : ""}.`}
         </p>
       </div>
 
