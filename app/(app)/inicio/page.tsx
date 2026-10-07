@@ -27,17 +27,6 @@ import { CashPrizeVisual, PrizeMotion } from "@/components/casa/PrizeShowcase";
 import { pollaPrizeMedia } from "@/components/casa/prize-media";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { ArrowRight, CheckCircle2, EyeOff, Settings } from "lucide-react";
-import { cookies } from "next/headers";
-import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
-import { PromoInvitados } from "@/components/casa/PromoInvitados";
-import { getReferralInvitee, getReferralPollaView } from "@/lib/casa/referrals";
-import {
-  REFERRAL_COOKIE,
-  REFERRAL_DISMISS_COOKIE,
-  pickPromoPolla,
-  referralPromo,
-  validReferralCode,
-} from "@/lib/casa/referrals-shared";
 import {
   listPublicPollas,
   getPots,
@@ -80,21 +69,15 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
     );
   }
 
-  const cookieStore = await cookies();
-  const referralHint = validReferralCode(cookieStore.get(REFERRAL_COOKIE)?.value);
-  const [pollas, myPollas, isAdmin, enVivo, invitee] = await Promise.all([
+  const [pollas, myPollas, isAdmin, enVivo] = await Promise.all([
     listPublicPollas(),
     listMyPollas(user.id),
     isCurrentUserAdmin(),
     // Partidos en juego de MIS pollas, con mi pronóstico. Si falla, la
     // pantalla sale sin la franja en vez de caerse.
     listMyLiveMatches(user.id).catch(() => []),
-    // Invitaciones (migración 135): personas nuevas que todavía pueden decir quién las invitó.
-    getReferralInvitee(user.id, referralHint),
   ]);
   const privatePollas = await listHiddenAdminPollas({ id: user.id, is_admin: isAdmin });
-  const verInvitacion = Boolean(invitee?.can_set_referrer && !invitee.referrer
-    && (invitee.hint || cookieStore.get(REFERRAL_DISMISS_COOKIE)?.value !== "1"));
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
   // paso sigue con status abierta hasta que alguien la cierre, y quedaba
   // listada como "del fin de semana" diciendo "cierra en cerrada".
@@ -108,19 +91,14 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
   // para quien participó.
   const cerradas = pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id)
     && (isPublicClosedPolla(p) || joinedIds.has(p.id)));
-  // Aviso de invitaciones (2026-09-17): la polla abierta con invitaciones que cierra
-  // primero, con desempate estable por id si dos cierran a la misma hora.
-  const promoPolla = pickPromoPolla(abiertas);
-  const [pots, pendientes, tournaments, pagos, promoView] = await Promise.all([
+  const [pots, pendientes, tournaments, pagos] = await Promise.all([
     getPots([...pollas, ...privatePollas].map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
     getPollaTournamentSlugs([...pollas, ...privatePollas]),
     // Prueba de pago (migración 133): qué pollas cerradas ya pagaron su premio.
     getPayoutProgress(cerradas.filter((p) => p.status === "resuelta").map((p) => p.id))
       .catch((): Record<string, { total: number; paid: number }> => ({})),
-    promoPolla ? getReferralPollaView(user.id, promoPolla.id) : Promise.resolve(null),
   ]);
-  const promo = promoPolla ? referralPromo(promoPolla, promoView, pots[promoPolla.id]?.prize_cop ?? 0) : null;
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
 
   // (2026-09-18) Mis pollas y Para entrar ya no son desplegables: salen de una.
@@ -166,9 +144,6 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
       </HeroFrame>
 
       <div className="space-y-6 px-4 pt-5">
-        {/* Punto 3 del dueño (2026-09-17): quien entró sin el enlace también puede decir quién lo invitó. */}
-        {verInvitacion && invitee && <QuienTeInvito initial={invitee} variant="casa" />}
-
         {/* El respaldo se suma por polla: la tarjeta ya no habla de cupos. */}
         <MyPollas prizeVisuals={Object.fromEntries(enJuegoMias.map(p => [p.id, prizePreview(p.id)]))} initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
 
@@ -231,7 +206,6 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
         </PollaSection>
         )}
       </div>
-      {promo && <PromoInvitados promo={promo} verPolla />}
     </div>
   );
 }

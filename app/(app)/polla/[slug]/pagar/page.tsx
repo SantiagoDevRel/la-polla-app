@@ -11,7 +11,7 @@ import { getMyEntries, getPollaBySlug, getPot, getActiveProofs, getOutstandingTi
 import { ChevronRight } from "lucide-react";
 import { DEFAULT_MAX_ENTRIES_PER_USER, isLiveEntry, isPollaOpen, type CasaEntry } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
-import { HeroFrame, Label, StreetCard } from "@/components/street";
+import { Label, StreetCard } from "@/components/street";
 import { PagarForm } from "@/components/casa/PagarForm";
 import { CuposForm } from "@/components/casa/CuposForm";
 import { CopiarDato } from "@/components/casa/CopiarDato";
@@ -122,38 +122,63 @@ export default async function PagarPage({
   const entrada = polla.entry_price_cop;
   if (pot.entry_prize_cop === undefined || pot.entry_house_cop === undefined || pot.projected_prize_cop === undefined) throw new Error("No se pudo leer el desglose de la entrada.");
   const alPozo = pot.entry_prize_cop;
+  const paymentMethod = polla.payout_method
+    ? polla.payout_method.charAt(0).toUpperCase() + polla.payout_method.slice(1)
+    : "cuenta";
 
 
-  return (
-    <div className="pb-28">
-      <HeroFrame height="min-h-[168px]">
-        <Label>{recovering && showNumber ? `Cupo ${shownNumber}` : isAnother ? "Más cupos en" : "Entrar a"}</Label>
-        <h1 className="lp-display mt-1 text-[30px] [overflow-wrap:anywhere]">{polla.name}</h1>
-      </HeroFrame>
-
-      <div className="space-y-4 px-4 pt-5">
-        {/* (2026-09-19, segunda tanda de «menos texto») En esta pantalla la gente
-            PAGA: solo quedan las frases que evitan un error con plata (no repetir la
-            transferencia, monto exacto, cuenta correcta). Cómo se gana, el empate y
-            cómo crece el pozo viven en Info; aquí hay un enlace. grok y muse
-            coincidieron: recortar de más acá sale más caro que una frase corta. */}
-        {rejected ? <p className="text-[15px] text-text-secondary">Comprobante rechazado. {rejectReason} Revísalo antes de transferir otra vez.</p>
-          : recovering && <p className="text-[15px] text-text-secondary">Si ya transferiste, solo completa el comprobante. No repitas el pago.</p>}
-        {/* Antes de hablar de plata: si tiene un cupo gratis por invitar, puede
-            entrar sin transferir. No aplica cuando está completando un comprobante. */}
-        {referral?.can_redeem && !recovering && !resumeOnly && (
-          <UsarCupoGratis slug={polla.slug} disponibles={referral.available} />
-        )}
-        {/* Qué pasa con tu plata. Explícito, sin letra chica. */}
-        <StreetCard className="p-4">
-          <div className="flex items-end justify-between">
-            <div>
-              <Label>{recovering ? "Valor del cupo" : "Valor de cada cupo"}</Label>
-              <div className="lp-money mt-1 text-[34px] leading-none text-gold">
-                {formatCop(entrada)}
-              </div>
+  const paymentDetails = (polla.payout_account ? (
+          <div className="border-t border-border-subtle pt-3">
+            <p className="text-[15px] font-semibold text-text-primary">{polla.payout_method ? paymentMethod : "Cuenta de cobro"}</p>
+            <div id="copiar-numero" className="lp-money mt-1 min-w-0 select-all text-[26px] leading-none text-text-primary [overflow-wrap:anywhere]">{polla.payout_account}</div>
+            {polla.payout_account_name && <p className="mt-1 text-[13px] text-text-secondary [overflow-wrap:anywhere]">{polla.payout_account_name}</p>}
+            <div className="mt-2 [&>button]:w-full [&>button]:border [&>button]:border-border-default">
+              <CopiarDato valor={polla.payout_account} etiqueta="numero" nombre={paymentMethod} texto={`Copiar ${paymentMethod}`} />
             </div>
           </div>
+        ) : (
+          <div role="alert" className="rounded-md border border-red-alert/40 bg-red-alert/10 p-3">
+            <p className="text-[15px] font-semibold text-red-alert">Falta la cuenta de cobro</p>
+            <p className="mt-1 text-[13px] text-text-secondary">Consulta con el administrador antes de transferir.</p>
+          </div>
+        ));
+
+  return (
+    <div className="space-y-4 px-4 pb-28">
+      <header className="pt-2">
+        <Link href={`/polla/${polla.slug}`} className="inline-flex min-h-11 items-center text-[13px] text-text-secondary underline-offset-4 transition-colors hover:text-text-primary hover:underline">Volver a la polla</Link>
+        <Label>{recovering && showNumber ? `Cupo ${shownNumber}` : isAnother ? "Más cupos en" : "Pagar cupo"}</Label>
+        <h1 className="lp-display mt-1 text-[30px] leading-tight [overflow-wrap:anywhere]">{polla.name}</h1>
+      </header>
+
+      {rejected ? <p role="alert" className="text-[15px] text-text-secondary">Comprobante rechazado. {rejectReason} Revísalo antes de transferir otra vez.</p>
+        : recovering && <p className="text-[15px] text-text-secondary">Si ya transferiste, solo completa el comprobante. No repitas el pago.</p>}
+      {referral?.can_redeem && !recovering && !resumeOnly && (
+        <UsarCupoGratis slug={polla.slug} disponibles={referral.available} />
+      )}
+
+      <StreetCard className="space-y-4 p-4">
+        <div>
+          <Label>{recovering ? "Valor del cupo" : "Valor por cupo"}</Label>
+          <div className="lp-money mt-1 text-[34px] leading-none text-text-primary">{formatCop(entrada)}</div>
+        </div>
+
+
+        {polla.kind !== "rifa" && !recovering && !resumeOnly ? (
+          <CuposForm embedded paymentDetails={paymentDetails} slug={polla.slug} entryPriceCop={polla.entry_price_cop}
+            available={Math.max(1, maxEntries - counted)} another={isAnother} />
+        ) : <div className="space-y-4">{paymentDetails}<PagarForm embedded resumeOnly={resumeOnly}
+          slug={polla.slug}
+          esRifa={polla.kind === "rifa"}
+          ticketCount={polla.ticket_count}
+          initialTicket={boleta && /^\d+$/.test(boleta) && Number(boleta) <= (polla.ticket_count ?? 0) ? boleta : ""}
+          entryNumber={polla.kind === "rifa" ? undefined : target?.entry_number ?? null}
+        /></div>}
+        <p className="text-center text-[13px] text-text-secondary">Revisamos tu comprobante y te avisamos.</p>
+      </StreetCard>
+
+      <details className="lp-card p-4">
+        <summary className="min-h-11 cursor-pointer text-[15px] font-semibold text-text-secondary transition-colors hover:text-text-primary focus-visible:outline focus-visible:outline-gold">Desglose y premio</summary>
           {polla.prize_kind === "objeto" ? <p className="mt-4 text-[15px] leading-relaxed text-text-secondary [overflow-wrap:anywhere]">Premio: <strong className="text-text-primary">{polla.prize_object}</strong></p> : polla.pot_mode === "fijo" ? <div className="mt-4 space-y-1.5 border-t border-border-subtle pt-3 text-[13px]">
             {/* Mínimo garantizado (migración 109). Las cifras salen de casa_payment_details_v2.
                 Filas como las del pozo proporcional: cifras, no prosa. */}
@@ -191,62 +216,16 @@ export default async function PagarPage({
               </span>
             </div>
           </div>}
-          <Link href={`/polla/${polla.slug}#info-premio`} className="mt-2 inline-flex min-h-11 items-center gap-0.5 text-[13px] font-semibold text-text-secondary underline-offset-4 transition-colors hover:text-text-primary hover:underline">
-            Cómo se gana <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" />
-          </Link>
-        </StreetCard>
 
-        {/* A DÓNDE se transfiere. Sin esto el flujo era imposible de
-            completar: la pantalla pedía el pantallazo de una transferencia
-            que la persona no sabía a quién hacer. */}
-        {polla.payout_account ? (
-          <StreetCard hero className="p-4">
-            <Label>{recovering ? "Cuenta de la inscripción" : "Transfiere a"}</Label>
-            <div className="lp-display-sm mt-1 text-gold">
-              {(polla.payout_method ?? "").toUpperCase()}
-            </div>
-            {/* Número + Copiar en una fila; con texto ampliado el botón baja de línea. */}
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-              <div id="copiar-numero" className="lp-money min-w-0 select-all text-[26px] leading-none text-text-primary [overflow-wrap:anywhere]">
-                {polla.payout_account}
-              </div>
-              <CopiarDato valor={polla.payout_account} etiqueta="numero" />
-            </div>
-            {polla.payout_account_name && (
-              <p className="mt-2 text-[13px] text-text-secondary">
-                A nombre de{" "}
-                <span className="text-text-primary">{polla.payout_account_name}</span>
-              </p>
-            )}
-            <p className="mt-3 border-t border-border-subtle pt-3 text-[12px] text-text-muted">
-              {recovering ? "El comprobante debe ser de esta cuenta." : <>Transfiere exactamente {formatCop(entrada)}.</>}
-            </p>
-          </StreetCard>
-        ) : (
-          <div className="border border-red-alert/40 bg-red-alert/10 p-3">
-            <p className="lp-label text-red-alert">Falta la cuenta de cobro</p>
-            <p className="mt-1 text-[13px] text-text-secondary">
-              Esta polla todavía no tiene cuenta de cobro. Avisa al
-              administrador antes de transferir dinero.
-            </p>
-          </div>
-        )}
+        <Link href={`/polla/${polla.slug}#info-premio`} className="mt-2 inline-flex min-h-11 items-center gap-0.5 text-[13px] font-semibold text-text-secondary underline-offset-4 transition-colors hover:text-text-primary hover:underline">
+          Cómo se gana <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+        </Link>
+      </details>
 
-        {invitee?.can_set_referrer && !resumeOnly && <QuienTeInvito initial={invitee} variant="pagar" />}
-
-        {polla.kind !== "rifa" && !recovering && !resumeOnly ? (
-          <CuposForm slug={polla.slug} entryPriceCop={polla.entry_price_cop}
-            available={Math.max(1, maxEntries - counted)} another={isAnother} />
-        ) : <PagarForm resumeOnly={resumeOnly}
-          slug={polla.slug}
-          esRifa={polla.kind === "rifa"}
-          ticketCount={polla.ticket_count}
-          initialTicket={boleta && /^\d+$/.test(boleta) && Number(boleta) <= (polla.ticket_count ?? 0) ? boleta : ""}
-          entryNumber={polla.kind === "rifa" ? undefined : target?.entry_number ?? null}
-        />}
-
-        <p className="text-center text-[12px] leading-relaxed text-text-muted">Revisamos tu comprobante y te avisamos.</p>
-      </div>
+      {invitee?.can_set_referrer && !resumeOnly && <details className="lp-card p-4">
+        <summary className="min-h-11 cursor-pointer text-[15px] text-text-secondary transition-colors hover:text-text-primary focus-visible:outline focus-visible:outline-gold">Código de invitación (opcional)</summary>
+        <QuienTeInvito initial={invitee} variant="pagar" />
+      </details>}
     </div>
   );
 }

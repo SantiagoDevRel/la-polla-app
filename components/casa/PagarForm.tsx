@@ -19,6 +19,7 @@ import { ImagePreparationError, prepareImageUpload, type PreparedImage } from "@
 import { submitProof } from "@/lib/casa/proof-submit";
 import { Label, StreetCard } from "@/components/street";
 import { useHydrated } from "@/lib/use-hydrated";
+import { Upload } from "lucide-react";
 
 interface Props {
   slug: string;
@@ -38,9 +39,10 @@ interface Props {
   slot?: { index: number; total: number };
   onRegistered?: (entryNumber: number | null) => void;
   onSendingChange?: (sending: boolean) => void;
+  embedded?: boolean;
 }
 
-export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false, entryNumber, slot, onRegistered, onSendingChange }: Props) {
+export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false, entryNumber, slot, onRegistered, onSendingChange, embedded = false }: Props) {
   const router = useRouter();
   const hydrated = useHydrated();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -221,12 +223,13 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
     );
   }
 
+  const Container = embedded ? "div" : StreetCard;
   return (
-    <StreetCard className="p-4">
+    <Container className={embedded ? "" : "p-4"}>
       {resumeOnly && <p className="mb-4 text-[15px] text-text-secondary">La inscripción cerró. Sube el mismo comprobante; no vuelvas a transferir.</p>}
       {esRifa && <div className="mb-4"><SelectorBoleta slug={slug} value={ticket} onChange={setTicket} disabled={enviando || resumeOnly} revision={revision} /></div>}
 
-      <Label>{slot && slot.total > 1 ? `Comprobante del cupo ${slot.index} de ${slot.total}` : "Comprobante de la transferencia"}</Label>
+      {slot && slot.total > 1 && <Label>Comprobante del cupo {slot.index} de {slot.total}</Label>}
 
       <input
         ref={inputRef}
@@ -249,7 +252,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={!hydrated || enviando}
-        className="mt-2 flex w-full cursor-pointer items-center justify-center rounded-lg border border-dashed border-border-strong bg-bg-elevated p-6 text-center transition-colors hover:border-gold/40 focus-visible:outline focus-visible:outline-gold"
+        className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border-strong bg-bg-elevated px-4 py-3 text-center transition-colors hover:border-gold/40 focus-visible:outline focus-visible:outline-gold disabled:cursor-default disabled:opacity-60"
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -265,9 +268,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
             Preparando la imagen…
           </span>
         ) : (
-          <span className="text-[13px] text-text-muted">
-            Sube aquí el comprobante
-          </span>
+          <><Upload aria-hidden="true" className="h-5 w-5 shrink-0" /><span className="text-[15px] font-semibold text-text-primary">Subir comprobante</span></>
         )}
       </button>
 
@@ -298,6 +299,6 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         {enviando ? recuperando ? "Verificando el envío..." : "Enviando..." : error ? "Reintentar envío" : "Enviar el comprobante"}
       </button>
       {recuperando && <p role="status" className="mt-2 text-center text-[13px] text-text-secondary">Estamos recuperando el envío. Conserva esta pantalla abierta.</p>}
-    </StreetCard>
+    </Container>
   );
 }
