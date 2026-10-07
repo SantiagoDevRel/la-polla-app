@@ -51,7 +51,7 @@ jobs:
       - name: Public accessibility checks
         run: npm run test:e2e -- --grep 'a11y:|página traducida'
       - name: Registration and app recovery checks
-        run: npm run test:e2e -- e2e/login-reliability.spec.ts e2e/storage-unavailable.spec.ts e2e/welcome-network-failure.spec.ts e2e/app-update.spec.ts
+        run: npm run test:e2e -- e2e/login-reliability.spec.ts e2e/login-hydration.spec.ts e2e/storage-unavailable.spec.ts e2e/welcome-network-failure.spec.ts e2e/app-update.spec.ts
 
   sql:
     name: Isolated migration and RLS checks

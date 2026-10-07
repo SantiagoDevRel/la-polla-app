@@ -6,7 +6,16 @@ This change does not enable autosave or modify historical P2P predictions.
 
 Score inputs retain keyboard focus while typing so values 10–30 can be entered
 without splitting digits across teams. Enter advances to the next editable score.
+Text controls with a numeric keyboard retain reliable select-and-replace behavior
+on Safari; only digits are accepted, with two characters and the existing 0–30 limit.
+Pointer selection prevents Safari from moving the caret after the selection handler.
 Manual text questions use their prompt as an accessible input label.
+Server-rendered prediction controls stay disabled until the client restores the
+entry's draft. A loading message distinguishes readiness from a closed pool.
+Kickoff text normalizes day-period whitespace shared differently by Node and WebKit,
+preventing a hydration replacement of the match board.
+The invitation promotion skips automatic opening while a field has focus or a
+draft/save is active. Skipping does not mark it seen; an idle future visit can show it.
 Below 640 px, 1X2 choices use full-width rows with the crest beside the label.
 Wider screens keep three equal columns. Enlarged labels retain enough width.
 
@@ -18,6 +27,8 @@ entry UUID and expected revision. SQL authorizes the owner and entry, rejects st
 versions, and returns one exact saved/rejected result for every submitted target.
 Incomplete and closed targets remain visibly unsaved. Saved counts and locked cards
 use confirmed values. A response for draft A cannot acknowledge a newer draft B.
+An exact confirmation with saved targets refreshes the server-rendered remaining
+count and cup summaries. Stable entry keys preserve newer unsaved edits during refresh.
 
 `casa_pick_save_state` stores one row per entry, with the revision and last operation.
 RLS denies client access; the new RPCs are service-only. A completed operation replays

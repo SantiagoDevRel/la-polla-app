@@ -5,6 +5,8 @@ import { defineConfig, devices } from "@playwright/test";
 const requestedPort = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? "3101", 10);
 const port = Number.isInteger(requestedPort) && requestedPort > 0 ? requestedPort : 3101;
 const baseURL = `http://127.0.0.1:${port}`;
+const browserName = process.env.PLAYWRIGHT_BROWSER_ENGINE === "webkit" ? "webkit" : "chromium";
+const channel = browserName === "chromium" ? "chrome" : undefined;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -21,7 +23,8 @@ export default defineConfig({
   },
   use: {
     baseURL,
-    channel: "chrome",
+    browserName,
+    channel,
     colorScheme: "dark",
     trace: "on-first-retry",
   },
@@ -45,14 +48,15 @@ export default defineConfig({
     {
       name: "desktop",
       use: {
-        ...devices["Desktop Chrome"],
-        channel: "chrome",
+        ...devices[browserName === "webkit" ? "Desktop Safari" : "Desktop Chrome"],
+        browserName,
+        channel,
         viewport: { width: 1280, height: 800 },
       },
     },
     {
       name: "mobile",
-      use: { ...devices["Pixel 7"], channel: "chrome" },
+      use: { ...devices[browserName === "webkit" ? "iPhone 13" : "Pixel 7"], browserName, channel },
     },
   ],
 });

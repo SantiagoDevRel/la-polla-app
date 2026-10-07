@@ -12,11 +12,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { SelectorBoleta } from "./Boletas";
 import { casaConnectionError, casaPost, uploadSignedFile } from "@/lib/casa/upload-client";
 import { ImagePreparationError, prepareImageUpload, type PreparedImage } from "@/lib/casa/prepare-proof";
 import { submitProof } from "@/lib/casa/proof-submit";
 import { Label, StreetCard } from "@/components/street";
+import { useHydrated } from "@/lib/use-hydrated";
 
 interface Props {
   slug: string;
@@ -40,11 +42,14 @@ interface Props {
 
 export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false, entryNumber, slot, onRegistered, onSendingChange }: Props) {
   const router = useRouter();
+  const hydrated = useHydrated();
   const inputRef = useRef<HTMLInputElement>(null);
   // Cada selección recibe un turno: si la persona elige otra imagen mientras
   // se prepara la anterior, el resultado viejo se descarta.
   const selectionRef = useRef(0);
   const sendingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const navigationIntentRef = useRef(0);
   const navigationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Keep the request identity across manual retries even when private browsing
   // or a full storage quota prevents sessionStorage from accepting the record.
@@ -58,13 +63,34 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
   const [enviando, setEnviando] = useState(false);
   const [recuperando, setRecuperando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [listo, setListo] = useState(false);
   const [registrado, setRegistrado] = useState<number | null>(null);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-  useEffect(() => () => {
-    selectionRef.current += 1;
-    if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
+  useEffect(() => {
+    mountedRef.current = true;
+    const cancelNavigation = () => {
+      navigationIntentRef.current += 1;
+      if (navigationTimerRef.current) clearTimeout(navigationTimerRef.current);
+      navigationTimerRef.current = null;
+    };
+    const onNavigationClick = (event: MouseEvent) => {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank") return;
+      const destination = new URL(link.href, window.location.href);
+      if (destination.origin === window.location.origin && destination.href !== window.location.href) cancelNavigation();
+    };
+    document.addEventListener("click", onNavigationClick, true);
+    window.addEventListener("popstate", cancelNavigation);
+    return () => {
+      mountedRef.current = false;
+      selectionRef.current += 1;
+      cancelNavigation();
+      document.removeEventListener("click", onNavigationClick, true);
+      window.removeEventListener("popstate", cancelNavigation);
+    };
   }, []);
 
   async function elegir(f: File | null) {
@@ -100,11 +126,15 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       return;
     }
 
+    const paymentPath = window.location.pathname;
+    const navigationIntent = navigationIntentRef.current;
+
     sendingRef.current = true;
     onSendingChange?.(true);
     setEnviando(true);
     setRecuperando(false);
     setError(null);
+    setSessionExpired(false);
     try {
       const url = `/api/casa/pollas/${slug}/join`;
       // Cada participación guarda su propio intento: retomar la 2 nunca reusa el de la 3.
@@ -136,19 +166,31 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       // de devolver en silencio la participación anterior.
       try { sessionStorage.removeItem(key); } catch { /* Storage may be disabled. */ }
       proofRecordsRef.current.delete(key);
+      // The write can finish after the user has left. Keep its confirmation,
+      // but never let an old form redirect or update its departed parent.
+      if (!mountedRef.current || window.location.pathname !== paymentPath) return;
       setListo(true);
       setRegistrado(result.entryNumber);
       if (onRegistered) { onRegistered(result.entryNumber); return; }
       // Un respiro para que se lea la confirmación antes de volver.
-      navigationTimerRef.current = setTimeout(() => router.push(`/polla/${slug}${result.entryNumber ? `?p=${result.entryNumber}` : ""}`), 1600);
+      if (navigationIntentRef.current !== navigationIntent) return;
+      navigationTimerRef.current = setTimeout(() => {
+        if (mountedRef.current && navigationIntentRef.current === navigationIntent && window.location.pathname === paymentPath) {
+          router.push(`/polla/${slug}${result.entryNumber ? `?p=${result.entryNumber}` : ""}`);
+        }
+      }, 1600);
     } catch (cause) {
+      if (!mountedRef.current) return;
       setRevision((n) => n + 1);
+      setSessionExpired((cause as { status?: number } | null)?.status === 401);
       setError(cause instanceof TypeError ? casaConnectionError().message : cause instanceof Error ? cause.message : casaConnectionError().message);
     } finally {
       sendingRef.current = false;
-      onSendingChange?.(false);
-      setEnviando(false);
-      setRecuperando(false);
+      if (mountedRef.current) {
+        onSendingChange?.(false);
+        setEnviando(false);
+        setRecuperando(false);
+      }
     }
   }
 
@@ -172,6 +214,9 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
             ? "Comprobante recibido. Te avisamos al confirmar."
             : "Comprobante recibido. Ya puedes pronosticar; suma al confirmar."}
         </p>
+        <Link href={`/polla/${slug}${registrado ? `?p=${registrado}` : ""}`} className="lp-btn lp-btn-primary mt-4 w-full">
+          {esRifa ? "Volver a la rifa" : "Ver mi cupo y pronosticar"}
+        </Link>
       </StreetCard>
     );
   }
@@ -191,7 +236,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
         // varios Android abren la cámara directo y no ofrecen galería, o sea
         // que el pago quedaba imposible de completar.
         accept="image/jpeg,image/png,image/webp"
-        disabled={enviando}
+        disabled={!hydrated || enviando}
         onChange={(e) => {
           void elegir(e.target.files?.[0] ?? null);
           // Permite volver a elegir el mismo archivo después de un error.
@@ -203,7 +248,7 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        disabled={enviando}
+        disabled={!hydrated || enviando}
         className="mt-2 flex w-full cursor-pointer items-center justify-center rounded-lg border border-dashed border-border-strong bg-bg-elevated p-6 text-center transition-colors hover:border-gold/40 focus-visible:outline focus-visible:outline-gold"
       >
         {preview ? (
@@ -213,6 +258,8 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
             alt="Vista previa del comprobante"
             className="max-h-[240px] w-auto"
           />
+        ) : !hydrated ? (
+          <span role="status" className="text-[13px] text-text-secondary">Cargando el formulario...</span>
         ) : preparando ? (
           <span role="status" className="text-[15px] text-text-secondary">
             Preparando la imagen…
@@ -236,6 +283,11 @@ export function PagarForm({ slug, esRifa, initialTicket = "", resumeOnly = false
           <span className="mt-2 block">Si ya transferiste, no repitas el pago. <a href="/soporte" className="underline">Pide ayuda en Soporte</a>.</span>
         </p>
       )}
+      {sessionExpired && <div className="mt-3">
+        <a href={`/login?returnTo=${encodeURIComponent(`/polla/${slug}${entryNumber ? `?p=${entryNumber}` : ""}`)}`}
+          target="_blank" rel="noopener noreferrer" className="lp-btn w-full border border-border-default">Ingresar de nuevo</a>
+        <p className="mt-2 text-center text-[13px] text-text-secondary">Ingresa en la otra pestaña y vuelve aquí para reintentar. Tu comprobante permanece en esta pantalla.</p>
+      </div>}
 
       <button
         type="button"

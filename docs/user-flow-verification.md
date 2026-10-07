@@ -19,34 +19,49 @@ account changes cannot overwrite another operation. Apply it before the app rele
 see [password setup and rolling deployment](phone-password.md).
 
 Receipt submissions preserve their request identity in memory when storage is blocked.
+An expired session offers login in another tab while keeping the selected receipt and
+request identity in the original screen for retry.
 The cup selector is disabled while any proof is being sent. Leaving a successful payment
 screen cancels its delayed navigation. A confirmed receipt and an approved payment remain
 different states. Existing server reconciliation verifies immutable bytes and digest.
+Responses that arrive after leaving the form cannot redirect or update its parent.
+Standalone confirmation includes an explicit link to continue. The cup selector keeps
+its dark background, readable value and keyboard operation across browser engines.
 
 Score inputs allow full two-digit values; Enter advances to the next field. Manual
 questions expose their prompt as an accessible label. Below 640 px, 1X2 options occupy
 full-width rows; larger screens use three equal columns. Team names stay readable with
 enlarged text. Manual Save and revision fences remain.
+Confirmed saves refresh the server summary without discarding newer local edits.
+The invitation notice skips automatic opening while a draft or focused input needs attention.
 
 Optional welcome downloads, splash storage and PWA registration failures cannot block
 registration. Service-worker installation is explicitly caught; authenticated routes
 retain their existing NetworkOnly policy. CI runs recovery checks against the built app.
+
+Phone, PIN, receipt and prediction controls wait until their React handlers and any
+saved draft are ready. Slow script downloads cannot silently discard early edits.
+Match times use canonical spaces to avoid Node/WebKit locale hydration mismatches.
 
 ## Regressions
 
 ```sh
 npm test -- tests/login-request.test.ts tests/verify-otp-reliability.test.ts tests/onboarding-return-flow.test.ts
 npm test -- tests/casa-upload-client.test.ts tests/casa-proof-server.test.ts tests/casa-proof-image.test.ts
-npm run test:e2e -- e2e/login-reliability.spec.ts e2e/storage-unavailable.spec.ts e2e/welcome-network-failure.spec.ts e2e/traduccion.spec.ts e2e/app-update.spec.ts
+npm run test:e2e -- e2e/login-reliability.spec.ts e2e/login-hydration.spec.ts e2e/storage-unavailable.spec.ts e2e/welcome-network-failure.spec.ts e2e/traduccion.spec.ts e2e/app-update.spec.ts
 npm run test:casa:browser
 npm run test:casa:sql
 ```
+
+With the matching WebKit binary already installed, run the same recovery tests with
+`PLAYWRIGHT_BROWSER_ENGINE=webkit`. The default uses installed Chrome; WebKit selects
+Safari desktop and iPhone viewport emulation. This does not test a physical device.
 
 The browser suite uses real React and synthetic HTTP fault injection; the SQL runner
 uses its own isolated container. Local end-to-end receipt checks additionally verify
 Storage bytes, database confirmation, authenticated API responses and the rendered UI.
 Never run synthetic payment approvals, proof uploads or prediction writes on production.
-`scripts/casa-proof-browser-check.mjs` persists three receipt regressions and refuses a
+`scripts/casa-proof-browser-check.mjs` persists seven receipt regressions and refuses a
 non-local origin or a server without an explicit local-only safety state. Run it with
 `CASA_ORIGIN` and `CASA_LOCAL_SERVER_STATE` pointing to a guarded local server.
 

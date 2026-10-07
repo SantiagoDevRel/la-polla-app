@@ -13,6 +13,7 @@ import {
 } from "react-phone-number-input";
 import flags from "react-phone-number-input/flags";
 import { useLocale, useTranslations } from "next-intl";
+import { useHydrated } from "@/lib/use-hydrated";
 
 interface PhoneInputProps {
   inputId?: string;
@@ -24,6 +25,7 @@ interface PhoneInputProps {
 
 export default function PhoneInput({ onChange, countries: allowed, inputId, initialValue = "" }: PhoneInputProps) {
   const t = useTranslations("Phone");
+  const hydrated = useHydrated();
   const locale = useLocale();
   const intlTag = locale === "en" ? "en-US" : "es-CO";
 
@@ -122,6 +124,7 @@ export default function PhoneInput({ onChange, countries: allowed, inputId, init
         {/* Botón de país */}
         <button
           type="button"
+          disabled={!hydrated}
           onClick={() => setOpen(!open)}
           aria-label={`${getCountryName(country)} +${callingCode}`}
           aria-expanded={open}
@@ -137,6 +140,7 @@ export default function PhoneInput({ onChange, countries: allowed, inputId, init
         {/* Input de número */}
         <input
           id={inputId}
+          disabled={!hydrated}
           type="tel"
           value={localNumber}
           onChange={(e) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { requestJson } from "@/lib/http/json-request";
 import {
   acknowledgesOperation, confirmedAfterAck, isPickSaveAck, isPickSaveState, isPickValues, normalizedPick, rebasePickDraft, samePick,
@@ -20,6 +21,7 @@ interface Options {
 
 /** Manual saves, exact confirmations and a stable operation for uncertain writes. */
 export function usePickSave(options: Options) {
+  const router = useRouter();
   const { slug, entryNumber, ownerId, entryId, initialPicks, initialRevision, targetIds, kind } = options;
   const [picks, setPicks] = useState(initialPicks);
   const [saved, setSaved] = useState(initialPicks);
@@ -129,10 +131,12 @@ export function usePickSave(options: Options) {
     const rejected = ack.results.find(r => r.status === "rejected");
     setMsg({ text: rejected ? `Guardamos ${ack.guardados}. ${rejected.error} Conservamos los cambios sin guardar.`
       : pending ? "Guardamos el envío anterior. Tienes cambios nuevos sin guardar." : "Guardado.", bad: Boolean(rejected || pending) });
+    if (ack.guardados > 0) router.refresh();
     return true;
   }
 
   function changed(id: string, value: PickValues) {
+    if (!hydrated) return;
     if (samePick(draftRef.current[id], savedRef.current[id])) draftBaseline.current[id] = normalizedPick(savedRef.current[id]);
     const next = { ...draftRef.current, [id]: value };
     draftRef.current = next;
@@ -141,7 +145,7 @@ export function usePickSave(options: Options) {
   }
 
   async function save() {
-    if (running.current) return;
+    if (!hydrated || running.current) return;
     running.current = true;
     setSaving(true);
     setMsg(null);
@@ -200,5 +204,5 @@ export function usePickSave(options: Options) {
     setMsg(null);
   }
 
-  return { picks, saved, changed, save, discard, dirty, saving, uncertain, sessionExpired, msg, setMsg };
+  return { picks, saved, changed, save, discard, dirty, saving, uncertain, sessionExpired, msg, setMsg, hydrated };
 }

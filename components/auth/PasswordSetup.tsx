@@ -7,9 +7,11 @@ import { useLocale } from "next-intl";
 import { KeyRound, Loader2 } from "lucide-react";
 import { LOGIN_CARD, LOGIN_TITLE, PRIMARY_BTN, GHOST_BTN } from "@/components/auth/login-styles";
 import PasswordInput from "./PasswordInput";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export default function PasswordSetup({ returnTo, manage = false, hasPassword = false, ownerId, revision }: { returnTo: string; manage?: boolean; hasPassword?: boolean; ownerId: string; revision: number }) {
   const en = useLocale() === "en";
+  const hydrated = useHydrated();
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [saving, setSaving] = useState(false);
@@ -76,7 +78,7 @@ export default function PasswordSetup({ returnTo, manage = false, hasPassword = 
         <p id="password-help" className="text-sm leading-relaxed text-text-secondary">{en ? "Avoid your birthday and repeated digits." : "Evita tu fecha de nacimiento y los números repetidos."}</p>
         {error && <p role="alert" className="text-sm text-red-alert bg-red-dim p-3 rounded-xl">{error}</p>}
         {refreshRequired ? <button type="button" className={PRIMARY_BTN} onClick={() => window.location.reload()}>{en ? "Refresh page" : "Actualizar página"}</button>
-          : <button type="submit" className={PRIMARY_BTN} disabled={saving}>{saving && <Loader2 className="w-5 h-5 animate-spin shrink-0" aria-hidden="true" />}<span className="min-w-0 [overflow-wrap:anywhere]">{saving ? (en ? "Saving…" : "Guardando…") : (en ? "Save password" : "Guardar contraseña")}</span></button>}
+          : <button type="submit" className={PRIMARY_BTN} disabled={saving || !hydrated}>{saving && <Loader2 className="w-5 h-5 animate-spin shrink-0" aria-hidden="true" />}<span className="min-w-0 [overflow-wrap:anywhere]">{saving ? (en ? "Saving…" : "Guardando…") : (en ? "Save password" : "Guardar contraseña")}</span></button>}
       </form>
       <a href={returnTo} className={GHOST_BTN} aria-disabled={saving} onClick={e => { if (saving) e.preventDefault(); }}>{manage ? (en ? "Back to profile" : "Volver a Perfil") : (en ? "Skip for now" : "Omitir por ahora")}</a>
     </section>

@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+// Keep synthetic OTP responses under Playwright's network interception.
+test.use({ serviceWorkers: "block" });
+
 for (const allStorage of [false, true]) {
 test(`registration stays usable when ${allStorage ? "all browser storage" : "session storage"} is blocked`, async ({ page }) => {
   const errors: string[] = [];

@@ -6,7 +6,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
-import { chromium, expect } from '@playwright/test';
+import { chromium, webkit, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
@@ -38,7 +38,7 @@ const evidence = { source: 'real React with synthetic HTTP only', staticDir, mod
 const port = Number(process.env.BROWSER_FIXTURE_PORT ?? 3197);
 fs.symlinkSync(path.join(repo, 'node_modules'), path.join(root, 'node_modules'), 'junction');
 fs.writeFileSync(path.join(root, 'index.html'), `<html lang="es"><head><title>Casa regression fixture</title><meta name="viewport" content="width=device-width,initial-scale=1">${cssFiles.map(f => `<link rel="stylesheet" href="/_next/static/css/${f}">`).join('')}<style>:root{--font-body:${fontBody};--font-display:${fontDisplay}}body{font-family:var(--font-body)}</style></head><body><div id="root"></div><script type="module" src="/main.tsx"></script></body></html>`);
-fs.writeFileSync(path.join(root, 'navigation.ts'), 'const router={refresh(){},push(url:string){(window as any).__navigation=url;}};export const useRouter=()=>router;');
+fs.writeFileSync(path.join(root, 'navigation.ts'), 'const router={refresh(){(window as any).__refreshCount=((window as any).__refreshCount??0)+1;},push(url:string){(window as any).__navigation=url;}};export const useRouter=()=>router;');
 fs.writeFileSync(path.join(root, 'link.tsx'), 'export default function Link({children,...props}:any){return <a {...props}>{children}</a>;}');
 fs.writeFileSync(path.join(root, 'main.tsx'), `
 import {useState} from 'react';
@@ -257,7 +257,7 @@ async function inspectVisual(page,mode) {
 try {
   await server.listen();
   // Use installed Chrome on every platform, matching the project's E2E gate.
-  browser=await chromium.launch({channel:'chrome',headless:true});
+  browser=process.env.BROWSER_ENGINE==='webkit' ? await webkit.launch() : await chromium.launch({channel:'chrome',headless:true});
   for(const mode of modes) {
     if(mode==='creator') {
       await runCase('provisional-creator',mode,'',async({page})=>{
@@ -330,12 +330,22 @@ try {
       await saveButton(page).click();await saved(page);assert.equal(store.state.picks[ids.match].homeScore,10);
       assert.equal(store.state.picks[ids.match].awayScore,12);
     });
+    if(mode==='matches') await runCase('keyboard-click-replaces-existing-score',mode,'',async({page,store})=>{
+      await fillPick(page,mode,7);await saveButton(page).click();await saved(page);
+      const inputs=page.locator('article').first().locator('input');
+      await inputs.first().click();await page.keyboard.type('12');
+      await expect(inputs.first()).toHaveValue('12');await page.keyboard.press('Enter');
+      await page.keyboard.type('10');await expect(inputs.nth(1)).toHaveValue('10');
+      await saveButton(page).click();await saved(page);
+      assert.equal(store.state.picks[ids.match].homeScore,12);assert.equal(store.state.picks[ids.match].awayScore,10);
+    });
     await runCase('pending-a-then-b',mode,'',async({page,store})=>{
       store.behavior='hold';await fillPick(page,mode,mode==='questions'?'A':1);await saveButton(page).click();
       await expect.poll(()=>Boolean(store.held)).toBe(true);
       await fillPick(page,mode,mode==='questions'?'B':2);store.behavior=null;store.held();
       await expect(page.getByText('Guardamos el envío anterior. Tienes cambios nuevos sin guardar.')).toBeVisible();
       await expect(blocked(page)).toHaveAttribute('data-app-update-blocked','true');await expect(saveButton(page)).toBeEnabled();
+      assert.equal(await page.evaluate(()=>window.__refreshCount),1);
       assert.equal(store.state.picks[target(mode)][value(mode)],mode==='questions'?'A':1);
       await page.screenshot({path:path.join(artifacts,`pending-${mode}-320.png`),fullPage:true});
       await saveButton(page).click();await saved(page);
@@ -376,6 +386,7 @@ try {
       await expect.poll(()=>store.sent.length).toBe(1);
       if(behavior==='hold'){await expect.poll(()=>Boolean(store.held)).toBe(true);await page.clock.fastForward(15001);}
       await saved(page);assert.equal(store.sent.length,1);assert.equal(store.reads.length,1);
+      assert.equal(await page.evaluate(()=>window.__refreshCount),1);
       assert.equal(store.state.picks[target(mode)][value(mode)],mode==='questions'?'A':1);store.held?.();
     });
     for(const behavior of ['html','wrong-ack']) await runCase(`uncertain-${behavior}`,mode,'',async({page,store})=>{
@@ -383,6 +394,7 @@ try {
       await expect(saveButton(page)).toHaveText('Comprobar guardado');await expect(saveButton(page)).toBeEnabled();
       await expect(blocked(page)).toHaveAttribute('data-app-update-blocked','true');assert.equal(store.state.revision,0);
       assert.equal(await page.getByRole('button',{name:'Guardado 1/1',exact:true}).count(),0);
+      assert.equal(await page.evaluate(()=>window.__refreshCount??0),0);
       const identity=store.sent[0].requestId;store.behavior=null;await saveButton(page).click();await saved(page);
       assert.equal(store.sent.length,2);assert.equal(store.sent[1].requestId,identity);
     });
@@ -417,6 +429,7 @@ try {
       await expect(page.getByRole('link',{name:'Ingresar de nuevo'})).toBeVisible();
       await expect(page.getByRole('link',{name:'Ingresar de nuevo'})).toHaveAttribute('target','_blank');
       await expect(saveButton(page)).toHaveText('Comprobar guardado');assert.equal(store.state.revision,0);
+      assert.equal(await page.evaluate(()=>window.__refreshCount??0),0);
       const identity=store.sent[0].requestId;store.authenticated=true;await saveButton(page).click();await saved(page);
       assert.equal(store.sent[1].requestId,identity);
     });

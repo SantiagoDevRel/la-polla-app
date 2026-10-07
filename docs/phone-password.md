@@ -22,6 +22,8 @@ The setup POST includes `expected_user_id`, `request_id` and `expected_revision`
 
 A request timeout can occur after commit. The form retains its digits in memory, freezes editing and retries the same operation. An exact acknowledgement must match the owner, request UUID and next revision before navigating. A stale-operation conflict requires a fresh authenticated status read before another deliberate save. Session changes and old open forms require refreshing the page. Passwords are never written to browser storage or logs.
 
+Phone and password controls remain disabled in server-rendered HTML until React attaches their handlers. This prevents early typing or pasting from being lost on slow JavaScript loads, including WebKit. `e2e/login-hydration.spec.ts` holds actual application scripts and checks the disabled state before releasing them and sending one normalized phone request.
+
 Migration 167 appends metadata without replacing credentials. During a rolling deployment, old unfenced writes remain allowed only until that owner receives their first fenced write. Every old write increments the revision, invalidating stale new requests. After the first fenced write, late unfenced writes are rejected. This compatibility window does not allow an old request to overwrite a credential protected by the new protocol.
 
 ## Validation

@@ -37,6 +37,7 @@ import { loginRequest, readLoginStorage, writeLoginStorage } from "@/lib/auth/lo
 import { loadProfile } from "@/lib/users/profile-client";
 import { needsName } from "@/lib/users/needs-name";
 import { normalizePhone } from "@/lib/auth/phone";
+import { useHydrated } from "@/lib/use-hydrated";
 import {
   CAPTCHA_FAILED_CODE,
   COUNTRY_NOT_ALLOWED_CODE,
@@ -183,6 +184,7 @@ function WhatsAppLoginButton({ href, en }: { href: string; en: boolean }) {
 }
 
 function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired, deliveryChannel = "sms", passwordLoginEnabled = false, whatsappLoginHref = null }: LoginClientProps) {
+  const hydrated = useHydrated();
   const en = useLocale() === "en";
   const [passwordMode, setPasswordMode] = useState(false);
   const [password, setPassword] = useState("");
@@ -887,7 +889,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
               )}
               <button
                 type="submit"
-                disabled={sending || (!passwordMode && cooldownRemaining > 0)}
+                disabled={!hydrated || sending || (!passwordMode && cooldownRemaining > 0)}
                 className={whatsappLoginHref ? `${SECONDARY_BTN} flex-wrap text-base min-h-[48px] disabled:opacity-40 disabled:cursor-not-allowed` : PRIMARY_BTN}
                 style={whatsappLoginHref ? undefined : PRIMARY_GLOW}
               >
@@ -910,7 +912,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
 
             </div>
 
-            {passwordLoginEnabled && <button type="button" className={`${passwordMode ? GHOST_BTN : SECONDARY_BTN} flex-wrap`} disabled={sending} onClick={() => {
+            {passwordLoginEnabled && <button type="button" className={`${passwordMode ? GHOST_BTN : SECONDARY_BTN} flex-wrap`} disabled={!hydrated || sending} onClick={() => {
               if (passwordMode) {
                 setStep("recovery"); setPassword(""); setError(null); return;
               }

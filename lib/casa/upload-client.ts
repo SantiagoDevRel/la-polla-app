@@ -34,7 +34,7 @@ export async function casaPost(url: string, body: unknown, options: {
         // A transient gateway failure can follow a committed operation. Keep
         // its identity when retrying; business errors need the user's action.
         if (!data.code && [408, 429, 500, 502, 503, 504].includes(res.status)) throw casaConnectionError();
-        throw Object.assign(new Error(data.error ?? "No se pudo completar la operación."), { code: data.code });
+        throw Object.assign(new Error(data.error ?? "No se pudo completar la operación."), { code: data.code, status: res.status });
       }
       if (data.ok !== true || data.error) throw casaConnectionError();
       return data;

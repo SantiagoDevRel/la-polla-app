@@ -13,7 +13,7 @@
 //
 // Modo 1X2 antes del inicio conserva los tres botones que pidió el dueño el
 // 2026-09-14 (escudo + nombre ES el botón, «Empate» en el medio). Modo marcador:
-// dos casillas de goles entre los escudos, con auto-salto.
+// Two score fields between the crests; Enter advances to the next field.
 //
 // Bajo cada opción 1X2 va la barra con el porcentaje de la gente que eligió
 // eso; en marcador, «cuántos pusieron 2-1» queda visible bajo su botón.
@@ -212,7 +212,10 @@ function opcionesDe(m: { home_team: string; away_team: string }) {
 function horaDe(m: BoardMatch): string {
   if (m.planned) return "Fecha por confirmar";
   if (m.scheduled_at_confirmed === false) return "Hora por confirmar";
-  return new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(m.scheduled_at));
+  // WebKit uses a non-breaking space in “p. m.” where Node uses a plain one.
+  // Canonical text prevents React from replacing the server-rendered board.
+  return new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit", hour12: true })
+    .format(new Date(m.scheduled_at)).replace(/[\u00a0\u202f]/g, " ");
 }
 
 export function PicksBoard({
@@ -231,7 +234,7 @@ export function PicksBoard({
 }: Props) {
   const planning = plannedMatches !== undefined;
   const [joinOpen, setJoinOpen] = useState(false);
-  const { picks: pickValues, saved: savedValues, changed, save: guardar, discard, dirty, saving, uncertain, sessionExpired, msg } = usePickSave({
+  const { picks: pickValues, saved: savedValues, changed, save: guardar, discard, dirty, saving, uncertain, sessionExpired, msg, hydrated } = usePickSave({
     slug, entryNumber, ownerId, entryId, initialRevision, initialPicks, targetIds: matches.map(m => m.id), kind: "match",
   });
   const picks = pickValues as Record<string, BoardPick>;
@@ -299,6 +302,7 @@ export function PicksBoard({
 
   function setScore(matchId: string, side: "home" | "away", raw: string) {
     if (planning) return;
+    if (raw !== "" && !/^\d+$/.test(raw)) return;
     const n = raw === "" ? null : Math.max(0, Math.min(30, Number(raw)));
     changed(matchId, { pick1x2: null,
       homeScore: side === "home" ? n : (picks[matchId]?.homeScore ?? null),
@@ -337,6 +341,7 @@ export function PicksBoard({
       mine={planning ? undefined : pickForDisplay(m, picks[m.id], m.final_verified_at || m.voided_at ? initialPicks[m.id] ?? saved[m.id] : saved[m.id], !m.planned && canEdit && canEditCasaMatch(m, now))}
       distribution={distribution}
       canEdit={!planning && canEdit}
+      ready={hydrated}
       canViewOthers={!planning && canViewOthers}
       showMine={!planning && showMine}
       showDay={showDay}
@@ -349,7 +354,8 @@ export function PicksBoard({
   );
 
   return (
-    <div data-app-update-blocked={dirty || saving || uncertain} className="space-y-4">
+    <div data-app-update-blocked={dirty || saving || uncertain} aria-busy={!planning && !hydrated} className="space-y-4">
+      {!planning && !hydrated && <p role="status" className="text-[13px] text-text-secondary">Cargando tus pronósticos…</p>}
       {/* ── Los partidos, en orden de empezada ───────────────────────────
           Un solo recorrido, de arriba abajo. El día es apenas un separador;
           dentro de cada uno el orden es la hora de inicio y no cambia nunca. */}
@@ -398,7 +404,7 @@ export function PicksBoard({
           <button
             type="button"
             onClick={guardar}
-            disabled={saving || (!dirty && !uncertain)}
+            disabled={!hydrated || saving || (!dirty && !uncertain)}
             className="lp-btn lp-btn-primary w-full"
           >
             {saving
@@ -445,7 +451,7 @@ export function PicksBoard({
    Fila 4 (desde el inicio): «Tu marcador» y el desplegable de los demás.
    ──────────────────────────────────────────────────────────────────────── */
 function MatchCard({
-  m, now, slug, scoringMode, mine, distribution, canEdit, canViewOthers, showMine, showDay, inputs, onPick1x2, onScore, onJump, onBlocked,
+  m, now, slug, scoringMode, mine, distribution, canEdit, ready, canViewOthers, showMine, showDay, inputs, onPick1x2, onScore, onJump, onBlocked,
 }: {
   m: BoardMatch;
   now: number;
@@ -454,6 +460,7 @@ function MatchCard({
   mine: BoardPick | undefined;
   distribution: CasaDistribution;
   canEdit: boolean;
+  ready: boolean;
   canViewOthers: boolean;
   showMine: boolean;
   /** En Finalizados y En vivo no hay encabezado de día: la tarjeta lo dice. */
@@ -588,7 +595,7 @@ function MatchCard({
               <button
                 key={op.key}
                 type="button"
-                disabled={!editable && !invitando}
+                disabled={!ready || (!editable && !invitando)}
                 onClick={() => (invitando ? onBlocked?.() : onPick1x2(m.id, op.key))}
                 aria-pressed={elegido}
                 aria-label={equipo ? `Gana ${equipo.name}` : "Empate"}
@@ -626,6 +633,7 @@ function MatchCard({
               // Casillas que invitan a pagar: el toque abre la hoja, no edita.
               <button
                 type="button"
+                disabled={!ready}
                 onClick={() => onBlocked?.()}
                 aria-label="Pagar la entrada para pronosticar"
                 className="lp-money flex h-[44px] cursor-pointer items-center gap-2 rounded-md border border-border-default bg-bg-elevated px-3 text-[22px] text-text-muted transition-colors hover:border-gold/30"
@@ -638,13 +646,20 @@ function MatchCard({
                   {i === 1 && dash}
                   <input
                     ref={(el) => { inputs.current.set(`${m.id}:${sideKey}`, el); }}
-                    type="number"
+                    type="text"
+                    disabled={!ready}
                     inputMode="numeric"
                     enterKeyHint="next"
-                    min={0}
-                    max={30}
+                    pattern="[0-9]*"
+                    maxLength={2}
                     value={(sideKey === "home" ? mine?.homeScore : mine?.awayScore) ?? ""}
                     onFocus={(e) => e.currentTarget.select()}
+                    onClick={(e) => e.currentTarget.select()}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.focus();
+                      e.currentTarget.select();
+                    }}
                     onChange={(e) => onScore(m.id, sideKey, e.target.value)}
                     onKeyDown={(e) => {
                       // Typing must stay in this field, including scores 10–30.
