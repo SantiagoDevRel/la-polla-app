@@ -43,7 +43,14 @@ export function PromoInvitados({ promo, verPolla = false }: {
       // Sin almacenamiento (modo privado): se muestra en esta visita.
     }
     // Después del primer pintado, para no competir con la carga de la pantalla.
-    const timer = window.setTimeout(() => setOpen(true), 600);
+    const timer = window.setTimeout(() => {
+      const active = document.activeElement;
+      const editing = active?.matches("input, textarea, select") || (active instanceof HTMLElement && active.isContentEditable);
+      // Keep the invitation available without interrupting active player work.
+      // Skipping this visit must not mark the promotion as seen.
+      if (editing || document.querySelector('[data-app-update-blocked="true"]')) return;
+      setOpen(true);
+    }, 600);
     return () => window.clearTimeout(timer);
   }, [isIOSApp, promo.pollaId]);
 

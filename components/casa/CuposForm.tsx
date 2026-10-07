@@ -9,8 +9,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { formatCop } from "@/lib/casa/format";
 import { PagarForm } from "./PagarForm";
+import { useHydrated } from "@/lib/use-hydrated";
 
 interface Props {
   slug: string;
@@ -22,8 +24,10 @@ interface Props {
 }
 
 export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
+  const hydrated = useHydrated();
   const [cupos, setCupos] = useState(1);
   const [registrados, setRegistrados] = useState<Array<number | null>>([]);
+  const [enviando, setEnviando] = useState<Record<number, boolean>>({});
   const options = Array.from({ length: Math.max(1, Math.min(available, 10)) }, (_, i) => i + 1);
   const primero = registrados.find((n): n is number => n != null);
 
@@ -33,17 +37,20 @@ export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
         <label htmlFor="cuantos-cupos" className="block text-[15px] font-semibold text-text-primary">
           {another ? "¿Cuántos cupos más quieres?" : "¿Cuántos cupos quieres en esta polla?"}
         </label>
+        <div className="relative mt-2">
         <select
           id="cuantos-cupos"
           value={cupos}
-          disabled={registrados.length > 0}
+          disabled={!hydrated || registrados.length > 0 || Object.values(enviando).some(Boolean)}
           onChange={(e) => setCupos(Number(e.target.value))}
-          className="lp-input mt-2 min-h-12 w-full cursor-pointer text-[15px] disabled:cursor-default disabled:opacity-60"
+          className="lp-input min-h-12 w-full cursor-pointer appearance-none pr-10 text-[15px] [color-scheme:dark] disabled:cursor-default disabled:opacity-60"
         >
           {options.map((n) => (
             <option key={n} value={n}>{n === 1 ? "1 cupo" : `${n} cupos`}</option>
           ))}
         </select>
+        <ChevronDown aria-hidden="true" size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+        </div>
         <p className="mt-2 text-[13px] text-text-secondary">
           Cada cupo lleva sus propios pronósticos.
           {available > 1 && ` Máximo ${available}${another ? " más" : ""}.`}
@@ -68,6 +75,7 @@ export function CuposForm({ slug, entryPriceCop, available, another }: Props) {
           entryNumber={null}
           slot={{ index: n, total: cupos }}
           onRegistered={(entryNumber) => setRegistrados((prev) => [...prev, entryNumber])}
+          onSendingChange={(sending) => setEnviando((prev) => ({ ...prev, [n]: sending }))}
         />
       ))}
 

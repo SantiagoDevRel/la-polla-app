@@ -6,7 +6,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
-import { chromium, expect } from '@playwright/test';
+import { chromium, webkit, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
@@ -30,14 +30,15 @@ const ids = {
   question: '40000000-0000-4000-8000-000000000001', question2: '40000000-0000-4000-8000-000000000002',
   option: '50000000-0000-4000-8000-000000000001',
 };
-const allModes = ['matches', 'provisional', 'questions', 'free', 'creator'];
+const allModes = ['matches', 'outcomes', 'provisional', 'questions', 'free', 'creator'];
 const modes = process.argv.slice(2).length ? process.argv.slice(2) : allModes;
 assert.ok(modes.every(mode => allModes.includes(mode)), 'Unknown fixture mode');
-const evidence = { source: 'real React with synthetic HTTP only', staticDir, modes, cases: [], probes: [], axe: [] };
+const selectedCases = new Set((process.env.BROWSER_CASES ?? '').split(',').filter(Boolean));
+const evidence = { source: 'real React with synthetic HTTP only', staticDir, modes, selectedCases: [...selectedCases], cases: [], probes: [], axe: [] };
 const port = Number(process.env.BROWSER_FIXTURE_PORT ?? 3197);
 fs.symlinkSync(path.join(repo, 'node_modules'), path.join(root, 'node_modules'), 'junction');
 fs.writeFileSync(path.join(root, 'index.html'), `<html lang="es"><head><title>Casa regression fixture</title><meta name="viewport" content="width=device-width,initial-scale=1">${cssFiles.map(f => `<link rel="stylesheet" href="/_next/static/css/${f}">`).join('')}<style>:root{--font-body:${fontBody};--font-display:${fontDisplay}}body{font-family:var(--font-body)}</style></head><body><div id="root"></div><script type="module" src="/main.tsx"></script></body></html>`);
-fs.writeFileSync(path.join(root, 'navigation.ts'), 'const router={refresh(){},push(url:string){(window as any).__navigation=url;}};export const useRouter=()=>router;');
+fs.writeFileSync(path.join(root, 'navigation.ts'), 'const router={refresh(){(window as any).__refreshCount=((window as any).__refreshCount??0)+1;},push(url:string){(window as any).__navigation=url;}};export const useRouter=()=>router;');
 fs.writeFileSync(path.join(root, 'link.tsx'), 'export default function Link({children,...props}:any){return <a {...props}>{children}</a>;}');
 fs.writeFileSync(path.join(root, 'main.tsx'), `
 import {useState} from 'react';
@@ -60,7 +61,7 @@ function App(){
  const matches=multiple?[match,{...match,id:ids.match2,home_team:'Atlético Nacional',away_team:'Deportivo Cali',scheduled_at:new Date(loadedAt+86400000).toISOString()}]:[match];
  const question={id:ids.question,prompt:'¿Quién será el primer goleador del campeonato colombiano?',points:3,input_kind:'texto' as const,resolved_at:state.closed?new Date().toISOString():null,resolved_text:state.closed?'Respuesta oficial':null};
  const questions=multiple?[question,{...question,id:ids.question2,prompt:'¿Quién dará la primera asistencia?',resolved_at:null,resolved_text:null}]:scenario==='options'?[{...question,input_kind:'opciones' as const,options:[{id:ids.option,label:'Un jugador con un nombre largo del equipo Millonarios que anota durante el segundo tiempo del partido'}]}]:[question];
- const content=mode==='creator'?<CrearPollaForm/>:mode==='free'?<UnirmeGratis slug="fixture" ownerId={state.ownerId} nombre="Polla regalo del campeonato colombiano" premio="Una camiseta oficial del equipo ganador"/>:mode==='questions'?<QuestionsBoard {...common} key={state.ownerId+state.entryId+state.mount} questions={questions}/>:<PicksBoard {...common} key={state.ownerId+state.entryId+state.mount} scoringMode="marcador" matches={matches} canViewOthers={false}/>;
+ const content=mode==='creator'?<CrearPollaForm/>:mode==='free'?<UnirmeGratis slug="fixture" ownerId={state.ownerId} nombre="Polla regalo del campeonato colombiano" premio="Una camiseta oficial del equipo ganador"/>:mode==='questions'?<QuestionsBoard {...common} key={state.ownerId+state.entryId+state.mount} questions={questions}/>:<PicksBoard {...common} key={state.ownerId+state.entryId+state.mount} scoringMode={mode==='outcomes'?'1x2':'marcador'} matches={matches} canViewOthers={false}/>;
  return <ToastProvider><main className="mx-auto max-w-3xl px-4 py-6"><h1 className="lp-display-sm mb-4">{mode==='creator'?'Crear polla':mode==='free'?'Polla regalo':'Pronósticos'}</h1>{content}</main></ToastProvider>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);
@@ -111,6 +112,7 @@ function journal(mode,scenario) {
         const values = normal(p);
         const error = this.closed.has(targetId) ? 'Este pronóstico cerró antes de guardarse.'
           : mode==='questions' ? (!values.optionId && !values.freeText ? 'Completa esta respuesta antes de guardar.' : null)
+          : mode==='outcomes' ? (!['L','E','V'].includes(values.pick1x2) ? 'Completa este pronóstico antes de guardar.' : null)
             : values.homeScore===null || values.awayScore===null ? 'Completa este pronóstico antes de guardar.' : null;
         if (error) return {targetId,status:'rejected',error};
         state.picks[targetId]=values;
@@ -161,11 +163,13 @@ async function fixture(mode, scenario='') {
       assert.equal(url.searchParams.get('p'),'1');
       assert.equal(url.searchParams.get('entryId'),ids.entry);
       store.reads.push(url.search);
+      if(store.behavior==='offline') {await route.abort('internetdisconnected');return;}
       if(!store.authenticated) {await route.fulfill({status:401,json:{error:'Ingresa de nuevo.'},headers:jsonHeaders});return;}
       await route.fulfill({json:{...clone(store.state),ownerId:store.ownerId},headers:jsonHeaders});return;
     }
     assert.equal(request.method(),'PUT'); assert.equal(url.search,'');
     const op=request.postDataJSON(); store.sent.push(clone(op));
+    if(store.behavior==='offline') {await route.abort('internetdisconnected');return;}
     if(!store.authenticated) {await route.fulfill({status:401,json:{error:'Ingresa de nuevo.'},headers:jsonHeaders});return;}
     if(store.behavior==='html') {await route.fulfill({contentType:'text/html',body:'<!doctype html><title>Login</title>'});return;}
     if(store.behavior==='wrong-ack') {
@@ -190,6 +194,7 @@ const saveButton=page=>page.locator('[data-app-update-blocked] button.lp-btn-pri
 const blocked=page=>page.locator('[data-app-update-blocked]');
 async function fillPick(page,mode,value,index=0,complete=true) {
   if(mode==='questions') await page.locator('input').nth(index).fill(String(value));
+  else if(mode==='outcomes') await page.locator('article').nth(index).getByRole('button',{name:value==='L'?'Gana Millonarios':value==='V'?'Gana Junior':'Empate',exact:true}).click();
   else {
     await page.locator('article').nth(index).locator('input').first().fill(String(value));
     if(complete) await page.locator('article').nth(index).locator('input').nth(1).fill('0');
@@ -207,12 +212,13 @@ async function record(name,mode,store,page) {
   console.log(`PASS ${mode}: ${name}`);
 }
 async function runCase(name,mode,scenario,work) {
+  if(selectedCases.size && !selectedCases.has(name)) return;
   const f=await fixture(mode,scenario);
   try{await f.open();await work(f);await record(name,mode,f.store,f.page);}finally{await f.close();}
 }
 async function inspectVisual(page,mode) {
   await page.evaluate(()=>document.fonts.ready);
-  for(const width of [320,639,640,768,1280]) {
+  for(const width of [320,639,640,641,768,1280]) {
     await page.setViewportSize({width,height:900});
     for(const zoom of [1,2]) {
       await page.evaluate(scale=>{
@@ -229,6 +235,15 @@ async function inspectVisual(page,mode) {
       assert.equal(probe.overflow,false,JSON.stringify(evidence.probes.at(-1)));
       assert.deepEqual(probe.hiddenEssential,[]);
       assert.ok(/outfit/i.test(probe.bodyFont));assert.ok(/bebas/i.test(probe.displayFont));assert.equal(probe.fontsLoaded,true);
+      if(mode==='outcomes') {
+        const layout=await page.locator('article [role="group"]').first().evaluate(group=>{
+          const buttons=[...group.querySelectorAll('button')];
+          return {columns:getComputedStyle(group).gridTemplateColumns.split(' ').length,
+            labels:buttons.map(button=>{const label=button.querySelector(':scope > span:last-child');return {text:label.textContent,height:label.getBoundingClientRect().height,lineHeight:parseFloat(getComputedStyle(label).lineHeight)};})};
+        });
+        assert.equal(layout.columns,width<640?1:3);
+        if(width<640) assert.ok(layout.labels.every(label=>label.height<=label.lineHeight+1),JSON.stringify(layout));
+      }
       await page.screenshot({path:path.join(artifacts,`${mode}-${width}-${zoom}x.png`),fullPage:true});
       if(mode==='creator') {await page.getByRole('group',{name:/^Cierre de respaldo/}).scrollIntoViewIfNeeded();await page.screenshot({path:path.join(artifacts,`closure-${width}-${zoom}x.png`)});}
     }
@@ -237,12 +252,12 @@ async function inspectVisual(page,mode) {
   const {violations}=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();
   evidence.axe.push({mode,violations:violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.map(n=>n.target)}))});
   assert.deepEqual(violations.filter(v=>['critical','serious'].includes(v.impact)).map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
-  console.log(`PASS ${mode}: CSS/fonts, five widths, 200% text, axe`);
+  console.log(`PASS ${mode}: CSS/fonts, six widths, 200% text, axe`);
 }
 try {
   await server.listen();
   // Use installed Chrome on every platform, matching the project's E2E gate.
-  browser=await chromium.launch({channel:'chrome',headless:true});
+  browser=process.env.BROWSER_ENGINE==='webkit' ? await webkit.launch() : await chromium.launch({channel:'chrome',headless:true});
   for(const mode of modes) {
     if(mode==='creator') {
       await runCase('provisional-creator',mode,'',async({page})=>{
@@ -267,12 +282,70 @@ try {
         await expect(page.getByRole('button',{name:'Ya estás dentro',exact:true})).toBeDisabled();assert.equal(store.joined,1);
       });continue;
     }
+    if(mode==='outcomes') {
+      await runCase('outcomes-all-choices',mode,'',async({page,store})=>{
+        for(const choice of ['L','E','V']) {
+          await fillPick(page,mode,choice);await saveButton(page).click();await saved(page);
+          assert.equal(store.state.picks[ids.match].pick1x2,choice);
+        }
+        await inspectVisual(page,mode);
+      });
+      await runCase('outcomes-edit-during-save',mode,'',async({page,store})=>{
+        store.behavior='hold';await fillPick(page,mode,'L');await saveButton(page).click();
+        await expect.poll(()=>Boolean(store.held)).toBe(true);
+        await fillPick(page,mode,'V');store.behavior=null;store.held();
+        await expect(page.getByText('Guardamos el envío anterior. Tienes cambios nuevos sin guardar.')).toBeVisible();
+        assert.equal(store.state.picks[ids.match].pick1x2,'L');
+        await saveButton(page).click();await saved(page);assert.equal(store.state.picks[ids.match].pick1x2,'V');
+      });
+      await runCase('outcomes-lost-response',mode,'',async({page,store})=>{
+        store.behavior='drop';await fillPick(page,mode,'E');await saveButton(page).click();await saved(page);
+        assert.equal(store.sent.length,1);assert.equal(store.reads.length,1);
+      });
+      await runCase('outcomes-offline-recovery',mode,'',async({page,store})=>{
+        store.behavior='offline';await fillPick(page,mode,'L');await saveButton(page).click();
+        await expect(saveButton(page)).toHaveText('Comprobar guardado');assert.equal(store.state.revision,0);
+        const requestId=store.sent[0].requestId;store.behavior=null;
+        await saveButton(page).click();await saved(page);assert.equal(store.sent[1].requestId,requestId);
+      });continue;
+    }
+    await runCase('offline-before-write-recovers',mode,'',async({page,store})=>{
+      store.behavior='offline';await fillPick(page,mode,mode==='questions'?'Mi respuesta':12);await saveButton(page).click();
+      await expect(saveButton(page)).toHaveText('Comprobar guardado');assert.equal(store.state.revision,0);
+      await expect(blocked(page)).toHaveAttribute('data-app-update-blocked','true');
+      const requestId=store.sent[0].requestId;store.behavior=null;await saveButton(page).click();await saved(page);
+      assert.equal(store.sent[1].requestId,requestId);
+    });
+    await runCase('synchronous-double-click-one-write',mode,'',async({page,store})=>{
+      store.behavior='hold';await fillPick(page,mode,mode==='questions'?'Una respuesta':3);
+      await saveButton(page).evaluate(button=>{button.click();button.click();});
+      await expect.poll(()=>Boolean(store.held)).toBe(true);assert.equal(store.sent.length,1);
+      store.behavior=null;store.held();await saved(page);assert.equal(store.state.revision,1);
+    });
+    if(mode==='matches') await runCase('keyboard-two-digit-score-and-enter',mode,'',async({page,store})=>{
+      const inputs=page.locator('article').first().locator('input');
+      await inputs.first().click();await page.keyboard.type('10');await expect(inputs.first()).toHaveValue('10');
+      await expect(inputs.first()).toBeFocused();await page.keyboard.press('Enter');await expect(inputs.nth(1)).toBeFocused();
+      await page.keyboard.type('12');await expect(inputs.nth(1)).toHaveValue('12');
+      await saveButton(page).click();await saved(page);assert.equal(store.state.picks[ids.match].homeScore,10);
+      assert.equal(store.state.picks[ids.match].awayScore,12);
+    });
+    if(mode==='matches') await runCase('keyboard-click-replaces-existing-score',mode,'',async({page,store})=>{
+      await fillPick(page,mode,7);await saveButton(page).click();await saved(page);
+      const inputs=page.locator('article').first().locator('input');
+      await inputs.first().click();await page.keyboard.type('12');
+      await expect(inputs.first()).toHaveValue('12');await page.keyboard.press('Enter');
+      await page.keyboard.type('10');await expect(inputs.nth(1)).toHaveValue('10');
+      await saveButton(page).click();await saved(page);
+      assert.equal(store.state.picks[ids.match].homeScore,12);assert.equal(store.state.picks[ids.match].awayScore,10);
+    });
     await runCase('pending-a-then-b',mode,'',async({page,store})=>{
       store.behavior='hold';await fillPick(page,mode,mode==='questions'?'A':1);await saveButton(page).click();
       await expect.poll(()=>Boolean(store.held)).toBe(true);
       await fillPick(page,mode,mode==='questions'?'B':2);store.behavior=null;store.held();
       await expect(page.getByText('Guardamos el envío anterior. Tienes cambios nuevos sin guardar.')).toBeVisible();
       await expect(blocked(page)).toHaveAttribute('data-app-update-blocked','true');await expect(saveButton(page)).toBeEnabled();
+      assert.equal(await page.evaluate(()=>window.__refreshCount),1);
       assert.equal(store.state.picks[target(mode)][value(mode)],mode==='questions'?'A':1);
       await page.screenshot({path:path.join(artifacts,`pending-${mode}-320.png`),fullPage:true});
       await saveButton(page).click();await saved(page);
@@ -313,6 +386,7 @@ try {
       await expect.poll(()=>store.sent.length).toBe(1);
       if(behavior==='hold'){await expect.poll(()=>Boolean(store.held)).toBe(true);await page.clock.fastForward(15001);}
       await saved(page);assert.equal(store.sent.length,1);assert.equal(store.reads.length,1);
+      assert.equal(await page.evaluate(()=>window.__refreshCount),1);
       assert.equal(store.state.picks[target(mode)][value(mode)],mode==='questions'?'A':1);store.held?.();
     });
     for(const behavior of ['html','wrong-ack']) await runCase(`uncertain-${behavior}`,mode,'',async({page,store})=>{
@@ -320,6 +394,7 @@ try {
       await expect(saveButton(page)).toHaveText('Comprobar guardado');await expect(saveButton(page)).toBeEnabled();
       await expect(blocked(page)).toHaveAttribute('data-app-update-blocked','true');assert.equal(store.state.revision,0);
       assert.equal(await page.getByRole('button',{name:'Guardado 1/1',exact:true}).count(),0);
+      assert.equal(await page.evaluate(()=>window.__refreshCount??0),0);
       const identity=store.sent[0].requestId;store.behavior=null;await saveButton(page).click();await saved(page);
       assert.equal(store.sent.length,2);assert.equal(store.sent[1].requestId,identity);
     });
@@ -354,6 +429,7 @@ try {
       await expect(page.getByRole('link',{name:'Ingresar de nuevo'})).toBeVisible();
       await expect(page.getByRole('link',{name:'Ingresar de nuevo'})).toHaveAttribute('target','_blank');
       await expect(saveButton(page)).toHaveText('Comprobar guardado');assert.equal(store.state.revision,0);
+      assert.equal(await page.evaluate(()=>window.__refreshCount??0),0);
       const identity=store.sent[0].requestId;store.authenticated=true;await saveButton(page).click();await saved(page);
       assert.equal(store.sent[1].requestId,identity);
     });
@@ -423,6 +499,7 @@ try {
       assert.equal(store.state.picks[ids.question].optionId,ids.option);await inspectVisual(page,'questions-options');
     });
   }
+  assert.ok(evidence.cases.length > 0, 'The selected modes and cases must execute a browser case');
   evidence.status='passed';console.log(`Browser evidence: ${artifacts}`);
 } catch(error) {
   evidence.status='failed';evidence.error=error.stack;throw error;

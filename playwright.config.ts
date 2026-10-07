@@ -5,6 +5,8 @@ import { defineConfig, devices } from "@playwright/test";
 const requestedPort = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? "3101", 10);
 const port = Number.isInteger(requestedPort) && requestedPort > 0 ? requestedPort : 3101;
 const baseURL = `http://127.0.0.1:${port}`;
+const browserName = process.env.PLAYWRIGHT_BROWSER_ENGINE === "webkit" ? "webkit" : "chromium";
+const channel = browserName === "chromium" ? "chrome" : undefined;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -21,14 +23,17 @@ export default defineConfig({
   },
   use: {
     baseURL,
-    channel: "chrome",
+    browserName,
+    channel,
     colorScheme: "dark",
     trace: "on-first-retry",
   },
   webServer: {
-    // Keep the browser gate on the same webpack path used by `npm run dev`
-    // and production builds. Serwist's Next integration is webpack-based.
-    command: `npm run dev -- --port ${port}`,
+    // CI verifies the completed webpack build. Local development can reuse
+    // its normal server; recovery checks can opt into a stable production app.
+    command: process.env.PLAYWRIGHT_PRODUCTION === "true"
+      ? `npm run start -- --port ${port}`
+      : `npm run dev -- --port ${port}`,
     // A service unrelated to La Polla once occupied the old port and still
     // answered 200 at `/`, so Playwright silently tested the wrong app. A
     // real app route makes the readiness check specific to this project.
@@ -43,14 +48,15 @@ export default defineConfig({
     {
       name: "desktop",
       use: {
-        ...devices["Desktop Chrome"],
-        channel: "chrome",
+        ...devices[browserName === "webkit" ? "Desktop Safari" : "Desktop Chrome"],
+        browserName,
+        channel,
         viewport: { width: 1280, height: 800 },
       },
     },
     {
       name: "mobile",
-      use: { ...devices["Pixel 7"], channel: "chrome" },
+      use: { ...devices[browserName === "webkit" ? "iPhone 13" : "Pixel 7"], browserName, channel },
     },
   ],
 });

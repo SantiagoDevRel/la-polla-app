@@ -9,6 +9,12 @@ delivery checks: [urgent/high fixes](docs/urgent-high-fixes.md), migrations 161â
 Manual save confirmations, revision guards, session recovery and bounded requests:
 [save reliability](docs/save-reliability.md), migrations 164â€“166.
 
+Registration and payment recovery checks: [user-flow verification](docs/user-flow-verification.md).
+Login has bounded requests, duplicate-submit locks and phone-scoped session readback
+after lost responses. Onboarding preserves the requested pool/payment destination.
+Receipt retries retain their identity when browser storage is unavailable; cup counts
+cannot change during uploads. Optional splash/update prompts tolerate blocked storage.
+
 Security dependency baseline (2026-10-06): Next.js and its ESLint config
 16.3.6, DOMPurify 3.4.16, source-map-js 1.2.2 and selector parser 7.1.6.
 Brace expansion keeps compatible patched generations (1.1.21 and 5.0.12).

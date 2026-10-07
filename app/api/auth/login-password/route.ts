@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     if (!result.ok) return reply({ error: "No pudimos iniciar sesión. Puedes entrar por SMS." }, 503);
     await recordLoginEvent({ userId: result.userId, method: "password", request });
     const returnTo = typeof body.returnTo === "string" ? safeReturnTo(body.returnTo) : null;
-    const response = reply({ ok: true, redirectTo: result.needsOnboarding ? "/onboarding" : returnTo || "/inicio" });
+    const response = reply({ ok: true, redirectTo: result.needsOnboarding ? `/onboarding${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}` : returnTo || "/inicio" });
     applyOnboardingCookie(response, result.needsOnboarding);
     return response;
   } catch { return reply({ error: "No pudimos iniciar sesión. Puedes entrar por SMS." }, 503); }

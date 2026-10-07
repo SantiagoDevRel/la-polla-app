@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { phonePasswordEnabled } from "@/lib/auth/password-config";
-import { hasPhonePassword } from "@/lib/auth/password-status";
+import { readPhonePasswordState } from "@/lib/auth/password-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function GET() {
     if (error || !user) return reply({ error: "Ingresa para consultar tu contraseña." }, 401);
     const enabled = phonePasswordEnabled();
     if (!enabled) return reply({ enabled: false });
-    return reply({ enabled: true, hasPassword: await hasPhonePassword(user) });
+    return reply({ enabled: true, userId: user.id, ...await readPhonePasswordState(user) });
   } catch {
     return reply({ error: "No pudimos consultar el estado de tu contraseña." }, 503);
   }

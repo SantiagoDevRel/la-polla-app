@@ -55,7 +55,7 @@ describe("Casa upload transport", () => {
   it.each([409, 401, 403])("keeps business/auth errors without retries (HTTP %s)", async (status) => {
     const fetch = vi.fn().mockResolvedValue(response({ error: "Necesitas iniciar sesión.", code: "USER_REQUIRED" }, status));
     vi.stubGlobal("fetch", fetch);
-    await expect(casaPost(url, body, { retrySafe: true })).rejects.toMatchObject({ code: "USER_REQUIRED", message: "Necesitas iniciar sesión." });
+    await expect(casaPost(url, body, { retrySafe: true })).rejects.toMatchObject({ code: "USER_REQUIRED", status, message: "Necesitas iniciar sesión." });
     expect(fetch).toHaveBeenCalledOnce();
   });
 

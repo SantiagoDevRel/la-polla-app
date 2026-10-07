@@ -9,9 +9,8 @@
 // request, y eso emite los Set-Cookie HttpOnly (el camino a prueba de iOS
 // Safari que usa también /api/auth/verify-otp).
 //
-// Reglas de sesión (CLAUDE.md, "Auth: cookies host-only + signOut global"):
-// signOut con scope 'local' en el request justo antes de mintear — nunca
-// 'global', nunca on-mount.
+// verifyOtp replaces the cookie session on success. Failed verification
+// must preserve any existing session; never sign out before verification.
 
 import type { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -148,10 +147,6 @@ export async function startSessionForVerifiedPhone(
 
   // Cliente SOLO de Auth, con las cookies del request y la IP real.
   const auth = await createAuthRouteClient(options.clientIp ?? null);
-  // scope:'local' — solo este navegador. 'global' revocaría las sesiones del
-  // usuario anterior en sus otros dispositivos.
-  await auth.signOut({ scope: "local" }).catch(() => {});
-
   const { error: verifyErr } = await auth.verifyOtp({
     email: syntheticEmail,
     token: emailOtp,

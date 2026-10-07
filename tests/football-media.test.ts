@@ -54,11 +54,15 @@ describe('complete football media catalog',()=>{
  });
  it('ships decodable, visible images for every catalog reference and tournament size',async()=>{
   const assets=new Set([...Object.values(sources),...Object.values(names),...Object.values(logos),...TOURNAMENTS.flatMap(t=>[getTournamentLogo(t.slug,'small'),getTournamentLogo(t.slug)])]);
-  await Promise.all([...assets].map(async asset=>{
+  const remaining=[...assets];
+  // More than 1,000 native decodes: bound the queue instead of retaining all
+  // decoded images at once. Windows takes about 40s for the complete catalog.
+  await Promise.all(Array.from({length:4},async()=>{for(;;){
+   const asset=remaining.pop();if(!asset)return;
    expect(asset).toMatch(/^\/(team-crests|flags|tournaments)\//);
    const image=await fs.readFile(path.join(process.cwd(),'public',asset.split('?')[0]));
    const metadata=await sharp(image).metadata();expect(metadata.width,asset).toBeGreaterThan(0);expect(metadata.height,asset).toBeGreaterThan(0);
    const stats=await sharp(image).flatten({background:'#f5f7fa'}).stats();expect(stats.channels.some(c=>c.stdev>=3),`Blank image: ${asset}`).toBe(true);
-  }));
- },30000);
+  }}));
+ },120000);
 });

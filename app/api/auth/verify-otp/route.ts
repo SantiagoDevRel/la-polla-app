@@ -10,7 +10,9 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAndRecordAttempt } from "@/lib/auth/rate-limit";
 import { recordLoginEvent } from "@/lib/auth/login-event";
-import { normalizePhone } from "@/lib/auth/phone";
+import { normalizePhone, toE164 } from "@/lib/auth/phone";
+import { needsName } from "@/lib/users/needs-name";
+import { isSameOriginRequest } from "@/lib/auth/telegram-login/same-origin";
 import { createAuthRouteClient, getClientIp } from "@/lib/supabase/auth-ip";
 
 export const runtime = "nodejs";
@@ -21,8 +23,9 @@ const verifySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  if (!isSameOriginRequest(request)) return NextResponse.json({ error: "Solicitud no permitida" }, { status: 403 });
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const parsed = verifySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -31,7 +34,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const phoneE164 = parsed.data.phone; // viene como "+57..."
+    const phoneE164 = toE164(parsed.data.phone);
+    if (!phoneE164) return NextResponse.json({ error: "Número inválido" }, { status: 400 });
     const phoneNormalized = normalizePhone(phoneE164); // "57..." sin +
     const code = parsed.data.token;
 
@@ -52,17 +56,8 @@ export async function POST(request: NextRequest) {
     // persona (Sb-Forwarded-For): el límite de /verify de Supabase es por IP y
     // desde Vercel lo compartían todos los usuarios. lib/supabase/auth-ip.ts.
     const auth = await createAuthRouteClient(ip);
-    // Defensive: clear any existing session BEFORE verifying. Users
-    // legitimately have multiple accounts (one per phone), and if they
-    // come into /login already logged into account A and then submit
-    // an OTP for account B, the cookie swap doesn't always happen
-    // cleanly when there's a live session on the request. Signing
-    // out first guarantees verifyOtp writes a fresh session and B
-    // takes over.
-    // scope:'local' — solo limpia ESTE browser. El default 'global'
-    // revocaba todas las sesiones del user anterior en sus otros
-    // dispositivos (hallazgo codex 2026-06-11).
-    await auth.signOut({ scope: "local" }).catch(() => {});
+    // verifyOtp replaces the cookie session on success. A wrong or expired
+    // code must not revoke the person's existing browser session.
 
     const { data, error } = await auth.verifyOtp({
       phone: phoneE164,
@@ -71,17 +66,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (error || !data.user) {
-      console.error("[verify-otp] verifyOtp failed:", error);
+      if (error && typeof error.status === "number" && (error.status === 0 || error.status >= 500)) {
+        return NextResponse.json({ error: "No pudimos verificar el código. Conserva tus 6 dígitos y vuelve a intentarlo." }, { status: 503 });
+      }
       return NextResponse.json(
-        { error: error?.message || "Código inválido o vencido" },
+        { error: "Código inválido o vencido. Revisa los 6 dígitos o pide uno nuevo." },
         { status: 401 },
       );
     }
-
-    // Detect new user (created within the last 30 seconds) → frontend
-    // routes a /onboarding para nombre + pollito.
-    const createdAt = new Date(data.user.created_at).getTime();
-    const isNewUser = Date.now() - createdAt < 30_000;
 
     // El trigger 003_auth_user_sync ya creó el row de public.users.
     // Normalizamos whatsapp_number (sin +) para que los lookups
@@ -94,6 +86,12 @@ export async function POST(request: NextRequest) {
         whatsapp_verified: true,
       })
       .eq("id", data.user.id);
+
+    // A code can take over 30 seconds to arrive. The profile, not account
+    // creation age, determines whether registration still needs onboarding.
+    const { data: profile, error: profileError } = await admin.from("users")
+      .select("display_name, avatar_url").eq("id", data.user.id).maybeSingle();
+    const isNewUser = !!profileError || !profile || needsName(profile.display_name) || !profile.avatar_url;
 
     void recordLoginEvent({
       userId: data.user.id,
@@ -111,6 +109,7 @@ export async function POST(request: NextRequest) {
       newUser: isNewUser,
       user: { id: data.user.id },
     });
+    response.headers.set("Cache-Control", "private, no-store");
     response.cookies.delete("lp_onb");
     return response;
   } catch (err) {

@@ -38,7 +38,7 @@ export function QuestionsBoard({
   canEdit,
   lockedReason,
 }: Props) {
-  const { picks, saved, changed, save: guardar, discard, dirty, saving, uncertain, sessionExpired, msg } = usePickSave({
+  const { picks, saved, changed, save: guardar, discard, dirty, saving, uncertain, sessionExpired, msg, hydrated } = usePickSave({
     slug, entryNumber, ownerId, entryId, initialRevision, initialPicks, targetIds: questions.map(q => q.id), kind: "question",
   });
 
@@ -62,11 +62,12 @@ export function QuestionsBoard({
   const confirmadas = questions.filter(q => saved[q.id]?.optionId || saved[q.id]?.freeText?.trim()).length;
 
   return (
-    <div data-app-update-blocked={dirty || saving || uncertain}>
+    <div data-app-update-blocked={dirty || saving || uncertain} aria-busy={!hydrated}>
+      {!hydrated && <p role="status" className="mb-3 px-4 text-[13px] text-text-secondary">Cargando tus respuestas…</p>}
       <ul className="space-y-px">
         {questions.map((q) => {
           const resuelta = q.resolved_at != null;
-          const editable = canEdit && !resuelta;
+          const editable = hydrated && canEdit && !resuelta;
           const dist = distribution.preguntas?.[q.id];
           const total = dist?.total ?? 0;
           const mine = editable ? picks[q.id] : saved[q.id];
@@ -134,6 +135,7 @@ export function QuestionsBoard({
                 <div>
                   <input
                     type="text"
+                    aria-label={q.prompt}
                     maxLength={120}
                     disabled={!editable}
                     value={mine?.freeText ?? ""}
@@ -175,7 +177,7 @@ export function QuestionsBoard({
           <button
             type="button"
             onClick={guardar}
-            disabled={saving || (!dirty && !uncertain)}
+            disabled={!hydrated || saving || (!dirty && !uncertain)}
             className="lp-btn lp-btn-primary w-full"
           >
             {saving
