@@ -46,6 +46,8 @@ See [verification and changes](docs/urgent-high-fixes.md).
   authorize changing rollout flags, subscriptions, keys, or unrelated rows.
 - Keep temporary reports, prompts, screenshots, exports, and requirement contracts in
   Downloads. Before multi-requirement work, record each request and evidence there.
+- This repository is public. Keep `backups/`, phone numbers, receipts, and personal data
+  out of tracked files. [Backup and restore](docs/backup-restore.md).
 - Commit and push your verified work. An agreed PR includes merge and deployment to
   the existing target, followed by production checks. Do not publish others' changes.
 - Before each commit, run the owner's staged-secret-scan and change-guard tools.
@@ -59,6 +61,12 @@ See [verification and changes](docs/urgent-high-fixes.md).
   not a phone list. Service/admin keys stay server-side and out of logs and bundles.
 - RLS remains enabled with explicit policies. Enumerate columns; never `select("*")`
   for user data. Admin-client reads must explicitly authorize and scope the user/pool.
+- A migration that creates a `public` table also enables RLS, adds policies, and grants
+  each needed role explicitly. From 2026-10-30 Supabase stops automatic grants; a
+  missing grant returns 42501. New `SECURITY DEFINER` functions set `search_path` and
+  revoke `EXECUTE` from `PUBLIC`, `anon`, and `authenticated` before granting roles.
+- List new public pages (SEO, legal, support) in `lib/supabase/middleware.ts`
+  (`PUBLIC_NO_AUTH_PREFIXES` or `_EXACT`); unlisted pages redirect to login.
 - The 2026-04 auth incident was RLS recursion, fixed in migration 022. The claim that
   `auth.uid()` never propagates was disproved. Keep existing service RPCs and filters;
   replacing the access model requires its own audit. [Historical handoff](docs/auth-uid-handoff.md).
@@ -160,6 +168,9 @@ See [verification and changes](docs/urgent-high-fixes.md).
 
 ## Open decisions
 
+Keep each owner idea here until the owner accepts or declines it. Before closing a task,
+ask about pending items in one line.
+
 - Creator-raffle defaults still need owner confirmation: link-only listing, 30-minute
   reservations, free creation, and three active raffles per creator.
 - Optional Claude Design/Lovable work remains undecided; no credits may be spent implicitly.
@@ -169,6 +180,11 @@ See [verification and changes](docs/urgent-high-fixes.md).
   do not infer activation from the client widget.
 - Further participation ideas, including match rooms or licensed broadcasts, remain open.
   The embedded Claude admin chat remains declined. Do not buy retransmission services.
+- Low participation per pool (2026-10-08): research in
+  `Downloads/research/2026-10-07-la-polla-engagement/` recommends targeted UI fixes, no
+  WhatsApp bot for now (Meta requires a gambling license), and no prepaid balance. It
+  flags that paid online pools need a Coljuegos concession and raffles an authorized
+  operator. The owner has not chosen changes; implement none without approval.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
