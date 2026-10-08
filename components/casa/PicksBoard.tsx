@@ -13,7 +13,7 @@
 //
 // Modo 1X2 antes del inicio conserva los tres botones que pidió el dueño el
 // 2026-09-14 (escudo + nombre ES el botón, «Empate» en el medio). Modo marcador:
-// Two score fields between the crests; Enter advances to the next field.
+// Two score fields between the crests; a typing pause or Enter advances.
 //
 // Bajo cada opción 1X2 va la barra con el porcentaje de la gente que eligió
 // eso; en marcador, «cuántos pusieron 2-1» queda visible bajo su botón.
@@ -155,6 +155,7 @@ interface Props {
 }
 
 const REFRESH_INTERVAL_MS = 30_000;
+const SCORE_AUTOJUMP_MS = 300;
 const REFRESH_LEAD_MS = 10 * 60_000;
 const REFRESH_TAIL_MS = 3 * 60 * 60_000;
 /** Browsers overflow timers longer than 2^31-1 ms; a longer wait re-evaluates on wake. */
@@ -309,7 +310,7 @@ export function PicksBoard({
       awayScore: side === "away" ? n : (picks[matchId]?.awayScore ?? null) });
   }
 
-  /** Enter: local → visitante → local del próximo partido editable; al final cierra el teclado. */
+  /** Local → visitante → local del próximo partido editable; al final cierra el teclado. */
   function saltarDesde(matchId: string, side: "home" | "away") {
     if (side === "home") {
       inputs.current.get(`${matchId}:away`)?.focus();
@@ -472,6 +473,14 @@ function MatchCard({
   /** Sin inscripción: tocar un partido abre la hoja de pago en vez de no hacer nada. */
   onBlocked?: () => void;
 }) {
+  const scoreJumpTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(scoreJumpTimer.current), []);
+
+  function cancelScoreJump() {
+    window.clearTimeout(scoreJumpTimer.current);
+    scoreJumpTimer.current = undefined;
+  }
+
   const cerrado = !m.planned && !canEditCasaMatch(m, now);
   const started = !m.planned && hasCasaMatchStarted(m, now);
   const editable = !m.planned && canEdit && !cerrado;
@@ -656,14 +665,29 @@ function MatchCard({
                     onFocus={(e) => e.currentTarget.select()}
                     onClick={(e) => e.currentTarget.select()}
                     onPointerDown={(e) => {
+                      // Touch/pen must keep native focus and keyboard activation.
+                      // Only mouse selection needs to override caret placement.
+                      if (e.pointerType !== "mouse") return;
                       e.preventDefault();
                       e.currentTarget.focus();
                       e.currentTarget.select();
                     }}
-                    onChange={(e) => onScore(m.id, sideKey, e.target.value)}
+                    onBlur={cancelScoreJump}
+                    onChange={(e) => {
+                      const field = e.currentTarget;
+                      const raw = field.value;
+                      cancelScoreJump();
+                      onScore(m.id, sideKey, raw);
+                      if (!/^\d{1,2}$/.test(raw)) return;
+                      // Wait for a second digit; never steal focus after leaving.
+                      scoreJumpTimer.current = window.setTimeout(() => {
+                        scoreJumpTimer.current = undefined;
+                        if (field.isConnected && !field.disabled && document.activeElement === field
+                          && !m.planned && canEditCasaMatch(m, Date.now())) onJump(m.id, sideKey);
+                      }, SCORE_AUTOJUMP_MS);
+                    }}
                     onKeyDown={(e) => {
-                      // Typing must stay in this field, including scores 10–30.
-                      // Enter explicitly advances to the next editable score.
+                      // Enter skips the pause and advances immediately.
                       if (e.key === "Enter") {
                         e.preventDefault();
                         onJump(m.id, sideKey);
