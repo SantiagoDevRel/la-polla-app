@@ -28,9 +28,15 @@ Responses that arrive after leaving the form cannot redirect or update its paren
 Standalone confirmation includes an explicit link to continue. The cup selector keeps
 its dark background, readable value and keyboard operation across browser engines.
 
-Score inputs allow full two-digit values; Enter advances to the next field. Manual
-questions expose their prompt as an accessible label. Below 640 px, 1X2 options occupy
-full-width rows; larger screens use three equal columns. Team names stay readable with
+Score inputs allow full two-digit values. After a 300 ms typing pause, focus
+advances from home to away and then to the next editable match; the last field
+closes the keyboard. Enter advances immediately. Leaving or clearing a field
+cancels its pending jump.
+Touch and pen input preserve native focus and keyboard activation. Mouse-only
+selection handling must not cancel touch pointer events; browser checks tap and
+edit multiple matches in a shortened mobile viewport before one batch save.
+Manual questions expose their prompt as an accessible label. Below 640 px, 1X2
+options occupy full-width rows; larger screens use three equal columns. Team names stay readable with
 enlarged text. Manual Save and revision fences remain.
 Confirmed saves refresh the server summary without discarding newer local edits.
 The invitation notice skips automatic opening while a draft or focused input needs attention.

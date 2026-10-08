@@ -51,7 +51,7 @@ import {ToastProvider} from '@/components/ui/Toast';
 const ids=${JSON.stringify(ids)};
 const params=new URLSearchParams(location.search), mode=params.get('mode'), scenario=params.get('case');
 const loadedAt=Date.now();
-const multiple=['closed','incomplete','rebase','restore-fresh'].includes(scenario);
+const multiple=['closed','incomplete','rebase','restore-fresh','touch','autojump'].includes(scenario);
 const initialPicks=['rebase','restore-fresh'].includes(scenario)?{[mode==='questions'?ids.question2:ids.match2]:{pick1x2:null,homeScore:mode==='questions'?null:1,awayScore:mode==='questions'?null:0,optionId:null,freeText:mode==='questions'?'Respuesta inicial':null}}:{};
 function App(){
  const [state,setState]=useState({ownerId:ids.owner,entryId:ids.entry,mount:0,closed:false,initialPicks,initialRevision:0});
@@ -129,10 +129,13 @@ function journal(mode,scenario) {
   };
 }
 async function fixture(mode, scenario='') {
-  const context=await browser.newContext({viewport:{width:320,height:900},colorScheme:'dark',reducedMotion:'reduce'});
+  const touch=['touch','autojump'].includes(scenario);
+  const context=await browser.newContext({viewport:{width:320,height:900},colorScheme:'dark',reducedMotion:'reduce',hasTouch:touch,isMobile:touch});
   const page=await context.newPage();
   // Install before the component creates its interval, so closure uses real UI time.
-  if(scenario==='closed') await page.clock.install();
+  if(['closed','autojump'].includes(scenario)) await page.clock.install();
+  // Installation alone keeps wall time running; freeze it for 299/300 ms checks.
+  if(scenario==='autojump') await page.clock.pauseAt(new Date(Date.now()+60_000));
   const errors=[]; const unexpected=[]; const store=journal(mode,scenario);
   page.on('pageerror', error=>errors.push(error.message));
   await page.route('**/api/**', async route=>{
@@ -338,6 +341,65 @@ try {
       await page.keyboard.type('10');await expect(inputs.nth(1)).toHaveValue('10');
       await saveButton(page).click();await saved(page);
       assert.equal(store.state.picks[ids.match].homeScore,12);assert.equal(store.state.picks[ids.match].awayScore,10);
+    });
+    if(mode==='matches') await runCase('touch-score-focus-and-batch-save',mode,'touch',async({page,store})=>{
+      // A shortened viewport also exercises scrolling past the sticky save bar.
+      await page.setViewportSize({width:320,height:420});
+      const inputs=page.locator('article input');
+      await expect(inputs.first()).toBeEnabled();
+      await page.evaluate(()=>{
+        window.__scoreTouches=[];
+        document.addEventListener('pointerdown',event=>{
+          if(event.target instanceof HTMLInputElement) window.__scoreTouches.push({pointerType:event.pointerType,cancelled:event.defaultPrevented,trusted:event.isTrusted});
+        });
+      });
+      for(const [index,score] of ['10','12','2','1'].entries()) {
+        await inputs.nth(index).tap();await expect(inputs.nth(index)).toBeFocused();
+        await page.keyboard.type(score);await expect(inputs.nth(index)).toHaveValue(score);
+      }
+      // A tap on an existing value must replace both digits, without saving each match.
+      await inputs.first().tap();await expect(inputs.first()).toBeFocused();
+      await page.keyboard.type('3');await expect(inputs.first()).toHaveValue('3');
+      const touches=await page.evaluate(()=>window.__scoreTouches);
+      assert.equal(touches.length,5);
+      assert.ok(touches.every(event=>event.pointerType==='touch'&&event.trusted&&!event.cancelled),JSON.stringify(touches));
+      assert.equal(store.sent.length,0);
+      await saveButton(page).tap();await saved(page,2);assert.equal(store.sent.length,1);
+      assert.equal(store.state.picks[ids.match].homeScore,3);assert.equal(store.state.picks[ids.match].awayScore,12);
+      assert.equal(store.state.picks[ids.match2].homeScore,2);assert.equal(store.state.picks[ids.match2].awayScore,1);
+      await inspectVisual(page,'matches-touch');
+    });
+    if(mode==='matches') await runCase('touch-score-autojump',mode,'autojump',async({page,store})=>{
+      const inputs=page.locator('article input');
+      await inputs.first().tap();await page.keyboard.type('1');
+      await page.clock.runFor(299);await expect(inputs.first()).toBeFocused();
+      await page.clock.runFor(1);await expect(inputs.nth(1)).toBeFocused();
+      await page.keyboard.type('2');await page.clock.runFor(300);
+      await expect(inputs.nth(2)).toBeFocused();
+      await page.keyboard.type('0');await page.clock.runFor(300);
+      await expect(inputs.nth(3)).toBeFocused();
+      await page.keyboard.type('3');await page.clock.runFor(300);
+      await expect(inputs.nth(3)).not.toBeFocused();
+      // Each new digit restarts the pause, so 10–30 remain editable.
+      await inputs.first().tap();await page.keyboard.type('1');await page.clock.runFor(150);
+      await page.keyboard.type('2');await page.clock.runFor(299);
+      await expect(inputs.first()).toBeFocused();await expect(inputs.first()).toHaveValue('12');
+      await page.clock.runFor(1);await expect(inputs.nth(1)).toBeFocused();
+      // Deleting and manually leaving a field must cancel its pending jump.
+      await inputs.first().tap();await page.keyboard.press('Backspace');await page.clock.runFor(1000);
+      await expect(inputs.first()).toHaveValue('');await expect(inputs.first()).toBeFocused();
+      await page.keyboard.type('4');await inputs.nth(2).tap();await page.clock.runFor(1000);
+      await expect(inputs.nth(2)).toBeFocused();
+      // Collapsing the day unmounts the fields and cancels their timers.
+      await inputs.first().tap();await page.keyboard.type('5');
+      const day=page.getByRole('button',{name:/Ma\u00f1ana/});
+      await day.tap();await expect(inputs).toHaveCount(0);await page.clock.runFor(1000);
+      await day.tap();await page.clock.runFor(1000);
+      await expect(inputs.first()).not.toBeFocused();await expect(inputs.first()).toHaveValue('5');
+      assert.equal(store.sent.length,0);
+      await saveButton(page).tap();await saved(page,2);assert.equal(store.sent.length,1);
+      assert.equal(store.state.picks[ids.match].homeScore,5);assert.equal(store.state.picks[ids.match].awayScore,2);
+      assert.equal(store.state.picks[ids.match2].homeScore,0);assert.equal(store.state.picks[ids.match2].awayScore,3);
     });
     await runCase('pending-a-then-b',mode,'',async({page,store})=>{
       store.behavior='hold';await fillPick(page,mode,mode==='questions'?'A':1);await saveButton(page).click();
