@@ -44,7 +44,8 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   /^\/admin(\/|$)/,
   /\/login/,
   /^\/set-password(\/|$)/,
-  /\/invites\/polla\//,
+  // /invites/polla/<token> y /invites/<token>: invitaciones con códigos.
+  /^\/invites(\/|$)/,
   /\/onboarding/,
   // Kill-switch: si un user queda atrapado con un SW corrupto/viejo,
   // visitar /reset.html ejecuta JS que desuscribe TODOS los SWs y
@@ -73,6 +74,15 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   // Rifas de creadores (migración 157): tablero con reservas que vencen,
   // cuenta de pago y comprobantes. Un tablero cacheado vende un número tomado.
   /^\/rifas?(\/|$)/,
+  // Resto de pantallas con sesión (2026-10-08). El layout autenticado lee
+  // inscripciones y pronósticos del usuario: offline no se sirven del cache.
+  // tests/sw-never-cache.test.ts falla si una ruta con sesión queda afuera.
+  /^\/dashboard(\/|$)/,
+  /^\/preview(\/|$)/,
+  /^\/road-to-worldcup(\/|$)/,
+  /^\/unirse(\/|$)/,
+  /^\/delete-account(\/|$)/,
+  /^\/design(\/|$)/,
 ];
 
 const serwist = new Serwist({
