@@ -12,7 +12,7 @@ Historical P2P predictions and production rollout settings are preserved.
 | Terminal balance | Both pot modes account for retained gross or actual payouts | Balance SQL |
 | Gift enrollment | `Entrar gratis` immediately enrolls; retries reuse the entry; old pending reservations complete without proof | Free SQL/API/browser |
 | Delivery checks | Types, lint, Vitest, build, hook, SQL/RLS, and browser feed `Quality gate` | `.github/workflows/quality.yml` |
-| Agent instructions | One current contract; auth incident marked resolved; legacy access filters retained | `AGENTS.md`, two-user RLS regression |
+| Agent instructions | One current contract; auth incident marked resolved; legacy access filters retained | `AGENTS.md` + `docs/agent-rules.md`, two-user RLS regression |
 
 ## Local checks
 
@@ -55,10 +55,10 @@ Do not enable rollout flags or rewrite historical data to install these changes.
 
 ## CI enforcement
 
-Require the aggregate **Quality gate** check on `main`. A workflow without a required
-branch check does not prevent merging failed checks. Keep that distinction visible
-until repository protection has been verified. There is no production secret in CI;
-it uses only loopback URLs and synthetic keys.
+Branch protection on `main` requires the aggregate **Quality gate** check (strict,
+admins included; verified 2026-10-08). A workflow without a required branch check
+does not prevent merging failed checks, so re-verify protection after changing CI.
+There is no production secret in CI; it uses only loopback URLs and synthetic keys.
 
 The current welcome screen intentionally shows nine featured leagues in three rows.
 The full supported competition catalog is tested independently. Do not expand the
