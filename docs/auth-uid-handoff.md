@@ -3,7 +3,8 @@
 > **Resolved 2026-04-26:** migration 022 fixed recursive RLS policies.
 > The original JWT propagation diagnosis below was disproved; it is historical
 > investigation material, not an active incident or instruction to bypass RLS.
-> See the final resolution and the current contract in [AGENTS.md](../AGENTS.md).
+> See the final resolution and the current contract in [AGENTS.md](../AGENTS.md)
+> and its [area rules](agent-rules.md#auth-and-login).
 > `scripts/casa-rls-check.sql` checks distinct authenticated identities and private
 > row isolation locally. It does not validate hosted GoTrue, SSR cookies, or every
 > production policy. Existing service-client reads still require explicit scopes.

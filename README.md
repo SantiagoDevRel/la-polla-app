@@ -4,7 +4,8 @@ Football pools: La Casa publishes pools, players enroll, predict, and compete.
 Paid entries use payment proofs; $0 gift pools enroll immediately through
 **Entrar gratis**, without proof or admin review. Historical private pools remain.
 
-Agent instructions: [AGENTS.md](AGENTS.md). Current security, timing, gifts, and
+Agent instructions: [AGENTS.md](AGENTS.md) and its
+[area rules](docs/agent-rules.md). Current security, timing, gifts, and
 delivery checks: [urgent/high fixes](docs/urgent-high-fixes.md), migrations 161–163.
 Manual save confirmations, revision guards, session recovery and bounded requests:
 [save reliability](docs/save-reliability.md), migrations 164–166.
