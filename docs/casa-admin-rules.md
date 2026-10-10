@@ -44,6 +44,12 @@ registra y el partido se juega y verifica normal. `casa_settle_polla_v2` falla c
 `OPEN_MATCH_ISSUES` mientras haya casos sin decidir. El vivo global nunca falla por
 Casa, en ningún modo; la migración no repuntúa historia ni modifica `predictions`.
 
+- **Anulado = invisible para jugadores (2026-10-10).** Un partido con `voided_at`
+  en una polla no sale en su página, el bot, los pronósticos de otros, las ligas
+  de la polla ni el aviso de pendientes de `/inicio` (`getPollaMatches` y
+  `listPollasConPicksPendientes` filtran `voided_at IS NULL`). Sus filas y sus
+  cero puntos siguen en SQL; el editor admin lo sigue mostrando como «Anulado».
+
 - **Reapertura.** Un partido mantenido que se reanuda y vuelve a suspenderse (o
   entra en otro estado con novedades) abre un caso **nuevo**; el decidido queda
   como historial. Un partido con una decisión **Anular** ya no abre casos nuevos.

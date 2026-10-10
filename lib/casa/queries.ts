@@ -216,6 +216,10 @@ export async function getMyPicks(
  * tenían un orden y hoy otro».) Dos partidos a la misma hora conservan el
  * orden que la casa les dio al crear la polla (`order_index`), que es el
  * desempate — nunca el azar del heap de Postgres.
+ *
+ * (2026-10-10, regla del dueño) Un partido anulado en esta polla no cuenta y
+ * nadie lo ve: no sale en la página, el bot ni los pronósticos de otros. Sus
+ * filas y sus cero puntos siguen en SQL; el editor admin lo sigue mostrando.
  */
 export async function getPollaMatches(pollaId: string) {
   const db = createAdminClient();
@@ -223,6 +227,7 @@ export async function getPollaMatches(pollaId: string) {
     .from("casa_polla_matches")
     .select("match_id, order_index, voided_at")
     .eq("polla_id", pollaId)
+    .is("voided_at", null)
     .order("order_index", { ascending: true });
 
   if (error) throw error;
@@ -362,19 +367,24 @@ export async function listPollasConPicksPendientes(
     const polla = porId.get(entry.polla_id);
     if (!polla) continue;
 
-    const [{ count: total }, { count: hechos }] = await Promise.all([
-      db
-        .from("casa_polla_matches")
-        .select("match_id", { count: "exact", head: true })
-        .eq("polla_id", polla.id),
-      db
-        .from("casa_picks")
-        .select("id", { count: "exact", head: true })
-        .eq("entry_id", entry.id),
-    ]);
+    // Un partido anulado no se puede pronosticar ni se muestra: no cuenta en
+    // el total, y un pronóstico viejo sobre él tampoco cuenta como hecho.
+    const { data: links } = await db
+      .from("casa_polla_matches")
+      .select("match_id")
+      .eq("polla_id", polla.id)
+      .is("voided_at", null);
+    const matchIds = (links ?? []).map((l: { match_id: string }) => l.match_id);
+    if (matchIds.length === 0) continue;
+    const { count: hechos } = await db
+      .from("casa_picks")
+      .select("id", { count: "exact", head: true })
+      .eq("entry_id", entry.id)
+      .in("match_id", matchIds);
 
-    const faltan = (total ?? 0) - (hechos ?? 0);
-    if (faltan > 0) salida.push({ polla, faltan, total: total ?? 0, entryNumber: entry.entry_number });
+    const total = matchIds.length;
+    const faltan = total - (hechos ?? 0);
+    if (faltan > 0) salida.push({ polla, faltan, total, entryNumber: entry.entry_number });
   }
   return salida;
 }
