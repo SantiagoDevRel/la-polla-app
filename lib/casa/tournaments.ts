@@ -44,6 +44,8 @@ export async function getPollaTournamentSlugs(
           .from("casa_polla_matches")
           .select("polla_id, match:matches(tournament)")
           .in("polla_id", ids)
+          // Un partido anulado no se muestra: tampoco su liga.
+          .is("voided_at", null)
           .order("polla_id")
           .order("order_index")
           .order("match_id")
