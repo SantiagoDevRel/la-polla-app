@@ -1240,6 +1240,10 @@ Unitarias: `npm test -- tests/auth-real-ip.test.ts`.
   el SDK no lanza excepción, así que el handler revisa el `error` devuelto.
   El detalle del proveedor queda solo en el log de Vercel
   (`tests/cron-admin-discrepancies-email.test.ts`).
+- Ese email, `/admin/discrepancias` y `/api/admin/polla-health` ignoran lo
+  anterior a OFIGOLAZO, la primera polla de la casa v2 (`DISCREPANCIAS_DESDE`
+  en `lib/admin/discrepancy-cutoff.ts`, 13-sep-2026 00:00 Colombia). Sin ese
+  corte, el correo repetía a diario 38 pollas P2P del Mundial sin payouts.
 - Verificación después de un deploy: `curl -X POST https://lapollacolombiana.com/api/cron/match-reminders`
   sin header debe dar **403** (nunca 307), y `gh workflow run match-reminders.yml`
   debe terminar en verde.
