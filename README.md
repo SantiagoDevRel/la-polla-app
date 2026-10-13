@@ -1367,6 +1367,10 @@ etiqueta y deja de decir «Confirmando ganadores y pago». Es solo visualizació
 escribe `casa_payouts` ni reparte, y el panel de admin sigue con el estado real
 (`pollaStatusLabel`). Pruebas: `tests/casa-pagada.test.ts`.
 
+Terminadas va de la más reciente a la más vieja (`recentFirst`: fin, reparto o cierre)
+y tiene scroll propio (`ScrollableList`, 55dvh con máximo 28rem): no alarga Inicio y
+un degradado abajo avisa mientras quedan pollas por ver.
+
 `components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
 En `/casa`, el orden es Mis pollas, Pollas disponibles y Pollas cerradas. Mis pollas

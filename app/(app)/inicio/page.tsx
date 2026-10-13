@@ -13,6 +13,7 @@ import { listMyPollas } from "@/lib/casa/my-pollas";
 import { listMyLiveMatches } from "@/lib/casa/live";
 import Image from "next/image";
 import { PollaSection } from "@/components/casa/PollaSection";
+import { ScrollableList } from "@/components/casa/ScrollableList";
 import { PollasRifasTabs } from "@/components/rifas/PollasRifasTabs";
 import { RifasTab } from "@/components/rifas/RifasTab";
 import { getMyRifas, rifasEnabled } from "@/lib/rifas/server";
@@ -34,7 +35,7 @@ import {
   getPollaEndings,
   listPollasConPicksPendientes,
 } from "@/lib/casa/queries";
-import { isPollaOpen, isPublicClosedPolla, pagadaDesde, pagadaLabel, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
+import { isPollaOpen, isPublicClosedPolla, pagadaDesde, pagadaLabel, pollaStatusLabel, recentFirst, type CasaPolla } from "@/lib/casa/types";
 import { entryPriceLabel, formatCop, timeLeft } from "@/lib/casa/format";
 import { premioLabel, premioValor } from "@/lib/casa/premio";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
@@ -104,8 +105,9 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
   const enJuegoIds = new Set(enJuegoMias.map(p => p.id));
   // Cerradas: las públicas (desde el 16-sep) para todos; las anteriores, solo
   // para quien participó.
-  const cerradas = pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id)
-    && (isPublicClosedPolla(p) || joinedIds.has(p.id)));
+  // La más reciente primero (recentFirst).
+  const cerradas = recentFirst(pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id)
+    && (isPublicClosedPolla(p) || joinedIds.has(p.id))), endings);
   const [pots, pendientes, tournaments, pagos] = await Promise.all([
     getPots([...pollas, ...privatePollas].map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
@@ -214,11 +216,14 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
 
         {cerradas.length > 0 && (
         <PollaSection id="pollas-cerradas" kind="closed" title="Terminadas" description="Pollas que ya no reciben inscripciones" count={cerradas.length}>
-              <ul className="grid gap-3">
-                {cerradas.map((polla) => (
-                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} pagada={pagadas.get(polla.id)} participated={joinedIds.has(polla.id)} closed />
-                ))}
-              </ul>
+              {/* Scroll propio (2026-10-13): el historial crece y no alarga Inicio. */}
+              <ScrollableList label="Pollas terminadas">
+                <ul className="grid gap-3">
+                  {cerradas.map((polla) => (
+                    <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} pagada={pagadas.get(polla.id)} participated={joinedIds.has(polla.id)} closed />
+                  ))}
+                </ul>
+              </ScrollableList>
         </PollaSection>
         )}
       </div>

@@ -8,7 +8,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }));
 
 import { getPollaEndings } from "@/lib/casa/queries";
-import { pagadaDesde, pagadaLabel, pollaFinishedAt, type CasaPolla } from "@/lib/casa/types";
+import { pagadaDesde, pagadaLabel, pollaFinishedAt, recentFirst, type CasaPolla } from "@/lib/casa/types";
 
 const AHORA = Date.parse("2026-10-13T20:00:00Z");
 const HORA = 3_600_000;
@@ -79,6 +79,28 @@ describe("«Pagada» 12 horas después de acabarse", () => {
 
   it("no aplica mientras sigan abiertas las inscripciones", () => {
     expect(pagadaDesde(polla({ closes_at: new Date(AHORA + HORA).toISOString() }), hace(40), AHORA)).toBeNull();
+  });
+});
+
+describe("orden de Terminadas (2026-10-13, pedido del dueño)", () => {
+  const p = (id: string, closes: number, settled: number | null = null) =>
+    ({ id, closes_at: hace(closes), settled_at: settled === null ? null : hace(settled) }) as CasaPolla;
+
+  it("la más reciente primero, por cuándo se acabó", () => {
+    const vieja = p("vieja", 400), nueva = p("nueva", 300);
+    expect(recentFirst([vieja, nueva], { vieja: hace(200), nueva: hace(100) }).map((x) => x.id)).toEqual(["nueva", "vieja"]);
+  });
+
+  it("sin final cae al reparto y después al cierre de inscripciones", () => {
+    const repartida = p("repartida", 500, 50), enJuego = p("en-juego", 20), terminada = p("terminada", 300);
+    expect(recentFirst([terminada, repartida, enJuego], { terminada: hace(100) }).map((x) => x.id))
+      .toEqual(["en-juego", "repartida", "terminada"]);
+  });
+
+  it("no cambia la lista original", () => {
+    const lista = [p("a", 300), p("b", 100)];
+    recentFirst(lista, {});
+    expect(lista.map((x) => x.id)).toEqual(["a", "b"]);
   });
 });
 
