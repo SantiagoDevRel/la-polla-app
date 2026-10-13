@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { DISCREPANCIAS_DESDE } from "@/lib/admin/discrepancy-cutoff";
 import { requireCronSecret } from "@/lib/auth/cron-secret";
 import { matchesEnJuego } from "@/lib/matches/en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -46,11 +47,16 @@ export async function POST(request: NextRequest) {
   //    (2026-09-03) Contaba solo los del modelo P2P viejo, así que una polla
   //    de la casa trabada no disparaba ninguna alerta: se quedaba sin puntuar
   //    y nadie se enteraba.
+  //    (2026-10-13) Solo partidos desde OFIGOLAZO: lo anterior no importa.
   const admin = createAdminClient();
   const { filas: trabados } = await matchesEnJuego<{ id: string }>(
     admin,
     "id",
-    (q) => q.eq("status", "finished").is("final_verified_at", null),
+    (q) =>
+      q
+        .eq("status", "finished")
+        .is("final_verified_at", null)
+        .gte("scheduled_at", DISCREPANCIAS_DESDE),
   );
   const matchDiscrepancies = trabados.length;
 

@@ -8,6 +8,7 @@
 // re-chequeamos en cada handler como defensa en profundidad.
 
 import { NextResponse } from "next/server";
+import { DISCREPANCIAS_DESDE } from "@/lib/admin/discrepancy-cutoff";
 import { matchesEnJuego } from "@/lib/matches/en-juego";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
@@ -44,6 +45,8 @@ export async function GET() {
   // destrabar un partido en disputa, así que dejar fuera a los de la casa
   // significaba que una polla trabada no tenía salida por la interfaz —
   // solo corriendo SQL a mano.
+  //
+  // (2026-10-13) Solo partidos desde OFIGOLAZO: lo anterior no importa.
   const { filas: matches, errores } = await matchesEnJuego<MatchRow>(
     admin,
     "id, external_id, source_external_ids, tournament, home_team, away_team, home_team_flag, away_team_flag, home_score, away_score, status, scheduled_at, final_verification_notes",
@@ -51,6 +54,7 @@ export async function GET() {
       q
         .eq("status", "finished")
         .is("final_verified_at", null)
+        .gte("scheduled_at", DISCREPANCIAS_DESDE)
         .order("scheduled_at", { ascending: false }),
   );
 

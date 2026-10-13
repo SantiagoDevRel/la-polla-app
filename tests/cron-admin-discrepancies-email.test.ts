@@ -23,6 +23,7 @@ vi.mock("@/lib/matches/en-juego", () => ({ matchesEnJuego: mocks.matchesEnJuego 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: mocks.createAdminClient }));
 
 import { POST } from "@/app/api/cron/admin-discrepancies-email/route";
+import { DISCREPANCIAS_DESDE } from "@/lib/admin/discrepancy-cutoff";
 
 const SECRET = "test-cron-secret-0123456789";
 const ENV_KEYS = ["CRON_SECRET", "ADMIN_ALERT_EMAIL", "RESEND_API_KEY", "RESEND_FROM_EMAIL"] as const;
@@ -85,6 +86,24 @@ describe("POST /api/cron/admin-discrepancies-email", () => {
       sent: true,
       counts: { stuckPollas: 1, endedNoPayouts: 0, matchDiscrepancies: 0 },
     });
+  });
+
+  it("solo cuenta partidos trabados desde OFIGOLAZO", async () => {
+    mocks.collectPollaHealth.mockResolvedValue({ stuckPollas: [], endedNoPayouts: [] });
+
+    await POST(authorizedRequest());
+
+    const filtros = mocks.matchesEnJuego.mock.calls[0][2] as (q: unknown) => unknown;
+    const calls: unknown[][] = [];
+    const q: Record<string, (...args: unknown[]) => unknown> = {};
+    for (const method of ["eq", "is", "gte"]) {
+      q[method] = (...args) => {
+        calls.push([method, ...args]);
+        return q;
+      };
+    }
+    filtros(q);
+    expect(calls).toContainEqual(["gte", "scheduled_at", DISCREPANCIAS_DESDE]);
   });
 
   it("no llama a Resend cuando no hay nada que reportar", async () => {

@@ -9,7 +9,11 @@
 // el cron) la importan desde lib.
 //
 // Cero cambio de lógica vs el original — solo cambio de ubicación.
+//
+// (2026-10-13) Solo pollas creadas desde DISCREPANCIAS_DESDE (OFIGOLAZO):
+// lo anterior no importa. Ver lib/admin/discrepancy-cutoff.ts.
 
+import { DISCREPANCIAS_DESDE } from "@/lib/admin/discrepancy-cutoff";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface StuckPolla {
@@ -54,7 +58,8 @@ export async function collectPollaHealth(): Promise<{
   const { data: actives } = await admin
     .from("pollas")
     .select("id, slug, name, match_ids, buy_in_amount")
-    .eq("status", "active");
+    .eq("status", "active")
+    .gte("created_at", DISCREPANCIAS_DESDE);
 
   const stuckPollas: StuckPolla[] = [];
   for (const p of (actives ?? []) as Array<{
@@ -95,6 +100,7 @@ export async function collectPollaHealth(): Promise<{
     .from("pollas")
     .select("id, slug, name, payment_mode, buy_in_amount")
     .eq("status", "ended")
+    .gte("created_at", DISCREPANCIAS_DESDE)
     .gt("buy_in_amount", 0)
     .in("payment_mode", ["pay_winner", "admin_collects"]);
 
