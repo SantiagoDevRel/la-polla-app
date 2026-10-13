@@ -540,6 +540,19 @@ export function pagadaDesde(
   return now - Date.parse(fin) >= PAGADA_TRAS_HORAS * 3_600_000 ? fin : null;
 }
 
+/**
+ * (2026-10-13, pedido del dueño) Terminadas va de la más reciente a la más
+ * vieja: por cuándo se acabó (getPollaEndings), si no por el reparto, si no
+ * por el cierre de inscripciones. Devuelve una copia.
+ */
+export function recentFirst<T extends Pick<CasaPolla, "id" | "closes_at" | "settled_at">>(
+  pollas: readonly T[],
+  endings: Readonly<Record<string, string>>,
+): T[] {
+  const at = (polla: T) => Date.parse(endings[polla.id] ?? polla.settled_at ?? polla.closes_at);
+  return [...pollas].sort((a, b) => at(b) - at(a));
+}
+
 /** «Pagada 10 oct»: la fecha distingue una polla de otra en Terminadas. */
 export function pagadaLabel(fin: string): { text: string; tone: "live" } {
   const otroAno = new Date(fin).getFullYear() !== new Date().getFullYear();
