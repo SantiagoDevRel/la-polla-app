@@ -6,8 +6,12 @@ import { Trophy } from "lucide-react";
 import UserAvatar from "@/components/ui/UserAvatar";
 import type { CasaObjectResult } from "@/lib/casa/object-result";
 
-/** Resultado completo sin adjudicación automática. Oculto mientras faltan partidos. */
-export function ObjectResult({ slug }: { slug: string }) {
+/**
+ * Resultado completo sin adjudicación automática. Oculto mientras faltan partidos.
+ * `pagada`: la polla ya sale «Pagada» (12 h después de acabarse), así que no
+ * se anuncia como pendiente de confirmación.
+ */
+export function ObjectResult({ slug, pagada = false }: { slug: string; pagada?: boolean }) {
   const [result, setResult] = useState<CasaObjectResult | null>(null);
   const [error, setError] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -74,6 +78,6 @@ export function ObjectResult({ slug }: { slug: string }) {
         <span className="block text-[13px] font-normal leading-[1.5] text-text-secondary">{result.winner.points} puntos{result.tied ? " · Desempate por registro" : ""}</span>
       </p>
     </div>
-    <p className="mt-2 text-[13px] leading-[1.5] text-text-secondary">Pendiente de confirmación de la casa.</p>
+    {!pagada && <p className="mt-2 text-[13px] leading-[1.5] text-text-secondary">Pendiente de confirmación de la casa.</p>}
   </section>;
 }

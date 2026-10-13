@@ -24,6 +24,7 @@ import {
   type CasaQuestion,
   type CasaSettlementReadiness,
   isPollaPublished,
+  pollaFinishedAt,
 } from "./types";
 
 async function withDrawState(pollas: CasaPolla[]): Promise<CasaPolla[]> {
@@ -505,6 +506,49 @@ export async function getPayoutProgress(pollaIds: string[]): Promise<Record<stri
       // siempre escribe paid_at y proof_path juntos).
       if (row.paid_at) item.paid += 1;
     }
+  }
+  return out;
+}
+
+/**
+ * Cuándo se acabó cada polla de partidos (pollaFinishedAt), para mostrarla
+ * «Pagada» 12 h después. Las que todavía tienen un partido sin resultado no
+ * aparecen. Lotes de 20 pollas y páginas de 1000 filas: PostgREST corta en
+ * 1000 sin avisar, y un corte dejaría una polla «terminada» antes de tiempo.
+ */
+export async function getPollaEndings(pollaIds: string[]): Promise<Record<string, string>> {
+  const ids = [...new Set(pollaIds)];
+  const links = new Map<string, Array<{ final_verified_at: string | null; voided_at: string | null }>>();
+  const db = createAdminClient();
+  for (let start = 0; start < ids.length; start += 20) {
+    const batch = ids.slice(start, start + 20);
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await db
+        .from("casa_polla_matches")
+        .select("polla_id, match_id, voided_at, match:matches!inner(final_verified_at)")
+        .in("polla_id", batch)
+        .order("polla_id", { ascending: true })
+        .order("match_id", { ascending: true })
+        .range(offset, offset + 999);
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as Array<{
+        polla_id: string;
+        voided_at: string | null;
+        match: { final_verified_at: string | null } | Array<{ final_verified_at: string | null }> | null;
+      }>;
+      for (const row of rows) {
+        const match = Array.isArray(row.match) ? row.match[0] : row.match;
+        const list = links.get(row.polla_id) ?? [];
+        list.push({ final_verified_at: match?.final_verified_at ?? null, voided_at: row.voided_at });
+        links.set(row.polla_id, list);
+      }
+      if (rows.length < 1000) break;
+    }
+  }
+  const out: Record<string, string> = {};
+  for (const [id, rows] of links) {
+    const fin = pollaFinishedAt(rows);
+    if (fin) out[id] = fin;
   }
   return out;
 }

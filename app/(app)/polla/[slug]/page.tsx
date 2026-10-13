@@ -30,6 +30,7 @@ import {
   getPayouts,
   getActiveProofs,
   getFixedPrizeThreshold,
+  getPollaEndings,
   getProvisionalPrizes,
 } from "@/lib/casa/queries";
 import { signPayoutProofs } from "@/lib/casa/payout-proofs";
@@ -40,6 +41,8 @@ import {
   isLiveEntry,
   isPollaOpen,
   isPublicClosedPolla,
+  pagadaDesde,
+  pagadaLabel,
   pollaStatusLabel,
   type CasaPayout,
   type CasaPolla,
@@ -149,6 +152,11 @@ export default async function PollaPage({
   // Invitaciones (migración 135): el código propio para Compartir y, si la
   // persona llegó por un enlace y todavía puede elegir, quién la invitó.
   const referralHint = validReferralCode((await cookies()).get(REFERRAL_COOKIE)?.value);
+  // Cuándo se acabó (12 h después sale «Pagada», igual que en Inicio). Si la
+  // lectura falla, la polla se ve con su estado de siempre.
+  const endingsPromise = polla.kind === "partidos" && !isPollaOpen(polla)
+    ? getPollaEndings([polla.id]).catch((): Record<string, string> => ({}))
+    : Promise.resolve<Record<string, string>>({});
   const [pot, bestEntry, entries, matches, questions, distribution, tabla, payouts, isAdmin, threshold, prizes, referral, invitee] =
     await Promise.all([
       getPot(polla.id),
@@ -210,7 +218,8 @@ export default async function PollaPage({
     .filter((cortesia) => cortesia.slug === polla.slug);
   const canResumeProof = !abierta && polla.kind !== "rifa" && entry?.status === "pendiente" && !entry.proof_path
     ? (await getActiveProofs(polla.id, user.id)).some((proof) => proof.entry_id === entry.id) : false;
-  const estado = pollaStatusLabel(polla);
+  const pagada = pagadaDesde(polla, (await endingsPromise)[polla.id] ?? null);
+  const estado = pagada ? pagadaLabel(pagada) : pollaStatusLabel(polla);
   // `anulada` cuenta igual que `rechazada`: NO estás inscrito. Es el estado que
   // deja el endpoint de join cuando se cae la subida del comprobante, y existe
   // justamente para que la persona pueda volver a intentar. Tratarla como
@@ -411,7 +420,7 @@ export default async function PollaPage({
         )}
 
         {objeto && polla.kind !== "rifa" && payouts.length === 0 && polla.status !== "resuelta" &&
-          <ObjectResult key={polla.slug} slug={polla.slug} />}
+          <ObjectResult key={polla.slug} slug={polla.slug} pagada={Boolean(pagada)} />}
 
         {isQuentroPolla(polla) && bestEntry?.status === "pagada" &&
           (polla.status !== "resuelta" || payouts.some((payout) => payout.user_id === user.id)) && <PrizeContact slug={polla.slug} />}
@@ -553,7 +562,8 @@ export default async function PollaPage({
           </div>
         )}
 
-        {partidosTerminados && payouts.length === 0 && (
+        {/* «Confirmando ganadores y pago» se calla cuando la polla ya sale «Pagada». */}
+        {partidosTerminados && payouts.length === 0 && !pagada && (
           <StreetCard className="mt-4 border-turf/40 p-4 first:mt-0">
             <p className="lp-label !text-turf">Todos los partidos terminaron</p>
             <p className="mt-1 text-[15px] leading-relaxed text-text-secondary">Confirmando ganadores y pago.</p>

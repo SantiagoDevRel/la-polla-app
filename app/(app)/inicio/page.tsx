@@ -31,9 +31,10 @@ import {
   listPublicPollas,
   getPots,
   getPayoutProgress,
+  getPollaEndings,
   listPollasConPicksPendientes,
 } from "@/lib/casa/queries";
-import { isPollaOpen, isPublicClosedPolla, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
+import { isPollaOpen, isPublicClosedPolla, pagadaDesde, pagadaLabel, pollaStatusLabel, type CasaPolla } from "@/lib/casa/types";
 import { entryPriceLabel, formatCop, timeLeft } from "@/lib/casa/format";
 import { premioLabel, premioValor } from "@/lib/casa/premio";
 import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
@@ -69,14 +70,28 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
     );
   }
 
-  const [pollas, myPollas, isAdmin, enVivo] = await Promise.all([
-    listPublicPollas(),
+  const publicPollas = listPublicPollas();
+  const [pollas, myPollas, isAdmin, enVivo, endings] = await Promise.all([
+    publicPollas,
     listMyPollas(user.id),
     isCurrentUserAdmin(),
     // Partidos en juego de MIS pollas, con mi pronóstico. Si falla, la
     // pantalla sale sin la franja en vez de caerse.
     listMyLiveMatches(user.id).catch(() => []),
+    // Cuándo se acabó cada polla de partidos que ya no recibe inscripciones.
+    // Si falla, ninguna sale «Pagada» y la pantalla sigue como antes.
+    publicPollas
+      .then((all) => getPollaEndings(all.filter((p) => p.kind === "partidos" && !isPollaOpen(p)).map((p) => p.id)))
+      .catch((): Record<string, string> => ({})),
   ]);
+  // (2026-10-13, pedido del dueño) 12 h después de acabarse, la polla sale
+  // «Pagada» y pasa a Terminadas, aunque el reparto siga sin registrarse.
+  const now = Date.now();
+  const pagadas = new Map<string, string>();
+  for (const polla of pollas) {
+    const fin = pagadaDesde(polla, endings[polla.id] ?? null, now);
+    if (fin) pagadas.set(polla.id, fin);
+  }
   const privatePollas = await listHiddenAdminPollas({ id: user.id, is_admin: isAdmin });
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
   // paso sigue con status abierta hasta que alguien la cierre, y quedaba
@@ -85,7 +100,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
   // Mis pollas solo lleva las que siguen en juego: una finalizada pasa sola a
   // Pollas cerradas (marcada "Participaste"), y una en juego no se repite abajo.
   const joinedIds = new Set(myPollas.map(p => p.id));
-  const enJuegoMias = myPollas.filter(p => p.status !== "resuelta" && p.status !== "anulada");
+  const enJuegoMias = myPollas.filter(p => p.status !== "resuelta" && p.status !== "anulada" && !pagadas.has(p.id));
   const enJuegoIds = new Set(enJuegoMias.map(p => p.id));
   // Cerradas: las públicas (desde el 16-sep) para todos; las anteriores, solo
   // para quien participó.
@@ -96,7 +111,8 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
     listPollasConPicksPendientes(user.id),
     getPollaTournamentSlugs([...pollas, ...privatePollas]),
     // Prueba de pago (migración 133): qué pollas cerradas ya pagaron su premio.
-    getPayoutProgress(cerradas.filter((p) => p.status === "resuelta").map((p) => p.id))
+    // Las «Pagada» no la necesitan: su etiqueta ya lo dice.
+    getPayoutProgress(cerradas.filter((p) => p.status === "resuelta" && !pagadas.has(p.id)).map((p) => p.id))
       .catch((): Record<string, { total: number; paid: number }> => ({})),
   ]);
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
@@ -200,7 +216,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
         <PollaSection id="pollas-cerradas" kind="closed" title="Terminadas" description="Pollas que ya no reciben inscripciones" count={cerradas.length}>
               <ul className="grid gap-3">
                 {cerradas.map((polla) => (
-                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} participated={joinedIds.has(polla.id)} closed />
+                  <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} pagada={pagadas.get(polla.id)} participated={joinedIds.has(polla.id)} closed />
                 ))}
               </ul>
         </PollaSection>
@@ -228,6 +244,7 @@ function PollaRow({
   tournaments,
   editable = false,
   payout,
+  pagada,
   participated = false,
   closed = false,
   hidden = false,
@@ -239,6 +256,8 @@ function PollaRow({
   editable?: boolean;
   /** Premios en dinero pagados con comprobante / totales (migración 133). */
   payout?: { total: number; paid: number };
+  /** Cuándo se acabó, si ya se muestra «Pagada» (pagadaDesde). */
+  pagada?: string;
   /** La persona tuvo inscripción en esta polla ya terminada. */
   participated?: boolean;
   /** Sección Pollas cerradas: tono gris translúcido. */
@@ -246,7 +265,7 @@ function PollaRow({
   /** Borrador u oculta: las pollas normales abren el editor administrativo. */
   hidden?: boolean;
 }) {
-  const estado = hidden ? { text: "Oculta", tone: "mute" as const } : pollaStatusLabel(polla);
+  const estado = hidden ? { text: "Oculta", tone: "mute" as const } : pagada ? pagadaLabel(pagada) : pollaStatusLabel(polla);
   const abierta = isPollaOpen(polla);
   const premioPagado = Boolean(payout && payout.total > 0 && payout.paid === payout.total);
   const localPrize = pollaPrizeMedia(polla.id);
@@ -279,7 +298,7 @@ function PollaRow({
               {/* Hueco de la tuerca del administrador: solo corre el nombre, no la fila del premio. */}
               {editable && <span aria-hidden="true" className="w-10 shrink-0" />}
             </>}
-            premioLabel={payout && payout.total > 0
+            premioLabel={!pagada && payout && payout.total > 0
               ? <span className={`flex items-center gap-1 ${premioPagado ? "text-turf" : ""}`}>
                   <CheckCircle2 aria-hidden="true" className="h-3 w-3 max-w-none shrink-0" />
                   {premioPagado ? "Pagado" : `Pagado ${payout.paid} de ${payout.total}`}

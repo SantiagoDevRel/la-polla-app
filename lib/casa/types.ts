@@ -488,6 +488,64 @@ export function pollaStatusLabel(polla: CasaPolla): {
   return { text: "Abierta", tone: "live" };
 }
 
+/**
+ * (2026-10-13, pedido del dueño) 12 horas después de que una polla se acaba,
+ * la gente la ve «Pagada» y en Terminadas de Inicio, sin esperar a que el
+ * administrador registre el reparto o el pago. Es solo lo que ve el jugador:
+ * no reparte ni marca pagos en la base, y el panel de admin sigue mostrando
+ * el estado real (pollaStatusLabel).
+ */
+export const PAGADA_TRAS_HORAS = 12;
+
+/**
+ * Cuándo se acabó una polla de partidos: el último resultado verificado o
+ * partido anulado. null mientras a un partido vivo le falte el resultado (un
+ * aplazado o un caso abierto en /admin/issues la mantienen en juego), y si
+ * todos sus partidos están anulados.
+ */
+export function pollaFinishedAt(
+  links: ReadonlyArray<{ final_verified_at: string | null; voided_at: string | null }>,
+): string | null {
+  let last: string | null = null;
+  let vivos = 0;
+  for (const link of links) {
+    if (!link.voided_at) {
+      if (!link.final_verified_at) return null;
+      vivos += 1;
+    }
+    const at = link.voided_at ?? link.final_verified_at;
+    if (at && (!last || Date.parse(at) > Date.parse(last))) last = at;
+  }
+  return vivos > 0 ? last : null;
+}
+
+/**
+ * Si la polla ya se muestra «Pagada», devuelve cuándo se acabó (para la fecha
+ * de la etiqueta); si no, null. `finishedAt` sale de pollaFinishedAt; las
+ * pollas sin partidos (preguntas, rifas) se acaban con el reparto.
+ *
+ * No aplica a una polla anulada, con desempate pendiente o donde nadie sumó
+ * puntos (no hay a quién pagarle).
+ */
+export function pagadaDesde(
+  polla: Pick<CasaPolla, "status" | "closes_at" | "settled_at"> & Partial<Pick<CasaPolla, "settlement_outcome" | "draw_pending">>,
+  finishedAt: string | null,
+  now = Date.now(),
+): string | null {
+  if (polla.status === "anulada" || polla.status === "borrador" || polla.draw_pending) return null;
+  if (polla.settlement_outcome === "house_retained_zero_points") return null;
+  if (Date.parse(polla.closes_at) > now) return null;
+  const fin = finishedAt ?? (polla.status === "resuelta" ? polla.settled_at : null);
+  if (!fin) return null;
+  return now - Date.parse(fin) >= PAGADA_TRAS_HORAS * 3_600_000 ? fin : null;
+}
+
+/** «Pagada 10 oct»: la fecha distingue una polla de otra en Terminadas. */
+export function pagadaLabel(fin: string): { text: string; tone: "live" } {
+  const otroAno = new Date(fin).getFullYear() !== new Date().getFullYear();
+  return { text: `Pagada ${formatShortDate(fin, { year: otroAno })}`, tone: "live" };
+}
+
 /** Resultado 1X2 real de un partido, a 90 minutos. null si no se verifico. */
 export function result1x2(
   homeScore: number | null,
