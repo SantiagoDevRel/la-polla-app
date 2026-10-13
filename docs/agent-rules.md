@@ -108,6 +108,12 @@ read each section here. These rules are as binding as `AGENTS.md`.
   caches and the worker registration.
   [Updates](../README.md#actualizaciones-publicadas).
 
+- Players see a pool as «Pagada <date>» in Terminadas 12 h after its last match result
+  (verified or voided; settlement for questions and raffles), even before the admin
+  records settlement or payment. Display only, never a payout write; admin views keep
+  the real status. Excluded: void pools, pending draws, nobody scored.
+  [Pagada](../README.md#pagada-12-h-después-de-terminar-2026-10-13).
+
 ## Tooling
 
 - The secret scanner reads immutable staged blobs offline, redacts findings and blocks

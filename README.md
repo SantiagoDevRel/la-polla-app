@@ -1354,6 +1354,19 @@ empezados aunque no se haya inscrito (sin «Tu pronóstico»). Las cerradas ante
 solo las ven sus participantes. Los comprobantes de pago siguen privados (pueden
 mostrar la cuenta del ganador). La tabla ya era visible con sesión.
 
+#### «Pagada» 12 h después de terminar (2026-10-13)
+
+Pedido del dueño: 12 horas después de que una polla se acaba, el jugador la ve
+«Pagada 10 oct» (verde) y en Terminadas de Inicio, fuera de Mis pollas, aunque el
+administrador todavía no haya registrado el reparto o el pago. Una polla de
+partidos se acaba con el último resultado verificado o partido anulado
+(`getPollaEndings` → `pollaFinishedAt`); las de preguntas y rifas, con el reparto.
+`pagadaDesde` (`lib/casa/types.ts`) decide; no aplica a anuladas, desempates
+pendientes ni pollas donde nadie sumó puntos. El detalle de la polla usa la misma
+etiqueta y deja de decir «Confirmando ganadores y pago». Es solo visualización: no
+escribe `casa_payouts` ni reparte, y el panel de admin sigue con el estado real
+(`pollaStatusLabel`). Pruebas: `tests/casa-pagada.test.ts`.
+
 `components/casa/MyPollas.tsx` muestra las inscripciones reales del usuario,
 con contador, estado de pago, búsqueda y páginas de cinco cuando hay muchas.
 En `/casa`, el orden es Mis pollas, Pollas disponibles y Pollas cerradas. Mis pollas
