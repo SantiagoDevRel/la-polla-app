@@ -1,8 +1,11 @@
-// app/(app)/casa/page.tsx — el inicio de la polla centralizada.
+// app/(app)/page.tsx — el inicio de la polla centralizada, en la raíz.
 //
 // Lo primero que ve un barrista: cuánta plata hay en juego ahora mismo, y qué
 // pollas están abiertas este fin de semana. El pozo es el gancho, así que es
 // lo más grande de la pantalla y lo único en el acento.
+//
+// (2026-10-14) Vive en `/` para que el enlace limpio lapollacolombiana.com
+// abra las pollas. `/inicio` y `/casa` redirigen acá con 308 (proxy.ts).
 
 import Link from "next/link";
 import { Fragment } from "react";
@@ -55,7 +58,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login?returnTo=/inicio");
+  if (!user) redirect("/login");
 
   // Rifas de creadores (migración 157): pestañas POLLAS | RIFAS, solo con el
   // flag y fuera de la app iOS. La pestaña RIFAS no carga nada de las pollas.

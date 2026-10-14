@@ -94,7 +94,7 @@ describe("compartir con código", () => {
     expect(referralLink("https://lapollacolombiana.com", "ofigolazo", "JUANPE4821"))
       .toBe("https://lapollacolombiana.com/polla/ofigolazo?ref=JUANPE4821");
     expect(referralLink("https://lapollacolombiana.com", "ofigolazo", null)).toBe("https://lapollacolombiana.com/polla/ofigolazo");
-    expect(referralLink("https://lapollacolombiana.com", null, "ANA0001")).toBe("https://lapollacolombiana.com/inicio?ref=ANA0001");
+    expect(referralLink("https://lapollacolombiana.com", null, "ANA0001")).toBe("https://lapollacolombiana.com/?ref=ANA0001");
   });
 
   it("el mensaje dice el código para quien entre sin el enlace", () => {
@@ -197,7 +197,7 @@ describe("proxy: los enlaces viejos de /casa siguen abriendo", () => {
   };
 
   it("la lista, la polla y su pago se mudan con 308", async () => {
-    expect(await permanente("/casa")).toEqual({ status: 308, location: "https://lapollacolombiana.com/inicio" });
+    expect(await permanente("/casa")).toEqual({ status: 308, location: "https://lapollacolombiana.com/" });
     expect(await permanente("/casa/ofigolazo")).toEqual({ status: 308, location: "https://lapollacolombiana.com/polla/ofigolazo" });
     expect(await permanente("/casa/ofigolazo/pagar")).toEqual({ status: 308, location: "https://lapollacolombiana.com/polla/ofigolazo/pagar" });
   });
@@ -211,6 +211,36 @@ describe("proxy: los enlaces viejos de /casa siguen abriendo", () => {
   it("no toca el panel de administración ni las API", async () => {
     expect((await permanente("/casa/admin")).status).not.toBe(308);
     expect((await permanente("/api/casa/mis-pollas")).status).not.toBe(308);
+  });
+});
+
+// (2026-10-14) La lista vive en `/`: el enlace limpio lapollacolombiana.com
+// abre las pollas. `/inicio` está en invitaciones viejas, en el bot y en
+// marcadores: redirige con su query, y `/` se sirve sin redirigir.
+describe("proxy: la lista de pollas vive en la raíz", () => {
+  const navegar = async (path: string, method = "GET") => {
+    const response = await proxy(new NextRequest(`https://lapollacolombiana.com${path}`, { method, headers: { "sec-fetch-dest": "document" } }));
+    return { status: response.status, location: response.headers.get("location") };
+  };
+
+  it("/inicio se muda a / con 308 y conserva la query", async () => {
+    expect(await navegar("/inicio")).toEqual({ status: 308, location: "https://lapollacolombiana.com/" });
+    expect(await navegar("/inicio?tab=rifas")).toEqual({ status: 308, location: "https://lapollacolombiana.com/?tab=rifas" });
+    expect(await navegar("/inicio?ref=ANA0001")).toEqual({ status: 308, location: "https://lapollacolombiana.com/?ref=ANA0001" });
+  });
+
+  it("/ no redirige: es la pantalla", async () => {
+    vi.mocked(updateSession).mockClear();
+    expect(await navegar("/")).toEqual({ status: 200, location: null });
+    expect(updateSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("las rutas retiradas caen en /", async () => {
+    expect(await navegar("/dashboard")).toEqual({ status: 307, location: "https://lapollacolombiana.com/" });
+  });
+
+  it("un POST a /inicio no se redirige", async () => {
+    expect((await navegar("/inicio", "POST")).status).toBe(200);
   });
 });
 
@@ -244,6 +274,6 @@ describe("aviso de cupo gratis por Telegram", () => {
     expect(message.text).toContain("¡Ganaste un cupo gratis!");
     expect(message.text).toContain("5 personas que invitaste ya pagaron una polla.");
     expect(message.text).toContain("Úsalo en la polla que quieras");
-    expect(message.buttons[0][0]).toEqual({ text: "👉 Ver las pollas", url: "https://lapollacolombiana.com/inicio" });
+    expect(message.buttons[0][0]).toEqual({ text: "👉 Ver las pollas", url: "https://lapollacolombiana.com/" });
   });
 });

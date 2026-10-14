@@ -98,7 +98,7 @@ describe("private six-digit password", () => {
   it("only permits the credential owner session and sanitizes returnTo", async () => {
     const db = database({ user_id: "00000000-0000-4000-8000-000000000010", ...await hashPhonePassword("012345") }); mocks.admin.mockReturnValue(db);
     const response = await login(request({ phone: "+573001234567", password: "012345", returnTo: "https://evil.test" }));
-    expect(response.status).toBe(200); expect((await response.json()).redirectTo).toBe("/inicio");
+    expect(response.status).toBe(200); expect((await response.json()).redirectTo).toBe("/");
     const options = mocks.session.mock.calls[0][2];
     expect(await options.authorize({ authUserId: "00000000-0000-4000-8000-000000000010", created: false })).toBe(true);
     expect(await options.authorize({ authUserId: "other", created: false })).toBe(false);

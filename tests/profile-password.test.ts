@@ -25,7 +25,7 @@ describe("password management from profile", () => {
   it("keeps registration optional and sanitizes external destinations", async () => {
     mocks.user.mockResolvedValue({ data: { user: { id: "owner-id" } } });
     const page = await SetPasswordPage({ searchParams: Promise.resolve({ returnTo: "https://evil.test" }) });
-    expect(page.props).toEqual({ returnTo: "/inicio", manage: false, hasPassword: false, ownerId: "owner-id", revision: 0 });
+    expect(page.props).toEqual({ returnTo: "/", manage: false, hasPassword: false, ownerId: "owner-id", revision: 0 });
   });
   it("distinguishes an existing password using the verified user", async () => {
     const user = { id: "owner-id" };

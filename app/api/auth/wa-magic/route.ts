@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     });
     if (!session.ok) return redirect(request, "/login/whatsapp?estado=unavailable");
     void recordLoginEvent({ userId: session.userId, method: "otp", request });
-    const response = redirect(request, session.needsOnboarding ? "/onboarding" : "/inicio");
+    const response = redirect(request, session.needsOnboarding ? "/onboarding" : "/");
     applyOnboardingCookie(response, session.needsOnboarding);
     return response;
   } catch {

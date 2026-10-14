@@ -40,7 +40,7 @@ export default function AdminMatchesPage() {
 
       >
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => router.push("/inicio")} className="text-text-secondary hover:text-gold transition-colors duration-200 cursor-pointer">
+          <button onClick={() => router.push("/")} className="text-text-secondary hover:text-gold transition-colors duration-200 cursor-pointer">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-bold text-text-primary">Admin — Partidos</h1>

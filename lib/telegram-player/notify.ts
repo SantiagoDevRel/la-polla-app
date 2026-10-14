@@ -144,7 +144,7 @@ export function referralGiftMessage(n: ReferralGiftNotice): { text: string; butt
         : "Las personas que invitaste ya pagaron una polla.",
       "Úsalo en la polla que quieras: entra y toca «Usar mi cupo gratis».",
     ].join("\n"),
-    buttons: [[{ text: "👉 Ver las pollas", url: "https://lapollacolombiana.com/inicio" }]],
+    buttons: [[{ text: "👉 Ver las pollas", url: "https://lapollacolombiana.com/" }]],
   };
 }
 

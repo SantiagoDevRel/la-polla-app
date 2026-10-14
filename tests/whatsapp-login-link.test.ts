@@ -126,7 +126,7 @@ describe("one-use login confirmation", () => {
   it("claims atomically then logs in as signed sender, not a supplied phone", async () => {
     const db = database(); m.admin.mockReturnValue(db);
     const res = await POST(post({}, `t=${token}&phone=573009999999`));
-    expect(res.status).toBe(303); expect(res.headers.get("location")).toBe("https://lapollacolombiana.com/inicio");
+    expect(res.status).toBe(303); expect(res.headers.get("location")).toBe("https://lapollacolombiana.com/");
     expect(m.session).toHaveBeenCalledWith(phone, "wa-link", expect.any(Object));
     expect(db.q.is).toHaveBeenCalledWith("consumed_at", null); expect(db.q.gt).toHaveBeenCalledWith("expires_at", expect.any(String));
     expect(res.headers.get("cache-control")).toContain("no-store"); expect(m.cookie).toHaveBeenCalled();

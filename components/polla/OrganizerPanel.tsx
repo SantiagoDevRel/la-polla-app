@@ -204,7 +204,7 @@ export default function OrganizerPanel({
       // Send the user out before the now-empty page re-fetches and
       // 404s on its own. router.replace so the back button doesn't
       // bring them to a dead URL.
-      router.replace("/inicio");
+      router.replace("/");
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       showToast(

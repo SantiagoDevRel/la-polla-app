@@ -24,7 +24,7 @@ function returnDestination() {
   const destination = safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"))
     || safeReturnTo(readLoginStorage("lp_returnTo"));
   writeLoginStorage("lp_returnTo", null);
-  return destination || "/inicio";
+  return destination || "/";
 }
 
 function StepDots({

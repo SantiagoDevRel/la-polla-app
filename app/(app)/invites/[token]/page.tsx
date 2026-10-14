@@ -1,4 +1,5 @@
 // app/(app)/invites/[token]/page.tsx — Accept a polla invite via token
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
@@ -102,12 +103,12 @@ async function InviteError({ message }: { message: string }) {
           {t("errInvalidTitle")}
         </h2>
         <p className="text-sm text-text-secondary mb-6">{message}</p>
-        <a
-          href="/inicio"
+        <Link
+          href="/"
           className="inline-block bg-gold text-bg-base font-semibold py-3 px-6 rounded-xl hover:brightness-110 transition-all"
         >
           {t("goHome")}
-        </a>
+        </Link>
       </div>
     </div>
   );

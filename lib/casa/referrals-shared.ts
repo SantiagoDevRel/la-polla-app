@@ -66,7 +66,7 @@ export function isGiftEntry(entry: Pick<CasaEntry, "origin"> | null | undefined)
 
 /** Enlace de invitación con el dominio público; sin polla lleva al inicio. */
 export function referralLink(origin: string, slug: string | null, code: string | null): string {
-  const base = slug ? `${origin}/polla/${encodeURIComponent(slug)}` : `${origin}/inicio`;
+  const base = slug ? `${origin}/polla/${encodeURIComponent(slug)}` : `${origin}/`;
   return code ? `${base}?${REFERRAL_PARAM}=${encodeURIComponent(code)}` : base;
 }
 

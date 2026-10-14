@@ -5,7 +5,7 @@
   "description": "La polla del fin de semana: entras, pronosticas y compites por el pozo.",
   "lang": "es-CO",
   "dir": "ltr",
-  "start_url": "/casa",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#080c10",

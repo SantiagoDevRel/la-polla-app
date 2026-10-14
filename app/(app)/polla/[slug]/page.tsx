@@ -136,7 +136,7 @@ export default async function PollaPage({
   // casa ya está publicitando — torneo, nombre, pozo, entrada, cierre y
   // partidos —: cero tabla de posiciones, cero participantes, cero pronósticos. Esa
   // línea la sostiene también el middleware, que solo abre `/polla/<slug>` y
-  // deja `/inicio`, `/casa/admin` y `/polla/<slug>/pagar` pidiendo sesión.
+  // deja `/`, `/casa/admin` y `/polla/<slug>/pagar` pidiendo sesión.
   if (!user) {
     const [potPublico, tournaments, matches] = await Promise.all([
       getPot(polla.id),
@@ -707,7 +707,7 @@ export default async function PollaPage({
           />
         )}
 
-        {isAdmin && !privateCampaign && !polla.draw_pending && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/inicio" />}
+        {isAdmin && !privateCampaign && !polla.draw_pending && <EliminarPolla id={polla.id} nombre={polla.name} redirectTo="/" />}
       </div>
       {/* Aviso de invitaciones (2026-09-17): solo en la polla del aviso. */}
       {promo && <PromoInvitados promo={promo} />}

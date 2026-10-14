@@ -149,7 +149,7 @@ export default function AdminPage() {
     <div className="pb-28">
       <HeroFrame height="h-[150px]">
         <Link
-          href="/inicio"
+          href="/"
           className="mb-3 inline-flex items-center gap-2 text-text-secondary transition-colors hover:text-text-primary"
         >
           <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />

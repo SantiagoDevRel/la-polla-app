@@ -1438,7 +1438,7 @@ export default function PollaSlugPage() {
         <div className="rounded-2xl p-6 text-center max-w-sm w-full lp-card">
           <div className="mb-3"><Info className="w-10 h-10 text-text-muted mx-auto" /></div>
           <p className="text-text-primary font-medium mb-4">{error || t("notFound")}</p>
-          <button onClick={() => router.push("/inicio")} className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold">
+          <button onClick={() => router.push("/")} className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold">
             {tCommon("back")}
           </button>
         </div>

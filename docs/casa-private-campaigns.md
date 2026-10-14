@@ -8,7 +8,7 @@ no se insertan partidos ficticios en `matches` ni se crean pronósticos.
 ## Acceso y vista previa
 
 Desde el 2026-10-04, **Borradores privados** aparece siempre para administradores
-en `/inicio`, con contador y desplegable, siempre comprimido al cargar.
+en `/`, con contador y desplegable, siempre comprimido al cargar.
 Incluye pollas sin archivar con `status=borrador` o `publication_mode=oculta`
 que aún estén dentro de su ventana administrativa: `canEditPolla` excluye vencidas,
 cerradas, finalizadas y desempates en curso. También filtra estado y cierre en SQL.
@@ -17,7 +17,7 @@ Las normales abren su editor
 administrativo; las campañas abren el detalle habitual. Cualquier administrador
 vigente puede leer las campañas, aunque no esté en su lista histórica de acceso.
 
-La navegación normal **POLLAS** (`/inicio`) muestra las campañas con
+La navegación normal **POLLAS** (`/`) muestra las campañas con
 el mismo `PollaCardBody` de las demás pollas, foto privada del premio y gorro SVG
 sobre la N de «navideña». Los títulos numerados conservan #1/#2 visible aunque
 el resto del nombre se recorte en la tarjeta; dentro se lee el título completo.
