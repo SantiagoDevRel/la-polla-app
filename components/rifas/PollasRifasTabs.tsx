@@ -1,4 +1,4 @@
-// components/rifas/PollasRifasTabs.tsx — pestañas POLLAS | RIFAS arriba de /inicio.
+// components/rifas/PollasRifasTabs.tsx — pestañas POLLAS | RIFAS arriba de la lista (/).
 //
 // Enlaces (?tab=rifas), no estado de cliente: la pestaña RIFAS se renderiza en
 // el servidor sin cargar las pollas, y el enlace se puede compartir o volver
@@ -16,8 +16,8 @@ export function PollasRifasTabs({ active }: { active: "pollas" | "rifas" }) {
   return (
     <nav aria-label="Pollas o rifas" className="px-4 pb-3">
       <div className="flex gap-1 rounded-full border border-border-default bg-bg-card/80 p-1 backdrop-blur-sm">
-        {tab("pollas", "POLLAS", "/inicio")}
-        {tab("rifas", "RIFAS", "/inicio?tab=rifas")}
+        {tab("pollas", "POLLAS", "/")}
+        {tab("rifas", "RIFAS", "/?tab=rifas")}
       </div>
     </nav>
   );

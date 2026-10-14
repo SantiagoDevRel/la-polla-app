@@ -266,7 +266,7 @@ try {
     const pg = await c.newPage();
     await pg.goto(`${APP}/rifa/${slug}`);
     await shot(pg, `20-comprador-${width}`);
-    await pg.goto(`${APP}/inicio?tab=rifas`);
+    await pg.goto(`${APP}/?tab=rifas`);
     await shot(pg, `21-pestana-rifas-${width}`);
     await c.close();
     const cc = await contextFor(people.creator, { width });
@@ -279,7 +279,7 @@ try {
   const zp = await zoom.newPage();
   await zp.goto(`${APP}/rifa/${slug}`);
   await shot(zp, "30-comprador-320-texto-200");
-  await zp.goto(`${APP}/inicio?tab=rifas`);
+  await zp.goto(`${APP}/?tab=rifas`);
   await shot(zp, "31-pestana-rifas-320-texto-200");
   const zc = await contextFor(people.creator, { width: 320, textZoom: true });
   const zcp = await zc.newPage();

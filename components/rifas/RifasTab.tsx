@@ -42,7 +42,7 @@ export function RifasTab({ data }: { data: RifaMyList }) {
           <p className="text-[15px] text-text-secondary">Cuando abras el enlace de una rifa, aparece aquí.</p>
           {data.can_create
             ? <Link href="/rifas/crear" className="lp-btn lp-btn-primary w-full">Crear mi rifa</Link>
-            : <Link href="/inicio" className="lp-btn lp-btn-ghost w-full">Ver pollas</Link>}
+            : <Link href="/" className="lp-btn lp-btn-ghost w-full">Ver pollas</Link>}
         </div>
       </div>
     );

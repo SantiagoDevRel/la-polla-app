@@ -11,8 +11,8 @@ proveedores ni los helpers retirados de ESPN/football-data.
 
 ## Comportamiento
 
-- `/inicio` (`/casa` redirige aquí): carrusel horizontal «Resúmenes de hoy», únicamente para
-  partidos terminados incluidos en pollas publicadas de la Casa. El alcance
+- `/` (`/inicio` y `/casa` redirigen aquí): carrusel horizontal «Resúmenes de
+  hoy», únicamente para partidos terminados incluidos en pollas publicadas de la Casa. El alcance
   confirmado por el usuario el 20 de septiembre de 2026 es todo el catálogo
   publicado, no solo las pollas en las que está inscrita cada persona.
 - `/polla/[slug]`: el mismo carrusel, restringido a esa polla y al día actual.

@@ -13,6 +13,6 @@ export default async function AdminRifasPage() {
   if (!rifasEnabled()) notFound();
   const user = await getAuthenticatedUser();
   if (!user) redirect("/login?returnTo=/admin/rifas");
-  if (!user.is_admin) redirect("/inicio");
+  if (!user.is_admin) redirect("/");
   return <RifasAdmin />;
 }

@@ -79,7 +79,7 @@ export function InvitacionesPerfil() {
           </p>
         </div>
         {profile.available > 0 && (
-          <Link href="/inicio" className="lp-btn lp-btn-primary min-h-11 w-full gap-2 text-[15px]">
+          <Link href="/" className="lp-btn lp-btn-primary min-h-11 w-full gap-2 text-[15px]">
             <Gift aria-hidden="true" className="h-4 w-4 shrink-0" />
             {profile.available === 1 ? "Usar mi cupo gratis" : `Usar mis ${profile.available} cupos gratis`}
           </Link>

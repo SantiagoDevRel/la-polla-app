@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Contraseña", robots: { index: false
 export default async function SetPasswordPage({ searchParams }: { searchParams: Promise<{ returnTo?: string }> }) {
   const params = await searchParams;
   const candidate = safeReturnTo(params.returnTo ?? null);
-  const returnTo = candidate && !candidate.startsWith("/set-password") ? candidate : "/inicio";
+  const returnTo = candidate && !candidate.startsWith("/set-password") ? candidate : "/";
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) redirect("/login");

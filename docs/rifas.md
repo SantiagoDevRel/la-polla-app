@@ -23,7 +23,7 @@ rifa (embudo rifa → cuenta → polla).
 | `/rifas/crear` | Creador habilitado | Formulario. Sin permiso: 404 |
 | `/rifa/<slug>` | Cualquiera (Pública) · creador y admins (Privada) | Tablero, reservar, pagar, comprobante, resultado. Sin sesión: tablero y registro al elegir |
 | `/rifa/<slug>/gestionar` | Solo el creador | Comprobantes, tablero con nombres, venta por fuera, liberar, resultado, compartir, imagen, foto del premio, actividad |
-| `/inicio?tab=rifas` | Con sesión | Pestañas **POLLAS \| RIFAS** (POLLAS por defecto): mis números, creadas por mí, abiertas por enlace |
+| `/?tab=rifas` | Con sesión | Pestañas **POLLAS \| RIFAS** (POLLAS por defecto): mis números, creadas por mí, abiertas por enlace |
 
 API: `/api/rifas/**` y `/api/admin/rifas`. Todas validan la sesión antes de tocar
 la base y mandan a SQL el uuid de la sesión como actor (nunca un dato del cliente).

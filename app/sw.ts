@@ -58,6 +58,8 @@ const NEVER_CACHE_PATHS: RegExp[] = [
   // fresca → bug visual (minute calculado en lugar de elapsed). Forzar
   // network garantiza chunks correctos.
   /^\/pollas(\/|$)/,
+  // La lista de pollas vive en `/` desde el 2026-10-14 (pozo, cierres, sesión).
+  /^\/$/,
   /^\/inicio(\/|$)/,
   /^\/avisos(\/|$)/,
   /^\/perfil(\/|$)/,

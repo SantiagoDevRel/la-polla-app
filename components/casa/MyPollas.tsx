@@ -135,7 +135,7 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
       <div className="lp-card p-5 text-center">
         <Ticket aria-hidden="true" className="mx-auto mb-2 h-7 w-7 text-text-secondary" />
         <p className="text-[15px] font-semibold text-text-primary">{activeOnly ? (en ? "You have no pools in play" : "No tienes pollas en juego") : (en ? "You haven't joined a pool yet" : "Todavía no te has inscrito en una polla")}</p>
-        <Link href="/inicio#pollas-disponibles" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-border-default px-4 text-[15px] text-text-primary transition-colors hover:bg-bg-elevated">{en ? "See available pools" : "Ver pollas disponibles"}<ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" /></Link>
+        <Link href="/#pollas-disponibles" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-border-default px-4 text-[15px] text-text-primary transition-colors hover:bg-bg-elevated">{en ? "See available pools" : "Ver pollas disponibles"}<ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" /></Link>
       </div> : <>
         {(pollas ?? []).length > PAGE_SIZE && <label className="block space-y-2 text-[13px] text-text-secondary">
           <span className="flex items-center gap-2"><Search aria-hidden="true" className="h-4 w-4" />{en ? "Search my pools" : "Buscar en mis pollas"}</span>

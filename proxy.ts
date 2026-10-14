@@ -46,7 +46,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // ── La casa se llama Inicio (2026-09-18) ───────────────────────────────
-  // El producto vive en `/inicio` (la lista) y `/polla/<slug>` (una polla).
+  // El producto vive en `/` (la lista) y `/polla/<slug>` (una polla).
   // `/casa/*` fue su nombre hasta hoy y NO se retira: ese enlace está pegado en
   // grupos de WhatsApp, en mensajes del bot de Telegram, en invitaciones con
   // `?ref=` y en cortesías con `?cortesia=`. Redirección permanente, con la
@@ -54,12 +54,22 @@ export async function proxy(request: NextRequest) {
   //
   // `/casa/admin` queda afuera a propósito: es su propia redirección al panel
   // (/admin/pollas) y nadie comparte ese enlace.
+  //
+  // (2026-10-14) La lista pasó de `/inicio` a `/`: el enlace limpio
+  // lapollacolombiana.com abre las pollas. `/inicio` tampoco se retira (está en
+  // enlaces de invitación, del bot y en marcadores) y `/casa` salta directo a
+  // `/`, sin pasar por `/inicio`.
   const casaPath = request.nextUrl.pathname;
   const navegacion = request.method === "GET" || request.method === "HEAD";
+  if (navegacion && (casaPath === "/inicio" || casaPath === "/inicio/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url, 308);
+  }
   if (navegacion && (casaPath === "/casa" || (casaPath.startsWith("/casa/") && !casaPath.startsWith("/casa/admin")))) {
     const url = request.nextUrl.clone();
     const resto = casaPath.slice("/casa".length);
-    url.pathname = resto === "" || resto === "/" ? "/inicio" : `/polla${resto}`;
+    url.pathname = resto === "" || resto === "/" ? "/" : `/polla${resto}`;
     return NextResponse.redirect(url, 308);
   }
 
@@ -111,12 +121,13 @@ export async function proxy(request: NextRequest) {
   // necesita entrada acá: ya lo bloquea P2P_CREATION_RETIRED.
   // `/inicio` salió de esta lista el 18-09: dejó de ser el tablero P2P y pasó a
   // ser la pantalla principal de la casa (el archivo viejo vive en
-  // app/(app)/_retirados/inicio, fuera del enrutador).
+  // app/(app)/_retirados/inicio, fuera del enrutador). Desde el 14-10 esa
+  // pantalla vive en `/`.
   const RETIRADAS = ["/dashboard", "/road-to-worldcup"];
   const path = request.nextUrl.pathname;
   if (RETIRADAS.some((r) => path === r || path.startsWith(`${r}/`))) {
     const url = request.nextUrl.clone();
-    url.pathname = "/inicio";
+    url.pathname = "/";
     url.search = "";
     return NextResponse.redirect(url, 307); // temporal: es una decisión de producto, no una URL muerta
   }

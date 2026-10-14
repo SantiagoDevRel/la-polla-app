@@ -255,7 +255,7 @@ export default function OpenInvitePage() {
           <Info className="w-10 h-10 text-text-muted mx-auto mb-3" />
           <p className="text-text-primary font-medium mb-4">{error || t("errLinkInvalid")}</p>
           <button
-            onClick={() => router.push("/inicio")}
+            onClick={() => router.push("/")}
             className="bg-gold text-bg-base px-6 py-2 rounded-xl font-semibold"
           >
             {t("goHome")}
@@ -461,7 +461,7 @@ export default function OpenInvitePage() {
             </button>
           )}
           <button
-            onClick={() => router.push("/inicio")}
+            onClick={() => router.push("/")}
             className="w-full text-text-muted text-xs pt-2"
           >
             {t("backHome")}

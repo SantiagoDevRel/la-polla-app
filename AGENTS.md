@@ -23,7 +23,7 @@ settings in any of these areas, read the matching section of
 - **UI and service worker:** components, media, app updates, draft screens.
 - **Tooling:** hooks, the secret scanner, CI.
 
-Player routes: `/inicio`, `/polla/[slug]`, `/futbol`, `/perfil`.
+Player routes: `/` (pool list), `/polla/[slug]`, `/futbol`, `/perfil`.
 
 ## Run, verify and deploy
 
@@ -95,8 +95,9 @@ npm run test:e2e
 - Every `/api/cron/*` handler starts with `requireCronSecret`; keep
   `tests/cron-auth.test.ts` covering it.
 - Keep host-only cookies, `redirectWithCookies` on every auth redirect, and the
-  permanent 308s in `proxy.ts` (www to apex; `/casa` to `/inicio`, `/casa/<rest>` to
-  `/polla/<rest>`, query intact, `/casa/admin` excluded). Never `signOut()` on mount.
+  permanent 308s in `proxy.ts` (www to apex; `/inicio` and `/casa` to `/`,
+  `/casa/<rest>` to `/polla/<rest>`, query intact, `/casa/admin` excluded). Never
+  `signOut()` on mount.
 - Telegram bot: resolve the sender through the linked identity; callback data is
   untrusted; no LLM handles identity, proofs or picks.
 

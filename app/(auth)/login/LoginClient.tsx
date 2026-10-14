@@ -351,7 +351,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
       writeLoginStorage(RETURN_TO_KEY, null);
     }
     writeLoginStorage(OTP_PENDING_KEY, null);
-    window.location.href = newUser ? `/onboarding${rt ? `?returnTo=${encodeURIComponent(rt)}` : ""}` : rt || "/inicio";
+    window.location.href = newUser ? `/onboarding${rt ? `?returnTo=${encodeURIComponent(rt)}` : ""}` : rt || "/";
   }, []);
 
   // PhoneInput emits an E.164 string already (e.g. "+573001234567")
@@ -479,7 +479,7 @@ function LoginInner({ telegramBotUsername, turnstileSiteKey, smsCaptchaRequired,
       if (!response.ok) { setError(typeof body.error === "string" ? body.error : (en ? "Could not sign in. Try SMS." : "No pudimos iniciar sesión. Puedes entrar por SMS.")); return; }
       if (body.ok !== true) throw new Error("Invalid login acknowledgement");
       setPassword("");
-      const destination = safeReturnTo(typeof body.redirectTo === "string" ? body.redirectTo : null) || "/inicio";
+      const destination = safeReturnTo(typeof body.redirectTo === "string" ? body.redirectTo : null) || "/";
       if (!destination.startsWith("/onboarding")) writeLoginStorage(RETURN_TO_KEY, null);
       writeLoginStorage(OTP_PENDING_KEY, null);
       window.location.assign(destination);

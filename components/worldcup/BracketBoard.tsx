@@ -1755,7 +1755,7 @@ export default function BracketBoard({ teams, matches, locked, lockedWinners }: 
       >
         <div className="flex h-16 items-center gap-2">
           <Link
-            href="/inicio"
+            href="/"
             aria-label="Volver a inicio"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border-subtle bg-bg-elevated text-text-secondary transition-colors hover:text-text-primary"
           >

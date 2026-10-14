@@ -148,7 +148,7 @@ export async function updateSession(request: NextRequest) {
   //
   // NO se hace con `startsWith("/polla")` a propósito: eso abriría también
   // `/polla/<slug>/pagar`. El patrón exige exactamente 2 segmentos, así que
-  // `/inicio`, `/polla/<slug>/pagar` y `/casa/admin` (bloqueado
+  // `/`, `/polla/<slug>/pagar` y `/casa/admin` (bloqueado
   // además explícito) siguen pidiendo sesión.
   const isCasaPollaPublica =
     /^\/polla\/[^/]+$/.test(path);
@@ -199,7 +199,8 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     const original = path + request.nextUrl.search;
     url.pathname = "/login";
-    url.search = `?returnTo=${encodeURIComponent(original)}`;
+    // `/` ya es el destino por defecto del login: el enlace limpio queda limpio.
+    url.search = original === "/" ? "" : `?returnTo=${encodeURIComponent(original)}`;
     return redirectWithCookies(url, supabaseResponse);
   }
 
@@ -212,7 +213,7 @@ export async function updateSession(request: NextRequest) {
   if (user && (path.startsWith("/login") || path.startsWith("/verify"))) {
     const url = request.nextUrl.clone();
     const returnTo = safeReturnTo(request.nextUrl.searchParams.get("returnTo"));
-    const [pathname, search = ""] = (returnTo ?? "/inicio").split("?");
+    const [pathname, search = ""] = (returnTo ?? "/").split("?");
     url.pathname = pathname;
     url.search = search ? `?${search}` : "";
     return redirectWithCookies(url, supabaseResponse);
@@ -225,10 +226,11 @@ export async function updateSession(request: NextRequest) {
   // because the onboarding page calls it to save the profile.
   const isApiRoute = path.startsWith("/api/");
   const isOnboardingRoute = path.startsWith("/onboarding");
+  // `/` salió de esta lista el 2026-10-14: ya no es un redirect sino la
+  // pantalla de las pollas, y pasa por el mismo gate que el resto.
   const isAuthFlowRoute =
     path.startsWith("/login") ||
-    path.startsWith("/verify") ||
-    path === "/";
+    path.startsWith("/verify");
 
   if (
     user &&

@@ -1313,6 +1313,14 @@ siguen en `/api/casa/*`. El tablero P2P que ocupaba `/inicio` pasó a
 borrar el archivo. Cobertura: `tests/casa-referrals.test.ts`
 («los enlaces viejos de /casa siguen abriendo»).
 
+**La lista en la raíz (2026-10-14).** La lista se mudó de `/inicio` a `/`
+(`app/(app)/page.tsx`): el enlace limpio `lapollacolombiana.com` abre las pollas.
+`proxy.ts` redirige `/inicio` a `/` con 308 y la query intacta (`?tab=rifas`,
+`?ref=`); `/casa` salta directo a `/`. Sin sesión, `/` va a `/login` sin
+`returnTo` y, con sesión, pasa por el gate de onboarding. El service worker
+trata `/` como NetworkOnly y el manifest abre en `/` (su `id` sigue en `/casa`).
+Cobertura: `tests/casa-referrals.test.ts` y `tests/root-home-middleware.test.ts`.
+
 **Mis pollas (`components/casa/MyPollas.tsx`).** Portada, no tablero: nombre,
 torneos, pozo (`prize_cop`, nuevo en `listMyPollas` vía `casa_pot_summaries_v2`),
 cierre y una sola línea de estado (`siguientePaso`): pronósticos que faltan →
