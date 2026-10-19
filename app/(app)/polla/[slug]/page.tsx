@@ -361,7 +361,7 @@ export default async function PollaPage({
               </div>
             ) : (
               <>
-                {objeto && crestPrize && <CrestPairPrize crests={crestPrize.crests} className="h-20 w-24 max-[359px]:h-16 max-[359px]:w-20" />}
+                {objeto && crestPrize && <CrestPairPrize crests={crestPrize.crests} className="h-20 w-24 max-[359px]:h-16 max-[359px]:w-16" />}
                 {objeto && !crestPrize && (polla.prize_image_path || privateCampaign?.draft.image_path) && (
                   privateCampaign ? <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} className="h-20 w-16" /> :
                   // eslint-disable-next-line @next/next/no-img-element
