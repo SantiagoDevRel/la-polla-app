@@ -413,6 +413,18 @@ export const CASA_PICK_COLUMNS =
 /** Tope por defecto si una lectura vieja no trae la columna (migración 131). */
 export const DEFAULT_MAX_ENTRIES_PER_USER = 10;
 
+/**
+ * Cupos por persona que de verdad aplican. Con entrada gratis (no rifa) es
+ * siempre 1: varios cupos regalados serían más oportunidades gratis de ganar el
+ * mismo premio (migración 143). SQL fija la columna en 1 (migración 168).
+ */
+export function maxEntriesPerUser(
+  polla: Pick<CasaPolla, "kind" | "entry_price_cop"> & Partial<Pick<CasaPolla, "max_entries_per_user">>,
+): number {
+  if (polla.kind !== "rifa" && polla.entry_price_cop === 0) return 1;
+  return polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER;
+}
+
 /** Una participación cuenta como inscripción viva: pagada o con comprobante en revisión. */
 export function isLiveEntry(entry: Pick<CasaEntry, "status" | "proof_path"> | null | undefined): boolean {
   return Boolean(entry && (entry.status === "pagada" || (entry.status === "pendiente" && entry.proof_path)));

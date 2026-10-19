@@ -1,8 +1,18 @@
 # Premios giratorios de James y el millón
 
-El catálogo `components/casa/prize-media.ts` aporta los visuales de POLLA JAMES
-y OFIGOLAZO4 en Inicio y en `/polla/[slug]`. El acceso y la publicación siguen
-pasando por las reglas existentes de Casa. El catálogo no modifica datos.
+El catálogo `components/casa/prize-media.ts` aporta los visuales de POLLA JAMES,
+OFIGOLAZO4 y OFIGOLAZO 5 (los dos con el millón) en Inicio y en `/polla/[slug]`.
+El acceso y la publicación siguen pasando por las reglas existentes de Casa. El
+catálogo no modifica datos. Una polla nueva con el millón se agrega por id.
+
+**Escudos quietos (2026-10-19).** POLLA REGALO 2 (boletas del clásico) muestra los
+escudos de Atlético Nacional y de Independiente Medellín con `CrestPairPrize`, sin
+giro ni gestos, en la tarjeta y junto al premio. Son los vigentes en octubre de
+2026: Nacional, el SVG de su escudo actual (colores oficiales `#00953b`); Medellín,
+el escudo nuevo del segundo semestre, extraído del vector del
+[manual de marca DIM 2026](https://dimoficial.com/wp-content/uploads/2026/08/Manual-de-marca-DIM-2026.pdf)
+(el catálogo del proveedor todavía trae el de las iniciales). WebP de 256 px de
+alto en `/prizes/v3-30099c32d6c6/crest-*-2026-256.webp`.
 
 Cada premio tiene 144 poses transparentes, cada 2,5 grados. `PrizeTurntable`
 selecciona una pose sin mover el premio: 192 px en miniaturas y 512 px en el

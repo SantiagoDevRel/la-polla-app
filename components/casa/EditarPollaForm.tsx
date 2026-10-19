@@ -21,6 +21,7 @@ import {
   MAX_POLLA_MATCHES,
   buildEditChanges,
   editableFieldsFromPolla,
+  isFreeDraft,
   removeMatchBlock,
   validateEditDraft,
   type EditableFields,
@@ -63,6 +64,7 @@ export function EditarPollaForm({ state }: { state: PollaEditorState }) {
   const hasEntries = entries > 0;
   const objeto = polla.prize_kind === "objeto";
   const esPartidos = polla.kind === "partidos";
+  const gratis = isFreeDraft(draft, polla.kind);
   const changes = buildEditChanges(original, draft, { hasEntries, kind: polla.kind, prizeKind: polla.prize_kind });
   const hayCambios = Object.keys(changes).length > 0;
   const lockedIds = useMemo(() => new Set(matches.map((m) => m.match_id)), [matches]);
@@ -100,7 +102,7 @@ export function EditarPollaForm({ state }: { state: PollaEditorState }) {
 
   async function guardar() {
     setAviso(null);
-    const invalid = validateEditDraft(draft, { hasEntries, prizeKind: polla.prize_kind });
+    const invalid = validateEditDraft(draft, { hasEntries, prizeKind: polla.prize_kind, kind: polla.kind });
     if (invalid) return setAviso({ tone: "error", text: invalid });
     if (!hayCambios) return setAviso({ tone: "error", text: "No hay cambios para guardar." });
     setGuardando(true);
@@ -193,13 +195,16 @@ export function EditarPollaForm({ state }: { state: PollaEditorState }) {
               type="number"
               min={1}
               max={50}
-              value={draft.maxEntriesPerUser}
+              value={gratis ? 1 : draft.maxEntriesPerUser}
+              disabled={gratis}
               onChange={(e) => set({ maxEntriesPerUser: Number(e.target.value) })}
               aria-describedby="editar-participaciones-ayuda"
               className="lp-input lp-money mt-2 text-[18px]"
             />
             <p id="editar-participaciones-ayuda" className="mt-2 text-[13px] leading-relaxed text-text-secondary">
-              Cuántos cupos puede comprar una misma persona. Cada cupo es una transferencia y un comprobante aparte. Bajarlo no quita cupos existentes.
+              {gratis
+                ? "Con entrada gratis, cada persona entra una sola vez."
+                : "Cuántos cupos puede comprar una misma persona. Cada cupo es una transferencia y un comprobante aparte. Bajarlo no quita cupos existentes."}
             </p>
           </div>
         )}

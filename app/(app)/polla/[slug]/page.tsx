@@ -17,6 +17,7 @@ import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
 import { CampaignPrizeMedia } from "@/components/casa/CampaignPrizeMedia";
 import { CashPrizeVisual, JerseyPrizeShowcase, PrizeMotion } from "@/components/casa/PrizeShowcase";
 import { pollaPrizeMedia } from "@/components/casa/prize-media";
+import { CrestPairPrize } from "@/components/casa/CrestPairPrize";
 import {
   getDistribution,
   getLeaderboard,
@@ -37,9 +38,9 @@ import { signPayoutProofs } from "@/lib/casa/payout-proofs";
 import { getPickSaveState } from "@/lib/casa/picks-save";
 import { PruebasDePago } from "@/components/casa/PruebasDePago";
 import {
-  DEFAULT_MAX_ENTRIES_PER_USER,
   isLiveEntry,
   isPollaOpen,
+  maxEntriesPerUser,
   isPublicClosedPolla,
   pagadaDesde,
   pagadaLabel,
@@ -273,6 +274,9 @@ export default async function PollaPage({
 
   const objeto = polla.prize_kind === "objeto";
   const localPrize = pollaPrizeMedia(polla.id);
+  // Camiseta y billetes giran junto a su cifra; los escudos van quietos en el lugar de la foto del premio.
+  const crestPrize = localPrize?.kind === "crests" ? localPrize : null;
+  const motionPrize = localPrize?.kind === "crests" ? null : localPrize;
   // Entrada gratis (migración 143): no hay nada que transferir ni comprobante
   // que subir, así que la puerta es un botón «Unirme», no la pantalla de pago.
   const gratis = polla.entry_price_cop === 0 && polla.kind !== "rifa";
@@ -280,7 +284,7 @@ export default async function PollaPage({
   const mostrarEntrar = !participa && (abierta || canResumeProof) && polla.kind !== "rifa";
   const retomar = !participa && entry && !isLiveEntry(entry) ? entry.entry_number : null;
   // Ya participa y quedan cupos: el CTA principal es comprar otro (migración 131).
-  const maxCupos = polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER;
+  const maxCupos = maxEntriesPerUser(polla);
   // Llegó por un enlace de cortesía y todavía no está inscrito (migración 138).
   const activarCortesia = Boolean(cortesiaDeEstaPolla?.redeemable) && !participa;
   // Con entrada gratis, un cupo por persona: varios cupos regalados serían
@@ -342,22 +346,23 @@ export default async function PollaPage({
         </div>
         {polla.kind === "partidos" && <ScoringModeBadge mode={polla.scoring_mode} className={`${participa ? "mt-2" : "mt-3"} self-start`} />}
         <div className={`${participa ? "mt-3" : "mt-4"} ${objeto ? "grid grid-cols-2" : "flex flex-wrap"} gap-x-3 gap-y-4`}>
-          <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : localPrize?.kind === "cash" ? "min-w-0 flex-[1_1_max-content]" : "min-w-0 flex-[1_1_min-content]"}>
-            {localPrize ? (
+          <div className={objeto ? "col-span-2 flex min-w-0 items-center gap-3" : motionPrize?.kind === "cash" ? "min-w-0 flex-[1_1_max-content]" : "min-w-0 flex-[1_1_min-content]"}>
+            {motionPrize ? (
               <div className="w-full min-w-0">
                 <Label>{polla.settlement_outcome === "house_retained_zero_points" ? "Premio no adjudicado" : premioLabel()}</Label>
-                <div className={`mt-1 flex min-w-0 flex-wrap items-center ${localPrize.kind === "jersey" ? "gap-2" : "gap-3"}`}>
-                  {localPrize.kind === "jersey" ? (
-                    <PrizeMotion media={localPrize.media} label="Camiseta de James Rodríguez girando" interactive className="h-24 w-20 shrink-0 max-[359px]:h-20 max-[359px]:w-16" />
-                  ) : <div className="w-20 shrink-0"><CashPrizeVisual banknote={localPrize.banknote} back={localPrize.back} poster={localPrize.poster} turntable={localPrize.turntable} compact interactive /></div>}
-                  <div className={`lp-money text-gold ${localPrize.kind === "jersey" ? "min-w-[min(100%,8rem)] flex-1 text-[22px] !leading-[1.15] max-[389px]:text-[20px] max-[359px]:text-[18px] [overflow-wrap:anywhere]" : "text-[32px] leading-none whitespace-nowrap"}`}>
-                    {localPrize.kind === "jersey" ? localPrize.title : formatCop(pot.prize_cop)}
+                <div className={`mt-1 flex min-w-0 flex-wrap items-center ${motionPrize.kind === "jersey" ? "gap-2" : "gap-3"}`}>
+                  {motionPrize.kind === "jersey" ? (
+                    <PrizeMotion media={motionPrize.media} label="Camiseta de James Rodríguez girando" interactive className="h-24 w-20 shrink-0 max-[359px]:h-20 max-[359px]:w-16" />
+                  ) : <div className="w-20 shrink-0"><CashPrizeVisual banknote={motionPrize.banknote} back={motionPrize.back} poster={motionPrize.poster} turntable={motionPrize.turntable} compact interactive /></div>}
+                  <div className={`lp-money text-gold ${motionPrize.kind === "jersey" ? "min-w-[min(100%,8rem)] flex-1 text-[22px] !leading-[1.15] max-[389px]:text-[20px] max-[359px]:text-[18px] [overflow-wrap:anywhere]" : "text-[32px] leading-none whitespace-nowrap"}`}>
+                    {motionPrize.kind === "jersey" ? motionPrize.title : formatCop(pot.prize_cop)}
                   </div>
                 </div>
               </div>
             ) : (
               <>
-                {objeto && (polla.prize_image_path || privateCampaign?.draft.image_path) && (
+                {objeto && crestPrize && <CrestPairPrize crests={crestPrize.crests} className="h-20 w-24 max-[359px]:h-16 max-[359px]:w-20" />}
+                {objeto && !crestPrize && (polla.prize_image_path || privateCampaign?.draft.image_path) && (
                   privateCampaign ? <CampaignPrizeMedia id={polla.id} label={`Premio: ${polla.prize_object}`} animated={polla.private_draft_motion} className="h-20 w-16" /> :
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -600,7 +605,7 @@ export default async function PollaPage({
               slug={polla.slug}
               entries={entries}
               selectedNumber={entry?.entry_number ?? null}
-              maxEntries={polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER}
+              maxEntries={maxEntriesPerUser(polla)}
               entryPriceCop={polla.entry_price_cop}
               open={abierta}
             />

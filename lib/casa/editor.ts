@@ -118,6 +118,11 @@ export function editableFieldsFromPolla(
 
 const blankToNull = (value: string) => (value.trim() ? value.trim() : null);
 
+/** Entrada gratis en el formulario: un solo cupo por persona, sin tope editable. */
+export function isFreeDraft(draft: Pick<EditableFields, "entryPriceCop">, kind: CasaPolla["kind"]): boolean {
+  return kind !== "rifa" && draft.entryPriceCop === 0;
+}
+
 /**
  * Solo las claves que cambian. Con inscripciones, las condiciones no se
  * envían nunca (SQL las rechazaría con POLLA_HAS_ENTRIES). Un pozo en objeto
@@ -132,7 +137,8 @@ export function buildEditChanges(
   if (draft.name.trim() !== original.name.trim()) changes.name = draft.name.trim();
   if (draft.description.trim() !== original.description.trim()) changes.description = blankToNull(draft.description);
   // El tope de participaciones se edita con o sin inscripciones (no en rifas).
-  if (options.kind !== "rifa" && draft.maxEntriesPerUser !== original.maxEntriesPerUser) {
+  // Con entrada gratis no se envía: SQL lo deja en 1 (migración 168).
+  if (options.kind !== "rifa" && !isFreeDraft(draft, options.kind) && draft.maxEntriesPerUser !== original.maxEntriesPerUser) {
     changes.maxEntriesPerUser = draft.maxEntriesPerUser;
   }
   // Invitaciones (2026-09-17): PRENDER se puede aunque ya haya inscritos — así se
@@ -165,12 +171,13 @@ export function buildEditChanges(
 /** Validación de formulario antes de enviar; SQL vuelve a validar todo. */
 export function validateEditDraft(
   draft: EditableFields,
-  options: { hasEntries: boolean; prizeKind: CasaPolla["prize_kind"] },
+  options: { hasEntries: boolean; prizeKind: CasaPolla["prize_kind"]; kind?: CasaPolla["kind"] },
 ): string | null {
   const name = draft.name.trim();
   if (name.length < 3 || name.length > 80) return "El nombre debe tener entre 3 y 80 caracteres.";
   if (draft.description.trim().length > 400) return "La descripción admite hasta 400 caracteres.";
-  if (!Number.isInteger(draft.maxEntriesPerUser) || draft.maxEntriesPerUser < 1 || draft.maxEntriesPerUser > 50) {
+  if (!isFreeDraft(draft, options.kind ?? "partidos")
+    && (!Number.isInteger(draft.maxEntriesPerUser) || draft.maxEntriesPerUser < 1 || draft.maxEntriesPerUser > 50)) {
     return "Los cupos por persona deben estar entre 1 y 50.";
   }
   if (options.hasEntries) return null;

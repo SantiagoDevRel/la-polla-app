@@ -16,7 +16,8 @@ read each section here. These rules are as binding as `AGENTS.md`.
 - Pool creation is admin-only; creator raffles use the separate allowlisted
   [rifas](rifas.md) flow.
 - A $0 gift pool uses **Entrar gratis** via `casa_join_free_v1`: immediate entry and
-  picks, no transfer, proof or admin review; retries return one entry.
+  picks, no transfer, proof or admin review; retries return one entry. Its per-person
+  cap is always 1 (migration 168 trigger; forms show it fixed).
 - An explicit free join completes an old pending reservation, keeping its proof/audit
   history.
 - Paid pools keep their payment flow; raffles keep numbered tickets; a gift pool is
