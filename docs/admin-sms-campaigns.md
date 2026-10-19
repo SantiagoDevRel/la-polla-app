@@ -20,6 +20,9 @@ No publicar ese teléfono ni las credenciales del proveedor en el repositorio.
 
 1. Elegir una polla abierta y publicada. Se insertan su nombre, entrada, premio
    (mínimo garantizado, pozo actual u objeto, según corresponda) y enlace canónico.
+   El mensaje debe llevar ese enlace o el de la página principal
+   (`https://lapollacolombiana.com/`), útil para anunciar varias pollas; el cierre
+   que se valida sigue siendo el de la polla elegida.
 2. Elegir **Apertura de polla** o **Recordatorio de cierre**. En cierre: 0 = hoy,
    1 = mañana, N = en N días. El botón de cálculo usa el cierre real y el día del
    envío en Colombia; el servidor rechaza plazos contradictorios. El mensaje se

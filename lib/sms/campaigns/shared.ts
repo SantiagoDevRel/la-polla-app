@@ -27,6 +27,12 @@ export function smsPlainText(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
+/** The chosen pool's link, or the home page that lists every open pool. */
+export function hasCampaignLink(message: string, slug: string) {
+  return message.includes(`https://lapollacolombiana.com/polla/${slug}`)
+    || /https:\/\/lapollacolombiana\.com\/?(?=[.,;:!?)]*(?:\s|$))/.test(message);
+}
+
 export function campaignTemplate(polla: CampaignPolla, kind: "opening" | "closing", days = 1) {
   const deadline = days === 0 ? "hoy" : days === 1 ? "mañana" : `en ${days} días`;
   return `${kind === "opening" ? `¡Ya está abierta ${polla.name} en La Polla Colombiana!` : `¡${polla.name} se cierra ${deadline}!`}
