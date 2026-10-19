@@ -9,7 +9,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMyEntries, getPollaBySlug, getPot, getActiveProofs, getOutstandingTicket } from "@/lib/casa/queries";
 import { ChevronRight } from "lucide-react";
-import { DEFAULT_MAX_ENTRIES_PER_USER, isLiveEntry, isPollaOpen, type CasaEntry } from "@/lib/casa/types";
+import { isLiveEntry, isPollaOpen, maxEntriesPerUser, type CasaEntry } from "@/lib/casa/types";
 import { formatCop } from "@/lib/casa/format";
 import { Label, StreetCard } from "@/components/street";
 import { PagarForm } from "@/components/casa/PagarForm";
@@ -63,7 +63,7 @@ export default async function PagarPage({
   // Una participación pagada o en revisión no tiene nada que hacer acá.
   // `anulada` (se cayó la subida) SÍ puede volver a intentar: SQL reusa esa fila.
   const retryable = (e: CasaEntry) => e.status === "rechazada" || e.status === "anulada" || (e.status === "pendiente" && !e.proof_path);
-  const maxEntries = polla.max_entries_per_user ?? DEFAULT_MAX_ENTRIES_PER_USER;
+  const maxEntries = maxEntriesPerUser(polla);
   const counted = entries.filter((e) => e.status !== "anulada").length;
   let target: CasaEntry | null = null;
   let isAnother = false;

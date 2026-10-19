@@ -184,6 +184,9 @@ comprobante. No existe «un pago de $100.000 por cinco cupos».
   impide nuevas. Cuentan pagadas, en revisión y rechazadas (una rechazada se
   reintenta en su misma fila); una carga fallida (`anulada`) no cuenta y su número
   se reutiliza. Las rifas no usan este tope: cada boleta ya es una inscripción.
+- **Entrada gratis = 1 cupo (migración 168).** Con entrada $0 (no rifa) el tope es
+  siempre 1: un trigger lo fija al crear, al bajar la entrada a 0 y si alguien
+  intenta subirlo. Crear y editar muestran «1» fijo; nunca «10 cupos».
 - **Numeración.** `casa_entries.entry_number` 1, 2, 3… por persona y polla
   (índice único parcial; las inscripciones anteriores quedaron como 1).
 - **Comprobante.** `casa_begin_entry_proof_v3(…, p_entry_number, …)`: número =

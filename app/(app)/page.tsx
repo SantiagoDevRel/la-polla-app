@@ -29,6 +29,7 @@ import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
 import { CampaignPrizeMedia } from "@/components/casa/CampaignPrizeMedia";
 import { CashPrizeVisual, PrizeMotion } from "@/components/casa/PrizeShowcase";
 import { pollaPrizeMedia } from "@/components/casa/prize-media";
+import { CrestPairPrize } from "@/components/casa/CrestPairPrize";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
 import { ArrowRight, CheckCircle2, EyeOff, Settings } from "lucide-react";
 import {
@@ -243,6 +244,8 @@ function prizePreview(id: string) {
   if (prize?.kind === "cash") return (
     <span className="relative z-20 flex h-16 w-14 shrink-0 items-center"><CashPrizeVisual banknote={prize.banknote} back={prize.back} poster={prize.poster} turntable={prize.turntable} compact interactive /></span>
   );
+  // Quietos y debajo del enlace de la tarjeta: tocarlos abre la polla.
+  if (prize?.kind === "crests") return <CrestPairPrize crests={prize.crests} className="h-16 w-16" />;
   return null;
 }
 
