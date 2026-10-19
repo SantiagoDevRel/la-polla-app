@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPollaById, getPots, listPublicPollas } from "@/lib/casa/queries";
 import { colombiaDateKey, colombiaDateTimeToIso } from "@/lib/time/colombia";
 import { PAISES_SMS } from "../paises";
-import { audienceUser, selectAudience, smsSize, type AudienceUser, type CampaignInput, type CampaignPolla } from "./shared";
+import { audienceUser, hasCampaignLink, selectAudience, smsSize, type AudienceUser, type CampaignInput, type CampaignPolla } from "./shared";
 import { assertCampaignTime, nextCampaignTime } from "./schedule";
 import { dispatchCampaign, quoteCampaign } from "./provider";
 
@@ -97,7 +97,7 @@ async function validatePolla(input: CampaignInput, scheduledAt: string | null) {
   if (!polla || polla.status !== "abierta") throw new Error("La polla no está abierta y publicada.");
   const sendAt = scheduledAt ?? new Date().toISOString();
   assertCampaignTime(sendAt, polla.closes_at);
-  if (!input.message.includes(`https://lapollacolombiana.com/polla/${polla.slug}`)) throw new Error("El mensaje debe incluir el enlace de la polla elegida.");
+  if (!hasCampaignLink(input.message, polla.slug)) throw new Error("El mensaje debe incluir el enlace de la polla elegida o https://lapollacolombiana.com/.");
   if (input.template === "closing") {
     const days = Math.round((Date.parse(`${colombiaDateKey(polla.closes_at)}T00:00Z`) - Date.parse(`${colombiaDateKey(sendAt)}T00:00Z`)) / 86400000);
     if (days !== input.days) throw new Error(`En la fecha del envío, esta polla se cierra ${days === 0 ? "hoy" : days === 1 ? "mañana" : `en ${days} días`}. Ajusta el plazo de la plantilla.`);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campaignTemplate, selectAudience, smsSize, type AudienceUser } from "./shared";
+import { campaignTemplate, hasCampaignLink, selectAudience, smsSize, type AudienceUser } from "./shared";
 
 describe("campaign copy and audience", () => {
   it("counts extension septets and UTF-16 rather than visible characters", () => {
@@ -24,5 +24,14 @@ describe("campaign copy and audience", () => {
     expect(campaignTemplate(polla, "closing", 1)).toContain("se cierra mañana");
     expect(campaignTemplate(polla, "closing", 2)).toContain("se cierra en 2 días");
     expect(campaignTemplate(polla, "closing", 0)).toContain("https://lapollacolombiana.com/polla/ofi-golazo-3");
+  });
+  it("accepts the chosen pool's link or the home page, never another pool", () => {
+    expect(hasCampaignLink("Entra: https://lapollacolombiana.com/polla/ofi-golazo-3", "ofi-golazo-3")).toBe(true);
+    expect(hasCampaignLink("Dos pollas abiertas.\nhttps://lapollacolombiana.com/", "ofi-golazo-3")).toBe(true);
+    expect(hasCampaignLink("Entra a https://lapollacolombiana.com.", "ofi-golazo-3")).toBe(true);
+    expect(hasCampaignLink("https://lapollacolombiana.com/polla/otra", "ofi-golazo-3")).toBe(false);
+    expect(hasCampaignLink("https://lapollacolombiana.com/login", "ofi-golazo-3")).toBe(false);
+    expect(hasCampaignLink("https://lapollacolombiana.com.evil.example", "ofi-golazo-3")).toBe(false);
+    expect(hasCampaignLink("Sin enlace", "ofi-golazo-3")).toBe(false);
   });
 });
