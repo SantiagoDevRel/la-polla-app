@@ -83,7 +83,8 @@ npm run test:e2e
   preview (`/api/pollas/preview`) returns join codes and payment instructions only
   for a token of that same pool.
 - `NEVER_CACHE_PATHS` in `app/sw.ts` keeps `/api/*`, auth pages and money/state
-  pages NetworkOnly; add new ones there (some authenticated pages are still missing).
+  pages NetworkOnly; add new ones there (`tests/sw-never-cache.test.ts` fails if a
+  page with a session is missing).
   New or changed authenticated APIs with user or money data return
   `private, no-store`; some existing routes do not, so never assume either. Never
   serve a session or authenticated content as an offline fallback.
