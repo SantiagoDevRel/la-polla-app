@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ChevronDown, UsersRound } from "lucide-react";
 import { CASA_HEADERS } from "@/lib/casa/contract";
 import { getPollitoBase, POLLITO_TYPES } from "@/lib/pollitos";
@@ -17,7 +18,7 @@ interface Player {
 }
 interface Selection { players: Player[]; editable: boolean }
 
-export function AdminPlayerSelector({ pollaId }: { pollaId: string }) {
+export function AdminPlayerSelector({ pollaId, viewedPlayerId }: { pollaId: string; viewedPlayerId?: string }) {
   const router = useRouter();
   const panelId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -135,7 +136,8 @@ export function AdminPlayerSelector({ pollaId }: { pollaId: string }) {
           <fieldset disabled={saving !== null || !data.editable || !synced} className="mt-3 max-h-[55dvh] space-y-1 overflow-y-auto overscroll-contain pr-1">
             <legend className="sr-only">Selecciona los jugadores de esta polla</legend>
             {data.players.map((player) => (
-              <label key={player.id} className="flex min-h-16 cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors duration-200 hover:bg-bg-elevated focus-within:bg-bg-elevated">
+              <div key={player.id} className="rounded-md px-2 py-2 transition-colors duration-200 hover:bg-bg-elevated focus-within:bg-bg-elevated">
+              <label className="flex min-h-16 cursor-pointer items-center gap-3">
                 <input
                   type="checkbox" checked={player.selected} disabled={player.conflict || loading}
                   onChange={() => void select(player)} aria-label={`Inscribir a ${player.name}`}
@@ -152,6 +154,12 @@ export function AdminPlayerSelector({ pollaId }: { pollaId: string }) {
                   </span>
                 </span>
               </label>
+              <Link href={`/admin/pollas/${pollaId}/jugadores/${player.id}`} aria-label={`Ver a ${player.name}`}
+                aria-current={viewedPlayerId === player.id ? "page" : undefined}
+                className="ml-9 inline-flex min-h-11 items-center rounded-full px-3 text-[13px] font-medium text-text-primary underline decoration-border-medium underline-offset-4 transition-colors duration-200 hover:bg-bg-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-turf">
+                {viewedPlayerId === player.id ? "Vista actual" : "Ver jugador"}
+              </Link>
+              </div>
             ))}
           </fieldset>
         ) : !error && <p className="mt-3 px-1 text-[13px] text-text-secondary">No hay jugadores configurados.</p>}

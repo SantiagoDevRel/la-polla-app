@@ -30,7 +30,7 @@ const ids = {
   question: '40000000-0000-4000-8000-000000000001', question2: '40000000-0000-4000-8000-000000000002',
   option: '50000000-0000-4000-8000-000000000001',
 };
-const allModes = ['matches', 'outcomes', 'provisional', 'questions', 'free', 'creator'];
+const allModes = ['matches', 'outcomes', 'provisional', 'questions', 'free', 'creator', 'admin'];
 const modes = process.argv.slice(2).length ? process.argv.slice(2) : allModes;
 assert.ok(modes.every(mode => allModes.includes(mode)), 'Unknown fixture mode');
 const selectedCases = new Set((process.env.BROWSER_CASES ?? '').split(',').filter(Boolean));
@@ -45,6 +45,7 @@ import {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {PicksBoard} from '@/components/casa/PicksBoard';
 import {QuestionsBoard} from '@/components/casa/QuestionsBoard';
+import {AdminPlayerSelector} from '@/components/casa/AdminPlayerSelector';
 import {CrearPollaForm} from '@/components/casa/CrearPollaForm';
 import {UnirmeGratis} from '@/components/casa/UnirmeGratis';
 import {ToastProvider} from '@/components/ui/Toast';
@@ -56,13 +57,13 @@ const initialPicks=['rebase','restore-fresh'].includes(scenario)?{[mode==='quest
 function App(){
  const [state,setState]=useState({ownerId:ids.owner,entryId:ids.entry,mount:0,closed:false,initialPicks,initialRevision:0});
  (window as any).__fixture={remount:(ownerId=state.ownerId,entryId=state.entryId,snapshot={})=>setState(s=>({...s,...snapshot,ownerId,entryId,mount:s.mount+1})),closeFirst:()=>setState(s=>({...s,closed:true}))};
- const common={slug:'fixture',ownerId:state.ownerId,entryId:state.entryId,entryNumber:1,initialRevision:state.initialRevision,initialPicks:state.initialPicks,distribution:{},canEdit:true};
+ const common={slug:'fixture',ownerId:state.ownerId,entryId:state.entryId,entryNumber:1,initialRevision:state.initialRevision,initialPicks:state.initialPicks,distribution:{},canEdit:true,...(mode==='admin'?{saveEndpoint:'/api/casa/admin/pollas/fixture/jugadores/'+state.ownerId+'/picks'}:{})};
  const match={id:ids.match,home_team:'Millonarios',away_team:'Junior',home_team_flag:null,away_team_flag:null,scheduled_at:mode==='provisional'?'2020-01-01T00:00:00Z':new Date(loadedAt+(scenario==='closed'?310000:86400000)).toISOString(),scheduled_at_confirmed:mode!=='provisional',status:'scheduled',home_score:null,away_score:null,final_verified_at:null};
  const matches=multiple?[match,{...match,id:ids.match2,home_team:'Atlético Nacional',away_team:'Deportivo Cali',scheduled_at:new Date(loadedAt+86400000).toISOString()}]:[match];
  const question={id:ids.question,prompt:'¿Quién será el primer goleador del campeonato colombiano?',points:3,input_kind:'texto' as const,resolved_at:state.closed?new Date().toISOString():null,resolved_text:state.closed?'Respuesta oficial':null};
  const questions=multiple?[question,{...question,id:ids.question2,prompt:'¿Quién dará la primera asistencia?',resolved_at:null,resolved_text:null}]:scenario==='options'?[{...question,input_kind:'opciones' as const,options:[{id:ids.option,label:'Un jugador con un nombre largo del equipo Millonarios que anota durante el segundo tiempo del partido'}]}]:[question];
  const content=mode==='creator'?<CrearPollaForm/>:mode==='free'?<UnirmeGratis slug="fixture" ownerId={state.ownerId} nombre="Polla regalo del campeonato colombiano" premio="Una camiseta oficial del equipo ganador"/>:mode==='questions'?<QuestionsBoard {...common} key={state.ownerId+state.entryId+state.mount} questions={questions}/>:<PicksBoard {...common} key={state.ownerId+state.entryId+state.mount} scoringMode={mode==='outcomes'?'1x2':'marcador'} matches={matches} canViewOthers={false}/>;
- return <ToastProvider><main className="mx-auto max-w-3xl px-4 py-6"><h1 className="lp-display-sm mb-4">{mode==='creator'?'Crear polla':mode==='free'?'Polla regalo':'Pronósticos'}</h1>{content}</main></ToastProvider>;
+ return <ToastProvider><main className="mx-auto max-w-3xl px-4 py-6"><h1 className="lp-display-sm mb-4">{mode==='creator'?'Crear polla':mode==='free'?'Polla regalo':mode==='admin'?'Vista de Pipe':'Pronósticos'}</h1>{mode==='admin'&&<AdminPlayerSelector pollaId="fixture" viewedPlayerId={state.ownerId}/>} {content}</main></ToastProvider>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);
 `);
@@ -159,7 +160,8 @@ async function fixture(mode, scenario='') {
     if(store.behavior==='drop') {await route.abort('failed');return;}
     await route.fulfill({json:{ok:true,owner_id:store.ownerId,slug:'fixture',entry_id:ids.entry,entry_number:1,created:true},headers:jsonHeaders});
   });
-  await page.route('**/api/casa/pollas/fixture/picks**', async route=>{
+  if(mode==='admin') await page.route('**/api/casa/admin/pollas/fixture/jugadores', route=>route.fulfill({json:{editable:true,players:Array.from({length:20},(_,i)=>({id:i===0?ids.owner:'10000000-0000-4000-8000-'+String(i+10).padStart(12,'0'),name:i===0?'Pipe':'Jugador '+(i+1),avatar:'millos',selected:i===0,ticket:null,revision:i===0?1:0,conflict:false}))},headers:jsonHeaders}));
+  await page.route(mode==='admin'?'**/api/casa/admin/pollas/fixture/jugadores/*/picks**':'**/api/casa/pollas/fixture/picks**', async route=>{
     const request=route.request(); const url=new URL(request.url());
     if (request.method()==='GET') {
       assert.equal(url.searchParams.get('state'),'1');
@@ -171,6 +173,7 @@ async function fixture(mode, scenario='') {
       await route.fulfill({json:{...clone(store.state),ownerId:store.ownerId},headers:jsonHeaders});return;
     }
     assert.equal(request.method(),'PUT'); assert.equal(url.search,'');
+    if(mode==='admin') assert.equal(request.headers()['x-casa-contract'],'2');
     const op=request.postDataJSON(); store.sent.push(clone(op));
     if(store.behavior==='offline') {await route.abort('internetdisconnected');return;}
     if(!store.authenticated) {await route.fulfill({status:401,json:{error:'Ingresa de nuevo.'},headers:jsonHeaders});return;}
@@ -284,6 +287,25 @@ try {
         store.behavior='drop';await page.getByRole('button',{name:'Entrar gratis',exact:true}).click();
         await expect(page.getByRole('button',{name:'Ya estás dentro',exact:true})).toBeDisabled();assert.equal(store.joined,1);
       });continue;
+    }
+    if(mode==='admin') {
+      await runCase('admin-player-manual-save-and-selector',mode,'',async({page,store})=>{
+        assert.equal(store.sent.length,0);
+        await expect(page.locator('article input').first()).toHaveValue('');
+        await page.getByRole('button',{name:/Jugadores de la casa/}).click();
+        await expect(page.getByRole('checkbox')).toHaveCount(20);
+        await expect(page.getByRole('link',{name:'Ver a Pipe',exact:true})).toHaveAttribute('href',`/admin/pollas/fixture/jugadores/${ids.owner}`);
+        await fillPick(page,mode,2);await saveButton(page).click();await saved(page);
+        assert.equal(store.state.picks[ids.match].homeScore,2);
+        assert.equal(store.sent.length,1);
+        await inspectVisual(page,mode);
+      });
+      await runCase('admin-player-lost-response',mode,'',async({page,store})=>{
+        store.behavior='drop';await fillPick(page,mode,3);await saveButton(page).click();await saved(page);
+        assert.equal(store.sent.length,1);assert.equal(store.reads.length,1);
+        assert.equal(store.state.picks[ids.match].homeScore,3);
+      });
+      continue;
     }
     if(mode==='outcomes') {
       await runCase('outcomes-all-choices',mode,'',async({page,store})=>{

@@ -10,6 +10,7 @@ import {
 
 interface Options {
   slug: string;
+  saveEndpoint?: string;
   entryNumber?: number | null;
   ownerId?: string;
   entryId?: string;
@@ -38,7 +39,7 @@ export function usePickSave(options: Options) {
   const restored = useRef(false);
   const [hydrated, setHydrated] = useState(false);
   const storageKey = ownerId && entryId ? `casa-pick-draft-v1:${ownerId}:${entryId}:${slug}` : null;
-  const endpoint = `/api/casa/pollas/${encodeURIComponent(slug)}/picks`;
+  const endpoint = options.saveEndpoint ?? `/api/casa/pollas/${encodeURIComponent(slug)}/picks`;
   const stateUrl = `${endpoint}?state=1${entryNumber ? `&p=${entryNumber}` : ""}${entryId ? `&entryId=${encodeURIComponent(entryId)}` : ""}`;
   const dirtyIds = targetIds.filter(id => !samePick(picks[id], saved[id]));
   const dirty = dirtyIds.length > 0;
@@ -170,7 +171,7 @@ export function usePickSave(options: Options) {
       }
       const sent = operation.current;
       setUncertain(true);
-      const result = await requestJson(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sent) },
+      const result = await requestJson(endpoint, { method: "PUT", headers: { "Content-Type": "application/json", ...(options.saveEndpoint ? { "X-Casa-Contract": "2" } : {}) }, body: JSON.stringify(sent) },
         (value): value is PickSaveAck => isPickSaveAck(value) && acknowledgesOperation(value, sent));
       if (result.ok) { confirm(result.data); return; }
       if (result.kind === "auth") { setSessionExpired(true); setMsg({ text: result.error, bad: true }); return; }

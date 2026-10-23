@@ -40,6 +40,22 @@ all existing proof, payment correction and final-state checks remain.
 
 ## Verification
 
+Migration **170** adds **Ver jugador** to each roster row. The administrator view
+at `/admin/pollas/[id]/jugadores/[userId]` retains the real admin session and shows
+the selected profile's name and pollito. A paid, selector-managed entry is required
+before showing its prediction board; an unenrolled profile gets instructions, and
+raffles do not show prediction inputs. No default predictions are generated.
+
+The view reuses `PicksBoard`, `QuestionsBoard` and their existing manual-save,
+draft-isolation, revision and uncertain-response protocol. Its dedicated GET/PUT
+API authorizes the real admin before database access. SQL rechecks the exact roster
+and selector-managed paid entry, holds the parent lock against withdrawal, then
+calls `casa_save_picks_v1`; match/question locks are unchanged. Each acknowledged
+request records its real admin actor in the append-only
+`casa_admin_player_pick_events` table. An arbitrary participant, another entry,
+receipt-backed entry or withdrawn profile cannot be edited through this view.
+Apply migration 170 before publishing this view.
+
 - `npm test -- tests/casa-admin-players-route.test.ts` covers authorization,
   contract, validation, actor spoofing, cache headers and SQL error propagation.
 - The required GitHub Actions SQL job runs `node scripts/check-casa-sql.mjs`.

@@ -16,6 +16,7 @@ import type { CasaDistribution, CasaQuestion } from "@/lib/casa/types";
 
 interface Props {
   slug: string;
+  saveEndpoint?: string;
   /** Participación que se está editando (migración 131). Sin número = la principal. */
   entryNumber?: number | null;
   ownerId?: string;
@@ -31,6 +32,7 @@ interface Props {
 
 export function QuestionsBoard({
   slug,
+  saveEndpoint,
   entryNumber, ownerId, entryId, initialRevision,
   questions,
   initialPicks,
@@ -39,7 +41,7 @@ export function QuestionsBoard({
   lockedReason,
 }: Props) {
   const { picks, saved, changed, save: guardar, discard, dirty, saving, uncertain, sessionExpired, msg, hydrated } = usePickSave({
-    slug, entryNumber, ownerId, entryId, initialRevision, initialPicks, targetIds: questions.map(q => q.id), kind: "question",
+    slug, saveEndpoint, entryNumber, ownerId, entryId, initialRevision, initialPicks, targetIds: questions.map(q => q.id), kind: "question",
   });
 
   const respondidas = useMemo(
