@@ -10,6 +10,11 @@ export function requireCasaContract(request: Request) {
 }
 
 const messages: Record<string, string> = {
+  INVALID_MANAGED_PLAYER: "Ese jugador no pertenece a la lista de la casa.",
+  INVALID_PLAYER_SELECTION: "La selección del jugador no es válida.",
+  MANAGED_ENTRY_CONFLICT: "Esta inscripción se gestiona fuera del selector. No se modificó.",
+  PLAYER_SELECTION_CHANGED: "Otro administrador cambió la selección. Actualiza la lista e intenta de nuevo.",
+  NO_AVAILABLE_TICKETS: "No quedan boletas disponibles en esta rifa.",
   INVALID_FIXED_PRIZE: "Elige un premio fijo mayor a cero.",
   INVALID_PUBLICATION_DATE: "La publicación debe ser futura y anterior al cierre de inscripciones.",
   PUBLICATION_HAS_ENTRIES: "Esta polla ya tiene inscripciones; su publicación no puede cambiar.",

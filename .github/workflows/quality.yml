@@ -63,7 +63,7 @@ jobs:
         with:
           node-version: 22
       - name: Pull the pinned PostgreSQL image before the isolated run
-        run: docker pull public.ecr.aws/supabase/postgres:17.6.1.159
+        run: docker pull docker.io/supabase/postgres:17.6.1.159@sha256:86a2e078779e5bdccda1f6f6c5063aa9779a322d1fface5fb408d051909b230f
       - run: node scripts/check-casa-sql.mjs
 
   gate:

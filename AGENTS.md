@@ -27,6 +27,12 @@ Player routes: `/` (pool list), `/polla/[slug]`, `/futbol`, `/perfil`.
 
 ## Run, verify and deploy
 
+- For La Polla, use GitHub-hosted Actions for dependency installation, typecheck,
+  lint, tests and builds; do not use the DGX. The owner approved this project
+  exception on 2026-10-23. Push review branches and require the existing Quality
+  gate before merging or publishing. Keep standard hosted runners and free-tier
+  limits. Local browser checks may reuse existing dependencies.
+
 ```sh
 npm ci  # Node >= 22.12, lockfile versions
 npm run dev -- --port 3001
