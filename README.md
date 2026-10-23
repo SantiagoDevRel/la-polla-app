@@ -10,6 +10,10 @@ delivery checks: [urgent/high fixes](docs/urgent-high-fixes.md), migrations 161â
 Manual save confirmations, revision guards, session recovery and bounded requests:
 [save reliability](docs/save-reliability.md), migrations 164â€“166.
 
+Administrator-only player enrollment: [managed players](docs/admin-managed-players.md),
+migration 169. The dropdown records paid entries with prize eligibility for the
+20 owner-approved profiles; registration guards and an immutable audit apply.
+
 Registration and payment recovery checks: [user-flow verification](docs/user-flow-verification.md).
 Login has bounded requests, duplicate-submit locks and phone-scoped session readback
 after lost responses. Onboarding preserves the requested pool/payment destination.

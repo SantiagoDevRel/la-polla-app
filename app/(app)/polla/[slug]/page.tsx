@@ -62,6 +62,7 @@ import { PicksBoard } from "@/components/casa/PicksBoard";
 import { QuestionsBoard } from "@/components/casa/QuestionsBoard";
 import { PollaTabs } from "@/components/casa/PollaTabs";
 import { PollaInfo } from "@/components/casa/PollaInfo";
+import { AdminPlayerSelector } from "@/components/casa/AdminPlayerSelector";
 import { EliminarPolla } from "@/components/casa/EliminarPolla";
 import { MisBoletas } from "@/components/casa/Boletas";
 import { PremioObjeto } from "@/components/casa/PremioObjeto";
@@ -300,6 +301,7 @@ export default async function PollaPage({
 
   return (
     <div className="pb-32">
+      {isAdmin && <AdminPlayerSelector key={polla.id} pollaId={polla.id} />}
       {/* ── Hero ──────────────────────────────────────────────────────────
             (2026-09-13) Compacto para que las pestañas aparezcan sin bajar:
             solo logos, nombre y estado, qué hay que acertar, y pozo +
