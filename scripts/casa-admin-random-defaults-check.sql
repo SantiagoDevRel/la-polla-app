@@ -35,7 +35,7 @@ BEGIN
   FOREACH mode IN ARRAY ARRAY['marcador','1x2'] LOOP
     INSERT INTO public.casa_pollas(id,slug,name,kind,scoring_mode,status,closes_at,opens_at,created_by,
       entry_price_cop,payout_method,payout_account)
-      VALUES(CASE WHEN mode='marcador' THEN p ELSE outcomes END,'random-'||p||'-'||mode,'Random fixture','partidos',mode,
+      VALUES(CASE WHEN mode='marcador' THEN p ELSE outcomes END,'random-'||p||'-'||mode,'Random fixture','partidos',mode::public.casa_scoring_mode,
         'abierta',clock_timestamp()+interval '1 hour',clock_timestamp()-interval '1 hour',actor,10000,'otro','fixture');
     INSERT INTO public.casa_polla_matches(polla_id,match_id)
       SELECT CASE WHEN mode='marcador' THEN p ELSE outcomes END,unnest(mids);
