@@ -314,9 +314,10 @@ export function PicksBoard({
       awayScore: side === "away" ? n : (picks[matchId]?.awayScore ?? null) });
   }
 
-  const showRandomFill = allowRandomFill && !planning && scoringMode === "marcador" && matches.length > 0;
+  const showRandomFill = allowRandomFill && !planning && matches.length > 0;
   const hasRandomFields = matches.some(m => canEditCasaMatch(m, now)
-    && (picks[m.id]?.homeScore == null || picks[m.id]?.awayScore == null));
+    && (scoringMode === "1x2" ? picks[m.id]?.pick1x2 == null
+      : picks[m.id]?.homeScore == null || picks[m.id]?.awayScore == null));
 
   function fillRandomScores() {
     if (!showRandomFill || !canEdit || !hydrated || saving || uncertain || sessionExpired) return;
@@ -324,6 +325,12 @@ export function PicksBoard({
     for (const match of matches) {
       if (!canEditCasaMatch(match, clickedAt)) continue;
       const pick = picks[match.id];
+      if (scoringMode === "1x2") {
+        if (pick?.pick1x2 != null) continue;
+        const outcomes: Pick1x2[] = ["L", "E", "V"];
+        changed(match.id, { pick1x2: outcomes[Math.floor(Math.random() * outcomes.length)], homeScore: null, awayScore: null });
+        continue;
+      }
       if (pick?.homeScore != null && pick?.awayScore != null) continue;
       changed(match.id, {
         pick1x2: null,
@@ -388,7 +395,9 @@ export function PicksBoard({
             Llenar aleatorio
           </button>
           <p className="text-[13px] leading-relaxed text-text-secondary">
-            Completa los campos vacíos con goles de 0 a 4. Conserva los marcadores que ya escribiste. Revisa y pulsa Guardar.
+            {scoringMode === "1x2"
+              ? "Completa los partidos pendientes eligiendo ganador o empate al azar. Conserva tus selecciones. Revisa y pulsa Guardar."
+              : "Completa los campos vacíos con goles de 0 a 4. Conserva los marcadores que ya escribiste. Revisa y pulsa Guardar."}
           </p>
         </div>
       )}
