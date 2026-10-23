@@ -36,7 +36,7 @@ BEGIN
   SELECT id INTO e FROM public.casa_entries WHERE polla_id=p AND user_id=player;
   state:=public.casa_admin_player_pick_state(p,player,actor);
   ASSERT state->>'ownerId'=player::text AND state->>'entryId'=e::text AND state->>'revision'='0' AND state->'picks'='{}'::jsonb;
-  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_picks WHERE entry_id=e), 'Enrollment/view must create no default picks';
+  ASSERT NOT EXISTS(SELECT 1 FROM public.casa_picks WHERE entry_id=e), 'Manual questions must receive no automatic answers';
   INSERT INTO public.casa_entries(polla_id,user_id,status,amount_cop) VALUES(p,outsider,'pagada',10000) RETURNING id INTO other_entry;
   PERFORM pg_temp.admin_pick_fails(format('SELECT public.casa_admin_save_player_picks(%L,%L,%L,%L,%L,0,%L,2)',p,player,outsider,e,request,input),'ADMIN_REQUIRED');
   PERFORM pg_temp.admin_pick_fails(format('SELECT public.casa_admin_save_player_picks(%L,%L,%L,%L,%L,0,%L,1)',p,player,actor,e,request,input),'UPDATE_REQUIRED');
@@ -73,14 +73,17 @@ BEGIN
     'admin-match-pool-'||p,actor,2)->>'id')::uuid;
   PERFORM public.casa_set_admin_player(mp,player,true,0,actor,2);
   SELECT id INTO me FROM public.casa_entries WHERE polla_id=mp AND user_id=player;
+  state:=public.casa_admin_player_pick_state(mp,player,actor);
+  ASSERT state->>'revision'='1';
+  ASSERT (SELECT home_score BETWEEN 0 AND 4 AND away_score BETWEEN 0 AND 4 FROM public.casa_picks WHERE entry_id=me);
   input:=jsonb_build_array(jsonb_build_object('matchId',m,'homeScore',2,'awayScore',1));
-  result:=public.casa_admin_save_player_picks(mp,player,actor,me,gen_random_uuid(),0,input,2);
+  result:=public.casa_admin_save_player_picks(mp,player,actor,me,gen_random_uuid(),(state->>'revision')::bigint,input,2);
   ASSERT result->>'guardados'='1';
   ASSERT (SELECT home_score=2 AND away_score=1 AND user_id=player FROM public.casa_picks WHERE entry_id=me);
   -- This match is a synthetic row created in this transaction, never a live fixture.
   UPDATE public.matches SET status='live',elapsed=1 WHERE id=m;
   input:=jsonb_build_array(jsonb_build_object('matchId',m,'homeScore',3,'awayScore',0));
-  result:=public.casa_admin_save_player_picks(mp,player,actor,me,gen_random_uuid(),1,input,2);
+  result:=public.casa_admin_save_player_picks(mp,player,actor,me,gen_random_uuid(),(result->>'revision')::bigint,input,2);
   ASSERT result->>'guardados'='0';
   ASSERT (SELECT home_score=2 AND away_score=1 FROM public.casa_picks WHERE entry_id=me);
   ASSERT NOT EXISTS(SELECT 1 FROM public.predictions);
