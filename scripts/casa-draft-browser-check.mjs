@@ -164,7 +164,21 @@ async function fixture(mode, scenario='') {
     if(store.behavior==='drop') {await route.abort('failed');return;}
     await route.fulfill({json:{ok:true,owner_id:store.ownerId,slug:'fixture',entry_id:ids.entry,entry_number:1,created:true},headers:jsonHeaders});
   });
-  if(mode==='admin') await page.route('**/api/casa/admin/pollas/fixture/jugadores', route=>route.fulfill({json:{editable:true,players:Array.from({length:20},(_,i)=>({id:i===0?ids.owner:'10000000-0000-4000-8000-'+String(i+10).padStart(12,'0'),name:i===0?'Pipe':'Jugador '+(i+1),avatar:'millos',selected:i===0,ticket:null,revision:i===0?1:0,conflict:false}))},headers:jsonHeaders}));
+  if(mode==='admin') {
+    const players=Array.from({length:20},(_,i)=>({id:i===0?ids.owner:'10000000-0000-4000-8000-'+String(i+10).padStart(12,'0'),name:i===0?'Pipe':'Jugador '+(i+1),avatar:'millos',selected:i===0,ticket:null,revision:i===0?1:0,conflict:false}));
+    store.rosterWrites=[];
+    await page.route('**/api/casa/admin/pollas/fixture/jugadores',async route=>{
+      const request=route.request();let randomPicksSaved=0;
+      if(request.method()==='PATCH') {
+        assert.equal(request.headers()['x-casa-contract'],'2');
+        const op=request.postDataJSON();store.rosterWrites.push(clone(op));
+        const player=players.find(p=>p.id===op.userId);assert.ok(player);assert.equal(op.revision,player.revision);
+        player.selected=op.selected;player.revision++;randomPicksSaved=op.selected?1:0;
+        if(store.behavior==='roster-drop'){await route.abort('failed');return;}
+      }else assert.equal(request.method(),'GET');
+      await route.fulfill({json:{editable:true,players,randomPicksSaved},headers:jsonHeaders});
+    });
+  }
   await page.route(mode==='admin'?'**/api/casa/admin/pollas/fixture/jugadores/*/picks**':'**/api/casa/pollas/fixture/picks**', async route=>{
     const request=route.request(); const url=new URL(request.url());
     if (request.method()==='GET') {
@@ -293,6 +307,22 @@ try {
       });continue;
     }
     if(mode==='admin') {
+      await runCase('admin-enrollment-confirms-saved-random-defaults',mode,'',async({page,store})=>{
+        await page.getByRole('button',{name:/Jugadores de la casa/}).click();
+        await expect(page.getByText(/se guardan pronósticos aleatorios para los partidos pendientes/)).toBeVisible();
+        const checkbox=page.getByRole('checkbox',{name:'Inscribir a Jugador 2',exact:true});await checkbox.check();
+        await expect(checkbox).toBeChecked();
+        await expect(page.getByText('Jugador 2: inscripción pagada y pronósticos aleatorios guardados.',{exact:true})).toBeVisible();
+        assert.equal(store.rosterWrites.length,1);assert.equal(store.rosterWrites[0].selected,true);
+        assert.equal(store.sent.length,0,'Enrollment must use one atomic server operation, not a client pick save');
+        await inspectVisual(page,'admin-default-enrollment');
+      });
+      await runCase('admin-enrollment-lost-response-reads-back-without-rewriting',mode,'',async({page,store})=>{
+        await page.getByRole('button',{name:/Jugadores de la casa/}).click();store.behavior='roster-drop';
+        const checkbox=page.getByRole('checkbox',{name:'Inscribir a Jugador 2',exact:true});await checkbox.check();
+        await expect(checkbox).toBeChecked();await expect(page.getByRole('alert')).toBeVisible();
+        assert.equal(store.rosterWrites.length,1);assert.equal(store.sent.length,0);
+      });
       await runCase('admin-random-fill-draft-then-save',mode,'',async({page,store})=>{
         const button=page.getByRole('button',{name:'Llenar aleatorio',exact:true});
         await expect(button).toBeEnabled();await button.click();

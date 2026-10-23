@@ -14,7 +14,7 @@ The owner explicitly chose **paid participation with prize eligibility**. Checki
 a player records an administrator-approved `pagada` entry at the pool's entry
 price. Existing SQL pot, leaderboard and settlement functions include that entry
 normally. It does not charge a bank account, upload a receipt, send a message,
-create credentials or fill any picks. Administrators are responsible for the
+create credentials. Administrators are responsible for the
 funding they record. Free pools retain a zero amount and their single-entry rule.
 
 Unchecking changes only this selector's entry to `anulada`, excluding it from the
@@ -44,7 +44,20 @@ Migration **170** adds **Ver jugador** to each roster row. The administrator vie
 at `/admin/pollas/[id]/jugadores/[userId]` retains the real admin session and shows
 the selected profile's name and pollito. A paid, selector-managed entry is required
 before showing its prediction board; an unenrolled profile gets instructions, and
-raffles do not show prediction inputs. No default predictions are generated.
+raffles do not show prediction inputs.
+
+Migration **171** makes a new checkbox selection in a match pool save random
+predictions in the same transaction as enrollment. Scores use integers0-4;
+1X2 uses a home win, draw or away win. Only missing, editable predictions are
+filled. Existing values, locked/void matches and prior administrator edits are
+preserved. Questions and raffles receive no automatic answers. Installation and
+already-selected readbacks create no picks; there is no backfill.
+
+The enrollment event UUID identifies the save request; the existing
+`casa_admin_save_player_picks`/`casa_save_picks_v1` writer retains ownership,
+revisions, match locks and real actor audit. A save failure rolls back enrollment
+and audit together. Duplicate requests never rerandomize, and removal/re-add
+retains existing picks. Apply171 before publishing its confirmation text.
 
 The view reuses `PicksBoard`, `QuestionsBoard` and their existing manual-save,
 draft-isolation, revision and uncertain-response protocol. Its dedicated GET/PUT

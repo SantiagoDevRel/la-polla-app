@@ -81,7 +81,10 @@ export function AdminPlayerSelector({ pollaId, viewedPlayerId }: { pollaId: stri
       if (!Array.isArray(body.players) || typeof body.editable !== "boolean") throw new Error("No se pudo confirmar la selección. Verifica el estado antes de reintentar.");
       if (mounted.current) {
         setData(body);
-        setNotice(player.selected ? `${player.name}: retirado de esta polla.` : `${player.name}: inscripción pagada registrada.`);
+        setNotice(player.selected ? `${player.name}: retirado de esta polla.`
+          : Number.isInteger(body.randomPicksSaved) && body.randomPicksSaved > 0
+            ? `${player.name}: inscripción pagada y pronósticos aleatorios guardados.`
+            : `${player.name}: inscripción pagada registrada.`);
         router.refresh();
       }
     } catch (cause) {
@@ -125,6 +128,7 @@ export function AdminPlayerSelector({ pollaId, viewedPlayerId }: { pollaId: stri
       <div id={panelId} hidden={!open} className="border-t border-border-subtle p-3">
         <p className="px-1 text-[13px] leading-relaxed text-text-secondary">
           Marca para registrar una entrada pagada, con derecho a premio. Desmarca para retirar al jugador de esta polla.
+          {" "}En pollas de partidos, se guardan pronósticos aleatorios para los partidos pendientes. Se conservan los que ya tenga.
         </p>
         {data && !data.editable && <p className="mt-2 px-1 text-[13px] text-text-secondary">Las inscripciones no están abiertas. Puedes consultar la selección.</p>}
         {error && <p role="alert" className="mt-3 px-1 text-[13px] text-red-alert">{error}</p>}
