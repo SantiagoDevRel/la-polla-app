@@ -27,7 +27,7 @@ DECLARE actor uuid:=gen_random_uuid(); outsider uuid:=gen_random_uuid(); p uuid:
 BEGIN
   INSERT INTO public.users(id,display_name,is_admin) VALUES(actor,'Random default admin',true),(outsider,'Unmanaged random fixture',false);
   FOR i IN 1..7 LOOP
-    m:=public.upsert_match_safe('random-default-'||p||'-'||i,'premier_2025',1,'league',
+    m:=public.upsert_match_safe('rnd-'||p||'-'||i,'premier_2025',1,'league',
       'Random home '||p||'-'||i,'Random away '||p||'-'||i,NULL,NULL,
       clock_timestamp()+interval '2 hours',NULL,NULL,NULL,'scheduled',NULL,NULL,NULL);
     mids:=array_append(mids,m);
