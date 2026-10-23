@@ -40,6 +40,7 @@ import { hasPick, liveMinuteLabel, pickLabel, pickOnTrack, shortTeam } from "@/l
 import { dayLabel, groupCasaMatchesByDay, type SectionMatch } from "@/lib/casa/picks-sections";
 import type { CasaDistribution, Pick1x2 } from "@/lib/casa/types";
 import { canEditCasaMatch, hasCasaMatchStarted } from "@/lib/casa/match-rules";
+import { randomScoreline, randomScoreOptions } from "@/lib/casa/random-scores";
 import { MatchPicks } from "./MatchPicks";
 import { EntrarSheet } from "./EntrarSheet";
 import { UnknownTeamCrest } from "./CampaignDecorations";
@@ -317,7 +318,8 @@ export function PicksBoard({
   const showRandomFill = allowRandomFill && !planning && matches.length > 0;
   const hasRandomFields = matches.some(m => canEditCasaMatch(m, now)
     && (scoringMode === "1x2" ? picks[m.id]?.pick1x2 == null
-      : picks[m.id]?.homeScore == null || picks[m.id]?.awayScore == null));
+      : (picks[m.id]?.homeScore == null || picks[m.id]?.awayScore == null)
+        && randomScoreOptions(picks[m.id]).length > 0));
 
   function fillRandomScores() {
     if (!showRandomFill || !canEdit || !hydrated || saving || uncertain || sessionExpired) return;
@@ -332,10 +334,12 @@ export function PicksBoard({
         continue;
       }
       if (pick?.homeScore != null && pick?.awayScore != null) continue;
+      const scoreline = randomScoreline(pick);
+      if (!scoreline) continue;
       changed(match.id, {
         pick1x2: null,
-        homeScore: pick?.homeScore ?? Math.floor(Math.random() * 5),
-        awayScore: pick?.awayScore ?? Math.floor(Math.random() * 5),
+        homeScore: scoreline[0],
+        awayScore: scoreline[1],
       });
     }
   }
@@ -397,7 +401,7 @@ export function PicksBoard({
           <p className="text-[13px] leading-relaxed text-text-secondary">
             {scoringMode === "1x2"
               ? "Completa los partidos pendientes eligiendo ganador o empate al azar. Conserva tus selecciones. Revisa y pulsa Guardar."
-              : "Completa los campos vacíos con goles de 0 a 4. Conserva los marcadores que ya escribiste. Revisa y pulsa Guardar."}
+              : "Elige entre 0-0, 1-0, 0-1, 2-1, 1-2, 1-1 y 2-2. Conserva lo que ya escribiste. Revisa y pulsa Guardar."}
           </p>
         </div>
       )}

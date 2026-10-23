@@ -47,7 +47,8 @@ before showing its prediction board; an unenrolled profile gets instructions, an
 raffles do not show prediction inputs.
 
 Migration **171** makes a new checkbox selection in a match pool save random
-predictions in the same transaction as enrollment. Scores use integers0-4;
+predictions in the same transaction as enrollment. Migration **172** restricts
+new random scores to **0-0,1-0,0-1,2-1,1-2,1-1,2-2**;
 1X2 uses a home win, draw or away win. Only missing, editable predictions are
 filled. Existing values, locked/void matches and prior administrator edits are
 preserved. Questions and raffles receive no automatic answers. Installation and
@@ -71,7 +72,9 @@ Apply migration 170 before publishing this view.
 
 In match pools, the managed-player board offers **Llenar aleatorio**
 above the match list. It fills only empty, editable score fields with integers
-from 0 to 4, preserving existing values (including zero) and locked matches.
+from the same seven approved pairs, preserving existing values (including zero)
+and locked matches. Partial drafts use compatible pairs; an incompatible entered
+side is left untouched. Previously saved scores are never rewritten.
 It changes the local draft only; **Guardar** still performs the audited save.
 In 1X2 pools (including Ofigolazo 5), it fills missing selections with a random
 home win, draw or away win, preserving existing selections and locked matches.
