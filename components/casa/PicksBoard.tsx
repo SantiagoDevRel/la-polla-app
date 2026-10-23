@@ -128,6 +128,7 @@ export interface BoardPick {
 interface Props {
   slug: string;
   saveEndpoint?: string;
+  allowRandomFill?: boolean;
   /** Participación que se está editando (migración 131). Sin número = la principal. */
   entryNumber?: number | null;
   ownerId?: string;
@@ -223,6 +224,7 @@ function horaDe(m: BoardMatch): string {
 export function PicksBoard({
   slug,
   saveEndpoint,
+  allowRandomFill = false,
   entryNumber, ownerId, entryId, initialRevision,
   scoringMode,
   matches,
@@ -312,6 +314,25 @@ export function PicksBoard({
       awayScore: side === "away" ? n : (picks[matchId]?.awayScore ?? null) });
   }
 
+  const showRandomFill = allowRandomFill && !planning && scoringMode === "marcador" && matches.length > 0;
+  const hasRandomFields = matches.some(m => canEditCasaMatch(m, now)
+    && (picks[m.id]?.homeScore == null || picks[m.id]?.awayScore == null));
+
+  function fillRandomScores() {
+    if (!showRandomFill || !canEdit || !hydrated || saving || uncertain || sessionExpired) return;
+    const clickedAt = Date.now();
+    for (const match of matches) {
+      if (!canEditCasaMatch(match, clickedAt)) continue;
+      const pick = picks[match.id];
+      if (pick?.homeScore != null && pick?.awayScore != null) continue;
+      changed(match.id, {
+        pick1x2: null,
+        homeScore: pick?.homeScore ?? Math.floor(Math.random() * 5),
+        awayScore: pick?.awayScore ?? Math.floor(Math.random() * 5),
+      });
+    }
+  }
+
   /** Local → visitante → local del próximo partido editable; al final cierra el teclado. */
   function saltarDesde(matchId: string, side: "home" | "away") {
     if (side === "home") {
@@ -359,6 +380,18 @@ export function PicksBoard({
   return (
     <div data-app-update-blocked={dirty || saving || uncertain} aria-busy={!planning && !hydrated} className="space-y-4">
       {!planning && !hydrated && <p role="status" className="text-[13px] text-text-secondary">Cargando tus pronósticos…</p>}
+      {showRandomFill && (
+        <div className="space-y-2">
+          <button type="button" onClick={fillRandomScores}
+            disabled={!hydrated || !canEdit || saving || uncertain || sessionExpired || !hasRandomFields}
+            className="lp-btn lp-btn-ghost min-h-11 w-full text-[15px] disabled:cursor-not-allowed disabled:opacity-50">
+            Llenar aleatorio
+          </button>
+          <p className="text-[13px] leading-relaxed text-text-secondary">
+            Completa los campos vacíos con goles de 0 a 4. Conserva los marcadores que ya escribiste. Revisa y pulsa Guardar.
+          </p>
+        </div>
+      )}
       {/* ── Los partidos, en orden de empezada ───────────────────────────
           Un solo recorrido, de arriba abajo. El día es apenas un separador;
           dentro de cada uno el orden es la hora de inicio y no cambia nunca. */}

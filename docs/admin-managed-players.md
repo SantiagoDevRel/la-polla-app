@@ -56,6 +56,13 @@ request records its real admin actor in the append-only
 receipt-backed entry or withdrawn profile cannot be edited through this view.
 Apply migration 170 before publishing this view.
 
+In score-based match pools, the managed-player board offers **Llenar aleatorio**
+above the match list. It fills only empty, editable score fields with integers
+from 0 to 4, preserving existing values (including zero) and locked matches.
+It changes the local draft only; **Guardar** still performs the audited save.
+The control is unavailable during loading, saving or uncertain/session-expired
+states, and absent from ordinary player, question, 1X2 and planning views.
+
 - `npm test -- tests/casa-admin-players-route.test.ts` covers authorization,
   contract, validation, actor spoofing, cache headers and SQL error propagation.
 - The required GitHub Actions SQL job runs `node scripts/check-casa-sql.mjs`.

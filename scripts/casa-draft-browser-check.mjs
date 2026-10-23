@@ -27,6 +27,7 @@ const ids = {
   owner: '10000000-0000-4000-8000-000000000001', ownerB: '10000000-0000-4000-8000-000000000002',
   entry: '20000000-0000-4000-8000-000000000001', entryB: '20000000-0000-4000-8000-000000000002',
   match: '30000000-0000-4000-8000-000000000001', match2: '30000000-0000-4000-8000-000000000002',
+  match3: '30000000-0000-4000-8000-000000000003',
   question: '40000000-0000-4000-8000-000000000001', question2: '40000000-0000-4000-8000-000000000002',
   option: '50000000-0000-4000-8000-000000000001',
 };
@@ -52,17 +53,18 @@ import {ToastProvider} from '@/components/ui/Toast';
 const ids=${JSON.stringify(ids)};
 const params=new URLSearchParams(location.search), mode=params.get('mode'), scenario=params.get('case');
 const loadedAt=Date.now();
-const multiple=['closed','incomplete','rebase','restore-fresh','touch','autojump'].includes(scenario);
-const initialPicks=['rebase','restore-fresh'].includes(scenario)?{[mode==='questions'?ids.question2:ids.match2]:{pick1x2:null,homeScore:mode==='questions'?null:1,awayScore:mode==='questions'?null:0,optionId:null,freeText:mode==='questions'?'Respuesta inicial':null}}:{};
+const multiple=['closed','incomplete','rebase','restore-fresh','touch','autojump','random'].includes(scenario);
+const initialPicks=scenario==='random'?{[ids.match2]:{pick1x2:null,homeScore:0,awayScore:0}}:['rebase','restore-fresh'].includes(scenario)?{[mode==='questions'?ids.question2:ids.match2]:{pick1x2:null,homeScore:mode==='questions'?null:1,awayScore:mode==='questions'?null:0,optionId:null,freeText:mode==='questions'?'Respuesta inicial':null}}:{};
 function App(){
  const [state,setState]=useState({ownerId:ids.owner,entryId:ids.entry,mount:0,closed:false,initialPicks,initialRevision:0});
  (window as any).__fixture={remount:(ownerId=state.ownerId,entryId=state.entryId,snapshot={})=>setState(s=>({...s,...snapshot,ownerId,entryId,mount:s.mount+1})),closeFirst:()=>setState(s=>({...s,closed:true}))};
- const common={slug:'fixture',ownerId:state.ownerId,entryId:state.entryId,entryNumber:1,initialRevision:state.initialRevision,initialPicks:state.initialPicks,distribution:{},canEdit:true,...(mode==='admin'?{saveEndpoint:'/api/casa/admin/pollas/fixture/jugadores/'+state.ownerId+'/picks'}:{})};
+ const common={slug:'fixture',ownerId:state.ownerId,entryId:state.entryId,entryNumber:1,initialRevision:state.initialRevision,initialPicks:state.initialPicks,distribution:{},canEdit:scenario!=='random-readonly',...(mode==='admin'?{saveEndpoint:'/api/casa/admin/pollas/fixture/jugadores/'+state.ownerId+'/picks',allowRandomFill:true}:{})};
  const match={id:ids.match,home_team:'Millonarios',away_team:'Junior',home_team_flag:null,away_team_flag:null,scheduled_at:mode==='provisional'?'2020-01-01T00:00:00Z':new Date(loadedAt+(scenario==='closed'?310000:86400000)).toISOString(),scheduled_at_confirmed:mode!=='provisional',status:'scheduled',home_score:null,away_score:null,final_verified_at:null};
  const matches=multiple?[match,{...match,id:ids.match2,home_team:'Atlético Nacional',away_team:'Deportivo Cali',scheduled_at:new Date(loadedAt+86400000).toISOString()}]:[match];
+ if(scenario==='random')matches.push({...match,id:ids.match3,home_team:'Santa Fe',away_team:'Medellín',scheduled_at:new Date(loadedAt-3600000).toISOString(),status:'live'});
  const question={id:ids.question,prompt:'¿Quién será el primer goleador del campeonato colombiano?',points:3,input_kind:'texto' as const,resolved_at:state.closed?new Date().toISOString():null,resolved_text:state.closed?'Respuesta oficial':null};
  const questions=multiple?[question,{...question,id:ids.question2,prompt:'¿Quién dará la primera asistencia?',resolved_at:null,resolved_text:null}]:scenario==='options'?[{...question,input_kind:'opciones' as const,options:[{id:ids.option,label:'Un jugador con un nombre largo del equipo Millonarios que anota durante el segundo tiempo del partido'}]}]:[question];
- const content=mode==='creator'?<CrearPollaForm/>:mode==='free'?<UnirmeGratis slug="fixture" ownerId={state.ownerId} nombre="Polla regalo del campeonato colombiano" premio="Una camiseta oficial del equipo ganador"/>:mode==='questions'?<QuestionsBoard {...common} key={state.ownerId+state.entryId+state.mount} questions={questions}/>:<PicksBoard {...common} key={state.ownerId+state.entryId+state.mount} scoringMode={mode==='outcomes'?'1x2':'marcador'} matches={matches} canViewOthers={false}/>;
+ const content=mode==='creator'?<CrearPollaForm/>:mode==='free'?<UnirmeGratis slug="fixture" ownerId={state.ownerId} nombre="Polla regalo del campeonato colombiano" premio="Una camiseta oficial del equipo ganador"/>:mode==='questions'?<QuestionsBoard {...common} key={state.ownerId+state.entryId+state.mount} questions={questions}/>:<PicksBoard {...common} key={state.ownerId+state.entryId+state.mount} scoringMode={mode==='outcomes'||scenario==='random-1x2'?'1x2':'marcador'} matches={matches} canViewOthers={false}/>;
  return <ToastProvider><main className="mx-auto max-w-3xl px-4 py-6"><h1 className="lp-display-sm mb-4">{mode==='creator'?'Crear polla':mode==='free'?'Polla regalo':mode==='admin'?'Vista de Pipe':'Pronósticos'}</h1>{mode==='admin'&&<AdminPlayerSelector pollaId="fixture" viewedPlayerId={state.ownerId}/>} {content}</main></ToastProvider>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);
@@ -93,6 +95,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function journal(mode,scenario) {
   const state = { entryId:ids.entry, ownerId:ids.owner, revision:0, picks:{}, lastResult:null };
   if(['rebase','restore-fresh'].includes(scenario)) state.picks[mode==='questions'?ids.question2:ids.match2]=normal(mode==='questions'?{freeText:'Respuesta inicial'}:{homeScore:1,awayScore:0});
+  if(scenario==='random')state.picks[ids.match2]=normal({homeScore:0,awayScore:0});
   return {
     state, sent:[], reads:[], closed:new Set(), authenticated:true, ownerId:ids.owner,
     lastInput:null, behavior:null, held:null, joined:0, freeJoined:false,
@@ -109,7 +112,7 @@ function journal(mode,scenario) {
       if (op.expectedRevision !== state.revision) return {status:409,json:{ok:false,revision:state.revision,error:'Hay pronósticos más recientes. Revisa tus cambios antes de volver a guardar.'}};
       const results = op.picks.map(p => {
         const targetId = p.matchId ?? p.questionId;
-        assert.ok([ids.match,ids.match2,ids.question,ids.question2].includes(targetId));
+        assert.ok([ids.match,ids.match2,ids.match3,ids.question,ids.question2].includes(targetId));
         const values = normal(p);
         const error = this.closed.has(targetId) ? 'Este pronóstico cerró antes de guardarse.'
           : mode==='questions' ? (!values.optionId && !values.freeText ? 'Completa esta respuesta antes de guardar.' : null)
@@ -289,6 +292,38 @@ try {
       });continue;
     }
     if(mode==='admin') {
+      await runCase('admin-random-fill-draft-then-save',mode,'',async({page,store})=>{
+        const button=page.getByRole('button',{name:'Llenar aleatorio',exact:true});
+        await expect(button).toBeEnabled();await button.click();
+        const values=await page.locator('article input').evaluateAll(inputs=>inputs.map(input=>input.value));
+        assert.equal(values.length,2);assert.ok(values.every(v=>/^\d$/.test(v)&&Number(v)<=4));
+        assert.equal(store.sent.length,0,'Random fill must not submit predictions');
+        await expect(button).toBeDisabled();
+        await saveButton(page).click();await saved(page);
+        assert.equal(store.sent.length,1);assert.equal(store.state.picks[ids.match].homeScore,Number(values[0]));
+        assert.equal(store.state.picks[ids.match].awayScore,Number(values[1]));
+        await inspectVisual(page,'admin-random');
+      });
+      await runCase('admin-random-preserves-existing-and-locked',mode,'random',async({page,store})=>{
+        store.closed.add(ids.match3);
+        const inputs=page.locator('article input');
+        await inputs.first().fill('2');
+        await page.getByRole('button',{name:'Llenar aleatorio',exact:true}).click();
+        await expect(inputs.first()).toHaveValue('2');
+        const values=await inputs.evaluateAll(nodes=>nodes.map(node=>node.value));
+        assert.equal(values[2],'0');assert.equal(values[3],'0');
+        assert.match(values[1],/^[0-4]$/);assert.equal(store.sent.length,0);
+        await saveButton(page).click();await expect(saveButton(page)).toHaveText('Guardado 2/3');
+        assert.deepEqual(store.sent[0].picks.map(p=>p.matchId),[ids.match]);
+        assert.equal(store.state.picks[ids.match2].homeScore,0);assert.equal(store.state.picks[ids.match2].awayScore,0);
+        assert.equal(store.state.picks[ids.match3],undefined);
+      });
+      await runCase('admin-random-readonly',mode,'random-readonly',async({page,store})=>{
+        await expect(page.getByRole('button',{name:'Llenar aleatorio',exact:true})).toBeDisabled();assert.equal(store.sent.length,0);
+      });
+      await runCase('admin-random-absent-from-1x2',mode,'random-1x2',async({page})=>{
+        await expect(page.getByRole('button',{name:'Llenar aleatorio',exact:true})).toHaveCount(0);
+      });
       await runCase('admin-player-manual-save-and-selector',mode,'',async({page,store})=>{
         assert.equal(store.sent.length,0);
         await expect(page.locator('article input').first()).toHaveValue('');
@@ -335,6 +370,7 @@ try {
       });continue;
     }
     await runCase('offline-before-write-recovers',mode,'',async({page,store})=>{
+      await expect(page.getByRole('button',{name:'Llenar aleatorio',exact:true})).toHaveCount(0);
       store.behavior='offline';await fillPick(page,mode,mode==='questions'?'Mi respuesta':12);await saveButton(page).click();
       await expect(saveButton(page)).toHaveText('Comprobar guardado');assert.equal(store.state.revision,0);
       await expect(blocked(page)).toHaveAttribute('data-app-update-blocked','true');
