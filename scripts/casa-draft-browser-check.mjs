@@ -326,11 +326,11 @@ try {
         store.closed.add(ids.match3);
         const button=page.getByRole('button',{name:'Llenar aleatorio',exact:true});
         await expect(button).toBeEnabled();await button.click();
-        const selected=page.locator('article').first().locator('button[aria-pressed="true"]');
+        const selected=page.getByRole('group',{name:'Tu pronóstico: Millonarios contra Junior',exact:true}).locator('button[aria-pressed="true"]');
         await expect(selected).toHaveCount(1);const selectedName=await selected.getAttribute('aria-label');
         const result=selectedName==='Gana Millonarios'?'L':selectedName==='Empate'?'E':selectedName==='Gana Junior'?'V':null;
         assert.ok(result);assert.equal(store.sent.length,0);
-        await expect(page.locator('article').nth(1).getByRole('button',{name:'Empate',exact:true})).toHaveAttribute('aria-pressed','true');
+        await expect(page.getByRole('group',{name:'Tu pronóstico: Atlético Nacional contra Deportivo Cali',exact:true}).getByRole('button',{name:'Empate',exact:true})).toHaveAttribute('aria-pressed','true');
         await expect(button).toBeDisabled();
         await saveButton(page).click();await expect(saveButton(page)).toHaveText('Guardado 2/3');
         assert.deepEqual(store.sent[0].picks.map(p=>p.matchId),[ids.match]);
