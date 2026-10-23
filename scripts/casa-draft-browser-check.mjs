@@ -53,15 +53,15 @@ import {ToastProvider} from '@/components/ui/Toast';
 const ids=${JSON.stringify(ids)};
 const params=new URLSearchParams(location.search), mode=params.get('mode'), scenario=params.get('case');
 const loadedAt=Date.now();
-const multiple=['closed','incomplete','rebase','restore-fresh','touch','autojump','random'].includes(scenario);
-const initialPicks=scenario==='random'?{[ids.match2]:{pick1x2:null,homeScore:0,awayScore:0}}:['rebase','restore-fresh'].includes(scenario)?{[mode==='questions'?ids.question2:ids.match2]:{pick1x2:null,homeScore:mode==='questions'?null:1,awayScore:mode==='questions'?null:0,optionId:null,freeText:mode==='questions'?'Respuesta inicial':null}}:{};
+const multiple=['closed','incomplete','rebase','restore-fresh','touch','autojump','random','random-1x2'].includes(scenario);
+const initialPicks=scenario==='random-1x2'?{[ids.match2]:{pick1x2:'E',homeScore:null,awayScore:null}}:scenario==='random'?{[ids.match2]:{pick1x2:null,homeScore:0,awayScore:0}}:['rebase','restore-fresh'].includes(scenario)?{[mode==='questions'?ids.question2:ids.match2]:{pick1x2:null,homeScore:mode==='questions'?null:1,awayScore:mode==='questions'?null:0,optionId:null,freeText:mode==='questions'?'Respuesta inicial':null}}:{};
 function App(){
  const [state,setState]=useState({ownerId:ids.owner,entryId:ids.entry,mount:0,closed:false,initialPicks,initialRevision:0});
  (window as any).__fixture={remount:(ownerId=state.ownerId,entryId=state.entryId,snapshot={})=>setState(s=>({...s,...snapshot,ownerId,entryId,mount:s.mount+1})),closeFirst:()=>setState(s=>({...s,closed:true}))};
  const common={slug:'fixture',ownerId:state.ownerId,entryId:state.entryId,entryNumber:1,initialRevision:state.initialRevision,initialPicks:state.initialPicks,distribution:{},canEdit:scenario!=='random-readonly',...(mode==='admin'?{saveEndpoint:'/api/casa/admin/pollas/fixture/jugadores/'+state.ownerId+'/picks',allowRandomFill:true}:{})};
  const match={id:ids.match,home_team:'Millonarios',away_team:'Junior',home_team_flag:null,away_team_flag:null,scheduled_at:mode==='provisional'?'2020-01-01T00:00:00Z':new Date(loadedAt+(scenario==='closed'?310000:86400000)).toISOString(),scheduled_at_confirmed:mode!=='provisional',status:'scheduled',home_score:null,away_score:null,final_verified_at:null};
  const matches=multiple?[match,{...match,id:ids.match2,home_team:'Atlético Nacional',away_team:'Deportivo Cali',scheduled_at:new Date(loadedAt+86400000).toISOString()}]:[match];
- if(scenario==='random')matches.push({...match,id:ids.match3,home_team:'Santa Fe',away_team:'Medellín',scheduled_at:new Date(loadedAt-3600000).toISOString(),status:'live'});
+ if(['random','random-1x2'].includes(scenario))matches.push({...match,id:ids.match3,home_team:'Santa Fe',away_team:'Medellín',scheduled_at:new Date(loadedAt-3600000).toISOString(),status:'live'});
  const question={id:ids.question,prompt:'¿Quién será el primer goleador del campeonato colombiano?',points:3,input_kind:'texto' as const,resolved_at:state.closed?new Date().toISOString():null,resolved_text:state.closed?'Respuesta oficial':null};
  const questions=multiple?[question,{...question,id:ids.question2,prompt:'¿Quién dará la primera asistencia?',resolved_at:null,resolved_text:null}]:scenario==='options'?[{...question,input_kind:'opciones' as const,options:[{id:ids.option,label:'Un jugador con un nombre largo del equipo Millonarios que anota durante el segundo tiempo del partido'}]}]:[question];
  const content=mode==='creator'?<CrearPollaForm/>:mode==='free'?<UnirmeGratis slug="fixture" ownerId={state.ownerId} nombre="Polla regalo del campeonato colombiano" premio="Una camiseta oficial del equipo ganador"/>:mode==='questions'?<QuestionsBoard {...common} key={state.ownerId+state.entryId+state.mount} questions={questions}/>:<PicksBoard {...common} key={state.ownerId+state.entryId+state.mount} scoringMode={mode==='outcomes'||scenario==='random-1x2'?'1x2':'marcador'} matches={matches} canViewOthers={false}/>;
@@ -96,6 +96,7 @@ function journal(mode,scenario) {
   const state = { entryId:ids.entry, ownerId:ids.owner, revision:0, picks:{}, lastResult:null };
   if(['rebase','restore-fresh'].includes(scenario)) state.picks[mode==='questions'?ids.question2:ids.match2]=normal(mode==='questions'?{freeText:'Respuesta inicial'}:{homeScore:1,awayScore:0});
   if(scenario==='random')state.picks[ids.match2]=normal({homeScore:0,awayScore:0});
+  if(scenario==='random-1x2')state.picks[ids.match2]=normal({pick1x2:'E'});
   return {
     state, sent:[], reads:[], closed:new Set(), authenticated:true, ownerId:ids.owner,
     lastInput:null, behavior:null, held:null, joined:0, freeJoined:false,
@@ -116,7 +117,7 @@ function journal(mode,scenario) {
         const values = normal(p);
         const error = this.closed.has(targetId) ? 'Este pronóstico cerró antes de guardarse.'
           : mode==='questions' ? (!values.optionId && !values.freeText ? 'Completa esta respuesta antes de guardar.' : null)
-          : mode==='outcomes' ? (!['L','E','V'].includes(values.pick1x2) ? 'Completa este pronóstico antes de guardar.' : null)
+          : mode==='outcomes'||scenario==='random-1x2' ? (!['L','E','V'].includes(values.pick1x2) ? 'Completa este pronóstico antes de guardar.' : null)
             : values.homeScore===null || values.awayScore===null ? 'Completa este pronóstico antes de guardar.' : null;
         if (error) return {targetId,status:'rejected',error};
         state.picks[targetId]=values;
@@ -321,8 +322,21 @@ try {
       await runCase('admin-random-readonly',mode,'random-readonly',async({page,store})=>{
         await expect(page.getByRole('button',{name:'Llenar aleatorio',exact:true})).toBeDisabled();assert.equal(store.sent.length,0);
       });
-      await runCase('admin-random-absent-from-1x2',mode,'random-1x2',async({page})=>{
-        await expect(page.getByRole('button',{name:'Llenar aleatorio',exact:true})).toHaveCount(0);
+      await runCase('admin-random-1x2-preserves-existing-and-locked',mode,'random-1x2',async({page,store})=>{
+        store.closed.add(ids.match3);
+        const button=page.getByRole('button',{name:'Llenar aleatorio',exact:true});
+        await expect(button).toBeEnabled();await button.click();
+        const selected=page.locator('article').first().locator('button[aria-pressed="true"]');
+        await expect(selected).toHaveCount(1);const selectedName=await selected.getAttribute('aria-label');
+        const result=selectedName==='Gana Millonarios'?'L':selectedName==='Empate'?'E':selectedName==='Gana Junior'?'V':null;
+        assert.ok(result);assert.equal(store.sent.length,0);
+        await expect(page.locator('article').nth(1).getByRole('button',{name:'Empate',exact:true})).toHaveAttribute('aria-pressed','true');
+        await expect(button).toBeDisabled();
+        await saveButton(page).click();await expect(saveButton(page)).toHaveText('Guardado 2/3');
+        assert.deepEqual(store.sent[0].picks.map(p=>p.matchId),[ids.match]);
+        assert.equal(store.state.picks[ids.match].pick1x2,result);assert.equal(store.state.picks[ids.match].homeScore,null);
+        assert.equal(store.state.picks[ids.match2].pick1x2,'E');assert.equal(store.state.picks[ids.match3],undefined);
+        await inspectVisual(page,'admin-random-1x2');
       });
       await runCase('admin-player-manual-save-and-selector',mode,'',async({page,store})=>{
         assert.equal(store.sent.length,0);
