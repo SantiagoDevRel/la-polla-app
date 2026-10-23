@@ -327,7 +327,7 @@ try {
         const button=page.getByRole('button',{name:'Llenar aleatorio',exact:true});
         await expect(button).toBeEnabled();await button.click();
         const values=await page.locator('article input').evaluateAll(inputs=>inputs.map(input=>input.value));
-        assert.equal(values.length,2);assert.ok(values.every(v=>/^\d$/.test(v)&&Number(v)<=4));
+        assert.equal(values.length,2);assert.ok(['0-0','1-0','0-1','2-1','1-2','1-1','2-2'].includes(values.join('-')));
         assert.equal(store.sent.length,0,'Random fill must not submit predictions');
         await expect(button).toBeDisabled();
         await saveButton(page).click();await saved(page);
@@ -343,7 +343,7 @@ try {
         await expect(inputs.first()).toHaveValue('2');
         const values=await inputs.evaluateAll(nodes=>nodes.map(node=>node.value));
         assert.equal(values[2],'0');assert.equal(values[3],'0');
-        assert.match(values[1],/^[0-4]$/);assert.equal(store.sent.length,0);
+        assert.ok(['2-1','2-2'].includes(values.slice(0,2).join('-')));assert.equal(store.sent.length,0);
         await saveButton(page).click();await expect(saveButton(page)).toHaveText('Guardado 2/3');
         assert.deepEqual(store.sent[0].picks.map(p=>p.matchId),[ids.match]);
         assert.equal(store.state.picks[ids.match2].homeScore,0);assert.equal(store.state.picks[ids.match2].awayScore,0);
@@ -351,6 +351,12 @@ try {
       });
       await runCase('admin-random-readonly',mode,'random-readonly',async({page,store})=>{
         await expect(page.getByRole('button',{name:'Llenar aleatorio',exact:true})).toBeDisabled();assert.equal(store.sent.length,0);
+      });
+      await runCase('admin-random-preserves-incompatible-partial',mode,'',async({page,store})=>{
+        const inputs=page.locator('article input');await inputs.first().fill('3');
+        await expect(page.getByRole('button',{name:'Llenar aleatorio',exact:true})).toBeDisabled();
+        await expect(inputs.first()).toHaveValue('3');await expect(inputs.nth(1)).toHaveValue('');
+        assert.equal(store.sent.length,0);
       });
       await runCase('admin-random-1x2-preserves-existing-and-locked',mode,'random-1x2',async({page,store})=>{
         store.closed.add(ids.match3);

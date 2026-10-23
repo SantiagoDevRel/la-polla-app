@@ -11,11 +11,14 @@ Manual save confirmations, revision guards, session recovery and bounded request
 [save reliability](docs/save-reliability.md), migrations 164–166.
 
 Administrator-only player enrollment: [managed players](docs/admin-managed-players.md),
-migrations 169–171. The dropdown records paid entries with prize eligibility for
+migrations 169–172. The dropdown records paid entries with prize eligibility for
 the 20 owner-approved profiles. **Ver jugador** opens their prediction board for
 manual administrator saves with the original locks, revisions and actor audit.
 Selecting a profile in a match pool also saves random missing predictions in
 the enrollment transaction; existing picks and locked matches are preserved.
+Exact-score random picks use only 0-0, 1-0, 0-1, 2-1, 1-2, 1-1 and 2-2,
+both on enrollment and in **Llenar aleatorio**. Both match-pool formats share
+the same administrator dropdown, player views and audited saves.
 
 Registration and payment recovery checks: [user-flow verification](docs/user-flow-verification.md).
 Login has bounded requests, duplicate-submit locks and phone-scoped session readback

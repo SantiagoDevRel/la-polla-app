@@ -54,7 +54,8 @@ BEGIN
     SELECT id INTO e FROM public.casa_entries WHERE polla_id=p AND user_id=player;
     ASSERT (SELECT count(*) FROM public.casa_picks WHERE entry_id=e)=3;
     ASSERT NOT EXISTS(SELECT 1 FROM public.casa_picks WHERE entry_id=e AND
-      (pick_1x2 IS NOT NULL OR home_score IS NULL OR away_score IS NULL OR home_score NOT BETWEEN 0 AND 4 OR away_score NOT BETWEEN 0 AND 4));
+      (pick_1x2 IS NOT NULL OR home_score IS NULL OR away_score IS NULL
+        OR (home_score,away_score) NOT IN ((0,0),(1,0),(0,1),(2,1),(1,2),(1,1),(2,2))));
     ASSERT NOT EXISTS(SELECT 1 FROM public.casa_picks WHERE entry_id=e AND match_id=ANY(mids[4:7]));
     ASSERT (SELECT revision=1 FROM public.casa_pick_save_state WHERE entry_id=e);
     ASSERT (SELECT count(*) FROM public.casa_admin_player_pick_events WHERE entry_id=e AND actor_id=actor)=1;
@@ -67,6 +68,21 @@ BEGIN
   ASSERT (SELECT count(*) FROM public.casa_entries WHERE polla_id=p)=20;
   ASSERT (SELECT count(*) FROM public.casa_picks WHERE polla_id=p)=60;
   RAISE NOTICE 'PASS all20 profiles receive audited saved scores; provisional/cancelled timing and play/cutoff/void locks retained';
+
+  -- The restriction applies to new random values, never to an existing manual
+  -- prediction. Re-enrollment must not rewrite an administrator's3-0 override.
+  SELECT user_id INTO player FROM public.casa_admin_players WHERE position=1;
+  SELECT id INTO e FROM public.casa_entries WHERE polla_id=p AND user_id=player;
+  state:=public.casa_admin_player_pick_state(p,player,actor);
+  result:=public.casa_admin_save_player_picks(p,player,actor,e,gen_random_uuid(),(state->>'revision')::bigint,
+    jsonb_build_array(jsonb_build_object('matchId',mids[1],'homeScore',3,'awayScore',0)),2);
+  ASSERT result->>'guardados'='1';
+  snapshot:=public.casa_admin_player_pick_state(p,player,actor);
+  PERFORM public.casa_set_admin_player(p,player,false,1,actor,2);
+  result:=public.casa_set_admin_player(p,player,true,2,actor,2);
+  ASSERT result->>'randomPicksSaved'='0';
+  ASSERT public.casa_admin_player_pick_state(p,player,actor)=snapshot;
+  RAISE NOTICE 'PASS exact approved score pairs and preserved manual scores outside the random catalog';
 
   SELECT user_id INTO player FROM public.casa_admin_players WHERE position=1;
   result:=public.casa_set_admin_player(outcomes,player,true,0,actor,2);
