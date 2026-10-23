@@ -33,12 +33,11 @@ BEGIN
     mids:=array_append(mids,m);
   END LOOP;
   FOREACH mode IN ARRAY ARRAY['marcador','1x2'] LOOP
-    INSERT INTO public.casa_pollas(id,slug,name,kind,scoring_mode,status,closes_at,opens_at,created_by,
-      entry_price_cop,payout_method,payout_account)
-      VALUES(CASE WHEN mode='marcador' THEN p ELSE outcomes END,'random-'||p||'-'||mode,'Random fixture','partidos',mode::public.casa_scoring_mode,
-        'abierta',clock_timestamp()+interval '1 hour',clock_timestamp()-interval '1 hour',actor,10000,'otro','fixture');
-    INSERT INTO public.casa_polla_matches(polla_id,match_id)
-      SELECT CASE WHEN mode='marcador' THEN p ELSE outcomes END,unnest(mids);
+    result:=public.casa_create_polla_v2(jsonb_build_object('name','Random fixture','kind','partidos','tournament','premier_2025',
+      'scoringMode',mode,'prizeKind','pozo','entryPriceCop',10000,'houseCutPct',30,
+      'closesAt',clock_timestamp()+interval '1 hour','closeMode','manual','publicationMode','ahora',
+      'payoutMethod','otro','payoutAccount','fixture','matchIds',to_jsonb(mids)),'random-'||p||'-'||mode,actor,2);
+    IF mode='marcador' THEN p:=(result->>'id')::uuid; ELSE outcomes:=(result->>'id')::uuid; END IF;
   END LOOP;
   -- Three editable cases: confirmed future, unknown-time past and cancelled
   -- before play. Four blocked: live, elapsed>0, confirmed cutoff, pool void.
@@ -88,9 +87,10 @@ BEGIN
   ASSERT (SELECT pick_1x2='E' FROM public.casa_picks WHERE entry_id=e AND match_id=mids[1]);
   RAISE NOTICE 'PASS1X2 defaults, manual overrides, withdrawal/re-add preserve picks and revision';
 
-  INSERT INTO public.casa_pollas(id,slug,name,kind,scoring_mode,status,closes_at,opens_at,created_by,entry_price_cop,payout_method,payout_account)
-    VALUES(failed,'random-failed-'||p,'Atomic random fixture','partidos','marcador','abierta',clock_timestamp()+interval '1 hour',clock_timestamp()-interval '1 hour',actor,10000,'otro','fixture');
-  INSERT INTO public.casa_polla_matches(polla_id,match_id) VALUES(failed,mids[1]);
+  failed:=(public.casa_create_polla_v2(jsonb_build_object('name','Atomic random fixture','kind','partidos','tournament','premier_2025',
+    'scoringMode','marcador','prizeKind','pozo','entryPriceCop',10000,'houseCutPct',30,
+    'closesAt',clock_timestamp()+interval '1 hour','closeMode','manual','publicationMode','ahora',
+    'payoutMethod','otro','payoutAccount','fixture','matchIds',jsonb_build_array(mids[1])),'random-failed-'||p,actor,2)->>'id')::uuid;
   PERFORM set_config('test.random_defaults_fail',failed::text,true);
   PERFORM pg_temp.random_expect_failure(format('SELECT public.casa_set_admin_player(%L,%L,true,0,%L,2)',failed,player,actor),'Forced random default save failure');
   ASSERT NOT EXISTS(SELECT 1 FROM public.casa_entries WHERE polla_id=failed);

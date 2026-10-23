@@ -15,10 +15,10 @@ export async function checkAdminPlayerConcurrency(container) {
   const sql=statement=>execFileSync("docker",["exec","-i",container,"psql","-U","supabase_admin","-d","la_polla_test","-X","-q","-tA","-v","ON_ERROR_STOP=1"],{input:`BEGIN; DO $$ BEGIN PERFORM public.casa_v2_context(2); END $$; ${statement} COMMIT;`,encoding:"utf8",timeout:120000,maxBuffer:8*1024*1024});
   // Independent sessions: the pool lock serializes duplicate add requests,
   // and revisions prevent a stale administrator from reversing a newer action.
-  const admin=randomUUID(),pool=randomUUID(),player=sql("SELECT user_id FROM public.casa_admin_players WHERE position=1;").trim();
-  sql(`INSERT INTO public.users(id,display_name,is_admin) VALUES('${admin}','Race admin',true); INSERT INTO public.casa_pollas(id,slug,name,kind,scoring_mode,status,closes_at,opens_at,created_by,entry_price_cop,payout_method,payout_account) VALUES('${pool}','race-${pool}','Race','partidos','marcador','abierta',clock_timestamp()+interval '2 hours',clock_timestamp()-interval '1 hour','${admin}',10000,'otro','fixture');`);
-  const match=sql(`SELECT public.upsert_match_safe('random-race-${pool}','premier_2025',1,'league','Race home ${pool}','Race away ${pool}',NULL,NULL,clock_timestamp()+interval '3 hours',NULL,NULL,NULL,'scheduled',NULL,NULL,NULL);`).trim();
-  sql(`INSERT INTO public.casa_polla_matches(polla_id,match_id) VALUES('${pool}','${match}');`);
+  const admin=randomUUID(),seed=randomUUID(),player=sql("SELECT user_id FROM public.casa_admin_players WHERE position=1;").trim();
+  sql(`INSERT INTO public.users(id,display_name,is_admin) VALUES('${admin}','Race admin',true);`);
+  const match=sql(`SELECT public.upsert_match_safe('random-race-${seed}','premier_2025',1,'league','Race home ${seed}','Race away ${seed}',NULL,NULL,clock_timestamp()+interval '3 hours',NULL,NULL,NULL,'scheduled',NULL,NULL,NULL);`).trim();
+  const pool=sql(`SELECT public.casa_create_polla_v2(jsonb_build_object('name','Race fixture','kind','partidos','tournament','premier_2025','scoringMode','marcador','prizeKind','pozo','entryPriceCop',10000,'houseCutPct',30,'closesAt',clock_timestamp()+interval '2 hours','closeMode','manual','publicationMode','ahora','payoutMethod','otro','payoutAccount','fixture','matchIds',jsonb_build_array('${match}'::uuid)),'race-${seed}','${admin}',2)->>'id';`).trim();
   function session(statement){
     const child=spawn("docker",["exec","-i",container,"psql","-U","supabase_admin","-d","la_polla_test","-X","-q","-tA","-v","ON_ERROR_STOP=1"],{stdio:["pipe","pipe","pipe"]});
     let output="",error="",unlock;
