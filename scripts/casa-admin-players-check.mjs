@@ -12,7 +12,7 @@ export function adminPlayerFixtures(migration) {
 
 export async function checkAdminPlayerConcurrency(container) {
   assert.match(container,/^[a-f0-9]{64}$/);
-  const sql=statement=>execFileSync("docker",["exec","-i",container,"psql","-U","supabase_admin","-d","la_polla_test","-X","-q","-tA","-v","ON_ERROR_STOP=1"],{input:`DO $$ BEGIN PERFORM public.casa_v2_context(2); END $$; ${statement}`,encoding:"utf8",timeout:120000,maxBuffer:8*1024*1024});
+  const sql=statement=>execFileSync("docker",["exec","-i",container,"psql","-U","supabase_admin","-d","la_polla_test","-X","-q","-tA","-v","ON_ERROR_STOP=1"],{input:`BEGIN; DO $$ BEGIN PERFORM public.casa_v2_context(2); END $$; ${statement} COMMIT;`,encoding:"utf8",timeout:120000,maxBuffer:8*1024*1024});
   // Independent sessions: the pool lock serializes duplicate add requests,
   // and revisions prevent a stale administrator from reversing a newer action.
   const admin=randomUUID(),pool=randomUUID(),player=sql("SELECT user_id FROM public.casa_admin_players WHERE position=1;").trim();

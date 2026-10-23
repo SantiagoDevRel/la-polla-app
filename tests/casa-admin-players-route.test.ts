@@ -11,7 +11,7 @@ const pool = "e948b0e4-9235-4d72-a094-80a90f8b5587";
 const actor = "e311b526-17f3-49bc-8b8f-0c32f5cb0675";
 const player = "30ed8c74-3499-4569-a99d-106a0aa41e2a";
 const context = { params: Promise.resolve({ id: pool }) };
-const request = (body: unknown, headers = { "X-Casa-Contract": "2" }) => new Request("http://localhost/api/casa/admin/pollas/pool/jugadores", {
+const request = (body: unknown, headers: Record<string, string> = { "X-Casa-Contract": "2" }) => new Request("http://localhost/api/casa/admin/pollas/pool/jugadores", {
   method: "PATCH", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body),
 });
 
