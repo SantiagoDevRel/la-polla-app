@@ -10,7 +10,7 @@ import { checkPasswordSaveConcurrency } from './local-pg/password-save-concurren
 import { adminPlayerFixtures, checkAdminPlayerConcurrency } from './casa-admin-players-check.mjs';
 const repo=fileURLToPath(new URL('..',import.meta.url));
 const name=`la-polla-check-${randomUUID()}`;
-const image='public.ecr.aws/supabase/postgres:17.6.1.159';
+const image='docker.io/supabase/postgres:17.6.1.159@sha256:86a2e078779e5bdccda1f6f6c5063aa9779a322d1fface5fb408d051909b230f';
 let container;
 const docker=(args,input)=>{
   const r=spawnSync('docker',args,{input,encoding:'utf8',windowsHide:true,timeout:120_000,maxBuffer:8*1024*1024});
