@@ -127,6 +127,7 @@ export interface BoardPick {
 
 interface Props {
   slug: string;
+  saveEndpoint?: string;
   /** Participación que se está editando (migración 131). Sin número = la principal. */
   entryNumber?: number | null;
   ownerId?: string;
@@ -221,6 +222,7 @@ function horaDe(m: BoardMatch): string {
 
 export function PicksBoard({
   slug,
+  saveEndpoint,
   entryNumber, ownerId, entryId, initialRevision,
   scoringMode,
   matches,
@@ -236,7 +238,7 @@ export function PicksBoard({
   const planning = plannedMatches !== undefined;
   const [joinOpen, setJoinOpen] = useState(false);
   const { picks: pickValues, saved: savedValues, changed, save: guardar, discard, dirty, saving, uncertain, sessionExpired, msg, hydrated } = usePickSave({
-    slug, entryNumber, ownerId, entryId, initialRevision, initialPicks, targetIds: matches.map(m => m.id), kind: "match",
+    slug, saveEndpoint, entryNumber, ownerId, entryId, initialRevision, initialPicks, targetIds: matches.map(m => m.id), kind: "match",
   });
   const picks = pickValues as Record<string, BoardPick>;
   const saved = savedValues as Record<string, BoardPick>;

@@ -44,7 +44,7 @@ try {
   }
   sql(read('scripts/local-pg/fixups/post.sql'));
   sql("SELECT public.casa_transition_mode((SELECT mode FROM public.casa_operation_control WHERE singleton),'v2');");
-  for(const file of ['casa-provisional-timing-check.sql','casa-terminal-balance-check.sql','casa-free-entry-check.sql','casa-rls-check.sql','casa-picks-privacy-check.sql','casa-pending-picks-check.sql','casa-pick-save-check.sql','user-form-save-check.sql','password-save-check.sql','casa-admin-players-check.sql']) {
+  for(const file of ['casa-provisional-timing-check.sql','casa-terminal-balance-check.sql','casa-free-entry-check.sql','casa-rls-check.sql','casa-picks-privacy-check.sql','casa-pending-picks-check.sql','casa-pick-save-check.sql','user-form-save-check.sql','password-save-check.sql','casa-admin-players-check.sql','casa-admin-player-picks-check.sql']) {
     sql(read(`scripts/${file}`)); console.log(`PASS ${file}`);
   }
   await checkPickSaveConcurrency(container);

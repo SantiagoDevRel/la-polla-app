@@ -10,6 +10,7 @@ export function requireCasaContract(request: Request) {
 }
 
 const messages: Record<string, string> = {
+  MANAGED_ENTRY_REQUIRED: "Primero inscribe al jugador en esta polla desde Jugadores de la casa.",
   INVALID_MANAGED_PLAYER: "Ese jugador no pertenece a la lista de la casa.",
   INVALID_PLAYER_SELECTION: "La selección del jugador no es válida.",
   MANAGED_ENTRY_CONFLICT: "Esta inscripción se gestiona fuera del selector. No se modificó.",

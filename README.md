@@ -11,8 +11,9 @@ Manual save confirmations, revision guards, session recovery and bounded request
 [save reliability](docs/save-reliability.md), migrations 164–166.
 
 Administrator-only player enrollment: [managed players](docs/admin-managed-players.md),
-migration 169. The dropdown records paid entries with prize eligibility for the
-20 owner-approved profiles; registration guards and an immutable audit apply.
+migrations 169–170. The dropdown records paid entries with prize eligibility for
+the 20 owner-approved profiles. **Ver jugador** opens their prediction board for
+manual administrator saves with the original locks, revisions and actor audit.
 
 Registration and payment recovery checks: [user-flow verification](docs/user-flow-verification.md).
 Login has bounded requests, duplicate-submit locks and phone-scoped session readback
