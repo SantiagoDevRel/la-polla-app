@@ -310,7 +310,7 @@ try {
       await runCase('admin-enrollment-confirms-saved-random-defaults',mode,'',async({page,store})=>{
         await page.getByRole('button',{name:/Jugadores de la casa/}).click();
         await expect(page.getByText(/se guardan pronósticos aleatorios para los partidos pendientes/)).toBeVisible();
-        const checkbox=page.getByRole('checkbox',{name:'Inscribir a Jugador 2',exact:true});await checkbox.check();
+        const checkbox=page.getByRole('checkbox',{name:'Inscribir a Jugador 2',exact:true});await checkbox.click();
         await expect(checkbox).toBeChecked();
         await expect(page.getByText('Jugador 2: inscripción pagada y pronósticos aleatorios guardados.',{exact:true})).toBeVisible();
         assert.equal(store.rosterWrites.length,1);assert.equal(store.rosterWrites[0].selected,true);
@@ -319,7 +319,7 @@ try {
       });
       await runCase('admin-enrollment-lost-response-reads-back-without-rewriting',mode,'',async({page,store})=>{
         await page.getByRole('button',{name:/Jugadores de la casa/}).click();store.behavior='roster-drop';
-        const checkbox=page.getByRole('checkbox',{name:'Inscribir a Jugador 2',exact:true});await checkbox.check();
+        const checkbox=page.getByRole('checkbox',{name:'Inscribir a Jugador 2',exact:true});await checkbox.click();
         await expect(checkbox).toBeChecked();await expect(page.getByRole('alert')).toBeVisible();
         assert.equal(store.rosterWrites.length,1);assert.equal(store.sent.length,0);
       });
