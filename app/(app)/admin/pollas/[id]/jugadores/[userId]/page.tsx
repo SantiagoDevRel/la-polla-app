@@ -61,7 +61,7 @@ export default async function AdminPlayerView({ params }: { params: Promise<{ id
       {!state ? <p className="mx-4 rounded-lg border border-border-subtle bg-bg-card/80 p-4 text-[15px] leading-relaxed text-text-secondary">
         {polla.kind === "rifa" ? "Esta rifa no requiere pronósticos." : player.conflict ? "Esta inscripción se gestiona fuera del selector. No puedes modificarla desde esta vista." : "Primero inscribe al jugador en Jugadores de la casa. Después vuelve a abrir su vista para pronosticar."}
       </p> : <div className="mx-4">
-        {polla.kind === "partidos" ? <PicksBoard key={state.entryId} slug={polla.slug} saveEndpoint={endpoint}
+        {polla.kind === "partidos" ? <PicksBoard key={state.entryId} slug={polla.slug} saveEndpoint={endpoint} allowRandomFill
           ownerId={userId} entryId={state.entryId} entryNumber={state.entryNumber} initialRevision={state.revision}
           scoringMode={polla.scoring_mode ?? "marcador"} matches={matches} initialPicks={matchPicks}
           distribution={{ resultado: {}, marcador: {}, preguntas: {} }} canEdit={canEdit} canViewOthers={false}
