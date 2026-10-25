@@ -16,20 +16,31 @@ import BottomNav from "@/components/nav/BottomNav";
 import { AppBackground } from "@/components/layout/AppBackground";
 import BrandHeader from "@/components/layout/BrandHeader";
 import FontScaleApplier from "@/components/layout/FontScaleApplier";
+import { CortesiaRegalo } from "@/components/casa/CortesiaRegalo";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { needsName } from "@/lib/users/needs-name";
 import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
+import { listPendingCourtesies } from "@/lib/casa/courtesies";
+import type { PendingCourtesy } from "@/lib/casa/courtesies-shared";
 import type { CasaPollaStatus } from "@/lib/casa/types";
 
 export const dynamic = "force-dynamic";
 
-async function getNavContext(): Promise<{ isAdmin: boolean; pollasPending: number; ownerId: string | null }> {
+interface NavContext {
+  isAdmin: boolean;
+  pollasPending: number;
+  ownerId: string | null;
+  /** Cortesías sin aceptar (migración 173): el aviso obligatorio. */
+  cortesias: PendingCourtesy[];
+}
+
+async function getNavContext(): Promise<NavContext> {
   let ownerId: string | null = null;
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { isAdmin: false, pollasPending: 0, ownerId };
+    if (!user) return { isAdmin: false, pollasPending: 0, ownerId, cortesias: [] };
     ownerId = user.id;
 
     const admin = createAdminClient();
@@ -45,11 +56,16 @@ async function getNavContext(): Promise<{ isAdmin: boolean; pollasPending: numbe
 
     // Cuántas pollas de la casa tienen partidos sin marcar. Se cuenta sobre
     // casa_entries/casa_picks (el modelo nuevo), no sobre el P2P viejo.
-    const pollasPending = await contarPendientes(admin, user.id);
+    // Las cortesías van aparte: si esa lectura falla, el nav sigue igual y el
+    // aviso sale en la próxima carga.
+    const [pollasPending, cortesias] = await Promise.all([
+      contarPendientes(admin, user.id),
+      listPendingCourtesies(user.id).catch((): PendingCourtesy[] => []),
+    ]);
 
-    return { isAdmin: perfil?.is_admin === true, pollasPending, ownerId };
+    return { isAdmin: perfil?.is_admin === true, pollasPending, ownerId, cortesias };
   } catch {
-    return { isAdmin: false, pollasPending: 0, ownerId };
+    return { isAdmin: false, pollasPending: 0, ownerId, cortesias: [] };
   }
 }
 
@@ -143,7 +159,7 @@ export default async function AppLayout({
     redirect("/onboarding");
   }
 
-  const { isAdmin, pollasPending, ownerId } = await getNavContext();
+  const { isAdmin, pollasPending, ownerId, cortesias } = await getNavContext();
 
   return (
     <ToastProvider>
@@ -173,6 +189,8 @@ export default async function AppLayout({
         <div className="pt-3">{children}</div>
       </div>
       <BottomNav isAdmin={isAdmin} pollasPending={pollasPending} />
+      {/* Cortesías del administrador: aviso que no se cierra hasta aceptarlas. */}
+      <CortesiaRegalo pendientes={cortesias} />
     </ToastProvider>
   );
 }

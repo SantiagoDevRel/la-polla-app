@@ -577,6 +577,16 @@ pendientes ni cambiar inscripciones después del reparto o del archivo.
 
 ### Cortesías: cupos gratis que reparte una persona (2026-09-17, migración 138)
 
+> **Desde el 2026-10-25 (migración 173) la cortesía es para quien la recibe.**
+> Al abrir la app, esa persona ve un aviso obligatorio («La Polla te regaló un
+> cupo gratis») que no se cierra ni se salta al recargar hasta aceptarlo
+> (`CortesiaRegalo`, montado en el layout con `casa_pending_courtesies_v1`).
+> Un toque crea un cupo de $0 por cada cortesía (`casa_accept_courtesies_v1`) y
+> lleva a ese cupo; en «Tus cupos» se llama «Cortesía». Si la polla cerró, el
+> aviso no aparece. Ya no se muestra la lista de enlaces para regalar; los
+> enlaces repartidos antes siguen canjeándose con las reglas de abajo.
+> Regresión: `scripts/casa-courtesy-accept-check.sql` (BEGIN … ROLLBACK).
+
 Solo el administrador las crea. Desde `/admin/cortesias` busca a una persona,
 elige una polla y le da de 1 a 20 cortesías. Cada una es un **enlace único**
 (`/casa/<slug>?cortesia=CODIGO`) que esa persona le pasa a alguien y que sirve

@@ -19,7 +19,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, Ticket } from "lucide-react";
 import { StreetCard } from "@/components/street";
 import { formatCop } from "@/lib/casa/format";
 import { isCourtesyEntry } from "@/lib/casa/courtesies-shared";
@@ -84,6 +84,11 @@ export function Participaciones({
   if (!selected?.entry_number) return null;
   const state = participationState(selected);
   const quedan = Math.max(0, maxEntries - counted);
+  // (2026-10-25) Pedido del dueño: «Cupo 1 · Cupo 2 · Cortesía». El cupo de
+  // cortesía se nombra por lo que es; si hay varios, se numeran entre ellos.
+  const cortesias = visible.filter((e) => participationState(e) === "cortesia").map((e) => e.entry_number);
+  const titulo = (numero: number, estado: ParticipationState) => estado !== "cortesia" ? `Cupo ${numero}`
+    : cortesias.length > 1 ? `Cortesía ${cortesias.indexOf(numero) + 1}` : "Cortesía";
 
   return (
     <StreetCard className="mt-4 p-4 first:mt-0">
@@ -115,8 +120,11 @@ export function Participaciones({
                 }`}
               >
                 <span className="min-w-0">
-                  <span className="block text-[15px] font-semibold text-text-primary [overflow-wrap:anywhere]">Cupo {numero}</span>
-                  {pago && <span className={`block text-[13px] leading-snug ${pago.clase} [overflow-wrap:anywhere]`}>{pago.texto}</span>}
+                  <span className="flex items-center gap-1.5 text-[15px] font-semibold text-text-primary [overflow-wrap:anywhere]">
+                    {estado === "cortesia" && <Ticket aria-hidden="true" className="h-4 w-4 max-w-none shrink-0 text-turf" />}
+                    {titulo(numero, estado)}
+                  </span>
+                  {pago && estado !== "cortesia" && <span className={`block text-[13px] leading-snug ${pago.clase} [overflow-wrap:anywhere]`}>{pago.texto}</span>}
                 </span>
                 {pendingByNumber && (faltan > 0 ? (
                   <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-alert/50 bg-red-alert/10 px-2.5 py-1 text-[13px] font-semibold text-red-alert">
