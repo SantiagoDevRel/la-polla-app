@@ -153,6 +153,16 @@ garantizado, el porcentaje de cada nueva entrada que suma al pozo y el pozo si
 entras. Info y el encabezado de la polla muestran «Mínimo garantizado». Las
 liquidaciones conservan las reglas de Casa v2 y pagan el `prize_cop` vigente.
 
+**Solo consignaciones reales (2026-10-25, migración 174).** La cuenta del
+administrador (`/admin/pollas` y `/pollas` del bot admin) no suma a los jugadores
+de la casa (169) ni los cupos gratis (cortesías e invitaciones).
+`casa_admin_money_v1` da por polla los inscritos reales, los de la casa, los
+gratis, lo consignado y el balance real: consignado menos el premio comprometido
+o, ya resuelta, menos lo pagado a personas reales (si gana un jugador de la casa,
+no sale dinero). `casa_house_total_v2` suma ese balance. El pozo, los inscritos
+públicos, el ranking y el reparto no cambian: los jugadores de la casa y los cupos
+gratis compiten y ganan igual. Regresión: `scripts/casa-admin-money-check.sql`.
+
 ## Publicación y fechas
 
 `publication_mode=ahora|programada|oculta` y el timestamp existente `opens_at`

@@ -34,7 +34,7 @@ import {
 } from "@/lib/telegram/admin";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import { formatColombiaDateTime } from "@/lib/time/colombia";
-import { getPot, listAllPollas, listPendingProofs } from "@/lib/casa/queries";
+import { getAdminMoney, getPot, listAllPollas, listPendingProofs } from "@/lib/casa/queries";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -318,15 +318,19 @@ async function sendPollas(chatId: number) {
     return;
   }
 
+  // La cuenta del administrador: solo consignaciones reales (migración 174).
+  const money = await getAdminMoney(vivas.slice(0, 10).map((p) => p.id));
   const bloques = await Promise.all(
     vivas.slice(0, 10).map(async (p) => {
       const pot = await getPot(p.id);
+      const cuenta = money[p.id];
       return [
         `<b>${esc(p.name)}</b>  <code>${esc(p.slug)}</code>`,
         `${p.status !== "abierta" ? "cerrada" : new Date(p.opens_at) > new Date()
           ? `se publica el ${esc(formatColombiaDateTime(p.opens_at, { day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true }))}`
-          : `cierra en ${timeLeft(p.closes_at)}`} · ${pot.paid_entries} jugando`,
-        p.prize_kind === "objeto" ? `Premio: <b>${esc(p.prize_object ?? "Objeto")}</b>` : `Pozo: <b>${formatCop(pot.prize_cop)}</b> · casa: ${formatCop(pot.house_cop)}`,
+          : `cierra en ${timeLeft(p.closes_at)}`} · ${cuenta.real_entries} inscritos`,
+        `Consignado: <b>${formatCop(cuenta.real_gross_cop)}</b>`,
+        p.prize_kind === "objeto" ? `Premio: <b>${esc(p.prize_object ?? "Objeto")}</b>` : `Pozo: <b>${formatCop(pot.prize_cop)}</b> · casa: ${formatCop(cuenta.real_house_cop)}`,
       ].join("\n");
     }),
   );

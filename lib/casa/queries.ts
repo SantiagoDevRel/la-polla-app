@@ -18,6 +18,7 @@ import {
   type CasaPayout,
   type CasaPick,
   type CasaPolla,
+  type CasaAdminMoney,
   type CasaPot,
   type CasaProvisionalPayout,
   type CasaProvisionalPrize,
@@ -611,6 +612,21 @@ export async function listPendingProofs(limit = 20) {
   return (data ?? []) as CasaEntry[];
 }
 
+/** Lo que de verdad entró por polla (migración 174), para el panel de administración. */
+export async function getAdminMoney(pollaIds: string[]): Promise<Record<string, CasaAdminMoney>> {
+  const out: Record<string, CasaAdminMoney> = {};
+  const ids = [...new Set(pollaIds)];
+  for (let start = 0; start < ids.length; start += 200) {
+    const batch = ids.slice(start, start + 200);
+    const { data, error } = await createAdminClient().rpc("casa_admin_money_v1", { p_ids: batch });
+    if (error) throw error;
+    if (data?.length !== batch.length) throw new Error("No se pudo leer la cuenta de todas las pollas.");
+    for (const row of data as Array<CasaAdminMoney & { polla_id: string }>) out[row.polla_id] = row;
+  }
+  return out;
+}
+
+/** «Balance de la casa»: solo dinero consignado de verdad (migración 174). */
 export async function getHouseTotal(pollaIds: string[]): Promise<number> {
   const { data, error } = await createAdminClient().rpc("casa_house_total_v2", { p_ids: pollaIds });
   if (error) throw error;

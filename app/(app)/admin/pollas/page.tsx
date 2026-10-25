@@ -3,7 +3,7 @@
 
 import { redirect } from "next/navigation";
 import { getAuthenticatedUser } from "@/lib/auth/admin";
-import { getPots, getHouseTotal, getSettlementReadiness, listAllPollas } from "@/lib/casa/queries";
+import { getAdminMoney, getPots, getHouseTotal, getSettlementReadiness, listAllPollas } from "@/lib/casa/queries";
 import { pollaStatusLabel } from "@/lib/casa/types";
 import { canEditPolla } from "@/lib/casa/editor";
 import { countOpenMatchIssues } from "@/lib/casa/match-issues";
@@ -19,6 +19,8 @@ export default async function CasaAdminPage() {
   const pollas = await listAllPollas(user);
   const pots = await getPots(pollas.map((polla) => polla.id));
   const totalCasa = await getHouseTotal(pollas.map((polla) => polla.id));
+  // (2026-10-25) La cuenta solo suma consignaciones reales: sin jugadores de la casa ni cupos gratis.
+  const money = await getAdminMoney(pollas.map((polla) => polla.id));
   // Partidos suspendidos/aplazados/cancelados/abandonados sin decidir.
   const openIssues = await countOpenMatchIssues();
   // (2026-09-17) Pollas de pozo en juego: cuáles ya se pueden repartir (SQL, migración 134).
@@ -54,6 +56,7 @@ export default async function CasaAdminPage() {
         editable: !polla.private_draft && canEditPolla(polla),
       }))}
       pots={pots}
+      money={money}
       totalCasa={totalCasa}
       openIssues={openIssues}
       readiness={readiness}
