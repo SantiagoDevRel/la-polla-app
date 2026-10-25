@@ -61,7 +61,7 @@ export function CortesiaRegalo({ pendientes }: { pendientes: PendingCourtesy[] }
         method: "POST", headers: CASA_HEADERS, body: JSON.stringify({ pollaId: actual.pollaId }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
+      if (!response.ok || data.ok !== true) {
         // 409: la cortesía venció o ya no existe. No se puede aceptar, así que
         // el aviso se va. Otro error: se queda para intentar otra vez.
         if (response.status === 409) setResueltas((r) => [...r, actual.pollaId]);
