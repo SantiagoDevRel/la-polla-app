@@ -330,7 +330,10 @@ async function sendPollas(chatId: number) {
           ? `se publica el ${esc(formatColombiaDateTime(p.opens_at, { day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true }))}`
           : `cierra en ${timeLeft(p.closes_at)}`} · ${cuenta.real_entries} inscritos`,
         `Consignado: <b>${formatCop(cuenta.real_gross_cop)}</b>`,
-        p.prize_kind === "objeto" ? `Premio: <b>${esc(p.prize_object ?? "Objeto")}</b>` : `Pozo: <b>${formatCop(pot.prize_cop)}</b> · casa: ${formatCop(cuenta.real_house_cop)}`,
+        p.prize_kind === "objeto" ? `Premio: <b>${esc(p.prize_object ?? "Objeto")}</b>` : `Pozo: <b>${formatCop(pot.prize_cop)}</b>`,
+        cuenta.real_house_cop === cuenta.house_wins_cop
+          ? `Para la casa: ${formatCop(cuenta.real_house_cop)}`
+          : `Para la casa: ${formatCop(cuenta.real_house_cop)} si gana un jugador · ${formatCop(cuenta.house_wins_cop)} si gana la casa`,
       ].join("\n");
     }),
   );

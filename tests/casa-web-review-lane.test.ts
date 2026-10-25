@@ -162,7 +162,7 @@ describe("Telegram review of corrected payments", () => {
   it("announces the Colombia publication date of a scheduled open polla", async () => {
     mocks.listAllPollas.mockResolvedValue([{ id: pollaId, name: "Programada", slug: "programada", status: "abierta", prize_kind: "pozo", opens_at: "2099-09-20T01:30:00Z", closes_at: "2099-09-21T01:30:00Z" }]);
     mocks.getPot.mockResolvedValue({ paid_entries: 0, prize_cop: 0, house_cop: 0 });
-    mocks.getAdminMoney.mockResolvedValue({ [pollaId]: { real_entries: 0, house_entries: 0, free_entries: 0, real_gross_cop: 0, real_house_cop: 0 } });
+    mocks.getAdminMoney.mockResolvedValue({ [pollaId]: { real_entries: 0, house_entries: 0, free_entries: 0, real_gross_cop: 0, prize_cost_cop: 0, real_house_cop: 0, house_wins_cop: 0 } });
     await telegram({ message: { chat: { id: 7 }, text: "/pollas" } });
     const text = mocks.sendMessage.mock.calls[0][1] as string;
     expect(text).toMatch(/se publica el 19 de septiembre/);
@@ -173,13 +173,22 @@ describe("Telegram review of corrected payments", () => {
     mocks.listAllPollas.mockResolvedValue([{ id: pollaId, name: "Abierta", slug: "abierta", status: "abierta", prize_kind: "pozo", opens_at: "2020-01-01T00:00:00Z", closes_at: "2099-09-21T01:30:00Z" }]);
     // Public pot: 82 entries incl. 20 house players and 3 free ones.
     mocks.getPot.mockResolvedValue({ paid_entries: 82, prize_cop: 1000000, house_cop: 580000 });
-    mocks.getAdminMoney.mockResolvedValue({ [pollaId]: { real_entries: 59, house_entries: 20, free_entries: 3, real_gross_cop: 1180000, real_house_cop: 180000 } });
+    mocks.getAdminMoney.mockResolvedValue({ [pollaId]: { real_entries: 59, house_entries: 20, free_entries: 3, real_gross_cop: 1180000, prize_cost_cop: 0, real_house_cop: 180000, house_wins_cop: 1180000 } });
     await telegram({ message: { chat: { id: 7 }, text: "/pollas" } });
     const text = mocks.sendMessage.mock.calls[0][1] as string;
     expect(text).toContain("59 inscritos");
     expect(text).toContain("Consignado: <b>$1.180.000</b>");
-    expect(text).toContain("casa: $180.000");
+    expect(text).toContain("Para la casa: $180.000 si gana un jugador · $1.180.000 si gana la casa");
     expect(text).not.toContain("82");
     expect(text).not.toContain("580.000");
+  });
+
+  it("shows a negative house balance as -$ in /pollas", async () => {
+    mocks.listAllPollas.mockResolvedValue([{ id: pollaId, name: "James", slug: "james", status: "abierta", prize_kind: "objeto", prize_object: "Camiseta", opens_at: "2020-01-01T00:00:00Z", closes_at: "2099-09-21T01:30:00Z" }]);
+    mocks.getPot.mockResolvedValue({ paid_entries: 23, prize_cop: 0, house_cop: 460000 });
+    mocks.getAdminMoney.mockResolvedValue({ [pollaId]: { real_entries: 23, house_entries: 0, free_entries: 0, real_gross_cop: 460000, prize_cost_cop: 550000, real_house_cop: -90000, house_wins_cop: 460000 } });
+    await telegram({ message: { chat: { id: 7 }, text: "/pollas" } });
+    const text = mocks.sendMessage.mock.calls[0][1] as string;
+    expect(text).toContain("Para la casa: -$90.000 si gana un jugador · $460.000 si gana la casa");
   });
 });

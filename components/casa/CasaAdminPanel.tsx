@@ -25,6 +25,11 @@ export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "stat
   editable?: boolean;
 };
 
+/** Saldo negativo en rojo. El oro se reserva al balance total (máximo 3 por pantalla). */
+function moneyTone(cop: number, positive = "text-gold") {
+  return cop < 0 ? "text-red-alert" : positive;
+}
+
 /** Pozo en dinero de partidos o preguntas: el reparto se confirma en «Pago a ganadores». */
 function settleInline(polla: Pick<AdminPolla, "prize_kind" | "kind">) {
   return polla.prize_kind === "pozo" && (polla.kind === "partidos" || polla.kind === "manual");
@@ -35,7 +40,8 @@ export function CasaAdminPanel({ pollas, pots, money = {}, totalCasa, openIssues
   pots: Record<string, CasaPot>;
   /** Solo consignaciones reales (migración 174): sin jugadores de la casa ni cupos gratis. */
   money?: Record<string, CasaAdminMoney>;
-  totalCasa: number;
+  /** Balance real de la casa en los dos casos de lo que está en juego (migración 175). */
+  totalCasa: { ifPlayerWins: number; ifHouseWins: number };
   /** Pollas de pozo en juego o terminadas: si ya se pueden repartir (migración 134). */
   readiness?: Record<string, CasaSettlementReadiness>;
   /** Casos de partidos sin decidir; `null` si no se pudo leer el conteo. */
@@ -95,7 +101,14 @@ export function CasaAdminPanel({ pollas, pots, money = {}, totalCasa, openIssues
         <div className="mt-4 grid grid-cols-2 gap-4">
           <div className="min-w-0">
             <Label>Balance de la casa</Label>
-            <p className="lp-money mt-1 text-[24px] leading-none text-gold [overflow-wrap:anywhere]">{formatCop(totalCasa)}</p>
+            {totalCasa.ifPlayerWins === totalCasa.ifHouseWins ? (
+              <p className={`lp-money mt-1 text-[24px] leading-none [overflow-wrap:anywhere] ${moneyTone(totalCasa.ifPlayerWins)}`}>{formatCop(totalCasa.ifPlayerWins)}</p>
+            ) : (
+              <dl className="mt-1 space-y-1.5">
+                <div><dt className="text-[12px] leading-tight text-text-secondary">Si gana un jugador</dt><dd className={`lp-money text-[20px] leading-tight [overflow-wrap:anywhere] ${moneyTone(totalCasa.ifPlayerWins)}`}>{formatCop(totalCasa.ifPlayerWins)}</dd></div>
+                <div><dt className="text-[12px] leading-tight text-text-secondary">Si gana la casa</dt><dd className={`lp-money text-[20px] leading-tight [overflow-wrap:anywhere] ${moneyTone(totalCasa.ifHouseWins)}`}>{formatCop(totalCasa.ifHouseWins)}</dd></div>
+              </dl>
+            )}
           </div>
           <div className="min-w-0">
             <Label>Recibos pendientes</Label>
@@ -210,6 +223,19 @@ export function CasaAdminPanel({ pollas, pots, money = {}, totalCasa, openIssues
                               {polla.status !== "borrador" && <Link href={`/polla/${polla.slug}`} className="lp-btn lp-btn-ghost !px-3 !text-[13px]">Ver polla</Link>}
                             </div>
                           </div>
+                          {cuenta && (
+                            <dl className="mb-4 flex flex-wrap gap-x-6 gap-y-2 rounded-md border border-border-default p-3">
+                              {cuenta.real_house_cop === cuenta.house_wins_cop ? (
+                                <div className="min-w-0"><dt className="text-[12px] text-text-secondary">Para la casa</dt><dd className={`lp-money text-[18px] leading-tight ${moneyTone(cuenta.real_house_cop, "text-text-primary")}`}>{formatCop(cuenta.real_house_cop)}</dd></div>
+                              ) : (
+                                <>
+                                  <div className="min-w-0"><dt className="text-[12px] text-text-secondary">Si gana un jugador</dt><dd className={`lp-money text-[18px] leading-tight ${moneyTone(cuenta.real_house_cop, "text-text-primary")}`}>{formatCop(cuenta.real_house_cop)}</dd></div>
+                                  <div className="min-w-0"><dt className="text-[12px] text-text-secondary">Si gana la casa</dt><dd className={`lp-money text-[18px] leading-tight ${moneyTone(cuenta.house_wins_cop, "text-text-primary")}`}>{formatCop(cuenta.house_wins_cop)}</dd></div>
+                                </>
+                              )}
+                              {cuenta.prize_cost_cop > 0 && <div className="min-w-0"><dt className="text-[12px] text-text-secondary">Costo del premio</dt><dd className="lp-money text-[18px] leading-tight text-text-primary">{formatCop(cuenta.prize_cost_cop)}</dd></div>}
+                            </dl>
+                          )}
                           <div className="[&_button]:!min-h-11">
                             {/* Resolver preguntas / registrar el número de la
                                 rifa. Sin esto, esas dos clases de polla solo
