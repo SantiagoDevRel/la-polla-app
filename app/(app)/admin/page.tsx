@@ -174,8 +174,8 @@ export default function AdminPage() {
           <Link href="/admin/pollas" className="lp-btn lp-btn-ghost mt-2 w-full">
             Administrar pollas
           </Link>
-          {/* Cupos de cortesía (migración 138): se buscan personas y se les dan
-              enlaces gratis para una polla. Solo desde acá. */}
+          {/* Cupos de cortesía (migraciones 138 y 173): se buscan personas y se
+              les dan cupos gratis para una polla, que aceptan al abrir la app. */}
           <Link href="/admin/cortesias" className="lp-btn lp-btn-ghost mt-2 w-full">
             Dar cortesías
           </Link>

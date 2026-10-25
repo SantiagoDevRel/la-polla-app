@@ -5,7 +5,6 @@
 import Link from "next/link";
 import { InvitacionesPerfil } from "@/components/casa/InvitacionesPerfil";
 import { MisRifasPerfil } from "@/components/rifas/MisRifasPerfil";
-import { MisCortesias } from "@/components/casa/MisCortesias";
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -339,11 +338,6 @@ export default function PerfilPage() {
 
         {/* Invitaciones (migración 135). iOS: fuera, como el resto de promociones con premio. */}
         {!isIOSApp && <InvitacionesPerfil />}
-
-        {/* Cortesías para regalar (migración 138). Solo aparece si la casa le dio
-            cupos; si no tiene, el componente no dibuja nada. Fuera de iOS por el
-            mismo criterio que las invitaciones. */}
-        {!isIOSApp && <MisCortesias profileStyle />}
 
         {/* Tamaño del texto — preferencia local por dispositivo. */}
         <FontScalePicker />

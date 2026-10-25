@@ -105,8 +105,8 @@ export function CortesiasAdmin({ pollas }: { pollas: CortesiaPolla[] }) {
       const nombre = persona.display_name || "La persona";
       showToast(
         cantidad === 1
-          ? `${nombre} ya tiene 1 cortesía para regalar.`
-          : `${nombre} ya tiene ${cantidad} cortesías para regalar.`,
+          ? `${nombre} tiene 1 cupo gratis. Lo acepta al abrir la app.`
+          : `${nombre} tiene ${cantidad} cupos gratis. Los acepta al abrir la app.`,
         "success",
       );
       setPersona(null);
@@ -170,12 +170,11 @@ export function CortesiasAdmin({ pollas }: { pollas: CortesiaPolla[] }) {
 
       <div className="px-4 pt-5">
         <p className="mb-5 text-[15px] leading-relaxed text-text-secondary">
-          Le das cupos gratis a una persona para que los regale. Cada cortesía es un enlace
-          distinto que solo sirve una vez.
+          Le das cupos gratis a una persona para que juegue. Al abrir la app le sale un
+          aviso y queda dentro con un toque.
         </p>
         <p className="mb-6 text-[13px] leading-snug text-text-muted">
-          *Solo las redime quien nunca ha tenido cuenta en La Polla, una vez por persona y
-          solo en la polla que elijas. Si nadie la usa antes del cierre, vence con la polla.
+          *Valen solo en la polla que elijas. Si no la acepta antes del cierre, vence con la polla.
         </p>
 
         {sinPollas ? (

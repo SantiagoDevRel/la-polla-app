@@ -81,8 +81,7 @@ import { UnirmeGratis } from "@/components/casa/UnirmeGratis";
 import { PagoConfirmado } from "@/components/casa/PagoConfirmado";
 import { ActivarCortesia } from "@/components/casa/ActivarCortesia";
 import { AvisoDesempate } from "@/components/casa/AvisoDesempate";
-import { MisCortesias } from "@/components/casa/MisCortesias";
-import { courtesyPreview, listMyCourtesies } from "@/lib/casa/courtesies";
+import { courtesyPreview } from "@/lib/casa/courtesies";
 import { COURTESY_COOKIE, COURTESY_FINE_PRINT, isCourtesyEntry, validCourtesyCode, type CourtesyPreview } from "@/lib/casa/courtesies-shared";
 import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
@@ -214,10 +213,6 @@ export default async function PollaPage({
     ? Object.fromEntries(entries.filter((e) => e.entry_number != null).map((e) => [e.entry_number!,
       editables.filter((id) => !allPicks.some((p) => p.entry_id === e.id && p.match_id === id)).length]))
     : null;
-  // Cortesías que esta persona tiene para regalar en esta polla (migración 138).
-  // Casi nadie tiene: la lista vuelve vacía y no se dibuja nada.
-  const misCortesias = (privateCampaign ? [] : await listMyCourtesies(user.id).catch(() => []))
-    .filter((cortesia) => cortesia.slug === polla.slug);
   const canResumeProof = !abierta && polla.kind !== "rifa" && entry?.status === "pendiente" && !entry.proof_path
     ? (await getActiveProofs(polla.id, user.id)).some((proof) => proof.entry_id === entry.id) : false;
   const pagada = pagadaDesde(polla, (await endingsPromise)[polla.id] ?? null);
@@ -525,7 +520,7 @@ export default async function PollaPage({
             entryId={entry.id}
             cortesia={isCourtesyEntry(entry)}
             gratis={isGiftEntry(entry)}
-            cupo={multiple ? entry.entry_number : null}
+            cupo={multiple && !isCourtesyEntry(entry) ? entry.entry_number : null}
             abierta={abierta}
           />
         )}
@@ -577,9 +572,9 @@ export default async function PollaPage({
           </StreetCard>
         )}
 
-        {misCortesias.length > 0 && (
-          <MisCortesias initial={misCortesias} mostrarPolla={false} />
-        )}
+        {/* (2026-10-25, migración 173) La lista de enlaces para regalar se fue:
+              la cortesía del administrador es un cupo para quien la recibe, que
+              la acepta en el aviso del layout y la ve como «Cortesía» en sus cupos. */}
 
         <PollaTabs
           slug={polla.slug}

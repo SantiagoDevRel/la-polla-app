@@ -105,6 +105,23 @@ export interface AdminCourtesy extends MyCourtesy {
   granted_at: string;
 }
 
+/** Cortesías sin aceptar de una persona en una polla (casa_pending_courtesies_v1). */
+export interface PendingCourtesy {
+  pollaId: string;
+  slug: string;
+  polla: string;
+  closesAt: string;
+  /** Cuántos cupos gratis recibe al aceptar. */
+  pending: number;
+}
+
+/** Lo que devuelve casa_accept_courtesies_v1 cuando no se pudo. */
+export function courtesyAcceptErrorMessage(code: string | null | undefined): string {
+  if (code === "COURTESY_EXPIRED") return "Esta polla ya cerró sus inscripciones, así que la cortesía venció.";
+  if (code === "COURTESY_NOT_FOUND") return "Esta cortesía ya no está disponible.";
+  return "No pudimos aceptar la cortesía. Intenta de nuevo.";
+}
+
 /** Lo que ve quien abre el enlace antes de tener cuenta (casa_courtesy_preview_v1). */
 export interface CourtesyPreview {
   status: CourtesyStatus;

@@ -8,7 +8,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CASA_CONTRACT } from "./contract";
-import type { AdminCourtesy, CourtesyPreview, MyCourtesy } from "./courtesies-shared";
+import type { AdminCourtesy, CourtesyPreview, MyCourtesy, PendingCourtesy } from "./courtesies-shared";
 
 /** Las cortesías de quien las reparte. Vacío también cuando nunca le dieron. */
 export async function listMyCourtesies(userId: string): Promise<MyCourtesy[]> {
@@ -83,4 +83,38 @@ export async function redeemCourtesy(code: string, userId: string): Promise<Cour
   });
   if (error) throw error;
   return data as CourtesyRedeemResult;
+}
+
+/**
+ * Cortesías que el administrador le dio a esta persona y todavía no acepta,
+ * por polla viva (migración 173). Alimenta el aviso obligatorio del layout.
+ */
+export async function listPendingCourtesies(userId: string): Promise<PendingCourtesy[]> {
+  const { data, error } = await createAdminClient().rpc("casa_pending_courtesies_v1", { p_user_id: userId });
+  if (error) throw error;
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    pollaId: row.polla_id as string,
+    slug: row.slug as string,
+    polla: row.name as string,
+    closesAt: row.closes_at as string,
+    pending: Number(row.pending),
+  }));
+}
+
+export interface CourtesyAcceptResult {
+  ok: boolean;
+  error?: string;
+  slug?: string;
+  polla?: string;
+  accepted?: number;
+  entry_number?: number;
+}
+
+/** Acepta todas las cortesías de esta persona en esa polla: un cupo de $0 por cada una. */
+export async function acceptCourtesies(pollaId: string, userId: string): Promise<CourtesyAcceptResult> {
+  const { data, error } = await createAdminClient().rpc("casa_accept_courtesies_v1", {
+    p_polla_id: pollaId, p_user_id: userId, p_contract: CASA_CONTRACT,
+  });
+  if (error) throw error;
+  return data as CourtesyAcceptResult;
 }
