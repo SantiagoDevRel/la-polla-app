@@ -16,7 +16,7 @@ import { formatCop, timeLeft } from "@/lib/casa/format";
 import { editorHref } from "@/lib/casa/editor";
 import { referralEvery } from "@/lib/casa/referrals-shared";
 import { RegalosPolla } from "@/components/casa/RegalosPolla";
-import type { pollaStatusLabel, CasaPolla, CasaPot, CasaSettlementReadiness } from "@/lib/casa/types";
+import type { pollaStatusLabel, CasaAdminMoney, CasaPolla, CasaPot, CasaSettlementReadiness } from "@/lib/casa/types";
 
 export type AdminPolla = Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "status" | "closes_at" | "opens_at" | "publication_mode" | "prize_kind" | "prize_object" | "draw_pending" | "settlement_outcome" | "entry_price_cop" | "referral_every"> & {
   label: ReturnType<typeof pollaStatusLabel>;
@@ -30,9 +30,11 @@ function settleInline(polla: Pick<AdminPolla, "prize_kind" | "kind">) {
   return polla.prize_kind === "pozo" && (polla.kind === "partidos" || polla.kind === "manual");
 }
 
-export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, readiness = {} }: {
+export function CasaAdminPanel({ pollas, pots, money = {}, totalCasa, openIssues = null, readiness = {} }: {
   pollas: AdminPolla[];
   pots: Record<string, CasaPot>;
+  /** Solo consignaciones reales (migración 174): sin jugadores de la casa ni cupos gratis. */
+  money?: Record<string, CasaAdminMoney>;
   totalCasa: number;
   /** Pollas de pozo en juego o terminadas: si ya se pueden repartir (migración 134). */
   readiness?: Record<string, CasaSettlementReadiness>;
@@ -153,6 +155,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, rea
               const expanded = openId === polla.id;
               const status = polla.label;
               const pot = pots[polla.id];
+              const cuenta = money[polla.id];
               const pending = counts?.[polla.id] ?? 0;
               return (
                 <motion.li key={polla.id} variants={fadeUp} className="lp-card overflow-hidden">
@@ -175,7 +178,7 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, rea
                       <span className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                         <Tape tone={status.tone === "cal" ? "mute" : status.tone}>{status.text}</Tape>
                         {readiness[polla.id]?.ready && <Tape tone="live">Lista para repartir</Tape>}
-                        <span className="text-[12px] text-text-secondary">{pot?.paid_entries ?? 0} inscritos</span>
+                        <span className="text-[12px] text-text-secondary">{cuenta ? `${cuenta.real_entries} inscritos${cuenta.house_entries > 0 ? ` · ${cuenta.house_entries} de la casa` : ""}${cuenta.free_entries > 0 ? ` · ${cuenta.free_entries} gratis` : ""}` : `${pot?.paid_entries ?? 0} inscritos`}</span>
                         {polla.status === "abierta" && <span className="text-[12px] text-text-secondary">Cierra en {timeLeft(polla.closes_at)}</span>}
                       </span>
                     </button>
@@ -197,7 +200,10 @@ export function CasaAdminPanel({ pollas, pots, totalCasa, openIssues = null, rea
                         )}
                         <div className="mt-6 border-t border-border-default pt-4">
                           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                            <div className="min-w-0"><Label>{polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label><p className="lp-money mt-1 text-[24px] text-text-primary [overflow-wrap:anywhere]">{polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot?.prize_cop ?? 0)}</p></div>
+                            <div className="flex min-w-0 flex-wrap gap-x-6 gap-y-3">
+                              <div className="min-w-0"><Label>{polla.prize_kind === "objeto" ? "Premio" : "Pozo"}</Label><p className="lp-money mt-1 text-[24px] text-text-primary [overflow-wrap:anywhere]">{polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot?.prize_cop ?? 0)}</p></div>
+                              {cuenta && <div className="min-w-0"><Label>Consignado</Label><p className="lp-money mt-1 text-[24px] text-text-primary [overflow-wrap:anywhere]">{formatCop(cuenta.real_gross_cop)}</p></div>}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                               {polla.private_draft && <Link href={`/admin/pollas/${polla.id}/preview`} className="lp-btn lp-btn-primary !text-[15px]">Ver borrador privado</Link>}
                               {polla.editable && <Link href={editorHref(polla.id)} className="lp-btn lp-btn-ghost !px-3 !text-[13px]"><Settings className="h-4 w-4 shrink-0" aria-hidden="true" />Editar</Link>}

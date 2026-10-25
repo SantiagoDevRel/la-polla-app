@@ -104,6 +104,18 @@ export interface CasaPot {
   projected_prize_cop?: number;
 }
 
+/**
+ * Cuenta del administrador (migración 174): solo consignaciones reales. Sin
+ * jugadores de la casa ni cupos gratis (cortesías e invitaciones).
+ */
+export interface CasaAdminMoney {
+  real_entries: number;
+  house_entries: number;
+  free_entries: number;
+  real_gross_cop: number;
+  real_house_cop: number;
+}
+
 /** Minimal personal-list payload: no payment accounts, proofs or user IDs. */
 export interface MyCasaPolla extends Pick<CasaPolla, "id" | "slug" | "name" | "kind" | "tournament" | "status" | "closes_at" | "prize_kind" | "prize_object"> {
   entry_status: "pendiente" | "pagada";
