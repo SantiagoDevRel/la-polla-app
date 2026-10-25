@@ -16,11 +16,16 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Gift, X } from "lucide-react";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
+import { COURTESY_ACCEPTED_KEY } from "@/lib/casa/courtesies-shared";
 import { REFERRAL_FINE_PRINT, type ReferralPromo } from "@/lib/casa/referrals-shared";
 import { CompartirPolla } from "./CompartirPolla";
 import { CopiarDato } from "./CopiarDato";
 
 const seenKey = (pollaId: string) => `lp_promo_invitados:${pollaId}`;
+
+function courtesyJustAccepted(): boolean {
+  try { return sessionStorage.getItem(COURTESY_ACCEPTED_KEY) === "1"; } catch { return false; }
+}
 
 export function PromoInvitados({ promo, verPolla = false }: {
   promo: ReferralPromo;
@@ -49,6 +54,9 @@ export function PromoInvitados({ promo, verPolla = false }: {
       // Keep the invitation available without interrupting active player work.
       // Skipping this visit must not mark the promotion as seen.
       if (editing || document.querySelector('[data-app-update-blocked="true"]')) return;
+      // Un aviso por visita: no va encima de «La Polla te regaló un cupo» ni
+      // justo después de aceptarlo.
+      if (document.querySelector("[data-cortesia-regalo]") || courtesyJustAccepted()) return;
       setOpen(true);
     }, 600);
     return () => window.clearTimeout(timer);

@@ -18,7 +18,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Gift } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CASA_HEADERS } from "@/lib/casa/contract";
-import type { PendingCourtesy } from "@/lib/casa/courtesies-shared";
+import { COURTESY_ACCEPTED_KEY, type PendingCourtesy } from "@/lib/casa/courtesies-shared";
 
 export function CortesiaRegalo({ pendientes }: { pendientes: PendingCourtesy[] }) {
   const router = useRouter();
@@ -71,6 +71,7 @@ export function CortesiaRegalo({ pendientes }: { pendientes: PendingCourtesy[] }
       }
       // Sin toast: la polla ya lo dice con «Cortesía activada. ¡A pronosticar!».
       setResueltas((r) => [...r, actual.pollaId]);
+      try { sessionStorage.setItem(COURTESY_ACCEPTED_KEY, "1"); } catch { /* Sin almacenamiento: puede salir el aviso de invitaciones. */ }
       const cupo = typeof data.entryNumber === "number" ? `?p=${data.entryNumber}` : "";
       router.push(`/polla/${encodeURIComponent(actual.slug)}${cupo}`);
       router.refresh();
@@ -86,6 +87,7 @@ export function CortesiaRegalo({ pendientes }: { pendientes: PendingCourtesy[] }
 
   return createPortal(
     <motion.div
+      data-cortesia-regalo=""
       className="fixed inset-0 z-[90] flex items-end justify-center bg-black/80 px-4 pb-4 pt-10 backdrop-blur-sm sm:items-center"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}

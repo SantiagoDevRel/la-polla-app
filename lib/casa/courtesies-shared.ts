@@ -115,6 +115,12 @@ export interface PendingCourtesy {
   pending: number;
 }
 
+/**
+ * sessionStorage: quien acaba de aceptar una cortesía no recibe otro aviso
+ * encima (el de invitaciones) en esta visita; lo verá en la próxima.
+ */
+export const COURTESY_ACCEPTED_KEY = "lp_cortesia_aceptada";
+
 /** Lo que devuelve casa_accept_courtesies_v1 cuando no se pudo. */
 export function courtesyAcceptErrorMessage(code: string | null | undefined): string {
   if (code === "COURTESY_EXPIRED") return "Esta polla ya cerró sus inscripciones, así que la cortesía venció.";
