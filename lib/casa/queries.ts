@@ -626,12 +626,16 @@ export async function getAdminMoney(pollaIds: string[]): Promise<Record<string, 
   return out;
 }
 
-/** «Balance de la casa»: solo dinero consignado de verdad (migración 174). */
-export async function getHouseTotal(pollaIds: string[]): Promise<number> {
-  const { data, error } = await createAdminClient().rpc("casa_house_total_v2", { p_ids: pollaIds });
+/**
+ * «Balance de la casa»: solo dinero consignado de verdad (174), en los dos casos
+ * de lo que está en juego (175): si gana un jugador real o uno de la casa.
+ */
+export async function getHouseTotals(pollaIds: string[]): Promise<{ ifPlayerWins: number; ifHouseWins: number }> {
+  const { data, error } = await createAdminClient().rpc("casa_admin_house_totals_v1", { p_ids: pollaIds });
   if (error) throw error;
-  if (typeof data !== "number") throw new Error("No se pudo leer la recaudación de la casa.");
-  return data;
+  const row = (data as Array<{ if_player_wins_cop: number; if_house_wins_cop: number }> | null)?.[0];
+  if (!row) throw new Error("No se pudo leer el balance de la casa.");
+  return { ifPlayerWins: row.if_player_wins_cop, ifHouseWins: row.if_house_wins_cop };
 }
 
 /** Owned, unexpired uploads; the database clock decides whether recovery is open. */

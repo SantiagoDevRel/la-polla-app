@@ -163,6 +163,13 @@ no sale dinero). `casa_house_total_v2` suma ese balance. El pozo, los inscritos
 públicos, el ranking y el reparto no cambian: los jugadores de la casa y los cupos
 gratis compiten y ganan igual. Regresión: `scripts/casa-admin-money-check.sql`.
 
+**Premios físicos y los dos casos (migración 175).** `casa_polla_costs` (solo
+servidor) guarda lo que costó un premio físico; POLLA JAMES: $550.000. Mientras
+una polla está en juego, el panel y el bot muestran lo que le queda a la casa si
+gana un jugador real (sale el premio y su costo) y si gana un jugador de la casa
+(no sale nada). Resuelta, los dos casos son lo que de verdad pasó. Totales:
+`casa_admin_house_totals_v1`. Los saldos negativos se escriben «-$90.000».
+
 ## Publicación y fechas
 
 `publication_mode=ahora|programada|oculta` y el timestamp existente `opens_at`

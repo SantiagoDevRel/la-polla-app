@@ -19,7 +19,9 @@ export function prizeImageUrl(path: string): string {
 }
 
 export function formatCop(cop: number): string {
-  return `$${Math.round(cop).toLocaleString("es-CO")}`;
+  const value = Math.round(cop);
+  // Un saldo negativo se lee «-$90.000», no «$-90.000».
+  return `${value < 0 ? "-" : ""}$${Math.abs(value).toLocaleString("es-CO")}`;
 }
 
 /**

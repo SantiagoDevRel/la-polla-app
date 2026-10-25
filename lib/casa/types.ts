@@ -113,7 +113,12 @@ export interface CasaAdminMoney {
   house_entries: number;
   free_entries: number;
   real_gross_cop: number;
+  /** Lo que costó el premio físico (175); 0 si no aplica o no se registró. */
+  prize_cost_cop: number;
+  /** Lo que le queda a la casa si gana un jugador real. */
   real_house_cop: number;
+  /** Lo que le queda a la casa si gana un jugador de la casa. Resuelta, igual al anterior. */
+  house_wins_cop: number;
 }
 
 /** Minimal personal-list payload: no payment accounts, proofs or user IDs. */
