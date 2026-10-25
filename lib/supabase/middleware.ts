@@ -190,7 +190,7 @@ export async function updateSession(request: NextRequest) {
   const isCasaJsonApi = /^\/api\/casa\/pollas\/[^/]+\/(leaderboard|tickets|award|join|unirme|picks|match-picks|prize-contact|object-result)\/?$/.test(path)
     || path === "/api/users/me" || path === "/api/feedback"
     || path === "/api/casa/highlights" || path === "/api/casa/mis-pollas" || path === "/api/casa/en-vivo"
-    || path === "/api/casa/referidos" || path === "/api/casa/cortesias"
+    || path === "/api/casa/referidos" || path === "/api/casa/cortesias" || path === "/api/casa/cortesias/aceptar"
     || path.startsWith("/api/casa/admin/")
     // Rifas (157): cada handler valida su sesión y responde JSON 401; la foto
     // del premio y el tablero de una Pública se leen sin sesión.
