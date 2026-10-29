@@ -78,7 +78,9 @@ updating both places and redeploying.
 
 ## Turning it on
 
-1. Get a SIM for the bot number and activate WhatsApp on a phone.
+1. Get a SIM for the bot number and activate WhatsApp on a phone. Tigo sells a new
+   prepaid eSIM line online (`compras.tigo.com.co/esim`, 2026-10-29); its checkout
+   only opens from a Colombian IP. The Z Flip4 test phone supports eSIM.
 2. On the DGX, follow [ops/whatsapp-openwa/README.md](../ops/whatsapp-openwa/README.md)
    up to `node setup.mjs pair <number>`, and link the device.
 3. In Vercel production, set `WHATSAPP_OPENWA_ALLOWED_PHONES` to the owner's
