@@ -512,6 +512,34 @@ export async function getPayoutProgress(pollaIds: string[]): Promise<Record<stri
 }
 
 /**
+ * La última polla con premio en dinero que ya lo pagó (informe de participación,
+ * 2026-10-29): resuelta, publicada y con todos sus premios pagados. Es la
+ * prueba de confianza para quien todavía no entra. El monto es el pozo de
+ * casa_payment_details_v2, el mismo que muestra su página; nada se suma aquí.
+ */
+export async function getLastPaidPolla(excludeId: string): Promise<{ slug: string; name: string; prizeCop: number } | null> {
+  const db = createAdminClient();
+  const { data, error } = await db
+    .from("casa_pollas")
+    .select("id, slug, name, status, publication_mode, opens_at")
+    .eq("status", "resuelta")
+    .eq("prize_kind", "pozo")
+    .eq("settlement_outcome", "money_awarded")
+    .is("archived_at", null)
+    .neq("id", excludeId)
+    .order("settled_at", { ascending: false })
+    .limit(5);
+  if (error) throw error;
+  const pollas = ((data ?? []) as Array<Pick<CasaPolla, "id" | "slug" | "name" | "status" | "publication_mode" | "opens_at">>)
+    .filter((p) => isPollaPublished(p));
+  if (pollas.length === 0) return null;
+  const progress = await getPayoutProgress(pollas.map((p) => p.id));
+  const pagada = pollas.find((p) => (progress[p.id]?.total ?? 0) > 0 && progress[p.id].paid === progress[p.id].total);
+  if (!pagada) return null;
+  return { slug: pagada.slug, name: pagada.name, prizeCop: (await getPot(pagada.id)).prize_cop };
+}
+
+/**
  * Cuándo se acabó cada polla de partidos (pollaFinishedAt), para mostrarla
  * «Pagada» 12 h después. Las que todavía tienen un partido sin resultado no
  * aparecen. Lotes de 20 pollas y páginas de 1000 filas: PostgREST corta en

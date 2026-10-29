@@ -158,9 +158,13 @@ export default async function PagarPage({
       )}
 
       <StreetCard className="space-y-4 p-4">
-        <div>
-          <Label>{recovering ? "Valor del cupo" : "Valor por cupo"}</Label>
-          <div className="lp-money mt-1 text-[34px] leading-none text-text-primary">{formatCop(entrada)}</div>
+        {/* (2026-10-29, informe de participación) El valor también se copia, como la cuenta. */}
+        <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+          <div className="min-w-0">
+            <Label>{recovering ? "Valor del cupo" : "Valor por cupo"}</Label>
+            <div id="copiar-valor" className="lp-money mt-1 text-[34px] leading-none text-text-primary">{formatCop(entrada)}</div>
+          </div>
+          {entrada > 0 && <CopiarDato valor={String(entrada)} etiqueta="valor" texto="Copiar valor" />}
         </div>
 
 
@@ -187,7 +191,7 @@ export default async function PagarPage({
               <span className="lp-money text-text-primary">{formatCop(pot.prize_cop)}</span>
             </div>
             {typeof polla.fixed_prize_cop === "number" && <div className="flex justify-between gap-3">
-              <span className="text-text-secondary">Mínimo garantizado</span>
+              <span className="text-text-secondary">El premio no baja de</span>
               <span className="lp-money text-text-primary">{formatCop(polla.fixed_prize_cop)}</span>
             </div>}
             {pot.projected_prize_cop > pot.prize_cop && <div className="flex justify-between gap-3 border-t border-border-subtle pt-1.5">
@@ -203,7 +207,7 @@ export default async function PagarPage({
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">
-                Costo del servicio
+                Para la casa
               </span>
               <span className="lp-money text-text-muted">
                 {formatCop(pot.entry_house_cop)}
