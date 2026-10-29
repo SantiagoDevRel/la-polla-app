@@ -477,6 +477,7 @@ describe("DGX relay", () => {
       if (url === "https://app.test/api/whatsapp/openwa") {
         const h = init.headers as Record<string, string>;
         expect(init.body).toBe(raw);
+        expect(init.redirect).toBe("manual");
         expect(verifyRelaySignature(SECRET, h["x-lapolla-timestamp"], h["x-lapolla-signature"], raw, Date.now())).toBe(true);
         return json(200, { outcome: "handled", replies: [{ to: `${PHONE}@c.us`, text: "uno" }, { to: `${PHONE}@c.us`, text: "dos" }] });
       }

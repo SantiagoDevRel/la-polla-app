@@ -147,6 +147,8 @@ export function createRelay(cfg, deps = {}) {
       method: "POST",
       headers: relayHeaders(cfg.relaySecret, raw),
       body: raw,
+      // Una redirección (p. ej. a /login) es configuración rota: se reporta, no se sigue.
+      redirect: "manual",
       signal: AbortSignal.timeout(70_000),
     });
   }
