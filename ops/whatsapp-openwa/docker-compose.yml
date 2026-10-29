@@ -1,0 +1,103 @@
+# ops/whatsapp-openwa/docker-compose.yml — Bot de jugadores por WhatsApp en el DGX.
+#
+# openwa: gateway de WhatsApp (OpenWA, motor whatsapp-web.js, SQLite local).
+#         Solo escucha en 127.0.0.1:2785 del host.
+# relay:  recibe los webhooks de OpenWA y habla con La Polla en Vercel.
+#
+# Procedimiento completo: README.md de esta carpeta. Nombres propios
+# (lapolla-openwa*) para no tocar otros stacks del DGX.
+
+name: lapolla-openwa
+
+services:
+  openwa:
+    # 0.26.0, multi-arch (amd64 + arm64), fijado por digest.
+    image: ghcr.io/rmyndharis/openwa:0.26.0@sha256:46e3d3d01b1948c96a0bea94f6650aa772370f40dd3956052d2da24fe4ee2acf
+    container_name: lapolla-openwa
+    restart: unless-stopped
+    stop_grace_period: 75s
+    networks: [bot]
+    # Endurecimiento del docker-compose.yml oficial de OpenWA.
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, KILL, SETGID, SETUID]
+    read_only: true
+    tmpfs: [/tmp]
+    pids_limit: 2048
+    mem_limit: 2g
+    ports:
+      - "127.0.0.1:2785:2785"
+    environment:
+      NODE_ENV: production
+      TZ: America/Bogota
+      HOME: /tmp
+      XDG_CONFIG_HOME: /tmp/.config
+      XDG_CACHE_HOME: /tmp/.cache
+      PORT: "2785"
+      ENGINE_TYPE: whatsapp-web.js
+      DATABASE_TYPE: sqlite
+      STORAGE_TYPE: local
+      # Remitentes @lid: OpenWA agrega senderPhone para identificar la cuenta.
+      RESOLVE_LID_TO_PHONE: "true"
+      # El relay vive en esta red; sin esto la protección SSRF lo rechaza.
+      SSRF_ALLOWED_HOSTS: relay
+      # Comprobantes de hasta 3 MB llegan en el webhook (base64 + sobre).
+      WEBHOOK_MEDIA_INLINE_MAX_BYTES: "3145728"
+      WEBHOOK_MAX_PAYLOAD_BYTES: "4400000"
+      # Minimizar datos: la app guarda lo que necesita; OpenWA no acumula chats.
+      MESSAGE_RETENTION_DAYS: "7"
+      UPDATE_CHECK_ENABLED: "false"
+      # Panel por http en loopback (túnel SSH); sin esto queda en blanco.
+      CSP_UPGRADE_INSECURE_REQUESTS: "false"
+    volumes:
+      - openwa-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2785/api/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  relay:
+    image: node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
+    container_name: lapolla-openwa-relay
+    restart: unless-stopped
+    user: node
+    command: ["node", "/app/relay.mjs"]
+    networks: [bot]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    mem_limit: 256m
+    volumes:
+      - ./relay.mjs:/app/relay.mjs:ro
+    # relay.env: lo escribe `node setup.mjs init` (sesión, llave, secreto del webhook).
+    # la-polla-openwa.env: WHATSAPP_OPENWA_RELAY_SECRET, el mismo de Vercel
+    # (almacén de secretos del DGX, nunca en el repo).
+    env_file:
+      - path: ./relay.env
+        required: true
+      - path: ${HOME}/.agent-secrets/la-polla-openwa.env
+        required: true
+    environment:
+      OPENWA_URL: http://openwa:2785
+      APP_URL: ${APP_URL:-https://lapollacolombiana.com}
+      OUTBOX_INTERVAL_MS: "30000"
+      RELAY_PORT: "8787"
+    depends_on:
+      openwa:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  bot:
+    name: lapolla-openwa
+
+volumes:
+  # Sesión de WhatsApp vinculada, llave admin y SQLite de OpenWA.
+  openwa-data:
+    name: lapolla-openwa-data

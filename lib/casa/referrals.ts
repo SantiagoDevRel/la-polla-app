@@ -8,6 +8,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyReferralGiftByTelegram } from "@/lib/telegram-player/notify";
+import { notifyReferralGiftByWhatsApp } from "@/lib/whatsapp-player/notify";
 import { CASA_CONTRACT } from "./contract";
 import { validReferralCode } from "./referrals-shared";
 import type { ReferralInviteeState, ReferralPerson, ReferralPollaView, ReferralProfile } from "./types";
@@ -112,10 +113,10 @@ export async function notifyReferralGifts(db: SupabaseClient = createAdminClient
     const { data, error } = await db.rpc("casa_referral_claim_credit_notices_v1", { p_limit: 20 });
     if (error || !Array.isArray(data)) return;
     for (const notice of data as CreditNotice[]) {
-      await notifyReferralGiftByTelegram(db, {
-        userId: notice.user_id,
-        invited: Number(notice.detail?.invitados ?? 0),
-      });
+      const gift = { userId: notice.user_id, invited: Number(notice.detail?.invitados ?? 0) };
+      await notifyReferralGiftByTelegram(db, gift);
+      // Bot de WhatsApp (OpenWA): solo si está encendido y la persona le escribió.
+      await notifyReferralGiftByWhatsApp(db, gift);
     }
   } catch (error) {
     console.warn("[casa/referrals] gift notices not sent:", (error as { name?: string }).name);

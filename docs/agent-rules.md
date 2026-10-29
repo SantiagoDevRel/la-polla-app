@@ -45,6 +45,8 @@ read each section here. These rules are as binding as `AGENTS.md`.
   and who may pick: `AGENTS.md`; registration closure: Matches and providers.
 - Telegram player writes reuse `saveCasaPicks` and `proof-server`.
   [Bot](../README.md#bot-de-telegram-para-jugadores-2026-09-15-migración-130).
+- The WhatsApp player bot (OpenWA) runs the same Telegram flows through
+  `lib/whatsapp-player`; it adds no write path. [Bot](whatsapp-openwa-bot.md).
 
 ## Auth and login
 

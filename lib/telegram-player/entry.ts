@@ -20,7 +20,7 @@ import { PROOF_BUCKET } from "@/lib/telegram/notify";
 import { redactId } from "@/lib/log";
 import { cb, cbNew, longId, shortId, stableUuid } from "./ids";
 import { COPY } from "./copy";
-import { buttonText, clearFlow, esc, sendScreen, setFlow, show, type Keyboard, type PlayerCtx } from "./context";
+import { buttonText, clearFlow, downloadMedia, esc, sendScreen, setFlow, show, showUploading, type Keyboard, type PlayerCtx } from "./context";
 import type { PlayerPhoto } from "./update";
 import { backToPolla, showPollaDetail } from "./pollas";
 
@@ -337,13 +337,13 @@ async function receiveProof(ctx: PlayerCtx, polla: CasaPolla, ticket: number | n
     await sendScreen(ctx, { text: "Esta polla ya no recibe inscripciones ni comprobantes nuevos. Si ya transferiste, no repitas el pago y escríbenos en soporte.", buttons: again });
     return;
   }
-  await ctx.bot.send("sendChatAction", { chat_id: ctx.chatId, action: "upload_photo" });
+  await showUploading(ctx);
 
   if (photo.size !== null && photo.size > MAX_PROOF_BYTES) {
     await sendScreen(ctx, { text: "Esa imagen pesa más de 8 MB. Envíala como foto (no como archivo) para que Telegram la comprima." });
     return;
   }
-  const bytes = await ctx.bot.download(photo.fileId, MAX_PROOF_BYTES);
+  const bytes = await downloadMedia(ctx, photo.fileId, MAX_PROOF_BYTES);
   if (bytes === "too_large") {
     await sendScreen(ctx, { text: "Esa imagen pesa más de 8 MB. Envíala como foto (no como archivo) para que Telegram la comprima." });
     return;

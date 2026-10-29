@@ -722,6 +722,7 @@ usuario decida — no asumas que pagar está OK. Mismo principio en
 - **Next.js 16** App Router + TypeScript
 - **Supabase** (PostgreSQL + Auth + RLS) — server-configured phone OTP and optional six-digit password; see [password rollout](docs/phone-password.md).
 - **WhatsApp** — optional configured login link/OTP channel. Legacy conversational outbound stays off unless explicitly configured; do not infer activation from retained code.
+- **WhatsApp player bot (OpenWA)** — shipped off behind `WHATSAPP_OPENWA_BOT_ENABLED`; gateway on the DGX. [Design and activation](docs/whatsapp-openwa-bot.md).
 - **API-Football** — única fuente de calendario, vivo y resultados (desde 2026-09-13)
 - **Cloudflare Turnstile** — optional OTP CAPTCHA; activation requires matching app and Supabase settings.
 - **Tailwind CSS** + **Framer Motion** + **lucide-react**
