@@ -16,8 +16,7 @@
 import { useState } from "react";
 import { Share2, Check } from "lucide-react";
 import type { PremioCompartir } from "@/lib/casa/share-text";
-import { referralLink } from "@/lib/casa/referrals-shared";
-import { shareLink } from "@/lib/casa/share-link";
+import { pollaShareUrl, shareLink } from "@/lib/casa/share-link";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
 import { useToast } from "@/components/ui/Toast";
 
@@ -55,21 +54,9 @@ export function CompartirPolla({
   const code = isIOSApp ? null : codigo;
   const tip = isIOSApp ? undefined : ayuda;
 
-  function enlace() {
-    // Compartimos el dominio público, incluso desde localhost o un preview.
-    // Conservamos Chicken Picks cuando la visita viene de su propio dominio.
-    const english = ["chickenpicks.app", "www.chickenpicks.app"].includes(
-      window.location.hostname,
-    );
-    const origin = english
-      ? "https://chickenpicks.app"
-      : "https://lapollacolombiana.com";
-    return referralLink(origin, slug, code);
-  }
-
   async function compartir() {
     try {
-      if (await shareLink(enlace()) !== "copied") return;
+      if (await shareLink(pollaShareUrl(slug, code)) !== "copied") return;
       setCopiado(true);
       window.setTimeout(() => setCopiado(false), 2200);
     } catch {

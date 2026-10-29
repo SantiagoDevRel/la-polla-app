@@ -13,13 +13,28 @@ import { isSmsCaptchaEnforced } from "@/lib/auth/captcha";
 import { phoneOtpChannel } from "@/lib/auth/phone-otp-channel";
 import { phonePasswordEnabled } from "@/lib/auth/password-config";
 import { getWhatsAppLoginHref } from "@/lib/auth/whatsapp-login";
+import { getPollaBySlug } from "@/lib/casa/queries";
 import LoginClient from "./LoginClient";
 
 // The label and start-otp must read the same server-side rollout setting.
 export const dynamic = "force-dynamic";
 
-export default function LoginPage() {
+/**
+ * «Vas a entrar a <polla>» (informe de participación, 2026-10-29): solo con un
+ * returnTo a /polla/<slug> de una polla publicada. Nombre y entrada son lo que
+ * ya muestra la página pública de la polla; si la lectura falla, no hay tarjeta.
+ */
+async function pollaDestino(returnTo: string | string[] | undefined) {
+  const slug = typeof returnTo === "string" ? /^\/polla\/([a-z0-9-]{1,80})(?:\/pagar)?(?:[?#].*)?$/i.exec(returnTo)?.[1] : undefined;
+  if (!slug) return null;
+  const polla = await getPollaBySlug(slug).catch(() => null);
+  if (!polla || polla.status === "anulada") return null;
+  return { name: polla.name, entryCop: polla.entry_price_cop };
+}
+
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ returnTo?: string | string[] }> }) {
   const turnstileSiteKey = (process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY ?? "").trim() || null;
+  const destino = await pollaDestino((await searchParams).returnTo);
   return (
     <LoginClient
       passwordLoginEnabled={phonePasswordEnabled()}
@@ -28,6 +43,7 @@ export default function LoginPage() {
       telegramBotUsername={null}
       turnstileSiteKey={turnstileSiteKey}
       smsCaptchaRequired={Boolean(turnstileSiteKey) && isSmsCaptchaEnforced()}
+      pollaDestino={destino}
     />
   );
 }

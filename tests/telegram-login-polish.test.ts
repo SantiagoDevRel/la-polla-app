@@ -682,7 +682,9 @@ describe("/login offers WhatsApp first and hides Telegram", () => {
     vi.stubGlobal("React", await import("react"));
     try {
       const LoginPage = (await import("@/app/(auth)/login/page")).default;
-      expect(LoginPage().props.telegramBotUsername).toBeNull();
+      const page = await LoginPage({ searchParams: Promise.resolve({}) });
+      expect(page.props.telegramBotUsername).toBeNull();
+      expect(page.props.pollaDestino).toBeNull();
     } finally { vi.unstubAllGlobals(); }
   }, 30_000);
 });

@@ -152,8 +152,12 @@ task, ask about pending ones in one line.
 - Participation ideas (match rooms, licensed broadcasts): open; buy no retransmission
   services.
 - Low participation per pool (2026-10-08): research on the owner's machine at
-  `~/Downloads/research/2026-10-07-la-polla-engagement/` suggests targeted UI fixes
-  and no prepaid balance. Undecided; implement nothing without approval.
+  `~/Downloads/research/2026-10-07-la-polla-engagement/`. The owner approved its UI
+  fixes on 2026-10-29; shipped: login keeps the pool, invite row with WhatsApp for
+  every signed-in player, last paid pool line, copy-amount button, simpler words.
+  Still undecided: entry pages without the background video, PDF proofs, a payment
+  reference, approval notice by Telegram or SMS, picks before paying, closing-day
+  SMS, one paid pool per week, 5–6 nearby matches. No prepaid balance.
 - WhatsApp player bot (2026-10-29): the owner approved an OpenWA bot on its own SIM.
   Shipped off; turning it on waits for the SIM and the owner's go-ahead. OpenWA
   automates WhatsApp Web, so the number can be banned.

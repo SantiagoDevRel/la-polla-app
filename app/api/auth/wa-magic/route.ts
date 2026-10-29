@@ -13,6 +13,7 @@ import {
 import { getClientIp } from "@/lib/supabase/auth-ip";
 import { isSameOriginRequest } from "@/lib/auth/telegram-login/same-origin";
 import { peekWhatsAppLogin, validWhatsAppToken, whatsappTokenHash } from "@/lib/auth/whatsapp-login";
+import { parseReturnToCookie, RETURN_TO_COOKIE } from "@/lib/auth/return-to-cookie";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,8 +59,14 @@ export async function POST(request: NextRequest) {
     });
     if (!session.ok) return redirect(request, "/login/whatsapp?estado=unavailable");
     void recordLoginEvent({ userId: session.userId, method: "otp", request });
-    const response = redirect(request, session.needsOnboarding ? "/onboarding" : "/");
+    // Quien venía de una polla vuelve a ella (lib/auth/return-to-cookie.ts).
+    const returnTo = parseReturnToCookie(request.cookies.get(RETURN_TO_COOKIE)?.value);
+    const destination = session.needsOnboarding
+      ? `/onboarding${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`
+      : returnTo ?? "/";
+    const response = redirect(request, destination);
     applyOnboardingCookie(response, session.needsOnboarding);
+    if (returnTo) response.cookies.set(RETURN_TO_COOKIE, "", { path: "/", maxAge: 0, sameSite: "lax", secure: request.nextUrl.protocol === "https:" });
     return response;
   } catch {
     return redirect(request, "/login/whatsapp?estado=unavailable");

@@ -33,6 +33,7 @@ import {
   getFixedPrizeThreshold,
   getPollaEndings,
   getProvisionalPrizes,
+  getLastPaidPolla,
 } from "@/lib/casa/queries";
 import { signPayoutProofs } from "@/lib/casa/payout-proofs";
 import { getPickSaveState } from "@/lib/casa/picks-save";
@@ -92,7 +93,7 @@ import { InvitaYGana } from "@/components/casa/InvitaYGana";
 import { PromoInvitados } from "@/components/casa/PromoInvitados";
 import { QuienTeInvito } from "@/components/casa/QuienTeInvito";
 import { VerMasInfo } from "@/components/casa/VerMasInfo";
-import { Camera, ChevronDown, Plus, Settings, Ticket } from "lucide-react";
+import { Camera, ChevronDown, ChevronRight, Plus, Settings, Ticket } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -230,6 +231,11 @@ export default async function PollaPage({
   // solo para administradores, ganadores y quienes participaron en la polla.
   // El resto ve igual el hecho: «Pagado · fecha».
   const puedeVerComprobantes = isAdmin || participa || payouts.some((p) => p.user_id === user.id);
+  // Quien todavía no entra ve que la polla anterior ya pagó (informe de
+  // participación, 2026-10-29). Si la lectura falla, la línea no sale.
+  const ultimaPagada = !participa && abierta && !privateCampaign
+    ? await getLastPaidPolla(polla.id).catch(() => null)
+    : null;
   const proofUrls = puedeVerComprobantes && payouts.length > 0 ? await signPayoutProofs(payouts) : {};
   const pagoPendiente = entry?.status === "pendiente" && Boolean(entry.proof_path);
   // (2026-09-18) La tarjeta "Tus cupos" es para ELEGIR entre varios. Con uno
@@ -391,12 +397,18 @@ export default async function PollaPage({
           {/* Pozo fijo = mínimo garantizado (migración 109): la cifra del pozo puede crecer. */}
           {/* Es un argumento para ENTRAR: quien ya está dentro lo tiene en Info. */}
           {!participa && !objeto && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
-            <span>Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</span>
+            <span>El premio no baja de {formatCop(polla.fixed_prize_cop)}</span>
           )}
           {/* El estado ya va en la etiqueta bajo el nombre: aquí no se repite. */}
           <span>
             {pot.paid_entries} inscritos{abierta ? ` · cierra en ${timeLeft(polla.closes_at)}` : ""}
           </span>
+          {ultimaPagada && (
+            <Link href={`/polla/${ultimaPagada.slug}`} className="inline-flex min-h-11 items-center gap-0.5 self-start font-semibold text-turf underline-offset-4 hover:underline [overflow-wrap:anywhere]">
+              {ultimaPagada.name} ya pagó {formatCop(ultimaPagada.prizeCop)}
+              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+            </Link>
+          )}
         </p>
       </HeroFrame>
 
@@ -499,8 +511,11 @@ export default async function PollaPage({
               dos comparten una fila corta y el detalle se abre si lo tocan.
               Comprar otro cupo vive en «Tus cupos» cuando ya hay varios. El
               precio no se repite en el botón: está arriba, en Entrada. */}
+        {/* (2026-10-29, informe de participación) Invitar es para todos los que
+            tienen sesión, no solo para quien ya participa. */}
         <InvitaYGana
-          view={abierta && every && codigo && referral && (participa || referral.counted > 0 || referral.in_review > 0) ? referral : null}
+          slug={polla.slug}
+          view={abierta && every && codigo && referral ? referral : null}
           every={every}
           leading={comprarOtro && !showCupos ? (
             <Link href={`/polla/${polla.slug}/pagar?participacion=nueva`} className="lp-btn lp-btn-ghost min-w-0 flex-[1_1_150px] gap-2 !px-3">
@@ -762,7 +777,7 @@ function PollaPublica({
             {localPrize?.kind === "jersey" ? localPrize.title : polla.prize_kind === "objeto" ? polla.prize_object : formatCop(pot.prize_cop)}
           </div>
           {polla.prize_kind !== "objeto" && polla.pot_mode === "fijo" && typeof polla.fixed_prize_cop === "number" && (
-            <p className="mt-1 text-[13px] text-text-secondary">Mínimo garantizado: {formatCop(polla.fixed_prize_cop)}</p>
+            <p className="mt-1 text-[13px] text-text-secondary">El premio no baja de {formatCop(polla.fixed_prize_cop)}</p>
           )}
         </div>
       </HeroFrame>

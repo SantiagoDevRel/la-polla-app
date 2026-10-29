@@ -131,6 +131,19 @@ describe("one-use login confirmation", () => {
     expect(db.q.is).toHaveBeenCalledWith("consumed_at", null); expect(db.q.gt).toHaveBeenCalledWith("expires_at", expect.any(String));
     expect(res.headers.get("cache-control")).toContain("no-store"); expect(m.cookie).toHaveBeenCalled();
   });
+  it("returns to the polla the login started from, also through onboarding", async () => {
+    const cookie = `lp_return_to=${encodeURIComponent("/polla/ofigolazo5?p=2")}`;
+    let res = await POST(post({ cookie }));
+    expect(res.headers.get("location")).toBe("https://lapollacolombiana.com/polla/ofigolazo5?p=2");
+    expect(res.headers.get("set-cookie")).toMatch(/lp_return_to=;.*Max-Age=0/i);
+    m.session.mockResolvedValue({ ok: true, userId: "test", needsOnboarding: true });
+    res = await POST(post({ cookie }));
+    expect(res.headers.get("location")).toBe(`https://lapollacolombiana.com/onboarding?returnTo=${encodeURIComponent("/polla/ofigolazo5?p=2")}`);
+  });
+  it.each(["https://evil.test/x", "//evil.test", "/a\\b", "%E0%A4%A"])("ignores an unsafe return cookie %s", async value => {
+    const res = await POST(post({ cookie: `lp_return_to=${value.startsWith("%") ? value : encodeURIComponent(value)}` }));
+    expect(res.headers.get("location")).toBe("https://lapollacolombiana.com/");
+  });
   it.each(["expired", "consumed", "race", "disabled"])("cannot sign in with %s link", async kind => {
     const db = database(); m.admin.mockReturnValue(db);
     if (kind === "expired") db.q.maybeSingle.mockResolvedValue({ data: { phone_number: phone, expires_at: new Date(0).toISOString() } });

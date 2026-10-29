@@ -65,6 +65,10 @@ read each section here. These rules are as binding as `AGENTS.md`.
   `PHONE_PASSWORD_ENABLED`) are server-set; never reactivate one by assumption.
   [Auth details](phone-password.md).
 - The Telegram login button stays hidden; its backend is retained.
+- A login that starts from a pool returns to it. `/login` shows «Vas a entrar a
+  <pool>» for a published pool and stores the `returnTo` in the 30-minute
+  `lp_return_to` cookie, which `/api/auth/wa-magic` reads because the WhatsApp link
+  opens another tab. Both sides pass it through `safeReturnTo`.
 - Onboarding requires a real display name and a pollito.
 
 ## Matches and providers

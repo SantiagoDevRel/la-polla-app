@@ -20,14 +20,18 @@
 // muestra siempre «N/5» camino al próximo cupo; el saldo se usa con
 // <UsarCupoGratis>, no aquí.
 
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { ChevronDown, Gift } from "lucide-react";
 import type { ReferralPollaView } from "@/lib/casa/types";
 import { REFERRAL_FINE_PRINT, referralMissing, referralProgress } from "@/lib/casa/referrals-shared";
+import { pollaShareUrl } from "@/lib/casa/share-link";
 import { useIsIOSApp } from "@/components/platform/PlatformProvider";
+import { WhatsAppGlyph } from "@/components/ui/WhatsAppGlyph";
 import { CopiarDato } from "./CopiarDato";
 
-export function InvitaYGana({ view, every, leading = null }: {
+export function InvitaYGana({ slug, view, every, leading = null }: {
+  /** La polla que se comparte con el código de invitación. */
+  slug: string;
   /** null = sin invitaciones en esta polla: solo se dibuja `leading`. */
   view: ReferralPollaView | null;
   every: number | null;
@@ -65,12 +69,12 @@ export function InvitaYGana({ view, every, leading = null }: {
         )}
       </div>
 
-      {invita && open && <InvitaDetalle id={panelId} view={invita.view} every={invita.every} />}
+      {invita && open && <InvitaDetalle id={panelId} slug={slug} view={invita.view} every={invita.every} />}
     </div>
   );
 }
 
-function InvitaDetalle({ id, view, every }: { id: string; view: ReferralPollaView; every: number }) {
+function InvitaDetalle({ id, slug, view, every }: { id: string; slug: string; view: ReferralPollaView; every: number }) {
   const { counted, in_review: enRevision, available: disponibles, waiting_gifts: esperando, code } = view;
   const avance = referralProgress(counted, every, disponibles);
   const faltan = referralMissing(counted, every);
@@ -105,7 +109,28 @@ function InvitaDetalle({ id, view, every }: { id: string; view: ReferralPollaVie
           <CopiarDato valor={code} etiqueta="codigo" nombre="tu código" />
         </div>
       )}
+      {/* (2026-10-29, informe de participación) Quien invita lo hace por WhatsApp.
+          Solo el enlace con el código, sin texto promocional (decisión del 2026-09-20). */}
+      <CompartirWhatsApp slug={slug} code={code} />
       <p className="text-[13px] italic text-text-muted">{REFERRAL_FINE_PRINT}</p>
     </div>
+  );
+}
+
+function CompartirWhatsApp({ slug, code }: { slug: string; code: string | null }) {
+  // El enlace usa window.location: se arma después de hidratar.
+  const [href, setHref] = useState<string | null>(null);
+  useEffect(() => { setHref(`https://wa.me/?text=${encodeURIComponent(pollaShareUrl(slug, code))}`); }, [slug, code]);
+  return (
+    <a
+      href={href ?? undefined}
+      aria-disabled={!href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-whatsapp px-4 py-3 text-center text-[15px] font-semibold leading-snug text-bg-base transition-all duration-200 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-whatsapp focus-visible:ring-offset-2 focus-visible:ring-offset-bg-card active:scale-[0.98] aria-disabled:pointer-events-none aria-disabled:opacity-60"
+    >
+      <WhatsAppGlyph className="h-5 w-5 shrink-0" />
+      <span className="min-w-0 [overflow-wrap:anywhere]">Invitar por WhatsApp</span>
+    </a>
   );
 }
