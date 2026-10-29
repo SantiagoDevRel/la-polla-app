@@ -3,6 +3,7 @@ import { getPot } from "@/lib/casa/queries";
 import { formatCop } from "@/lib/casa/format";
 import { sendTextMessage } from "@/lib/whatsapp/bot";
 import { notifyPlayerReviewByTelegram } from "@/lib/telegram-player/notify";
+import { notifyPlayerReviewByWhatsApp } from "@/lib/whatsapp-player/notify";
 import { notifyReferralGifts } from "@/lib/casa/referrals";
 
 /** Both admin channels send the same best-effort notice after a new decision. */
@@ -17,12 +18,16 @@ export async function notifyCasaReview(entryId: string, pollaId: string, approve
     if (entry && polla) {
       // Telegram primero: WhatsApp está apagado (lib/whatsapp/outbound.ts) y el
       // bot de jugadores es por donde la gente se inscribe sin la web.
-      await notifyPlayerReviewByTelegram(db, {
+      const notice = {
         userId: entry.user_id, pollaId, pollaName: polla.name, kind: polla.kind, approved,
         prizeKind: polla.prize_kind, prizeObject: polla.prize_object, pozoCop: pot.prize_cop,
         rejectReason: entry.reject_reason ?? null, ticketNumber: entry.ticket_number ?? null,
         entryNumber: entry.entry_number ?? null,
-      });
+      };
+      await notifyPlayerReviewByTelegram(db, notice);
+      // Bot de WhatsApp por OpenWA (apagado sin WHATSAPP_OPENWA_BOT_ENABLED):
+      // solo si la persona ya le escribió al bot.
+      await notifyPlayerReviewByWhatsApp(db, notice);
       const numbered = entry.entry_number != null && entry.entry_number > 1;
       await notifyPlayer({ userId: entry.user_id, aprobado: approved,
         pollaName: numbered ? `${polla.name} (cupo ${entry.entry_number})` : polla.name,

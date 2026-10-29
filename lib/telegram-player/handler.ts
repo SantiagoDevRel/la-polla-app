@@ -102,7 +102,6 @@ export interface PlayerBotDeps {
 
 export type PlayerOutcome = LoginHandlerOutcome | "player";
 
-type CallbackUpdate = Extract<PlayerUpdate, { kind: "callback" }>;
 type MessageUpdate = Extract<PlayerUpdate, { kind: "message" }>;
 
 function buildCtx(
@@ -254,9 +253,10 @@ export async function handleTelegramUpdate(update: unknown, deps: PlayerBotDeps)
     editMessageId: action.kind === "callback" && !newMessage ? action.messageId : null,
   }, chat);
 
+  const routes: PlayerRouteOptions = { webLink: () => webLink(ctx, loginDeps) };
   try {
-    if (routed.kind === "callback") await routeCallback(ctx, routed, loginDeps);
-    else await routeMessage(ctx, routed, loginDeps);
+    if (routed.kind === "callback") await routePlayerCallback(ctx, routed.data, routes);
+    else await routePlayerMessage(ctx, routed, routes);
     return "player";
   } catch (err) {
     console.error("[telegram-player] update falló:", redactId(ctx.account.userId), (err as Error).message);
@@ -275,13 +275,22 @@ function homeScreen() {
   return { text: COPY.home, buttons: homeButtons() };
 }
 
-async function routeMessage(ctx: PlayerCtx, message: MessageUpdate, loginDeps: LoginHandlerDeps): Promise<void> {
+/** Lo que el ruteo necesita de un mensaje, venga de Telegram o de WhatsApp. */
+export type PlayerMessage = Pick<MessageUpdate, "text" | "photo" | "otherMedia">;
+
+export interface PlayerRouteOptions {
+  /** «Entrar a la página web»: cada canal entrega su propio enlace. */
+  webLink: () => Promise<void>;
+}
+
+/** Texto o foto de una cuenta ya resuelta. Compartido con el bot de WhatsApp. */
+export async function routePlayerMessage(ctx: PlayerCtx, message: PlayerMessage, routes: PlayerRouteOptions): Promise<void> {
   const flow = ctx.chat.flow;
   // Escribiendo un nombre o una respuesta libre, «Pagos» o «Hola» son texto:
   // solo cuentan como menú los botones de abajo y los comandos con «/».
   const command = menuCommandOf(message.text, { strict: flow?.name === "answer" || flow?.name === "name" });
 
-  if (command === "web") return webLink(ctx, loginDeps);
+  if (command === "web") return routes.webLink();
   if (command === "cancelar") {
     await clearFlow(ctx);
     await sendHome(ctx, `${COPY.cancelled}
@@ -360,8 +369,9 @@ const FLOW_CALLBACKS: Record<string, ReadonlySet<string>> = {
   photo_pick: new Set(["ph"]),
 };
 
-async function routeCallback(ctx: PlayerCtx, query: CallbackUpdate, loginDeps: LoginHandlerDeps): Promise<void> {
-  const [op, a, b, c, d] = query.data.split(":");
+/** Botón tocado (callback_data). Compartido con el bot de WhatsApp. */
+export async function routePlayerCallback(ctx: PlayerCtx, data: string, routes: PlayerRouteOptions): Promise<void> {
+  const [op, a, b, c, d] = data.split(":");
   const flow = ctx.chat.flow;
   if (flow && flow.name !== "proof" && !FLOW_CALLBACKS[flow.name]?.has(op)) await clearFlow(ctx);
   if (!NO_PROFILE_OPS.has(op) && !(await ensureProfile(ctx))) return;
@@ -372,7 +382,7 @@ async function routeCallback(ctx: PlayerCtx, query: CallbackUpdate, loginDeps: L
     case "ml": return showMyPollas(ctx, Number(a) || 0);
     case "pg": return showPayments(ctx);
     case "hp": return showHelp(ctx);
-    case "web": return webLink(ctx, loginDeps);
+    case "web": return routes.webLink();
     case "pf":
       if (ctx.chat.flow && ctx.chat.flow.name !== "proof") await clearFlow(ctx);
       return showProfile(ctx);

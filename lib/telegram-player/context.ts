@@ -55,6 +55,21 @@ export interface PlayerAccount {
   phoneE164: string;
 }
 
+/**
+ * Otro canal para las mismas pantallas (WhatsApp por OpenWA, lib/whatsapp-
+ * player). Sin canal, todo sale por el bot de Telegram como siempre.
+ */
+export interface PlayerChannel {
+  kind: "whatsapp";
+  show(screen: Screen): Promise<void>;
+  sendScreen(screen: Screen): Promise<void>;
+  /** Mensaje con el menú principal (en WhatsApp no hay teclado fijo). */
+  sendWithMenu(text: string): Promise<void>;
+  /** Guarda o borra (null) el paso de texto en curso. */
+  saveFlow(flow: { name: FlowName; data: FlowData; at: string } | null): Promise<void>;
+  download(fileId: string, maxBytes: number): Promise<Buffer | "too_large" | null>;
+}
+
 export interface PlayerCtx {
   config: TelegramLoginConfig;
   db: SupabaseClient;
@@ -67,6 +82,7 @@ export interface PlayerCtx {
   chat: PlayerChat;
   /** Mensaje del botón tocado; null si la persona escribió. */
   editMessageId: number | null;
+  channel?: PlayerChannel;
 }
 
 export function esc(s: string | null | undefined): string {
@@ -108,11 +124,15 @@ export async function readPlayerChat(db: SupabaseClient, telegramUserId: number,
 
 export async function setFlow(ctx: PlayerCtx, name: FlowName, data: FlowData): Promise<void> {
   const at = new Date(ctx.now()).toISOString();
-  const { error } = await ctx.db.from("telegram_login_chats").upsert(
-    { telegram_user_id: ctx.telegramUserId, locale: ctx.chat.locale, bot_flow: name, bot_flow_data: data, bot_flow_at: at, updated_at: at },
-    { onConflict: "telegram_user_id" },
-  );
-  if (error) console.warn("[telegram-player] no se guardó el paso:", error.code);
+  if (ctx.channel) {
+    await ctx.channel.saveFlow({ name, data, at });
+  } else {
+    const { error } = await ctx.db.from("telegram_login_chats").upsert(
+      { telegram_user_id: ctx.telegramUserId, locale: ctx.chat.locale, bot_flow: name, bot_flow_data: data, bot_flow_at: at, updated_at: at },
+      { onConflict: "telegram_user_id" },
+    );
+    if (error) console.warn("[telegram-player] no se guardó el paso:", error.code);
+  }
   ctx.chat.flow = { name, data, at: ctx.now() };
   ctx.chat.stored = true;
 }
@@ -120,11 +140,15 @@ export async function setFlow(ctx: PlayerCtx, name: FlowName, data: FlowData): P
 export async function clearFlow(ctx: PlayerCtx): Promise<void> {
   if (!ctx.chat.flow && !ctx.chat.stored) return;
   ctx.chat.stored = false;
-  const { error } = await ctx.db
-    .from("telegram_login_chats")
-    .update({ bot_flow: null, bot_flow_data: null, bot_flow_at: null, updated_at: new Date(ctx.now()).toISOString() })
-    .eq("telegram_user_id", ctx.telegramUserId);
-  if (error) console.warn("[telegram-player] no se limpió el paso:", error.code);
+  if (ctx.channel) {
+    await ctx.channel.saveFlow(null);
+  } else {
+    const { error } = await ctx.db
+      .from("telegram_login_chats")
+      .update({ bot_flow: null, bot_flow_data: null, bot_flow_at: null, updated_at: new Date(ctx.now()).toISOString() })
+      .eq("telegram_user_id", ctx.telegramUserId);
+    if (error) console.warn("[telegram-player] no se limpió el paso:", error.code);
+  }
   ctx.chat.flow = null;
 }
 
@@ -140,6 +164,7 @@ function messageBody(ctx: PlayerCtx, screen: Screen): Record<string, unknown> {
 
 /** Muestra una pantalla: reemplaza el mensaje del botón tocado o manda uno nuevo. */
 export async function show(ctx: PlayerCtx, screen: Screen): Promise<void> {
+  if (ctx.channel) return ctx.channel.show(screen);
   if (ctx.editMessageId) {
     const edited = await ctx.bot.call("editMessageText", {
       ...messageBody(ctx, screen),
@@ -153,12 +178,28 @@ export async function show(ctx: PlayerCtx, screen: Screen): Promise<void> {
 
 /** Siempre un mensaje nuevo (respuestas a texto o foto, avisos). */
 export async function sendScreen(ctx: PlayerCtx, screen: Screen): Promise<number | null> {
+  if (ctx.channel) {
+    await ctx.channel.sendScreen(screen);
+    return null;
+  }
   const sent = await ctx.bot.call<{ message_id?: number }>("sendMessage", messageBody(ctx, screen));
   return sent.ok && typeof sent.result.message_id === "number" ? sent.result.message_id : null;
 }
 
+/** «Subiendo foto…» mientras se procesa el comprobante (solo Telegram). */
+export async function showUploading(ctx: PlayerCtx): Promise<void> {
+  if (ctx.channel) return;
+  await ctx.bot.send("sendChatAction", { chat_id: ctx.chatId, action: "upload_photo" });
+}
+
+/** Bytes de una imagen recibida: archivo de Telegram o foto guardada por el canal. */
+export function downloadMedia(ctx: PlayerCtx, fileId: string, maxBytes: number): Promise<Buffer | "too_large" | null> {
+  return ctx.channel ? ctx.channel.download(fileId, maxBytes) : ctx.bot.download(fileId, maxBytes);
+}
+
 /** Mensaje con el menú fijo de abajo (el teclado de siempre). */
 export async function sendWithMenu(ctx: PlayerCtx, text: string): Promise<void> {
+  if (ctx.channel) return ctx.channel.sendWithMenu(text);
   await ctx.bot.send("sendMessage", {
     chat_id: ctx.chatId,
     text,

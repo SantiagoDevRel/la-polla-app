@@ -42,6 +42,9 @@ const PUBLIC_NO_AUTH_PREFIXES = [
 ];
 const PUBLIC_NO_AUTH_EXACT = new Set([
   "/api/whatsapp/zernio", // Authenticated by HMAC before parsing or touching the database.
+  // OpenWA bot relay (DGX): 404 while disabled, relay HMAC + timestamp before parsing.
+  "/api/whatsapp/openwa",
+  "/api/whatsapp/openwa/outbox",
   "/api/app-version", // Public build identity only; no auth or database access.
   "/sitemap.xml",
   "/robots.txt",
