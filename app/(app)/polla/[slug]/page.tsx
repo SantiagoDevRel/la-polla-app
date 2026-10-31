@@ -488,7 +488,7 @@ export default async function PollaPage({
         )}
 
         {mostrarEntrar && !activarCortesia && !usarCupo && (gratis ? (
-          <UnirmeGratis slug={polla.slug} nombre={polla.name} premio={objeto ? polla.prize_object : null} ownerId={user.id} />
+          <UnirmeGratis slug={polla.slug} nombre={polla.name} premio={objeto ? (localPrize?.kind === "jersey" ? localPrize.title : polla.prize_object) : null} ownerId={user.id} />
         ) : (
           <ParaParticipar
             polla={polla}
