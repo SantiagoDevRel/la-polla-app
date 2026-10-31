@@ -232,7 +232,7 @@ describe("notices", () => {
     const content = JSON.parse((fetcher.mock.calls[0] as unknown as [unknown, { body: string }])[1].body);
     expect(content.template).toBeUndefined();
     expect(content.message).toContain(approved ? "Pago confirmado" : "Valor incompleto");
-    if (!approved) expect(content.message).toContain("no repitas la transferencia");
+    if (!approved) expect(content.message).toContain("No repitas la transferencia");
     expect(content.buttons).toContainEqual(expect.objectContaining({ title: "Menú" }));
     expect(db.writes.some(w => w.table === "whatsapp_bot_chats")).toBe(false);
     const key = (claimed as unknown as [string, { p_key: string }])[1].p_key;

@@ -20,7 +20,7 @@ import { PROOF_BUCKET } from "@/lib/telegram/notify";
 import { redactId } from "@/lib/log";
 import { cb, cbNew, longId, shortId, stableUuid } from "./ids";
 import { COPY, MENU_LABELS } from "./copy";
-import { buttonText, clearFlow, downloadMedia, esc, sendScreen, setFlow, show, showUploading, type Keyboard, type PlayerCtx } from "./context";
+import { blocks, buttonText, clearFlow, downloadMedia, esc, sendScreen, setFlow, show, showUploading, type Keyboard, type PlayerCtx } from "./context";
 import type { PlayerPhoto } from "./update";
 import { backToPolla, showPollaDetail } from "./pollas";
 
@@ -83,13 +83,13 @@ async function paymentInstructions(ctx: PlayerCtx, polla: CasaPolla, ticket: num
       "Revisamos el comprobante y te avisamos por este chat. Si hay un error, te decimos por qué.",
     ].filter((l) => l !== null).join("\n"),
     buttons: [[{ text: "❌ Cancelar", callback_data: cb("cx", P) }]],
-    compactText: [lead, `<b>${esc(polla.name)}</b>${ticket != null ? ` · boleta ${ticket}` : ""}`,
-      `Transfiere <b>${formatCop(polla.entry_price_cop)}</b>.`,
-      `${esc(methodLabel(polla.payout_method))}: ${esc(polla.payout_account)}`,
-      polla.payout_account_name ? `Titular: ${esc(polla.payout_account_name)}` : null,
-      polla.prize_kind === "objeto" ? `Premio: ${esc(polla.prize_object)}` : `Premio: ${formatCop(pot.prize_cop)}`,
-      "Envía aquí la imagen del comprobante (JPG, PNG o WEBP, máximo 3 MB). No repitas la transferencia.",
-    ].filter(Boolean).join("\n"),
+    compactText: blocks([lead], [`<b>${esc(polla.name)}</b>${ticket != null ? ` · boleta ${ticket}` : ""}`],
+      [`Transfiere: <b>${formatCop(polla.entry_price_cop)}</b>`,
+        `${esc(methodLabel(polla.payout_method))}: ${esc(polla.payout_account)}`,
+        polla.payout_account_name ? `Titular: ${esc(polla.payout_account_name)}` : null],
+      [polla.prize_kind === "objeto" ? `Premio: ${esc(polla.prize_object)}` : `Premio: ${formatCop(pot.prize_cop)}`],
+      ["Envía aquí la imagen del comprobante (JPG, PNG o WEBP, máximo 3 MB).", "No repitas la transferencia."],
+    ),
   });
 }
 
@@ -447,8 +447,10 @@ async function receiveProof(ctx: PlayerCtx, polla: CasaPolla, ticket: number | n
               : null,
         ].filter((l) => l !== null).join("\n"),
       compactText: alreadyPaid
-        ? `Tu pago de ${esc(polla.name)}${ticket != null ? ` · boleta ${ticket}` : ""} ya está confirmado.`
-        : `Recibimos tu comprobante de ${esc(polla.name)}${ticket != null ? ` · boleta ${ticket}` : ""}. Está en revisión.${polla.kind === "partidos" ? " Puedes pronosticar; tus puntos cuentan al confirmar el pago." : polla.kind === "manual" ? " Puedes responder; tus puntos cuentan al confirmar el pago." : ""}`,
+        ? blocks([`<b>${esc(polla.name)}</b>${ticket != null ? ` · boleta ${ticket}` : ""}`], ["Tu pago ya está confirmado."])
+        : blocks([`<b>${esc(polla.name)}</b>${ticket != null ? ` · boleta ${ticket}` : ""}`], ["Recibimos tu comprobante.", "Está en revisión."],
+          [polla.kind === "partidos" ? "Ya puedes pronosticar. Tus puntos cuentan cuando confirmemos el pago."
+            : polla.kind === "manual" ? "Ya puedes responder. Tus puntos cuentan cuando confirmemos el pago." : null]),
       buttons,
     });
     return;

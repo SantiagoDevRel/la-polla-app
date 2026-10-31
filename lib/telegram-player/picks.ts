@@ -14,7 +14,7 @@ import { canEditCasaMatch, hasCasaMatchStarted } from "@/lib/casa/match-rules";
 import { isPollaOpen, LOCK_MINUTES, type CasaPick, type CasaPolla, type CasaQuestion } from "@/lib/casa/types";
 import { cb, longId, shortId } from "./ids";
 import { COPY } from "./copy";
-import { buttonText, clearFlow, esc, sendScreen, setFlow, show, type Keyboard, type PlayerCtx } from "./context";
+import { blocks, buttonText, clearFlow, esc, sendScreen, setFlow, show, type Keyboard, type PlayerCtx } from "./context";
 import { backToPolla, showPollaDetail } from "./pollas";
 
 type PollaMatch = Awaited<ReturnType<typeof getPollaMatches>>[number];
@@ -99,22 +99,23 @@ async function renderMatch(ctx: PlayerCtx, polla: CasaPolla, matches: PollaMatch
       text: [...header, "", `¿Cuántos goles hace <b>${esc(shortTeam(match.home_team))}</b>?`, "<i>También puedes escribir el marcador completo, por ejemplo 2-1.</i>"]
         .filter((l) => l !== null).join("\n"),
       buttons: [...goalRows((g) => cb("h", P, M, g)), ...nav],
-      compactText: [notice, `<b>${esc(polla.name)}</b> · partido ${index} de ${matches.length}`,
-        `<b>${esc(match.home_team)} vs ${esc(match.away_team)}</b>`,
-        esc(formatMatchTime(match.scheduled_at, match.scheduled_at_confirmed !== false)),
-        current ? `Actual: ${esc(current)}` : null,
-        `Cierra ${LOCK_MINUTES} minutos antes. Escribe el marcador: <b>2-1</b> (local primero).`,
-      ].filter(Boolean).join("\n"),
+      compactText: blocks([notice], [`${esc(polla.name)} · partido ${index} de ${matches.length}`],
+        [`<b>${esc(match.home_team)} vs ${esc(match.away_team)}</b>`,
+          esc(formatMatchTime(match.scheduled_at, match.scheduled_at_confirmed !== false)),
+          `Cierra ${LOCK_MINUTES} minutos antes.`],
+        [current ? `Actual: ${esc(current)}` : null],
+        ["Escribe el marcador: <b>2-1</b> (local primero)."]),
     });
     return;
   }
   await clearFlow(ctx);
   await show(ctx, {
     text: [...header, "", "¿Quién gana? Toca una opción:"].filter((l) => l !== null).join("\n"),
-    compactText: [notice, `${esc(polla.name)} · partido ${index} de ${matches.length}`,
-      `<b>${esc(match.home_team)} vs ${esc(match.away_team)}</b>`,
-      `${esc(formatMatchTime(match.scheduled_at, match.scheduled_at_confirmed !== false))} · Cierra ${LOCK_MINUTES} minutos antes.`,
-      current ? `Actual: ${esc(current)}` : null, "¿Quién gana?"].filter(Boolean).join("\n"),
+    compactText: blocks([notice], [`${esc(polla.name)} · partido ${index} de ${matches.length}`],
+      [`<b>${esc(match.home_team)} vs ${esc(match.away_team)}</b>`,
+        esc(formatMatchTime(match.scheduled_at, match.scheduled_at_confirmed !== false)),
+        `Cierra ${LOCK_MINUTES} minutos antes.`],
+      [current ? `Actual: ${esc(current)}` : null], ["¿Quién gana?"]),
     buttons: [
       [{ text: buttonText(`🏠 Gana ${shortTeam(match.home_team)}`), callback_data: cb("x", P, M, "L") }],
       [{ text: "🤝 Empate", callback_data: cb("x", P, M, "E") }],
@@ -153,9 +154,9 @@ async function showSummaryOrNext(ctx: PlayerCtx, polla: CasaPolla, afterId: stri
           ? `✅ Ya tienes pronóstico en todos los partidos abiertos. Puedes cambiarlos hasta ${LOCK_MINUTES} minutos antes de cada partido.`
           : "No hay partidos abiertos para pronosticar en este momento.",
     ].filter((l) => l !== null).join("\n"),
-    compactText: [notice, esc(polla.name), matches.length === 0 ? "Aún no hay partidos."
-      : openCount > 0 ? `Ya pronosticaste todos. Puedes cambiar hasta ${LOCK_MINUTES} minutos antes de cada partido.`
-        : "No hay partidos abiertos para pronosticar."].filter(Boolean).join("\n"),
+    compactText: blocks([notice], [`<b>${esc(polla.name)}</b>`], [matches.length === 0 ? "Aún no hay partidos."
+      : openCount > 0 ? `Ya pronosticaste todos.\nPuedes cambiarlos hasta ${LOCK_MINUTES} minutos antes de cada partido.`
+        : "No hay partidos abiertos para pronosticar."]),
     buttons: [
       [{ text: "📋 Ver o cambiar mis pronósticos", callback_data: cb("ls", P) }],
       [{ text: "🏆 Tabla", callback_data: cb("tb", P) }],
@@ -168,7 +169,91 @@ async function showSummaryOrNext(ctx: PlayerCtx, polla: CasaPolla, afterId: stri
 export async function startPicks(ctx: PlayerCtx, polla: CasaPolla): Promise<void> {
   if (polla.kind === "manual") return startQuestions(ctx, polla);
   if (polla.kind !== "partidos") return showPollaDetail(ctx, polla);
+  if (polla.scoring_mode === "1x2" && ctx.channel?.pickForm && await openPickForm(ctx, polla)) return;
   await showSummaryOrNext(ctx, polla, null);
+}
+
+/** One form with every open match (pending first). false = use the per-match flow. */
+async function openPickForm(ctx: PlayerCtx, polla: CasaPolla): Promise<boolean> {
+  const { entry, matches, byMatch } = await loadPickContext(ctx, polla);
+  if (!entryCanPick(entry) || !pollaAcceptsPicks(polla)) return false;
+  const open = matches.filter((m) => canEditCasaMatch(m));
+  if (open.length < 2) return false;
+  const ordered = [...open.filter((m) => !byMatch.has(m.id)), ...open.filter((m) => byMatch.has(m.id))];
+  await clearFlow(ctx);
+  return ctx.channel!.pickForm!({
+    pollaId: polla.id, pollaName: polla.name, total: open.length,
+    matches: ordered.map((m) => ({
+      id: m.id, home: shortTeam(m.home_team), away: shortTeam(m.away_team),
+      when: formatMatchTime(m.scheduled_at, m.scheduled_at_confirmed !== false),
+      current: pickLabel(polla, m, byMatch.get(m.id)),
+    })),
+    fallback: cb("e", shortId(polla.id), shortId(ordered[0].id)),
+  });
+}
+
+/**
+ * Answer of the one-screen form. Same saver as every other path; matches that
+ * closed meanwhile or do not belong to the pool are reported, never saved.
+ */
+export async function savePickForm(ctx: PlayerCtx, pollaId: string, choices: { matchId: string; pick: "L" | "E" | "V" }[]): Promise<void> {
+  const polla = await getPollaById(pollaId);
+  if (!polla || polla.kind !== "partidos" || polla.status === "borrador" || polla.status === "anulada") {
+    await sendScreen(ctx, { text: "Esa polla ya no está disponible." });
+    return;
+  }
+  const P = shortId(polla.id);
+  const { entry, matches, byMatch } = await loadPickContext(ctx, polla);
+  if (!(await guard(ctx, polla, entry))) return;
+  if (polla.scoring_mode !== "1x2") {
+    await showSummaryOrNext(ctx, polla, null, COPY.expiredButton);
+    return;
+  }
+  const byId = new Map(matches.map((m) => [m.id, m]));
+  const valid = choices.filter((c) => { const m = byId.get(c.matchId); return m && canEditCasaMatch(m); });
+  const closed = choices.length - valid.length;
+  if (valid.length === 0) {
+    await show(ctx, {
+      text: [`<b>${esc(polla.name)}</b>`, "", closed > 0 ? "Esos partidos ya cerraron. No se guardó nada." : "No marcaste ningún partido. No se guardó nada."].join("\n"),
+      buttons: [[{ text: "⚽ Pronosticar", callback_data: cb("pk", P) }], backToPolla(polla)],
+    });
+    return;
+  }
+  const result = await saveCasaPicks(polla, ctx.account.userId, valid.map((c) => ({ matchId: c.matchId, pick1x2: c.pick })), ctx.db);
+  if (!result.ok) {
+    await show(ctx, {
+      text: [`<b>${esc(polla.name)}</b>`, "", `⚠️ ${esc(result.error)}`].join("\n"),
+      buttons: [[{ text: "⚽ Pronosticar", callback_data: cb("pk", P) }], backToPolla(polla)],
+    });
+    return;
+  }
+  const rejected = new Set(result.results.filter((r) => r.status === "rejected").map((r) => r.targetId));
+  const saved = valid.filter((c) => !rejected.has(c.matchId));
+  const notSaved = closed + (valid.length - saved.length);
+  const label = (c: (typeof saved)[number]) => {
+    const m = byId.get(c.matchId)!;
+    return `${esc(shortTeam(m.home_team))} vs ${esc(shortTeam(m.away_team))}: ${c.pick === "E" ? "empate" : `gana ${esc(shortTeam(c.pick === "L" ? m.home_team : m.away_team))}`}`;
+  };
+  const chosen = new Set(saved.map((c) => c.matchId));
+  const missing = matches.filter((m) => canEditCasaMatch(m) && !byMatch.has(m.id) && !chosen.has(m.id)).length;
+  const text = [
+    `<b>${esc(polla.name)}</b>`,
+    "",
+    `✅ Guardamos ${saved.length} ${saved.length === 1 ? "pronóstico" : "pronósticos"}.`,
+    "",
+    ...saved.map(label),
+    notSaved > 0 || missing > 0 ? "" : null,
+    notSaved > 0 ? `${notSaved} ${notSaved === 1 ? "partido ya cerró y no se guardó" : "partidos ya cerraron y no se guardaron"}.` : null,
+    missing > 0 ? `Te ${missing === 1 ? "falta 1 partido" : `faltan ${missing} partidos`}.` : null,
+    entry?.status === "pendiente" ? `\n${COPY.pendingPoints}` : null,
+  ].filter((l) => l !== null).join("\n");
+  await show(ctx, {
+    text,
+    buttons: [
+      [missing > 0 ? { text: "⚽ Pronosticar", callback_data: cb("pk", P) } : { text: "📋 Mis pronósticos", callback_data: cb("ls", P) }],
+      [{ text: "🏆 Tabla", callback_data: cb("tb", P) }],
+    ],
+  });
 }
 
 export async function skipMatch(ctx: PlayerCtx, polla: CasaPolla, matchShort: string | undefined): Promise<void> {

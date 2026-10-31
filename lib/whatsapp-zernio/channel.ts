@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PlayerChannel, PlayerChat, Screen } from "@/lib/telegram-player/context";
+import type { PickForm, PlayerChannel, PlayerChat, Screen } from "@/lib/telegram-player/context";
 import { createWhatsAppChannel } from "@/lib/whatsapp-player/channel";
 import { adaptScreen, menuForScreen, renderZernioMenu, type ZernioContent, type ZernioMenu } from "./format";
+import { pickFlowContent } from "./pick-flow";
 
 export interface ZernioTurn { replies: ZernioContent[]; menu: ZernioMenu | null }
 
-export function createZernioChannel(db: SupabaseClient, phone: string, chat: PlayerChat, turn: ZernioTurn, now: () => number): PlayerChannel {
+export function createZernioChannel(db: SupabaseClient, phone: string, chat: PlayerChat, turn: ZernioTurn, now: () => number,
+  flow: { id?: string | null; draft?: boolean } = {}): PlayerChannel {
   const base = createWhatsAppChannel({ db, phone, chat, turn: { replies: [], menu: undefined }, now });
   const push = async (screen: Screen) => {
     const { menu, links } = menuForScreen(adaptScreen(screen, chat.flow?.name), chat.flow?.name);
@@ -14,6 +16,13 @@ export function createZernioChannel(db: SupabaseClient, phone: string, chat: Pla
   };
   return {
     ...base, show: push, sendScreen: push,
+    // The form message carries no menu; the short follow-up keeps the per-match
+    // path for clients that cannot open forms (for example WhatsApp Web).
+    ...(flow.id ? { pickForm: async (form: PickForm) => {
+      turn.replies.push(pickFlowContent(flow.id!, form, { draft: flow.draft }));
+      await push({ text: "¿No se abre? Pronostica partido por partido.", buttons: [[{ text: "Uno por uno", callback_data: form.fallback }]] });
+      return true;
+    } } : {}),
     // sendWelcome calls sendHome next; omit Telegram's separate verbose welcome.
     sendWithMenu: async () => {},
     download: async (fileId, maxBytes) => {

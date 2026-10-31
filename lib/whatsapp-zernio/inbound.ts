@@ -11,6 +11,7 @@ const schema = zernioIncomingMessage.extend({
   metadata: zernioIncomingMessage.shape.metadata.unwrap().unwrap().extend({
     interactiveType: z.string().optional(), interactiveId: z.string().max(200).optional(),
     quickReplyPayload: z.string().max(200).optional(),
+    flowResponseJson: z.string().max(20_000).optional(), flowResponseData: z.record(z.string(), z.unknown()).optional(),
   }).nullish(),
   interactiveMetadata,
   message: zernioIncomingMessage.shape.message.extend({
@@ -30,6 +31,8 @@ export interface ZernioInbound {
   text: string | null;
   selection: string | null;
   attachment: { type: string; url?: string | null; mimeType?: string | null } | null;
+  /** Submitted WhatsApp Flow (nfm_reply). Content is untrusted input, never identity. */
+  flowResponse?: unknown;
 }
 
 /** Caller has already verified the raw-body HMAC. No text/contact/caption identity. */
@@ -47,10 +50,11 @@ export function parseZernioInbound(payload: unknown, config: ZernioBotConfig, no
   const meta = event.metadata;
   const selection = (meta?.interactiveType === "button_reply" || meta?.interactiveType === "list_reply" ? meta.interactiveId : null)
     ?? event.interactiveMetadata?.quickReplyPayload ?? event.message.interactiveMetadata?.quickReplyPayload ?? meta?.quickReplyPayload ?? null;
-  const attachment = event.message.attachments?.[0] ?? null;
-  const text = !attachment && !selection ? event.message.text?.trim().slice(0, 500) || null : null;
+  const flowResponse = meta?.flowResponseData ?? meta?.flowResponseJson ?? null;
+  const attachment = flowResponse ? null : event.message.attachments?.[0] ?? null;
+  const text = !attachment && !selection && !flowResponse ? event.message.text?.trim().slice(0, 500) || null : null;
   // Provider message id survives a redelivery with a different webhook envelope id.
   const providerId = event.message.platformMessageId || event.message.id || event.id;
   return { key: `z:${createHash("sha256").update(JSON.stringify([config.accountId, providerId])).digest("hex")}`,
-    phone, conversationId: event.conversation.id, sentAt: event.message.sentAt, text, selection, attachment };
+    phone, conversationId: event.conversation.id, sentAt: event.message.sentAt, text, selection, attachment, flowResponse };
 }

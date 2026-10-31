@@ -18,6 +18,8 @@ allowlist (or `WHATSAPP_ZERNIO_BOT_ENABLED=false`) and redeploy.
 | `WHATSAPP_ZERNIO_BOT_ENABLED=true` | Enable the official-number player bot. Unset preserves the existing login webhook response. |
 | `WHATSAPP_ZERNIO_BOT_ALLOWED_PHONES` | Optional comma-separated E.164 digits. A nonempty malformed list allows nobody. |
 | `ZERNIO_API_KEY`, `ZERNIO_WHATSAPP_ACCOUNT_ID`, `ZERNIO_WEBHOOK_SECRET` | Existing server credentials and HMAC verification. |
+| `ZERNIO_WHATSAPP_PICKS_FLOW_ID` | Published WhatsApp Flow id for the one-screen 1X2 form. Unset keeps one match per message. Not a secret. |
+| `ZERNIO_WHATSAPP_PICKS_FLOW_DRAFT=true` | Testing only: sends the flow as an unpublished draft. |
 
 Existing WhatsApp login settings still govern login links. No templates, new
 subscriptions, dependencies, phone numbers or credentials are added.
@@ -38,7 +40,7 @@ anon and authenticated and grant service_role only. New tables have RLS/deny-all
 | Payment | Exact SQL price, payment account, prize, send image; Cancelar / Menú. |
 | Proof error | Reintentar / Menú; retry asks for the image again, preserving the proof step. |
 | Exact score | Type `2-1`, local first; Saltar / Ver todos / Volver a la polla / Menú. |
-| 1X2 | Home win / draw / away win and shared navigation. |
+| 1X2 | With a configured flow and 2+ open matches: one form with every open match (up to 20, pending first) and «Guardar»; a short follow-up offers «Uno por uno» for clients that cannot open forms. Otherwise home win / draw / away win per match. |
 | Questions | Choose or type answer; skip / own answers / back / Menú. |
 | Own picks or answers | Choose one to edit; table / back / Menú. |
 | Table | Existing SQL standings, own rank/points; refresh / back / Menú. |
@@ -68,6 +70,33 @@ select the exact pool. Truncation/splitting preserve graphemes. Long rules and
 standings split without silently removing data. Opaque ids map to stored callbacks,
 which the player router revalidates against the database. Concise `compactText`
 is presentation from existing source data; Telegram and OpenWA retain their copy.
+
+## One-screen 1X2 form (WhatsApp Flows)
+
+`lib/whatsapp-zernio/pick-flow-json.ts` is the static Flow JSON (version 7.1): an intro,
+20 optional radio groups (match label 30 characters, date and current pick in the
+description, «Gana local / Empate / Gana visitante») and a footer that completes with
+the pool id, each slot's match id and the chosen option. Each message fills the slots
+through `flow_action_payload`; unused slots are hidden. Unmarked matches do not change.
+
+The answer arrives as `message.received` with `metadata.flowResponseData` (or
+`flowResponseJson`). Identity is still the verified phone; the payload is untrusted
+input. Only tokens starting with `lp-picks:` are accepted, then `savePickForm` reloads
+the pool, the entry and every match, drops matches outside the pool or already closed,
+and saves the rest in one `saveCasaPicks` call (same RPC, locks and audit as the web).
+The reply lists what was saved and how many matches closed or are still missing.
+
+Provisioning (published flows are immutable; a JSON change needs a new flow id):
+
+    node tools/secrets.mjs run --vars zernio.env -- node --experimental-strip-types       apps/la-polla/scripts/zernio-pick-flow.mjs create|upload|status|publish [flowId]
+
+with `ZERNIO_WHATSAPP_ACCOUNT_ID` in the environment. Test with the draft flag on the
+physical phone, publish, then set `ZERNIO_WHATSAPP_PICKS_FLOW_ID` and remove the draft flag.
+Exact-score pools keep the typed `2-1` flow. WhatsApp Web may not open forms; the
+«Uno por uno» follow-up covers it.
+
+WhatsApp copy (`compactText`) uses `blocks()`: one fact per line and a blank line
+between blocks; the Zernio formatter trims lines and collapses extra blank lines.
 
 ## Provider and security contract
 

@@ -27,7 +27,7 @@ import { getTournamentName } from "@/lib/tournaments";
 import { loginLinkOrigin } from "@/lib/auth/telegram-login/links";
 import { cb, longId, shortId } from "./ids";
 import { COPY, MENU_LABELS } from "./copy";
-import { buttonText, esc, show, type Keyboard, type PlayerCtx, type Screen } from "./context";
+import { blocks, buttonText, esc, show, type Keyboard, type PlayerCtx, type Screen } from "./context";
 
 const PAGE_SIZE = 8;
 
@@ -248,12 +248,12 @@ export async function pollaDetailScreen(ctx: PlayerCtx, polla: CasaPolla, notice
       : entry?.status === "pendiente" && entry.proof_path ? "Comprobante en revisión. Puedes jugar; tus puntos cuentan al confirmar el pago."
         : entryStatusLine(entry);
   return { text: lines.filter((l) => l !== null).join("\n"),
-    compactText: [notice, `<b>${esc(polla.name)}</b>`,
-      `${prizeLine(polla, pot)} · Entrada: ${entryPriceLabel(polla.entry_price_cop)} · ${pot.paid_entries} inscritos`,
-      open ? `Cierra ${formatDateTime(polla.closes_at)} (Colombia)` : `Estado: ${esc(pollaEndedLabel(polla) ?? pollaStatusLabel(polla).text)}`,
-      compactStatus,
-      ...lines.filter(l => l?.startsWith("🏆 Gan") || l?.startsWith("Todos terminaron") || l?.startsWith("Número sorteado:")),
-    ].filter(Boolean).join("\n"), buttons };
+    compactText: blocks([notice], [`<b>${esc(polla.name)}</b>`],
+      [prizeLine(polla, pot), `Entrada: ${entryPriceLabel(polla.entry_price_cop)}`, `Inscritos: ${pot.paid_entries}`,
+        open ? `Cierra: ${formatDateTime(polla.closes_at)}` : `Estado: ${esc(pollaEndedLabel(polla) ?? pollaStatusLabel(polla).text)}`],
+      [compactStatus],
+      lines.filter(l => l?.startsWith("🏆 Gan") || l?.startsWith("Todos terminaron") || l?.startsWith("Número sorteado:")),
+    ), buttons };
 }
 
 export async function showPollaDetail(ctx: PlayerCtx, polla: CasaPolla, notice?: string): Promise<void> {
@@ -364,13 +364,13 @@ export async function showTable(ctx: PlayerCtx, polla: CasaPolla): Promise<void>
   }
   await show(ctx, {
     text: lines.join("\n"),
-    compactText: [`<b>Tabla · ${esc(polla.name)}</b>`,
-      entry?.status === "pendiente" && entry.proof_path ? "Pago en revisión: tus puntos aparecerán cuando lo confirmemos." : null,
-      rows.length ? `${rows.length} participantes` : "Aún no hay participantes con pago confirmado.",
-      ...rows.slice(0, 15).map(row => `${row.puesto}. ${esc(row.display_name ?? "Sin nombre")} · ${pts(row.points)}${row.user_id === ctx.account.userId ? " ← tú" : ""}`),
-      ...rows.filter(row => row.user_id === ctx.account.userId && !rows.slice(0, 15).some(r => r.user_id === row.user_id)).slice(0, 1)
+    compactText: blocks([`<b>Tabla · ${esc(polla.name)}</b>`, rows.length ? `${rows.length} participantes` : null],
+      [entry?.status === "pendiente" && entry.proof_path ? "Pago en revisión: tus puntos aparecerán cuando lo confirmemos." : null],
+      rows.length ? rows.slice(0, 15).map(row => `${row.puesto}. ${esc(row.display_name ?? "Sin nombre")} · ${pts(row.points)}${row.user_id === ctx.account.userId ? " ← tú" : ""}`)
+        : ["Aún no hay participantes con pago confirmado."],
+      rows.filter(row => row.user_id === ctx.account.userId && !rows.slice(0, 15).some(r => r.user_id === row.user_id)).slice(0, 1)
         .map(row => `Tú: puesto ${row.puesto} de ${rows.length} · ${pts(row.points)}`),
-    ].filter(Boolean).join("\n"),
+    ),
     buttons: [[{ text: "🔄 Actualizar", callback_data: cb("tb", P) }], [{ text: "⬅️ Volver a la polla", callback_data: cb("p", P) }]],
   });
 }
@@ -470,7 +470,8 @@ export async function showHelp(ctx: PlayerCtx): Promise<void> {
       "",
       `¿Tienes un problema? Escríbenos en ${esc(support)}`,
     ].join("\n"),
-    compactText: `Elige una polla, inscríbete y pronostica hasta ${LOCK_MINUTES} minutos antes del partido. ¿Necesitas ayuda? Entra a Más → Entrar a la web → Soporte.`,
+    compactText: blocks(["1. Elige una polla.", "2. Inscríbete y envía el comprobante.", `3. Pronostica hasta ${LOCK_MINUTES} minutos antes de cada partido.`],
+      ["¿Necesitas ayuda? Entra a Más → Entrar a la web → Soporte."]),
     buttons: [[{ text: MENU_LABELS.abiertas, callback_data: cb("ol", 0) }], ...urlRow("🌐 Soporte", support)],
   });
 }
