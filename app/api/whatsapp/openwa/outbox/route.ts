@@ -6,18 +6,19 @@
 //   {"action":"ack","id":"<uuid>","ok":true}     → enviado (o falló, ok:false)
 // Misma seguridad que /api/whatsapp/openwa: apagado → 404; firma HMAC del relay
 // con timestamp antes de parsear → 401. Reclamar y confirmar son funciones SQL
-// (migración 176); reclamar también limpia lo vencido.
+// (migraciones 176/178); reclamar también prepara el menú de encuesta.
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getWhatsAppBotConfig } from "@/lib/whatsapp-player/config";
+import { parseOpenWaMenu } from "@/lib/whatsapp-player/poll-menu";
 import { RELAY_SIGNATURE_HEADER, RELAY_TIMESTAMP_HEADER, verifyRelaySignature } from "@/lib/whatsapp-player/signature";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const NO_STORE = { "Cache-Control": "no-store" };
+const NO_STORE = { "Cache-Control": "private, no-store" };
 
 const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("claim"), limit: z.number().int().min(1).max(20).optional() }),
@@ -49,13 +50,19 @@ export async function POST(request: NextRequest) {
 
   const db = createAdminClient();
   if (parsed.data.action === "claim") {
-    const { data, error } = await db.rpc("whatsapp_bot_claim_outbox", { p_limit: parsed.data.limit ?? 10 });
+    const { data, error } = await db.rpc("whatsapp_bot_claim_openwa_outbox", { p_limit: parsed.data.limit ?? 10 });
     if (error) {
       console.error("[whatsapp-player] avisos no reclamados:", error.code);
       return NextResponse.json({ error: "unavailable" }, { status: 503, headers: NO_STORE });
     }
-    const messages = ((data ?? []) as Array<{ id: string; phone: string; body: string }>)
-      .map((m) => ({ id: m.id, to: `${m.phone}@c.us`, text: m.body }));
+    const messages = ((data ?? []) as Array<{ id: string; phone: string; body: string; menu?: unknown }>)
+      .map((m) => {
+        const menu = parseOpenWaMenu(m.menu);
+        return { id: m.id, to: `${m.phone}@c.us`, text: m.body,
+          ...(menu ? { poll: { nonce: menu.nonce, name: "Elige una opción.",
+            options: menu.options.map(o => o.label), allowMultipleAnswers: false } } : {}),
+        };
+      });
     return NextResponse.json({ messages }, { headers: NO_STORE });
   }
   const { data, error } = await db.rpc("whatsapp_bot_ack_outbox", {

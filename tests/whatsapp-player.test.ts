@@ -18,6 +18,7 @@ import { chatStateFromRow, createWhatsAppChannel, type WhatsAppChatRow } from "@
 import { signRelayBody, verifyRelaySignature } from "@/lib/whatsapp-player/signature";
 import { handleWhatsAppEvent, RATE_LIMIT_PER_MINUTE, type WhatsAppBotDeps } from "@/lib/whatsapp-player/handler";
 import { notifyPlayerReviewByWhatsApp } from "@/lib/whatsapp-player/notify";
+import { renderOpenWaScreen } from "@/lib/whatsapp-player/poll-menu";
 import { chatKeyOf, createChatQueue, createRelay, relayHeaders, verifyOpenWaSignature } from "../ops/whatsapp-openwa/relay.mjs";
 
 const NOW = Date.parse("2026-10-29T18:00:00Z");
@@ -219,6 +220,7 @@ interface FakeOpts {
   duplicate?: boolean;
   recentCount?: number;
   mediaRow?: { data_b64: string } | null;
+  pollPhone?: string;
 }
 type Write = { table: string; op: string; value: unknown; filters: Array<[string, unknown]> };
 
@@ -247,6 +249,7 @@ function fakeDb(opts: FakeOpts = {}) {
         if (table === "whatsapp_bot_chats") return { data: opts.chatRow ?? null, error: null };
         if (table === "users") return { data: opts.profile ?? null, error: null };
         if (table === "whatsapp_bot_media") return { data: opts.mediaRow ?? null, error: null };
+        if (table === "whatsapp_bot_polls") return { data: opts.pollPhone ? { phone: opts.pollPhone } : null, error: null };
         return { data: null, error: null };
       },
       then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(result()).then(resolve, reject),
@@ -294,7 +297,8 @@ describe("handleWhatsAppEvent — who answers what", () => {
     const out = await handleWhatsAppEvent(event({ body: "Buenas tardes" }), deps(db));
     expect(out.replies[0].text).toContain("*¡Hola, Ana Pérez!*");
     expect(out.replies[0].text).toContain("Escribe «menú»");
-    expect(out.replies[1].text).toContain("*1.* ⚽ Pollas disponibles");
+    expect(out.replies[1].text).toContain("*1.* Pollas disponibles");
+    expect(out.replies[1].poll).toMatchObject({ allowMultipleAnswers: false });
     const menuWrite = db.writes.find((w) => w.table === "whatsapp_bot_chats" && w.op === "update" && (w.value as { menu?: unknown }).menu);
     expect((menuWrite?.value as { menu: WhatsAppMenu }).menu.options[0]).toMatchObject({ key: "1", data: cb("ol", 0) });
   });
@@ -337,8 +341,10 @@ describe("handleWhatsAppEvent — who answers what", () => {
     });
     const out = await handleWhatsAppEvent(event({ body: "1" }), deps(db));
     expect(routes.routePlayerCallback).toHaveBeenCalledWith(expect.objectContaining({ account: { userId: "user-1", phoneE164: `+${PHONE}` } }), cb("ol", 0), expect.anything());
-    expect(out.replies).toEqual([{ to: `${PHONE}@c.us`, text: "*Pollas disponibles*\n\n*1.* Polla Millos\n\n_Responde con el número de la opción._" }]);
-    expect(db.writes).toContainEqual(expect.objectContaining({ table: "whatsapp_bot_chats", op: "update", value: expect.objectContaining({ menu: { mode: "num", options: [{ key: "1", data: cb("p", "x"), label: "Polla Millos" }] } }) }));
+    expect(out.replies).toHaveLength(1);
+    expect(out.replies[0]).toMatchObject({ to: `${PHONE}@c.us`, poll: { options: ["Polla Millos", "Menú"], allowMultipleAnswers: false } });
+    expect(out.replies[0].text).toContain("*1.* Polla Millos");
+    expect(db.writes).toContainEqual(expect.objectContaining({ table: "whatsapp_bot_chats", op: "update", value: expect.objectContaining({ menu: expect.objectContaining({ mode: "num", options: [{ key: "1", data: cb("p", "x"), label: "Polla Millos" }, { key: "2", data: "m", label: "Menú" }] }) }) }));
   });
 
   it("while typing a ticket number, «15» is text even if a notice left a numbered menu", async () => {
@@ -392,6 +398,45 @@ describe("handleWhatsAppEvent — who answers what", () => {
     expect(out.outcome).toBe("failed");
     expect(out.replies.at(-1)?.text).toContain("No pudimos completar eso");
     expect(db.writes).toContainEqual(expect.objectContaining({ table: "whatsapp_bot_inbound", op: "update", value: { status: "failed" } }));
+  });
+
+  it("routes a poll vote through the mapped user's shared callback, even for a private voter id", async () => {
+    const rendered = renderOpenWaScreen({ text: "Tus pollas.", buttons: [[{ text: "Elegir", callback_data: "p:x" }]] }, "num");
+    const db = fakeDb({ chatRow: chatRow({ menu: rendered.menu }), pollPhone: PHONE });
+    db.rpc.mockResolvedValue({ data: [{ phone: PHONE, chat_id: `${PHONE}@c.us`, callback: "p:x", menu_nonce: rendered.menu.nonce }], error: null });
+    const d = deps(db);
+    const out = await handleWhatsAppEvent({ event: "poll.vote", data: {
+      pollMessageId: "wa-poll", chatId: `${PHONE}@c.us`, voterId: "90000000001@lid", selectedOptions: ["Elegir"], timestamp: NOW_S,
+      fromMe: false, selfChecked: true,
+    } }, d);
+    expect(out.outcome).toBe("handled");
+    expect(routes.routePlayerCallback).toHaveBeenCalledWith(expect.objectContaining({ account: { userId: "user-1", phoneE164: `+${PHONE}` } }), "p:x", expect.anything());
+    expect(d.resolveAccount).not.toHaveBeenCalled();
+    expect(routes.routePlayerMessage).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the menu nonce after a poll claim before dispatching the callback", async () => {
+    const current = renderOpenWaScreen({ text: "Nuevo menú." }, "num");
+    const db = fakeDb({ chatRow: chatRow({ menu: current.menu }), pollPhone: PHONE });
+    db.rpc.mockResolvedValue({ data: [{ phone: PHONE, chat_id: `${PHONE}@c.us`, callback: "p:x", menu_nonce: "a".repeat(32) }], error: null });
+    const out = await handleWhatsAppEvent({ event: "poll.vote", data: {
+      pollMessageId: "old-poll", chatId: `${PHONE}@c.us`, voterId: "90000000001@lid", selectedOptions: ["Elegir"], timestamp: NOW_S,
+      fromMe: false, selfChecked: true,
+    } }, deps(db));
+    expect(out).toEqual({ outcome: "ignored", replies: [] });
+    expect(routes.routePlayerCallback).not.toHaveBeenCalled();
+  });
+
+  it("paginates typed Más/Anterior locally, persists a fresh nonce and still handles menú", async () => {
+    const rendered = renderOpenWaScreen({ text: "Elige.", buttons: [Array.from({ length: 25 }, (_, i) => ({ text: `Polla ${i}`, callback_data: `p:${i}` }))] }, "num");
+    const db = fakeDb({ chatRow: chatRow({ menu: rendered.menu }) });
+    const out = await handleWhatsAppEvent(event({ body: "Más" }), deps(db));
+    expect(out.replies[0].poll?.options).toContain("Anterior");
+    expect(out.replies[0].poll?.options).toContain("Menú");
+    expect(out.replies[0].poll?.nonce).not.toBe(rendered.menu.nonce);
+    expect(routes.routePlayerCallback).not.toHaveBeenCalled();
+    await handleWhatsAppEvent(event({ body: "menú" }), deps(db));
+    expect(routes.routePlayerCallback).toHaveBeenCalledWith(expect.anything(), "m", expect.anything());
   });
 });
 

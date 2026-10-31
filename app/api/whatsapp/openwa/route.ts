@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 // Un comprobante se guarda, se sube y se verifica antes de responder.
 export const maxDuration = 60;
 
-const NO_STORE = { "Cache-Control": "no-store" };
+const NO_STORE = { "Cache-Control": "private, no-store" };
 // Imagen de hasta 3 MB en base64 + sobre de OpenWA (límite de Vercel: 4,5 MB).
 const MAX_BODY_BYTES = 4_400_000;
 

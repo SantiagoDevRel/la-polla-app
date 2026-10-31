@@ -32,7 +32,7 @@ docker compose pull
 docker compose up -d openwa          # wait until healthy
 node setup.mjs init                  # session, operator key, webhook secret → relay.env
 docker compose up -d relay           # the webhook host must resolve before the next step
-node setup.mjs webhook               # OpenWA → http://relay:8787/openwa
+node setup.mjs webhook               # message.received + poll.vote → relay
 node setup.mjs test-webhook          # expects success and status 200
 node setup.mjs start                 # session waits for a QR or a pairing code
 ```
@@ -50,6 +50,32 @@ instead, and type the code. `node setup.mjs qr qr.png` saves a QR image instead.
 `node setup.mjs status` shows `ready` once linked.
 
 Then follow "Turning it on" in the design doc (Vercel flag and allowlist).
+
+## Enable native poll menus
+
+Review/apply migration `178_whatsapp_openwa_polls.sql`, deploy the matching app,
+and copy the updated `relay.mjs` and `setup.mjs` to this stack while the bot remains
+off. Restart only the relay and run `node setup.mjs webhook` to update the existing
+webhook subscription to `message.received` + `poll.vote`. This implementation does
+not change the active stack, webhook, session, secrets or production database.
+
+No new dependencies or poll flag are required. With the dedicated SIM linked and
+the owner's approval, enable the existing `WHATSAPP_OPENWA_BOT_ENABLED` flag first
+under the existing allowlist. A menu sends `send-text` followed by
+`POST /api/sessions/:sessionId/messages/send-poll` with
+`{chatId, name, options, allowMultipleAnswers:false}`. The returned WhatsApp
+`messageId` is registered by a signed `/api/whatsapp/openwa/poll-sent` request;
+`poll.vote` uses that mapping and menu nonce. Stale polls and subsequent vote
+changes never run another action. The poll contains at most 12 choices and
+always Menú; larger menus have Más / Anterior. Number, letter and title replies
+remain available.
+
+The relay reads the session phone and, for @lid voters, the contact's `/phone`
+endpoint only to exclude bot self-votes. If this check cannot resolve, it ignores
+the vote and the player can type a choice. Never derive a player account from
+the voter id. Validate both c.us and @lid voting, paging, replay/changed votes,
+typed fallback, proof and picks after linking the SIM. Until then the bot stays
+dormant; there is no live WhatsApp delivery verification.
 
 ## Operation
 
