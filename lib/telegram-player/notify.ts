@@ -29,12 +29,13 @@ export interface ReviewNotice {
   entryNumber?: number | null;
 }
 
-export function reviewNoticeMessage(n: ReviewNotice): { text: string; buttons: Array<Array<{ text: string; callback_data: string }>> } {
+export function reviewNoticeMessage(n: ReviewNotice): { text: string; compactText: string; buttons: Array<Array<{ text: string; callback_data: string }>> } {
   const P = shortId(n.pollaId);
   const ticket = n.ticketNumber != null ? ` (boleta ${n.ticketNumber})`
     : n.entryNumber != null && n.entryNumber > 1 ? ` (cupo ${n.entryNumber})` : "";
   if (n.approved) {
     return {
+      compactText: `Pago confirmado: ${esc(n.pollaName)}${ticket}. ${n.prizeKind === "objeto" ? `Premio: ${esc(n.prizeObject ?? "el premio")}.` : `Pozo: ${formatCop(n.pozoCop)}.`}`,
       text: [
         `✅ <b>Confirmamos tu pago de ${esc(n.pollaName)}${ticket}.</b>`,
         "",
@@ -52,6 +53,7 @@ export function reviewNoticeMessage(n: ReviewNotice): { text: string; buttons: A
     };
   }
   return {
+    compactText: `Pago rechazado: ${esc(n.pollaName)}${ticket}.${n.rejectReason ? ` Motivo: ${esc(n.rejectReason)}.` : ""} Envía el comprobante correcto; no repitas la transferencia.`,
     text: [
       `❌ <b>No pudimos confirmar tu pago de ${esc(n.pollaName)}${ticket}.</b>`,
       n.rejectReason ? `Motivo: ${esc(n.rejectReason)}` : null,
@@ -134,8 +136,9 @@ export interface ReferralGiftNotice {
  * Cupo gratis por invitar (migración 144): queda de saldo y la persona lo usa
  * en la polla que quiera, así que el botón lleva a las pollas abiertas.
  */
-export function referralGiftMessage(n: ReferralGiftNotice): { text: string; buttons: NoticeButton[][] } {
+export function referralGiftMessage(n: ReferralGiftNotice): { text: string; compactText: string; buttons: NoticeButton[][] } {
   return {
+    compactText: "Ganaste un cupo gratis. Para usarlo, entra a Más → Entrar a la web y elige «Usar mi cupo gratis» en una polla.",
     text: [
       "🎁 <b>¡Ganaste un cupo gratis!</b>",
       "",
@@ -144,7 +147,7 @@ export function referralGiftMessage(n: ReferralGiftNotice): { text: string; butt
         : "Las personas que invitaste ya pagaron una polla.",
       "Úsalo en la polla que quieras: entra y toca «Usar mi cupo gratis».",
     ].join("\n"),
-    buttons: [[{ text: "👉 Ver las pollas", url: "https://lapollacolombiana.com/" }]],
+    buttons: [[{ text: "Pollas disponibles", url: "https://lapollacolombiana.com/" }]],
   };
 }
 

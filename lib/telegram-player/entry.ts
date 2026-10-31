@@ -19,7 +19,7 @@ import { isPollaOpen, type CasaPolla } from "@/lib/casa/types";
 import { PROOF_BUCKET } from "@/lib/telegram/notify";
 import { redactId } from "@/lib/log";
 import { cb, cbNew, longId, shortId, stableUuid } from "./ids";
-import { COPY } from "./copy";
+import { COPY, MENU_LABELS } from "./copy";
 import { buttonText, clearFlow, downloadMedia, esc, sendScreen, setFlow, show, showUploading, type Keyboard, type PlayerCtx } from "./context";
 import type { PlayerPhoto } from "./update";
 import { backToPolla, showPollaDetail } from "./pollas";
@@ -88,7 +88,7 @@ async function paymentInstructions(ctx: PlayerCtx, polla: CasaPolla, ticket: num
       `${esc(methodLabel(polla.payout_method))}: ${esc(polla.payout_account)}`,
       polla.payout_account_name ? `Titular: ${esc(polla.payout_account_name)}` : null,
       polla.prize_kind === "objeto" ? `Premio: ${esc(polla.prize_object)}` : `Premio: ${formatCop(pot.prize_cop)}`,
-      "Envía aquí la imagen del comprobante (JPG, PNG o WEBP). Si ya transferiste, no repitas el pago.",
+      "Envía aquí la imagen del comprobante (JPG, PNG o WEBP, máximo 3 MB). No repitas la transferencia.",
     ].filter(Boolean).join("\n"),
   });
 }
@@ -280,8 +280,8 @@ export async function askProofPolla(ctx: PlayerCtx, photo: PlayerPhoto): Promise
   }
   if (candidates.length === 0) {
     await sendScreen(ctx, {
-      text: "Si es un comprobante de pago, primero elige la polla en <b>⚽ Pollas abiertas</b> y toca <b>Inscribirme</b>. Después envías la foto.",
-      buttons: [[{ text: "⚽ Pollas abiertas", callback_data: cb("ol", 0) }]],
+      text: `Primero elige la polla en <b>${MENU_LABELS.abiertas}</b> y toca <b>Inscribirme</b>. Después envía el comprobante.`,
+      buttons: [[{ text: MENU_LABELS.abiertas, callback_data: cb("ol", 0) }]],
     });
     return;
   }
@@ -289,7 +289,8 @@ export async function askProofPolla(ctx: PlayerCtx, photo: PlayerPhoto): Promise
   await sendScreen(ctx, {
     text: "¿De cuál polla es este comprobante? Si es de una rifa, primero elige tu boleta desde la polla.",
     buttons: [
-      ...candidates.map((p) => [{ text: buttonText(`${p.name} · ${formatCop(p.entry_price_cop)}`), callback_data: cb("ph", shortId(p.id)) }]),
+      ...candidates.map((p) => [{ text: buttonText(`${p.name} · ${formatCop(p.entry_price_cop)}`), callback_data: cb("ph", shortId(p.id)),
+        listRow: { title: p.name, description: `Entrada: ${formatCop(p.entry_price_cop)}` } }]),
       [{ text: "❌ No es un comprobante", callback_data: "cx" }],
     ],
   });
@@ -445,6 +446,9 @@ async function receiveProof(ctx: PlayerCtx, polla: CasaPolla, ticket: number | n
               ? "Mientras tanto ya puedes responder las preguntas; tu participación cuenta cuando confirmemos el pago."
               : null,
         ].filter((l) => l !== null).join("\n"),
+      compactText: alreadyPaid
+        ? `Tu pago de ${esc(polla.name)}${ticket != null ? ` · boleta ${ticket}` : ""} ya está confirmado.`
+        : `Recibimos tu comprobante de ${esc(polla.name)}${ticket != null ? ` · boleta ${ticket}` : ""}. Está en revisión.${polla.kind === "partidos" ? " Puedes pronosticar; tus puntos cuentan al confirmar el pago." : polla.kind === "manual" ? " Puedes responder; tus puntos cuentan al confirmar el pago." : ""}`,
       buttons,
     });
     return;

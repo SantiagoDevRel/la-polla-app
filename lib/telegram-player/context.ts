@@ -14,6 +14,8 @@ export interface Button {
   text: string;
   callback_data?: string;
   url?: string;
+  /** Optional native list presentation; other transports keep the regular text. */
+  listRow?: { title: string; description: string };
 }
 export type Keyboard = Button[][];
 
