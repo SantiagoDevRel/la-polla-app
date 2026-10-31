@@ -10,10 +10,11 @@ export type ZernioContent = {
   message?: string;
   buttons?: { type: "postback"; title: string; payload: string }[];
   interactive?: {
-    type: "list" | "cta_url";
+    type: "list" | "cta_url" | "flow";
     body: { text: string };
     action: { button: string; sections: { rows: { id: string; title: string; description?: string }[] }[] }
-      | { name: "cta_url"; parameters: { display_text: string; url: string } };
+      | { name: "cta_url"; parameters: { display_text: string; url: string } }
+      | { name: "flow"; parameters: Record<string, unknown> };
   };
 };
 
@@ -121,7 +122,12 @@ export function adaptScreen(screen: Screen, flow?: FlowName): Screen {
       .replace("Revisamos el comprobante y te avisamos por este chat. Si hay un error, te decimos por qué.", "Revisamos tu comprobante. Consulta el estado en Mis pagos.");
   }
   if (!kept.some(b => b.callback_data === "m")) kept = [...kept, { text: "Menú", callback_data: "m" }];
-  return { text: text.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, "").trim(), buttons: [kept.map(b => ({ ...b, text: actionLabel(b) }))] };
+  return { text: tidyText(text.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, "")), buttons: [kept.map(b => ({ ...b, text: actionLabel(b) }))] };
+}
+
+/** Trim every line (removed icons leave spaces) and keep at most one blank line between blocks. */
+export function tidyText(text: string): string {
+  return text.split("\n").map(line => line.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export function menuForScreen(screen: Screen, flow?: FlowName, nonce = randomBytes(8).toString("hex")): { menu: ZernioMenu; links: ZernioContent[] } {
@@ -145,7 +151,7 @@ export function menuForScreen(screen: Screen, flow?: FlowName, nonce = randomByt
   // the body too, so native limits never hide price, close time or status.
   const overflow = options.filter(o => o.listRow && rowDescription(o).length > 72)
     .map(o => `${o.listRow!.title}: ${o.listRow!.description}`);
-  return { menu: { zernio: 1, nonce, body: [body, ...overflow].join("\n"), options, page: 0, mode: menuModeFor(flow) }, links };
+  return { menu: { zernio: 1, nonce, body: overflow.length ? `${body}\n\n${overflow.join("\n")}` : body, options, page: 0, mode: menuModeFor(flow) }, links };
 }
 
 export function visibleOptions(menu: ZernioMenu) {

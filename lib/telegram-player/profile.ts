@@ -10,7 +10,7 @@ import { POLLITO_TYPES } from "@/lib/pollitos";
 import { maskPhone } from "@/lib/auth/telegram-login/mask-phone";
 import { cb } from "./ids";
 import { COPY } from "./copy";
-import { clearFlow, esc, sendScreen, sendWelcome, setFlow, show, type PlayerCtx, type Screen } from "./context";
+import { blocks, clearFlow, esc, sendScreen, sendWelcome, setFlow, show, type PlayerCtx, type Screen } from "./context";
 
 export interface PlayerProfile {
   display_name: string | null;
@@ -147,8 +147,8 @@ export function profileScreen(profile: PlayerProfile, phoneE164: string, notice?
       `Celular: ${esc(maskPhone(phoneE164))}`,
       `Cuenta para recibir premios: ${esc(payoutSummary(profile))}`,
     ].filter((l) => l !== null).join("\n"),
-    compactText: [notice, `<b>${esc(profile.display_name)}</b> · ${esc(pollitoLabel(profile.avatar_url))}`,
-      `Cuenta para premios: ${esc(payoutSummary(profile))}`].filter(Boolean).join("\n"),
+    compactText: blocks([notice], [`<b>${esc(profile.display_name)}</b>`, `Pollito: ${esc(pollitoLabel(profile.avatar_url))}`],
+      [`Cuenta para premios: ${esc(payoutSummary(profile))}`]),
     buttons: [
       [{ text: "✏️ Cambiar nombre", callback_data: "pn" }],
       [{ text: "🐥 Cambiar pollito", callback_data: "pc" }],

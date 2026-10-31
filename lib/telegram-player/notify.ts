@@ -12,7 +12,7 @@ import { getTelegramLoginConfig } from "@/lib/auth/telegram-login/config";
 import { formatCop } from "@/lib/casa/format";
 import { redactId } from "@/lib/log";
 import { cbNew, shortId } from "./ids";
-import { esc } from "./context";
+import { blocks, esc } from "./context";
 
 export interface ReviewNotice {
   userId: string;
@@ -35,7 +35,8 @@ export function reviewNoticeMessage(n: ReviewNotice): { text: string; compactTex
     : n.entryNumber != null && n.entryNumber > 1 ? ` (cupo ${n.entryNumber})` : "";
   if (n.approved) {
     return {
-      compactText: `Pago confirmado: ${esc(n.pollaName)}${ticket}. ${n.prizeKind === "objeto" ? `Premio: ${esc(n.prizeObject ?? "el premio")}.` : `Pozo: ${formatCop(n.pozoCop)}.`}`,
+      compactText: blocks([`<b>${esc(n.pollaName)}${ticket}</b>`], ["Pago confirmado."],
+        [n.prizeKind === "objeto" ? `Premio: ${esc(n.prizeObject ?? "el premio")}` : `Pozo: ${formatCop(n.pozoCop)}`]),
       text: [
         `✅ <b>Confirmamos tu pago de ${esc(n.pollaName)}${ticket}.</b>`,
         "",
@@ -53,7 +54,8 @@ export function reviewNoticeMessage(n: ReviewNotice): { text: string; compactTex
     };
   }
   return {
-    compactText: `Pago rechazado: ${esc(n.pollaName)}${ticket}.${n.rejectReason ? ` Motivo: ${esc(n.rejectReason)}.` : ""} Envía el comprobante correcto; no repitas la transferencia.`,
+    compactText: blocks([`<b>${esc(n.pollaName)}${ticket}</b>`], ["Pago rechazado.", n.rejectReason ? `Motivo: ${esc(n.rejectReason)}` : null],
+      ["Envía el comprobante correcto.", "No repitas la transferencia."]),
     text: [
       `❌ <b>No pudimos confirmar tu pago de ${esc(n.pollaName)}${ticket}.</b>`,
       n.rejectReason ? `Motivo: ${esc(n.rejectReason)}` : null,

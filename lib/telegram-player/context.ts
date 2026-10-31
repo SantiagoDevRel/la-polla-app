@@ -72,6 +72,19 @@ export interface PlayerChannel {
   /** Guarda o borra (null) el paso de texto en curso. */
   saveFlow(flow: { name: FlowName; data: FlowData; at: string } | null): Promise<void>;
   download(fileId: string, maxBytes: number): Promise<Buffer | "too_large" | null>;
+  /** Optional one-screen 1X2 form (WhatsApp Flows). false = not available, use the per-match flow. */
+  pickForm?(form: PickForm): Promise<boolean>;
+}
+
+/** Open matches for a one-screen 1X2 form, already filtered by the shared rules. */
+export interface PickForm {
+  pollaId: string;
+  pollaName: string;
+  /** All open matches; a transport may show only its first slots. */
+  total: number;
+  matches: { id: string; home: string; away: string; when: string; current: string | null }[];
+  /** Per-match fallback (callback data) for clients that cannot open forms. */
+  fallback: string;
 }
 
 export interface PlayerCtx {
@@ -87,6 +100,11 @@ export interface PlayerCtx {
   /** Mensaje del botón tocado; null si la persona escribió. */
   editMessageId: number | null;
   channel?: PlayerChannel;
+}
+
+/** Compact WhatsApp copy: one fact per line and a blank line between blocks. */
+export function blocks(...groups: Array<Array<string | null | undefined | false>>): string {
+  return groups.map((g) => g.filter(Boolean).join("\n")).filter(Boolean).join("\n\n");
 }
 
 export function esc(s: string | null | undefined): string {

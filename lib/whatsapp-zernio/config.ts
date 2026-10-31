@@ -5,6 +5,10 @@ export interface ZernioBotConfig {
   accountId: string;
   apiKey: string;
   allowedPhones: ReadonlySet<string> | null;
+  /** Published WhatsApp Flow for one-screen 1X2 picks; null keeps the per-match flow. */
+  pickFlowId?: string | null;
+  /** Sends the flow as an unpublished draft (testing only). */
+  pickFlowDraft?: boolean;
 }
 
 export function getZernioBotConfig(env: Record<string, string | undefined> = process.env): ZernioBotConfig | null {
@@ -15,7 +19,8 @@ export function getZernioBotConfig(env: Record<string, string | undefined> = pro
   const raw = env.WHATSAPP_ZERNIO_BOT_ALLOWED_PHONES?.trim();
   // A configured but malformed allowlist fails closed, never opens the bot.
   const allowedPhones = raw ? new Set(raw.split(",").map(p => p.trim()).filter(p => PHONE_RE.test(p))) : null;
-  return { accountId, apiKey, allowedPhones };
+  const pickFlowId = /^\d{6,20}$/.test(env.ZERNIO_WHATSAPP_PICKS_FLOW_ID?.trim() ?? "") ? env.ZERNIO_WHATSAPP_PICKS_FLOW_ID!.trim() : null;
+  return { accountId, apiKey, allowedPhones, pickFlowId, pickFlowDraft: env.ZERNIO_WHATSAPP_PICKS_FLOW_DRAFT === "true" };
 }
 
 export function zernioPhoneAllowed(config: ZernioBotConfig, phone: string): boolean {

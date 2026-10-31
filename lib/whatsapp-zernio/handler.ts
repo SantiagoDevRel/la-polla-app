@@ -11,6 +11,8 @@ import { normalizeCommandText } from "@/lib/telegram-player/update";
 import { createZernioChannel, type ZernioTurn } from "./channel";
 import { HOME, MORE, matchZernioOption, menuForScreen, parseZernioMenu, renderZernioMenu, type ZernioContent } from "./format";
 import { downloadZernioProof } from "./media";
+import { parsePickFlowResponse } from "./pick-flow";
+import { savePickForm } from "@/lib/telegram-player/picks";
 import { deliverTurn } from "./delivery";
 import type { ZernioInbound } from "./inbound";
 import type { ZernioBotConfig } from "./config";
@@ -67,11 +69,15 @@ async function buildTurn(event: ZernioInbound, deps: ZernioDeps): Promise<Zernio
       config: {} as TelegramLoginConfig, db, bot: NO_BOT, env: process.env, now,
       chatId: 0, telegramUserId: 0, account: { userId, phoneE164: `+${event.phone}` }, chat: state.chat, editMessageId: null,
     };
-    ctx.channel = createZernioChannel(db, event.phone, ctx.chat, turn, now);
+    ctx.channel = createZernioChannel(db, event.phone, ctx.chat, turn, now, { id: deps.config.pickFlowId, draft: deps.config.pickFlowDraft });
     if (state.expiredFlow) await ctx.channel.saveFlow(null);
     const textFlow = ["name", "ticket", "score", "answer", "pay_name", "pay_account"].includes(ctx.chat.flow?.name ?? "");
     const picked = matchZernioOption(menu, event.selection ?? event.text ?? "", Boolean(event.selection), textFlow);
-    if (picked?.startsWith("zpage:")) {
+    const form = event.flowResponse != null ? parsePickFlowResponse(event.flowResponse) : null;
+    if (event.flowResponse != null) {
+      if (form && await ensureProfile(ctx)) await savePickForm(ctx, form.pollaId, form.choices);
+      else if (!form) await ctx.channel.show({ text: "Ese formulario ya no es válido. Vuelve al menú." });
+    } else if (picked?.startsWith("zpage:")) {
       if (menu) {
         menu = { ...menu, page: Number(picked.slice(6)) };
         turn.menu = menu;
