@@ -3,9 +3,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { setMarketingPreference } from "@/lib/whatsapp/marketing-preferences";
 import { confirmPreference, parsePreferenceEvent, verifyZernioSignature } from "@/lib/whatsapp/zernio-preferences";
 import { replyWithWhatsAppLogin } from "@/lib/auth/whatsapp-login";
+import { getZernioBotConfig } from "@/lib/whatsapp-zernio/config";
+import { parseZernioInbound } from "@/lib/whatsapp-zernio/inbound";
+import { handleZernioPlayerEvent } from "@/lib/whatsapp-zernio/handler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// The DB's two-minute lease outlives this invocation, including stalled writes.
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   if (Number(request.headers.get("content-length")) > 65536) return new NextResponse(null, { status: 413 });
@@ -20,6 +25,13 @@ export async function POST(request: NextRequest) {
   try {
     const event = parsePreferenceEvent(payload, process.env.ZERNIO_WHATSAPP_ACCOUNT_ID);
     if (!event) {
+      const config = getZernioBotConfig();
+      const playerEvent = config ? parseZernioInbound(payload, config) : null;
+      if (config && playerEvent) {
+        const outcome = await handleZernioPlayerEvent(playerEvent, { db: createAdminClient(), config,
+          login: capture => replyWithWhatsAppLogin(payload, capture) });
+        return NextResponse.json({ ok: true, outcome }, { headers: { "Cache-Control": "private, no-store" } });
+      }
       const login = await replyWithWhatsAppLogin(payload);
       return NextResponse.json({ ok: true, ignored: login === "ignored", limited: login === "limited", contactRequested: login === "contact_requested" });
     }
@@ -37,6 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch {
     // No phone numbers, message bodies, tokens or provider errors in logs.
-    return NextResponse.json({ error: "preference_unavailable" }, { status: 503 });
+    return NextResponse.json({ error: "preference_unavailable" }, { status: 503,
+      ...(getZernioBotConfig() ? { headers: { "Cache-Control": "private, no-store" } } : {}) });
   }
 }

@@ -11,7 +11,7 @@ export async function notifyCasaReview(entryId: string, pollaId: string, approve
   try {
     const db = createAdminClient();
     const [{ data: entry }, { data: polla }, pot] = await Promise.all([
-      db.from("casa_entries").select("user_id, reject_reason, ticket_number, entry_number").eq("id", entryId).eq("polla_id", pollaId).single(),
+      db.from("casa_entries").select("user_id, reject_reason, ticket_number, entry_number, current_proof_attempt_id, reviewed_at").eq("id", entryId).eq("polla_id", pollaId).single(),
       db.from("casa_pollas").select("name, slug, prize_kind, prize_object, kind").eq("id", pollaId).single(),
       getPot(pollaId),
     ]);
@@ -27,7 +27,7 @@ export async function notifyCasaReview(entryId: string, pollaId: string, approve
       await notifyPlayerReviewByTelegram(db, notice);
       // Bot de WhatsApp por OpenWA (apagado sin WHATSAPP_OPENWA_BOT_ENABLED):
       // solo si la persona ya le escribió al bot.
-      await notifyPlayerReviewByWhatsApp(db, notice);
+      await notifyPlayerReviewByWhatsApp(db, notice, `${entryId}:${entry.current_proof_attempt_id}:${entry.reviewed_at}:${approved}`);
       const numbered = entry.entry_number != null && entry.entry_number > 1;
       await notifyPlayer({ userId: entry.user_id, aprobado: approved,
         pollaName: numbered ? `${polla.name} (cupo ${entry.entry_number})` : polla.name,

@@ -1,6 +1,8 @@
 # La Polla ⚽🇨🇴
 
 Football pools: La Casa publishes pools, players enroll, predict, and compete.
+Official WhatsApp player bot with native buttons and lists (default off):
+[Zernio bot](docs/whatsapp-zernio-bot.md), migration 177. The OpenWA transport remains available.
 Paid entries use payment proofs; $0 gift pools enroll immediately through
 **Entrar gratis**, without proof or admin review. Historical private pools remain.
 

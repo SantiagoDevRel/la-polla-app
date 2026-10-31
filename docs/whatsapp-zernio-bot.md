@@ -1,0 +1,125 @@
+# WhatsApp player bot through Zernio
+
+Players use La Polla from the official WhatsApp number (the login-link number on
+Zernio) with native reply buttons and lists. This is a second transport for
+`lib/telegram-player`, alongside the OpenWA relay.
+
+**Status (2026-10-31):** migration 177 applied in production. The bot is enabled
+only for an allowlisted test number (`WHATSAPP_ZERNIO_BOT_ALLOWED_PHONES`); every
+other number still gets the login link exactly as before. Opening it to everyone
+is the owner's decision: WhatsApp's Business Messaging Policy restricts real-money
+gambling, and a ban on this number would also take down the WhatsApp login.
+
+## Configuration
+
+| Variable | Meaning |
+| --- | --- |
+| `WHATSAPP_ZERNIO_BOT_ENABLED=true` | Enable the official-number player bot. Unset preserves the existing login webhook response. |
+| `WHATSAPP_ZERNIO_BOT_ALLOWED_PHONES` | Optional comma-separated E.164 digits. A nonempty malformed list allows nobody. |
+| `ZERNIO_API_KEY`, `ZERNIO_WHATSAPP_ACCOUNT_ID`, `ZERNIO_WEBHOOK_SECRET` | Existing server credentials and HMAC verification. |
+
+Existing WhatsApp login settings still govern login links. No templates, new
+subscriptions, dependencies, phone numbers or credentials are added.
+
+Migration `177_whatsapp_zernio_bot.sql` adds verified conversation and last inbound
+time to migration 176's chat, plus a service-only delivery ledger. New functions explicitly revoke execution from PUBLIC,
+anon and authenticated and grant service_role only. New tables have RLS/deny-all.
+
+## UX map
+
+| Screen | Actions |
+| --- | --- |
+| New account | Type name, then choose pollito; Menú remains available. |
+| Home | Pollas disponibles / Mis pollas / Más |
+| More | Mis pagos / Mi perfil / Entrar a la web / Ayuda / Menú |
+| Available or joined pools | Choose pool; existing pool pages and Más navigation. |
+| Pool | Join or free join, proof retry, predict or questions, own picks, table, rules, web, Menú; availability comes from the shared flow. |
+| Payment | Exact SQL price, payment account, prize, send image; Cancelar / Menú. |
+| Proof error | Reintentar / Menú; retry asks for the image again, preserving the proof step. |
+| Exact score | Type `2-1`, local first; Saltar / Ver todos / Volver a la polla / Menú. |
+| 1X2 | Home win / draw / away win and shared navigation. |
+| Questions | Choose or type answer; skip / own answers / back / Menú. |
+| Own picks or answers | Choose one to edit; table / back / Menú. |
+| Table | Existing SQL standings, own rank/points; refresh / back / Menú. |
+| Profile | Name / pollito / prize account and shared back navigation; Menú. |
+| Notices | Next player action and Menú, only inside the 24-hour window. |
+
+Exact scores use one short typed message per match rather than two goal-selection
+steps and network round trips. The existing score parser, locks and save RPC still
+validate and save it. Explicit Menú/Hola navigation works during free input.
+Numbers and full option titles work outside text steps; letters can select
+navigation during text steps without confusing scores, tickets, names or answers.
+
+One to three actions use native reply buttons; four to ten use one list. Longer
+menus paginate with Más, Anterior and Menú, never exceeding ten rows. Labels are
+unique after truncation. Truncation/splitting preserve graphemes. Long rules and
+standings split without silently removing data. Opaque ids map to stored callbacks,
+which the player router revalidates against the database. Concise `compactText`
+is presentation from existing source data; Telegram and OpenWA retain their copy.
+
+## Provider and security contract
+
+The supplied Zernio OpenAPI v1.429.1 was inspected at `sendInboxMessage`,
+`WebhookPayloadMessageReceived` and `getWhatsAppMedia`:
+
+- Reply buttons: three maximum, title 20 characters, `payload` returned as reply
+  id. WhatsApp ignores URL fields here: links use `interactive.cta_url`.
+- Lists: ten total rows; title 24, description 72, id 200; opener 20 characters.
+  All interactive bodies use a conservative 1,024-character bound, also documented
+  in Meta's [interactive object reference](https://whatsapp.github.io/WhatsApp-Nodejs-SDK/api-reference/types/InteractiveObject/).
+- Button/list ids come from root metadata; quick replies support
+  `interactiveMetadata` and root metadata. Attachment captions never become
+  commands. Standby, wrong-account, outgoing, stale and future events fail closed.
+- Identity comes exclusively from `zernioVerifiedPhone`. BSUID-only users retain
+  the native contact request. Text, captions, address-book cards and vCards never
+  select an account.
+- The webhook checks HMAC before parsing, processes ALTA/BAJA first, then the
+  enabled/allowlisted bot, otherwise the original login reply. The literal phrase
+  `dame el link para entrar a la polla` and Entrar a la web retain the original
+  login token, expiry, rate limit and content through a captured delivery adapter.
+- Attachment URLs must be exactly the authenticated Zernio HTTPS media proxy,
+  pinned to the configured account. No redirects, arbitrary hosts or extra query
+  fields. Bearer keys never go to user-supplied hosts or Meta CDN URLs.
+- Downloads stop at 3 MiB, including streams without Content-Length. MIME and
+  magic bytes are checked. Actual image bytes decide JPG/PNG/WEBP, including PNG
+  named JPG. Migration 176's staging size is preserved. PDF is rejected because
+  `ProofContentType` accepts only images; the bot asks for a screenshot.
+- Media staging is phone-scoped and expires after two hours when read. Proofs
+  still use `beginCasaProof` / `confirmCasaProof`. Picks use the existing Casa save
+  RPC. Historical P2P predictions remain untouched.
+- SQL serializes turns per phone and atomically caps inbound at 20/minute.
+  Provider message ids dedupe envelope redeliveries. Interrupted processing is
+  never reexecuted with uncertain business writes. Prepared replies retry with
+  the same bodies and provider idempotency keys.
+- Review event keys include entry, attempt, review time and decision; referral
+  gifts use the credit event id. A notice preserves the active input menu; its
+  opaque buttons resolve the stored delivery menu before entering the shared
+  router. Every send checks the strict 24-hour boundary, including retries.
+  Outside the window, skip without templates. OpenWA still serves its users
+  when no eligible Zernio chat exists.
+
+## Acceptance ledger and handoff
+
+Claude owns review, final gates, commit, deployment and physical-phone acceptance.
+This implementer does not commit, push, open PRs, change flags, write production
+or apply migrations. Work stays in `feat/whatsapp-bot-full-ux`.
+
+| Brief requirement | Implementation and evidence |
+| --- | --- |
+| Register, name, pollito; see pools; join; proof; predict/change; table | Shared router and `handler.ts`; Telegram flow regressions. |
+| Real buttons, lists, pagination, limits, truncation, links, typed fallback | `format.ts`; `tests/whatsapp-zernio-format.test.ts`. |
+| HMAC → preference → verified bot → original login | Route regression tests, including byte-identical off responses. |
+| Sender-only identity; BSUID native contact request | Inbound/route tests plus existing username-login tests. |
+| Server download; allowlist, cap, MIME/magic; existing proof path; retry | `media.ts`, channel, shared `entry.ts`; media/handler tests. |
+| Notices only <24 h; idempotent; no templates | `notify.ts`, `delivery.ts`, migration 177; window/delivery tests. |
+| Default-off flags and allowlist | `config.ts` and unit tests. |
+| Reuse 176; free migration number; RLS/grants | Migration 177 and static SQL assertions. No database application. |
+| Colombia tú, concise copy, chick, menu escape | Renderer and optional shared `compactText`. |
+| No secrets/PII, production writes, commits, dependencies or logic fork | Scoped working diff and DGX verification. |
+| Existing WhatsApp/Telegram tests and DGX build | Exact commands/results in the final handoff. |
+
+Real provider rendering/delivery, a live signed media event, runtime execution of
+migration 177, production configuration and physical-phone acceptance remain the
+orchestrator's release checks. SQL tests here inspect the migration contract,
+not a running PostgreSQL instance. Notice delivery is best effort like Telegram;
+provider failures preserve the prepared body for the same source event's retry.

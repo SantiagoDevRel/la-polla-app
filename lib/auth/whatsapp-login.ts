@@ -34,9 +34,11 @@ export function getWhatsAppLoginHref(): string | null {
 }
 
 /** Call only after the Zernio webhook's raw-body HMAC has been checked. */
-export async function replyWithWhatsAppLogin(payload: unknown): Promise<"ignored" | "sent" | "limited" | "contact_requested"> {
+export async function replyWithWhatsAppLogin(payload: unknown, deliver?: (conversationId: string, key: string, content: Record<string, unknown>) => Promise<void>): Promise<"ignored" | "sent" | "limited" | "contact_requested"> {
   const c = config();
   if (!c) return "ignored";
+  const reply = (conversationId: string, key: string, content: Record<string, unknown>) =>
+    deliver ? deliver(conversationId, key, content) : sendReply(c, conversationId, key, content);
   const parsed = zernioIncomingMessage.safeParse(payload);
   if (!parsed.success || parsed.data.account.accountId !== c.accountId) return "ignored";
   const { message, conversation, id } = parsed.data;
@@ -49,7 +51,7 @@ export async function replyWithWhatsAppLogin(payload: unknown): Promise<"ignored
     // never sign in using a typed number or a contact chosen from the address book.
     if (!c.enabled || !message.sender.businessScopedUserId) return "ignored";
     const requestKey = createHmac("sha256", c.secret).update(JSON.stringify(["wa-contact-v1", c.accountId, id])).digest("hex");
-    await sendReply(c, conversation.id, `wa-contact-${requestKey}`, { interactive: {
+    await reply(conversation.id, `wa-contact-${requestKey}`, { interactive: {
       type: "request_contact_info",
       body: { text: "Para recibir tu enlace personal de La Polla, comparte tu número con el botón de WhatsApp de abajo." },
       action: { name: "request_contact_info" },
@@ -68,14 +70,14 @@ export async function replyWithWhatsAppLogin(payload: unknown): Promise<"ignored
   });
   if (error) throw new Error("WhatsApp login reservation unavailable");
   if (issued === "limited") {
-    await sendReply(c, conversation.id, `wa-login-limited-${hash.slice(4)}`, {
+    await reply(conversation.id, `wa-login-limited-${hash.slice(4)}`, {
       message: "Ya solicitaste cinco enlaces en la última hora. Usa el más reciente o entra por SMS o contraseña en https://lapollacolombiana.com/login.",
     });
     return "limited";
   }
   if (issued !== "issued" && issued !== "retry") return "ignored";
   const url = `${ORIGIN}/login/whatsapp?t=${token}`;
-  await sendReply(c, conversation.id, `wa-login-${hash.slice(4)}`, { interactive: {
+  await reply(conversation.id, `wa-login-${hash.slice(4)}`, { interactive: {
     type: "cta_url",
     body: { text: "Haz clic aquí para entrar a La Polla.\nEl enlace es personal y vence en 10 minutos. No lo compartas." },
     action: { name: "cta_url", parameters: { display_text: "Haz clic para entrar", url } },
