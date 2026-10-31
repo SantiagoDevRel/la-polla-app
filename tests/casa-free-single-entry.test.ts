@@ -67,6 +67,17 @@ describe("premios con imagen propia", () => {
     for (const crest of prize.crests) expect(exists(crest.src)).toBe(true);
   });
 
+  it("POLLA JAMES 2 gira la misma camiseta de POLLA JAMES, con su propio título", () => {
+    const previous = pollaPrizeMedia("e5e5719d-bdaf-407d-bf8d-b856338709a9");
+    const james2 = pollaPrizeMedia("95c5a3f0-8131-47af-b167-cf3928db4d9b");
+    expect(james2?.kind).toBe("jersey");
+    if (james2?.kind !== "jersey" || previous?.kind !== "jersey") return;
+    expect(james2.media).toEqual(previous.media);
+    expect(james2.photos).toEqual(previous.photos);
+    expect(james2.title).toBe("Camiseta Atlético Nacional firmada por James");
+    for (const photo of james2.photos) expect(exists(photo.src)).toBe(true);
+  });
+
   it("las demás pollas no inventan imagen", () => {
     expect(pollaPrizeMedia("00000000-0000-4000-8000-000000000000")).toBeNull();
   });
