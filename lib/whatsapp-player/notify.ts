@@ -12,6 +12,8 @@ import type { Screen } from "@/lib/telegram-player/context";
 import { referralGiftMessage, reviewNoticeMessage, type ReferralGiftNotice, type ReviewNotice } from "@/lib/telegram-player/notify";
 import { getWhatsAppBotConfig, phoneAllowed } from "./config";
 import { renderScreen } from "./format";
+import { getZernioBotConfig } from "@/lib/whatsapp-zernio/config";
+import { notifyZernioReview, notifyZernioReferralGift } from "@/lib/whatsapp-zernio/notify";
 
 type OutboxKind = "review" | "referral_gift";
 
@@ -37,10 +39,18 @@ async function enqueue(db: SupabaseClient, userId: string, kind: OutboxKind, scr
   }
 }
 
-export function notifyPlayerReviewByWhatsApp(db: SupabaseClient, notice: ReviewNotice): Promise<boolean> {
+export async function notifyPlayerReviewByWhatsApp(db: SupabaseClient, notice: ReviewNotice, eventKey?: string): Promise<boolean> {
+  if (getZernioBotConfig()) {
+    const sent = await notifyZernioReview(db, notice, eventKey);
+    if (sent !== null) return sent;
+  }
   return enqueue(db, notice.userId, "review", reviewNoticeMessage(notice));
 }
 
-export function notifyReferralGiftByWhatsApp(db: SupabaseClient, notice: ReferralGiftNotice): Promise<boolean> {
+export async function notifyReferralGiftByWhatsApp(db: SupabaseClient, notice: ReferralGiftNotice, eventKey?: string): Promise<boolean> {
+  if (getZernioBotConfig()) {
+    const sent = await notifyZernioReferralGift(db, notice, eventKey);
+    if (sent !== null) return sent;
+  }
   return enqueue(db, notice.userId, "referral_gift", referralGiftMessage(notice));
 }

@@ -99,6 +99,12 @@ async function renderMatch(ctx: PlayerCtx, polla: CasaPolla, matches: PollaMatch
       text: [...header, "", `¿Cuántos goles hace <b>${esc(shortTeam(match.home_team))}</b>?`, "<i>También puedes escribir el marcador completo, por ejemplo 2-1.</i>"]
         .filter((l) => l !== null).join("\n"),
       buttons: [...goalRows((g) => cb("h", P, M, g)), ...nav],
+      compactText: [notice, `<b>${esc(polla.name)}</b> · partido ${index} de ${matches.length}`,
+        `<b>${esc(match.home_team)} vs ${esc(match.away_team)}</b>`,
+        esc(formatMatchTime(match.scheduled_at, match.scheduled_at_confirmed !== false)),
+        current ? `Actual: ${esc(current)}` : null,
+        `Cierra ${LOCK_MINUTES} minutos antes. Escribe el marcador: <b>2-1</b> (local primero).`,
+      ].filter(Boolean).join("\n"),
     });
     return;
   }

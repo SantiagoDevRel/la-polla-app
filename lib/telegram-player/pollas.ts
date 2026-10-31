@@ -102,6 +102,7 @@ export async function showOpenPollas(ctx: PlayerCtx, page = 0): Promise<void> {
   if (nav.length) buttons.push(nav);
   await show(ctx, {
     text: ["<b>Pollas abiertas</b>", "Toca una para ver el premio, las reglas y cómo inscribirte.", "", ...lines].join("\n"),
+    compactText: "Pollas disponibles. Elige una para ver entrada, premio y cierre.",
     buttons,
   });
 }
@@ -133,6 +134,7 @@ export async function showMyPollas(ctx: PlayerCtx, page = 0): Promise<void> {
   if (nav.length) buttons.push(nav);
   await show(ctx, {
     text: ["<b>Mis pollas</b>", "Toca una para pronosticar, ver la tabla o las reglas.", "", ...lines].join("\n"),
+    compactText: "Mis pollas. Elige una para pronosticar o ver la tabla.",
     buttons,
   });
 }
@@ -236,7 +238,8 @@ export async function pollaDetailScreen(ctx: PlayerCtx, polla: CasaPolla, notice
   if (polla.kind !== "rifa") infoRow.unshift({ text: "🏆 Tabla", callback_data: cb("tb", P) });
   buttons.push(infoRow);
   buttons.push(...urlRow("🌐 Ver en la página", pollaUrl(ctx, polla.slug)));
-  return { text: lines.filter((l) => l !== null).join("\n"), buttons };
+  return { text: lines.filter((l) => l !== null).join("\n"),
+    compactText: lines.filter((l, i) => l !== null && i !== 2).join("\n").replace(/ \(faltan [^)]*\)/g, ""), buttons };
 }
 
 export async function showPollaDetail(ctx: PlayerCtx, polla: CasaPolla, notice?: string): Promise<void> {

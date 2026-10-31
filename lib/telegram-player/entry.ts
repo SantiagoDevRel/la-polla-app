@@ -83,6 +83,13 @@ async function paymentInstructions(ctx: PlayerCtx, polla: CasaPolla, ticket: num
       "Revisamos el comprobante y te avisamos por este chat. Si hay un error, te decimos por qué.",
     ].filter((l) => l !== null).join("\n"),
     buttons: [[{ text: "❌ Cancelar", callback_data: cb("cx", P) }]],
+    compactText: [lead, `<b>${esc(polla.name)}</b>${ticket != null ? ` · boleta ${ticket}` : ""}`,
+      `Transfiere <b>${formatCop(polla.entry_price_cop)}</b>.`,
+      `${esc(methodLabel(polla.payout_method))}: ${esc(polla.payout_account)}`,
+      polla.payout_account_name ? `Titular: ${esc(polla.payout_account_name)}` : null,
+      polla.prize_kind === "objeto" ? `Premio: ${esc(polla.prize_object)}` : `Premio: ${formatCop(pot.prize_cop)}`,
+      "Envía aquí la imagen del comprobante (JPG, PNG o WEBP). Si ya transferiste, no repitas el pago.",
+    ].filter(Boolean).join("\n"),
   });
 }
 

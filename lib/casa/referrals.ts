@@ -116,7 +116,7 @@ export async function notifyReferralGifts(db: SupabaseClient = createAdminClient
       const gift = { userId: notice.user_id, invited: Number(notice.detail?.invitados ?? 0) };
       await notifyReferralGiftByTelegram(db, gift);
       // Bot de WhatsApp (OpenWA): solo si está encendido y la persona le escribió.
-      await notifyReferralGiftByWhatsApp(db, gift);
+      await notifyReferralGiftByWhatsApp(db, gift, notice.event_id);
     }
   } catch (error) {
     console.warn("[casa/referrals] gift notices not sent:", (error as { name?: string }).name);

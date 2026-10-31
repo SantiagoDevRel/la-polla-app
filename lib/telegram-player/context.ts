@@ -19,6 +19,8 @@ export type Keyboard = Button[][];
 
 export interface Screen {
   text: string;
+  /** Optional concise copy for the official WhatsApp transport; same source data. */
+  compactText?: string;
   buttons?: Keyboard;
 }
 
