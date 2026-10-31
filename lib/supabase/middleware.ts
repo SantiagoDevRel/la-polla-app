@@ -45,6 +45,7 @@ const PUBLIC_NO_AUTH_EXACT = new Set([
   // OpenWA bot relay (DGX): 404 while disabled, relay HMAC + timestamp before parsing.
   "/api/whatsapp/openwa",
   "/api/whatsapp/openwa/outbox",
+  "/api/whatsapp/openwa/poll-sent",
   "/api/app-version", // Public build identity only; no auth or database access.
   "/sitemap.xml",
   "/robots.txt",
