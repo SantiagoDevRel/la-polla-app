@@ -9,11 +9,18 @@ type PollaPrize = { kind: "jersey"; title: string; media: PrizeMedia; photos: re
 /** El millón en diez billetes de cien mil: OFIGOLAZO4 y OFIGOLAZO 5. */
 const CASH_POLLAS = new Set(["05f83cb8-d16d-42fd-a6b8-a0840c9b0cf9", "6e9bea55-fdc0-4ba1-b703-9f947c2bb3c1"]);
 
+/** La camiseta firmada de James: POLLA JAMES y POLLA JAMES 2 (gratis, sin boleta). */
+const JAMES_TITLES: Readonly<Record<string, string>> = {
+  "e5e5719d-bdaf-407d-bf8d-b856338709a9": "Camiseta James firmada (XL o L) + boleta clásico (oriental o sur)",
+  "95c5a3f0-8131-47af-b167-cf3928db4d9b": "Camiseta Atlético Nacional firmada por James",
+};
+
 /** Versioned display assets; publication and access remain enforced by the caller. */
 export function pollaPrizeMedia(id: string, base = "/prizes/v3-30099c32d6c6/"): PollaPrize | null {
-  if (id === "e5e5719d-bdaf-407d-bf8d-b856338709a9") return {
+  const jamesTitle = JAMES_TITLES[id];
+  if (jamesTitle) return {
     kind: "jersey",
-    title: "Camiseta James firmada (XL o L) + boleta clásico (oriental o sur)",
+    title: jamesTitle,
     media: { front: `${base}james-v2-front.png`, back: `${base}james-v2-back.png`, poster: `${base}james-v2-poster.png`,
       video: `${base}james-v2-turntable.webm`, animation: `${base}james-v2-turntable.webp`,
       turntable: { small: `${base}james-v3-atlas-192-`, large: `${base}james-v3-atlas-512-` } },
