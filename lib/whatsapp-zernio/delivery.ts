@@ -42,7 +42,14 @@ export async function deliverTurn(db: SupabaseClient, config: ZernioBotConfig, t
         if (stopped.error) throw new Error("Bot delivery unavailable");
         return "ignored";
       }
-      await (options.send ?? sendZernioContent)(config, target.conversationId, replies[i], `${target.key}:${i}`);
+      try {
+        await (options.send ?? sendZernioContent)(config, target.conversationId, replies[i], `${target.key}:${i}`);
+      } catch (error) {
+        // An optional form the provider refuses (for example Meta integrity error
+        // 139000) must not block the turn: the per-match fallback after it still goes out.
+        if (replies[i].interactive?.type !== "flow") throw error;
+        console.warn("[whatsapp-zernio] pick form not delivered; sending the per-match fallback");
+      }
     }
     const sent = await db.from("whatsapp_zernio_deliveries").update({ status: "sent" }).eq("key", target.key).eq("lease", lease);
     if (sent.error) throw new Error("Bot delivery acknowledgement unavailable");

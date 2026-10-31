@@ -95,6 +95,14 @@ physical phone, publish, then set `ZERNIO_WHATSAPP_PICKS_FLOW_ID` and remove the
 Exact-score pools keep the typed `2-1` flow. WhatsApp Web may not open forms; the
 «Uno por uno» follow-up covers it.
 
+**Status (2026-10-31): off in production.** Draft flow `990480350128405` was created
+without validation errors, but Meta refuses to send it: Zernio returns
+`platformError.code 139000` («Integrity requirements not met») for the business
+account. That is an account-level block (business verification / account quality in
+WhatsApp Manager, or Meta support), not a code issue. Both env vars were removed, so
+1X2 pools use the per-match list. If a form send ever fails, `deliverTurn` skips it and
+still sends the «Uno por uno» follow-up, so the turn is never stuck.
+
 WhatsApp copy (`compactText`) uses `blocks()`: one fact per line and a blank line
 between blocks; the Zernio formatter trims lines and collapses extra blank lines.
 

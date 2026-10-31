@@ -161,6 +161,17 @@ describe("durable delivery, idempotency and rate limiting", () => {
     await expect(deliverTurn(db as never, config, target, vi.fn(), { now: () => now, send: vi.fn().mockRejectedValue(new Error()) })).rejects.toThrow("pending");
     expect(db.writes).toContainEqual({ table: "whatsapp_zernio_deliveries", value: { lease_until: new Date(0).toISOString() } });
   });
+  it("skips a refused pick form and still delivers the per-match fallback", async () => {
+    const form = { interactive: { type: "flow", body: { text: "form" }, action: { name: "flow", parameters: {} } } };
+    const fallback = { message: "Uno por uno" };
+    const db = database({ outcome: "ready", replies: [form, fallback] });
+    const send = vi.fn().mockRejectedValueOnce(new Error("Zernio reply pending")).mockResolvedValue(undefined);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await deliverTurn(db as never, config, target, vi.fn(), { now: () => now, send })).toBe("sent");
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[1][2]).toEqual(fallback);
+    expect(db.writes).toContainEqual({ table: "whatsapp_zernio_deliveries", value: { status: "sent" } });
+  });
   it.each([0, 24 * 3_600_000, 24 * 3_600_000 + 1])("does not send outside the service window (%i)", async age => {
     const db = database({ outcome: "ready", replies: [{ message: "test" }] }, { zernio_last_inbound_at: age === 0 ? null : new Date(now - age).toISOString() });
     const send = vi.fn();
