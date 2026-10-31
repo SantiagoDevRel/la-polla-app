@@ -4,11 +4,12 @@ Players use La Polla from the official WhatsApp number (the login-link number on
 Zernio) with native reply buttons and lists. This is a second transport for
 `lib/telegram-player`, alongside the OpenWA relay.
 
-**Status (2026-10-31):** migration 177 applied in production. The bot is enabled
-only for an allowlisted test number (`WHATSAPP_ZERNIO_BOT_ALLOWED_PHONES`); every
-other number still gets the login link exactly as before. Opening it to everyone
-is the owner's decision: WhatsApp's Business Messaging Policy restricts real-money
-gambling, and a ban on this number would also take down the WhatsApp login.
+**Status (2026-10-31):** migration 177 applied and the bot is open to every number
+(the owner approved it; `WHATSAPP_ZERNIO_BOT_ALLOWED_PHONES` is unset in production).
+The literal login phrase still returns the login link. Risk the owner accepted:
+WhatsApp's Business Messaging Policy restricts real-money gambling, and a ban on
+this number would also take down the WhatsApp login. To close it again, set the
+allowlist (or `WHATSAPP_ZERNIO_BOT_ENABLED=false`) and redeploy.
 
 ## Configuration
 

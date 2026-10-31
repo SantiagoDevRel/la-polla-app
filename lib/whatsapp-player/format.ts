@@ -1,7 +1,8 @@
 // lib/whatsapp-player/format.ts — Pantallas del bot de Telegram convertidas a
 // mensajes de WhatsApp. Funciones puras.
 //
-// OpenWA (whatsapp-web.js) no tiene botones ni listas: cada botón se vuelve una
+// Respaldo de texto; los menús nativos de encuestas viven en poll-menu.ts.
+// OpenWA (whatsapp-web.js) no tiene reply buttons ni listas: cada botón se vuelve una
 // opción numerada y la persona responde con el número. Mientras el bot espera
 // un texto que puede ser un número (boleta, marcador, cuenta Nequi, respuesta
 // libre…), las opciones van con LETRAS para no confundir «15» con la opción 15.

@@ -1,13 +1,14 @@
 // lib/whatsapp-player/channel.ts — Canal WhatsApp para las pantallas del bot de
 // jugadores (lib/telegram-player). Cada pantalla se convierte a texto con
-// opciones (format.ts) y se acumula como respuesta del turno: el relay del DGX
+// respaldo numerado y encuesta (poll-menu.ts): el relay del DGX
 // las envía en orden por OpenWA. El paso de texto en curso y el menú viven en
 // whatsapp_bot_chats; las fotos, en whatsapp_bot_media.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { FLOW_NAMES, FLOW_TTL_MS, type FlowData, type FlowName, type PlayerChannel, type PlayerChat, type Screen } from "@/lib/telegram-player/context";
 import { COPY } from "@/lib/telegram-player/copy";
-import { menuModeFor, parseMenu, renderScreen, toWhatsAppText, type WhatsAppMenu } from "./format";
+import { menuModeFor, parseMenu, toWhatsAppText, type WhatsAppMenu } from "./format";
+import { parseOpenWaMenu, renderOpenWaScreen, type OpenWaPoll } from "./poll-menu";
 
 export const MEDIA_FILE_PREFIX = "wa:";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -46,13 +47,14 @@ export function chatStateFromRow(row: WhatsAppChatRow | null, now: number): What
     chat: valid
       ? { locale: "es", flow: { name: name as FlowName, data: data as FlowData, at }, stored: true }
       : { locale: "es", flow: null, stored: false },
-    menu: parseMenu(row.menu),
+    menu: parseOpenWaMenu(row.menu) ?? parseMenu(row.menu),
     expiredFlow: stored && !valid,
   };
 }
 
 export interface WhatsAppTurn {
   replies: string[];
+  polls?: Map<string, OpenWaPoll>;
   /** Menú de la última pantalla con opciones de este turno (undefined = sin cambios). */
   menu: WhatsAppMenu | undefined;
 }
@@ -66,8 +68,9 @@ export function createWhatsAppChannel(opts: {
 }): PlayerChannel {
   const { db, phone, chat, turn } = opts;
   const push = (screen: Screen) => {
-    const rendered = renderScreen(screen, menuModeFor(chat.flow?.name));
+    const rendered = renderOpenWaScreen(screen, menuModeFor(chat.flow?.name));
     if (rendered.text) turn.replies.push(rendered.text);
+    (turn.polls ??= new Map()).set(rendered.text, rendered.poll);
     if (rendered.menu) turn.menu = rendered.menu;
   };
   return {

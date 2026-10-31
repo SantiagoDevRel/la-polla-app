@@ -29,6 +29,8 @@ import { phoneAllowed, type WhatsAppBotConfig } from "./config";
 import { chatStateFromRow, createWhatsAppChannel, MEDIA_FILE_PREFIX, plainReply, WHATSAPP_COPY, type WhatsAppChatRow, type WhatsAppTurn } from "./channel";
 import { matchMenu } from "./format";
 import { classifyOpenWaEvent } from "./inbound";
+import { parseOpenWaMenu, POLL_PAGE_PREFIX, renderOpenWaMenu, type OpenWaPoll } from "./poll-menu";
+import { claimPollVote } from "./poll-votes";
 
 export const RATE_LIMIT_PER_MINUTE = 20;
 
@@ -51,6 +53,7 @@ export interface WhatsAppReply {
   /** Chat de WhatsApp («57300…@c.us» o «…@lid»). */
   to: string;
   text: string;
+  poll?: OpenWaPoll;
 }
 
 export type WhatsAppOutcome = "ignored" | "duplicate" | "limited" | "unverified" | "handled" | "failed";
@@ -71,7 +74,12 @@ export async function handleWhatsAppEvent(
   deps: WhatsAppBotDeps,
 ): Promise<{ outcome: WhatsAppOutcome; replies: WhatsAppReply[] }> {
   const now = deps.now ?? Date.now;
-  const event = classifyOpenWaEvent(payload, now());
+  const isVote = typeof payload === "object" && payload !== null && "event" in payload && payload.event === "poll.vote";
+  const vote = isVote ? await claimPollVote(payload, deps.db, deps.config, now()) : null;
+  if (isVote && !vote) return { outcome: "ignored", replies: [] };
+  const event = vote
+    ? { kind: "message" as const, messageId: vote.messageId, phone: vote.phone, replyTo: vote.chatId, text: null, media: null, otherMedia: false }
+    : classifyOpenWaEvent(payload, now());
   if (event.kind === "ignore") return { outcome: "ignored", replies: [] };
   if (event.kind === "unverified") {
     return { outcome: "unverified", replies: [{ to: event.replyTo, text: WHATSAPP_COPY.unverified }] };
@@ -100,6 +108,11 @@ export async function handleWhatsAppEvent(
     const { data: row, error: rowError } = await db.from("whatsapp_bot_chats").select(CHAT_COLUMNS).eq("phone", event.phone).maybeSingle();
     if (rowError) throw new Error(`chat no leído: ${rowError.code}`);
     const state = chatStateFromRow((row as WhatsAppChatRow | null) ?? null, now());
+    // Also fence a text turn that might have advanced after the SQL vote claim.
+    if (vote && (!state.userId || parseOpenWaMenu(state.menu)?.nonce !== vote.nonce)) {
+      await db.from("whatsapp_bot_inbound").update({ status: "done" }).eq("message_id", event.messageId);
+      return { outcome: "ignored", replies: [] };
+    }
 
     let userId = state.userId;
     if (!userId) {
@@ -140,8 +153,21 @@ export async function handleWhatsAppEvent(
         reply(link.kind === "magic" ? WHATSAPP_COPY.webMagic(link.url) : link.kind === "limited" ? WHATSAPP_COPY.webLimited(link.url) : WHATSAPP_COPY.webPlain(link.url));
       },
     };
+    const dispatch = async (data: string) => {
+      if (data.startsWith(POLL_PAGE_PREFIX)) {
+        const menu = parseOpenWaMenu(state.menu);
+        const page = data.slice(POLL_PAGE_PREFIX.length);
+        if (!menu || !/^\d{1,4}$/.test(page)) return;
+        const rendered = renderOpenWaMenu({ ...menu, page: Number(page) });
+        turn.replies.push(rendered.text);
+        (turn.polls ??= new Map()).set(rendered.text, rendered.poll);
+        turn.menu = rendered.menu;
+      } else await routePlayerCallback(ctx, data, routes);
+    };
 
-    if (event.media?.kind === "too_large") {
+    if (vote) {
+      await dispatch(vote.callback);
+    } else if (event.media?.kind === "too_large") {
       reply(WHATSAPP_COPY.mediaTooLarge);
     } else if (event.media?.kind === "inline") {
       const { data: staged, error: mediaError } = await db.from("whatsapp_bot_media")
@@ -168,7 +194,7 @@ export async function handleWhatsAppEvent(
         else if (menuCommandOf(text)) await routePlayerMessage(ctx, { text, photo: null, otherMedia: false }, routes);
         else await sendWelcome(ctx, profile?.display_name ?? null);
       } else if (picked) {
-        await routePlayerCallback(ctx, picked, routes);
+        await dispatch(picked);
       } else {
         await routePlayerMessage(ctx, { text, photo: null, otherMedia: false }, routes);
       }
@@ -177,13 +203,16 @@ export async function handleWhatsAppEvent(
     if (turn.menu !== undefined) {
       const { error: menuError } = await db.from("whatsapp_bot_chats")
         .update({ menu: turn.menu, updated_at: new Date(now()).toISOString() }).eq("phone", event.phone);
-      if (menuError) console.warn("[whatsapp-player] menú no guardado:", menuError.code);
+      if (menuError) throw new Error(`menu not saved: ${menuError.code}`);
     }
   } catch (err) {
     outcome = "failed";
-    console.error("[whatsapp-player] mensaje falló:", redactId(event.phone), (err as Error).message);
+    console.error("[whatsapp-player] mensaje falló:", redactId(event.phone), (err as Error).name);
+    turn.polls?.clear();
     turn.replies.push(WHATSAPP_COPY.failure);
   }
   await db.from("whatsapp_bot_inbound").update({ status: outcome === "failed" ? "failed" : "done" }).eq("message_id", event.messageId);
-  return { outcome, replies: turn.replies.filter(Boolean).map((text) => ({ to: event.replyTo, text })) };
+  return { outcome, replies: turn.replies.filter(Boolean).map((text) => ({ to: event.replyTo, text,
+    ...(turn.polls?.get(text) ? { poll: turn.polls.get(text) } : {}),
+  })) };
 }

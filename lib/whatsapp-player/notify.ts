@@ -11,7 +11,7 @@ import { redactId } from "@/lib/log";
 import type { Screen } from "@/lib/telegram-player/context";
 import { referralGiftMessage, reviewNoticeMessage, type ReferralGiftNotice, type ReviewNotice } from "@/lib/telegram-player/notify";
 import { getWhatsAppBotConfig, phoneAllowed } from "./config";
-import { renderScreen } from "./format";
+import { renderOpenWaScreen } from "./poll-menu";
 import { getZernioBotConfig } from "@/lib/whatsapp-zernio/config";
 import { notifyZernioReview, notifyZernioReferralGift } from "@/lib/whatsapp-zernio/notify";
 
@@ -24,7 +24,7 @@ async function enqueue(db: SupabaseClient, userId: string, kind: OutboxKind, scr
     const { data, error } = await db.from("whatsapp_bot_chats").select("phone").eq("user_id", userId).maybeSingle();
     const phone = (data as { phone?: string } | null)?.phone;
     if (error || !phone || !phoneAllowed(config, phone)) return false;
-    const rendered = renderScreen(screen, "num");
+    const rendered = renderOpenWaScreen(screen, "num");
     const { error: insertError } = await db.from("whatsapp_bot_outbox").insert({
       phone, user_id: userId, kind, body: rendered.text, menu: rendered.menu,
     });

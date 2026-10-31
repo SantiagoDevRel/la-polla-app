@@ -129,7 +129,7 @@ async function webhook() {
   const hooks = await api(key, "GET", `/api/sessions/${id}/webhooks`);
   const existing = Array.isArray(hooks) ? hooks.find((h) => h.url === WEBHOOK_URL) : null;
   // PUT siempre: deja el secreto de relay.env aunque init lo haya regenerado.
-  const spec = { events: ["message.received"], secret: values.OPENWA_WEBHOOK_SECRET, retryCount: 3 };
+  const spec = { events: ["message.received", "poll.vote"], secret: values.OPENWA_WEBHOOK_SECRET, retryCount: 3 };
   if (existing) {
     await api(key, "PUT", `/api/sessions/${id}/webhooks/${existing.id}`, spec);
     console.log("✓ webhook actualizado → relay");

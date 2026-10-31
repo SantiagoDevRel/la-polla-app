@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 // ops/whatsapp-openwa/relay.mjs — Puente entre OpenWA (DGX) y La Polla (Vercel).
 //
-// 1. OpenWA entrega cada mensaje recibido en POST /openwa, firmado con
+// 1. OpenWA entrega message.received y poll.vote en POST /openwa, firmados con
 //    X-OpenWA-Signature (HMAC del cuerpo con OPENWA_WEBHOOK_SECRET).
-// 2. El relay responde 200 de inmediato y reenvía el MISMO cuerpo a
+// 2. El relay responde 200 de inmediato y reenvía el cuerpo a
 //    APP_URL/api/whatsapp/openwa, firmado con x-lapolla-timestamp y
 //    x-lapolla-signature (HMAC de "<ts>.<cuerpo>" con WHATSAPP_OPENWA_RELAY_SECRET).
-// 3. Envía por OpenWA las respuestas que devuelve la app, en orden.
+//    Los votos añaden la comprobación de que el votante no es el propio bot.
+// 3. Envía texto + encuesta, en orden; firma el ack poll-sent con el id real.
 // 4. Cada OUTBOX_INTERVAL_MS reclama los avisos pendientes (pago aprobado o
 //    rechazado, cupo de regalo), los envía y confirma cada uno.
 //
 // Sin dependencias (Node 22+). Los logs nunca llevan números ni textos.
 
 import { createServer } from "node:http";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { pathToFileURL } from "node:url";
 
 const env = process.env;
@@ -58,11 +59,11 @@ export function relayHeaders(secret, raw, nowMs = Date.now()) {
 export function chatKeyOf(raw) {
   try {
     const body = JSON.parse(raw);
-    if (body?.event !== "message.received") return null;
+    if (body?.event !== "message.received" && body?.event !== "poll.vote") return null;
     const data = body.data ?? {};
     if (data.fromMe === true || data.isGroup === true) return null;
-    const key = typeof data.from === "string" ? data.from : typeof data.chatId === "string" ? data.chatId : null;
-    return key && key.length <= 200 ? key : null;
+    const key = typeof data.chatId === "string" ? data.chatId : typeof data.from === "string" ? data.from : null;
+    return key && /^[1-9][0-9]{0,39}@(c\.us|lid)$/.test(key) ? key : null;
   } catch {
     return null;
   }
@@ -106,8 +107,8 @@ export function createRelay(cfg, deps = {}) {
   const wait = deps.sleep ?? sleep;
   const queue = createChatQueue();
 
-  async function openwaSend(chatId, text, idempotencyKey) {
-    const url = `${cfg.openwaUrl}/api/sessions/${encodeURIComponent(cfg.sessionId)}/messages/send-text`;
+  async function openwaSend(chatId, content, idempotencyKey, poll = false) {
+    const url = `${cfg.openwaUrl}/api/sessions/${encodeURIComponent(cfg.sessionId)}/messages/${poll ? "send-poll" : "send-text"}`;
     for (let attempt = 0; attempt < 3; attempt++) {
       let res;
       try {
@@ -115,7 +116,8 @@ export function createRelay(cfg, deps = {}) {
           method: "POST",
           headers: { "content-type": "application/json", "x-api-key": cfg.apiKey, "idempotency-key": idempotencyKey },
           // Sin vista previa: los enlaces de entrada no deben abrirse solos.
-          body: JSON.stringify({ chatId, text, linkPreview: false }),
+          body: JSON.stringify(poll ? { chatId, name: content.name, options: content.options, allowMultipleAnswers: false }
+            : { chatId, text: content, linkPreview: false }),
           signal: AbortSignal.timeout(60_000),
         });
       } catch (err) {
@@ -123,7 +125,11 @@ export function createRelay(cfg, deps = {}) {
         await wait(3000 * (attempt + 1));
         continue;
       }
-      if (res.ok) return true;
+      if (res.ok) {
+        if (!poll) return true;
+        const sent = await res.json().catch(() => null);
+        return typeof sent?.messageId === "string" && sent.messageId.length <= 200 && sent.messageId.length > 0 ? sent.messageId : false;
+      }
       const body = await res.json().catch(() => null);
       const code = body?.code ?? body?.error?.code ?? "";
       // Puede haber salido: no se reintenta con la misma clave.
@@ -153,9 +159,70 @@ export function createRelay(cfg, deps = {}) {
     });
   }
 
+  async function openwaGet(path) {
+    const res = await fetchImpl(`${cfg.openwaUrl}/api/sessions/${encodeURIComponent(cfg.sessionId)}${path}`, {
+      headers: { "x-api-key": cfg.apiKey }, signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error("identity_check_failed");
+    return res.json();
+  }
+
+  /** Resolve only to exclude our own votes, never to choose a player's account. */
+  async function checkedVote(raw) {
+    const body = JSON.parse(raw);
+    const voter = body?.data?.voterId;
+    if (body?.data?.fromMe === true || typeof voter !== "string" || !/^[1-9][0-9]{0,39}@(c\.us|lid)$/.test(voter)) return null;
+    const session = await openwaGet("");
+    const own = String(session?.phone ?? "").replace(/\D/g, "");
+    if (!/^[1-9][0-9]{7,14}$/.test(own)) throw new Error("session_not_linked");
+    const resolved = voter.endsWith("@lid")
+      ? (await openwaGet(`/contacts/${encodeURIComponent(voter)}/phone`))?.phone
+      : voter.slice(0, -5);
+    const voterPhone = String(resolved ?? "").replace(/\D/g, "");
+    // Fail closed while OpenWA cannot exclude a self-vote from a private id.
+    if (!/^[1-9][0-9]{7,14}$/.test(voterPhone)) throw new Error("voter_unresolved");
+    if (own === voterPhone) return null;
+    return JSON.stringify({ ...body, data: { ...body.data, selfChecked: true, fromMe: false } });
+  }
+
+  async function sendReply(reply, key) {
+    const ok = await openwaSend(reply.to, reply.text.slice(0, 4096), key);
+    const poll = reply.poll;
+    if (!ok || !poll) return ok;
+    if (typeof poll.nonce !== "string" || !/^[a-f0-9]{32}$/.test(poll.nonce)
+      || typeof poll.name !== "string" || !poll.name || poll.name.length > 255
+      || !Array.isArray(poll.options) || poll.options.length < 2 || poll.options.length > 12
+      || poll.options.some(o => typeof o !== "string" || !o || o.length > 100)
+      || new Set(poll.options).size !== poll.options.length || poll.allowMultipleAnswers !== false) return false;
+    await wait(SEND_GAP_MS);
+    const pollMessageId = await openwaSend(reply.to, poll, `${key}-poll`, true);
+    if (!pollMessageId) return false;
+    // sendResolved may turn c.us into lid (or vice versa). The serialized native
+    // message key carries the actual remote JID used by poll.vote's parent poll.
+    const sentChatId = /^true_([1-9][0-9]{0,39}@(c\.us|lid))_/.exec(pollMessageId)?.[1] ?? reply.to;
+    const raw = JSON.stringify({ pollMessageId, chatId: sentChatId, nonce: poll.nonce });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await signedPost("/api/whatsapp/openwa/poll-sent", raw);
+        if (res.ok) return (await res.json().catch(() => null))?.ok === true;
+        if (res.status < 500 && res.status !== 429) return false;
+      } catch { /* Retry the acknowledgement, never a new poll. */ }
+      await wait(2000 * (attempt + 1));
+    }
+    log("encuesta sin confirmar; el menú de texto sigue disponible");
+    return false;
+  }
+
   async function forward(raw) {
     let messageId = "msg";
-    try { messageId = String(JSON.parse(raw)?.data?.id ?? "msg").slice(0, 150); } catch { /* cuerpo ya validado */ }
+    try {
+      const body = JSON.parse(raw);
+      if (body?.event === "poll.vote") {
+        raw = await checkedVote(raw);
+        if (!raw) return;
+        messageId = `vote-${createHash("sha256").update(raw).digest("hex")}`;
+      } else messageId = String(body?.data?.id ?? "msg").slice(0, 150);
+    } catch (err) { log("evento sin identidad verificable:", err?.name ?? "error"); return; }
     for (let attempt = 0; attempt < 3; attempt++) {
       let res;
       try {
@@ -179,7 +246,7 @@ export function createRelay(cfg, deps = {}) {
         const reply = replies[i];
         if (typeof reply?.to !== "string" || typeof reply?.text !== "string" || !reply.text) continue;
         if (i > 0) await wait(SEND_GAP_MS);
-        await openwaSend(reply.to, reply.text.slice(0, 4096), `in-${messageId}-${i}`);
+        await sendReply(reply, `in-${messageId}-${i}`);
       }
       return;
     }
@@ -201,7 +268,7 @@ export function createRelay(cfg, deps = {}) {
         const messages = Array.isArray(body?.messages) ? body.messages : [];
         for (const m of messages) {
           if (typeof m?.id !== "string" || typeof m?.to !== "string" || typeof m?.text !== "string") continue;
-          const ok = await openwaSend(m.to, m.text.slice(0, 4096), `outbox-${m.id}`);
+          const ok = await sendReply(m, `outbox-${m.id}`);
           const ack = await signedPost("/api/whatsapp/openwa/outbox", JSON.stringify(ok
             ? { action: "ack", id: m.id, ok: true }
             : { action: "ack", id: m.id, ok: false, error: "send_failed" }));
