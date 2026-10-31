@@ -62,16 +62,16 @@ describe("Telegram screens → WhatsApp text", () => {
   it("numbers the buttons, strips the new-message mark and remembers each callback", () => {
     const screen: Screen = {
       text: "¿Qué quieres hacer?",
-      buttons: [[{ text: "Pollas abiertas", callback_data: cbNew("ol", 0) }], [{ text: "Mis pagos", callback_data: "pg" }],
+      buttons: [[{ text: "Pollas disponibles", callback_data: cbNew("ol", 0) }], [{ text: "Mis pagos", callback_data: "pg" }],
         [{ text: "Ver en la web", url: "https://lapollacolombiana.com/polla/x" }, { text: "Peligro", url: "javascript:alert(1)" }]],
     };
     const { text, menu } = renderScreen(screen, "num");
-    expect(text).toContain("*1.* Pollas abiertas\n*2.* Mis pagos");
+    expect(text).toContain("*1.* Pollas disponibles\n*2.* Mis pagos");
     expect(text).toContain("_Responde con el número de la opción._");
     expect(text).toContain("Ver en la web: https://lapollacolombiana.com/polla/x");
     expect(text).not.toContain("javascript:");
     expect(menu).toEqual({ mode: "num", options: [
-      { key: "1", data: cb("ol", 0), label: "Pollas abiertas" },
+      { key: "1", data: cb("ol", 0), label: "Pollas disponibles" },
       { key: "2", data: "pg", label: "Mis pagos" },
     ] });
   });
@@ -103,7 +103,7 @@ describe("Telegram screens → WhatsApp text", () => {
 
 describe("short replies → callbacks", () => {
   const menu: WhatsAppMenu = { mode: "num", options: [
-    { key: "1", data: "ol", label: "🏆 Pollas abiertas" },
+    { key: "1", data: "ol", label: "🏆 Pollas disponibles" },
     { key: "2", data: "pg", label: "Mis pagos" },
   ] };
 
@@ -294,7 +294,7 @@ describe("handleWhatsAppEvent — who answers what", () => {
     const out = await handleWhatsAppEvent(event({ body: "Buenas tardes" }), deps(db));
     expect(out.replies[0].text).toContain("*¡Hola, Ana Pérez!*");
     expect(out.replies[0].text).toContain("Escribe «menú»");
-    expect(out.replies[1].text).toContain("*1.* ⚽ Pollas abiertas");
+    expect(out.replies[1].text).toContain("*1.* ⚽ Pollas disponibles");
     const menuWrite = db.writes.find((w) => w.table === "whatsapp_bot_chats" && w.op === "update" && (w.value as { menu?: unknown }).menu);
     expect((menuWrite?.value as { menu: WhatsAppMenu }).menu.options[0]).toMatchObject({ key: "1", data: cb("ol", 0) });
   });
@@ -330,14 +330,14 @@ describe("handleWhatsAppEvent — who answers what", () => {
   });
 
   it("«1» opens the first option of the last screen, as if the button were tapped", async () => {
-    const menu: WhatsAppMenu = { mode: "num", options: [{ key: "1", data: cb("ol", 0), label: "Pollas abiertas" }] };
+    const menu: WhatsAppMenu = { mode: "num", options: [{ key: "1", data: cb("ol", 0), label: "Pollas disponibles" }] };
     const db = fakeDb({ chatRow: chatRow({ menu }) });
     routes.routePlayerCallback.mockImplementation(async (ctx: PlayerCtx) => {
-      await show(ctx, { text: "<b>Pollas abiertas</b>", buttons: [[{ text: "Polla Millos", callback_data: cb("p", "x") }]] });
+      await show(ctx, { text: "<b>Pollas disponibles</b>", buttons: [[{ text: "Polla Millos", callback_data: cb("p", "x") }]] });
     });
     const out = await handleWhatsAppEvent(event({ body: "1" }), deps(db));
     expect(routes.routePlayerCallback).toHaveBeenCalledWith(expect.objectContaining({ account: { userId: "user-1", phoneE164: `+${PHONE}` } }), cb("ol", 0), expect.anything());
-    expect(out.replies).toEqual([{ to: `${PHONE}@c.us`, text: "*Pollas abiertas*\n\n*1.* Polla Millos\n\n_Responde con el número de la opción._" }]);
+    expect(out.replies).toEqual([{ to: `${PHONE}@c.us`, text: "*Pollas disponibles*\n\n*1.* Polla Millos\n\n_Responde con el número de la opción._" }]);
     expect(db.writes).toContainEqual(expect.objectContaining({ table: "whatsapp_bot_chats", op: "update", value: expect.objectContaining({ menu: { mode: "num", options: [{ key: "1", data: cb("p", "x"), label: "Polla Millos" }] } }) }));
   });
 

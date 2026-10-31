@@ -92,6 +92,17 @@ describe("authenticated proof download", () => {
       expect(await downloadZernioProof({ type: "image", url }, config, vi.fn().mockResolvedValue(response))).toEqual({ ok: false, reason: "unsupported" });
     }
   });
+  it("rejects PDF magic bytes even when disguised as an image or generic document", async () => {
+    for (const mimeType of ["image/jpeg", "application/octet-stream"]) {
+      const fetcher = vi.fn().mockResolvedValue(new Response("%PDF-1.7\nfixture", { headers: { "Content-Type": mimeType } }));
+      expect(await downloadZernioProof({ type: "document", url, mimeType }, config, fetcher)).toEqual({ ok: false, reason: "unsupported" });
+    }
+  });
+  it("accepts the exact 3 MiB boundary without increasing the staging cap", async () => {
+    const bytes = Buffer.alloc(MAX_ZERNIO_PROOF_BYTES); png.copy(bytes);
+    expect(await downloadZernioProof({ type: "document", url, mimeType: "image/png" }, config,
+      vi.fn().mockResolvedValue(new Response(bytes)))).toMatchObject({ ok: true, mime: "image/png" });
+  });
   it("caps declared size and streamed size even without Content-Length", async () => {
     const oversized = Buffer.alloc(MAX_ZERNIO_PROOF_BYTES + 1);
     for (const response of [new Response(png, { headers: { "Content-Length": String(oversized.length) } }), new Response(oversized)]) {
@@ -193,11 +204,13 @@ describe("official WhatsApp uses the existing player flow", () => {
   });
   it("keeps the literal login phrase reachable without onboarding", async () => {
     const db = database(undefined, { user_id: null }); const resolveAccount = vi.fn();
-    const login = vi.fn(async capture => { await capture(conversationId, "stable", { message: "login reply" }); return "sent"; });
+    const loginContent = { interactive: { type: "cta_url", body: { text: "Tu enlace personal" },
+      action: { name: "cta_url", parameters: { display_text: "Entrar a la web", url: "https://example.test/login" } } } };
+    const login = vi.fn(async capture => { await capture(conversationId, "stable", loginContent); return "sent"; });
     const send = vi.fn();
     await handleZernioPlayerEvent({ ...target, text: "dame el link para entrar a la polla", selection: null, attachment: null }, { db: db as never, config, login, now: () => now, resolveAccount, send });
     expect(resolveAccount).not.toHaveBeenCalled(); expect(login).toHaveBeenCalledOnce();
-    expect(send).toHaveBeenCalledWith(config, conversationId, { message: "login reply" }, "key:0");
+    expect(send).toHaveBeenCalledWith(config, conversationId, loginContent, "key:0");
   });
 });
 
@@ -206,20 +219,25 @@ describe("notices", () => {
   function enable() {
     vi.stubEnv("WHATSAPP_ZERNIO_BOT_ENABLED", "true"); vi.stubEnv("ZERNIO_WHATSAPP_ACCOUNT_ID", accountId); vi.stubEnv("ZERNIO_API_KEY", "test-key");
   }
-  it("sends an in-window notice once with a stable event key, without replacing input menus", async () => {
+  it.each([true, false])("sends an in-window review (approved=%s) once, without replacing input menus", async approved => {
     enable();
     const db = database(undefined, { zernio_last_inbound_at: new Date(Date.now() - 1000).toISOString(), flow: "score" });
     const fetcher = vi.fn(async () => new Response('{"success":true}'));
     vi.stubGlobal("fetch", fetcher);
-    expect(await notifyZernioReview(db as never, notice, "entry:attempt:revision")).toBe(true);
+    const review = { ...notice, approved, rejectReason: approved ? null : "Valor incompleto" };
+    expect(await notifyZernioReview(db as never, review, "entry:attempt:revision")).toBe(true);
     const claimed = db.rpc.mock.calls.find(call => call[0] === "whatsapp_zernio_claim");
     expect(claimed).toBeTruthy();
     expect(fetcher).toHaveBeenCalledOnce();
-    expect(JSON.parse((fetcher.mock.calls[0] as unknown as [unknown, { body: string }])[1].body).template).toBeUndefined();
+    const content = JSON.parse((fetcher.mock.calls[0] as unknown as [unknown, { body: string }])[1].body);
+    expect(content.template).toBeUndefined();
+    expect(content.message).toContain(approved ? "Pago confirmado" : "Valor incompleto");
+    if (!approved) expect(content.message).toContain("no repitas la transferencia");
+    expect(content.buttons).toContainEqual(expect.objectContaining({ title: "Menú" }));
     expect(db.writes.some(w => w.table === "whatsapp_bot_chats")).toBe(false);
     const key = (claimed as unknown as [string, { p_key: string }])[1].p_key;
     db.rpc.mockResolvedValue({ data: { outcome: "sent", lease: "lease" }, error: null });
-    expect(await notifyZernioReview(db as never, notice, "entry:attempt:revision")).toBe(true);
+    expect(await notifyZernioReview(db as never, review, "entry:attempt:revision")).toBe(true);
     expect(db.rpc).toHaveBeenLastCalledWith("whatsapp_zernio_claim", expect.objectContaining({ p_key: key, p_inbound_at: null }));
     expect(fetcher).toHaveBeenCalledOnce();
   });

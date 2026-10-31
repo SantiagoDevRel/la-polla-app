@@ -10,7 +10,7 @@ import { normalizeCommandText } from "./update";
 import { cb } from "./ids";
 
 export const MENU_LABELS = {
-  abiertas: "⚽ Pollas abiertas",
+  abiertas: "⚽ Pollas disponibles",
   mias: "🎟 Mis pollas",
   pagos: "💳 Mis pagos",
   perfil: "👤 Mi perfil",
@@ -53,6 +53,7 @@ const COMMANDS: Record<string, MenuCommand> = {
   inicio: "home",
   hola: "home",
   "pollas abiertas": "abiertas",
+  "pollas disponibles": "abiertas",
   "/pollas": "abiertas",
   pollas: "abiertas",
   "mis pollas": "mias",

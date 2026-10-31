@@ -274,6 +274,6 @@ describe("aviso de cupo gratis por Telegram", () => {
     expect(message.text).toContain("¡Ganaste un cupo gratis!");
     expect(message.text).toContain("5 personas que invitaste ya pagaron una polla.");
     expect(message.text).toContain("Úsalo en la polla que quieras");
-    expect(message.buttons[0][0]).toEqual({ text: "👉 Ver las pollas", url: "https://lapollacolombiana.com/" });
+    expect(message.buttons[0][0]).toEqual({ text: "Pollas disponibles", url: "https://lapollacolombiana.com/" });
   });
 });

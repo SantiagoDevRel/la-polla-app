@@ -111,6 +111,10 @@ async function renderMatch(ctx: PlayerCtx, polla: CasaPolla, matches: PollaMatch
   await clearFlow(ctx);
   await show(ctx, {
     text: [...header, "", "¿Quién gana? Toca una opción:"].filter((l) => l !== null).join("\n"),
+    compactText: [notice, `${esc(polla.name)} · partido ${index} de ${matches.length}`,
+      `<b>${esc(match.home_team)} vs ${esc(match.away_team)}</b>`,
+      `${esc(formatMatchTime(match.scheduled_at, match.scheduled_at_confirmed !== false))} · Cierra ${LOCK_MINUTES} minutos antes.`,
+      current ? `Actual: ${esc(current)}` : null, "¿Quién gana?"].filter(Boolean).join("\n"),
     buttons: [
       [{ text: buttonText(`🏠 Gana ${shortTeam(match.home_team)}`), callback_data: cb("x", P, M, "L") }],
       [{ text: "🤝 Empate", callback_data: cb("x", P, M, "E") }],
@@ -149,6 +153,9 @@ async function showSummaryOrNext(ctx: PlayerCtx, polla: CasaPolla, afterId: stri
           ? `✅ Ya tienes pronóstico en todos los partidos abiertos. Puedes cambiarlos hasta ${LOCK_MINUTES} minutos antes de cada partido.`
           : "No hay partidos abiertos para pronosticar en este momento.",
     ].filter((l) => l !== null).join("\n"),
+    compactText: [notice, esc(polla.name), matches.length === 0 ? "Aún no hay partidos."
+      : openCount > 0 ? `Ya pronosticaste todos. Puedes cambiar hasta ${LOCK_MINUTES} minutos antes de cada partido.`
+        : "No hay partidos abiertos para pronosticar."].filter(Boolean).join("\n"),
     buttons: [
       [{ text: "📋 Ver o cambiar mis pronósticos", callback_data: cb("ls", P) }],
       [{ text: "🏆 Tabla", callback_data: cb("tb", P) }],

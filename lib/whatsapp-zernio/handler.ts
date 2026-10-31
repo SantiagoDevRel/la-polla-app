@@ -83,7 +83,7 @@ async function buildTurn(event: ZernioInbound, deps: ZernioDeps): Promise<Zernio
         await ctx.channel.show(MORE);
       }
     } else if (picked === "zretry") {
-      await ctx.channel.show({ text: "Envía de nuevo la imagen del comprobante. Si ya transferiste, no repitas el pago." });
+      await ctx.channel.show({ text: "Envía la imagen del comprobante (JPG, PNG o WEBP, máximo 3 MB). No repitas la transferencia." });
     } else if (picked) {
       await routePlayerCallback(ctx, picked, { webLink });
     } else if (event.selection) {
@@ -91,7 +91,7 @@ async function buildTurn(event: ZernioInbound, deps: ZernioDeps): Promise<Zernio
     } else if (event.attachment) {
       const downloaded = await (deps.download ?? downloadZernioProof)(event.attachment, deps.config);
       if (!downloaded.ok) {
-        await ctx.channel.show({ text: downloaded.reason === "too_large" ? "La imagen supera 3 MB. Envíala como foto para reducir su tamaño."
+        await ctx.channel.show({ text: downloaded.reason === "too_large" ? "Supera 3 MB. Envía el comprobante como foto para reducir su tamaño."
           : downloaded.reason === "unsupported" ? "Envía el comprobante como imagen JPG, PNG o WEBP. Si está en PDF, envía una captura de pantalla."
           : "No pudimos descargar el comprobante. Envía la imagen de nuevo.",
           buttons: [[{ text: "Reintentar", callback_data: "zretry" }]] });

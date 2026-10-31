@@ -81,7 +81,8 @@ export async function showOpenPollas(ctx: PlayerCtx, page = 0): Promise<void> {
   const pollas = (await listPublicPollas()).filter((p) => isPollaOpen(p));
   if (pollas.length === 0) {
     await show(ctx, {
-      text: "<b>Pollas abiertas</b>\n\nAhora no hay pollas abiertas. El administrador publica las pollas de cada fin de semana: vuelve a revisar pronto.",
+      text: "<b>Pollas disponibles</b>\n\nAhora no hay pollas disponibles. Vuelve a revisar pronto.",
+      compactText: "No hay pollas disponibles. Vuelve pronto.",
       buttons: [[{ text: MENU_LABELS.mias, callback_data: cb("ml", 0) }]],
     });
     return;
@@ -94,15 +95,16 @@ export async function showOpenPollas(ctx: PlayerCtx, page = 0): Promise<void> {
     return `• <b>${esc(p.name)}</b>\n   Entrada ${entryPriceLabel(p.entry_price_cop)} · Premio ${prize} · cierra en ${timeLeft(p.closes_at)}`;
   });
   const buttons: Keyboard = slice.map((p) => [
-    { text: buttonText(`${p.name} · ${entryPriceLabel(p.entry_price_cop)}`), callback_data: cb("p", shortId(p.id)) },
+    { text: buttonText(`${p.name} · ${entryPriceLabel(p.entry_price_cop)}`), callback_data: cb("p", shortId(p.id)),
+      listRow: { title: p.name, description: `${entryPriceLabel(p.entry_price_cop)} · Cierra ${formatDateTime(p.closes_at)} (Colombia)${slice.some(other => other.id !== p.id && other.name === p.name) ? ` · ${p.slug}` : ""}` } },
   ]);
   const nav = [];
   if (safePage > 0) nav.push({ text: "⬅️ Anteriores", callback_data: cb("ol", safePage - 1) });
   if ((safePage + 1) * PAGE_SIZE < pollas.length) nav.push({ text: "Más pollas ➡️", callback_data: cb("ol", safePage + 1) });
   if (nav.length) buttons.push(nav);
   await show(ctx, {
-    text: ["<b>Pollas abiertas</b>", "Toca una para ver el premio, las reglas y cómo inscribirte.", "", ...lines].join("\n"),
-    compactText: "Pollas disponibles. Elige una para ver entrada, premio y cierre.",
+    text: ["<b>Pollas disponibles</b>", "Toca una para ver el premio, las reglas y cómo inscribirte.", "", ...lines].join("\n"),
+    compactText: "Pollas disponibles. Elige una.",
     buttons,
   });
 }
@@ -111,7 +113,8 @@ export async function showMyPollas(ctx: PlayerCtx, page = 0): Promise<void> {
   const mine = await listMyPollas(ctx.account.userId);
   if (mine.length === 0) {
     await show(ctx, {
-      text: "<b>Mis pollas</b>\n\nTodavía no estás inscrito en ninguna polla. Mira las pollas abiertas para participar.",
+      text: "<b>Mis pollas</b>\n\nTodavía no estás inscrito en ninguna polla. Mira las pollas disponibles para participar.",
+      compactText: "Aún no tienes pollas. Elige una para participar.",
       buttons: [[{ text: MENU_LABELS.abiertas, callback_data: cb("ol", 0) }]],
     });
     return;
@@ -126,7 +129,8 @@ export async function showMyPollas(ctx: PlayerCtx, page = 0): Promise<void> {
     return `• <b>${esc(p.name)}</b>\n   ${pay} · ${state}`;
   });
   const buttons: Keyboard = slice.map((p) => [
-    { text: buttonText(`${p.entry_status === "pagada" ? "✅" : "⏳"} ${p.name}`), callback_data: cb("p", shortId(p.id)) },
+    { text: buttonText(`${p.entry_status === "pagada" ? "✅" : "⏳"} ${p.name}`), callback_data: cb("p", shortId(p.id)),
+      listRow: { title: p.name, description: `${p.entry_status === "pagada" ? "Inscrito" : "Pago pendiente"} · ${p.status === "resuelta" ? "Finalizada" : p.status === "cerrada" ? "Inscripciones cerradas" : `Cierra ${formatDateTime(p.closes_at)} (Colombia)`}${slice.some(other => other.id !== p.id && other.name === p.name) ? ` · ${p.slug}` : ""}` } },
   ]);
   const nav = [];
   if (safePage > 0) nav.push({ text: "⬅️ Anteriores", callback_data: cb("ml", safePage - 1) });
@@ -134,7 +138,7 @@ export async function showMyPollas(ctx: PlayerCtx, page = 0): Promise<void> {
   if (nav.length) buttons.push(nav);
   await show(ctx, {
     text: ["<b>Mis pollas</b>", "Toca una para pronosticar, ver la tabla o las reglas.", "", ...lines].join("\n"),
-    compactText: "Mis pollas. Elige una para pronosticar o ver la tabla.",
+    compactText: "Mis pollas. Elige una.",
     buttons,
   });
 }
@@ -238,8 +242,18 @@ export async function pollaDetailScreen(ctx: PlayerCtx, polla: CasaPolla, notice
   if (polla.kind !== "rifa") infoRow.unshift({ text: "🏆 Tabla", callback_data: cb("tb", P) });
   buttons.push(infoRow);
   buttons.push(...urlRow("🌐 Ver en la página", pollaUrl(ctx, polla.slug)));
+  const compactStatus = polla.kind === "rifa"
+    ? tickets.length ? `Tus boletas: ${tickets.map(t => `${t.ticket_number}: ${ticketStateLabel(t)}`).join(", ")}` : "Elige una boleta para participar."
+    : entry?.status === "pagada" ? "Estás inscrito."
+      : entry?.status === "pendiente" && entry.proof_path ? "Comprobante en revisión. Puedes jugar; tus puntos cuentan al confirmar el pago."
+        : entryStatusLine(entry);
   return { text: lines.filter((l) => l !== null).join("\n"),
-    compactText: lines.filter((l, i) => l !== null && i !== 2).join("\n").replace(/ \(faltan [^)]*\)/g, ""), buttons };
+    compactText: [notice, `<b>${esc(polla.name)}</b>`,
+      `${prizeLine(polla, pot)} · Entrada: ${entryPriceLabel(polla.entry_price_cop)} · ${pot.paid_entries} inscritos`,
+      open ? `Cierra ${formatDateTime(polla.closes_at)} (Colombia)` : `Estado: ${esc(pollaEndedLabel(polla) ?? pollaStatusLabel(polla).text)}`,
+      compactStatus,
+      ...lines.filter(l => l?.startsWith("🏆 Gan") || l?.startsWith("Todos terminaron") || l?.startsWith("Número sorteado:")),
+    ].filter(Boolean).join("\n"), buttons };
 }
 
 export async function showPollaDetail(ctx: PlayerCtx, polla: CasaPolla, notice?: string): Promise<void> {
@@ -350,6 +364,13 @@ export async function showTable(ctx: PlayerCtx, polla: CasaPolla): Promise<void>
   }
   await show(ctx, {
     text: lines.join("\n"),
+    compactText: [`<b>Tabla · ${esc(polla.name)}</b>`,
+      entry?.status === "pendiente" && entry.proof_path ? "Pago en revisión: tus puntos aparecerán cuando lo confirmemos." : null,
+      rows.length ? `${rows.length} participantes` : "Aún no hay participantes con pago confirmado.",
+      ...rows.slice(0, 15).map(row => `${row.puesto}. ${esc(row.display_name ?? "Sin nombre")} · ${pts(row.points)}${row.user_id === ctx.account.userId ? " ← tú" : ""}`),
+      ...rows.filter(row => row.user_id === ctx.account.userId && !rows.slice(0, 15).some(r => r.user_id === row.user_id)).slice(0, 1)
+        .map(row => `Tú: puesto ${row.puesto} de ${rows.length} · ${pts(row.points)}`),
+    ].filter(Boolean).join("\n"),
     buttons: [[{ text: "🔄 Actualizar", callback_data: cb("tb", P) }], [{ text: "⬅️ Volver a la polla", callback_data: cb("p", P) }]],
   });
 }
@@ -405,6 +426,7 @@ export async function showPayments(ctx: PlayerCtx): Promise<void> {
   if (rows.length === 0) {
     await show(ctx, {
       text: "<b>Mis pagos</b>\n\nTodavía no has enviado comprobantes. Cuando te inscribas a una polla, aquí ves si ya confirmamos tu pago.",
+      compactText: "Aún no tienes pagos. Elige una polla para participar.",
       buttons: [[{ text: MENU_LABELS.abiertas, callback_data: cb("ol", 0) }]],
     });
     return;
@@ -421,11 +443,13 @@ export async function showPayments(ctx: PlayerCtx): Promise<void> {
     lines.push(`• ${label}\n   ${state}`);
     if (!seen.has(row.polla_id)) {
       seen.add(row.polla_id);
-      buttons.push([{ text: buttonText(`${actionable && polla.status === "abierta" ? "📸" : "👉"} ${polla.name}`), callback_data: cb("p", shortId(row.polla_id)) }]);
+      buttons.push([{ text: buttonText(`${actionable && polla.status === "abierta" ? "📸" : "👉"} ${polla.name}`), callback_data: cb("p", shortId(row.polla_id)),
+        listRow: { title: polla.name, description: state.replace(/<[^>]+>/g, "") } }]);
     }
   }
   lines.push("", "Revisamos cada comprobante a mano. Cuando lo confirmemos o haya un problema, te avisamos por este chat.");
-  await show(ctx, { text: lines.join("\n").slice(0, 4000), buttons: buttons.slice(0, 10) });
+  await show(ctx, { text: lines.join("\n").slice(0, 4000),
+    compactText: lines.slice(0, -2).join("\n"), buttons: buttons.slice(0, 10) });
 }
 
 // ── Ayuda e inicio ──────────────────────────────────────────────────────────
@@ -446,6 +470,7 @@ export async function showHelp(ctx: PlayerCtx): Promise<void> {
       "",
       `¿Tienes un problema? Escríbenos en ${esc(support)}`,
     ].join("\n"),
+    compactText: `Elige una polla, inscríbete y pronostica hasta ${LOCK_MINUTES} minutos antes del partido. ¿Necesitas ayuda? Entra a Más → Entrar a la web → Soporte.`,
     buttons: [[{ text: MENU_LABELS.abiertas, callback_data: cb("ol", 0) }], ...urlRow("🌐 Soporte", support)],
   });
 }

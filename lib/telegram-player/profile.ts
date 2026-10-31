@@ -147,6 +147,8 @@ export function profileScreen(profile: PlayerProfile, phoneE164: string, notice?
       `Celular: ${esc(maskPhone(phoneE164))}`,
       `Cuenta para recibir premios: ${esc(payoutSummary(profile))}`,
     ].filter((l) => l !== null).join("\n"),
+    compactText: [notice, `<b>${esc(profile.display_name)}</b> · ${esc(pollitoLabel(profile.avatar_url))}`,
+      `Cuenta para premios: ${esc(payoutSummary(profile))}`].filter(Boolean).join("\n"),
     buttons: [
       [{ text: "✏️ Cambiar nombre", callback_data: "pn" }],
       [{ text: "🐥 Cambiar pollito", callback_data: "pc" }],

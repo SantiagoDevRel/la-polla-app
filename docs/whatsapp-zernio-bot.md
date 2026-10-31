@@ -33,7 +33,7 @@ anon and authenticated and grant service_role only. New tables have RLS/deny-all
 | Home | Pollas disponibles / Mis pollas / Más |
 | More | Mis pagos / Mi perfil / Entrar a la web / Ayuda / Menú |
 | Available or joined pools | Choose pool; existing pool pages and Más navigation. |
-| Pool | Join or free join, proof retry, predict or questions, own picks, table, rules, web, Menú; availability comes from the shared flow. |
+| Pool | Join or free join, proof retry, predict or questions, own picks, table, rules, Menú; availability comes from the shared flow. Web login stays in Más. |
 | Payment | Exact SQL price, payment account, prize, send image; Cancelar / Menú. |
 | Proof error | Reintentar / Menú; retry asks for the image again, preserving the proof step. |
 | Exact score | Type `2-1`, local first; Saltar / Ver todos / Volver a la polla / Menú. |
@@ -50,9 +50,20 @@ validate and save it. Explicit Menú/Hola navigation works during free input.
 Numbers and full option titles work outside text steps; letters can select
 navigation during text steps without confusing scores, tickets, names or answers.
 
-One to three actions use native reply buttons; four to ten use one list. Longer
+One to three actions use native reply buttons only when every label fits in 20
+characters; otherwise they use a list. Pool choices always use lists with the
+complete name: up to 24 characters in the title and the rest first in the
+description (72 maximum), followed by price, Colombia close time or entry status.
+Names are capped at 80 characters by the existing pool contract. If facts do not
+fit beside a long name, the body also shows the full name and facts. Shared
+Telegram buttons retain their own text; optional `listRow` metadata supplies the
+unabridged name to Zernio. Ordinary screen URLs are omitted; the personal login
+CTA still uses the original captured login adapter from Más → Entrar a la web.
+Four to ten actions use one list. Longer
 menus paginate with Más, Anterior and Menú, never exceeding ten rows. Labels are
-unique after truncation. Truncation/splitting preserve graphemes. Long rules and
+unique after truncation except pool names sharing a prefix, whose descriptions
+preserve the remainder. Ambiguous typed titles select nothing; opaque ids still
+select the exact pool. Truncation/splitting preserve graphemes. Long rules and
 standings split without silently removing data. Opaque ids map to stored callbacks,
 which the player router revalidates against the database. Concise `compactText`
 is presentation from existing source data; Telegram and OpenWA retain their copy.
@@ -82,8 +93,11 @@ The supplied Zernio OpenAPI v1.429.1 was inspected at `sendInboxMessage`,
   fields. Bearer keys never go to user-supplied hosts or Meta CDN URLs.
 - Downloads stop at 3 MiB, including streams without Content-Length. MIME and
   magic bytes are checked. Actual image bytes decide JPG/PNG/WEBP, including PNG
-  named JPG. Migration 176's staging size is preserved. PDF is rejected because
-  `ProofContentType` accepts only images; the bot asks for a screenshot.
+  named JPG. Migration 176's staging size is preserved. PDF remains rejected:
+  `ProofContentType`, the web join MIME enum, SQL proof RPCs (098/131), storage
+  MIME allowlist and upload signature verifier accept only JPG/PNG/WEBP; admin
+  review renders an image. The bot asks for a screenshot. No converter,
+  dependency, migration or expanded proof contract is introduced.
 - Media staging is phone-scoped and expires after two hours when read. Proofs
   still use `beginCasaProof` / `confirmCasaProof`. Picks use the existing Casa save
   RPC. Historical P2P predictions remain untouched.
@@ -102,7 +116,15 @@ The supplied Zernio OpenAPI v1.429.1 was inspected at `sendInboxMessage`,
 
 Claude owns review, final gates, commit, deployment and physical-phone acceptance.
 This implementer does not commit, push, open PRs, change flags, write production
-or apply migrations. Work stays in `feat/whatsapp-bot-full-ux`.
+or apply migrations. This polish stays in `feat/whatsapp-zernio-polish`.
+
+The polish standardizes **Pollas disponibles** in shared player copy (the old
+typed command remains an alias), shortens payment/proof/pick/profile/help/review
+copy and keeps Menú on every non-home screen. Tables, rules and own picks retain
+their underlying data. Regression flows cover paid/free entry with both exact
+scores and 1X2, proof rejection/retry and upload recovery, edits, standings,
+joined-pool lists, payments, profile and help. Rendering on a real phone remains
+Claude's release acceptance.
 
 | Brief requirement | Implementation and evidence |
 | --- | --- |
