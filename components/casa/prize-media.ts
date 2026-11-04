@@ -6,8 +6,12 @@ type PollaPrize = { kind: "jersey"; title: string; media: PrizeMedia; photos: re
   | { kind: "cash"; banknote: string; back: string; poster: string; turntable: NonNullable<PrizeMedia["turntable"]> }
   | { kind: "crests"; crests: readonly PrizeCrest[] };
 
-/** El millón en diez billetes de cien mil: OFIGOLAZO4 y OFIGOLAZO 5. */
-const CASH_POLLAS = new Set(["05f83cb8-d16d-42fd-a6b8-a0840c9b0cf9", "6e9bea55-fdc0-4ba1-b703-9f947c2bb3c1"]);
+/** El millón en diez billetes de cien mil: OFIGOLAZO4, OFIGOLAZO 5 y OFIGOLAZO6. */
+const CASH_POLLAS = new Set([
+  "05f83cb8-d16d-42fd-a6b8-a0840c9b0cf9",
+  "6e9bea55-fdc0-4ba1-b703-9f947c2bb3c1",
+  "b41d8824-ed89-4394-9b56-a2a0bd9e6e7a",
+]);
 
 /** La camiseta firmada de James: POLLA JAMES y POLLA JAMES 2 (gratis, sin boleta). */
 const JAMES_TITLES: Readonly<Record<string, string>> = {
