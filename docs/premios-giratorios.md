@@ -1,7 +1,7 @@
 # Premios giratorios de James y el millón
 
 El catálogo `components/casa/prize-media.ts` aporta los visuales de POLLA JAMES,
-OFIGOLAZO4 y OFIGOLAZO 5 (los dos con el millón) en Inicio y en `/polla/[slug]`.
+OFIGOLAZO4, OFIGOLAZO 5 y OFIGOLAZO6 (con el millón) en Inicio y en `/polla/[slug]`.
 El acceso y la publicación siguen pasando por las reglas existentes de Casa. El
 catálogo no modifica datos. Una polla nueva con el millón se agrega por id.
 

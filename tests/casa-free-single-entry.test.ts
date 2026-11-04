@@ -57,6 +57,7 @@ describe("premios con imagen propia", () => {
     const ofigolazo5 = pollaPrizeMedia("6e9bea55-fdc0-4ba1-b703-9f947c2bb3c1");
     expect(ofigolazo5?.kind).toBe("cash");
     expect(ofigolazo5).toEqual(previous);
+    expect(pollaPrizeMedia("b41d8824-ed89-4394-9b56-a2a0bd9e6e7a")).toEqual(previous);
   });
 
   it("POLLA REGALO 2 muestra los escudos de Nacional y Medellín, quietos", () => {
