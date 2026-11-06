@@ -11,7 +11,7 @@ export function rifaJson(body: unknown, status = 200) {
 
 const MESSAGES: Record<string, string> = {
   RIFA_NOT_FOUND: "Esta rifa no existe o no está disponible.",
-  RIFA_HIDDEN: "Esta rifa está en revisión y no recibe reservas.",
+  RIFA_HIDDEN: "La Polla está revisando esta rifa. Por ahora no vende números.",
   RIFA_CLOSED: "Esta rifa ya cerró. No se reciben más reservas.",
   RIFA_FINISHED: "Esta rifa ya tiene resultado.",
   CREATOR_CANNOT_BUY: "Creaste esta rifa. Para anotar un número usa «Venta por fuera».",
@@ -33,7 +33,7 @@ const MESSAGES: Record<string, string> = {
   REQUEST_CONFLICT: "Este intento corresponde a otro archivo. Vuelve a elegir el comprobante.",
   INVALID_UPLOAD: "Usa una imagen JPG, PNG o WEBP de hasta 8 MB.",
   DUPLICATE_PROOF: "Ese comprobante ya lo enviaste en esta rifa.",
-  NO_RESERVED_NUMBERS: "No tienes números reservados esperando comprobante.",
+  NO_RESERVED_NUMBERS: "No tienes números esperando comprobante.",
   RESERVATION_EXPIRING: "Tu reserva está por vencer. Vuelve a elegir tus números.",
   ATTEMPT_NOT_FOUND: "No encontramos ese comprobante.",
   ATTEMPT_REPLACED: "Este comprobante fue reemplazado por uno más reciente.",
@@ -41,7 +41,7 @@ const MESSAGES: Record<string, string> = {
   UPLOAD_EXPIRED: "Venció el tiempo de carga. Vuelve a elegir tus números y el comprobante.",
   PROOF_NOT_UPLOADED: "La carga todavía no está completa. Intenta de nuevo.",
   REASON_REQUIRED: "Escribe el motivo.",
-  INVALID_DECISION: "Elige aprobar o rechazar.",
+  INVALID_DECISION: "Elige confirmar el pago o marcarlo como no pagado.",
   NOT_APPROVED: "Ese pago no está aprobado.",
   TICKET_NOT_FOUND: "No encontramos ese número.",
   INVALID_TICKET_STATE: "Ese número no admite esta acción en su estado actual.",

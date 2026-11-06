@@ -226,10 +226,26 @@ no decodifica WebP: el logo y los pollitos van como PNG de paleta en
 lucro», «Rifa para …» en grande, qué compra lo recaudado y la camiseta girando
 (provisional: la de James, hasta tener el diseño de cada camiseta). Mismo patrón
 que `components/casa/prize-media.ts`; no hay columnas nuevas ni cambios de SQL.
-Primera: «Rifa solidaria La Iguaná · Camiseta 1» (`/rifa/rifa-solidaria-la-iguana-camiseta`),
-de carlos con Santi de coadministrador, Privada, 100 números a $30.000, Lotería de
-Medellín del 13-nov. Una camiseta por rifa, de a una: la siguiente se crea al cerrar
-esta y se agrega su uuid al mapa. Prueba: `tests/rifas-benefit.test.ts`.
+Primera: «Rifa solidaria La Iguaná» (`/rifa/rifa-solidaria-la-iguana-camiseta`),
+premio «Camiseta firmada por Franco Armani», de carlos con Santi de coadministrador,
+Pública, 100 números a $30.000, Lotería de Medellín del 13-nov. Una camiseta por rifa,
+de a una: la siguiente se crea al cerrar esta y se agrega su uuid al mapa.
+Prueba: `tests/rifas-benefit.test.ts`.
+
+### Sin «reservado» a la vista (6-nov-2026, pedido del dueño)
+
+SQL no cambió: los estados siguen siendo `reservado` → `en_revision` → `pagado`.
+Cambió lo que se ve:
+
+- **Quien compra** ve el tablero en dos estados: Libre o Pagado (todo número
+  tomado sale Pagado). El botón dice «Pagar»; SQL aparta los números 30 min
+  mientras sube el comprobante. Con el comprobante enviado, sus números dicen
+  «pagado»; sin comprobante, «falta el comprobante».
+- **El equipo** ve Libre, Sin pagar (`reservado`), Por confirmar (`en_revision`)
+  y Pagado. En cada comprobante: «Confirmar pago» (aprobar) o «No pagó» (rechazar:
+  pide el motivo y libera los números). «Deshacer confirmación» es revertir.
+- Quien administra la rifa no puede comprar en ella: el tablero lo dice y enlaza
+  a Gestionar (antes tocar un número no hacía nada).
 
 ## Pruebas
 

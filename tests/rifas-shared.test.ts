@@ -103,7 +103,7 @@ describe("tablero", () => {
       winningNumber: 8,
     }));
     expect(html).toContain('aria-label="00, libre"');
-    expect(html).toContain('aria-label="07, reservado"');
+    expect(html).toContain('aria-label="07, sin pagar"');
     expect(html).toContain('aria-label="08, pagado, tuyo, ganador"');
     expect(html).toContain("lp-rifa-reservado");
     expect(html).toContain("lp-rifa-ganador");

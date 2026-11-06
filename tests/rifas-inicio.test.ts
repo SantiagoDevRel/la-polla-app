@@ -30,19 +30,31 @@ describe("RifasInicio", () => {
   it("la rifa sin ánimo de lucro sale con su etiqueta, su causa y el botón con el precio", () => {
     const out = html([view()], emptyList);
     expect(out).toContain(">Rifa</span>");
-    expect(out).toContain("para una familia damnificada en La Iguaná");
+    expect(out).toContain("Para una familia damnificada en La Iguaná");
     expect(out).toContain("Elegir número · $30.000");
     expect(out).toContain("3 de 100 números tomados");
+    expect(out).toContain(">Sin ánimo de lucro</span>");
+    expect(out).not.toContain("lucro ·");
+  });
+
+  it("sin «reservado» a la vista: con comprobante ya es pagado; sin comprobante lo dice", () => {
+    const tickets = [
+      { number: 7, state: "en_revision" as const, origin: "app" as const, expires_at: null, proof_id: null },
+      { number: 23, state: "reservado" as const, origin: "app" as const, expires_at: null, proof_id: null },
+    ];
+    const out = html([view({ viewer: { ...view().viewer, tickets } })], emptyList);
+    expect(out).toContain("Tus números: Pagados 07 · Falta el comprobante 23");
+    expect(out).not.toMatch(/[Rr]eservad/);
   });
 
   it("quien ya compró ve sus números; el equipo ve «Ver rifa» y los comprobantes por revisar", () => {
     const tickets = [{ number: 7, state: "en_revision" as const, origin: "app" as const, expires_at: null, proof_id: null }];
-    expect(html([view({ viewer: { ...view().viewer, tickets } })], emptyList)).toContain("Tus números: Por confirmar 07");
+    expect(html([view({ viewer: { ...view().viewer, tickets } })], emptyList)).toContain("Tus números: Pagados 07");
     const created = [{ slug: "rifa-solidaria-la-iguana-camiseta", name: "x", status: "abierta" as const, visibility: "publica" as const,
       draw_at: view().draw_at, hidden: false, number_count: 100, paid: 0, pending_proofs: 4 }];
     const out = html([view({ viewer: { ...view().viewer, is_creator: true } })], { ...emptyList, created });
     expect(out).toContain("Ver rifa");
-    expect(out).toContain("4 comprobantes por revisar");
+    expect(out).toContain("4 pagos por confirmar");
     // La destacada no se repite en las filas.
     expect(out).not.toContain("Creada por ti");
   });
@@ -59,5 +71,25 @@ describe("inicio sin pestañas", () => {
     expect(page).not.toMatch(/PollasRifasTabs|tab === "rifas"/);
     expect(page).toContain("<MyPollas typeTag={conRifas}");
     expect(page).toContain('tag={tag ? "polla" : undefined}');
+  });
+});
+
+describe("ajustes del 6-nov", () => {
+  const src = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+  it("el tablero público solo muestra libre o pagado, y el equipo sabe por qué no puede comprar", () => {
+    const comprador = src("components/rifas/RifaComprador.tsx");
+    expect(comprador).toContain('state: c.s === "libre" ? "libre" : "pagado"');
+    expect(comprador).toContain("Administras esta rifa, así que aquí no puedes comprar números.");
+    expect(comprador).not.toMatch(/>Reservar<|"Reservar"|Quitar mi reserva/);
+  });
+  it("el equipo confirma el pago o lo marca como no pagado", () => {
+    const gestion = src("components/rifas/RifaGestion.tsx");
+    expect(gestion).toContain("Confirmar pago");
+    expect(gestion).toContain("No pagó");
+    expect(gestion).not.toMatch(/"Reservado"|>Aprobar<|>Rechazar</);
+  });
+  it("los borradores privados salieron del inicio y van al final del panel", () => {
+    expect(src("app/(app)/page.tsx")).not.toMatch(/pollas-privadas|listHiddenAdminPollas/);
+    expect(src("app/(app)/admin/page.tsx")).toContain("<AdminPanel footer=");
   });
 });

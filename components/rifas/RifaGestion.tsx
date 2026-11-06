@@ -27,9 +27,9 @@ type Action = Record<string, unknown> & { action: string };
 
 const EVENT_LABEL: Record<string, string> = {
   rifa_creada: "Rifa creada", visibilidad: "Cambió la visibilidad", oculta: "La Polla ocultó la rifa", visible: "La Polla volvió a mostrar la rifa",
-  reserva: "Reserva", reserva_cancelada: "Reserva cancelada", reservas_vencidas: "Reservas vencidas",
-  comprobante_enviado: "Comprobante recibido", pago_aprobado: "Pago aprobado", pago_rechazado: "Pago rechazado",
-  aprobacion_revertida: "Aprobación revertida", venta_por_fuera: "Venta por fuera", venta_por_fuera_pagada: "Venta por fuera pagada",
+  reserva: "Eligió números", reserva_cancelada: "Soltó números", reservas_vencidas: "Vencieron sin comprobante",
+  comprobante_enviado: "Comprobante recibido", pago_aprobado: "Pago confirmado", pago_rechazado: "Marcado como no pagado",
+  aprobacion_revertida: "Confirmación deshecha", venta_por_fuera: "Venta por fuera", venta_por_fuera_pagada: "Venta por fuera pagada",
   numero_liberado: "Número liberado", resultado: "Resultado", reporte: "Reporte de un usuario",
 };
 
@@ -91,7 +91,7 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
       <StreetCard className="p-4">
         <dl className="grid grid-cols-3 gap-2 text-center">
           <div><dt className="text-[12px] text-text-muted">Pagados</dt><dd className="font-display text-[26px] leading-none tracking-[0.04em]">{rifa.summary.pagado}</dd></div>
-          <div><dt className="text-[12px] text-text-muted">Reservados</dt><dd className="font-display text-[26px] leading-none tracking-[0.04em]">{rifa.summary.reservado}</dd></div>
+          <div><dt className="text-[12px] text-text-muted">Sin confirmar</dt><dd className="font-display text-[26px] leading-none tracking-[0.04em]">{rifa.summary.reservado}</dd></div>
           <div><dt className="text-[12px] text-text-muted">Recaudado</dt><dd className="lp-money text-[18px] leading-tight text-text-primary">{formatCop(rifa.summary.collected_cop)}</dd></div>
         </dl>
         <p className="mt-3 border-t border-border-subtle pt-3 text-[13px] text-text-secondary [overflow-wrap:anywhere]">
@@ -106,7 +106,7 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
       {pending.length > 0 && (
         <section aria-labelledby="pendientes-title" className="space-y-2">
           <h2 id="pendientes-title" className="lp-display-sm flex items-center gap-2 text-[22px]">
-            Comprobantes por revisar
+            Pagos por confirmar
             <span className="rounded-full bg-red-alert px-2 py-0.5 font-body text-[13px] font-semibold text-text-primary">{pending.length}</span>
           </h2>
           {pending.map((p) => <ProofCard key={p.id} slug={slug} proof={p} busy={busy} act={act} locked={drawPassed} />)}
@@ -121,7 +121,7 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
           <p className="text-[13px] text-text-secondary">Toca un número</p>
         </div>
         <RifaBoard label="Tablero de la rifa" cells={cells} winningNumber={rifa.winning_number} onPick={(n) => setOpen(n)} />
-        <RifaLegend showReview />
+        <RifaLegend team />
       </section>
 
       <SharePanel rifa={rifa} shareUrl={shareUrl} />
@@ -136,7 +136,7 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
               <li key={t.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
                 <span className="font-display text-[18px] tracking-[0.04em]">{rifaNumber(t.number)}</span>
                 <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{t.name ?? "Sin nombre"}<span className="block text-text-muted">{displayPhone(t.phone)}</span></span>
-                <span className="text-text-secondary">{t.state === "pagado" ? "Pagado" : t.state === "en_revision" ? "En revisión" : "Reservado"}{t.origin === "fuera" ? " · por fuera" : ""}</span>
+                <span className="text-text-secondary">{t.state === "pagado" ? "Pagado" : t.state === "en_revision" ? "Por confirmar" : "Sin pagar"}{t.origin === "fuera" ? " · por fuera" : ""}</span>
               </li>
             ))}
           </ul>
@@ -145,7 +145,7 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
 
       {approved.length > 0 && !finished && (
         <details className="lp-card p-4">
-          <summary className="flex min-h-11 cursor-pointer items-center text-[15px] font-semibold">Pagos aprobados en la app ({approved.length})</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center text-[15px] font-semibold">Pagos confirmados en la app ({approved.length})</summary>
           <div className="mt-2 space-y-2">{approved.map((p) => <ProofCard key={p.id} slug={slug} proof={p} busy={busy} act={act} locked={drawPassed} />)}</div>
         </details>
       )}
@@ -215,22 +215,22 @@ function ProofCard({ slug, proof, busy, act, locked }: {
       </a>
       {mode ? (
         <div className="space-y-2">
-          <label htmlFor={`motivo-${proof.id}`} className="block text-[13px] text-text-secondary">{mode === "rechazar" ? "¿Por qué lo rechazas?" : "¿Por qué reviertes la aprobación?"}</label>
+          <label htmlFor={`motivo-${proof.id}`} className="block text-[13px] text-text-secondary">{mode === "rechazar" ? "¿Qué pasó con el pago? Lo ve quien compró." : "¿Por qué deshaces la confirmación?"}</label>
           <input id={`motivo-${proof.id}`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} className="lp-input w-full" />
           <div className="flex gap-2">
             <button type="button" onClick={() => { setMode(null); setReason(""); }} className="lp-btn lp-btn-ghost flex-1">Cancelar</button>
             <button type="button" disabled={busy || reason.trim().length < 3}
-              onClick={() => void act({ action: mode, proofId: proof.id, reason }, mode === "rechazar" ? "Comprobante rechazado. Los números quedaron libres." : "Aprobación revertida.")}
-              className="lp-btn lp-btn-danger flex-1">{mode === "rechazar" ? "Rechazar" : "Revertir"}</button>
+              onClick={() => void act({ action: mode, proofId: proof.id, reason }, mode === "rechazar" ? "Marcado como no pagado. Los números quedaron libres." : "Confirmación deshecha.")}
+              className="lp-btn lp-btn-danger flex-1">{mode === "rechazar" ? "No pagó" : "Deshacer"}</button>
           </div>
         </div>
       ) : proof.state === "en_revision" ? (
         <div className="flex gap-2">
-          {!locked && <button type="button" disabled={busy} onClick={() => setMode("rechazar")} className="lp-btn lp-btn-ghost flex-1">Rechazar</button>}
-          <button type="button" disabled={busy} onClick={() => void act({ action: "aprobar", proofId: proof.id }, "Pago aprobado.")} className="lp-btn lp-btn-primary flex-1">Aprobar</button>
+          {!locked && <button type="button" disabled={busy} onClick={() => setMode("rechazar")} className="lp-btn lp-btn-ghost flex-1">No pagó</button>}
+          <button type="button" disabled={busy} onClick={() => void act({ action: "aprobar", proofId: proof.id }, "Pago confirmado.")} className="lp-btn lp-btn-primary flex-1">Confirmar pago</button>
         </div>
       ) : locked ? null : (
-        <button type="button" disabled={busy} onClick={() => setMode("revertir")} className="lp-btn lp-btn-ghost w-full">Revertir aprobación</button>
+        <button type="button" disabled={busy} onClick={() => setMode("revertir")} className="lp-btn lp-btn-ghost w-full">Deshacer confirmación</button>
       )}
     </StreetCard>
   );
@@ -577,7 +577,7 @@ function TicketDialog({ number, ticket, rifa, busy, act, onClose }: {
               <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} /> Ya pagó
             </label>
             <button type="submit" disabled={busy || name.trim().length < 2 || !/^\+[1-9]\d{7,14}$/.test(phone)} className="lp-btn lp-btn-primary w-full">
-              {paid ? "Marcar pagado" : "Marcar reservado"}
+              {paid ? "Marcar pagado" : "Anotar sin pago"}
             </button>
             <p className="text-[12px] text-text-muted">Anota solo datos que la persona te autorizó. No necesita cuenta: si después se registra con ese celular, verá su número.</p>
           </form>
@@ -587,7 +587,7 @@ function TicketDialog({ number, ticket, rifa, busy, act, onClose }: {
           <p className="text-[15px] font-semibold [overflow-wrap:anywhere]">{ticket.name ?? "Comprador"}</p>
           <p className="text-[13px] text-text-secondary">{displayPhone(ticket.phone)}</p>
           <p className="text-[13px] text-text-secondary">
-            {ticket.state === "pagado" ? "Pagado" : ticket.state === "en_revision" ? "Comprobante en revisión" : "Reservado"}
+            {ticket.state === "pagado" ? "Pagado" : ticket.state === "en_revision" ? "Pagado, por confirmar" : "Sin pagar"}
             {ticket.origin === "fuera" ? " · venta por fuera" : ""}
             {ticket.expires_at ? ` · vence ${formatColombiaDateTime(ticket.expires_at, { hour: "numeric", minute: "2-digit" })}` : ""}
           </p>

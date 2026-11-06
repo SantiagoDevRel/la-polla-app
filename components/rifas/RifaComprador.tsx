@@ -1,10 +1,12 @@
 "use client";
 // components/rifas/RifaComprador.tsx — la rifa vista por quien compra.
 //
-// Flujo: elegir números → «Reservar» (SQL atómico) → transferir el valor que
-// calcula SQL a la cuenta del creador → subir el comprobante (mismo contrato
-// de carga que Casa: compresión en el navegador, URL firmada, verificación de
-// bytes en el servidor) → el creador aprueba y el número queda Pagado.
+// Flujo: elegir números → «Pagar» (SQL los aparta 30 min, atómico) → transferir
+// el valor que calcula SQL a la cuenta del creador → subir el comprobante (mismo
+// contrato de carga que Casa: compresión en el navegador, URL firmada,
+// verificación de bytes en el servidor) → el número ya se ve Pagado y el
+// creador lo confirma o lo marca como no pagado (y queda libre).
+// (2026-11-06) El tablero público no muestra «reservado»: libre o pagado.
 // Sin sesión se ve el tablero y elegir lleva al registro con returnTo.
 // Menos texto: una línea por estado; lo legal va en una sola frase al final.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -70,7 +72,7 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
 
   const cells: BoardCell[] = useMemo(() => rifa.board.map((c) => ({
     n: c.n, mine: c.m,
-    state: c.s === "pagado" ? "pagado" : c.s === "reservado" ? "reservado" : "libre",
+    state: c.s === "libre" ? "libre" : "pagado",
   })), [rifa.board]);
 
   const openForPicking = !rifa.closed && !rifa.hidden && !rifa.viewer.is_creator;
@@ -90,7 +92,7 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
     try {
       await post(`/api/rifas/${slug}/reservar`, { action: "reservar", numbers: [...selected] });
       setSelected(new Set());
-      showToast("Números reservados. Transfiere y sube el comprobante.", "success");
+      showToast("Listo. Ahora transfiere y sube el comprobante.", "success");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -155,7 +157,7 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
         <p className="rounded-lg border border-border-default bg-bg-card/80 px-3 py-2 text-[13px] text-text-secondary">Privada: solo la ven quien la creó y los administradores.</p>
       )}
       {rifa.hidden && (
-        <p role="status" className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[13px] text-text-primary">La Polla está revisando esta rifa. No recibe reservas.</p>
+        <p role="status" className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[13px] text-text-primary">La Polla está revisando esta rifa. Por ahora no vende números.</p>
       )}
 
       <ResultBanner rifa={rifa} />
@@ -165,7 +167,7 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
         </p>
       )}
       {rifa.status === "abierta" && rifa.closed && (
-        <p role="status" className="rounded-lg border border-border-default bg-bg-card/80 px-3 py-2 text-[13px] text-text-secondary">Ya no se reciben reservas. Falta el resultado del sorteo.</p>
+        <p role="status" className="rounded-lg border border-border-default bg-bg-card/80 px-3 py-2 text-[13px] text-text-secondary">Ya no se venden números. Falta el resultado del sorteo.</p>
       )}
 
       <section aria-labelledby="tablero-title">
@@ -176,13 +178,21 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
         <RifaBoard label="Tablero de números" cells={cells} selected={selected} winningNumber={rifa.winning_number}
           onPick={openForPicking ? toggle : undefined} pickable={(c) => c.state === "libre"} />
         <RifaLegend showSelected={openForPicking} />
+        {rifa.viewer.is_creator && !rifa.closed && (
+          // El equipo de la rifa no puede comprar en ella (SQL lo impide): sin esta
+          // línea, tocar un número no hacía nada y parecía dañado.
+          <p className="mt-3 rounded-lg border border-border-default bg-bg-card/80 px-3 py-2 text-[13px] text-text-secondary">
+            Administras esta rifa, así que aquí no puedes comprar números.{" "}
+            <Link href={`/rifa/${slug}/gestionar`} className="font-semibold text-text-primary underline underline-offset-2">Gestionar la rifa</Link>
+          </p>
+        )}
       </section>
 
       {error && <p role="alert" className="rounded-lg border border-red-alert/40 bg-red-alert/10 px-3 py-2 text-[15px] text-text-primary">{error}</p>}
 
       {needsAccount && openForPicking && (
         <StreetCard className="p-4">
-          <p className="text-[15px] text-text-primary">Para reservar, agrega la cuenta donde recibirías el premio.</p>
+          <p className="text-[15px] text-text-primary">Para comprar, agrega la cuenta donde recibirías el premio.</p>
           <PayoutAccountButton label="Agregar mi cuenta" className="lp-btn lp-btn-primary mt-3 w-full"
             note="Si ganas, quien creó la rifa te paga a esta cuenta. También queda guardada en tu perfil." onSaved={() => void refresh()} />
         </StreetCard>
@@ -195,13 +205,13 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
             {rifa.viewer.tickets.map((t) => (
               <li key={t.number} className="rounded-full border border-border-default bg-bg-elevated px-3 py-1 text-[13px]">
                 <span className="font-display text-[16px] tracking-[0.04em]">{rifaNumber(t.number)}</span>{" "}
-                <span className="text-text-secondary">{t.state === "pagado" ? "pagado" : t.state === "en_revision" ? "en revisión" : "por pagar"}</span>
+                <span className="text-text-secondary">{t.state === "reservado" ? "falta el comprobante" : "pagado"}</span>
               </li>
             ))}
           </ul>
-          {reviewing.length > 0 && <p className="text-[15px] text-text-secondary">Tu comprobante está en revisión. Quien creó la rifa confirma el pago.</p>}
+          {reviewing.length > 0 && <p className="text-[15px] text-text-secondary">Ya quedaron pagados. Quien creó la rifa revisa la transferencia y la confirma.</p>}
           {lastProof?.state === "rechazado" && (
-            <p role="alert" className="text-[15px] text-text-primary">Comprobante rechazado{lastProof.reject_reason ? `: ${lastProof.reject_reason}` : "."}</p>
+            <p role="alert" className="text-[15px] text-text-primary">Quien creó la rifa marcó tu pago como no recibido{lastProof.reject_reason ? `: ${lastProof.reject_reason}` : "."} Esos números quedaron libres.</p>
           )}
           {rifa.prize_kind === "texto" && paid.length > 0 && (
             <p className="text-[13px] text-text-secondary">Si ganas, quien creó la rifa te escribe por WhatsApp al celular de tu cuenta.</p>
@@ -231,10 +241,10 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
               {selected.size === 1 ? "número" : "números"} · {formatCop(rifa.price_cop)} c/u
             </p>
             {!rifa.viewer.signed_in ? (
-              <Link href={loginHref} onClick={rememberSelection} className="lp-btn lp-btn-primary shrink-0 !px-5">Entrar para reservar</Link>
+              <Link href={loginHref} onClick={rememberSelection} className="lp-btn lp-btn-primary shrink-0 !px-5">Entrar para pagar</Link>
             ) : needsAccount ? null : (
               <button type="button" onClick={reservar} disabled={busy !== null} className="lp-btn lp-btn-primary shrink-0 !px-5">
-                {busy === "reservar" ? "Reservando…" : "Reservar"}
+                {busy === "reservar" ? "Un momento…" : "Pagar"}
               </button>
             )}
           </div>
@@ -286,7 +296,7 @@ function PayBlock({ rifa, reservedNumbers, expiresAt, busy, setBusy, onDone, onQ
       }
       setStatus("Confirmando…");
       await post(`/api/rifas/${rifa.slug}/comprobante`, { action: "confirm", proofId: begun.proof_id });
-      showToast("Comprobante enviado. Quien creó la rifa revisa el pago.", "success");
+      showToast("Comprobante enviado. Tus números quedaron pagados.", "success");
       setStatus(null);
     } catch (err) {
       setStatus(null);
@@ -305,7 +315,7 @@ function PayBlock({ rifa, reservedNumbers, expiresAt, busy, setBusy, onDone, onQ
         <div className="lp-money mt-1 text-[30px] leading-none text-text-primary">{formatCop(rifa.viewer.pending_amount_cop)}</div>
         <p className="mt-1 text-[13px] text-text-secondary">
           Números {reservedNumbers.map(rifaNumber).join(", ")}
-          {expiresAt ? ` · la reserva vence ${formatColombiaDateTime(expiresAt, { hour: "numeric", minute: "2-digit" })}` : ""}
+          {expiresAt ? ` · sube el comprobante antes de las ${formatColombiaDateTime(expiresAt, { hour: "numeric", minute: "2-digit" })}` : ""}
         </p>
       </div>
       <div className="border-t border-border-subtle pt-3">
@@ -326,7 +336,7 @@ function PayBlock({ rifa, reservedNumbers, expiresAt, busy, setBusy, onDone, onQ
       {error && <p role="alert" className="text-[15px] text-text-primary">{error}</p>}
       <p className="text-[12px] text-text-muted">Una sola transferencia por todos tus números. Si ya transferiste, no repitas el pago.</p>
       <button type="button" disabled={busy !== null} onClick={() => void onQuitar(reservedNumbers)}
-        className="lp-btn lp-btn-ghost w-full">Quitar mi reserva</button>
+        className="lp-btn lp-btn-ghost w-full">Ya no los quiero</button>
     </StreetCard>
   );
 }
