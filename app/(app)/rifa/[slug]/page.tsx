@@ -56,7 +56,7 @@ export default async function RifaPage({ params }: { params: Promise<{ slug: str
           </div>
         )}
       </HeroFrame>
-      <RifaComprador initial={rifa} benefit />
+      <RifaComprador initial={rifa} benefitCause={benefit.cause} />
     </div>
   );
 
