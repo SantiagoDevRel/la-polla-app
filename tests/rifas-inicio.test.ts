@@ -47,13 +47,14 @@ describe("RifasInicio", () => {
     expect(out).not.toMatch(/[Rr]eservad/);
   });
 
-  it("quien ya compró ve sus números; el equipo ve «Ver rifa» y los comprobantes por revisar", () => {
+  it("quien ya compró ve sus números; el equipo también compra y ve los pagos por confirmar", () => {
     const tickets = [{ number: 7, state: "en_revision" as const, origin: "app" as const, expires_at: null, proof_id: null }];
     expect(html([view({ viewer: { ...view().viewer, tickets } })], emptyList)).toContain("Tus números: Pagados 07");
     const created = [{ slug: "rifa-solidaria-la-iguana-camiseta", name: "x", status: "abierta" as const, visibility: "publica" as const,
       draw_at: view().draw_at, hidden: false, number_count: 100, paid: 0, pending_proofs: 4 }];
     const out = html([view({ viewer: { ...view().viewer, is_creator: true } })], { ...emptyList, created });
-    expect(out).toContain("Ver rifa");
+    expect(out).toContain("Elegir número · $30.000");
+    expect(out).not.toContain("Ver rifa");
     expect(out).toContain("4 pagos por confirmar");
     // La destacada no se repite en las filas.
     expect(out).not.toContain("Creada por ti");
@@ -76,10 +77,11 @@ describe("inicio sin pestañas", () => {
 
 describe("ajustes del 6-nov", () => {
   const src = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
-  it("el tablero público solo muestra libre o pagado, y el equipo sabe por qué no puede comprar", () => {
+  it("el tablero público solo muestra libre o pagado, y el equipo compra como cualquiera", () => {
     const comprador = src("components/rifas/RifaComprador.tsx");
     expect(comprador).toContain('state: c.s === "libre" ? "libre" : "pagado"');
-    expect(comprador).toContain("Administras esta rifa, así que aquí no puedes comprar números.");
+    expect(comprador).toContain("const openForPicking = !rifa.closed && !rifa.hidden;");
+    expect(comprador).not.toContain("no puedes comprar");
     expect(comprador).not.toMatch(/>Reservar<|"Reservar"|Quitar mi reserva/);
   });
   it("el equipo confirma el pago o lo marca como no pagado", () => {

@@ -169,7 +169,9 @@ El creador suma a otra persona por el celular con el que entra a La Polla
 (panel → «Equipo»). Un coadministrador opera la rifa igual que el creador —
 comprobantes, ventas por fuera, liberar, resultado, visibilidad, imagen y foto
 del premio— porque `rifa_require_owner` acepta a `rifa_is_manager` (creador o
-fila en `rifa_managers`). No puede comprar en esa rifa, no suma ni quita a
+fila en `rifa_managers`). Desde la migración 179 compra números con el flujo
+normal, pero no confirma ni rechaza su propio comprobante (`OWN_PROOF`: lo hace
+la creadora, a quien sí se le permite porque el dinero es suyo). No suma ni quita a
 otros (`OWNER_ONLY`) y la rifa le aparece en «Mis rifas». El dinero sigue yendo a
 la cuenta de la rifa. Máximo 5. Quitarlo le quita el panel y la vista de la
 Privada. Prueba N de `scripts/rifas-check.sql`.
@@ -244,8 +246,8 @@ Cambió lo que se ve:
 - **El equipo** ve Libre, Sin pagar (`reservado`), Por confirmar (`en_revision`)
   y Pagado. En cada comprobante: «Confirmar pago» (aprobar) o «No pagó» (rechazar:
   pide el motivo y libera los números). «Deshacer confirmación» es revertir.
-- Quien administra la rifa no puede comprar en ella: el tablero lo dice y enlaza
-  a Gestionar (antes tocar un número no hacía nada).
+- Quien administra la rifa compra igual que cualquiera (migración 179): elige,
+  transfiere y sube el comprobante. Su propio pago lo confirma la creadora.
 
 ## Pruebas
 
