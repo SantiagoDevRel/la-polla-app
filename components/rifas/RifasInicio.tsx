@@ -44,14 +44,13 @@ function myRows(mine: RifaMyList | null, skip: ReadonlySet<string>): RifaRow[] {
 function FeaturedRifa({ rifa, pendingProofs }: { rifa: RifaPublicView; pendingProofs: number }) {
   const benefit = rifaBenefit(rifa.id);
   const href = `/rifa/${rifa.slug}`;
-  const manager = rifa.viewer.is_creator;
   const taken = rifa.counts.pagado + rifa.counts.reservado;
   const tickets = rifa.viewer.tickets;
   return (
     <li className="relative min-w-0">
       <StreetCard className="relative bg-bg-elevated p-4 transition-colors hover:border-border-strong">
         {/* Toda la tarjeta abre la rifa; la camiseta queda por encima para poder girarla. */}
-        <Link href={href} aria-label={`${manager ? "Ver" : "Elegir número en"} ${rifa.name}`}
+        <Link href={href} aria-label={`Elegir número en ${rifa.name}`}
           className="absolute inset-0 z-10 cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" />
         <PollaCardBody
           tag="rifa"
@@ -83,7 +82,7 @@ function FeaturedRifa({ rifa, pendingProofs }: { rifa: RifaPublicView; pendingPr
           {tickets.length > 0 ? `Tus números: ${numbersLabel(tickets)}` : `${taken} de ${rifa.number_count} números tomados`}
         </p>
         <span aria-hidden="true" className="lp-btn lp-btn-ghost mt-3 w-full gap-2 !border-turf/50 !px-4 text-text-primary">
-          {manager ? "Ver rifa" : `Elegir número · ${formatCop(rifa.price_cop)}`}
+          {`Elegir número · ${formatCop(rifa.price_cop)}`}
           <ArrowRight className="h-4 w-4 max-w-none shrink-0 text-turf" />
         </span>
       </StreetCard>

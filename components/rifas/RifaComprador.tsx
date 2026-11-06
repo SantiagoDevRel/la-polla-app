@@ -75,7 +75,8 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
     state: c.s === "libre" ? "libre" : "pagado",
   })), [rifa.board]);
 
-  const openForPicking = !rifa.closed && !rifa.hidden && !rifa.viewer.is_creator;
+  // (2026-11-06, migración 179) El equipo de la rifa también compra, con el mismo flujo.
+  const openForPicking = !rifa.closed && !rifa.hidden;
   const toggle = (n: number) => {
     setError(null);
     setSelected((prev) => {
@@ -178,14 +179,6 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
         <RifaBoard label="Tablero de números" cells={cells} selected={selected} winningNumber={rifa.winning_number}
           onPick={openForPicking ? toggle : undefined} pickable={(c) => c.state === "libre"} />
         <RifaLegend showSelected={openForPicking} />
-        {rifa.viewer.is_creator && !rifa.closed && (
-          // El equipo de la rifa no puede comprar en ella (SQL lo impide): sin esta
-          // línea, tocar un número no hacía nada y parecía dañado.
-          <p className="mt-3 rounded-lg border border-border-default bg-bg-card/80 px-3 py-2 text-[13px] text-text-secondary">
-            Administras esta rifa, así que aquí no puedes comprar números.{" "}
-            <Link href={`/rifa/${slug}/gestionar`} className="font-semibold text-text-primary underline underline-offset-2">Gestionar la rifa</Link>
-          </p>
-        )}
       </section>
 
       {error && <p role="alert" className="rounded-lg border border-red-alert/40 bg-red-alert/10 px-3 py-2 text-[15px] text-text-primary">{error}</p>}

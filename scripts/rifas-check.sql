@@ -161,8 +161,7 @@ BEGIN
     'NUMBER_TAKEN', 'C3 número tomado');
   ASSERT d = 'El 07 ya lo tomó otra persona. Elige otro número.', 'C3 mensaje claro: ' || d;
 END $$;
-SELECT pg_temp.expect_fail($$SELECT public.rifa_reserve_v1((SELECT id FROM r),'77777777-7777-4777-8777-0000000000c1',ARRAY[30])$$,
-  'CREATOR_CANNOT_BUY', 'C4 el creador compra en la app');
+-- C4 · (179) la creadora ya no tiene bloqueo para comprar: ver N3 (rifa de premio en especie).
 SELECT pg_temp.expect_fail($$SELECT public.rifa_reserve_v1((SELECT id FROM r),'77777777-7777-4777-8777-0000000000b2',ARRAY[100])$$,
   'INVALID_NUMBER', 'C5 número fuera de rango');
 SELECT pg_temp.expect_fail($$SELECT public.rifa_reserve_v1((SELECT id FROM r),'77777777-7777-4777-8777-0000000000b2',ARRAY[40,41,42,43,44,45,46,47,48,49,50])$$,
@@ -463,8 +462,30 @@ DO $$ BEGIN
   ASSERT EXISTS (SELECT 1 FROM jsonb_array_elements(public.rifa_my_list_v1('77777777-7777-4777-8777-0000000000b2')->'created') x
                  WHERE x->>'slug' = (SELECT slug FROM rn)), 'N2 aparece en Mis rifas del coadministrador';
 END $$;
-SELECT pg_temp.expect_fail($$SELECT public.rifa_reserve_v1((SELECT id FROM rn),'77777777-7777-4777-8777-0000000000b2',ARRAY[9])$$,
-  'CREATOR_CANNOT_BUY', 'N3 el coadministrador no compra');
+-- N3 · (179) el coadministrador compra con el flujo normal, pero no confirma su propio pago:
+-- lo confirma la creadora.
+DO $$
+DECLARE v_rifa uuid := (SELECT id FROM rn); v_proof uuid := gen_random_uuid(); v_err text := 'none';
+BEGIN
+  ASSERT (public.rifa_public_view_v1((SELECT slug FROM rn), '77777777-7777-4777-8777-0000000000b2')->'viewer'->>'can_reserve')::boolean,
+    'N3 el coadministrador puede reservar';
+  -- La creadora también compra (y se suelta para no tocar los casos siguientes).
+  PERFORM public.rifa_reserve_v1(v_rifa, '77777777-7777-4777-8777-0000000000c1', ARRAY[61]);
+  PERFORM public.rifa_cancel_reservation_v1(v_rifa, '77777777-7777-4777-8777-0000000000c1', ARRAY[61]);
+  PERFORM public.rifa_reserve_v1(v_rifa, '77777777-7777-4777-8777-0000000000b2', ARRAY[60]);
+  INSERT INTO public.rifa_proofs (id, rifa_id, buyer_id, request_id, numbers, amount_cop, path, content_sha256,
+    content_type, content_bytes, state, expires_at, submitted_at)
+  VALUES (v_proof, v_rifa, '77777777-7777-4777-8777-0000000000b2', gen_random_uuid(), ARRAY[60], 5000,
+    format('rifas/%s/%s.png', v_rifa, v_proof), repeat('b', 64), 'image/png', 10, 'en_revision', now() + interval '1 hour', now());
+  UPDATE public.rifa_tickets SET state = 'en_revision', proof_id = v_proof, expires_at = NULL
+   WHERE rifa_id = v_rifa AND number = 60 AND state = 'reservado';
+  BEGIN PERFORM public.rifa_review_proof_v1('77777777-7777-4777-8777-0000000000b2', v_proof, 'aprobar', NULL);
+  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM; END;
+  ASSERT v_err = 'OWN_PROOF', 'N3 el coadministrador no confirma su propio pago: ' || v_err;
+  PERFORM public.rifa_review_proof_v1('77777777-7777-4777-8777-0000000000c1', v_proof, 'rechazar', 'prueba del check');
+  ASSERT NOT EXISTS (SELECT 1 FROM public.rifa_tickets WHERE rifa_id = v_rifa AND number = 60 AND state <> 'liberado'),
+    'N3 la creadora lo marca como no pagado y el número queda libre';
+END $$;
 SELECT pg_temp.expect_fail($$SELECT public.rifa_add_manager_v1('77777777-7777-4777-8777-0000000000b2',(SELECT id FROM rn),'+573190000006')$$,
   'OWNER_ONLY', 'N3 el coadministrador no suma a otros');
 SELECT public.rifa_offline_sale_v1('77777777-7777-4777-8777-0000000000b2', (SELECT id FROM rn), 9, 'Venta del coadmin', '+573190000096', false);

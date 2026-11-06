@@ -15,6 +15,7 @@ const MESSAGES: Record<string, string> = {
   RIFA_CLOSED: "Esta rifa ya cerró. No se reciben más reservas.",
   RIFA_FINISHED: "Esta rifa ya tiene resultado.",
   CREATOR_CANNOT_BUY: "Creaste esta rifa. Para anotar un número usa «Venta por fuera».",
+  OWN_PROOF: "Ese pago es tuyo: lo confirma quien creó la rifa.",
   INVALID_NUMBER: "Elige números que estén en el tablero de esta rifa.",
   NUMBER_TAKEN: "Ese número ya lo tomó otra persona. Elige otro.",
   MAX_PENDING_NUMBERS: "Tienes demasiados números sin pago confirmado en esta rifa.",
