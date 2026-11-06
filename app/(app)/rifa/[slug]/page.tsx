@@ -13,6 +13,7 @@ import { HeroFrame, Label, Tape } from "@/components/street";
 import { RifaComprador } from "@/components/rifas/RifaComprador";
 import { PrizeMotion } from "@/components/casa/PrizeShowcase";
 import { rifaBenefit } from "@/lib/rifas/benefit";
+import { rifaPartner } from "@/lib/rifas/partner";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function RifaPage({ params }: { params: Promise<{ slug: str
   if (error || !rifa) notFound();
   if (!viewer) await rifaRpc("rifa_track_view_v1", { p_rifa: rifa.id, p_viewer: null });
   const benefit = rifaBenefit(rifa.id);
+  const partner = rifaPartner(rifa.id);
   const gestionar = rifa.viewer.is_creator && (
     <Link href={`/rifa/${rifa.slug}/gestionar`} aria-label="Gestionar mi rifa"
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-default bg-bg-card/80 text-text-primary transition-colors hover:border-gold/30">
@@ -38,6 +40,17 @@ export default async function RifaPage({ params }: { params: Promise<{ slug: str
       <HeroFrame height="min-h-[136px]">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
+            {/* (2026-11-06) Rifa con Los Del Sur: el escudo de la barra va primero (lib/rifas/partner.ts). */}
+            {partner && (
+              <div className="mb-3 flex min-w-0 items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element -- WebP en su tamaño real, sin Image Optimization */}
+                <img src={partner.escudo} alt="" width={52} height={52} className="h-[52px] w-[52px] max-w-none shrink-0" />
+                <div className="min-w-0">
+                  <p className="lp-display text-[26px] leading-none [overflow-wrap:anywhere]">{partner.name}</p>
+                  <p className="mt-1 text-[13px] text-text-secondary">La barra y sus combos</p>
+                </div>
+              </div>
+            )}
             <Tape tone="live" className="max-w-full [overflow-wrap:anywhere]">Sin ánimo de lucro</Tape>
             <p className="lp-label mt-3">Rifa para</p>
             <h1 className="lp-display mt-1 text-[34px] leading-[1.02] [overflow-wrap:anywhere]">{benefit.cause}</h1>

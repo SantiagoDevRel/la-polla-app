@@ -19,7 +19,7 @@ import { formatCop } from "@/lib/casa/format";
 import { formatColombiaDateTime, toColombiaDateTimeInput } from "@/lib/time/colombia";
 import { ImagePreparationError, PRIZE_IMAGE_PREPARE_OPTIONS, prepareImageUpload } from "@/lib/casa/prepare-proof";
 import {
-  displayPhone, drawLabel, PAYMENT_METHOD_LABEL, rifaNumber, rifaShareText, STORY_CLUBS, STORY_TEMPLATE_OPTIONS, whatsappChatUrl,
+  displayPhone, drawLabel, PAYMENT_METHOD_LABEL, rifaNumber, rifaShareText, STORY_CLUBS, storyTemplateOptions, whatsappChatUrl,
   type RifaCreatorTicket, type RifaCreatorView, type RifaTeam, type StoryTemplate,
 } from "@/lib/rifas/shared";
 
@@ -33,7 +33,8 @@ const EVENT_LABEL: Record<string, string> = {
   numero_liberado: "Número liberado", resultado: "Resultado", reporte: "Reporte de un usuario",
 };
 
-export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; shareUrl: string }) {
+/** partner: rifa de una barra (lib/rifas/partner.ts) → solo sus plantillas de historia. */
+export function RifaGestion({ initial, shareUrl, partner = null }: { initial: RifaCreatorView; shareUrl: string; partner?: "lds" | null }) {
   const [rifa, setRifa] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +125,7 @@ export function RifaGestion({ initial, shareUrl }: { initial: RifaCreatorView; s
         <RifaLegend team />
       </section>
 
-      <SharePanel rifa={rifa} shareUrl={shareUrl} />
+      <SharePanel rifa={rifa} shareUrl={shareUrl} partner={partner} />
       <PrizePhoto slug={slug} hasImage={rifa.has_prize_image} onDone={refresh} />
       {rifa.team && <TeamPanel team={rifa.team} busy={busy} act={act} />}
 
@@ -326,8 +327,9 @@ type ShareState = "loading" | "ready" | "error";
  * El archivo se prepara ANTES del toque: iOS exige que share() ocurra dentro
  * del gesto del usuario, sin una descarga en medio.
  */
-function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: string }) {
-  const [template, setTemplate] = useState<StoryTemplate>("neutra");
+function SharePanel({ rifa, shareUrl, partner }: { rifa: RifaCreatorView; shareUrl: string; partner: "lds" | null }) {
+  const options = storyTemplateOptions(partner);
+  const [template, setTemplate] = useState<StoryTemplate>(options[0].key);
   const [club, setClub] = useState(STORY_CLUBS[0].key);
   const [withLink, setWithLink] = useState(true);
   const [file, setFile] = useState<File | null>(null);
@@ -337,7 +339,7 @@ function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: strin
   const [attempt, setAttempt] = useState(0);
   const { showToast } = useToast();
   const text = rifaShareText(rifa, shareUrl, formatCop(rifa.price_cop));
-  const option = STORY_TEMPLATE_OPTIONS.find((t) => t.key === template) ?? STORY_TEMPLATE_OPTIONS[0];
+  const option = options.find((t) => t.key === template) ?? options[0];
   // La imagen cambia con los números tomados, el sorteo (volver a jugar cambia fecha y
   // lotería) y el resultado: la versión evita compartir una copia vieja.
   const version = [rifa.tickets.map((t) => `${t.number}${t.state[0]}`).join("."), rifa.status, rifa.draw_at,
@@ -397,7 +399,7 @@ function SharePanel({ rifa, shareUrl }: { rifa: RifaCreatorView; shareUrl: strin
         {/* Radios nativos: flechas, un solo Tab y foco en el elegido, sin código propio. */}
         <fieldset className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           <legend className="sr-only">Diseño</legend>
-          {STORY_TEMPLATE_OPTIONS.map((t) => {
+          {options.map((t) => {
             const selected = template === t.key;
             return (
               <label key={t.key}

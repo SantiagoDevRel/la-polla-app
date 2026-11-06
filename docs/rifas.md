@@ -194,7 +194,7 @@ aparece Aprobar (`DRAW_LOCKED`).
 
 `GET /api/rifas/<slug>/historia?plantilla=<diseño>&club=<clave>`: PNG
 1080×1920, solo el creador. Nombre, premio, tablero con los tomados marcados
-(X roja sobre el número, 29-sep), fecha y hora en Colombia, lotería, valor y el enlace. Doce
+(X roja sobre el número, 29-sep), fecha y hora en Colombia, lotería, valor y el dominio (desde el 7-nov, sin el enlace). Doce
 plantillas en `lib/rifas/story-templates`: `neutra`, `club`, `estadio`, `boleta`,
 `marcador`, `cuaderno`, `camiseta`, `pizarra`, `retro`, `premium`, `neon`, `confeti`.
 `neutra` es el respaldo de una clave desconocida. `club` y `camiseta` usan colores
@@ -233,6 +233,34 @@ premio «Camiseta firmada por Franco Armani», de carlos con Santi de coadminist
 Pública, 100 números a $30.000, Lotería de Medellín del 13-nov. Una camiseta por rifa,
 de a una: la siguiente se crea al cerrar esta y se agrega su uuid al mapa.
 Prueba: `tests/rifas-benefit.test.ts`.
+
+### Con Los Del Sur (7-nov-2026, pedido del dueño)
+
+La rifa La Iguaná es en colaboración con Los Del Sur. `lib/rifas/partner.ts` la
+marca por uuid (portada, inicio, panel) y por slug (la imagen de historia solo
+recibe el slug de SQL); el test exige que ambos sean la misma rifa.
+- Portada y tarjeta del inicio: escudo (`public/rifas/lds/escudo-*.webp`) y
+  «Los Del Sur · La barra y sus combos».
+- Imagen para historia: esa rifa solo ve **seis plantillas de la barra**
+  (`lds-tribuna`, `lds-combos`, `lds-humo`, `lds-trapo`, `lds-escudo`,
+  `lds-sombrillas`, en `story-templates/designs-lds.tsx`) y las demás rifas no
+  las ven. Encabezado con escudo, pollito barrista grande y La Polla solo como
+  logo pequeño junto al dominio. Arte en `assets/rifas-story/lds/`
+  (`scripts/bake-rifa-lds-assets.py`): escudo, trapo y fotos de la app de LDS, y
+  seis pollitos barristas (pava «BARRA BRAVA», bombo, bandera, trompeta,
+  sombrilla, trapo) editados con Qwen Image Edit 2511 en el DGX a partir de
+  `pollito_verde_base`. Originales en `Downloads/agent-work/lds-pollitos-20261107/`.
+  La web conserva los pollitos de siempre.
+- Prueba: `tests/rifas-lds-story.test.ts`.
+
+### Pagar en un popup (7-nov-2026)
+
+«Pagar» aparta los números y abre un popup con el valor exacto, la cuenta (con
+botón de copiar), el titular, «Subir comprobante» y «Ya no los quiero». Se cierra
+al enviar el comprobante; mientras falte, «Tus números» muestra «Pagar $…» para
+reabrirlo. Sin textos de vencimiento ni de «una sola transferencia»: el dueño
+pidió menos texto. La imagen de historia dice solo el dominio, sin el enlace de
+la rifa, sin «La Polla organiza el tablero» y sin «Edición hincha/especial».
 
 ### Sin «reservado» a la vista (6-nov-2026, pedido del dueño)
 

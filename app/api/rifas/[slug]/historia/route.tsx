@@ -6,6 +6,8 @@
 // números tomados.
 // Registro: lib/rifas/story-templates (12 diseños, respaldo neutra).
 // Solo usesClub carga pollito del catálogo, sin escudos oficiales.
+// Las rifas de Los Del Sur (lib/rifas/partner.ts) usan SOLO sus 6 plantillas:
+// escudo, trapo y fotos de la barra + un pollito barrista (assets/rifas-story/lds).
 // Fuentes de la marca (Bebas Neue + Outfit 600) en assets/fonts, OFL.
 // Runtime Node: lee fuentes y pollitos del disco (sin fetch a sí mismo). Los
 // pollitos van como PNG en assets/rifas-story porque satori no decodifica WebP.
@@ -15,7 +17,8 @@ import { ImageResponse } from "next/og";
 import { rifaError, rifaJson, RIFA_DISABLED, RIFA_UNAUTHORIZED } from "@/lib/rifas/errors";
 import { getRifaViewer, rifaRpc, rifasEnabled, validSlug } from "@/lib/rifas/server";
 import { storyClub } from "@/lib/rifas/shared";
-import { STORY_H, STORY_W, getStoryTemplate, renderStory, type StoryData } from "@/lib/rifas/story-templates";
+import { rifaPartnerBySlug } from "@/lib/rifas/partner";
+import { LDS_STORY_TEMPLATE_LIST, STORY_H, STORY_W, getStoryTemplate, renderStory, type StoryData, type StoryPartnerArt } from "@/lib/rifas/story-templates";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,19 +39,28 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
 
   const url = new URL(request.url);
   const templateParam = url.searchParams.get("plantilla");
-  const template = getStoryTemplate(templateParam);
+  const partner = rifaPartnerBySlug(r.slug);
+  const template = getStoryTemplate(templateParam, partner?.key ?? null);
+  const lds = LDS_STORY_TEMPLATE_LIST.find((t) => t.key === template.key) ?? null;
   const club = storyClub(url.searchParams.get("club"));
   const appHost = (process.env.NEXT_PUBLIC_APP_URL ?? "https://lapollacolombiana.com").replace(/^https?:\/\//, "").replace(/\/$/, "");
 
-  const [bebas, outfit, logo, pollito] = await Promise.all([
+  const [bebas, outfit, logo, pollito, partnerArt] = await Promise.all([
     readFile(join(process.cwd(), "assets/fonts/BebasNeue-latin.ttf")),
     readFile(join(process.cwd(), "assets/fonts/Outfit-SemiBold-latin.ttf")),
     // PNG horneados (scripts/bake-rifa-story-assets.py): satori no decodifica WebP.
     asset("assets/rifas-story/logo.png", "image/png"),
-    template.usesClub ? asset(`assets/rifas-story/pollito_${club.key}.png`, "image/png") : Promise.resolve(null),
+    lds ? asset(`assets/rifas-story/lds/pollito-${lds.pollito}.png`, "image/png")
+      : template.usesClub ? asset(`assets/rifas-story/pollito_${club.key}.png`, "image/png") : Promise.resolve(null),
+    // Arte de la barra (scripts/bake-rifa-lds-assets.py).
+    lds ? Promise.all([
+      asset("assets/rifas-story/lds/escudo.png", "image/png"),
+      asset("assets/rifas-story/lds/trapo.png", "image/png"),
+      lds.background ? asset(`assets/rifas-story/lds/fondo-${lds.background}.jpg`, "image/jpeg") : Promise.resolve(null),
+    ]).then(([escudo, trapo, background]): StoryPartnerArt => ({ escudo, trapo, background })) : Promise.resolve(null),
   ]);
 
-  return new ImageResponse(renderStory(template.key, { r, club, appHost, logo, pollito }), {
+  return new ImageResponse(renderStory(template.key, { r, club, appHost, logo, pollito, partner: partnerArt }), {
     width: STORY_W, height: STORY_H,
     fonts: [
       { name: "Bebas", data: bebas, weight: 400, style: "normal" },

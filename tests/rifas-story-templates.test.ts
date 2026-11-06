@@ -74,7 +74,8 @@ describe("registro y privacidad", () => {
     expect(html).not.toContain("PRIVADO");
     expect(html).toContain("LA POLLA");
     expect(html).toContain("GANADOR 07");
-    expect(html).toContain("lapollacolombiana.com/rifa/abcd2345");
+    expect(html).toContain(">lapollacolombiana.com<");
+    expect(html).not.toMatch(/organiza el tablero|EDICIÓN|\/rifa\/abcd2345/);
     expect([...html.matchAll(/data-number="(\d+)"/g)].map((m) => Number(m[1]))).toEqual(Array.from({ length: 100 }, (_, i) => i));
     expect(html.match(/data-taken="true"/g)).toHaveLength(3);
     expect(html.match(/data-winner="true"/g)).toHaveLength(1);

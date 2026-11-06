@@ -8,7 +8,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { STORY_TEMPLATE_LIST, STORY_W, STORY_H, renderStory, type StoryData } from "../lib/rifas/story-templates";
+import { LDS_STORY_TEMPLATE_LIST, STORY_TEMPLATE_LIST, STORY_W, STORY_H, renderStory, type StoryData } from "../lib/rifas/story-templates";
 import { STORY_CLUBS } from "../lib/rifas/shared";
 
 // sharp viene con Next (dependencia de next/image); no se agrega al package.json.
@@ -47,6 +47,27 @@ async function main() {
       { width: STORY_W, height: STORY_H, fonts }).arrayBuffer());
     const file = join(out, `${template.key}.webp`);
     await sharp(png).resize(THUMB_W, THUMB_H).webp({ quality: 80 }).toFile(file);
+    console.log(file);
+  }
+  // Los Del Sur (lib/rifas/partner.ts): ejemplo con los datos de la rifa solidaria.
+  const data = async (path: string, mime: string) => `data:${mime};base64,${(await readFile(join(root, path))).toString("base64")}`;
+  const lds: StoryData = { ...r, slug: "rifa-solidaria-la-iguana-camiseta", name: "Rifa solidaria La Iguaná",
+    prize_text: "Camiseta firmada por Franco Armani", number_count: 100, price_cop: 30_000,
+    lottery_name: "Lotería de Medellín", draw_at: "2026-11-14T03:30:00.000Z", taken: [3, 7, 10, 21, 33, 45, 58, 77, 90] };
+  const full = process.argv.includes("--full");
+  for (const template of LDS_STORY_TEMPLATE_LIST) {
+    const [pollito, escudo, trapo, background] = await Promise.all([
+      data(`assets/rifas-story/lds/pollito-${template.pollito}.png`, "image/png"),
+      data("assets/rifas-story/lds/escudo.png", "image/png"),
+      data("assets/rifas-story/lds/trapo.png", "image/png"),
+      template.background ? data(`assets/rifas-story/lds/fondo-${template.background}.jpg`, "image/jpeg") : Promise.resolve(null),
+    ]);
+    const png = Buffer.from(await new ImageResponse(renderStory(template.key, { r: lds, club, logo, pollito,
+      appHost: "lapollacolombiana.com", partner: { escudo, trapo, background } }), { width: STORY_W, height: STORY_H, fonts }).arrayBuffer());
+    const file = join(out, `${template.key}.webp`);
+    await sharp(png).resize(THUMB_W, THUMB_H).webp({ quality: 80 }).toFile(file);
+    // --full: copia en tamaño real para revisarla (no se versiona).
+    if (full) await import("node:fs/promises").then((fs) => fs.writeFile(join(process.env.LDS_PREVIEW_DIR ?? root, `${template.key}.png`), png));
     console.log(file);
   }
 }

@@ -68,6 +68,12 @@ export interface Treatment {
   boardStyle?: CSSProperties; prizeStyle?: CSSProperties; footerStyle?: CSSProperties;
   /** Swap title/prize emphasis without changing the reserved board and footer regions. */
   prizeFirst?: boolean; backdrop?: ReactNode; ornament?: ReactNode;
+  /** Plantillas de una barra: su encabezado reemplaza el de La Polla, que pasa al pie junto al dominio. */
+  header?: ReactNode; footerLogo?: boolean;
+  /** Encabezado más alto: el título baja. Sin superar el panel del premio (top 420). */
+  titleTop?: number; titleNode?: ReactNode;
+  /** Pollito grande que sobresale del bloque del título. */
+  pollitoSize?: number; pollitoTop?: number; pollitoRight?: number; nameWidth?: number;
 }
 
 /** X de número tomado: rojo de alerta de la marca (#FF3D57), un poco más profundo para leerse sobre casillas claras. */
@@ -115,26 +121,27 @@ export function StoryFrame(props: StoryProps, theme: Treatment) {
   const muted = theme.muted ?? "#BFC9D8";
   const center = theme.centered ?? false;
   const prize = r.prize_kind === "dinero" ? formatCop(r.prize_cop ?? 0) : (r.prize_text ?? "");
-  const titleTop = theme.prizeFirst ? 380 : 160;
+  const titleTop = theme.prizeFirst ? 380 : theme.titleTop ?? 160;
   const prizeTop = theme.prizeFirst ? 156 : 420;
   const board = boardLayout(r.number_count, BOARD_W, BOARD_H);
   const boardTop = 664 + (BOARD_H - board.height) / 2;
   return <div style={{ display: "flex", width: STORY_W, height: STORY_H, background: theme.background,
     color: ink, fontFamily: "Outfit", fontWeight: 600, position: "relative", overflow: "hidden" }}>
     {theme.backdrop}
-    <div style={{ display: "flex", alignItems: "center", gap: 18, position: "absolute", left: 70, top: 60 }}>
+    {theme.header ?? <div style={{ display: "flex", alignItems: "center", gap: 18, position: "absolute", left: 70, top: 60 }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- PNG embedded in next/og */}
       <img src={logo} width={70} height={70} alt="" />
       <span style={{ ...display, fontSize: 42 }}>LA POLLA</span>
-    </div>
+    </div>}
     {theme.ornament}
     <div style={{ display: "flex", flexDirection: "column", position: "absolute", left: 80, top: titleTop,
       width: 920, height: 244, alignItems: center ? "center" : "flex-start" }}>
-      <span style={{ ...display, fontSize: theme.titleSize ?? 128, color: theme.accent ?? ink, ...theme.titleStyle }}>
+      {theme.titleNode ?? <span style={{ ...display, fontSize: theme.titleSize ?? 128, color: theme.accent ?? ink, ...theme.titleStyle }}>
         {theme.title ?? "RIFA"}
-      </span>
-      <FittedText text={r.name.toUpperCase()} width={pollito ? 700 : 920} height={110} size={56} family="Bebas" center={center} />
-      {pollito && <img src={pollito} width={190} height={190} alt="" style={{ position: "absolute", right: 0, top: 10 }} /> /* eslint-disable-line @next/next/no-img-element */}
+      </span>}
+      <FittedText text={r.name.toUpperCase()} width={pollito ? theme.nameWidth ?? 700 : 920} height={110} size={56} family="Bebas" center={center} />
+      {pollito && <img src={pollito} width={theme.pollitoSize ?? 190} height={theme.pollitoSize ?? 190} alt="" /* eslint-disable-line @next/next/no-img-element */
+        style={{ position: "absolute", right: theme.pollitoRight ?? 0, top: theme.pollitoTop ?? 10 }} />}
     </div>
     <div style={{ display: "flex", flexDirection: "column", position: "absolute", left: 80, top: prizeTop,
       width: 920, height: 202, padding: "16px 24px", borderRadius: 18, background: theme.panel ?? "#131B2B",
@@ -169,9 +176,14 @@ export function StoryFrame(props: StoryProps, theme: Treatment) {
     </div>
     <div style={{ display: "flex", flexDirection: "column", position: "absolute", left: 60, top: 1790,
       width: 960, alignItems: "center", background: theme.panel ?? "#131B2B", borderRadius: 12, padding: "8px 0" }}>
-      <span style={{ fontSize: 24 }}>Escoge tu número en</span>
-      <FittedText text={`${appHost}/rifa/${r.slug}`} width={960} height={52} size={39} family="Bebas" center />
-      <span style={{ fontSize: 19, color: muted, marginTop: 6 }}>La Polla organiza el tablero. El pago va directo a quien creó la rifa.</span>
+      {/* (2026-11-06, pedido del dueño) Solo el dominio: más fácil de leer y recordar. */}
+      {theme.footerLogo
+        ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, width: 960 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- PNG embedded in next/og */}
+            <img src={logo} width={60} height={60} alt="" />
+            <FittedText text={appHost} width={560} height={96} size={64} family="Bebas" center />
+          </div>
+        : <FittedText text={appHost} width={960} height={96} size={64} family="Bebas" center />}
     </div>
   </div>;
 }

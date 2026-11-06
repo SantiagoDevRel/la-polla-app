@@ -85,7 +85,6 @@ export function camiseta(props: StoryProps) {
       <path d="M168 200V1850 M912 200V1850" stroke="#FFFFFF" opacity="0.6" strokeWidth="3" strokeDasharray="5 9" />
       <rect x="46" y="44" width="988" height="1832" rx="30" fill={INK} opacity="0.65" />
     </Art>,
-    ornament: <div style={{ display: "flex", position: "absolute", top: 65, right: 80, fontSize: 23, letterSpacing: 4 }}>EDICIÓN HINCHA</div>,
   });
 }
 
@@ -123,7 +122,6 @@ export function premium(props: StoryProps) {
     boardStyle: { borderTop: "2px solid #080c10", borderBottom: "2px solid #080c10", borderRadius: 0 },
     footerStyle: { borderBottom: "2px solid #080c10", borderRadius: 0 },
     backdrop: <Art><path d="M70 142H1010 M70 34H1010" stroke={INK} strokeWidth="2" /></Art>,
-    ornament: <div style={{ display: "flex", position: "absolute", top: 80, right: 80, fontSize: 21, letterSpacing: 6 }}>EDICIÓN ESPECIAL</div>,
   });
 }
 
