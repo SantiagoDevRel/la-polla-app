@@ -28,11 +28,11 @@ function jamesJersey(base = "/prizes/v3-30099c32d6c6/"): RifaBenefit["jersey"] {
 }
 
 const LA_IGUANA = {
-  cause: "una familia damnificada en La Iguana",
+  cause: "una familia damnificada en La Iguaná",
   detail: "Todo lo recaudado compra camas, colchones, cobijas y almohadas para su casa.",
 } as const;
 
-/** Rifa solidaria La Iguana: una camiseta por rifa, de a una. */
+/** Rifa solidaria La Iguaná: una camiseta por rifa, de a una. */
 const BENEFIT_RIFAS: Readonly<Record<string, () => RifaBenefit>> = {
   "495aa5b1-767c-47bb-8487-15223ab44f63": () => ({ ...LA_IGUANA, jersey: jamesJersey() }),
 };

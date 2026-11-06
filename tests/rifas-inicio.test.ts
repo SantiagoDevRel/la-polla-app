@@ -13,7 +13,7 @@ const LA_IGUANA_1 = "495aa5b1-767c-47bb-8487-15223ab44f63";
 
 function view(over: Partial<RifaPublicView> = {}): RifaPublicView {
   return {
-    id: LA_IGUANA_1, slug: "rifa-solidaria-la-iguana-camiseta", name: "Rifa solidaria La Iguana · Camiseta 1", creator_name: "carlos",
+    id: LA_IGUANA_1, slug: "rifa-solidaria-la-iguana-camiseta", name: "Rifa solidaria La Iguaná · Camiseta 1", creator_name: "carlos",
     prize_kind: "texto", prize_cop: null, prize_text: "Camiseta firmada", has_prize_image: false, number_count: 100, price_cop: 30000,
     lottery_name: "Lotería de Medellín", digits_rule: "ultimas_dos", draw_at: new Date(Date.now() + 3 * 86_400_000).toISOString(),
     visibility: "publica", status: "abierta", winning_number: null, hidden: false, hidden_reason: null, closed: false, reservation_minutes: 30,
@@ -30,7 +30,7 @@ describe("RifasInicio", () => {
   it("la rifa sin ánimo de lucro sale con su etiqueta, su causa y el botón con el precio", () => {
     const out = html([view()], emptyList);
     expect(out).toContain(">Rifa</span>");
-    expect(out).toContain("para una familia damnificada en La Iguana");
+    expect(out).toContain("para una familia damnificada en La Iguaná");
     expect(out).toContain("Elegir número · $30.000");
     expect(out).toContain("3 de 100 números tomados");
   });
