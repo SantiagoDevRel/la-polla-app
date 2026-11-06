@@ -33,7 +33,9 @@ describe("RifasInicio", () => {
     expect(out).toContain("Para una familia damnificada en La Iguaná");
     expect(out).toContain("Elegir número · $30.000");
     expect(out).toContain("3 de 100 números tomados");
-    expect(out).toContain(">Sin ánimo de lucro</span>");
+    // (2026-11-06) Con Los Del Sur: escudo y nombre de la barra antes de «Sin ánimo de lucro».
+    expect(out).toContain('src="/rifas/lds/escudo-128.webp"');
+    expect(out).toContain(">Los Del Sur</span> · Sin ánimo de lucro</span>");
     expect(out).not.toContain("lucro ·");
   });
 

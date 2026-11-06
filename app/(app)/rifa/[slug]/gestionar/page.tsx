@@ -7,6 +7,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCreatorView, getRifaViewer, rifasEnabled, validSlug } from "@/lib/rifas/server";
 import { HeroFrame, Label } from "@/components/street";
 import { RifaGestion } from "@/components/rifas/RifaGestion";
+import { rifaPartner } from "@/lib/rifas/partner";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function GestionarRifaPage({ params }: { params: Promise<{ 
         <Label>Gestionar mi rifa</Label>
         <h1 className="lp-display mt-1 text-[30px] [overflow-wrap:anywhere]">{data.name}</h1>
       </HeroFrame>
-      <RifaGestion initial={data} shareUrl={`${appUrl}/rifa/${data.slug}`} />
+      <RifaGestion initial={data} shareUrl={`${appUrl}/rifa/${data.slug}`} partner={rifaPartner(data.id)?.key ?? null} />
     </div>
   );
 }

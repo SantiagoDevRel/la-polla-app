@@ -4,7 +4,7 @@
 // y la imagen de historia. Las cifras de dinero NO se calculan acá: vienen de
 // SQL (rifa_reserve_v1, rifa_creator_view_v1). Acá solo se escriben bonito.
 import { formatColombiaDateTime } from "@/lib/time/colombia";
-import { STORY_TEMPLATE_CATALOG } from "./story-templates/catalog";
+import { LDS_STORY_TEMPLATE_CATALOG, STORY_TEMPLATE_CATALOG, type LdsStoryTemplateKey } from "./story-templates/catalog";
 
 export type RifaBoardState = "libre" | "reservado" | "pagado";
 export type RifaTicketState = "reservado" | "en_revision" | "pagado";
@@ -194,10 +194,16 @@ export function displayPhone(phone: string | null): string {
  * (docs/pollito-clubes.md): no se inventan camisetas ni se usan escudos.
  */
 export const STORY_TEMPLATES = STORY_TEMPLATE_CATALOG.map((template) => template.key);
-export type StoryTemplate = (typeof STORY_TEMPLATES)[number];
+export type StoryTemplate = (typeof STORY_TEMPLATES)[number] | LdsStoryTemplateKey;
 
+type StoryTemplateOption = { key: StoryTemplate; label: string; usesClub: boolean };
 /** Opciones del selector de diseño en el panel (orden = orden en pantalla). */
-export const STORY_TEMPLATE_OPTIONS: ReadonlyArray<{ key: StoryTemplate; label: string; usesClub: boolean }> = STORY_TEMPLATE_CATALOG;
+export const STORY_TEMPLATE_OPTIONS: ReadonlyArray<StoryTemplateOption> = STORY_TEMPLATE_CATALOG;
+
+/** Una rifa de Los Del Sur (lib/rifas/partner.ts) solo ofrece las plantillas de la barra. */
+export function storyTemplateOptions(partner: "lds" | null): ReadonlyArray<StoryTemplateOption> {
+  return partner === "lds" ? LDS_STORY_TEMPLATE_CATALOG : STORY_TEMPLATE_OPTIONS;
+}
 
 export interface StoryClub { key: string; label: string; primary: string; secondary: string; ink: string }
 

@@ -14,6 +14,7 @@ import { CardTypeTag, PollaCardBody } from "@/components/casa/PollaCard";
 import { PollaSection } from "@/components/casa/PollaSection";
 import { formatCop, timeLeft } from "@/lib/casa/format";
 import { rifaBenefit } from "@/lib/rifas/benefit";
+import { rifaPartner } from "@/lib/rifas/partner";
 import { drawLabel, rifaNumber, type RifaMyList, type RifaPublicView } from "@/lib/rifas/shared";
 
 type RifaRow = { slug: string; href: string; name: string; detail: string; badge?: string };
@@ -43,6 +44,7 @@ function myRows(mine: RifaMyList | null, skip: ReadonlySet<string>): RifaRow[] {
 
 function FeaturedRifa({ rifa, pendingProofs }: { rifa: RifaPublicView; pendingProofs: number }) {
   const benefit = rifaBenefit(rifa.id);
+  const partner = rifaPartner(rifa.id);
   const href = `/rifa/${rifa.slug}`;
   const taken = rifa.counts.pagado + rifa.counts.reservado;
   const tickets = rifa.viewer.tickets;
@@ -59,9 +61,13 @@ function FeaturedRifa({ rifa, pendingProofs }: { rifa: RifaPublicView; pendingPr
           kind="rifa"
           identity={benefit
             ? (
-              <span className="min-w-0 text-[13px] leading-snug [overflow-wrap:anywhere]">
-                <span className="block font-semibold text-turf">Sin ánimo de lucro</span>
-                <span className="block text-text-secondary">Para {benefit.cause}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element -- escudo de la barra (lib/rifas/partner.ts), WebP en su tamaño real */}
+                {partner && <img src={partner.escudo} alt="" width={36} height={36} className="h-9 w-9 max-w-none shrink-0" />}
+                <span className="min-w-0 text-[13px] leading-snug [overflow-wrap:anywhere]">
+                  <span className="block font-semibold text-turf">{partner ? <><span className="text-text-primary">{partner.name}</span> · </> : null}Sin ánimo de lucro</span>
+                  <span className="block text-text-secondary">Para {benefit.cause}</span>
+                </span>
               </span>
             )
             : undefined}

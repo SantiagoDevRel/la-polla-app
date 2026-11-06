@@ -11,14 +11,13 @@
 // Menos texto: una línea por estado; lo legal va en una sola frase al final.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Flag, Trophy, Upload } from "lucide-react";
+import { Flag, Trophy, Upload, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { CopiarDato } from "@/components/casa/CopiarDato";
 import { PayoutAccountButton } from "@/components/casa/PayoutAccountButton";
 import { Label, StreetCard } from "@/components/street";
 import { RifaBoard, RifaLegend, type BoardCell } from "@/components/rifas/RifaBoard";
 import { formatCop } from "@/lib/casa/format";
-import { formatColombiaDateTime } from "@/lib/time/colombia";
 import { ImagePreparationError, PROOF_PREPARE_OPTIONS, prepareImageUpload } from "@/lib/casa/prepare-proof";
 import { uploadSignedFile } from "@/lib/casa/upload-client";
 import { DIGITS_RULE_LABEL, drawLabel, PAYMENT_METHOD_LABEL, rifaNumber, type RifaPublicView } from "@/lib/rifas/shared";
@@ -39,7 +38,8 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState<null | "reservar" | "comprobante" | "quitar">(null);
   const [error, setError] = useState<string | null>(null);
-  const { showToast } = useToast();
+  // (2026-11-06, pedido del dueño) «Pagar» abre un popup con el valor y la cuenta.
+  const [payOpen, setPayOpen] = useState(false);
   const slug = rifa.slug;
 
   const refresh = useCallback(async () => {
@@ -93,7 +93,7 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
     try {
       await post(`/api/rifas/${slug}/reservar`, { action: "reservar", numbers: [...selected] });
       setSelected(new Set());
-      showToast("Listo. Ahora transfiere y sube el comprobante.", "success");
+      setPayOpen(true);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -118,7 +118,6 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
   const reviewing = rifa.viewer.tickets.filter((t) => t.state === "en_revision");
   const paid = rifa.viewer.tickets.filter((t) => t.state === "pagado");
   const lastProof = rifa.viewer.proofs[0];
-  const expiresAt = reserved.map((t) => t.expires_at).filter(Boolean).sort()[0] ?? null;
   const lastDraw = rifa.draws[rifa.draws.length - 1];
 
   return (
@@ -202,6 +201,11 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
               </li>
             ))}
           </ul>
+          {reserved.length > 0 && rifa.payment && (
+            <button type="button" onClick={() => setPayOpen(true)} className="lp-btn lp-btn-primary w-full">
+              Pagar {formatCop(rifa.viewer.pending_amount_cop)}
+            </button>
+          )}
           {reviewing.length > 0 && <p className="text-[15px] text-text-secondary">Ya quedaron pagados. Quien creó la rifa revisa la transferencia y la confirma.</p>}
           {lastProof?.state === "rechazado" && (
             <p role="alert" className="text-[15px] text-text-primary">Quien creó la rifa marcó tu pago como no recibido{lastProof.reject_reason ? `: ${lastProof.reject_reason}` : "."} Esos números quedaron libres.</p>
@@ -213,15 +217,13 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
       )}
 
       {reserved.length > 0 && rifa.payment && (
-        <PayBlock rifa={rifa} reservedNumbers={reserved.map((t) => t.number)} expiresAt={expiresAt}
+        <PayDialog open={payOpen} onClose={() => setPayOpen(false)} rifa={rifa} reservedNumbers={reserved.map((t) => t.number)}
           busy={busy} setBusy={setBusy} onDone={refresh} onQuitar={quitar} />
       )}
 
       <footer className="space-y-2 pt-2 text-[12px] leading-relaxed text-text-muted">
-        {benefit ? <>
-          <p className="text-[15px] font-semibold leading-snug text-text-primary">El 100&nbsp;% de lo recaudado va para {benefitCause}.</p>
-          <p>Rifa sin ánimo de lucro. La Polla solo organiza el tablero y no cobra nada: el dinero va directo a la cuenta de la rifa.</p>
-        </> : <p>La Polla solo organiza el tablero. El dinero va directo a quien creó la rifa: La Polla no recibe pagos ni entrega premios.</p>}
+        {/* (2026-11-06) Sin la nota de «La Polla solo organiza el tablero»: el dueño la quitó. */}
+        {benefit && <p className="text-[15px] font-semibold leading-snug text-text-primary">El 100&nbsp;% de lo recaudado va para {benefitCause}.</p>}
         {rifa.viewer.signed_in && !rifa.viewer.is_creator && <ReportButton slug={slug} reported={rifa.viewer.reported} />}
       </footer>
 
@@ -264,18 +266,28 @@ function ResultBanner({ rifa }: { rifa: RifaPublicView }) {
   );
 }
 
-function PayBlock({ rifa, reservedNumbers, expiresAt, busy, setBusy, onDone, onQuitar }: {
-  rifa: RifaPublicView; reservedNumbers: number[]; expiresAt: string | null;
+/** Popup de pago: el valor exacto, la cuenta y el botón para subir el comprobante. Nada más. */
+function PayDialog({ open, onClose, rifa, reservedNumbers, busy, setBusy, onDone, onQuitar }: {
+  open: boolean; onClose: () => void; rifa: RifaPublicView; reservedNumbers: number[];
   busy: string | null; setBusy: (v: null | "comprobante") => void; onDone: () => Promise<void>; onQuitar: (n: number[]) => Promise<void>;
 }) {
   const payment = rifa.payment!;
+  const dialog = useRef<HTMLDialogElement>(null);
   const file = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  useEffect(() => {
+    const el = dialog.current;
+    if (!el) return;
+    if (open && !el.open) el.showModal();
+    if (!open && el.open) el.close();
+  }, [open]);
+
   async function enviar(chosen: File) {
     setBusy("comprobante"); setError(null); setStatus("Preparando la imagen…");
+    let sent = false;
     try {
       const prepared = await prepareImageUpload(chosen, PROOF_PREPARE_OPTIONS);
       const candidate = prepared.candidates[0];
@@ -291,27 +303,34 @@ function PayBlock({ rifa, reservedNumbers, expiresAt, busy, setBusy, onDone, onQ
       await post(`/api/rifas/${rifa.slug}/comprobante`, { action: "confirm", proofId: begun.proof_id });
       showToast("Comprobante enviado. Tus números quedaron pagados.", "success");
       setStatus(null);
+      sent = true;
     } catch (err) {
       setStatus(null);
       setError(err instanceof ImagePreparationError ? err.message : (err as Error).message);
     } finally {
       setBusy(null);
       if (file.current) file.current.value = "";
+      if (sent) onClose();
       await onDone();
     }
   }
 
   return (
-    <StreetCard hero className="space-y-3 p-4">
-      <div>
-        <Label>Transfiere exactamente</Label>
-        <div className="lp-money mt-1 text-[30px] leading-none text-text-primary">{formatCop(rifa.viewer.pending_amount_cop)}</div>
-        <p className="mt-1 text-[13px] text-text-secondary">
-          Números {reservedNumbers.map(rifaNumber).join(", ")}
-          {expiresAt ? ` · sube el comprobante antes de las ${formatColombiaDateTime(expiresAt, { hour: "numeric", minute: "2-digit" })}` : ""}
-        </p>
+    // Escape no cierra mientras sube el comprobante.
+    <dialog ref={dialog} aria-labelledby="pagar-title" onClose={onClose} onCancel={(e) => { if (busy) e.preventDefault(); }}
+      className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-xl border border-border-default bg-bg-card p-4 text-text-primary backdrop:bg-bg-base/80">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="pagar-title" className="lp-label">Transfiere exactamente</h2>
+          <div className="lp-money mt-1 text-[34px] leading-none text-text-primary">{formatCop(rifa.viewer.pending_amount_cop)}</div>
+          <p className="mt-1 text-[13px] text-text-secondary">Números {reservedNumbers.map(rifaNumber).join(", ")}</p>
+        </div>
+        <button type="button" onClick={onClose} disabled={busy !== null} aria-label="Cerrar"
+          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary">
+          <X aria-hidden="true" className="h-5 w-5" />
+        </button>
       </div>
-      <div className="border-t border-border-subtle pt-3">
+      <div className="mt-3 border-t border-border-subtle pt-3">
         <p className="text-[13px] text-text-muted">{PAYMENT_METHOD_LABEL[payment.method]}</p>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <div id="copiar-cuenta-rifa" className="lp-money min-w-0 select-all text-[24px] leading-none text-text-primary [overflow-wrap:anywhere]">{payment.account}</div>
@@ -322,15 +341,14 @@ function PayBlock({ rifa, reservedNumbers, expiresAt, busy, setBusy, onDone, onQ
       <input ref={file} type="file" accept="image/*" className="sr-only" id="rifa-comprobante"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void enviar(f); }} />
       <label htmlFor="rifa-comprobante" aria-disabled={busy !== null}
-        className={`lp-btn lp-btn-primary w-full ${busy !== null ? "pointer-events-none opacity-60" : ""}`}>
+        className={`lp-btn lp-btn-primary mt-4 w-full ${busy !== null ? "pointer-events-none opacity-60" : ""}`}>
         <Upload aria-hidden="true" className="h-5 w-5" /> Subir comprobante
       </label>
-      {status && <p role="status" className="text-[13px] text-text-secondary">{status}</p>}
-      {error && <p role="alert" className="text-[15px] text-text-primary">{error}</p>}
-      <p className="text-[12px] text-text-muted">Una sola transferencia por todos tus números. Si ya transferiste, no repitas el pago.</p>
-      <button type="button" disabled={busy !== null} onClick={() => void onQuitar(reservedNumbers)}
-        className="lp-btn lp-btn-ghost w-full">Ya no los quiero</button>
-    </StreetCard>
+      {status && <p role="status" className="mt-2 text-[13px] text-text-secondary">{status}</p>}
+      {error && <p role="alert" className="mt-2 text-[15px] text-text-primary">{error}</p>}
+      <button type="button" disabled={busy !== null} onClick={() => { onClose(); void onQuitar(reservedNumbers); }}
+        className="lp-btn lp-btn-ghost mt-2 w-full">Ya no los quiero</button>
+    </dialog>
   );
 }
 
