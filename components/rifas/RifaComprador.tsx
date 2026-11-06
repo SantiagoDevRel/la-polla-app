@@ -30,8 +30,9 @@ async function post(url: string, body: unknown) {
   return data;
 }
 
-/** benefit: rifa sin ánimo de lucro; la portada ya muestra el premio, aquí solo valor y sorteo. */
-export function RifaComprador({ initial, benefit = false }: { initial: RifaPublicView; benefit?: boolean }) {
+/** benefitCause: rifa sin ánimo de lucro («una familia…»); la portada ya muestra el premio, aquí solo valor y sorteo. */
+export function RifaComprador({ initial, benefitCause = null }: { initial: RifaPublicView; benefitCause?: string | null }) {
+  const benefit = benefitCause !== null;
   const [rifa, setRifa] = useState(initial);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState<null | "reservar" | "comprobante" | "quitar">(null);
@@ -214,9 +215,10 @@ export function RifaComprador({ initial, benefit = false }: { initial: RifaPubli
       )}
 
       <footer className="space-y-2 pt-2 text-[12px] leading-relaxed text-text-muted">
-        <p>{benefit
-          ? "Rifa sin ánimo de lucro. La Polla solo organiza el tablero y no cobra nada: el dinero va directo a la cuenta de la rifa."
-          : "La Polla solo organiza el tablero. El dinero va directo a quien creó la rifa: La Polla no recibe pagos ni entrega premios."}</p>
+        {benefit ? <>
+          <p className="text-[15px] font-semibold leading-snug text-text-primary">El 100&nbsp;% de lo recaudado va para {benefitCause}.</p>
+          <p>Rifa sin ánimo de lucro. La Polla solo organiza el tablero y no cobra nada: el dinero va directo a la cuenta de la rifa.</p>
+        </> : <p>La Polla solo organiza el tablero. El dinero va directo a quien creó la rifa: La Polla no recibe pagos ni entrega premios.</p>}
         {rifa.viewer.signed_in && !rifa.viewer.is_creator && <ReportButton slug={slug} reported={rifa.viewer.reported} />}
       </footer>
 
