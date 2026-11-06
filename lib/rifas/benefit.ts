@@ -37,6 +37,9 @@ const BENEFIT_RIFAS: Readonly<Record<string, () => RifaBenefit>> = {
   "495aa5b1-767c-47bb-8487-15223ab44f63": () => ({ ...LA_IGUANA, jersey: jamesJersey() }),
 };
 
+/** Las rifas sin ánimo de lucro van de primeras en el inicio, para todos (si son Públicas). */
+export const FEATURED_RIFA_IDS: readonly string[] = Object.keys(BENEFIT_RIFAS);
+
 export function rifaBenefit(rifaId: string): RifaBenefit | null {
   return BENEFIT_RIFAS[rifaId]?.() ?? null;
 }

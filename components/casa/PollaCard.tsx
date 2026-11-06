@@ -33,8 +33,12 @@ export type PollaCardDato = { label?: ReactNode; value?: ReactNode; tone?: keyof
  * vez de recortar letras. Lo que cambie entre tarjetas va en `topRight` o en
  * el dato, nunca en una fila nueva.
  */
-export function PollaCardBody({ name, nameDecoration, prizeVisual, tournaments, kind, muted = false, topRight, premioLabel, premio, objeto = false, dato, children }: {
+export function PollaCardBody({ name, nameDecoration, prizeVisual, tournaments, kind, muted = false, topRight, premioLabel, premio, objeto = false, dato, tag, identity, children }: {
   name: string;
+  /** Inicio con pollas y rifas juntas (2026-11-06): etiqueta chiquita antes del nombre. */
+  tag?: "polla" | "rifa";
+  /** Reemplaza la fila de torneos (una rifa dice para qué es). Una línea. */
+  identity?: ReactNode;
   nameDecoration?: ReactNode;
   prizeVisual?: ReactNode;
   tournaments: readonly string[];
@@ -59,12 +63,13 @@ export function PollaCardBody({ name, nameDecoration, prizeVisual, tournaments, 
           el aviso ya no le deja al nombre cuatro letras de ancho (`4em`), el
           aviso baja a su propia línea: el nombre nunca desaparece. */}
       <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1">
+        {tag && <CardTypeTag tag={tag} />}
         <h3 title={name} className={`min-w-[4em] flex-1 truncate font-display text-[22px] leading-[1.25] tracking-[0.04em] ${nameDecoration ? "-mt-2 pt-2" : ""} ${tono}`}>{nameDecoration ?? name}</h3>
         {topRight && <div className="ml-auto flex shrink-0 items-center gap-3">{topRight}</div>}
       </div>
 
       <div className="mt-2 flex min-h-8 items-center">
-        <TournamentIdentity tournaments={tournaments} kind={kind} limit={MAX_LOGOS} />
+        {identity ?? <TournamentIdentity tournaments={tournaments} kind={kind} limit={MAX_LOGOS} />}
       </div>
 
       {/* Dos columnas en una fila. El premio se queda con lo que sobra y parte
@@ -96,5 +101,15 @@ export function PollaCardBody({ name, nameDecoration, prizeVisual, tournaments, 
 
       {children}
     </>
+  );
+}
+
+/** «POLLA» o «RIFA», chiquita: distingue las dos en el inicio sin otra sección ni pestaña. */
+export function CardTypeTag({ tag }: { tag: "polla" | "rifa" }) {
+  return (
+    <span className={`inline-flex shrink-0 items-center rounded-full border px-1.5 text-[10px] font-semibold uppercase leading-[1.6] tracking-[0.1em] ${
+      tag === "rifa" ? "border-turf/60 text-turf" : "border-border-strong text-text-secondary"}`}>
+      {tag === "rifa" ? "Rifa" : "Polla"}
+    </span>
   );
 }

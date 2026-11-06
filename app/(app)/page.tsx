@@ -17,9 +17,9 @@ import { listMyLiveMatches } from "@/lib/casa/live";
 import Image from "next/image";
 import { PollaSection } from "@/components/casa/PollaSection";
 import { ScrollableList } from "@/components/casa/ScrollableList";
-import { PollasRifasTabs } from "@/components/rifas/PollasRifasTabs";
-import { RifasTab } from "@/components/rifas/RifasTab";
+import { RifasInicio } from "@/components/rifas/RifasInicio";
 import { getMyRifas, rifasEnabled } from "@/lib/rifas/server";
+import { listFeaturedRifas } from "@/lib/rifas/featured";
 import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -54,29 +54,25 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function CasaPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function CasaPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Rifas de creadores (migración 157): pestañas POLLAS | RIFAS, solo con el
-  // flag y fuera de la app iOS. La pestaña RIFAS no carga nada de las pollas.
+  // Rifas de creadores (migración 157), solo con el flag y fuera de la app iOS.
+  // (2026-11-06) Sin pestañas POLLAS | RIFAS: una sola pantalla, las rifas sin
+  // ánimo de lucro de primeras y cada tarjeta con su etiqueta «RIFA»/«POLLA».
+  // `/?tab=rifas` (enlaces viejos) cae aquí mismo. Si las rifas fallan, el
+  // inicio sale igual, sin ellas.
   const conRifas = rifasEnabled() && !(await isIOSAppRequest());
-  if (conRifas && (await searchParams).tab === "rifas") {
-    const { data: rifas } = await getMyRifas(user.id);
-    return (
-      <div className="pb-28">
-        <PollasRifasTabs active="rifas" />
-        {rifas ? <RifasTab data={rifas} />
-          : <p role="alert" className="px-4 text-[15px] text-text-secondary">No se pudieron cargar tus rifas. Actualiza la página.</p>}
-      </div>
-    );
-  }
+  const rifasInicio = conRifas
+    ? Promise.all([listFeaturedRifas(user.id).catch(() => []), getMyRifas(user.id).then((r) => r.data).catch(() => null)])
+    : Promise.resolve(null);
 
   const publicPollas = listPublicPollas();
-  const [pollas, myPollas, isAdmin, enVivo, endings] = await Promise.all([
+  const [pollas, myPollas, isAdmin, enVivo, endings, rifas] = await Promise.all([
     publicPollas,
     listMyPollas(user.id),
     isCurrentUserAdmin(),
@@ -88,6 +84,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
     publicPollas
       .then((all) => getPollaEndings(all.filter((p) => p.kind === "partidos" && !isPollaOpen(p)).map((p) => p.id)))
       .catch((): Record<string, string> => ({})),
+    rifasInicio,
   ]);
   // (2026-10-13, pedido del dueño) 12 h después de acabarse, la polla sale
   // «Pagada» y pasa a Terminadas, aunque el reparto siga sin registrarse.
@@ -140,7 +137,11 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
       {/* Se monta siempre (aunque hoy no haya nada): se refresca solo cada 30 s
           y aparece cuando un partido arranca, sin recargar la página. Vacío no
           dibuja nada, ni su espacio. */}
-      {conRifas && <PollasRifasTabs active="pollas" />}
+      {rifas && (
+        <div className="px-4 pb-5 empty:hidden">
+          <RifasInicio featured={rifas[0]} mine={rifas[1]} />
+        </div>
+      )}
       <LiveNow initialRows={enVivo} />
 
       {/* ── Hero: la plata en juego ───────────────────────────────────── */}
@@ -167,13 +168,13 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
 
       <div className="space-y-6 px-4 pt-5">
         {/* El respaldo se suma por polla: la tarjeta ya no habla de cupos. */}
-        <MyPollas prizeVisuals={Object.fromEntries(enJuegoMias.map(p => [p.id, prizePreview(p.id)]))} initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
+        <MyPollas typeTag={conRifas} prizeVisuals={Object.fromEntries(enJuegoMias.map(p => [p.id, prizePreview(p.id)]))} initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
 
         {isAdmin && (
           <PollaSection id="pollas-privadas" kind="open" title="Borradores privados" count={privatePollas.length} defaultOpen={false}>
             {privatePollas.length > 0 ? (
               <ul className="grid gap-3">
-                {privatePollas.map(polla => <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? resolveTournamentSlugs(polla, [])} hidden />)}
+                {privatePollas.map(polla => <PollaRow tag={conRifas} key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? resolveTournamentSlugs(polla, [])} hidden />)}
               </ul>
             ) : (
               <StreetCard className="p-5 text-center">
@@ -209,7 +210,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
         ) : (
           <ul className="grid gap-3">
             {disponibles.map((polla) => (
-              <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} />
+              <PollaRow tag={conRifas} key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} />
             ))}
           </ul>
         )}
@@ -224,7 +225,7 @@ export default async function CasaPage({ searchParams }: { searchParams: Promise
               <ScrollableList label="Pollas terminadas">
                 <ul className="grid gap-3">
                   {cerradas.map((polla) => (
-                    <PollaRow key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} pagada={pagadas.get(polla.id)} participated={joinedIds.has(polla.id)} closed />
+                    <PollaRow tag={conRifas} key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} pagada={pagadas.get(polla.id)} participated={joinedIds.has(polla.id)} closed />
                   ))}
                 </ul>
               </ScrollableList>
@@ -259,6 +260,7 @@ function PollaRow({
   participated = false,
   closed = false,
   hidden = false,
+  tag = false,
 }: {
   polla: CasaPolla;
   pot?: { prize_cop: number; paid_entries: number };
@@ -275,6 +277,8 @@ function PollaRow({
   closed?: boolean;
   /** Borrador u oculta: las pollas normales abren el editor administrativo. */
   hidden?: boolean;
+  /** Inicio con rifas: etiqueta «POLLA» en la tarjeta. */
+  tag?: boolean;
 }) {
   const estado = hidden ? { text: "Oculta", tone: "mute" as const } : pagada ? pagadaLabel(pagada) : pollaStatusLabel(polla);
   const abierta = isPollaOpen(polla);
@@ -296,6 +300,7 @@ function PollaRow({
                 comprobante se ve adentro, en el resultado.
               - A la derecha, siempre: el cierre si está abierta; si no, los inscritos. */}
           <PollaCardBody
+            tag={tag ? "polla" : undefined}
             name={polla.name}
             nameDecoration={polla.private_draft ? <SantaHatTitle compact>{polla.name}</SantaHatTitle> : undefined}
             prizeVisual={prizePreview(polla.id) ?? (polla.private_draft ? (
