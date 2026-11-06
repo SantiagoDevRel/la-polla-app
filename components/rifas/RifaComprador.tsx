@@ -30,7 +30,8 @@ async function post(url: string, body: unknown) {
   return data;
 }
 
-export function RifaComprador({ initial }: { initial: RifaPublicView }) {
+/** benefit: rifa sin ánimo de lucro; la portada ya muestra el premio, aquí solo valor y sorteo. */
+export function RifaComprador({ initial, benefit = false }: { initial: RifaPublicView; benefit?: boolean }) {
   const [rifa, setRifa] = useState(initial);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState<null | "reservar" | "comprobante" | "quitar">(null);
@@ -120,7 +121,7 @@ export function RifaComprador({ initial }: { initial: RifaPublicView }) {
     <div className="space-y-4 px-4 pt-4">
       {/* Premio, valor y sorteo: tres datos, una tarjeta. */}
       <StreetCard className="p-4">
-        <div className="flex gap-4">
+        <div className={benefit && !rifa.has_prize_image ? "hidden" : "flex gap-4"}>
           {rifa.has_prize_image && (
             // eslint-disable-next-line @next/next/no-img-element -- bucket privado con URL firmada; sin next/image (free tier).
             <img src={`/api/rifas/${slug}/premio`} alt="Foto del premio" width={88} height={88}
@@ -133,7 +134,7 @@ export function RifaComprador({ initial }: { initial: RifaPublicView }) {
               : <p className="mt-1 text-[17px] font-semibold leading-snug text-text-primary [overflow-wrap:anywhere]">{rifa.prize_text}</p>}
           </div>
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border-subtle pt-3 text-[13px]">
+        <dl className={`grid grid-cols-2 gap-3 text-[13px] ${benefit && !rifa.has_prize_image ? "" : "mt-4 border-t border-border-subtle pt-3"}`}>
           <div className="min-w-0">
             <dt className="text-text-muted">Cada número</dt>
             <dd className="lp-money mt-0.5 text-[20px] leading-none text-text-primary">{formatCop(rifa.price_cop)}</dd>
@@ -213,7 +214,9 @@ export function RifaComprador({ initial }: { initial: RifaPublicView }) {
       )}
 
       <footer className="space-y-2 pt-2 text-[12px] leading-relaxed text-text-muted">
-        <p>La Polla solo organiza el tablero. El dinero va directo a quien creó la rifa: La Polla no recibe pagos ni entrega premios.</p>
+        <p>{benefit
+          ? "Rifa sin ánimo de lucro. La Polla solo organiza el tablero y no cobra nada: el dinero va directo a la cuenta de la rifa."
+          : "La Polla solo organiza el tablero. El dinero va directo a quien creó la rifa: La Polla no recibe pagos ni entrega premios."}</p>
         {rifa.viewer.signed_in && !rifa.viewer.is_creator && <ReportButton slug={slug} reported={rifa.viewer.reported} />}
       </footer>
 
