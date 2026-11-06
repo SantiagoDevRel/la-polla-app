@@ -95,7 +95,7 @@ export async function notifyBuyerReview(n: { buyerId: string; rifaName: string; 
   const numeros = n.numbers.map(rifaNumber).join(", ");
   const text = n.approved
     ? `Tu pago en la rifa «${n.rifaName}» quedó confirmado. Tus números: ${numeros}.`
-    : `El creador de la rifa «${n.rifaName}» rechazó tu comprobante${n.reason ? `: ${n.reason}` : "."} Los números ${numeros} quedaron libres.`;
+    : `Quien creó la rifa «${n.rifaName}» marcó tu pago como no recibido${n.reason ? `: ${n.reason}` : "."} Los números ${numeros} quedaron libres.`;
   await notifyRifaByTelegram(createAdminClient(), n.buyerId, text, { text: "Ver la rifa", url: appUrl(`/rifa/${n.slug}`) })
     .catch(() => console.warn("[rifas] aviso al comprador no enviado:", redactId(n.buyerId)));
 }

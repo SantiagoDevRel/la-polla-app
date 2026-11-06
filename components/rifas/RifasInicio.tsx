@@ -19,9 +19,10 @@ import { drawLabel, rifaNumber, type RifaMyList, type RifaPublicView } from "@/l
 type RifaRow = { slug: string; href: string; name: string; detail: string; badge?: string };
 
 function numbersLabel(numbers: Array<{ number: number; state: string }>): string {
-  const paid = numbers.filter((n) => n.state === "pagado").map((n) => rifaNumber(n.number));
-  const pending = numbers.filter((n) => n.state !== "pagado").map((n) => rifaNumber(n.number));
-  return [paid.length ? `Pagados ${paid.join(", ")}` : "", pending.length ? `Por confirmar ${pending.join(", ")}` : ""].filter(Boolean).join(" · ");
+  // Con el comprobante enviado el número ya es pagado (2026-11-06): no se muestra «reservado».
+  const paid = numbers.filter((n) => n.state !== "reservado").map((n) => rifaNumber(n.number));
+  const pending = numbers.filter((n) => n.state === "reservado").map((n) => rifaNumber(n.number));
+  return [paid.length ? `Pagados ${paid.join(", ")}` : "", pending.length ? `Falta el comprobante ${pending.join(", ")}` : ""].filter(Boolean).join(" · ");
 }
 
 /** Las rifas de la persona que no están destacadas, una fila por rifa (la compra manda sobre la visita). */
@@ -58,13 +59,18 @@ function FeaturedRifa({ rifa, pendingProofs }: { rifa: RifaPublicView; pendingPr
           tournaments={[]}
           kind="rifa"
           identity={benefit
-            ? <span className="min-w-0 truncate text-[13px] font-semibold text-turf">Sin ánimo de lucro · para {benefit.cause}</span>
+            ? (
+              <span className="min-w-0 text-[13px] leading-snug [overflow-wrap:anywhere]">
+                <span className="block font-semibold text-turf">Sin ánimo de lucro</span>
+                <span className="block text-text-secondary">Para {benefit.cause}</span>
+              </span>
+            )
             : undefined}
           prizeVisual={benefit?.jersey
             ? <PrizeMotion media={benefit.jersey.media} label={benefit.jersey.label} interactive className="relative z-20 h-16 w-14 shrink-0" />
             : undefined}
           topRight={pendingProofs > 0 && (
-            <span className="shrink-0 rounded-full bg-red-alert px-2 py-0.5 text-[13px] font-semibold text-text-primary" aria-label={`${pendingProofs} comprobantes por revisar`}>
+            <span className="shrink-0 rounded-full bg-red-alert px-2 py-0.5 text-[13px] font-semibold text-text-primary" aria-label={`${pendingProofs} pagos por confirmar`}>
               {pendingProofs}
             </span>
           )}

@@ -24,14 +24,13 @@ import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
-import { listHiddenAdminPollas } from "@/lib/casa/private-draft-query";
 import { SantaHatTitle } from "@/components/casa/CampaignDecorations";
 import { CampaignPrizeMedia } from "@/components/casa/CampaignPrizeMedia";
 import { CashPrizeVisual, PrizeMotion } from "@/components/casa/PrizeShowcase";
 import { pollaPrizeMedia } from "@/components/casa/prize-media";
 import { CrestPairPrize } from "@/components/casa/CrestPairPrize";
 import { canEditPolla, editorHref } from "@/lib/casa/editor";
-import { ArrowRight, CheckCircle2, EyeOff, Settings } from "lucide-react";
+import { ArrowRight, CheckCircle2, Settings } from "lucide-react";
 import {
   listPublicPollas,
   getPots,
@@ -42,7 +41,7 @@ import {
 import { isPollaOpen, isPublicClosedPolla, pagadaDesde, pagadaLabel, pollaStatusLabel, recentFirst, type CasaPolla } from "@/lib/casa/types";
 import { entryPriceLabel, formatCop, timeLeft } from "@/lib/casa/format";
 import { premioLabel, premioValor } from "@/lib/casa/premio";
-import { getPollaTournamentSlugs, resolveTournamentSlugs } from "@/lib/casa/tournaments";
+import { getPollaTournamentSlugs } from "@/lib/casa/tournaments";
 import { PollaCardBody } from "@/components/casa/PollaCard";
 import { ScoringModeBadge } from "@/components/casa/ScoringModeBadge";
 import {
@@ -94,7 +93,6 @@ export default async function CasaPage() {
     const fin = pagadaDesde(polla, endings[polla.id] ?? null, now);
     if (fin) pagadas.set(polla.id, fin);
   }
-  const privatePollas = await listHiddenAdminPollas({ id: user.id, is_admin: isAdmin });
   // isPollaOpen() y no `status === "abierta"`: una polla cuyo closes_at ya
   // paso sigue con status abierta hasta que alguien la cierre, y quedaba
   // listada como "del fin de semana" diciendo "cierra en cerrada".
@@ -110,9 +108,9 @@ export default async function CasaPage() {
   const cerradas = recentFirst(pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id)
     && (isPublicClosedPolla(p) || joinedIds.has(p.id))), endings);
   const [pots, pendientes, tournaments, pagos] = await Promise.all([
-    getPots([...pollas, ...privatePollas].map((p) => p.id)),
+    getPots(pollas.map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
-    getPollaTournamentSlugs([...pollas, ...privatePollas]),
+    getPollaTournamentSlugs(pollas),
     // Prueba de pago (migración 133): qué pollas cerradas ya pagaron su premio.
     // Las «Pagada» no la necesitan: su etiqueta ya lo dice.
     getPayoutProgress(cerradas.filter((p) => p.status === "resuelta" && !pagadas.has(p.id)).map((p) => p.id))
@@ -170,22 +168,8 @@ export default async function CasaPage() {
         {/* El respaldo se suma por polla: la tarjeta ya no habla de cupos. */}
         <MyPollas typeTag={conRifas} prizeVisuals={Object.fromEntries(enJuegoMias.map(p => [p.id, prizePreview(p.id)]))} initialPollas={enJuegoMias} activeOnly flat pendingByPolla={pendientes.reduce<Record<string, number>>((acc, p) => ({ ...acc, [p.polla.id]: Math.max(acc[p.polla.id] ?? 0, p.faltan) }), {})} />
 
-        {isAdmin && (
-          <PollaSection id="pollas-privadas" kind="open" title="Borradores privados" count={privatePollas.length} defaultOpen={false}>
-            {privatePollas.length > 0 ? (
-              <ul className="grid gap-3">
-                {privatePollas.map(polla => <PollaRow tag={conRifas} key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? resolveTournamentSlugs(polla, [])} hidden />)}
-              </ul>
-            ) : (
-              <StreetCard className="p-5 text-center">
-                <EyeOff aria-hidden="true" className="mx-auto mb-2 h-6 w-6 text-text-secondary" />
-                <p className="lp-display-sm text-text-primary">No hay pollas ocultas</p>
-                <Link href="/admin/pollas/crear" className="lp-btn lp-btn-ghost mt-3">Crear polla</Link>
-              </StreetCard>
-            )}
-          </PollaSection>
-        )}
-
+        {/* (2026-11-06) Los borradores privados salieron de aquí: van al final
+            del panel de administración (components/admin/AdminDrafts.tsx). */}
         {/* Para entrar: sin desplegable. Si no hay ninguna y la persona ya juega
             en otra, la sección no se dibuja; el aviso de «pronto» es solo para
             quien llega y no tiene nada que hacer. */}

@@ -16,10 +16,14 @@ export interface BoardCell {
   mine?: boolean;
 }
 
+// (2026-11-06, pedido del dueño) No hay estado «reservado» a la vista. Quien
+// compra ve solo Libre o Pagado: con el comprobante enviado el número ya es
+// suyo. El equipo distingue lo que falta: Sin pagar (sin comprobante o venta
+// por fuera sin pago) y Por confirmar (comprobante enviado).
 const STATE_LABEL: Record<BoardCellState, string> = {
   libre: "libre",
-  reservado: "reservado",
-  en_revision: "comprobante en revisión",
+  reservado: "sin pagar",
+  en_revision: "pagado, por confirmar",
   pagado: "pagado",
 };
 
@@ -65,12 +69,15 @@ export function RifaBoard({
   );
 }
 
-/** Leyenda: los tres estados con su forma. Crece y envuelve con el texto ampliado. */
-export function RifaLegend({ showReview = false, showSelected = false }: { showReview?: boolean; showSelected?: boolean }) {
+/** Leyenda con la forma de cada estado. Crece y envuelve con el texto ampliado.
+ *  team: la vista del equipo, que además ve Sin pagar y Por confirmar. */
+export function RifaLegend({ team = false, showSelected = false }: { team?: boolean; showSelected?: boolean }) {
   const items: Array<{ tone: string; label: string; Icon: typeof Check | null }> = [
     { tone: "lp-rifa-libre", label: "Libre", Icon: null },
-    { tone: "lp-rifa-reservado", label: "Reservado", Icon: Clock },
-    ...(showReview ? [{ tone: "lp-rifa-revision", label: "En revisión", Icon: FileText }] : []),
+    ...(team ? [
+      { tone: "lp-rifa-reservado", label: "Sin pagar", Icon: Clock },
+      { tone: "lp-rifa-revision", label: "Por confirmar", Icon: FileText },
+    ] : []),
     { tone: "lp-rifa-pagado", label: "Pagado", Icon: Check },
     ...(showSelected ? [{ tone: "lp-rifa-sel", label: "Elegido", Icon: Plus }] : []),
   ];
