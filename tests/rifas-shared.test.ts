@@ -74,7 +74,7 @@ describe("errores", () => {
   });
   it("tono: sin palabras vetadas ni voseo", () => {
     const source = read("lib/rifas/errors.ts") + read("components/rifas/RifaComprador.tsx") + read("components/rifas/RifaGestion.tsx")
-      + read("components/rifas/RifaForm.tsx") + read("components/rifas/RifasTab.tsx");
+      + read("components/rifas/RifaForm.tsx") + read("components/rifas/RifasInicio.tsx");
     for (const word of [/\bparce\b/i, /\bplata\b/i, /pantallazo/i, /\bpilas\b/i, /\bbacano\b/i, /\btenés\b/i, /\bpodés\b/i]) {
       expect(source).not.toMatch(word);
     }

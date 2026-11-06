@@ -9,9 +9,9 @@ const { rifaBenefit } = await import("@/lib/rifas/benefit");
 const LA_IGUANA_1 = "495aa5b1-767c-47bb-8487-15223ab44f63";
 
 describe("rifaBenefit", () => {
-  it("la rifa solidaria de La Iguana dice para quién es la plata y qué compra", () => {
+  it("la rifa solidaria de La Iguaná dice para quién es la plata y qué compra", () => {
     const b = rifaBenefit(LA_IGUANA_1);
-    expect(b?.cause).toBe("una familia damnificada en La Iguana");
+    expect(b?.cause).toBe("una familia damnificada en La Iguaná");
     expect(b?.detail).toMatch(/camas, colchones, cobijas y almohadas/);
   });
 

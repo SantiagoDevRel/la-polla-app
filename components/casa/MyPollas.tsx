@@ -33,7 +33,7 @@ const searchKey = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, 
  * aviso ya no abre una fila propia debajo, que hacía más alta a la polla con
  * pendientes: va junto al nombre, donde las demás llevan la flecha.
  */
-export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, split = false, flat = false, pendingByPolla = {}, prizeVisuals = {} }: {
+export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false, split = false, flat = false, pendingByPolla = {}, prizeVisuals = {}, typeTag = false }: {
   initialPollas?: MyCasaPolla[]; defaultOpen?: boolean;
   /** Server-rendered prize previews for the joined pools on Inicio. */
   prizeVisuals?: Record<string, ReactNode>;
@@ -49,6 +49,8 @@ export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false
   split?: boolean;
   /** Respaldo para pollas sin conteo por cupo (se suman igual en una sola línea). */
   pendingByPolla?: Record<string, number>;
+  /** Inicio con rifas: etiqueta «POLLA» en cada tarjeta. */
+  typeTag?: boolean;
 }) {
   const [loadedPollas, setPollas] = useState<MyCasaPolla[]>();
   const pollas = initialPollas ?? loadedPollas;
@@ -68,10 +70,10 @@ export function MyPollas({ initialPollas, defaultOpen = true, activeOnly = false
 
   const retry = () => setAttempt(n => n + 1);
   if (flat && pollas && pollas.length === 0 && !error) return null;
-  if (!split) return <MyPollasSection id="mis-pollas" kind="mine" flat={flat} pollas={pollas} error={error} retry={retry} defaultOpen={defaultOpen} activeOnly={activeOnly} pendingByPolla={pendingByPolla} prizeVisuals={prizeVisuals} />;
+  if (!split) return <MyPollasSection id="mis-pollas" kind="mine" flat={flat} pollas={pollas} error={error} retry={retry} defaultOpen={defaultOpen} activeOnly={activeOnly} pendingByPolla={pendingByPolla} prizeVisuals={prizeVisuals} typeTag={typeTag} />;
   return <div className="space-y-3">
-    <MyPollasSection id="mis-pollas" kind="mine" compact activeOnly pollas={pollas?.filter(p => !isFinished(p))} error={error} retry={retry} defaultOpen={defaultOpen} pendingByPolla={pendingByPolla} prizeVisuals={prizeVisuals} />
-    <MyPollasSection id="mis-pollas-cerradas" kind="closed" compact pollas={pollas?.filter(isFinished)} error={error} retry={retry} defaultOpen={false} pendingByPolla={pendingByPolla} prizeVisuals={prizeVisuals} />
+    <MyPollasSection id="mis-pollas" kind="mine" compact activeOnly pollas={pollas?.filter(p => !isFinished(p))} error={error} retry={retry} defaultOpen={defaultOpen} pendingByPolla={pendingByPolla} prizeVisuals={prizeVisuals} typeTag={typeTag} />
+    <MyPollasSection id="mis-pollas-cerradas" kind="closed" compact pollas={pollas?.filter(isFinished)} error={error} retry={retry} defaultOpen={false} pendingByPolla={pendingByPolla} prizeVisuals={prizeVisuals} typeTag={typeTag} />
   </div>;
 }
 
@@ -108,9 +110,9 @@ export function siguientePaso(polla: MyCasaPolla, fallback: number, en: boolean)
   return null;
 }
 
-function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOnly = false, compact = false, flat = false, pendingByPolla, prizeVisuals }: {
+function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOnly = false, compact = false, flat = false, pendingByPolla, prizeVisuals, typeTag = false }: {
   id: string; kind: "mine" | "closed"; pollas?: MyCasaPolla[]; error: boolean; retry: () => void;
-  defaultOpen: boolean; activeOnly?: boolean; compact?: boolean; flat?: boolean; pendingByPolla: Record<string, number>; prizeVisuals: Record<string, ReactNode>;
+  defaultOpen: boolean; activeOnly?: boolean; compact?: boolean; flat?: boolean; pendingByPolla: Record<string, number>; prizeVisuals: Record<string, ReactNode>; typeTag?: boolean;
 }) {
   const en = useLocale() === "en";
   const closedList = kind === "closed";
@@ -161,6 +163,7 @@ function MyPollasSection({ id, kind, pollas, error, retry, defaultOpen, activeOn
                 <Link href={`/polla/${polla.slug}`} aria-label={`${en ? "Open" : "Ver"} ${polla.name}`}
                   className="absolute inset-0 z-10 cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" />
                 <PollaCardBody
+                  tag={typeTag ? "polla" : undefined}
                   prizeVisual={prizeVisuals[polla.id]}
                   name={polla.name}
                   tournaments={polla.tournaments}

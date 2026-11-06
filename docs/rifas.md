@@ -23,7 +23,7 @@ rifa (embudo rifa → cuenta → polla).
 | `/rifas/crear` | Creador habilitado | Formulario. Sin permiso: 404 |
 | `/rifa/<slug>` | Cualquiera (Pública) · creador y admins (Privada) | Tablero, reservar, pagar, comprobante, resultado. Sin sesión: tablero y registro al elegir |
 | `/rifa/<slug>/gestionar` | Solo el creador | Comprobantes, tablero con nombres, venta por fuera, liberar, resultado, compartir, imagen, foto del premio, actividad |
-| `/?tab=rifas` | Con sesión | Pestañas **POLLAS \| RIFAS** (POLLAS por defecto): mis números, creadas por mí, abiertas por enlace |
+| `/` (inicio) | Con sesión | **Una sola pantalla** desde el 6-nov-2026 (sin pestañas POLLAS \| RIFAS): arriba la sección «Rifas» con las rifas sin ánimo de lucro (`lib/rifas/featured.ts`) y debajo, en filas, mis números, creadas por mí y abiertas por enlace (`components/rifas/RifasInicio.tsx`). Cada tarjeta lleva una etiqueta chiquita «RIFA» o «POLLA». `/?tab=rifas` cae en el mismo inicio |
 
 API: `/api/rifas/**` y `/api/admin/rifas`. Todas validan la sesión antes de tocar
 la base y mandan a SQL el uuid de la sesión como actor (nunca un dato del cliente).
@@ -226,7 +226,7 @@ no decodifica WebP: el logo y los pollitos van como PNG de paleta en
 lucro», «Rifa para …» en grande, qué compra lo recaudado y la camiseta girando
 (provisional: la de James, hasta tener el diseño de cada camiseta). Mismo patrón
 que `components/casa/prize-media.ts`; no hay columnas nuevas ni cambios de SQL.
-Primera: «Rifa solidaria La Iguana · Camiseta 1» (`/rifa/rifa-solidaria-la-iguana-camiseta`),
+Primera: «Rifa solidaria La Iguaná · Camiseta 1» (`/rifa/rifa-solidaria-la-iguana-camiseta`),
 de carlos con Santi de coadministrador, Privada, 100 números a $30.000, Lotería de
 Medellín del 13-nov. Una camiseta por rifa, de a una: la siguiente se crea al cerrar
 esta y se agrega su uuid al mapa. Prueba: `tests/rifas-benefit.test.ts`.
