@@ -220,6 +220,17 @@ porque `.vercelignore` no subía `assets/` (500 ENOENT, corregido en #164). Sato
 no decodifica WebP: el logo y los pollitos van como PNG de paleta en
 `assets/rifas-story/` (`scripts/bake-rifa-story-assets.py`, ~410 KB).
 
+## Rifas sin ánimo de lucro (6-nov-2026)
+
+`lib/rifas/benefit.ts` enlaza por uuid una portada especial: sello «Sin ánimo de
+lucro», «Rifa para …» en grande, qué compra lo recaudado y la camiseta girando
+(provisional: la de James, hasta tener el diseño de cada camiseta). Mismo patrón
+que `components/casa/prize-media.ts`; no hay columnas nuevas ni cambios de SQL.
+Primera: «Rifa solidaria La Iguana · Camiseta 1» (`/rifa/rifa-solidaria-la-iguana-camiseta`),
+de carlos con Santi de coadministrador, Privada, 100 números a $30.000, Lotería de
+Medellín del 13-nov. Una camiseta por rifa, de a una: la siguiente se crea al cerrar
+esta y se agrega su uuid al mapa. Prueba: `tests/rifas-benefit.test.ts`.
+
 ## Pruebas
 
 | Prueba | Qué cubre |
