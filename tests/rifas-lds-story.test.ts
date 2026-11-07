@@ -26,7 +26,7 @@ const props = (template: (typeof LDS_STORY_TEMPLATE_LIST)[number]) => ({
   partner: {
     escudo: file("assets/rifas-story/lds/escudo.png", "image/png"),
     trapo: file("assets/rifas-story/lds/trapo.png", "image/png"),
-    background: template.background ? file(`assets/rifas-story/lds/fondo-${template.background}.jpg`, "image/jpeg") : null,
+    background: file(`assets/rifas-story/lds/fondo-${template.background}.jpg`, "image/jpeg"),
   },
 });
 
@@ -45,6 +45,7 @@ describe("rifaPartner", () => {
 describe("plantillas de Los Del Sur", () => {
   it("6 propias y exclusivas: la rifa de la barra no ve las de La Polla, ni al revés", () => {
     expect(new Set(LDS_STORY_TEMPLATE_LIST.map((t) => t.key)).size).toBe(6);
+    expect(new Set(LDS_STORY_TEMPLATE_LIST.map((t) => t.background)).size).toBe(6);
     expect(storyTemplateOptions("lds").map((t) => t.key)).toEqual(LDS_STORY_TEMPLATE_LIST.map((t) => t.key));
     expect(storyTemplateOptions(null)).toBe(STORY_TEMPLATE_OPTIONS);
     expect(getStoryTemplate("neutra", "lds").key).toBe("lds-tribuna");
@@ -53,17 +54,23 @@ describe("plantillas de Los Del Sur", () => {
     expect(STORY_TEMPLATE_LIST.some((t) => t.key.startsWith("lds-"))).toBe(false);
   });
   it.each(LDS_STORY_TEMPLATE_LIST)("$key: arte local, miniatura y datos públicos completos", (template) => {
+    // Las seis van sobre una foto real de la barra (scripts/bake-rifa-lds-fondos.py), cada una distinta.
     for (const path of [`assets/rifas-story/lds/pollito-${template.pollito}.png`, `public/plantillas-rifa/${template.key}.webp`,
-      ...(template.background ? [`assets/rifas-story/lds/fondo-${template.background}.jpg`] : [])]) expect(existsSync(path)).toBe(true);
+      `assets/rifas-story/lds/fondo-${template.background}.jpg`]) expect(existsSync(path)).toBe(true);
     const p = props(template);
     const html = renderToStaticMarkup(template.render({ ...p, r: { ...r, buyer_phone: "PRIVADO" } as StoryData }));
     expect(html).not.toContain("PRIVADO");
     expect(html).toContain("LOS DEL SUR");
+    // Lema: «barrismo social» en tres, el de los combos en las otras; nunca «barra brava».
+    const lideres = ["lds-humo", "lds-escudo", "lds-sombrillas"].includes(template.key);
+    expect(html).toContain(lideres ? "LÍDERES DEL BARRISMO SOCIAL" : "LA BARRA Y SUS COMBOS");
+    expect(html.toLowerCase()).not.toContain("barra brava");
     // La Polla solo en el pie: logo pequeño + dominio, sin el encabezado «LA POLLA».
     expect(html).not.toContain(">LA POLLA<");
     expect(html).toContain(">lapollacolombiana.com<");
     expect(html.includes(p.pollito)).toBe(true);
     expect(html.includes(p.partner.escudo)).toBe(true);
+    expect(html.includes(p.partner.background)).toBe(true);
     expect([...html.matchAll(/data-number="(\d+)"/g)]).toHaveLength(100);
     expect(html.match(/data-taken="true"/g)).toHaveLength(3);
     expect(html.match(/#FFD700/g)?.length ?? 0).toBeLessThanOrEqual(3);

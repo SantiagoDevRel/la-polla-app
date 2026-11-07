@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-# scripts/bake-rifa-lds-assets.py <pollitos_dir> <lds_public_dir>
+# scripts/bake-rifa-lds-assets.py <pollitos_dir> [<lds_public_dir>]
 #
 # Arte de Los Del Sur para la rifa solidaria La Iguaná (lib/rifas/partner.ts):
-# - assets/rifas-story/lds/: pollitos barristas (PNG con alfa), escudo, trapo y
-#   fondos 1080×1920 (JPEG) para la imagen de historia. next/og (satori) no
-#   decodifica WebP: todo va en PNG/JPEG.
+# - assets/rifas-story/lds/: pollitos barristas (PNG con alfa), escudo y trapo
+#   para la imagen de historia. next/og (satori) no decodifica WebP: todo va en
+#   PNG. Los fondos (fotos reales de la barra) salen de
+#   scripts/bake-rifa-lds-fondos.py.
 # - public/rifas/lds/escudo-{128,256}.webp para la portada y el inicio.
 #
 # <pollitos_dir>: originales de Qwen Image Edit 2511 (DGX, ComfyUI), editados a
 # partir de public/pollitos/pollito_verde_base.webp sobre fondo blanco. Se
 # guardan fuera del repo (Downloads/agent-work/lds-pollitos-20261107/).
-# <lds_public_dir>: los-del-sur-app/apps/pwa-los-del-sur/public (escudo.png,
-# trapos/los-del-sur.webp, tribuna-sur.webp, design-assets/barra-bg-poster.jpg).
+# <lds_public_dir> (opcional; sin él solo se hornean los pollitos):
+# los-del-sur-app/apps/pwa-los-del-sur/public (escudo.png, trapos/los-del-sur.webp).
 # Requiere Pillow con soporte WebP.
 import os
 import sys
@@ -20,13 +21,16 @@ from PIL import Image, ImageDraw, ImageFilter
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STORY = os.path.join(ROOT, "assets", "rifas-story", "lds")
 PUBLIC = os.path.join(ROOT, "public", "rifas", "lds")
-pollitos_dir, lds_dir = sys.argv[1], sys.argv[2]
+pollitos_dir = sys.argv[1]
+lds_dir = sys.argv[2] if len(sys.argv) > 2 else None
 os.makedirs(STORY, exist_ok=True)
 os.makedirs(PUBLIC, exist_ok=True)
 
-# Pollito final → original elegido (pava y sombrilla: segunda pasada que corrige «BARRA BRAVA»).
-POLLITOS = {"pava": "pavafix2", "bombo": "bombo", "bandera": "bandera",
-            "trompeta": "trompeta", "sombrilla": "sombrillafix1", "trapo": "trapo"}
+# Pollito final → original elegido. (2026-11-07, pedido del dueño) La pava dice
+# «BARRA POPULAR», nunca «barra brava»: una segunda edición de Qwen cambió solo
+# ese texto (sufijo -pop<semilla>) y le quitó a la sombrilla unas letras de la cara.
+POLLITOS = {"pava": "pavafix2-pop13", "bombo": "bombo-pop9", "bandera": "bandera-pop9",
+            "trompeta": "trompeta-pop9", "sombrilla": "sombrillafix1-pop13", "trapo": "trapo"}
 
 
 def cut_white(path):
@@ -66,27 +70,14 @@ def save_png(im, name, size):
 for key, src in POLLITOS.items():
     save_png(cut_white(os.path.join(pollitos_dir, f"{src}.png")), f"pollito-{key}.png", 360)
 
-escudo = Image.open(os.path.join(lds_dir, "escudo.png")).convert("RGBA")
-escudo.resize((300, 300), Image.LANCZOS).save(os.path.join(STORY, "escudo.png"), optimize=True)
-for size in (128, 256):
-    escudo.resize((size, size), Image.LANCZOS).save(os.path.join(PUBLIC, f"escudo-{size}.webp"), quality=86)
+if lds_dir:
+    escudo = Image.open(os.path.join(lds_dir, "escudo.png")).convert("RGBA")
+    escudo.resize((300, 300), Image.LANCZOS).save(os.path.join(STORY, "escudo.png"), optimize=True)
+    for size in (128, 256):
+        escudo.resize((size, size), Image.LANCZOS).save(os.path.join(PUBLIC, f"escudo-{size}.webp"), quality=86)
 
-trapo = Image.open(os.path.join(lds_dir, "trapos", "los-del-sur.webp")).convert("RGBA")
-trapo = trapo.resize((1240, round(1240 * trapo.height / trapo.width)), Image.LANCZOS)
-trapo.quantize(colors=128, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE).save(os.path.join(STORY, "trapo.png"), optimize=True)
+    trapo = Image.open(os.path.join(lds_dir, "trapos", "los-del-sur.webp")).convert("RGBA")
+    trapo = trapo.resize((1240, round(1240 * trapo.height / trapo.width)), Image.LANCZOS)
+    trapo.quantize(colors=128, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE).save(os.path.join(STORY, "trapo.png"), optimize=True)
 
-
-def background(src, center_x, name):
-    """Recorte vertical 9:16 alrededor de center_x (fracción del ancho), a 1080×1920."""
-    im = Image.open(src).convert("RGB")
-    w, h = im.size
-    cw = round(h * 9 / 16)
-    left = min(max(round(w * center_x - cw / 2), 0), w - cw)
-    im.crop((left, 0, left + cw, h)).resize((1080, 1920), Image.LANCZOS).save(
-        os.path.join(STORY, f"fondo-{name}.jpg"), quality=78, optimize=True, progressive=True)
-
-
-background(os.path.join(lds_dir, "tribuna-sur.webp"), 0.5, "tribuna")
-background(os.path.join(lds_dir, "tribuna-sur.webp"), 0.22, "combos")
-background(os.path.join(lds_dir, "design-assets", "barra-bg-poster.jpg"), 0.5, "humo")
 print("ok", sorted(os.listdir(STORY)), sorted(os.listdir(PUBLIC)))
