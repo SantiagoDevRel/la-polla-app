@@ -14,6 +14,8 @@ import { RifaComprador } from "@/components/rifas/RifaComprador";
 import { PrizeMotion } from "@/components/casa/PrizeShowcase";
 import { rifaBenefit } from "@/lib/rifas/benefit";
 import { rifaPartner } from "@/lib/rifas/partner";
+import { hasComboAnswer } from "@/lib/rifas/combo";
+import { ComboPregunta } from "@/components/rifas/ComboPregunta";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,8 @@ export default async function RifaPage({ params }: { params: Promise<{ slug: str
   if (!viewer) await rifaRpc("rifa_track_view_v1", { p_rifa: rifa.id, p_viewer: null });
   const benefit = rifaBenefit(rifa.id);
   const partner = rifaPartner(rifa.id);
+  // (2026-11-07) Rifa con barra: «¿Eres de un combo?» una vez, con sesión (migración 180).
+  const askCombo = partner !== null && viewer !== null && !(await hasComboAnswer(rifa.id, viewer.id));
   const gestionar = rifa.viewer.is_creator && (
     <Link href={`/rifa/${rifa.slug}/gestionar`} aria-label="Gestionar mi rifa"
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border-default bg-bg-card/80 text-text-primary transition-colors hover:border-gold/30">
@@ -70,6 +74,7 @@ export default async function RifaPage({ params }: { params: Promise<{ slug: str
         )}
       </HeroFrame>
       <RifaComprador initial={rifa} benefitCause={benefit.cause} />
+      {askCombo && partner && <ComboPregunta slug={rifa.slug} partnerName={partner.name} escudo={partner.escudo} />}
     </div>
   );
 
@@ -85,6 +90,7 @@ export default async function RifaPage({ params }: { params: Promise<{ slug: str
         </div>
       </HeroFrame>
       <RifaComprador initial={rifa} />
+      {askCombo && partner && <ComboPregunta slug={rifa.slug} partnerName={partner.name} escudo={partner.escudo} />}
     </div>
   );
 }
