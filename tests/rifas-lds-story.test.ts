@@ -61,6 +61,10 @@ describe("plantillas de Los Del Sur", () => {
     const html = renderToStaticMarkup(template.render({ ...p, r: { ...r, buyer_phone: "PRIVADO" } as StoryData }));
     expect(html).not.toContain("PRIVADO");
     expect(html).toContain("LOS DEL SUR");
+    // Lema: «barrismo social» en tres, el de los combos en las otras; nunca «barra brava».
+    const lideres = ["lds-humo", "lds-escudo", "lds-sombrillas"].includes(template.key);
+    expect(html).toContain(lideres ? "LÍDERES DEL BARRISMO SOCIAL" : "LA BARRA Y SUS COMBOS");
+    expect(html.toLowerCase()).not.toContain("barra brava");
     // La Polla solo en el pie: logo pequeño + dominio, sin el encabezado «LA POLLA».
     expect(html).not.toContain(">LA POLLA<");
     expect(html).toContain(">lapollacolombiana.com<");

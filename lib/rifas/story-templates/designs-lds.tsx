@@ -19,6 +19,9 @@ const PANEL = "rgba(4, 16, 9, 0.84)";
 const BOARD = "rgba(4, 16, 9, 0.6)";
 /** Sombra para el texto que va directo sobre la foto. */
 const LIFT = "0 2px 4px rgba(0,0,0,0.9), 0 0 18px rgba(0,0,0,0.75)";
+/** Lema bajo «LOS DEL SUR» (2026-11-07, pedido del dueño: «líderes del barrismo social» en algunas). */
+const COMBOS = "LA BARRA Y SUS COMBOS";
+const LIDERES = "LÍDERES DEL BARRISMO SOCIAL";
 
 /**
  * Oscurece arriba (encabezado y título) y abajo (fecha y dominio) y deja la
@@ -37,28 +40,28 @@ function Photo({ src, strength }: { src: string | null; strength?: number }) {
   </div>;
 }
 
-function Header({ escudo }: { escudo: string }) {
+function Header({ escudo, tagline }: { escudo: string; tagline: string }) {
   return <div style={{ display: "flex", alignItems: "center", gap: 22, position: "absolute", left: 56, top: 40 }}>
     {/* eslint-disable-next-line @next/next/no-img-element -- PNG embedded in next/og */}
     <img src={escudo} width={132} height={132} alt="" />
     <div style={{ display: "flex", flexDirection: "column" }}>
       <span style={{ ...display, fontSize: 76, color: WHITE, textShadow: LIFT }}>LOS DEL SUR</span>
-      <span style={{ fontSize: 24, letterSpacing: 5, color: GREEN_LIGHT, textShadow: LIFT }}>LA BARRA Y SUS COMBOS</span>
+      <span style={{ fontSize: 24, letterSpacing: tagline.length > 22 ? 3 : 5, color: GREEN_LIGHT, textShadow: LIFT }}>{tagline}</span>
     </div>
   </div>;
 }
 
 /** Base común: foto de la barra, encabezado, pollito grande, casillas blancas con borde verde, La Polla al pie. */
-function lds(props: StoryProps, theme: Partial<Treatment> & { strength?: number }) {
+function lds(props: StoryProps, theme: Partial<Treatment> & { strength?: number; tagline?: string }) {
   const art = props.partner;
-  const { strength, titleStyle, ...rest } = theme;
+  const { strength, titleStyle, tagline = COMBOS, ...rest } = theme;
   return StoryFrame(props, {
     background: NIGHT, panel: PANEL, accent: GREEN_LIGHT, cell: WHITE, cellBorder: GREEN, radius: 10,
     title: "RIFA SUREÑA", titleSize: 100, titleTop: 190, nameWidth: 640,
     pollitoSize: 320, pollitoTop: -170, pollitoRight: -50, footerLogo: true, nameShadow: LIFT,
     titleStyle: { textShadow: LIFT, ...titleStyle },
     boardStyle: { border: `3px solid ${GREEN}`, background: BOARD },
-    header: art ? <Header escudo={art.escudo} /> : undefined,
+    header: art ? <Header escudo={art.escudo} tagline={tagline} /> : undefined,
     backdrop: <Photo src={art?.background ?? null} strength={strength} />,
     ...rest,
   });
@@ -73,7 +76,7 @@ export function combos(props: StoryProps) {
 }
 
 export function humo(props: StoryProps) {
-  return lds(props, {});
+  return lds(props, { tagline: LIDERES });
 }
 
 export function trapo(props: StoryProps) {
@@ -87,10 +90,10 @@ export function trapo(props: StoryProps) {
 }
 
 export function escudo(props: StoryProps) {
-  return lds(props, { title: "SIEMPRE PRESENTES", titleSize: 84 });
+  return lds(props, { title: "SIEMPRE PRESENTES", titleSize: 84, tagline: LIDERES });
 }
 
 export function sombrillas(props: StoryProps) {
   // Foto de día con cielo blanco: más sombra para que el texto blanco se lea igual.
-  return lds(props, { strength: 0.16 });
+  return lds(props, { strength: 0.16, tagline: LIDERES });
 }
