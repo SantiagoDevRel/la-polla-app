@@ -52,7 +52,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
     asset("assets/rifas-story/logo.png", "image/png"),
     lds ? asset(`assets/rifas-story/lds/pollito-${lds.pollito}.png`, "image/png")
       : template.usesClub ? asset(`assets/rifas-story/pollito_${club.key}.png`, "image/png") : Promise.resolve(null),
-    // Arte de la barra (scripts/bake-rifa-lds-assets.py).
+    // Arte de la barra: escudo y trapo (scripts/bake-rifa-lds-assets.py) y la
+    // foto real de fondo (scripts/bake-rifa-lds-fondos.py).
     lds ? Promise.all([
       asset("assets/rifas-story/lds/escudo.png", "image/png"),
       asset("assets/rifas-story/lds/trapo.png", "image/png"),

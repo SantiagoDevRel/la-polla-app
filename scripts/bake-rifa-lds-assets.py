@@ -2,16 +2,17 @@
 # scripts/bake-rifa-lds-assets.py <pollitos_dir> <lds_public_dir>
 #
 # Arte de Los Del Sur para la rifa solidaria La Iguaná (lib/rifas/partner.ts):
-# - assets/rifas-story/lds/: pollitos barristas (PNG con alfa), escudo, trapo y
-#   fondos 1080×1920 (JPEG) para la imagen de historia. next/og (satori) no
-#   decodifica WebP: todo va en PNG/JPEG.
+# - assets/rifas-story/lds/: pollitos barristas (PNG con alfa), escudo y trapo
+#   para la imagen de historia. next/og (satori) no decodifica WebP: todo va en
+#   PNG. Los fondos (fotos reales de la barra) salen de
+#   scripts/bake-rifa-lds-fondos.py.
 # - public/rifas/lds/escudo-{128,256}.webp para la portada y el inicio.
 #
 # <pollitos_dir>: originales de Qwen Image Edit 2511 (DGX, ComfyUI), editados a
 # partir de public/pollitos/pollito_verde_base.webp sobre fondo blanco. Se
 # guardan fuera del repo (Downloads/agent-work/lds-pollitos-20261107/).
 # <lds_public_dir>: los-del-sur-app/apps/pwa-los-del-sur/public (escudo.png,
-# trapos/los-del-sur.webp, tribuna-sur.webp, design-assets/barra-bg-poster.jpg).
+# trapos/los-del-sur.webp).
 # Requiere Pillow con soporte WebP.
 import os
 import sys
@@ -75,18 +76,4 @@ trapo = Image.open(os.path.join(lds_dir, "trapos", "los-del-sur.webp")).convert(
 trapo = trapo.resize((1240, round(1240 * trapo.height / trapo.width)), Image.LANCZOS)
 trapo.quantize(colors=128, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE).save(os.path.join(STORY, "trapo.png"), optimize=True)
 
-
-def background(src, center_x, name):
-    """Recorte vertical 9:16 alrededor de center_x (fracción del ancho), a 1080×1920."""
-    im = Image.open(src).convert("RGB")
-    w, h = im.size
-    cw = round(h * 9 / 16)
-    left = min(max(round(w * center_x - cw / 2), 0), w - cw)
-    im.crop((left, 0, left + cw, h)).resize((1080, 1920), Image.LANCZOS).save(
-        os.path.join(STORY, f"fondo-{name}.jpg"), quality=78, optimize=True, progressive=True)
-
-
-background(os.path.join(lds_dir, "tribuna-sur.webp"), 0.5, "tribuna")
-background(os.path.join(lds_dir, "tribuna-sur.webp"), 0.22, "combos")
-background(os.path.join(lds_dir, "design-assets", "barra-bg-poster.jpg"), 0.5, "humo")
 print("ok", sorted(os.listdir(STORY)), sorted(os.listdir(PUBLIC)))

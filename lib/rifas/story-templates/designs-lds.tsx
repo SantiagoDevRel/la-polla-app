@@ -2,7 +2,10 @@
 // las de La Polla (StoryFrame): cambia el arte. Encabezado con el escudo de la
 // barra, pollito barrista grande arriba a la derecha y La Polla solo en el pie,
 // pequeña, junto al dominio. Fotos y escudo vienen como data URIs locales.
-import type { ReactNode } from "react";
+//
+// (2026-11-07, pedido del dueño) Las seis llevan de fondo una foto REAL de la
+// barra, del Instagram oficial @ldsoficial (scripts/bake-rifa-lds-fondos.py):
+// nada de arte generado. Los paneles dejan ver la foto alrededor del tablero.
 import { display, StoryFrame, type Treatment } from "./common";
 import type { StoryProps } from "./types";
 
@@ -10,17 +13,27 @@ const GREEN = "#1E9A44";
 const GREEN_LIGHT = "#5BE08A";
 const NIGHT = "#06140C";
 const WHITE = "#F5F7FA";
-const PANEL = "rgba(5, 18, 11, 0.9)";
+/** Premio, fecha y dominio: casi opacos, el texto se lee sobre cualquier foto. */
+const PANEL = "rgba(4, 16, 9, 0.84)";
+/** El tablero tiene casillas blancas propias: su fondo deja pasar más foto. */
+const BOARD = "rgba(4, 16, 9, 0.6)";
+/** Sombra para el texto que va directo sobre la foto. */
+const LIFT = "0 2px 4px rgba(0,0,0,0.9), 0 0 18px rgba(0,0,0,0.75)";
 
-function Art({ children }: { children: ReactNode }) {
-  return <svg width="1080" height="1920" viewBox="0 0 1080 1920" style={{ position: "absolute", top: 0, left: 0 }}>{children}</svg>;
+/**
+ * Oscurece arriba (encabezado y título) y abajo (fecha y dominio) y deja la
+ * foto más clara en el medio. `strength` sube todo para fotos de día.
+ */
+function shade(strength = 0) {
+  const a = (v: number) => Math.min(0.95, v + strength).toFixed(2);
+  return `linear-gradient(180deg, rgba(3,10,6,${a(0.56)}) 0%, rgba(3,10,6,${a(0.4)}) 14%, rgba(3,10,6,${a(0.36)}) 24%, rgba(3,10,6,${a(0.26)}) 45%, rgba(3,10,6,${a(0.4)}) 70%, rgba(3,10,6,${a(0.76)}) 100%)`;
 }
 
-function Photo({ src, shade }: { src: string | null; shade: string }) {
+function Photo({ src, strength }: { src: string | null; strength?: number }) {
   return <div style={{ display: "flex", position: "absolute", top: 0, left: 0, width: 1080, height: 1920 }}>
     {/* eslint-disable-next-line @next/next/no-img-element -- JPEG embedded in next/og */}
     {src && <img src={src} width={1080} height={1920} alt="" style={{ position: "absolute", top: 0, left: 0 }} />}
-    <div style={{ display: "flex", position: "absolute", top: 0, left: 0, width: 1080, height: 1920, backgroundImage: shade }} />
+    <div style={{ display: "flex", position: "absolute", top: 0, left: 0, width: 1080, height: 1920, backgroundImage: shade(strength) }} />
   </div>;
 }
 
@@ -29,91 +42,55 @@ function Header({ escudo }: { escudo: string }) {
     {/* eslint-disable-next-line @next/next/no-img-element -- PNG embedded in next/og */}
     <img src={escudo} width={132} height={132} alt="" />
     <div style={{ display: "flex", flexDirection: "column" }}>
-      <span style={{ ...display, fontSize: 76, color: WHITE }}>LOS DEL SUR</span>
-      <span style={{ fontSize: 24, letterSpacing: 5, color: GREEN_LIGHT }}>LA BARRA Y SUS COMBOS</span>
+      <span style={{ ...display, fontSize: 76, color: WHITE, textShadow: LIFT }}>LOS DEL SUR</span>
+      <span style={{ fontSize: 24, letterSpacing: 5, color: GREEN_LIGHT, textShadow: LIFT }}>LA BARRA Y SUS COMBOS</span>
     </div>
   </div>;
 }
 
-/** Base común: encabezado de la barra, pollito grande, casillas blancas con borde verde, La Polla al pie. */
-function lds(props: StoryProps, theme: Partial<Treatment> & { background: string }) {
+/** Base común: foto de la barra, encabezado, pollito grande, casillas blancas con borde verde, La Polla al pie. */
+function lds(props: StoryProps, theme: Partial<Treatment> & { strength?: number }) {
   const art = props.partner;
+  const { strength, titleStyle, ...rest } = theme;
   return StoryFrame(props, {
-    panel: PANEL, accent: GREEN_LIGHT, cell: WHITE, cellBorder: GREEN, radius: 10,
+    background: NIGHT, panel: PANEL, accent: GREEN_LIGHT, cell: WHITE, cellBorder: GREEN, radius: 10,
     title: "RIFA SUREÑA", titleSize: 100, titleTop: 190, nameWidth: 640,
-    pollitoSize: 320, pollitoTop: -170, pollitoRight: -50, footerLogo: true,
-    boardStyle: { border: `3px solid ${GREEN}` },
+    pollitoSize: 320, pollitoTop: -170, pollitoRight: -50, footerLogo: true, nameShadow: LIFT,
+    titleStyle: { textShadow: LIFT, ...titleStyle },
+    boardStyle: { border: `3px solid ${GREEN}`, background: BOARD },
     header: art ? <Header escudo={art.escudo} /> : undefined,
-    ...theme,
+    backdrop: <Photo src={art?.background ?? null} strength={strength} />,
+    ...rest,
   });
 }
 
 export function tribuna(props: StoryProps) {
-  return lds(props, {
-    background: NIGHT,
-    backdrop: <Photo src={props.partner?.background ?? null}
-      shade="linear-gradient(180deg, rgba(3,10,6,0.45) 0%, rgba(3,10,6,0.7) 30%, rgba(3,10,6,0.86) 60%, rgba(3,10,6,0.92) 100%)" />,
-  });
+  return lds(props, {});
 }
 
 export function combos(props: StoryProps) {
-  return lds(props, {
-    background: NIGHT, title: "RIFA DEL BARRIO",
-    backdrop: <Photo src={props.partner?.background ?? null}
-      shade="linear-gradient(180deg, rgba(3,10,6,0.5) 0%, rgba(3,10,6,0.78) 35%, rgba(3,10,6,0.9) 100%)" />,
-  });
+  return lds(props, { title: "RIFA DEL BARRIO", strength: 0.08 });
 }
 
 export function humo(props: StoryProps) {
-  return lds(props, {
-    background: "#0B3A1E",
-    backdrop: <Photo src={props.partner?.background ?? null}
-      shade="linear-gradient(180deg, rgba(4,26,12,0.55) 0%, rgba(4,26,12,0.72) 40%, rgba(4,26,12,0.85) 100%)" />,
-  });
+  return lds(props, {});
 }
 
 export function trapo(props: StoryProps) {
   const art = props.partner;
   return lds(props, {
-    background: "#070B08",
     // El trapo de la barra hace de título.
     titleNode: art
       ? <img src={art.trapo} width={620} height={104} alt="" style={{ marginBottom: 4 }} /> /* eslint-disable-line @next/next/no-img-element */
       : undefined,
-    backdrop: <Art>{Array.from({ length: 6 }, (_, i) => <rect key={i} x={i * 180 + 45} y="0" width="90" height="1920" fill={GREEN} opacity="0.32" />)}
-      <rect x="28" y="28" width="1024" height="1864" rx="28" fill="none" stroke={WHITE} strokeOpacity="0.35" strokeWidth="3" /></Art>,
   });
 }
 
 export function escudo(props: StoryProps) {
-  const art = props.partner;
-  return lds(props, {
-    background: NIGHT, title: "SIEMPRE PRESENTES", titleSize: 84,
-    backdrop: <div style={{ display: "flex", position: "absolute", top: 0, left: 0, width: 1080, height: 1920 }}>
-      <Art><circle cx="540" cy="1080" r="520" fill="none" stroke={GREEN} strokeWidth="26" opacity="0.5" />
-        <circle cx="540" cy="1080" r="470" fill="none" stroke={WHITE} strokeWidth="6" opacity="0.25" /></Art>
-      {/* eslint-disable-next-line @next/next/no-img-element -- PNG embedded in next/og */}
-      {art && <img src={art.escudo} width={900} height={900} alt="" style={{ position: "absolute", left: 90, top: 630, opacity: 0.16 }} />}
-    </div>,
-  });
-}
-
-/** Sombrillas verdes y blancas vistas desde arriba, como en la tribuna. */
-function umbrella({ x, y, r }: { x: number; y: number; r: number }, key: number) {
-  // Función, no componente: satori solo acepta elementos intrínsecos dentro de <svg>.
-  return <g key={key}>{Array.from({ length: 8 }, (_, i) => {
-    const a0 = (i * Math.PI) / 4;
-    const a1 = ((i + 1) * Math.PI) / 4;
-    const d = `M${x} ${y}L${x + r * Math.cos(a0)} ${y + r * Math.sin(a0)}A${r} ${r} 0 0 1 ${x + r * Math.cos(a1)} ${y + r * Math.sin(a1)}Z`;
-    return <path key={i} d={d} fill={i % 2 ? WHITE : GREEN} />;
-  })}<circle cx={x} cy={y} r={r * 0.08} fill="#0B3A1E" /></g>;
+  return lds(props, { title: "SIEMPRE PRESENTES", titleSize: 84 });
 }
 
 export function sombrillas(props: StoryProps) {
-  const spots = Array.from({ length: 30 }, (_, i) => ({ x: (i % 5) * 230 + (Math.floor(i / 5) % 2 ? 115 : 0) + 20, y: Math.floor(i / 5) * 330 + 60, r: 110 + (i * 37) % 40 }));
-  return lds(props, {
-    background: "#0B3A1E",
-    backdrop: <Art>{spots.map((s, i) => umbrella(s, i))}
-      <rect x="0" y="0" width="1080" height="1920" fill={NIGHT} opacity="0.55" /></Art>,
-  });
+  // Foto de día con cielo blanco: más sombra para que el texto blanco se lea igual.
+  return lds(props, { strength: 0.16 });
 }

@@ -50,14 +50,16 @@ export function fitLines(text: string, width: number, height: number, maxSize: n
   throw new RangeError("Texto fuera del contrato de la historia.");
 }
 
-export function FittedText({ text, width, height, size, family = "Outfit", center = false, color, breakWords = true }: {
+export function FittedText({ text, width, height, size, family = "Outfit", center = false, color, breakWords = true, shadow }: {
   text: string; width: number; height: number; size: number; family?: "Bebas" | "Outfit"; center?: boolean; color?: string; breakWords?: boolean;
+  /** text-shadow para texto que va directo sobre una foto. */
+  shadow?: string;
 }) {
   const fitted = fitLines(text, width, height, size, family, breakWords);
   return <div style={{ display: "flex", flexDirection: "column", width, height, justifyContent: "center",
     alignItems: center ? "center" : "flex-start", fontFamily: family, fontWeight: family === "Bebas" ? 400 : 600,
     fontSize: fitted.fontSize, lineHeight: 1.12, color, letterSpacing: family === "Bebas" ? 1 : 0 }}>
-      {fitted.lines.map((line, i) => <span key={i} style={{ whiteSpace: "pre", flexShrink: 0 }}>{line}</span>)}
+      {fitted.lines.map((line, i) => <span key={i} style={{ whiteSpace: "pre", flexShrink: 0, ...(shadow ? { textShadow: shadow } : {}) }}>{line}</span>)}
   </div>;
 }
 
@@ -74,6 +76,8 @@ export interface Treatment {
   titleTop?: number; titleNode?: ReactNode;
   /** Pollito grande que sobresale del bloque del título. */
   pollitoSize?: number; pollitoTop?: number; pollitoRight?: number; nameWidth?: number;
+  /** Sombra del nombre de la rifa cuando va sobre una foto. */
+  nameShadow?: string;
 }
 
 /** X de número tomado: rojo de alerta de la marca (#FF3D57), un poco más profundo para leerse sobre casillas claras. */
@@ -139,7 +143,7 @@ export function StoryFrame(props: StoryProps, theme: Treatment) {
       {theme.titleNode ?? <span style={{ ...display, fontSize: theme.titleSize ?? 128, color: theme.accent ?? ink, ...theme.titleStyle }}>
         {theme.title ?? "RIFA"}
       </span>}
-      <FittedText text={r.name.toUpperCase()} width={pollito ? theme.nameWidth ?? 700 : 920} height={110} size={56} family="Bebas" center={center} />
+      <FittedText text={r.name.toUpperCase()} width={pollito ? theme.nameWidth ?? 700 : 920} height={110} size={56} family="Bebas" center={center} shadow={theme.nameShadow} />
       {pollito && <img src={pollito} width={theme.pollitoSize ?? 190} height={theme.pollitoSize ?? 190} alt="" /* eslint-disable-line @next/next/no-img-element */
         style={{ position: "absolute", right: theme.pollitoRight ?? 0, top: theme.pollitoTop ?? 10 }} />}
     </div>
