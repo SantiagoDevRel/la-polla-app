@@ -8,6 +8,8 @@ import { getCreatorView, getRifaViewer, rifasEnabled, validSlug } from "@/lib/ri
 import { HeroFrame, Label } from "@/components/street";
 import { RifaGestion } from "@/components/rifas/RifaGestion";
 import { rifaPartner } from "@/lib/rifas/partner";
+import { getComboSummary } from "@/lib/rifas/combo";
+import { CombosResumen } from "@/components/rifas/CombosResumen";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,9 @@ export default async function GestionarRifaPage({ params }: { params: Promise<{ 
   if (!viewer) redirect(`/login?returnTo=${encodeURIComponent(`/rifa/${slug}/gestionar`)}`);
   const { data, error } = await getCreatorView(slug, viewer.id);
   if (error || !data) notFound();
+  const partner = rifaPartner(data.id);
+  // (2026-11-07) Las respuestas de «¿Eres de un combo?» son solo para un administrador de La Polla.
+  const combos = partner && viewer.is_admin ? await getComboSummary(data.id) : null;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://lapollacolombiana.com";
 
   return (
@@ -27,7 +32,8 @@ export default async function GestionarRifaPage({ params }: { params: Promise<{ 
         <Label>Gestionar mi rifa</Label>
         <h1 className="lp-display mt-1 text-[30px] [overflow-wrap:anywhere]">{data.name}</h1>
       </HeroFrame>
-      <RifaGestion initial={data} shareUrl={`${appUrl}/rifa/${data.slug}`} partner={rifaPartner(data.id)?.key ?? null} />
+      <RifaGestion initial={data} shareUrl={`${appUrl}/rifa/${data.slug}`} partner={partner?.key ?? null} />
+      {partner && viewer.is_admin && <CombosResumen summary={combos} partnerName={partner.name} />}
     </div>
   );
 }

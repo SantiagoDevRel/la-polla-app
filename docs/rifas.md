@@ -253,6 +253,18 @@ recibe el slug de SQL); el test exige que ambos sean la misma rifa.
   La web conserva los pollitos de siempre.
 - Prueba: `tests/rifas-lds-story.test.ts`.
 
+### «¿Eres de un combo?» (7-nov-2026, migración 180)
+
+En una rifa con barra, la primera vez que alguien con sesión la abre sale una
+ventana: «¿Eres de un combo de Los Del Sur?». Si marca la casilla escribe el
+combo; si no, Continuar. Escape la cierra sin guardar y vuelve a salir en la
+próxima visita. No cambia nada de la compra.
+
+- Tabla `rifa_combo_answers` (una fila por persona y rifa), solo service_role.
+- `POST /api/rifas/[slug]/combo` con sesión; solo rifas de `lib/rifas/partner.ts`.
+- Las respuestas, agrupadas por combo (sin tildes ni mayúsculas), las ve solo un
+  administrador de La Polla (`users.is_admin`) al final de Gestionar.
+
 ### Pagar en un popup (7-nov-2026)
 
 «Pagar» aparta los números y abre un popup con el valor exacto, la cuenta (con
