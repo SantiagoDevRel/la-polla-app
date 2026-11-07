@@ -246,11 +246,19 @@ recibe el slug de SQL); el test exige que ambos sean la misma rifa.
   `lds-sombrillas`, en `story-templates/designs-lds.tsx`) y las demás rifas no
   las ven. Encabezado con escudo, pollito barrista grande y La Polla solo como
   logo pequeño junto al dominio. Arte en `assets/rifas-story/lds/`
-  (`scripts/bake-rifa-lds-assets.py`): escudo, trapo y fotos de la app de LDS, y
+  (`scripts/bake-rifa-lds-assets.py`): escudo, trapo de la app de LDS y
   seis pollitos barristas (pava «BARRA BRAVA», bombo, bandera, trompeta,
   sombrilla, trapo) editados con Qwen Image Edit 2511 en el DGX a partir de
   `pollito_verde_base`. Originales en `Downloads/agent-work/lds-pollitos-20261107/`.
   La web conserva los pollitos de siempre.
+- Fondos (7-nov-2026, pedido del dueño): las seis plantillas van sobre **fotos
+  reales de la barra** del Instagram oficial @ldsoficial, nunca arte generado
+  (los fondos anteriores eran generados y traían letras y marcas deformadas).
+  `scripts/bake-rifa-lds-fondos.py` recorta cada foto a 1080×1920 y documenta
+  la publicación de origen; los originales quedan fuera del repo, en
+  `Downloads/agent-work/la-polla-lds-fotos-20261107/originales/`. El dueño
+  tiene permiso de la barra para usar sus fotos y su escudo. Los paneles son
+  semitransparentes para que la foto se vea alrededor del tablero.
 - Prueba: `tests/rifas-lds-story.test.ts`.
 
 ### «¿Eres de un combo?» (7-nov-2026, migración 180)
