@@ -7,11 +7,11 @@
 // Sin sesión se cuenta la visita (embudo rifa → cuenta → polla).
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Settings } from "lucide-react";
+import { Camera, ChevronDown, Settings } from "lucide-react";
 import { getPublicView, getRifaViewer, rifaRpc, rifasEnabled, validSlug } from "@/lib/rifas/server";
 import { HeroFrame, Label, Tape } from "@/components/street";
 import { RifaComprador } from "@/components/rifas/RifaComprador";
-import { PrizeMotion } from "@/components/casa/PrizeShowcase";
+import { PrizeMotion, PrizePhotoCarousel } from "@/components/casa/PrizeShowcase";
 import { rifaBenefit } from "@/lib/rifas/benefit";
 import { rifaPartner } from "@/lib/rifas/partner";
 import { hasComboAnswer } from "@/lib/rifas/combo";
@@ -71,6 +71,17 @@ export default async function RifaPage({ params }: { params: Promise<{ slug: str
               <p className="mt-1 text-[13px] text-text-secondary [overflow-wrap:anywhere]">{rifa.name}</p>
             </div>
           </div>
+        )}
+        {/* (2026-11-08) Las fotos reales de la camiseta, cerradas por defecto: el giro se hizo con ellas. */}
+        {benefit.jersey && benefit.jersey.photos.length > 0 && (
+          <details className="group/fotos mt-4">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 rounded-full border border-border-strong bg-bg-elevated/90 px-4 py-2.5 text-[15px] font-semibold leading-[1.45] text-text-primary transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold [&::-webkit-details-marker]:hidden">
+              <Camera aria-hidden="true" className="h-5 w-5 shrink-0" />
+              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">Ver foto original</span>
+              <ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 transition-transform duration-200 group-open/fotos:rotate-180" />
+            </summary>
+            <PrizePhotoCarousel photos={benefit.jersey.photos} className="mt-3 rounded-xl border border-border-default bg-bg-card/80 p-3" />
+          </details>
         )}
       </HeroFrame>
       <RifaComprador initial={rifa} benefitCause={benefit.cause} />

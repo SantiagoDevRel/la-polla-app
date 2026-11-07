@@ -14,6 +14,8 @@ export interface StoryProps {
   /** Local PNG data URIs; rendering never fetches assets. */
   logo: string; pollito: string | null;
   partner?: StoryPartnerArt | null;
+  /** Foto del premio de frente (PNG data URI, fondo transparente): va al lado del texto del premio. */
+  prizeImage?: string | null;
 }
 export interface StoryTemplate {
   key: AnyStoryTemplateKey; label: string; usesClub: boolean;

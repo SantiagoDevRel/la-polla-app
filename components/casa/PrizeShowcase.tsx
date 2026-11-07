@@ -146,15 +146,22 @@ export function CashPrizeVisual({ banknote, back, turntable, poster, compact = f
 }
 
 export function JerseyPrizeShowcase({ media, photos }: { media: PrizeMedia; photos: readonly PrizePhoto[] }) {
-  const [photo, setPhoto] = useState(0);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const id = useId();
   return <section aria-label="Camiseta de James Rodríguez" className="overflow-hidden rounded-xl border border-border-default bg-bg-card/80 backdrop-blur-sm">
     <div className="relative bg-gradient-to-b from-turf/10 via-bg-card/40 to-bg-card/80 px-4 py-5">
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-[20%] top-[15%] h-[180px] rounded-full bg-turf/10 blur-3xl" />
       <PrizeMotion media={media} label="Camiseta de Nacional de James Rodríguez" interactive className="mx-auto h-[300px] w-full max-w-[360px]" />
     </div>
-    <div aria-label="Fotos originales de la camiseta" tabIndex={0} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain border-t border-border-subtle p-4 [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold">
+    <PrizePhotoCarousel photos={photos} className="border-t border-border-subtle p-4" />
+  </section>;
+}
+
+/** Fotos originales del premio: carrusel horizontal; un clic amplía y Escape o la X cierran. */
+export function PrizePhotoCarousel({ photos, className }: { photos: readonly PrizePhoto[]; className?: string }) {
+  const [photo, setPhoto] = useState(0);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const id = useId();
+  return <>
+    <div aria-label="Fotos originales de la camiseta" tabIndex={0} className={cn("flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold", className)}>
         {photos.map((item, index) => <button key={item.src} type="button" aria-label={`Ampliar: ${item.alt}`} onClick={() => { setPhoto(index); dialog.current?.showModal(); }} className="group w-[calc(100%-1rem)] shrink-0 snap-start cursor-pointer overflow-hidden rounded-md border border-border-default transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={item.src} alt={item.alt} width={1536} height={2048} loading="lazy" draggable={false} className="aspect-[3/4] w-full select-none object-contain transition-transform duration-200 group-hover:scale-[1.01]" />
@@ -168,5 +175,5 @@ export function JerseyPrizeShowcase({ media, photos }: { media: PrizeMedia; phot
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={photos[photo]?.src} alt={photos[photo]?.alt} width={1536} height={2048} className="h-auto w-full object-contain" />
     </dialog>
-  </section>;
+  </>;
 }

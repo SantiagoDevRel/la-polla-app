@@ -28,6 +28,7 @@ const props = (template: (typeof LDS_STORY_TEMPLATE_LIST)[number]) => ({
     trapo: file("assets/rifas-story/lds/trapo.png", "image/png"),
     background: file(`assets/rifas-story/lds/fondo-${template.background}.jpg`, "image/jpeg"),
   },
+  prizeImage: file("assets/rifas-story/premios/armani-frente.png", "image/png"),
 });
 
 describe("rifaPartner", () => {
@@ -71,9 +72,18 @@ describe("plantillas de Los Del Sur", () => {
     expect(html.includes(p.pollito)).toBe(true);
     expect(html.includes(p.partner.escudo)).toBe(true);
     expect(html.includes(p.partner.background)).toBe(true);
+    // (2026-11-08) La camiseta de frente va al lado del premio.
+    expect(html.includes(p.prizeImage)).toBe(true);
+    expect(html).toContain("Armani");
     expect([...html.matchAll(/data-number="(\d+)"/g)]).toHaveLength(100);
     expect(html.match(/data-taken="true"/g)).toHaveLength(3);
     expect(html.match(/#FFD700/g)?.length ?? 0).toBeLessThanOrEqual(3);
+  });
+  it("sin foto del premio no aparece el recuadro de la camiseta", () => {
+    const template = LDS_STORY_TEMPLATE_LIST[0];
+    const html = renderToStaticMarkup(template.render({ ...props(template), prizeImage: null }));
+    expect(html).not.toContain("rgba(190,165,255");
+    expect(html).toContain("Armani");
   });
   it.each(LDS_STORY_TEMPLATE_LIST)("$key genera PNG 1080×1920", async (template) => {
     const png = Buffer.from(await new ImageResponse(template.render(props(template)), { width: 1080, height: 1920, fonts }).arrayBuffer());

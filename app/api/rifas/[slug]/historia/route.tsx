@@ -18,6 +18,7 @@ import { rifaError, rifaJson, RIFA_DISABLED, RIFA_UNAUTHORIZED } from "@/lib/rif
 import { getRifaViewer, rifaRpc, rifasEnabled, validSlug } from "@/lib/rifas/server";
 import { storyClub } from "@/lib/rifas/shared";
 import { rifaPartnerBySlug } from "@/lib/rifas/partner";
+import { rifaStoryPrize } from "@/lib/rifas/benefit";
 import { LDS_STORY_TEMPLATE_LIST, STORY_H, STORY_W, getStoryTemplate, renderStory, type StoryData, type StoryPartnerArt } from "@/lib/rifas/story-templates";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +46,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
   const club = storyClub(url.searchParams.get("club"));
   const appHost = (process.env.NEXT_PUBLIC_APP_URL ?? "https://lapollacolombiana.com").replace(/^https?:\/\//, "").replace(/\/$/, "");
 
-  const [bebas, outfit, logo, pollito, partnerArt] = await Promise.all([
+  const prizePath = rifaStoryPrize(r.slug);
+  const [bebas, outfit, logo, pollito, partnerArt, prizeImage] = await Promise.all([
     readFile(join(process.cwd(), "assets/fonts/BebasNeue-latin.ttf")),
     readFile(join(process.cwd(), "assets/fonts/Outfit-SemiBold-latin.ttf")),
     // PNG horneados (scripts/bake-rifa-story-assets.py): satori no decodifica WebP.
@@ -59,9 +61,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       asset("assets/rifas-story/lds/trapo.png", "image/png"),
       lds.background ? asset(`assets/rifas-story/lds/fondo-${lds.background}.jpg`, "image/jpeg") : Promise.resolve(null),
     ]).then(([escudo, trapo, background]): StoryPartnerArt => ({ escudo, trapo, background })) : Promise.resolve(null),
+    // El premio de frente al lado del texto (lib/rifas/benefit.ts), solo en las rifas que lo tienen.
+    prizePath ? asset(prizePath, "image/png") : Promise.resolve(null),
   ]);
 
-  return new ImageResponse(renderStory(template.key, { r, club, appHost, logo, pollito, partner: partnerArt }), {
+  return new ImageResponse(renderStory(template.key, { r, club, appHost, logo, pollito, partner: partnerArt, prizeImage }), {
     width: STORY_W, height: STORY_H,
     fonts: [
       { name: "Bebas", data: bebas, weight: 400, style: "normal" },

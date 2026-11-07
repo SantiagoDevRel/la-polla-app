@@ -114,6 +114,11 @@ const nextConfig = {
         source: "/prizes/v3-30099c32d6c6/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
+      {
+        // Camiseta de Franco Armani (rifa solidaria La Iguaná), misma regla.
+        source: "/prizes/armani-bf38a139b7c2/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       // iOS Universal Links — el archivo apple-app-site-association NO tiene
       // extensión, así que Next lo serviría como octet-stream. Apple exige
       // Content-Type: application/json y acceso público sin redirect (el
