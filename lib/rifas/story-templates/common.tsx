@@ -121,6 +121,11 @@ export function StoryBoard({ r, theme }: { r: StoryProps["r"]; theme: Treatment 
 /** Shared information contract. Each theme owns its art, surfaces and headline composition. */
 export function StoryFrame(props: StoryProps, theme: Treatment) {
   const { r, logo, pollito, appHost } = props;
+  // (2026-11-08, pedido del dueño) El premio de frente, chiquito, al lado del texto:
+  // así se entiende qué se rifa. Sobresale del panel sin tocar el título ni el tablero.
+  const prizeImage = props.prizeImage ?? null;
+  const prizeImageH = theme.prizeFirst ? 190 : 270;
+  const prizeImageW = Math.round(prizeImageH * 0.848);
   const ink = theme.ink ?? PAPER;
   const muted = theme.muted ?? "#BFC9D8";
   const center = theme.centered ?? false;
@@ -151,10 +156,16 @@ export function StoryFrame(props: StoryProps, theme: Treatment) {
       width: 920, height: 202, padding: "16px 24px", borderRadius: 18, background: theme.panel ?? "#131B2B",
       alignItems: center ? "center" : "flex-start", ...theme.prizeStyle }}>
       <span style={{ fontSize: 24, letterSpacing: 3, color: theme.prizeStyle?.color ?? (theme.prizeStyle?.background ? "#BFC9D8" : muted) }}>PREMIO</span>
-      <FittedText text={prize} width={872} height={136} size={r.prize_kind === "dinero" ? 100 : 44}
+      <FittedText text={prize} width={prizeImage ? 872 - prizeImageW - 12 : 872} height={136} size={r.prize_kind === "dinero" ? 100 : 44}
         family={r.prize_kind === "dinero" ? "Bebas" : "Outfit"} center={center}
         color={theme.prizeStyle?.color ?? GOLD} />
     </div>
+    {prizeImage && <div style={{ display: "flex", position: "absolute", left: 990 - prizeImageW, top: prizeTop + 101 - prizeImageH / 2,
+      width: prizeImageW, height: prizeImageH,
+      backgroundImage: "radial-gradient(circle at 50% 50%, rgba(190,165,255,0.30) 0%, rgba(190,165,255,0) 68%)" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- PNG embedded in next/og */}
+      <img src={prizeImage} width={prizeImageW} height={prizeImageH} alt="" />
+    </div>}
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "absolute",
       top: boardTop, left: (STORY_W - board.width - 40) / 2, width: board.width + 40, height: board.height + 40,
       borderRadius: 24, background: theme.panel ?? "#131B2B", ...theme.boardStyle }}>

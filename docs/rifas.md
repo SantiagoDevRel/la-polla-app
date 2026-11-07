@@ -226,13 +226,23 @@ no decodifica WebP: el logo y los pollitos van como PNG de paleta en
 
 `lib/rifas/benefit.ts` enlaza por uuid una portada especial: sello «Sin ánimo de
 lucro», «Rifa para …» en grande, qué compra lo recaudado y la camiseta girando
-(provisional: la de James, hasta tener el diseño de cada camiseta). Mismo patrón
+con un desplegable cerrado «Ver foto original» (las dos fotos reales). Mismo patrón
 que `components/casa/prize-media.ts`; no hay columnas nuevas ni cambios de SQL.
 Primera: «Rifa solidaria La Iguaná» (`/rifa/rifa-solidaria-la-iguana-camiseta`),
 premio «Camiseta firmada por Franco Armani», de carlos con Santi de coadministrador,
 Pública, 100 números a $30.000, Lotería de Medellín del 13-nov. Una camiseta por rifa,
 de a una: la siguiente se crea al cerrar esta y se agrega su uuid al mapa.
 Prueba: `tests/rifas-benefit.test.ts`.
+
+**Camiseta de Franco Armani (8-nov-2026, pedido del dueño).** Reemplaza a la de
+James. El giro sale de las dos fotos reales (frente con autógrafo y espalda),
+recortadas sin retocar el diseño: 144 poses en `public/prizes/armani-bf38a139b7c2/`
+(caché immutable, cualquier cambio crea otra carpeta), detalle en
+`docs/premios-giratorios.md`. Las seis plantillas de historia muestran la
+camiseta de frente al lado del premio (`assets/rifas-story/premios/armani-frente.png`,
+enlazada por slug con `rifaStoryPrize`). En esa imagen fija el autógrafo real se
+repasó más grueso, en su misma forma y lugar, para que se lea a ese tamaño; el
+giro y las fotos no se tocaron.
 
 ### Con Los Del Sur (7-nov-2026, pedido del dueño)
 

@@ -39,6 +39,18 @@ subtítulos. Se pueden ampliar con clic y cerrar con Escape o el botón de cierr
 El aviso de desempate de todas las pollas con objeto también empieza cerrado:
 título y flecha visibles, regla completa y ejemplo al abrirlo.
 
+## Camiseta de Franco Armani (rifa solidaria La Iguaná, 8-nov-2026)
+
+Reemplaza a la de James en la portada de la rifa (`lib/rifas/benefit.ts`). Se
+recortaron las dos fotos reales (`armani-real-front.jpg` y `armani-real-back.jpg`,
+sin EXIF), se corrigió la perspectiva de la espalda y se montaron sobre dos
+superficies con volumen en Blender (DGX): de -90° a 90° se ve el frente y del
+otro lado la espalda, sin redibujar el diseño. Mismas 144 poses y atlas que James.
+Límites conocidos: los puños que la foto deja fuera del encuadre quedan cortados
+y el canto de perfil es una reconstrucción. 55 archivos, 9.973.919 bytes, en
+`public/prizes/armani-bf38a139b7c2/` con la misma caché immutable. Fuentes,
+máscaras y escenas en `Downloads/agent-work/la-polla-armani-20261108/`.
+
 ## Archivos y caché
 
 Los 106 archivos aprobados están en `public/prizes/v3-30099c32d6c6/`: atlas,

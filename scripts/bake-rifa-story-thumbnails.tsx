@@ -55,6 +55,8 @@ async function main() {
     prize_text: "Camiseta firmada por Franco Armani", number_count: 100, price_cop: 30_000,
     lottery_name: "Lotería de Medellín", draw_at: "2026-11-14T03:30:00.000Z", taken: [3, 7, 10, 21, 33, 45, 58, 77, 90] };
   const full = process.argv.includes("--full");
+  // La camiseta de frente que acompaña al premio (lib/rifas/benefit.ts → rifaStoryPrize).
+  const prizeImage = await data("assets/rifas-story/premios/armani-frente.png", "image/png");
   for (const template of LDS_STORY_TEMPLATE_LIST) {
     const [pollito, escudo, trapo, background] = await Promise.all([
       data(`assets/rifas-story/lds/pollito-${template.pollito}.png`, "image/png"),
@@ -63,7 +65,7 @@ async function main() {
       template.background ? data(`assets/rifas-story/lds/fondo-${template.background}.jpg`, "image/jpeg") : Promise.resolve(null),
     ]);
     const png = Buffer.from(await new ImageResponse(renderStory(template.key, { r: lds, club, logo, pollito,
-      appHost: "lapollacolombiana.com", partner: { escudo, trapo, background } }), { width: STORY_W, height: STORY_H, fonts }).arrayBuffer());
+      appHost: "lapollacolombiana.com", partner: { escudo, trapo, background }, prizeImage }), { width: STORY_W, height: STORY_H, fonts }).arrayBuffer());
     const file = join(out, `${template.key}.webp`);
     await sharp(png).resize(THUMB_W, THUMB_H).webp({ quality: 80 }).toFile(file);
     // --full: copia en tamaño real para revisarla (no se versiona).
