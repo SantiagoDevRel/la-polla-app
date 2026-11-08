@@ -163,20 +163,18 @@
     }
   },
   "Welcome": {
-    "introLine": "Every weekend we post the pools.\nYou join, you pick, you play for the pot.",
-    "tournamentChampions": "Champions",
-    "tournamentLaLiga": "La Liga",
-    "step1": "Pick the weekend's pool",
-    "step2": "Pay and send the screenshot",
-    "step3": "Call home, draw or away",
-    "step4": "Wait for kickoff",
-    "step5": "Most correct picks takes it",
-    "taglineBefore": "Of the pot,",
-    "taglineAccent": "70% IS YOURS",
-    "skip": "Skip",
-    "start": "Get started",
-    "tournamentLibertadores": "Libertadores",
-    "tournamentBetplay": "BetPlay"
+    "lead": "Here you'll find",
+    "word1": "Pools",
+    "word2": "Raffles",
+    "word3": "Social causes",
+    "word4": "Non-profit",
+    "word5": "And much more",
+    "summary": "Pools · Raffles · Social causes · Non-profit",
+    "screenReader": "Pools, raffles, social causes, non-profit initiatives and much more.",
+    "fans": "For fans of Nacional and every team in Colombia.",
+    "partnerLead": "Non-profit initiatives with",
+    "partnerName": "Los Del Sur",
+    "start": "Get started"
   },
   "Scoring": {
     "tier1Label": "Exact score",

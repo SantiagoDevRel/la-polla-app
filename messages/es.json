@@ -163,20 +163,18 @@
     }
   },
   "Welcome": {
-    "introLine": "Cada fin de semana subimos las pollas.\nEntras, pronosticas y compites por el pozo.",
-    "tournamentChampions": "Champions",
-    "tournamentLaLiga": "La Liga",
-    "step1": "Eliges la polla de la semana",
-    "step2": "Pagas y subes el comprobante",
-    "step3": "Eliges local, empate o visitante",
-    "step4": "Esperas el resultado",
-    "step5": "El que más acierta, gana",
-    "taglineBefore": "El que más acierta",
-    "taglineAccent": "SE LLEVA EL POZO",
-    "skip": "Saltar",
-    "start": "Empezar",
-    "tournamentLibertadores": "Libertadores",
-    "tournamentBetplay": "BetPlay"
+    "lead": "Aquí encuentras",
+    "word1": "Pollas",
+    "word2": "Rifas",
+    "word3": "Causas sociales",
+    "word4": "Sin ánimo de lucro",
+    "word5": "Y mucho más",
+    "summary": "Pollas · Rifas · Causas sociales · Sin ánimo de lucro",
+    "screenReader": "Pollas, rifas, causas sociales, iniciativas sin ánimo de lucro y mucho más.",
+    "fans": "Para los hinchas de Nacional y de todos los equipos de Colombia.",
+    "partnerLead": "Iniciativas sin ánimo de lucro con",
+    "partnerName": "Los Del Sur",
+    "start": "Entrar"
   },
   "Scoring": {
     "tier1Label": "Resultado exacto",

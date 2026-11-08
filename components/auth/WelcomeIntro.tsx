@@ -1,103 +1,74 @@
 // components/auth/WelcomeIntro.tsx — la bienvenida, una sola vez en la vida.
 //
-// Se muestra una unica vez, antes del formulario de login, y su unico trabajo
-// es que alguien que nunca vio esto entienda el producto en 15 segundos:
-//   1. Linea de intro que se escribe sola.
-//   2. Fila de escudos de los torneos.
-//   3. Los 5 pasos, en cascada: escoges, pagas, marcas, esperas, cobras.
-//   4. Remate: del pozo, el 70% es de ustedes.
+// (2026-11-08) Rehecha a pedido del dueño: la anterior (frase que se escribía
+// sola, nueve escudos, cinco pasos y remate del pozo) tardaba ~8 s y contaba
+// demasiado. La nueva es la "opción B" aprobada en Claude Design: el pollito,
+// el wordmark tricolor y UNA palabra grande que rota rápido (Pollas → Rifas →
+// Causas sociales → Sin ánimo de lucro → Y mucho más), con barras de progreso
+// tipo historia arriba. Abajo: a quién va dirigida, el resaltado verde de las
+// iniciativas sin ánimo de lucro con Los Del Sur (solo mencionados: sin su
+// escudo ni sus fotos, decisión del dueño) y el botón de entrar, que aparece
+// al segundo para que nadie tenga que esperar la rotación completa.
 //
-// (2026-08-25) Antes cerraba con "Todo esto es GRATIS" sobre un video de
-// estadio a pantalla completa. Las dos cosas se fueron: la app ahora cobra
-// entrada, y el video se descargaba en datos moviles antes de que la persona
-// supiera siquiera de que se trata.
-//   5. CTA line settle.
-//
-// Persisted via localStorage so returning users land straight on the
-// login form. Reduced-motion users skip the cadence and see the full
-// composition in one frame.
+// Se recuerda en localStorage (`lp_welcome_seen_v1`): quien vuelve cae directo
+// en el login. Con movimiento reducido se pinta el estado final de una vez.
+// No pinta fondo opaco: el AppBackground del layout de auth se ve detrás, con
+// un velo encima para el contraste, así que no descarga nada nuevo.
 
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- pre-sized public assets avoid Vercel image-optimization quota */
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useLocale, useTranslations } from "next-intl";
-import { useIsIOSApp } from "@/components/platform/PlatformProvider";
-import { getTournamentLogo, getTournamentLogoClassName, getTournamentShortName } from "@/lib/tournaments";
-import { RESULT_LEAGUES } from "@/lib/api-football/leagues";
+import { useTranslations } from "next-intl";
 
 const SEEN_KEY = "lp_welcome_seen_v1";
-const TYPE_MS = 26; // ms between chars — fast, energetic typewriter
-const CHAR_FADE_MS = 160; // each char's fade-in; multiple chars overlap mid-fade
-// Single eased curve reused everywhere so phases share the same
-// "physics". Acts close to easeOutExpo — soft landing, no overshoot.
+const WORD_MS = 900; // cada palabra en pantalla
+const CTA_DELAY_S = 1.1; // el botón llega antes de que termine la rotación
 const SMOOTH: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-// Nueve torneos, en una rejilla 3 × 3 exacta. La lista es EXPLÍCITA y no
-// `Object.keys(RESULT_LEAGUES)`: la app soporta muchos más, y derivarla de ahí
-// dejaba una última fila suelta (10 logos = 3+3+3+1) y alargaba la cascada de
-// entrada. Si se cambia, que el total siga siendo múltiplo de 3.
-const TOURNAMENT_ORDER = [
-  'champions_2025', 'premier_2025', 'laliga_2025',
-  'seriea_2025', 'bundesliga_2025', 'ligue1_2025',
-  'libertadores_2026', 'betplay_2026', 'brasileirao_2026',
-].filter((slug) => slug in RESULT_LEAGUES);
+const WORDS = [
+  { key: "word1", size: "text-[64px]" },
+  { key: "word2", size: "text-[64px]" },
+  { key: "word3", size: "text-[48px]" },
+  { key: "word4", size: "text-[42px]" },
+  { key: "word5", size: "text-[56px]" },
+] as const;
+const LAST = WORDS.length - 1;
 
-// Stage gates — ms between the previous beat finishing and the next
-// one starting. Tight enough to keep momentum, loose enough that
-// nothing animates over the previous block.
-type Stage = "intro" | "tournaments" | "steps" | "gratis" | "ready";
-const STAGE_DELAYS: Record<Exclude<Stage, "intro">, number> = {
-  tournaments: 350, // intro typing finishes → logos start almost immediately
-  steps: 900, // logos cascade ~1.1s, then steps kick in
-  gratis: 2200, // 5 steps land + a beat of read time
-  ready: 1300, // savor the gold "GRATIS" before the CTA
-};
+type Stage = "playing" | "ready";
 
 export function WelcomeIntro() {
   const t = useTranslations("Welcome");
-  const locale = useLocale();
   const tBrand = useTranslations("Brand");
-  const isIOSApp = useIsIOSApp();
   const prefersReducedMotion = useReducedMotion();
-  const INTRO = t("introLine");
-  const INTRO_CHARS = useMemo(() => INTRO.split(""), [INTRO]);
-  const STEPS = useMemo(
-    () => [t("step1"), t("step2"), t("step3"), t("step4"), t("step5")],
-    [t],
-  );
 
   const [shouldShow, setShouldShow] = useState(false);
-  const [typed, setTyped] = useState("");
-  const [stage, setStage] = useState<Stage>("intro");
+  const [index, setIndex] = useState(0);
+  const [stage, setStage] = useState<Stage>("playing");
   const [exiting, setExiting] = useState(false);
 
-  // Gate visibility on the localStorage flag. Runs once on mount; the
-  // initial render returns null so SSR doesn't flash the overlay for
-  // returning users.
+  // Gate visibility on the localStorage flag. The first render returns null
+  // so SSR never flashes the overlay for returning users.
   useEffect(() => {
     if (typeof window === "undefined") return;
     let seen = false;
     try {
       seen = window.localStorage.getItem(SEEN_KEY) === "1";
     } catch {
-      /* storage unavailable — fall through and show the intro */
+      /* storage unavailable — show the intro */
     }
     if (seen) return;
     if (prefersReducedMotion) {
-      setTyped(INTRO);
+      setIndex(LAST);
       setStage("ready");
     }
     setShouldShow(true);
-    // `INTRO` only changes with the active locale. If that happens before
-    // dismissal, keep the fully rendered reduced-motion copy in sync.
-  }, [INTRO, prefersReducedMotion]);
+  }, [prefersReducedMotion]);
 
   // Keep the login/onboarding UI out of sight and out of the tab order while
-  // the first-visit story is active. The global AppBackground is a sibling,
-  // so it remains visible without mounting or downloading a second video.
+  // the welcome is active.
   useLayoutEffect(() => {
     if (!shouldShow) return;
     const content = document.querySelector<HTMLElement>("[data-auth-content]");
@@ -118,44 +89,19 @@ export function WelcomeIntro() {
     };
   }, [shouldShow]);
 
-  // Typewriter cadence for the intro line.
+  // Word rotation: one pass, then rest on the last word.
   useEffect(() => {
-    if (!shouldShow || stage !== "intro") return;
-    if (typed.length >= INTRO.length) {
-      const tm = window.setTimeout(
-        () => setStage("tournaments"),
-        STAGE_DELAYS.tournaments,
-      );
-      return () => window.clearTimeout(tm);
-    }
+    if (!shouldShow || stage === "ready") return;
     const tm = window.setTimeout(() => {
-      setTyped(INTRO.slice(0, typed.length + 1));
-    }, TYPE_MS);
+      if (index >= LAST) setStage("ready");
+      else setIndex(index + 1);
+    }, index >= LAST ? 450 : WORD_MS);
     return () => window.clearTimeout(tm);
-  }, [typed, shouldShow, stage, INTRO]);
-
-  // Stage progression past the typewriter.
-  useEffect(() => {
-    if (stage === "tournaments") {
-      const t = window.setTimeout(() => setStage("steps"), STAGE_DELAYS.steps);
-      return () => window.clearTimeout(t);
-    }
-    if (stage === "steps") {
-      const t = window.setTimeout(
-        () => setStage("gratis"),
-        STAGE_DELAYS.gratis,
-      );
-      return () => window.clearTimeout(t);
-    }
-    if (stage === "gratis") {
-      const t = window.setTimeout(() => setStage("ready"), STAGE_DELAYS.ready);
-      return () => window.clearTimeout(t);
-    }
-  }, [stage]);
+  }, [shouldShow, stage, index]);
 
   function fastForward() {
     if (stage === "ready") return;
-    setTyped(INTRO);
+    setIndex(LAST);
     setStage("ready");
   }
 
@@ -171,14 +117,18 @@ export function WelcomeIntro() {
 
   if (!shouldShow) return null;
 
-  const showTournaments =
-    stage === "tournaments" ||
-    stage === "steps" ||
-    stage === "gratis" ||
-    stage === "ready";
-  const showSteps = stage === "steps" || stage === "gratis" || stage === "ready";
-  const showGratis = stage === "gratis" || stage === "ready";
-  const showReady = stage === "ready";
+  const part1 = tBrand("wordmarkPart1");
+  const part2 = tBrand("wordmarkPart2");
+  const part3 = tBrand("wordmarkPart3");
+  const word = WORDS[index];
+  const reveal = (delay: number) =>
+    prefersReducedMotion
+      ? { initial: false as const, animate: { opacity: 1, y: 0 } }
+      : {
+          initial: { opacity: 0, y: 16, filter: "blur(6px)" },
+          animate: { opacity: 1, y: 0, filter: "blur(0px)" },
+          transition: { duration: 0.5, delay, ease: SMOOTH },
+        };
 
   return (
     <AnimatePresence>
@@ -187,271 +137,143 @@ export function WelcomeIntro() {
           initial={prefersReducedMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={
-            prefersReducedMotion
-              ? { duration: 0 }
-              : { duration: 0.7, ease: SMOOTH }
-          }
-          className="fixed inset-0 z-[10000] overflow-hidden"
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.5, ease: SMOOTH }}
+          className="fixed inset-0 z-[10000] overflow-hidden bg-bg-base/90"
           data-testid="welcome-intro"
           data-welcome-stage={stage}
         >
-          {/* (2026-09-02) El estadio vuelve a verse aca — sin descargar un
-              solo byte extra.
-              La objecion de agosto era legitima: esta pantalla cargaba SU
-              PROPIO <video> a pantalla completa en la primerisima visita, con
-              datos moviles, antes de que la persona supiera de que se trata.
-              Pero la respuesta correcta no era apagar el fondo: era dejar de
-              pedirlo dos veces. `AppBackground` ya esta montado en
-              app/(auth)/layout.tsx, asi que basta con NO pintar un fondo
-              opaco encima y el estadio se ve a traves. Cero descarga nueva, y
-              la bienvenida deja de ser la unica pantalla plana de la app.
-              El velo de abajo es el que garantiza el contraste del texto. */}
-          <div className="absolute inset-0 bg-bg-base/45" />
+          {/* Humo tricolor: tres manchas difuminadas, cero bytes. */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute -left-28 top-10 h-80 w-80 rounded-full bg-gold/30 blur-[80px]" />
+            <div className="absolute -right-36 top-64 h-[340px] w-[340px] rounded-full bg-[#2F6DF4]/30 blur-[90px]" />
+            <div className="absolute -left-14 bottom-28 h-72 w-72 rounded-full bg-[#E4463A]/25 blur-[90px]" />
+          </div>
 
-          {/* Soft radial vignette pulling focus to the center column. */}
           <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(70% 70% at 50% 45%, transparent 45%, rgba(8,12,16,0.75) 100%)",
-            }}
-          />
-
-          {/* Desvanecido inferior: entrega la pantalla al fondo solido para
-              que el CTA no quede flotando sobre un borde duro. */}
-          <div
-            className="absolute bottom-0 left-0 right-0 h-[200px] pointer-events-none"
-            style={{
-              background:
-                "linear-gradient(180deg, transparent 0%, rgba(8,12,16,0.75) 50%, rgba(8,12,16,1) 100%)",
-            }}
-          />
-
-          {/* Skip chip — visible until the CTA arrives. */}
-          {!showReady && (
-            <button
-              type="button"
-              onClick={fastForward}
-              className="absolute right-4 top-4 z-10 inline-flex min-h-11 items-center rounded-full border border-border-subtle bg-bg-card/70 px-4 text-[11px] uppercase tracking-wider text-text-secondary backdrop-blur-sm transition-colors hover:text-gold"
-            >
-              {t("skip")}
-            </button>
-          )}
-
-          {/* Layout strategy: every block is rendered from the very first
-              frame with its final size and position. Stages only flip the
-              opacity/blur/transform of each block — never the DOM tree —
-              so the column's height is constant and nothing ever shifts
-              up or down as content reveals. overflow-y-auto is the
-              fallback for short viewports where the full stack still
-              wouldn't fit (older iPhones in landscape, etc.). */}
-          <div
-            className="relative z-10 w-full h-full overflow-y-auto flex flex-col items-center justify-start px-4 pt-10 pb-12 max-w-lg mx-auto"
+            className="relative z-10 mx-auto flex h-full w-full max-w-md flex-col items-center overflow-y-auto px-4 pb-8 pt-4"
             onClick={fastForward}
           >
-            {/* Wordmark */}
-            <div className="flex items-center gap-3 mb-7">
+            {/* Barras de progreso tipo historia. */}
+            <div aria-hidden="true" className="grid w-full grid-cols-5 gap-[5px]">
+              {WORDS.map((w, i) => (
+                <div key={w.key} className="h-1 overflow-hidden rounded-sm bg-white/20">
+                  <motion.div
+                    className="h-full origin-left rounded-sm bg-text-primary"
+                    initial={false}
+                    animate={{ scaleX: i <= index ? 1 : 0 }}
+                    transition={{
+                      duration: prefersReducedMotion || i < index || stage === "ready" ? 0 : WORD_MS / 1000,
+                      ease: "linear",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <motion.div {...reveal(0.05)} className="relative mt-[clamp(12px,3.5dvh,32px)] flex justify-center">
+              <div aria-hidden="true" className="absolute inset-4 rounded-full bg-gold/20 blur-[28px]" />
               <img
-                src="/pollitos/pollito_pibe_lider-128.webp"
+                src="/pollitos/pollito_pibe_lider-256.webp"
                 alt=""
-                width={52}
-                height={52}
-                className="object-contain"
+                width={140}
+                height={140}
+                className="relative h-[clamp(88px,17dvh,140px)] w-[clamp(88px,17dvh,140px)] max-w-none object-contain"
               />
-              <span
-                className="font-display leading-none tracking-[0.04em] flex items-baseline gap-[5px]"
-                style={{
-                  fontSize: 26,
-                  
-                }}
-              >
-                {tBrand("wordmarkPart3") ? (
-                  <>
-                    <span style={{ color: "var(--gold)" }}>{tBrand("wordmarkPart1")}</span>
-                    <span style={{ color: "#2F6DF4" }}>{tBrand("wordmarkPart2")}</span>
-                    <span style={{ color: "#E4463A" }}>{tBrand("wordmarkPart3")}</span>
-                  </>
-                ) : (
-                  <>
-                    <span style={{ color: "var(--gold)" }}>{tBrand("wordmarkPart1")}</span>
-                    <span style={{ color: "var(--gold)" }}>{tBrand("wordmarkPart2")}</span>
-                  </>
-                )}
-              </span>
-            </div>
+            </motion.div>
 
-            {/* Intro typewriter — per-character technique.
-                ─────────────────────────────────────────────────────────
-                Every character of INTRO is rendered as its own <span>
-                from the very first frame, in its exact final position.
-                The browser computes the layout once at mount and never
-                touches it again — the spans take their natural width
-                even when `opacity:0`, so the line wrap, line count,
-                vertical spacing and column height are LOCKED from
-                frame 0.
-                Reveal happens by toggling each span's opacity based on
-                `typed.length > i`. A 240ms CSS transition turns the
-                hard binary flip into a gentle fade, and because typed
-                grows one char per 50ms, multiple chars are mid-fade at
-                any moment — that overlap is what makes the reveal feel
-                fluid instead of stuttering.
-                There is literally NO mechanism by which a char could
-                move: the DOM never reorders, no width changes, no
-                container resizes. Whatever is on screen stays exactly
-                where it is for the entire intro. */}
-            <div className="w-full max-w-[360px] mx-auto">
-              <p
-                className="text-text-primary text-[15px] leading-relaxed font-medium text-center whitespace-pre-line"
-                style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
-              >
-                {INTRO_CHARS.map((ch, i) => {
-                  if (ch === "\n") return <br key={`br-${i}`} />;
-                  const visible = typed.length > i;
-                  return (
-                    <span
-                      key={i}
-                      style={{
-                        opacity: visible ? 1 : 0,
-                        transition: prefersReducedMotion
-                          ? "none"
-                          : `opacity ${CHAR_FADE_MS}ms ease-out`,
-                      }}
-                    >
-                      {ch}
-                    </span>
-                  );
-                })}
-              </p>
-            </div>
-
-            {/* Tournament logos — slot reserved (min-h) from the start so
-                the rest of the column doesn't move when the row reveals. */}
-            <div className="mt-6 grid w-full grid-cols-3 items-start gap-x-2 gap-y-4">
-              {(isIOSApp ? [] : TOURNAMENT_ORDER).map((tournament, i) => (
-                <motion.div
-                  key={tournament}
-                  initial={{
-                    opacity: 0,
-                    scale: 0.92,
-                    filter: "blur(6px)",
-                  }}
-                  animate={
-                    showTournaments
-                      ? { opacity: 1, scale: 1, filter: "blur(0px)" }
-                      : { opacity: 0, scale: 0.92, filter: "blur(6px)" }
-                  }
-                  transition={{
-                    duration: prefersReducedMotion ? 0 : 0.45,
-                    delay:
-                      prefersReducedMotion || !showTournaments ? 0 : i * 0.13,
-                    ease: SMOOTH,
-                  }}
-                  className="flex flex-col items-center gap-1.5"
-                >
-                  {isIOSApp ? null : (
-                    <img
-                      src={getTournamentLogo(tournament, "small")}
-                      alt={getTournamentShortName(tournament, locale)}
-                      width={36}
-                      height={36}
-                      className={`h-11 w-11 rounded-sm p-1 object-contain ${getTournamentLogoClassName(tournament)}`}
-                    />
-                  )}
-                  <span className="text-center text-[13px] leading-tight text-text-secondary [overflow-wrap:anywhere]">
-                    {getTournamentShortName(tournament, locale)}
-                  </span>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Steps — list always mounted; per-item opacity flips on the
-                stage gate with a stagger so each line lands one after the
-                next without any vertical reflow. */}
-            <ol className="mt-8 w-full max-w-[34ch] mx-auto flex flex-col items-start gap-3 text-left">
-              {STEPS.map((s, i) => (
-                <motion.li
-                  key={s}
-                  initial={{ opacity: 0, filter: "blur(4px)" }}
-                  animate={
-                    showSteps
-                      ? { opacity: 1, filter: "blur(0px)" }
-                      : { opacity: 0, filter: "blur(4px)" }
-                  }
-                  transition={{
-                    duration: prefersReducedMotion ? 0 : 0.7,
-                    delay: prefersReducedMotion || !showSteps ? 0 : i * 0.32,
-                    ease: SMOOTH,
-                  }}
-                  className="flex items-center gap-3 text-text-primary text-[14px] font-medium w-full"
-                  style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
-                >
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gold/15 border border-gold/40 text-gold text-[11px] font-bold inline-flex items-center justify-center">
-                    {i + 1}
-                  </span>
-                  <span>{s}</span>
-                </motion.li>
-              ))}
-            </ol>
-
-            {/* Gratis punchline — always rendered with its slot reserved. */}
             <motion.p
-              initial={{ opacity: 0, filter: "blur(4px)" }}
-              animate={
-                showGratis
-                  ? { opacity: 1, filter: "blur(0px)" }
-                  : { opacity: 0, filter: "blur(4px)" }
-              }
-              transition={{
-                duration: prefersReducedMotion ? 0 : 0.85,
-                ease: SMOOTH,
-              }}
-              className="mt-8 text-text-primary text-[16px] font-semibold text-center"
-              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.7)" }}
+              {...reveal(0.2)}
+              className="mt-2 text-center font-display text-[clamp(44px,7.4dvh,62px)] leading-[0.95] tracking-[0.05em] [-webkit-text-size-adjust:none] [text-size-adjust:none]"
             >
-              {t("taglineBefore")}{" "}
-              <motion.span
-                initial={{ scale: 0.7, opacity: 0 }}
-                animate={
-                  showGratis
-                    ? { scale: 1, opacity: 1 }
-                    : { scale: 0.7, opacity: 0 }
-                }
-                transition={{
-                  duration: prefersReducedMotion ? 0 : 1.1,
-                  delay:
-                    prefersReducedMotion || !showGratis ? 0 : 0.45,
-                  ease: [0.34, 1.4, 0.64, 1],
-                }}
-                className="inline-block font-display text-gold text-[26px] tracking-wide align-[-0.05em]"
-                style={{ textShadow: "0 2px 8px rgba(255, 215, 0, 0.35)" }}
-              >
-                {t("taglineAccent")}
-              </motion.span>
-              .
+              {part3 ? (
+                <>
+                  <span className="text-gold">{part1}</span>{" "}
+                  <span className="text-[#2F6DF4]">{part2}</span>
+                  <br />
+                  <span className="text-[#E4463A]">{part3}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-gold">{part1}</span>{" "}
+                  <span className="text-gold">{part2}</span>
+                </>
+              )}
             </motion.p>
 
-            {/* CTA — always rendered, pointer-events disabled
-                until showReady so users can't tap an invisible button. */}
+            <motion.p {...reveal(0.35)} className="mt-[clamp(8px,2.4dvh,20px)] text-center text-[15px] font-medium text-text-secondary">
+              {t("lead")}
+            </motion.p>
+
+            <h1 className="relative mt-1 flex h-[clamp(84px,12.5dvh,104px)] w-full [-webkit-text-size-adjust:none] [text-size-adjust:none] items-center justify-center text-center font-display font-normal leading-none tracking-[0.03em] text-text-primary">
+              <span className="sr-only">{t("screenReader")}</span>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={word.key}
+                  aria-hidden="true"
+                  className={`${word.size} block max-w-full [overflow-wrap:anywhere] [text-wrap:balance]`}
+                  initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -24 }}
+                  transition={{ duration: prefersReducedMotion ? 0 : 0.18, ease: SMOOTH }}
+                >
+                  {t(word.key)}
+                </motion.span>
+              </AnimatePresence>
+            </h1>
+
+            <motion.p
+              {...reveal(0.9)}
+              aria-hidden="true"
+              className="mt-2 text-center text-[14px] font-medium leading-normal text-text-secondary"
+            >
+              {t("summary")}
+            </motion.p>
+
+            <div className="min-h-6 flex-1" />
+
+            <motion.p
+              {...reveal(0.9)}
+              className="max-w-[300px] text-center text-[17px] font-semibold leading-snug text-text-primary"
+            >
+              {t("fans")}
+            </motion.p>
+
+            <motion.p
+              {...reveal(1.05)}
+              className="mt-4 rounded-[28px] bg-turf px-7 py-3 text-center text-[15px] font-medium leading-snug text-bg-base shadow-[0_0_24px_rgba(31,216,127,0.35)]"
+            >
+              <svg
+                aria-hidden="true"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mr-1.5 inline-block align-[-3px]"
+              >
+                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+              </svg>
+              {t("partnerLead")}
+              <br />
+              <strong className="font-bold">{t("partnerName")}</strong>
+            </motion.p>
+
+            {/* El botón llega al segundo: nadie espera la rotación completa. */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: showReady ? 1 : 0 }}
-              transition={{
-                duration: prefersReducedMotion ? 0 : 0.8,
-                ease: SMOOTH,
-              }}
-              className="mt-10 flex flex-col items-center gap-4"
-              style={{ pointerEvents: showReady ? "auto" : "none" }}
+              {...reveal(CTA_DELAY_S)}
+              className="mt-5 w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 type="button"
                 onClick={dismiss}
-                className="min-h-11 rounded-full bg-gold px-10 py-3 text-base font-bold text-bg-base transition-all hover:brightness-110"
+                className="min-h-[52px] w-full rounded-full bg-gold px-10 py-3 text-[17px] font-bold text-bg-base transition-all hover:brightness-110 active:scale-[0.98]"
               >
                 {t("start")}
               </button>
-
             </motion.div>
           </div>
         </motion.div>
