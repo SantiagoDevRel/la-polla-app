@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyHandoffToken } from "@/lib/auth/handoff-token";
+import { safeReturnTo } from "@/lib/auth/safe-return-to";
 
 export const runtime = "nodejs";
 
@@ -32,11 +33,7 @@ export async function GET(request: NextRequest) {
 
   // Sanitize defensivo (handoff ya lo hace, pero double-check porque el
   // token vino de un dominio externo y la firma sola no garantiza shape).
-  const safePath =
-    payload.target_path.startsWith("/") &&
-    !payload.target_path.startsWith("//")
-      ? payload.target_path
-      : "/perfil";
+  const safePath = safeReturnTo(payload.target_path) ?? "/perfil";
 
   const supabase = await createClient();
   try {

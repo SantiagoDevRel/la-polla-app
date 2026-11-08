@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { signHandoffToken } from "@/lib/auth/handoff-token";
+import { safeReturnTo } from "@/lib/auth/safe-return-to";
 
 export const runtime = "nodejs";
 
@@ -46,11 +47,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Sanitize target_path: solo paths relativos que arrancan con / y no
-  // intentan ser protocol-relative (//evil.com/...).
+  // Sanitize target_path: solo rutas internas (safeReturnTo también rechaza
+  // "/\host" y los tabs/saltos que el parser convierte en //host).
   const rawPath = typeof body.path === "string" ? body.path : "/perfil";
-  const targetPath =
-    rawPath.startsWith("/") && !rawPath.startsWith("//") ? rawPath : "/perfil";
+  const targetPath = safeReturnTo(rawPath) ?? "/perfil";
 
   let token: string;
   try {
