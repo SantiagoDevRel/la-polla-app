@@ -11,6 +11,7 @@
 //     wired in instrumentation.ts);
 //   - crons and provider webhooks answer 404 (proxy.ts, requireCronSecret).
 // Production and local development are unaffected. Edge-safe: no Node imports.
+import { NextResponse } from "next/server";
 
 export function isPreviewDeployment(env: Record<string, string | undefined> = process.env): boolean {
   return env.VERCEL_ENV === "preview";
@@ -101,10 +102,7 @@ export function isPreviewRefusedPath(pathname: string): boolean {
 }
 
 /** 404 for crons and webhooks in a preview; null elsewhere. */
-export function previewRefusal(pathname: string, env: Record<string, string | undefined> = process.env): Response | null {
+export function previewRefusal(pathname: string, env: Record<string, string | undefined> = process.env): NextResponse | null {
   if (!isPreviewDeployment(env) || !isPreviewRefusedPath(pathname)) return null;
-  return new Response(JSON.stringify({ error: "disabled_in_preview" }), {
-    status: 404,
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
-  });
+  return NextResponse.json({ error: "disabled_in_preview" }, { status: 404, headers: { "Cache-Control": "no-store" } });
 }
