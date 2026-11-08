@@ -1,0 +1,56 @@
+[
+ {
+  "name": "ghost44-1",
+  "seed": 1,
+  "image": "out/front-sig-44.png",
+  "prompt": "Remove the white mannequin completely (no head, no neck, no shoulders, no stand) so it becomes an invisible ghost mannequin product photo: through the neck opening show the inside back of the same purple collar. Keep the jersey, its shape, the two gold signatures, the logos and the pattern exactly identical. Pure white background."
+ },
+ {
+  "name": "ghost44-2",
+  "seed": 2,
+  "image": "out/front-sig-44.png",
+  "prompt": "Remove the white mannequin completely (no head, no neck, no shoulders, no stand) so it becomes an invisible ghost mannequin product photo: through the neck opening show the inside back of the same purple collar. Keep the jersey, its shape, the two gold signatures, the logos and the pattern exactly identical. Pure white background."
+ },
+ {
+  "name": "ghost44-3",
+  "seed": 3,
+  "image": "out/front-sig-44.png",
+  "prompt": "Remove the white mannequin completely (no head, no neck, no shoulders, no stand) so it becomes an invisible ghost mannequin product photo: through the neck opening show the inside back of the same purple collar. Keep the jersey, its shape, the two gold signatures, the logos and the pattern exactly identical. Pure white background."
+ },
+ {
+  "name": "frontg-66",
+  "seed": 66,
+  "prompt": "Turn this photo into a professional e-commerce product photo of the same long-sleeve football goalkeeper jersey, front view, on an invisible ghost mannequin (no mannequin, no neck and no head visible; the inside back of the collar shows through the neck opening), perfectly symmetric, the torso full and neatly shaped, both long sleeves hanging straight down close to the sides of the body with the cuffs at hip height, smooth ironed fabric without wrinkles, soft even studio lighting, plain pure white background. Keep the jersey design exactly the same as in the photo: the purple and dark navy diagonal brush-stroke pattern with speckled texture, the white Nike swoosh on the right chest, the white POSTOBON logo with green outline on each shoulder, the green and white Atletico Nacional crest on the left chest, the large white lowercase \"betsson\" sponsor across the chest, the plain purple crew-neck collar and the plain purple side panels, and the two handwritten gold marker signatures on the upper chest."
+ },
+ {
+  "name": "frontg-77",
+  "seed": 77,
+  "prompt": "Turn this photo into a professional e-commerce product photo of the same long-sleeve football goalkeeper jersey, front view, on an invisible ghost mannequin (no mannequin, no neck and no head visible; the inside back of the collar shows through the neck opening), perfectly symmetric, the torso full and neatly shaped, both long sleeves hanging straight down close to the sides of the body with the cuffs at hip height, smooth ironed fabric without wrinkles, soft even studio lighting, plain pure white background. Keep the jersey design exactly the same as in the photo: the purple and dark navy diagonal brush-stroke pattern with speckled texture, the white Nike swoosh on the right chest, the white POSTOBON logo with green outline on each shoulder, the green and white Atletico Nacional crest on the left chest, the large white lowercase \"betsson\" sponsor across the chest, the plain purple crew-neck collar and the plain purple side panels, and the two handwritten gold marker signatures on the upper chest."
+ },
+ {
+  "name": "frontg-88",
+  "seed": 88,
+  "prompt": "Turn this photo into a professional e-commerce product photo of the same long-sleeve football goalkeeper jersey, front view, on an invisible ghost mannequin (no mannequin, no neck and no head visible; the inside back of the collar shows through the neck opening), perfectly symmetric, the torso full and neatly shaped, both long sleeves hanging straight down close to the sides of the body with the cuffs at hip height, smooth ironed fabric without wrinkles, soft even studio lighting, plain pure white background. Keep the jersey design exactly the same as in the photo: the purple and dark navy diagonal brush-stroke pattern with speckled texture, the white Nike swoosh on the right chest, the white POSTOBON logo with green outline on each shoulder, the green and white Atletico Nacional crest on the left chest, the large white lowercase \"betsson\" sponsor across the chest, the plain purple crew-neck collar and the plain purple side panels, and the two handwritten gold marker signatures on the upper chest."
+ },
+ {
+  "name": "backm-1",
+  "seed": 1,
+  "image": "out/front-sig-44.png",
+  "image2": "armani2.png",
+  "prompt": "Image 1 shows the front of a goalkeeper jersey on a mannequin. Show the BACK of this same jersey: same mannequin, same pose, same size, same position and same framing, seen from directly behind, with both sleeves hanging straight down exactly like in image 1. Use the back design from image 2: the purple and dark navy diagonal brush-stroke pattern with speckled texture and the large white POSTOBON logo with dark green outline across the upper back, plain purple collar and side panels. No signatures, no crest, no swoosh and no betsson on the back. Pure white background."
+ },
+ {
+  "name": "backm-2",
+  "seed": 2,
+  "image": "out/front-sig-44.png",
+  "image2": "armani2.png",
+  "prompt": "Image 1 shows the front of a goalkeeper jersey on a mannequin. Show the BACK of this same jersey: same mannequin, same pose, same size, same position and same framing, seen from directly behind, with both sleeves hanging straight down exactly like in image 1. Use the back design from image 2: the purple and dark navy diagonal brush-stroke pattern with speckled texture and the large white POSTOBON logo with dark green outline across the upper back, plain purple collar and side panels. No signatures, no crest, no swoosh and no betsson on the back. Pure white background."
+ },
+ {
+  "name": "backm-3",
+  "seed": 3,
+  "image": "out/front-sig-44.png",
+  "image2": "armani2.png",
+  "prompt": "Image 1 shows the front of a goalkeeper jersey on a mannequin. Show the BACK of this same jersey: same mannequin, same pose, same size, same position and same framing, seen from directly behind, with both sleeves hanging straight down exactly like in image 1. Use the back design from image 2: the purple and dark navy diagonal brush-stroke pattern with speckled texture and the large white POSTOBON logo with dark green outline across the upper back, plain purple collar and side panels. No signatures, no crest, no swoosh and no betsson on the back. Pure white background."
+ }
+]
