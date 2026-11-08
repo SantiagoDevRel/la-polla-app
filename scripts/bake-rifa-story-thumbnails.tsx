@@ -8,7 +8,8 @@ import { mkdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { LDS_STORY_TEMPLATE_LIST, STORY_TEMPLATE_LIST, STORY_W, STORY_H, renderStory, type StoryData } from "../lib/rifas/story-templates";
+import { LDS_STORY_TEMPLATE_LIST, STORY_TEMPLATE_LIST, STORY_W, STORY_H, renderStory, storyHasFormats, storySize, type StoryData,
+  type StoryFormat } from "../lib/rifas/story-templates";
 import { STORY_CLUBS } from "../lib/rifas/shared";
 
 // sharp viene con Next (dependencia de next/image); no se agrega al package.json.
@@ -22,14 +23,16 @@ async function main() {
   const root = process.cwd();
   const out = join(root, "public/plantillas-rifa");
   await mkdir(out, { recursive: true });
-  const [bebas, outfit, logoBytes] = await Promise.all([
+  const [bebas, outfit, outfitBold, logoBytes] = await Promise.all([
     readFile(join(root, "assets/fonts/BebasNeue-latin.ttf")),
     readFile(join(root, "assets/fonts/Outfit-SemiBold-latin.ttf")),
+    readFile(join(root, "assets/fonts/Outfit-Bold-latin.ttf")),
     readFile(join(root, "assets/rifas-story/logo.png")),
   ]);
   const fonts = [
     { name: "Bebas", data: bebas, weight: 400 as const, style: "normal" as const },
     { name: "Outfit", data: outfit, weight: 600 as const, style: "normal" as const },
+    { name: "Outfit", data: outfitBold, weight: 700 as const, style: "normal" as const },
   ];
   const logo = `data:image/png;base64,${logoBytes.toString("base64")}`;
   const club = STORY_CLUBS[0];
@@ -55,22 +58,39 @@ async function main() {
     prize_text: "Camiseta firmada por Franco Armani y René Higuita", number_count: 100, price_cop: 30_000,
     lottery_name: "Lotería de Medellín", draw_at: "2026-11-14T03:30:00.000Z", taken: [3, 7, 10, 21, 33, 45, 58, 77, 90] };
   const full = process.argv.includes("--full");
-  // La camiseta de frente que acompaña al premio (lib/rifas/benefit.ts → rifaStoryPrize).
+  // El arte de la rifa solidaria (lib/rifas/benefit.ts → rifaStoryArt; ese módulo es
+  // server-only, por eso se repite aquí): camiseta chica, en alta para el tablero, y titular.
   const prizeImage = await data("assets/rifas-story/premios/armani-frente.png", "image/png");
+  const prizeLarge = await data("assets/rifas-story/premios/armani-frente-hd.png", "image/png");
+  const headline = [{ text: "RIFA SOLIDARIA" }, { text: "POR UNA FAMILIA", accent: true }, { text: "DAMNIFICADA EN LA IGUANÁ" }];
   for (const template of LDS_STORY_TEMPLATE_LIST) {
-    const [pollito, escudo, trapo, background] = await Promise.all([
-      data(`assets/rifas-story/lds/pollito-${template.pollito}.png`, "image/png"),
-      data("assets/rifas-story/lds/escudo.png", "image/png"),
-      data("assets/rifas-story/lds/trapo.png", "image/png"),
-      template.background ? data(`assets/rifas-story/lds/fondo-${template.background}.jpg`, "image/jpeg") : Promise.resolve(null),
-    ]);
-    const png = Buffer.from(await new ImageResponse(renderStory(template.key, { r: lds, club, logo, pollito,
-      appHost: "lapollacolombiana.com", partner: { escudo, trapo, background }, prizeImage }), { width: STORY_W, height: STORY_H, fonts }).arrayBuffer());
-    const file = join(out, `${template.key}.webp`);
-    await sharp(png).resize(THUMB_W, THUMB_H).webp({ quality: 80 }).toFile(file);
-    // --full: copia en tamaño real para revisarla (no se versiona).
-    if (full) await import("node:fs/promises").then((fs) => fs.writeFile(join(process.env.LDS_PREVIEW_DIR ?? root, `${template.key}.png`), png));
-    console.log(file);
+    const formats = storyHasFormats(template.key)
+      // La miniatura del tablero es la vertical (el selector es 9:16); --full guarda las dos.
+      ? (full ? ["vertical", "cuadrada"] as const : ["vertical"] as const)
+      : ["vertical"] as const;
+    for (const format of formats as readonly StoryFormat[]) {
+      const background = template.background
+        ? (storyHasFormats(template.key) ? `${template.background}-${format}` : template.background) : null;
+      const [pollito, escudo, trapo, photo] = await Promise.all([
+        data(`assets/rifas-story/lds/pollito-${template.pollito}.png`, "image/png"),
+        data("assets/rifas-story/lds/escudo.png", "image/png"),
+        data("assets/rifas-story/lds/trapo.png", "image/png"),
+        background ? data(`assets/rifas-story/lds/fondo-${background}.jpg`, "image/jpeg") : Promise.resolve(null),
+      ]);
+      const size = storySize(template.key, format);
+      const png = Buffer.from(await new ImageResponse(renderStory(template.key, { r: lds, club, logo, pollito,
+        appHost: "lapollacolombiana.com", partner: { escudo, trapo, background: photo },
+        prizeImage: storyHasFormats(template.key) ? prizeLarge : prizeImage, format, headline }),
+      { width: size.width, height: size.height, fonts }).arrayBuffer());
+      const name = storyHasFormats(template.key) ? `${template.key}-${format}` : template.key;
+      if (format === "vertical") {
+        const file = join(out, `${template.key}.webp`);
+        await sharp(png).resize(THUMB_W, THUMB_H).webp({ quality: 80 }).toFile(file);
+        console.log(file);
+      }
+      // --full: copia en tamaño real para revisarla (no se versiona).
+      if (full) await import("node:fs/promises").then((fs) => fs.writeFile(join(process.env.LDS_PREVIEW_DIR ?? root, `${name}.png`), png));
+    }
   }
 }
 
