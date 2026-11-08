@@ -47,6 +47,25 @@ try {
   for(const file of ['casa-provisional-timing-check.sql','casa-terminal-balance-check.sql','casa-free-entry-check.sql','casa-rls-check.sql','casa-picks-privacy-check.sql','casa-pending-picks-check.sql','casa-pick-save-check.sql','user-form-save-check.sql','password-save-check.sql','casa-admin-players-check.sql','casa-admin-player-picks-check.sql','casa-admin-random-defaults-check.sql','casa-admin-money-check.sql','polla-participants-insert-check.sql']) {
     sql(read(`scripts/${file}`)); console.log(`PASS ${file}`);
   }
+  // Migration 183 and its reversal: the production no-op path and the fresh
+  // database path, in both directions.
+  const lit=s=>`'${s.replace(/'/g,"''")}'`;
+  const prodStatus="CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying])::text[])))";
+  const repo010Status="CHECK (((status)::text = ANY ((ARRAY['approved'::character varying, 'rejected'::character varying])::text[])))";
+  const statusCheck="(SELECT c.oid FROM pg_constraint c WHERE c.conrelid='public.polla_participants'::regclass AND c.conname='polla_participants_status_check')";
+  const assertStatus=(def,marked,label)=>sql(`DO $$ BEGIN ASSERT pg_get_constraintdef(${statusCheck})=${lit(def)}, ${lit(label+' (definition)')}; ASSERT (obj_description(${statusCheck},'pg_constraint') IS NOT NULL)=${marked}, ${lit(label+' (marker)')}; END $$;`);
+  const m183=read('supabase/migrations/183_polla_participants_status_check_matches_prod.sql');
+  const r183=read('supabase/reversa/183_polla_participants_status_check_matches_prod_REVERSA.sql');
+  assertStatus(prodStatus,true,'183 did not install the production check');
+  sql('COMMENT ON CONSTRAINT polla_participants_status_check ON public.polla_participants IS NULL;');
+  sql(m183); assertStatus(prodStatus,false,'183 changed a database that already matches production');
+  sql(r183); assertStatus(prodStatus,false,'REVERSA 183 changed a database that 183 did not change');
+  sql("ALTER TABLE public.polla_participants DROP CONSTRAINT polla_participants_status_check; ALTER TABLE public.polla_participants ADD CONSTRAINT polla_participants_status_check CHECK (status IN ('approved','rejected'));");
+  assertStatus(repo010Status,false,'Fixture did not restore the 010 check');
+  sql(m183); assertStatus(prodStatus,true,'183 did not widen the 010 check');
+  sql(r183); assertStatus(repo010Status,false,'REVERSA 183 did not restore the 010 check');
+  sql(m183); assertStatus(prodStatus,true,'183 did not re-apply after its reversal');
+  console.log('PASS 183 status check round trip (production no-op, fresh database, reversal)');
   await checkPickSaveConcurrency(container);
   await checkPasswordSaveConcurrency(container);
   await checkAdminPlayerConcurrency(container);

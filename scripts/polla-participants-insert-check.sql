@@ -56,15 +56,10 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN refused:=true;
   END;
   ASSERT refused, 'Insert for another user was accepted';
-  -- The plain join shape must pass RLS. The repo chain (migration 010) allows
-  -- only status approved/rejected, so here the table check stops it; production
-  -- also allows 'pending' (checked 2026-11-08), where this row would be stored
-  -- as a harmless pending join. Either way RLS must not be what refuses it.
-  BEGIN
-    INSERT INTO public.polla_participants(polla_id,user_id,role,status,paid,payment_status)
-      VALUES(current_setting('test.polla')::uuid,auth.uid(),'player','pending',false,'pending');
-  EXCEPTION WHEN check_violation THEN NULL;
-  END;
+  -- The plain join shape must pass RLS and the table check. Migration 183 makes
+  -- a fresh database allow 'pending' like production, so the row is stored.
+  INSERT INTO public.polla_participants(polla_id,user_id,role,status,paid,payment_status)
+    VALUES(current_setting('test.polla')::uuid,auth.uid(),'player','pending',false,'pending');
 END $$;
 RESET ROLE;
 DO $$
@@ -73,5 +68,9 @@ BEGIN
     WHERE polla_id=current_setting('test.polla')::uuid
       AND (role<>'player' OR status<>'pending' OR coalesce(paid,false) OR payment_status<>'pending')),
     'A privileged row was stored';
+  ASSERT (SELECT count(*) FROM public.polla_participants
+    WHERE polla_id=current_setting('test.polla')::uuid
+      AND user_id=current_setting('test.attacker')::uuid)=1,
+    'The plain pending join row was not stored exactly once';
 END $$;
 ROLLBACK;
