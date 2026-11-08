@@ -59,7 +59,12 @@ Las fotos reales (`armani-real-front.jpg` y `armani-real-back.jpg`, sin EXIF)
 siguen bajo «Ver foto original». 55 archivos, 9.485.100 bytes, en
 `public/prizes/armani-8e245f817802/` con la misma caché immutable. La imagen fija de
 las historias (`assets/rifas-story/premios/armani-frente.png`) sale de la misma
-recreación. Fuentes y escenas en `Downloads/agent-work/la-polla-armani2-20261108/`.
+recreación.
+
+**Para la próxima camiseta** (por ejemplo, la de Armani blanca y rosada), los
+scripts que se usaron y la receta paso a paso están en `scripts/rifa-camiseta/`
+(ver su README). Se parte de dos fotos reales, frente y espalda; cambian los
+prompts, los recortes y los prefijos `armani`.
 
 ## Archivos y caché
 
