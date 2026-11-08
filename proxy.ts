@@ -19,6 +19,7 @@ import { courtesyCookieOptions, referralCookieOptions, rifaLinkCookieOptions } f
 import { COURTESY_COOKIE, COURTESY_PARAM, validCourtesyCode } from "@/lib/casa/courtesies-shared";
 import { REFERRAL_COOKIE, REFERRAL_PARAM, validReferralCode } from "@/lib/casa/referrals-shared";
 import { RIFA_PAGE_RE, rifaLinkCookieValue } from "@/lib/rifas/link-cookie";
+import { previewRefusal } from "@/lib/preview-guard";
 
 type Locale = "es" | "en";
 
@@ -31,6 +32,10 @@ function resolveLocale(host: string): Locale {
 }
 
 export async function proxy(request: NextRequest) {
+  // Vercel Preview: crons and provider webhooks answer 404 (lib/preview-guard.ts).
+  const refused = previewRefusal(request.nextUrl.pathname);
+  if (refused) return refused;
+
   const host = (request.headers.get("host") ?? "").toLowerCase();
 
   // www → apex, 308 permanente. Las cookies de Supabase son host-only

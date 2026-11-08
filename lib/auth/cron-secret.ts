@@ -21,6 +21,7 @@
 // responden 401; tienen su propio chequeo.
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { isPreviewDeployment } from "@/lib/preview-guard";
 
 const BEARER_PREFIX = "Bearer ";
 
@@ -45,8 +46,16 @@ export function cronSecretMatches(provided: string | null | undefined): boolean 
  * - 500 `{ error: "CRON_SECRET not configured" }` si falta la variable.
  * - 403 `{ error: "forbidden" }` si el header falta, no usa `Bearer ` o no
  *   coincide.
+ * - 404 `{ error: "disabled_in_preview" }` en un deploy de Vercel Preview: un
+ *   cron nunca corre contra la base de previews (lib/preview-guard.ts).
  */
 export function requireCronSecret(request: Request): NextResponse | null {
+  if (isPreviewDeployment()) {
+    return NextResponse.json(
+      { error: "disabled_in_preview" },
+      { status: 404, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const expected = process.env.CRON_SECRET;
   if (!expected || expected.trim() === "") {
     return NextResponse.json(

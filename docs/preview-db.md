@@ -21,10 +21,12 @@ only. Production data and keys never reach a preview.
   entries, payments or picks. Add only synthetic rows.
 - All scheduled jobs are removed after the replay; the preview database calls
   nothing on its own.
-- Preview deployments stay behind Vercel Authentication. Preview still holds some
-  real provider keys (for example `RESEND_API_KEY` with `FEEDBACK_NOTIFY_EMAIL`):
-  submitting feedback or uploading a proof in a preview can reach those providers.
-  Test with flows that send nothing.
+- Preview deployments stay behind Vercel Authentication. Preview still shares some
+  real provider keys with production (Resend, Telegram, Twilio, Wompi...). With
+  `VERCEL_ENV=preview`, `lib/preview-guard.ts` turns every fetch to a messaging or
+  payment provider into a no-op that logs `preview: skipped <provider>` and returns a
+  fake success, and crons and provider webhooks answer 404. Add any new provider host
+  there. Claude vision (proof checks) is not blocked: it sends no message.
 
 ## Logging in to a preview
 
