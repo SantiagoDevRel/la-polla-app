@@ -66,6 +66,19 @@ try {
   sql(r183); assertStatus(repo010Status,false,'REVERSA 183 did not restore the 010 check');
   sql(m183); assertStatus(prodStatus,true,'183 did not re-apply after its reversal');
   console.log('PASS 183 status check round trip (production no-op, fresh database, reversal)');
+  // Migration 184 and its reversal. With participants_insert_self restored the
+  // insert check must fail (a direct self-join is accepted again); re-applying
+  // 184 must make it pass.
+  const m184=read('supabase/migrations/184_retire_participants_insert_self.sql');
+  const r184=read('supabase/reversa/184_retire_participants_insert_self_REVERSA.sql');
+  const insertCheck=read('scripts/polla-participants-insert-check.sql');
+  sql(r184);
+  sql("SET LOCAL search_path = pg_catalog, public; DO $$ BEGIN ASSERT (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='polla_participants' AND policyname='participants_insert_self' AND with_check='(user_id = auth.uid())')=1, 'REVERSA 184 did not restore participants_insert_self'; END $$;");
+  let mutantCaught=false;
+  try { sql(insertCheck); } catch(e) { mutantCaught=/participants_insert_self is still active/.test(e.message); }
+  if(!mutantCaught)throw Error('The insert check did not fail with participants_insert_self restored');
+  sql(m184); sql(insertCheck);
+  console.log('PASS 184 round trip (reversal restores the 001 policy, the check fails on it, re-apply passes)');
   await checkPickSaveConcurrency(container);
   await checkPasswordSaveConcurrency(container);
   await checkAdminPlayerConcurrency(container);
