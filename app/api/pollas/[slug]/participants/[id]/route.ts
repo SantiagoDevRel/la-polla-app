@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPollaOrganizer } from "@/lib/pollas/organizer";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -28,29 +29,25 @@ export async function PATCH(
     const admin = createAdminClient();
     const { data: polla } = await admin
       .from("pollas")
-      .select("id")
+      .select("id, created_by")
       .eq("slug", (await params).slug)
       .maybeSingle();
     if (!polla) return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
 
-    const { data: caller } = await admin
-      .from("polla_participants")
-      .select("role")
-      .eq("polla_id", polla.id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!caller || caller.role !== "admin") {
+    if (!isPollaOrganizer(polla, user.id)) {
       return NextResponse.json({ error: "Solo el admin puede modificar participantes" }, { status: 403 });
     }
 
     const { data: target } = await admin
       .from("polla_participants")
-      .select("id, role, polla_id")
+      .select("id, polla_id, user_id")
       .eq("id", (await params).id)
       .eq("polla_id", polla.id)
       .maybeSingle();
     if (!target) return NextResponse.json({ error: "Participante no encontrado" }, { status: 404 });
-    if (target.role === "admin") {
+    // Only the organizer (pollas.created_by) is protected; a role value in
+    // the participant row grants nothing, so it cannot shield an account.
+    if (target.user_id === polla.created_by) {
       return NextResponse.json({ error: "No se puede expulsar a un admin" }, { status: 400 });
     }
 

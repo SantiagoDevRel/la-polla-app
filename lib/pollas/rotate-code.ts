@@ -3,8 +3,8 @@
 // persists it. Shared between the web rotate-code route and the
 // WhatsApp bot rotate flow so that both paths stay DB-identical.
 //
-// DOES NOT check admin permission. Callers MUST verify
-// polla_participants.role === 'admin' for (user, polla) before calling.
+// DOES NOT check admin permission. Callers MUST verify the caller is the
+// polla organizer (isPollaOrganizer: pollas.created_by) before calling.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateUniqueJoinCode } from "@/lib/pollas/join-code";

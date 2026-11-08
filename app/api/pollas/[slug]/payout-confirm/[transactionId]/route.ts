@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPollaOrganizer } from "@/lib/pollas/organizer";
 
 interface Params {
   params: Promise<{ slug: string; transactionId: string }>;
@@ -52,15 +53,8 @@ export async function POST(_request: NextRequest, { params }: Params) {
     );
   }
 
-  // Permisos: admin de la polla, el que paga, o el que recibe.
-  const { data: membership } = await admin
-    .from("polla_participants")
-    .select("role")
-    .eq("polla_id", polla.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const isAdmin =
-    membership?.role === "admin" || polla.created_by === user.id;
+  // Permisos: organizador de la polla (created_by), el que paga, o el que recibe.
+  const isAdmin = isPollaOrganizer(polla, user.id);
   const isFrom = tx.from_user_id === user.id;
   const isTo = tx.to_user_id === user.id;
   if (!isAdmin && !isFrom && !isTo) {
@@ -123,14 +117,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     );
   }
 
-  const { data: membership } = await admin
-    .from("polla_participants")
-    .select("role")
-    .eq("polla_id", polla.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const isAdmin =
-    membership?.role === "admin" || polla.created_by === user.id;
+  const isAdmin = isPollaOrganizer(polla, user.id);
 
   // Solo admin o el que confirmó pueden deshacer.
   if (!isAdmin && tx.paid_by_user_id !== user.id) {

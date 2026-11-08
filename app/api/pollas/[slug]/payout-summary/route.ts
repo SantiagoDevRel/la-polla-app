@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPollaOrganizer } from "@/lib/pollas/organizer";
 import {
   computePayout,
   type PaymentMode,
@@ -83,8 +84,7 @@ export async function GET(
     }
   }
 
-  const isAdmin =
-    viewerMembership?.role === "admin" || polla.created_by === user.id;
+  const isAdmin = isPollaOrganizer(polla, user.id);
 
   // Participantes que ENTRAN al pozo: approved + paid. Si la polla es
   // pay_winner, paid=true al join (nada que cobrar al inicio); si es

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPollaOrganizer } from "@/lib/pollas/organizer";
 import crypto from "crypto";
 
 function newToken(): string {
@@ -22,7 +23,7 @@ async function loadContext(slug: string) {
   const admin = createAdminClient();
   const { data: polla } = await admin
     .from("pollas")
-    .select("id, slug, invite_token")
+    .select("id, slug, invite_token, created_by")
     .eq("slug", slug)
     .maybeSingle();
   if (!polla) return { error: "Polla no encontrada", status: 404 as const };
@@ -34,7 +35,7 @@ async function loadContext(slug: string) {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  return { polla, admin, part };
+  return { polla, admin, part, userId: user.id };
 }
 
 // Lectura: cualquier participante aprobado o expulsado puede leer el token.
@@ -52,7 +53,7 @@ async function ensureParticipant(slug: string) {
 async function ensureAdmin(slug: string) {
   const ctx = await loadContext(slug);
   if ("error" in ctx) return ctx;
-  if (!ctx.part || ctx.part.role !== "admin") {
+  if (!ctx.part || !isPollaOrganizer(ctx.polla, ctx.userId)) {
     return { error: "Solo el admin puede renovar el link", status: 403 as const };
   }
   return { polla: ctx.polla, admin: ctx.admin };

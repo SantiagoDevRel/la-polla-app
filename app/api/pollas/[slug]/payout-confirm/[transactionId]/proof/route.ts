@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPollaOrganizer } from "@/lib/pollas/organizer";
 
 interface Params {
   params: Promise<{ slug: string; transactionId: string }>;
@@ -50,14 +51,7 @@ async function loadTxAndPermissions(
     return { error: "Transacción no encontrada" as const, status: 404 };
   }
 
-  const { data: membership } = await admin
-    .from("polla_participants")
-    .select("role")
-    .eq("polla_id", polla.id)
-    .eq("user_id", userId)
-    .maybeSingle();
-  const isAdmin =
-    membership?.role === "admin" || polla.created_by === userId;
+  const isAdmin = isPollaOrganizer(polla, userId);
   const isFrom = tx.from_user_id === userId;
   const isTo = tx.to_user_id === userId;
 
