@@ -4,6 +4,8 @@
 -- one that migration added (restrictive INSERT, authenticated, the safe-shape
 -- check), so it cannot drop a different same-named policy created later.
 begin;
+-- Same pinned path as the migration so pg_policies text compares identically.
+set local search_path = pg_catalog, public;
 set local lock_timeout = '500ms';
 set local statement_timeout = '5s';
 set local idle_in_transaction_session_timeout = '3s';

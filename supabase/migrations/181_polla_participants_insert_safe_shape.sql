@@ -36,7 +36,19 @@
 --
 -- The DELETE route and payout-summary server-side authorization are a separate
 -- code change (PROPUESTA, no la-polla deploy tonight).
+--
+-- Production: applied 2026-11-07 as version 20261107200349. On 2026-11-08 the
+-- seguridad3 lane added only the search_path pin and the "Found: %" detail in
+-- the drift errors so the guard gives the same verdict in a fresh replay; the
+-- created policy, its comment and every guard condition are unchanged. Do not
+-- re-apply in production.
 begin;
+-- pg_policies deparses expressions against the current search_path: a session
+-- whose path includes auth prints auth.uid() as uid(). Pin the path so the
+-- drift guard below compares the same text on every runner (production SQL
+-- editor, migration tools, the isolated CI replay). No object is created in
+-- or resolved from this path; every name below is schema-qualified.
+set local search_path = pg_catalog, public;
 set local lock_timeout = '500ms';
 set local statement_timeout = '5s';
 set local idle_in_transaction_session_timeout = '3s';
@@ -70,7 +82,7 @@ begin
        and roles = array['public']::name[]
        and qual is null and with_check = '(user_id = auth.uid())'
   ) then
-    raise exception 'participants_insert_self drift; stop';
+    raise exception 'participants_insert_self drift; stop. Found: %', (select json_agg(row_to_json(x)) from (select policyname, cmd, permissive, roles, qual, with_check from pg_policies where schemaname='public' and tablename='polla_participants' order by policyname) x);
   end if;
   if not exists (
     select 1 from pg_policies
@@ -80,7 +92,7 @@ begin
        and with_check is null
        and qual = '((user_id = auth.uid()) OR private.is_approved_participant(polla_id))'
   ) then
-    raise exception 'participants_select drift; stop';
+    raise exception 'participants_select drift; stop. Found: %', (select json_agg(row_to_json(x)) from (select policyname, cmd, permissive, roles, qual, with_check from pg_policies where schemaname='public' and tablename='polla_participants' order by policyname) x);
   end if;
 
   -- The restrictive policy is meaningful only while authenticated can insert.
