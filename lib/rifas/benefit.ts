@@ -12,25 +12,27 @@ export interface RifaBenefit {
   cause: string;
   /** Qué se compra con lo recaudado. */
   detail: string;
-  /** La camiseta que se rifa: el giro sale de sus dos fotos reales, que también se muestran. */
+  /** La camiseta que se rifa, girando, con sus fotos reales debajo («Ver foto original»). */
   jersey: { media: PrizeMedia; label: string; photos: readonly PrizePhoto[] } | null;
 }
 
 /**
- * (2026-11-08) Camiseta de arquero de Franco Armani, firmada: 144 poses
- * renderizadas con sus dos fotos originales (frente y espalda) sin retocar el
- * diseño. Carpeta versionada por contenido; un cambio crea otra carpeta.
+ * (2026-11-08, v2) Camiseta de arquero firmada por Franco Armani y René Higuita.
+ * El giro ya no pega las fotos: es una recreación limpia (frente y espalda sin
+ * maniquí, generadas con IA a partir de las dos fotos) sobre un volumen en
+ * Blender, 144 poses. Las firmas del giro son una recreación; las reales están
+ * en las fotos originales. Carpeta versionada por contenido; un cambio crea otra.
  */
-function armaniJersey(base = "/prizes/armani-bf38a139b7c2/"): RifaBenefit["jersey"] {
+function armaniJersey(base = "/prizes/armani-ba57128cfb3f/"): RifaBenefit["jersey"] {
   return {
-    label: "Camiseta de arquero de Franco Armani firmada, girando",
+    label: "Camiseta de arquero firmada por Franco Armani y René Higuita, girando",
     media: {
-      front: `${base}armani-v1-front.png`, back: `${base}armani-v1-back.png`, poster: `${base}armani-v1-poster.png`,
-      video: `${base}armani-v1-turntable.webm`, animation: `${base}armani-v1-turntable.webp`,
-      turntable: { small: `${base}armani-v1-atlas-192-`, large: `${base}armani-v1-atlas-512-` },
+      front: `${base}armani-v2-front.png`, back: `${base}armani-v2-back.png`, poster: `${base}armani-v2-poster.png`,
+      video: `${base}armani-v2-turntable.webm`, animation: `${base}armani-v2-turntable.webp`,
+      turntable: { small: `${base}armani-v2-atlas-192-`, large: `${base}armani-v2-atlas-512-` },
     },
     photos: [
-      { src: `${base}armani-real-front.jpg`, label: "Frente y autógrafo", alt: "Foto original del frente de la camiseta con el autógrafo de Franco Armani" },
+      { src: `${base}armani-real-front.jpg`, label: "Frente y autógrafos", alt: "Foto original del frente de la camiseta con los autógrafos de Franco Armani y René Higuita" },
       { src: `${base}armani-real-back.jpg`, label: "Espalda", alt: "Foto original de la espalda de la camiseta" },
     ],
   };

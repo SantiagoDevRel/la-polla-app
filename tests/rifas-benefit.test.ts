@@ -30,11 +30,11 @@ describe("rifaBenefit", () => {
     }
   });
 
-  it("gira la camiseta de Franco Armani y trae sus dos fotos originales", () => {
+  it("gira la camiseta firmada por Armani e Higuita y trae sus dos fotos originales", () => {
     const jersey = rifaBenefit(LA_IGUANA_1)?.jersey;
-    expect(jersey?.media.front).toMatch(/\/prizes\/armani-[0-9a-f]{12}\/armani-v1-front\.png$/);
-    expect(jersey?.label).toMatch(/Franco Armani/);
-    expect(jersey?.photos.map(photo => photo.label)).toEqual(["Frente y autógrafo", "Espalda"]);
+    expect(jersey?.media.front).toMatch(/\/prizes\/armani-[0-9a-f]{12}\/armani-v2-front\.png$/);
+    expect(jersey?.label).toMatch(/Franco Armani y René Higuita/);
+    expect(jersey?.photos.map(photo => photo.label)).toEqual(["Frente y autógrafos", "Espalda"]);
     for (const photo of jersey!.photos) expect(existsSync(join(process.cwd(), "public", photo.src)), photo.src).toBe(true);
   });
 

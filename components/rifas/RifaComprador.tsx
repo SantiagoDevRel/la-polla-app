@@ -154,7 +154,7 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
       </StreetCard>
 
       {rifa.visibility === "privada" && (
-        <p className="rounded-lg border border-border-default bg-bg-card/80 px-3 py-2 text-[13px] text-text-secondary">Privada: solo la ven quien la creó y los administradores.</p>
+        <p className="rounded-lg border border-border-default bg-bg-card/80 px-3 py-2 text-[13px] text-text-secondary">Privada: solo la ven el equipo, los administradores y quien ya tiene números.</p>
       )}
       {rifa.hidden && (
         <p role="status" className="rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-[13px] text-text-primary">La Polla está revisando esta rifa. Por ahora no vende números.</p>

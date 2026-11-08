@@ -179,7 +179,7 @@ function Visibility({ rifa, busy, act }: { rifa: RifaCreatorView; busy: boolean;
   const publica = rifa.visibility === "publica";
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3">
-      <p className="text-[13px] text-text-secondary">{publica ? "Pública: la abre cualquiera con el enlace." : "Privada: solo tú y los administradores."}</p>
+      <p className="text-[13px] text-text-secondary">{publica ? "Pública: la abre cualquiera con el enlace." : "Privada: solo el equipo, los administradores y quien ya tiene números."}</p>
       <button type="button" disabled={busy}
         onClick={() => void act({ action: "visibilidad", visibility: publica ? "privada" : "publica" }, publica ? "La rifa quedó privada." : "La rifa quedó pública.")}
         className="lp-btn lp-btn-ghost !min-h-11 !px-4 text-[13px]">{publica ? "Volver a privada" : "Hacer pública"}</button>

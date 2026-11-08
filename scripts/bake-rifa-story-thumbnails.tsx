@@ -52,7 +52,7 @@ async function main() {
   // Los Del Sur (lib/rifas/partner.ts): ejemplo con los datos de la rifa solidaria.
   const data = async (path: string, mime: string) => `data:${mime};base64,${(await readFile(join(root, path))).toString("base64")}`;
   const lds: StoryData = { ...r, slug: "rifa-solidaria-la-iguana-camiseta", name: "Rifa solidaria La Iguaná",
-    prize_text: "Camiseta firmada por Franco Armani", number_count: 100, price_cop: 30_000,
+    prize_text: "Camiseta firmada por Franco Armani y René Higuita", number_count: 100, price_cop: 30_000,
     lottery_name: "Lotería de Medellín", draw_at: "2026-11-14T03:30:00.000Z", taken: [3, 7, 10, 21, 33, 45, 58, 77, 90] };
   const full = process.argv.includes("--full");
   // La camiseta de frente que acompaña al premio (lib/rifas/benefit.ts → rifaStoryPrize).

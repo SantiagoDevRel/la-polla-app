@@ -39,17 +39,26 @@ subtítulos. Se pueden ampliar con clic y cerrar con Escape o el botón de cierr
 El aviso de desempate de todas las pollas con objeto también empieza cerrado:
 título y flecha visibles, regla completa y ejemplo al abrirlo.
 
-## Camiseta de Franco Armani (rifa solidaria La Iguaná, 8-nov-2026)
+## Camiseta de Armani e Higuita (rifa solidaria La Iguaná, 8-nov-2026)
 
-Reemplaza a la de James en la portada de la rifa (`lib/rifas/benefit.ts`). Se
-recortaron las dos fotos reales (`armani-real-front.jpg` y `armani-real-back.jpg`,
-sin EXIF), se corrigió la perspectiva de la espalda y se montaron sobre dos
-superficies con volumen en Blender (DGX): de -90° a 90° se ve el frente y del
-otro lado la espalda, sin redibujar el diseño. Mismas 144 poses y atlas que James.
-Límites conocidos: los puños que la foto deja fuera del encuadre quedan cortados
-y el canto de perfil es una reconstrucción. 55 archivos, 9.973.919 bytes, en
-`public/prizes/armani-bf38a139b7c2/` con la misma caché immutable. Fuentes,
-máscaras y escenas en `Downloads/agent-work/la-polla-armani-20261108/`.
+Reemplaza a la de James en la portada de la rifa (`lib/rifas/benefit.ts`). La
+primera versión pegaba las fotos reales y el dueño la rechazó: las mangas se
+veían mal puestas. La v2 es una recreación limpia:
+
+1. Qwen Image Edit 2511 (ComfyUI del DGX) convirtió cada foto en una toma de
+   catálogo sin maniquí, de frente y de espalda, con las mangas extendidas.
+   Conserva diseño, patrocinadores y las dos firmas (Franco Armani y René
+   Higuita), pero las firmas del giro son una recreación de la IA.
+2. Un volumen inflado (Poisson) a partir de la silueta da el cuerpo y las
+   mangas; frente y espalda son una sola malla soldada en el borde. Los
+   costados usan una muestra continua del estampado para no estirar la foto.
+3. Blender Cycles renderiza las mismas 144 poses y atlas que James.
+
+Las fotos reales (`armani-real-front.jpg` y `armani-real-back.jpg`, sin EXIF)
+siguen bajo «Ver foto original». 55 archivos, 9.442.495 bytes, en
+`public/prizes/armani-ba57128cfb3f/` con la misma caché immutable. La imagen fija de
+las historias (`assets/rifas-story/premios/armani-frente.png`) sale de la misma
+recreación. Fuentes y escenas en `Downloads/agent-work/la-polla-armani2-20261108/`.
 
 ## Archivos y caché
 

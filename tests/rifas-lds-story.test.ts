@@ -16,7 +16,7 @@ const fonts = [
 ];
 const r: StoryData = {
   slug: LA_IGUANA.slug, name: "Rifa solidaria La Iguaná", prize_kind: "texto", prize_cop: null,
-  prize_text: "Camiseta firmada por Franco Armani", number_count: 100, price_cop: 30_000,
+  prize_text: "Camiseta firmada por Franco Armani y René Higuita", number_count: 100, price_cop: 30_000,
   lottery_name: "Lotería de Medellín", draw_at: "2026-11-14T03:30:00Z", status: "abierta", winning_number: null, taken: [3, 7, 90],
 };
 const props = (template: (typeof LDS_STORY_TEMPLATE_LIST)[number]) => ({
@@ -75,6 +75,7 @@ describe("plantillas de Los Del Sur", () => {
     // (2026-11-08) La camiseta de frente va al lado del premio.
     expect(html.includes(p.prizeImage)).toBe(true);
     expect(html).toContain("Armani");
+    expect(html).toContain("René Higuita");
     expect([...html.matchAll(/data-number="(\d+)"/g)]).toHaveLength(100);
     expect(html.match(/data-taken="true"/g)).toHaveLength(3);
     expect(html.match(/#FFD700/g)?.length ?? 0).toBeLessThanOrEqual(3);
