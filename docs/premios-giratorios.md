@@ -48,15 +48,16 @@ veían mal puestas. La v2 es una recreación limpia:
 1. Qwen Image Edit 2511 (ComfyUI del DGX) convirtió cada foto en una toma de
    catálogo sin maniquí, de frente y de espalda, con las mangas extendidas.
    Conserva diseño, patrocinadores y las dos firmas (Franco Armani y René
-   Higuita), pero las firmas del giro son una recreación de la IA.
+   Higuita); las firmas son una recreación de la IA, repasadas en dorado más
+   grueso (máscara de tinta dilatada) para que se lean al tamaño del giro.
 2. Un volumen inflado (Poisson) a partir de la silueta da el cuerpo y las
    mangas; frente y espalda son una sola malla soldada en el borde. Los
    costados usan una muestra continua del estampado para no estirar la foto.
 3. Blender Cycles renderiza las mismas 144 poses y atlas que James.
 
 Las fotos reales (`armani-real-front.jpg` y `armani-real-back.jpg`, sin EXIF)
-siguen bajo «Ver foto original». 55 archivos, 9.442.495 bytes, en
-`public/prizes/armani-ba57128cfb3f/` con la misma caché immutable. La imagen fija de
+siguen bajo «Ver foto original». 55 archivos, 9.485.100 bytes, en
+`public/prizes/armani-8e245f817802/` con la misma caché immutable. La imagen fija de
 las historias (`assets/rifas-story/premios/armani-frente.png`) sale de la misma
 recreación. Fuentes y escenas en `Downloads/agent-work/la-polla-armani2-20261108/`.
 

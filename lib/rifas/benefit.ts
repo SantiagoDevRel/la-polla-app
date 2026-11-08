@@ -20,10 +20,11 @@ export interface RifaBenefit {
  * (2026-11-08, v2) Camiseta de arquero firmada por Franco Armani y René Higuita.
  * El giro ya no pega las fotos: es una recreación limpia (frente y espalda sin
  * maniquí, generadas con IA a partir de las dos fotos) sobre un volumen en
- * Blender, 144 poses. Las firmas del giro son una recreación; las reales están
- * en las fotos originales. Carpeta versionada por contenido; un cambio crea otra.
+ * Blender, 144 poses. Las firmas del giro son una recreación repasada en dorado
+ * para que se lean; las reales están en las fotos originales. Carpeta versionada
+ * por contenido; un cambio crea otra.
  */
-function armaniJersey(base = "/prizes/armani-ba57128cfb3f/"): RifaBenefit["jersey"] {
+function armaniJersey(base = "/prizes/armani-8e245f817802/"): RifaBenefit["jersey"] {
   return {
     label: "Camiseta de arquero firmada por Franco Armani y René Higuita, girando",
     media: {

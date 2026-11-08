@@ -231,16 +231,16 @@ con un desplegable cerrado «Ver foto original» (las dos fotos reales). Mismo p
 que `components/casa/prize-media.ts`; no hay columnas nuevas ni cambios de SQL.
 Primera: «Rifa solidaria La Iguaná» (`/rifa/rifa-solidaria-la-iguana-camiseta`),
 premio «Camiseta firmada por Franco Armani y René Higuita», de carlos con Santi de
-coadministrador, 100 números a $30.000, Lotería de Medellín del 13-nov. Desde el
-8-nov está Privada mientras el dueño la revisa; él la vuelve Pública desde
-Gestionar («Hacer pública»). Una camiseta por rifa,
+coadministrador, Pública, 100 números a $30.000, Lotería de Medellín del 13-nov.
+El 8-nov estuvo Privada unas horas mientras se rehacía la camiseta; el dueño
+puede ocultarla y publicarla desde Gestionar («Volver a privada» / «Hacer pública»). Una camiseta por rifa,
 de a una: la siguiente se crea al cerrar esta y se agrega su uuid al mapa.
 Prueba: `tests/rifas-benefit.test.ts`.
 
 **Camiseta de Armani e Higuita (8-nov-2026, pedido del dueño).** Reemplaza a la de
 James. El giro es una recreación limpia de la camiseta (sin maniquí, mangas bien
 puestas) hecha con IA a partir de las dos fotos reales y renderizada en Blender:
-144 poses en `public/prizes/armani-ba57128cfb3f/` (caché immutable, cualquier cambio
+144 poses en `public/prizes/armani-8e245f817802/` (caché immutable, cualquier cambio
 crea otra carpeta), detalle en `docs/premios-giratorios.md`. Las firmas del giro
 son una recreación; las fotos reales siguen en «Ver foto original». Las seis
 plantillas de historia muestran la misma camiseta de frente al lado del premio
