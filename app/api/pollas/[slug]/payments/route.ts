@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPollaOrganizer } from "@/lib/pollas/organizer";
 import {
   notifyAdminPaymentSubmitted,
   notifyParticipantPaymentApproved,
@@ -45,7 +46,7 @@ export async function GET(
     const adminClient = createAdminClient();
     const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
-      .select("id, payment_mode, admin_payment_instructions, admin_payout_method, admin_payout_account, admin_payout_account_name, admin_payout_account_type, buy_in_amount, currency")
+      .select("id, created_by, payment_mode, admin_payment_instructions, admin_payout_method, admin_payout_account, admin_payout_account_name, admin_payout_account_type, buy_in_amount, currency")
       .eq("slug", (await params).slug)
       .single();
 
@@ -75,7 +76,9 @@ export async function GET(
       }
     }
 
-    const isAdmin = myParticipant?.role === "admin";
+    // Authority is pollas.created_by (lib/pollas/organizer.ts), never the
+    // participant role column.
+    const isAdmin = Boolean(myParticipant) && isPollaOrganizer(polla, user.id);
 
     // Todos los participantes ven la lista completa — el pozo es público.
     const { data: payments, error: paymentsError } = await adminClient
@@ -165,7 +168,7 @@ export async function POST(
 
     const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
-      .select("id, payment_mode")
+      .select("id, created_by, payment_mode")
       .eq("slug", (await params).slug)
       .single();
 
@@ -260,7 +263,7 @@ export async function PATCH(
 
     const { data: polla, error: pollaError } = await adminClient
       .from("pollas")
-      .select("id, payment_mode")
+      .select("id, created_by, payment_mode")
       .eq("slug", (await params).slug)
       .single();
 
@@ -275,15 +278,9 @@ export async function PATCH(
       );
     }
 
-    // Verificar que quien hace la petición es admin de ESTA polla.
-    const { data: adminParticipant } = await adminClient
-      .from("polla_participants")
-      .select("role")
-      .eq("polla_id", polla.id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (!adminParticipant || adminParticipant.role !== "admin") {
+    // Verificar que quien hace la petición es el organizador de ESTA polla
+    // (pollas.created_by; el role de polla_participants no da autoridad).
+    if (!isPollaOrganizer(polla, user.id)) {
       return NextResponse.json(
         { error: "Solo el organizador de esta polla puede hacer esto" },
         { status: 403 }
@@ -294,7 +291,7 @@ export async function PATCH(
     // polla_participants rechaza UPDATEs del organizador sobre la fila de
     // otro usuario (policy EXISTS recursiva), y esto era el "Error interno"
     // que veía el admin al tocar Marcar. auth.uid() ya se validó arriba y
-    // el role='admin' de esta polla también.
+    // que es el organizador (created_by) también.
     const isApprove = parsed.data.action === "approve";
     const updatePayload = isApprove
       ? { paid: true, paid_at: new Date().toISOString() }

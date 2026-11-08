@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPollaOrganizer } from "@/lib/pollas/organizer";
 import { resolvePollaMatches } from "@/lib/matches/resolve-scope";
 import {
   POLLA_COLUMNS,
@@ -215,7 +216,9 @@ export async function GET(
       );
     }
 
-    const currentRole = participant?.role || (polla.created_by === user.id ? "admin" : "player");
+    // Organizer authority is pollas.created_by (lib/pollas/organizer.ts); a
+    // participant row's role is display data and never grants admin.
+    const currentRole = isPollaOrganizer(polla, user.id) ? "admin" : "player";
 
     return NextResponse.json({
       polla,
@@ -250,12 +253,10 @@ export async function GET(
 // predictions, notifications, invites). All FKs to public.pollas have
 // ON DELETE CASCADE, so a single DELETE on pollas is atomic.
 //
-// Auth: must be authenticated AND have role='admin' on
-// polla_participants for this polla. The check mirrors rotate-code so
-// both endpoints stay in lockstep on what "admin of this polla" means.
-// We do NOT fall back to pollas.created_by — the participant row is
-// the authoritative source (admins can transfer ownership in the
-// future without needing a parallel column rename).
+// Auth: must be authenticated AND be the polla's organizer
+// (pollas.created_by, lib/pollas/organizer.ts). The participant row's role
+// is client-writable history and no longer grants authority (security
+// audit 2026-11-07, S1); rotate-code uses the same check.
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
@@ -272,7 +273,7 @@ export async function DELETE(
 
   const { data: polla, error: pollaErr } = await admin
     .from("pollas")
-    .select("id, name")
+    .select("id, name, created_by")
     .eq("slug", (await params).slug)
     .maybeSingle();
   if (pollaErr) {
@@ -286,13 +287,7 @@ export async function DELETE(
     );
   }
 
-  const { data: membership } = await admin
-    .from("polla_participants")
-    .select("role")
-    .eq("polla_id", polla.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!membership || membership.role !== "admin") {
+  if (!isPollaOrganizer(polla, user.id)) {
     return NextResponse.json(
       { error: "Solo el admin de la polla puede borrarla" },
       { status: 403 },

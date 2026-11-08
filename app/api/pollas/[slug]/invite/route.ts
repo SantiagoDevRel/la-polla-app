@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPollaOrganizer } from "@/lib/pollas/organizer";
 import { sendCTAButton } from "@/lib/whatsapp/interactive";
 import { z } from "zod";
 import crypto from "crypto";
@@ -49,7 +50,7 @@ export async function POST(
     // Get polla by slug
     const { data: polla, error: pollaError } = await admin
       .from("pollas")
-      .select("id, name, type, slug")
+      .select("id, name, type, slug, created_by")
       .eq("slug", (await params).slug)
       .single();
 
@@ -60,15 +61,8 @@ export async function POST(
       );
     }
 
-    // Verify caller is admin of this polla
-    const { data: callerParticipant } = await admin
-      .from("polla_participants")
-      .select("role")
-      .eq("polla_id", polla.id)
-      .eq("user_id", user.id)
-      .single();
-
-    if (!callerParticipant || callerParticipant.role !== "admin") {
+    // Verify caller is the organizer (creator) of this polla.
+    if (!isPollaOrganizer(polla, user.id)) {
       return NextResponse.json(
         { error: "Solo el admin puede invitar" },
         { status: 403 }

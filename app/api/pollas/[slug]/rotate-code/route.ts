@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPollaOrganizer } from "@/lib/pollas/organizer";
 import { rotateJoinCode } from "@/lib/pollas/rotate-code";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export async function POST(
   // using the admin client to bypass the RLS propagation issue.
   const { data: polla, error: pollaErr } = await admin
     .from("pollas")
-    .select("id, slug")
+    .select("id, slug, created_by")
     .eq("slug", (await params).slug)
     .maybeSingle();
   if (pollaErr) throw pollaErr;
@@ -36,13 +37,7 @@ export async function POST(
     return NextResponse.json({ error: "Polla no encontrada" }, { status: 404 });
   }
 
-  const { data: membership } = await admin
-    .from("polla_participants")
-    .select("role")
-    .eq("polla_id", polla.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!membership || membership.role !== "admin") {
+  if (!isPollaOrganizer(polla, user.id)) {
     return NextResponse.json(
       { error: "Solo el admin puede rotar el código" },
       { status: 403 },
