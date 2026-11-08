@@ -17,6 +17,7 @@
 !/tsconfig.json
 !/css.d.ts
 !/proxy.ts
+!/instrumentation.ts
 # Fuentes y pollitos que la imagen de historia de rifas lee del disco en runtime
 # (sin esto la función responde 500: ENOENT /var/task/assets/fonts/...).
 !/assets
