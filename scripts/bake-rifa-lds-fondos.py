@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# scripts/bake-rifa-lds-fondos.py <fotos_dir>
+# scripts/bake-rifa-lds-fondos.py <fotos_dir> [fondo ...]
 #
 # Fondos de las seis plantillas de historia de Los Del Sur (lib/rifas/partner.ts):
 # fotos REALES de la barra, publicadas en el Instagram oficial @ldsoficial
@@ -41,19 +41,32 @@ FONDOS = {
 }
 
 
-def bake(name, foto, cx, cy, zoom):
+# (2026-11-08) Plantilla «Tablero»: el diseño cuadrado 1080×1350 aprobado por el
+# dueño y su versión vertical 1080×1920 (el mismo cuadrado con fondo arriba y
+# abajo). Misma foto que «tribuna», recortada como `background-size: cover;
+# background-position: 50% 40%` del diseño original.
+TABLERO = {
+    "tablero-cuadrada": ("De1p5lyoLey_3", 0.5, 0.4, 1.0, (1080, 1350)),
+    "tablero-vertical": ("De1p5lyoLey_3", 0.5, 0.4, 1.0, (1080, 1920)),
+}
+
+
+def bake(name, foto, cx, cy, zoom, size=(1080, 1920)):
     im = Image.open(os.path.join(fotos_dir, f"{foto}.jpg")).convert("RGB")
     w, h = im.size
+    tw, th = size
     ch = round(h / zoom)
-    cw = round(ch * 9 / 16)
+    cw = round(ch * tw / th)
     if cw > w:
-        cw, ch = w, round(w * 16 / 9)
+        cw, ch = w, round(w * th / tw)
     left = min(max(round(w * cx - cw / 2), 0), w - cw)
     top = min(max(round(h * cy - ch / 2), 0), h - ch)
-    im.crop((left, top, left + cw, top + ch)).resize((1080, 1920), Image.Resampling.LANCZOS).save(
+    im.crop((left, top, left + cw, top + ch)).resize(size, Image.Resampling.LANCZOS).save(
         os.path.join(STORY, f"fondo-{name}.jpg"), quality=80, optimize=True, progressive=True)
     return f"{name}: {foto} {w}x{h} -> recorte {cw}x{ch} en ({left},{top})"
 
 
-for name, spec in FONDOS.items():
-    print(bake(name, *spec))
+only = set(sys.argv[2:])
+for name, spec in {**FONDOS, **TABLERO}.items():
+    if not only or name in only:
+        print(bake(name, *spec))

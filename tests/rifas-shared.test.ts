@@ -93,6 +93,8 @@ describe("plantillas de historia", () => {
   it("las fuentes de la marca existen para next/og", () => {
     expect(existsSync(join(root, "assets/fonts/BebasNeue-latin.ttf"))).toBe(true);
     expect(existsSync(join(root, "assets/fonts/Outfit-SemiBold-latin.ttf"))).toBe(true);
+    // Resaltados del tablero de Los Del Sur.
+    expect(existsSync(join(root, "assets/fonts/Outfit-Bold-latin.ttf"))).toBe(true);
   });
 });
 

@@ -22,6 +22,7 @@ import {
   displayPhone, drawLabel, PAYMENT_METHOD_LABEL, rifaNumber, rifaShareText, STORY_CLUBS, storyTemplateOptions, whatsappChatUrl,
   type RifaCreatorTicket, type RifaCreatorView, type RifaTeam, type StoryTemplate,
 } from "@/lib/rifas/shared";
+import { STORY_FORMATS, storyHasFormats, type StoryFormat } from "@/lib/rifas/story-templates/catalog";
 
 type Action = Record<string, unknown> & { action: string };
 
@@ -331,6 +332,8 @@ function SharePanel({ rifa, shareUrl, partner }: { rifa: RifaCreatorView; shareU
   const options = storyTemplateOptions(partner);
   const [template, setTemplate] = useState<StoryTemplate>(options[0].key);
   const [club, setClub] = useState(STORY_CLUBS[0].key);
+  // El tablero de Los Del Sur sale en cuadrada (WhatsApp) o vertical (historia de Instagram).
+  const [format, setFormat] = useState<StoryFormat>("cuadrada");
   const [withLink, setWithLink] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [state, setState] = useState<ShareState>("loading");
@@ -344,7 +347,9 @@ function SharePanel({ rifa, shareUrl, partner }: { rifa: RifaCreatorView; shareU
   // lotería) y el resultado: la versión evita compartir una copia vieja.
   const version = [rifa.tickets.map((t) => `${t.number}${t.state[0]}`).join("."), rifa.status, rifa.draw_at,
     rifa.lottery_name, rifa.winning_number ?? "", rifa.name].join("|");
-  const storyHref = `/api/rifas/${rifa.slug}/historia?plantilla=${template}${option.usesClub ? `&club=${club}` : ""}&v=${encodeURIComponent(version)}`;
+  const hasFormats = storyHasFormats(template);
+  const storyHref = `/api/rifas/${rifa.slug}/historia?plantilla=${template}${option.usesClub ? `&club=${club}` : ""}${hasFormats ? `&formato=${format}` : ""}&v=${encodeURIComponent(version)}`;
+  const fileName = `rifa-${rifa.slug}${hasFormats ? `-${format}` : ""}.png`;
 
   useEffect(() => {
     let alive = true;
@@ -356,12 +361,12 @@ function SharePanel({ rifa, shareUrl, partner }: { rifa: RifaCreatorView; shareU
         if (!res.ok) throw new Error(String(res.status));
         const blob = await res.blob();
         if (!alive) return;
-        setFile(new File([blob], `rifa-${rifa.slug}.png`, { type: "image/png" }));
+        setFile(new File([blob], fileName, { type: "image/png" }));
         setState("ready");
       })
       .catch(() => { if (alive) setState("error"); });
     return () => { alive = false; ctrl.abort(); };
-  }, [storyHref, rifa.slug, attempt]);
+  }, [storyHref, fileName, attempt]);
 
   useEffect(() => {
     if (!file) { setPreview(null); return; }
@@ -393,7 +398,7 @@ function SharePanel({ rifa, shareUrl, partner }: { rifa: RifaCreatorView; shareU
       </div>
       <Link href={`/rifa/${rifa.slug}`} className="inline-flex min-h-11 items-center text-[13px] font-semibold text-text-secondary underline-offset-4 hover:text-text-primary hover:underline">Ver como comprador</Link>
       <div className="space-y-3 border-t border-border-subtle pt-3">
-        <p className="text-[15px] font-semibold">Imagen para historia</p>
+        <p className="text-[15px] font-semibold">Imagen para compartir</p>
         {/* Miniaturas estáticas (public/plantillas-rifa, scripts/bake-rifa-story-thumbnails.tsx):
             se ven todas al instante; la imagen real con los números de esta rifa se arma abajo. */}
         {/* Radios nativos: flechas, un solo Tab y foco en el elegido, sin código propio. */}
@@ -414,6 +419,24 @@ function SharePanel({ rifa, shareUrl, partner }: { rifa: RifaCreatorView; shareU
             );
           })}
         </fieldset>
+        {hasFormats && (
+          <fieldset className="space-y-1">
+            <legend className="text-[13px] text-text-secondary">Formato</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {STORY_FORMATS.map((f) => {
+                const selected = format === f.key;
+                return (
+                  <label key={f.key}
+                    className={`flex min-h-11 cursor-pointer items-center justify-center rounded-lg border px-2 py-2 text-center text-[15px] leading-tight transition-colors focus-within:ring-2 focus-within:ring-gold/60 [overflow-wrap:anywhere] ${selected ? "border-text-primary bg-bg-elevated font-semibold text-text-primary" : "border-border-subtle text-text-secondary hover:border-gold/30"}`}>
+                    <input type="radio" name="formato-imagen" value={f.key} checked={selected}
+                      onChange={() => setFormat(f.key)} className="sr-only" />
+                    {f.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
         {option.usesClub && (
           <div>
             <label htmlFor="club-historia" className="block text-[13px] text-text-secondary">Club</label>
@@ -425,9 +448,9 @@ function SharePanel({ rifa, shareUrl, partner }: { rifa: RifaCreatorView; shareU
         <div className="flex justify-center rounded-lg border border-border-subtle bg-bg-base p-2">
           {preview ? (
             // eslint-disable-next-line @next/next/no-img-element -- imagen generada (blob), tamaño real
-            <img src={preview} alt="Vista previa de la imagen para historia" className="h-auto max-h-[420px] w-auto max-w-full rounded" />
+            <img src={preview} alt="Vista previa de la imagen para compartir" className="h-auto max-h-[420px] w-auto max-w-full rounded" />
           ) : (
-            <div className="flex aspect-[9/16] h-[320px] items-center justify-center p-4 text-center text-[13px] text-text-muted">
+            <div className={`flex ${hasFormats && format === "cuadrada" ? "aspect-[4/5]" : "aspect-[9/16]"} h-[320px] items-center justify-center p-4 text-center text-[13px] text-text-muted`}>
               {state === "error" ? "No se pudo preparar la imagen." : "Preparando la imagen…"}
             </div>
           )}
