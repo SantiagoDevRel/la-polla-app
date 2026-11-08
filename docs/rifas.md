@@ -191,10 +191,10 @@ mismo (imagen privada por URL firmada de 5 min) con Aprobar y Rechazar. La lista
 «Comprobantes por revisar» también muestra la imagen. Después del sorteo solo
 aparece Aprobar (`DRAW_LOCKED`).
 
-## Imagen para historia
+## Imagen para compartir (historia o tablero)
 
-`GET /api/rifas/<slug>/historia?plantilla=<diseño>&club=<clave>`: PNG
-1080×1920, solo el creador. Nombre, premio, tablero con los tomados marcados
+`GET /api/rifas/<slug>/historia?plantilla=<diseño>&club=<clave>[&formato=cuadrada|vertical]`: PNG
+1080×1920 (el tablero de Los Del Sur, también 1080×1350), solo el creador. Nombre, premio, tablero con los tomados marcados
 (X roja sobre el número, 29-sep), fecha y hora en Colombia, lotería, valor y el dominio (desde el 7-nov, sin el enlace). Doce
 plantillas en `lib/rifas/story-templates`: `neutra`, `club`, `estadio`, `boleta`,
 `marcador`, `cuaderno`, `camiseta`, `pizarra`, `retro`, `premium`, `neon`, `confeti`.
@@ -254,9 +254,9 @@ marca por uuid (portada, inicio, panel) y por slug (la imagen de historia solo
 recibe el slug de SQL); el test exige que ambos sean la misma rifa.
 - Portada y tarjeta del inicio: escudo (`public/rifas/lds/escudo-*.webp`) y
   «Los Del Sur · La barra y sus combos».
-- Imagen para historia: esa rifa solo ve **seis plantillas de la barra**
-  (`lds-tribuna`, `lds-combos`, `lds-humo`, `lds-trapo`, `lds-escudo`,
-  `lds-sombrillas`, en `story-templates/designs-lds.tsx`) y las demás rifas no
+- Imagen para compartir: esa rifa solo ve **siete plantillas de la barra**
+  (`lds-tablero`, `lds-tribuna`, `lds-combos`, `lds-humo`, `lds-trapo`, `lds-escudo`,
+  `lds-sombrillas`, en `story-templates/designs-lds*.tsx`) y las demás rifas no
   las ven. Encabezado con escudo, pollito barrista grande y La Polla solo como
   logo pequeño junto al dominio. Arte en `assets/rifas-story/lds/`
   (`scripts/bake-rifa-lds-assets.py`): escudo, trapo de la app de LDS y
@@ -276,6 +276,22 @@ recibe el slug de SQL); el test exige que ambos sean la misma rifa.
   `Downloads/agent-work/la-polla-lds-fotos-20261107/originales/`. El dueño
   tiene permiso de la barra para usar sus fotos y su escudo. Los paneles son
   semitransparentes para que la foto se vea alrededor del tablero.
+- **Tablero, la principal (8-nov-2026, pedido del dueño).** `lds-tablero`
+  (`story-templates/designs-lds-tablero.tsx`) va primero y sale por defecto en
+  Gestionar. Copia el diseño aprobado para el canal de WhatsApp de LDS: titular
+  justificado a 600 px, las boletas con las tomadas tachadas en vivo (misma
+  regla del tablero público: pagadas, por confirmar y reservas de 30 min
+  vigentes; nunca nombres ni celulares), la camiseta grande al lado, pastillas
+  de valor/rango/sorteo y «Compra tu boleta en <dominio>». Dos formatos, que
+  Gestionar ofrece como «Cuadrada» (1080×1350, WhatsApp y feed; por defecto) y
+  «Vertical (historia de Instagram)» (1080×1920: el mismo cuadrado con 285 px
+  de foto arriba y abajo). Cada formato tiene su recorte de la foto
+  (`fondo-tablero-cuadrada.jpg`, `fondo-tablero-vertical.jpg`). El titular y la
+  camiseta en alta (`armani-frente-hd.png`) salen de `rifaStoryArt` en
+  `lib/rifas/benefit.ts`, por slug; una rifa sin titular usa «RIFA SUREÑA» y
+  su nombre. Los resaltados verdes van en Outfit 700 (`assets/fonts/Outfit-Bold-latin.ttf`,
+  OFL, mismo recorte latino que el 600). Rifa 2 y 3: otra entrada en
+  `rifaStoryArt` con su camiseta.
 - Prueba: `tests/rifas-lds-story.test.ts`.
 
 ### «¿Eres de un combo?» (7-nov-2026, migración 180)

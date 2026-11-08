@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-const { rifaBenefit, rifaStoryPrize } = await import("@/lib/rifas/benefit");
+const { rifaBenefit, rifaStoryArt, rifaStoryPrize } = await import("@/lib/rifas/benefit");
 const { PARTNER_RIFAS } = await import("@/lib/rifas/partner");
 
 const LA_IGUANA_1 = "495aa5b1-767c-47bb-8487-15223ab44f63";
@@ -45,6 +45,15 @@ describe("rifaBenefit", () => {
     expect(path).toBe("assets/rifas-story/premios/armani-frente.png");
     expect(existsSync(join(process.cwd(), path!))).toBe(true);
     expect(rifaStoryPrize("mwrikpci")).toBeNull();
+  });
+
+  it("el tablero lleva la camiseta en alta y el titular aprobado", () => {
+    const art = rifaStoryArt("rifa-solidaria-la-iguana-camiseta");
+    expect(art?.prizeLarge).toBe("assets/rifas-story/premios/armani-frente-hd.png");
+    expect(existsSync(join(process.cwd(), art!.prizeLarge))).toBe(true);
+    expect(art?.headline.map((line) => line.text)).toEqual(["RIFA SOLIDARIA", "POR UNA FAMILIA", "DAMNIFICADA EN LA IGUANÁ"]);
+    expect(art?.headline.filter((line) => line.accent).map((line) => line.text)).toEqual(["POR UNA FAMILIA"]);
+    expect(rifaStoryArt("mwrikpci")).toBeNull();
   });
 
   it("la carpeta de la camiseta tiene caché immutable como las demás versionadas", async () => {

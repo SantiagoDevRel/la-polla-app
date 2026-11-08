@@ -81,7 +81,7 @@ export interface Treatment {
 }
 
 /** X de número tomado: rojo de alerta de la marca (#FF3D57), un poco más profundo para leerse sobre casillas claras. */
-const TAKEN_X = "#E5243B";
+export const TAKEN_X = "#E5243B";
 
 export function StoryBoard({ r, theme }: { r: StoryProps["r"]; theme: Treatment }) {
   const layout = boardLayout(r.number_count, BOARD_W, BOARD_H);

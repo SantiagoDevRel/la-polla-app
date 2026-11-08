@@ -56,15 +56,39 @@ export function rifaBenefit(rifaId: string): RifaBenefit | null {
   return BENEFIT_RIFAS[rifaId]?.() ?? null;
 }
 
+/** Lo que necesitan las imágenes para compartir de una rifa solidaria. */
+export interface RifaStoryArt {
+  /** Camiseta de frente, chica (356 px de ancho), para las plantillas de historia. */
+  prize: string;
+  /** La misma en alta (600 px), para el tablero, donde va grande. */
+  prizeLarge: string;
+  /** Titular del tablero, línea por línea; `accent` va en verde. */
+  headline: readonly { text: string; accent?: boolean }[];
+}
+
+/** El titular del diseño aprobado para La Iguaná (canal de WhatsApp de LDS, 8-nov). */
+const LA_IGUANA_HEADLINE = [
+  { text: "RIFA SOLIDARIA" }, { text: "POR UNA FAMILIA", accent: true }, { text: "DAMNIFICADA EN LA IGUANÁ" },
+] as const;
+
 /**
- * (2026-11-08) La camiseta de frente para las imágenes de historia: PNG en
- * assets/rifas-story (satori no decodifica WebP). Va por slug porque la imagen
- * solo recibe el slug desde SQL, igual que lib/rifas/partner.ts.
+ * (2026-11-08) Arte de las imágenes para compartir: PNG en assets/rifas-story
+ * (satori no decodifica WebP). Va por slug porque la imagen solo recibe el slug
+ * desde SQL, igual que lib/rifas/partner.ts. Rifa 2 y 3: otra entrada con su
+ * camiseta y el mismo titular.
  */
-const STORY_PRIZE_BY_SLUG: Readonly<Record<string, string>> = {
-  "rifa-solidaria-la-iguana-camiseta": "assets/rifas-story/premios/armani-frente.png",
+const STORY_ART_BY_SLUG: Readonly<Record<string, RifaStoryArt>> = {
+  "rifa-solidaria-la-iguana-camiseta": {
+    prize: "assets/rifas-story/premios/armani-frente.png",
+    prizeLarge: "assets/rifas-story/premios/armani-frente-hd.png",
+    headline: LA_IGUANA_HEADLINE,
+  },
 };
 
+export function rifaStoryArt(slug: string): RifaStoryArt | null {
+  return STORY_ART_BY_SLUG[slug] ?? null;
+}
+
 export function rifaStoryPrize(slug: string): string | null {
-  return STORY_PRIZE_BY_SLUG[slug] ?? null;
+  return rifaStoryArt(slug)?.prize ?? null;
 }
