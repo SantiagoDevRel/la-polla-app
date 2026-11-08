@@ -21,7 +21,8 @@
 --   F · vencimiento perezoso de reservas sin comprobante
 --   G · venta por fuera: sin cuenta, celular válido, aparece a quien se
 --       registre después con ese celular
---   H · visibilidad: de Pública a Privada solo sin números tomados
+--   H · visibilidad: de Pública a Privada también con números; quien los tiene
+--       la sigue viendo (182)
 --   I · revertir aprobación deja auditoría con motivo
 --   J · resultado: no antes del sorteo, ganador pendiente, número no vendido
 --       (volver a jugar / desierta), ganador pagado
@@ -288,10 +289,20 @@ BEGIN
 END $$;
 
 -- ════════════════════════════════════════════════════════════════════════
--- H · de Pública a Privada con números de otras personas: no
+-- H · de Pública a Privada con números de otras personas (182): sí, y quien
+--     ya tiene números la sigue viendo; nadie más.
 -- ════════════════════════════════════════════════════════════════════════
-SELECT pg_temp.expect_fail($$SELECT public.rifa_set_visibility_v1('77777777-7777-4777-8777-0000000000c1',(SELECT id FROM r),'privada')$$,
-  'VISIBILITY_LOCKED', 'H2 Pública→Privada con números tomados');
+SELECT public.rifa_set_visibility_v1('77777777-7777-4777-8777-0000000000c1', (SELECT id FROM r), 'privada');
+DO $$ BEGIN
+  ASSERT (SELECT visibility FROM public.rifas WHERE id=(SELECT id FROM r)) = 'privada', 'H2 Pública→Privada con números tomados';
+  ASSERT public.rifa_public_view_v1((SELECT slug FROM public.rifas WHERE id=(SELECT id FROM r)), '77777777-7777-4777-8777-0000000000b1') IS NOT NULL,
+    'H2 quien tiene números sigue viendo la Privada';
+END $$;
+SELECT pg_temp.expect_fail($$SELECT public.rifa_public_view_v1((SELECT slug FROM public.rifas WHERE id=(SELECT id FROM r)),'77777777-7777-4777-8777-0000000000c2')$$,
+  'RIFA_NOT_FOUND', 'H2 sin números no ve la Privada');
+SELECT pg_temp.expect_fail($$SELECT public.rifa_public_view_v1((SELECT slug FROM public.rifas WHERE id=(SELECT id FROM r)),NULL)$$,
+  'RIFA_NOT_FOUND', 'H2 sin sesión no ve la Privada');
+SELECT public.rifa_set_visibility_v1('77777777-7777-4777-8777-0000000000c1', (SELECT id FROM r), 'publica');
 
 -- ════════════════════════════════════════════════════════════════════════
 -- I · revertir aprobación

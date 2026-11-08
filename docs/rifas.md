@@ -21,7 +21,7 @@ rifa (embudo rifa → cuenta → polla).
 | `/admin/rifas` | `users.is_admin` | Creadores (buscar, habilitar, quitar), todas las rifas con reportes (ocultar/mostrar) y embudo |
 | Perfil → «Mis rifas» | Creador habilitado | «Crear mi rifa» + sus rifas con comprobantes pendientes. A quien no tiene permiso no se le dibuja nada |
 | `/rifas/crear` | Creador habilitado | Formulario. Sin permiso: 404 |
-| `/rifa/<slug>` | Cualquiera (Pública) · creador y admins (Privada) | Tablero, reservar, pagar, comprobante, resultado. Sin sesión: tablero y registro al elegir |
+| `/rifa/<slug>` | Cualquiera (Pública) · equipo, admins y quien ya tiene números (Privada) | Tablero, reservar, pagar, comprobante, resultado. Sin sesión: tablero y registro al elegir |
 | `/rifa/<slug>/gestionar` | Solo el creador | Comprobantes, tablero con nombres, venta por fuera, liberar, resultado, compartir, imagen, foto del premio, actividad |
 | `/` (inicio) | Con sesión | **Una sola pantalla** desde el 6-nov-2026 (sin pestañas POLLAS \| RIFAS): arriba la sección «Rifas» con las rifas sin ánimo de lucro (`lib/rifas/featured.ts`) y debajo, en filas, mis números, creadas por mí y abiertas por enlace (`components/rifas/RifasInicio.tsx`). Cada tarjeta lleva una etiqueta chiquita «RIFA» o «POLLA». `/?tab=rifas` cae en el mismo inicio |
 
@@ -96,8 +96,9 @@ por color **y** por forma/ícono, y el lector de pantalla lo anuncia en palabras
   auditado), vende por fuera, libera, escribe el resultado y cambia la
   visibilidad. **Un administrador de La Polla no puede** (`CREATOR_ONLY`): puede
   ocultar la rifa y ver reportes.
-- Privada → Pública solo si el creador sigue habilitado; Pública → Privada solo
-  sin números tomados.
+- Privada → Pública solo si el creador sigue habilitado. Pública → Privada en
+  cualquier momento (migración 182, 8-nov-2026): quien ya tiene números vivos la
+  sigue viendo; nadie más fuera del equipo y los administradores.
 - Después de `draw_at` no hay reservas, ventas por fuera ni comprobantes
   **nuevos** (evita pagar solo si ganó). **El tablero queda congelado para el
   creador (`DRAW_LOCKED`)**: ya conoce el número, así que solo puede **aprobar**
@@ -229,20 +230,22 @@ lucro», «Rifa para …» en grande, qué compra lo recaudado y la camiseta gir
 con un desplegable cerrado «Ver foto original» (las dos fotos reales). Mismo patrón
 que `components/casa/prize-media.ts`; no hay columnas nuevas ni cambios de SQL.
 Primera: «Rifa solidaria La Iguaná» (`/rifa/rifa-solidaria-la-iguana-camiseta`),
-premio «Camiseta firmada por Franco Armani», de carlos con Santi de coadministrador,
-Pública, 100 números a $30.000, Lotería de Medellín del 13-nov. Una camiseta por rifa,
+premio «Camiseta firmada por Franco Armani y René Higuita», de carlos con Santi de
+coadministrador, Pública, 100 números a $30.000, Lotería de Medellín del 13-nov.
+El 8-nov estuvo Privada unas horas mientras se rehacía la camiseta; el dueño
+puede ocultarla y publicarla desde Gestionar («Volver a privada» / «Hacer pública»). Una camiseta por rifa,
 de a una: la siguiente se crea al cerrar esta y se agrega su uuid al mapa.
 Prueba: `tests/rifas-benefit.test.ts`.
 
-**Camiseta de Franco Armani (8-nov-2026, pedido del dueño).** Reemplaza a la de
-James. El giro sale de las dos fotos reales (frente con autógrafo y espalda),
-recortadas sin retocar el diseño: 144 poses en `public/prizes/armani-bf38a139b7c2/`
-(caché immutable, cualquier cambio crea otra carpeta), detalle en
-`docs/premios-giratorios.md`. Las seis plantillas de historia muestran la
-camiseta de frente al lado del premio (`assets/rifas-story/premios/armani-frente.png`,
-enlazada por slug con `rifaStoryPrize`). En esa imagen fija el autógrafo real se
-repasó más grueso, en su misma forma y lugar, para que se lea a ese tamaño; el
-giro y las fotos no se tocaron.
+**Camiseta de Armani e Higuita (8-nov-2026, pedido del dueño).** Reemplaza a la de
+James. El giro es una recreación limpia de la camiseta (sin maniquí, mangas bien
+puestas) hecha con IA a partir de las dos fotos reales y renderizada en Blender:
+144 poses en `public/prizes/armani-8e245f817802/` (caché immutable, cualquier cambio
+crea otra carpeta), detalle en `docs/premios-giratorios.md`. Las firmas del giro
+son una recreación; las fotos reales siguen en «Ver foto original». Las seis
+plantillas de historia muestran la misma camiseta de frente al lado del premio
+(`assets/rifas-story/premios/armani-frente.png`, enlazada por slug con
+`rifaStoryPrize`).
 
 ### Con Los Del Sur (7-nov-2026, pedido del dueño)
 

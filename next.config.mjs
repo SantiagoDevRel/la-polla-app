@@ -116,7 +116,7 @@ const nextConfig = {
       },
       {
         // Camiseta de Franco Armani (rifa solidaria La Iguaná), misma regla.
-        source: "/prizes/armani-bf38a139b7c2/:path*",
+        source: "/prizes/armani-8e245f817802/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
       // iOS Universal Links — el archivo apple-app-site-association NO tiene
