@@ -55,6 +55,9 @@ npm run test:e2e
   [Checks](docs/urgent-high-fixes.md).
 - Keep the deny-all `.vercelignore` allowlist; add `!/path` for any new top-level path
   the build or runtime reads.
+- Vercel Preview uses the synthetic preview database, never production values;
+  preview logins, schema changes and the 7-day pause:
+  [preview database](docs/preview-db.md).
 
 ## Data and money
 
