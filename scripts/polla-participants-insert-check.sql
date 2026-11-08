@@ -1,8 +1,8 @@
 -- Synthetic users in a disposable database. No real accounts or data.
--- Proves migration 181: a signed-in user cannot self-insert a privileged
--- polla_participants row (admin, approved, paid or a non-pending payment),
--- cannot insert a row for someone else, and the plain player/pending/unpaid
--- shape is not refused by RLS.
+-- Proves migrations 181 and 184: a signed-in user cannot insert any
+-- polla_participants row directly (privileged shapes since 181, every shape
+-- since 184 retired participants_insert_self), not even for someone else,
+-- while the service role, the only legitimate writer, still can.
 \set ON_ERROR_STOP on
 BEGIN;
 DO $$
@@ -56,21 +56,44 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN refused:=true;
   END;
   ASSERT refused, 'Insert for another user was accepted';
-  -- The plain join shape must pass RLS and the table check. Migration 183 makes
-  -- a fresh database allow 'pending' like production, so the row is stored.
-  INSERT INTO public.polla_participants(polla_id,user_id,role,status,paid,payment_status)
-    VALUES(current_setting('test.polla')::uuid,auth.uid(),'player','pending',false,'pending');
+  -- Since 184 the plain join shape is refused by RLS too; joins go through
+  -- the service role (createAdminClient) in the server routes.
+  refused:=false;
+  BEGIN
+    INSERT INTO public.polla_participants(polla_id,user_id,role,status,paid,payment_status)
+      VALUES(current_setting('test.polla')::uuid,auth.uid(),'player','pending',false,'pending');
+  EXCEPTION WHEN insufficient_privilege THEN refused:=true;
+  END;
+  ASSERT refused, 'A direct self-join was accepted; participants_insert_self is still active';
 END $$;
+RESET ROLE;
+-- anon cannot insert either.
+SET LOCAL ROLE anon;
+SELECT set_config('request.jwt.claims','{"role":"anon"}',true);
+DO $$
+DECLARE refused boolean:=false;
+BEGIN
+  BEGIN
+    INSERT INTO public.polla_participants(polla_id,user_id,role,status,paid,payment_status)
+      VALUES(current_setting('test.polla')::uuid,current_setting('test.attacker')::uuid,'player','pending',false,'pending');
+  EXCEPTION WHEN insufficient_privilege THEN refused:=true;
+  END;
+  ASSERT refused, 'An anon insert was accepted';
+END $$;
+RESET ROLE;
+-- The server join path: service_role bypasses RLS and stores the approved row.
+SET LOCAL ROLE service_role;
+INSERT INTO public.polla_participants(polla_id,user_id,role,status,paid,payment_status)
+  VALUES(current_setting('test.polla')::uuid,current_setting('test.attacker')::uuid,'player','approved',false,'pending');
 RESET ROLE;
 DO $$
 BEGIN
-  ASSERT NOT EXISTS(SELECT 1 FROM public.polla_participants
-    WHERE polla_id=current_setting('test.polla')::uuid
-      AND (role<>'player' OR status<>'pending' OR coalesce(paid,false) OR payment_status<>'pending')),
-    'A privileged row was stored';
+  ASSERT NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='polla_participants'
+    AND cmd IN ('INSERT','ALL') AND permissive='PERMISSIVE'), 'A permissive INSERT policy remains';
   ASSERT (SELECT count(*) FROM public.polla_participants
+    WHERE polla_id=current_setting('test.polla')::uuid)=1, 'Only the service-role join row may exist';
+  ASSERT (SELECT status FROM public.polla_participants
     WHERE polla_id=current_setting('test.polla')::uuid
-      AND user_id=current_setting('test.attacker')::uuid)=1,
-    'The plain pending join row was not stored exactly once';
+      AND user_id=current_setting('test.attacker')::uuid)='approved', 'The service-role join row is missing';
 END $$;
 ROLLBACK;
