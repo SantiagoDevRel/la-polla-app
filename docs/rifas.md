@@ -97,7 +97,7 @@ por color **y** por forma/ícono, y el lector de pantalla lo anuncia en palabras
   visibilidad. **Un administrador de La Polla no puede** (`CREATOR_ONLY`): puede
   ocultar la rifa y ver reportes.
 - Privada → Pública solo si el creador sigue habilitado. Pública → Privada en
-  cualquier momento (migración 181, 8-nov-2026): quien ya tiene números vivos la
+  cualquier momento (migración 182, 8-nov-2026): quien ya tiene números vivos la
   sigue viendo; nadie más fuera del equipo y los administradores.
 - Después de `draw_at` no hay reservas, ventas por fuera ni comprobantes
   **nuevos** (evita pagar solo si ganó). **El tablero queda congelado para el

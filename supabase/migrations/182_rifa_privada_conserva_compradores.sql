@@ -1,4 +1,4 @@
--- 181_rifa_privada_conserva_compradores.sql — una rifa Pública puede volver a Privada
+-- 182_rifa_privada_conserva_compradores.sql — una rifa Pública puede volver a Privada
 -- sin dejar por fuera a quien ya tiene números.
 --
 -- Pedido del dueño (2026-11-08): ocultar la rifa de La Iguaná mientras se
@@ -17,6 +17,10 @@
 --
 -- CREATE OR REPLACE conserva SECURITY DEFINER, search_path y los GRANT
 -- (EXECUTE solo service_role desde la 157).
+--
+-- Aplicada en producción el 2026-11-07 19:56 (COL) con el nombre
+-- «181_rifa_privada_conserva_compradores» (versión 20261108005644). En el repo
+-- pasó a 182 porque la 181 quedó para polla_participants_insert_safe_shape (#239).
 
 CREATE OR REPLACE FUNCTION public.rifa_can_view(p_rifa public.rifas, p_viewer uuid)
 RETURNS boolean LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -25,7 +29,7 @@ BEGIN
     RETURN true;
   END IF;
   IF p_rifa.visibility = 'publica' AND p_rifa.hidden_at IS NULL THEN RETURN true; END IF;
-  -- (181) Privada u oculta: solo la sigue viendo quien ya tiene números en ella.
+  -- (182) Privada u oculta: solo la sigue viendo quien ya tiene números en ella.
   RETURN p_viewer IS NOT NULL AND EXISTS (
     SELECT 1 FROM public.rifa_tickets t WHERE t.rifa_id = p_rifa.id AND t.buyer_id = p_viewer AND t.state <> 'liberado');
 END $$;
@@ -39,7 +43,7 @@ BEGIN
   IF p_visibility NOT IN ('privada', 'publica') THEN PERFORM public.rifa_fail('INVALID_VISIBILITY', NULL, '22023'); END IF;
   IF r.status <> 'abierta' THEN PERFORM public.rifa_fail('RIFA_FINISHED'); END IF;
   PERFORM public.rifa_sweep_expired(p_rifa);
-  -- (181) De Pública a Privada también con números: quien los tiene la sigue viendo (rifa_can_view).
+  -- (182) De Pública a Privada también con números: quien los tiene la sigue viendo (rifa_can_view).
   IF p_visibility = 'publica' AND r.visibility = 'privada' AND NOT public.rifa_is_creator(r.creator_id) THEN
     PERFORM public.rifa_fail('CREATOR_REQUIRED', NULL, '42501');
   END IF;

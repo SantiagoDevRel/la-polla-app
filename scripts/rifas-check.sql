@@ -22,7 +22,7 @@
 --   G · venta por fuera: sin cuenta, celular válido, aparece a quien se
 --       registre después con ese celular
 --   H · visibilidad: de Pública a Privada también con números; quien los tiene
---       la sigue viendo (181)
+--       la sigue viendo (182)
 --   I · revertir aprobación deja auditoría con motivo
 --   J · resultado: no antes del sorteo, ganador pendiente, número no vendido
 --       (volver a jugar / desierta), ganador pagado
@@ -289,7 +289,7 @@ BEGIN
 END $$;
 
 -- ════════════════════════════════════════════════════════════════════════
--- H · de Pública a Privada con números de otras personas (181): sí, y quien
+-- H · de Pública a Privada con números de otras personas (182): sí, y quien
 --     ya tiene números la sigue viendo; nadie más.
 -- ════════════════════════════════════════════════════════════════════════
 SELECT public.rifa_set_visibility_v1('77777777-7777-4777-8777-0000000000c1', (SELECT id FROM r), 'privada');
