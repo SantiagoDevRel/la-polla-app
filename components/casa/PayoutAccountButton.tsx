@@ -10,7 +10,10 @@ import { retryProfilePatch, loadProfile, saveProfilePatch, type PersistedProfile
 
 type AccountDraft = { ownerId: string | null; mutation: PendingProfileMutation | null };
 
-function AccountDialog({ onClose, note, onSaved, draft }: { onClose: () => void; note: string; onSaved?: () => void; draft: MutableRefObject<AccountDraft> }) {
+export type PayoutAccountDraft = AccountDraft;
+
+/** El editor de la cuenta de pago en un diálogo. También lo abre PremioCuentaAviso. */
+export function PayoutAccountDialog({ onClose, note, onSaved, draft, title = "Tu cuenta de pago" }: { onClose: () => void; note: string; onSaved?: () => void; draft: MutableRefObject<AccountDraft>; title?: string }) {
   const tCommon = useTranslations("Common");
   const dialog = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -98,7 +101,7 @@ function AccountDialog({ onClose, note, onSaved, draft }: { onClose: () => void;
       className="m-auto max-h-[85dvh] w-[calc(100%_-_2rem)] max-w-md overflow-y-auto rounded-xl border border-border-default bg-bg-card p-0 text-text-primary backdrop:bg-bg-base/80 backdrop:backdrop-blur-sm">
       <div className="p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 id={`${id}-title`} className="font-display text-[24px] leading-tight tracking-[0.04em]">Tu cuenta de pago</h2>
+          <h2 id={`${id}-title`} className="font-display text-[24px] leading-tight tracking-[0.04em]">{title}</h2>
           <button type="button" disabled={saving} onClick={() => dialog.current?.close()} aria-label="Cerrar cuenta de pago"
             className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary">
             <X size={20} aria-hidden />
@@ -134,6 +137,6 @@ export function PayoutAccountButton({ note = CASA_NOTE, label = "Llenar o revisa
   const draft = useRef<AccountDraft>({ ownerId: null, mutation: null });
   return <>
     <button type="button" onClick={() => setOpen(true)} className={`${className} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-primary`}>{label}</button>
-    {open && <AccountDialog note={note} onSaved={onSaved} draft={draft} onClose={() => setOpen(false)} />}
+    {open && <PayoutAccountDialog note={note} onSaved={onSaved} draft={draft} onClose={() => setOpen(false)} />}
   </>;
 }
