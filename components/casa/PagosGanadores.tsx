@@ -223,7 +223,7 @@ export function PagosGanadores({ pollaId, pollaName, kind = "partidos" }: { poll
   );
 }
 
-function PagoGanador({ row, mode, onPaid }: { row: AdminPayoutRow; mode: "preview" | "pay"; onPaid: () => void }) {
+export function PagoGanador({ row, mode, onPaid }: { row: AdminPayoutRow; mode: "preview" | "pay"; onPaid: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<{ blob: Blob; type: string; name: string } | null>(null);
   const [preview, setPreview] = useState<string | null>(null);

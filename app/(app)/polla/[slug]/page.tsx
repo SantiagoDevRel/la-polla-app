@@ -430,7 +430,7 @@ export default async function PollaPage({
               Va primero a propósito — cuando una polla ya terminó, el
               resultado es lo único que importa de esa pantalla. */}
         {payouts.length > 0 && (
-          <ResultadoPolla payouts={payouts} miUserId={user.id} totalCop={pot.prize_cop} proofUrls={proofUrls} />
+          <ResultadoPolla payouts={payouts} miUserId={user.id} totalCop={pot.prize_cop} proofUrls={proofUrls} adminPollaId={isAdmin ? polla.id : null} />
         )}
 
         {objeto && polla.kind !== "rifa" && payouts.length === 0 && polla.status !== "resuelta" &&
@@ -882,13 +882,15 @@ function PollaPublica({
    ──────────────────────────────────────────────────────────────────────── */
 function ResultadoPolla({
   payouts,
-  miUserId, totalCop, proofUrls,
+  miUserId, totalCop, proofUrls, adminPollaId,
 }: {
   payouts: CasaPayout[];
   miUserId: string;
   totalCop: number;
   /** id del premio → URL firmada del comprobante de pago (migración 133). */
   proofUrls: Record<string, string>;
+  /** Solo administradores: «Pagar» debajo de cada ganador. */
+  adminPollaId: string | null;
 }) {
   const miPremio = payouts.find((p) => p.user_id === miUserId);
   const objeto = payouts[0]?.prize_kind === "objeto";
@@ -899,7 +901,7 @@ function ResultadoPolla({
   const reparto = !objeto && payouts.length > 1
     ? `Pozo ${formatCop(totalCop)} · ${payouts.length} ganadores${parejo ? ` · ${formatCop(payouts[0].amount_cop)} cada uno` : ""}`
     : !objeto ? `Pozo ${formatCop(totalCop)} · un solo ganador` : null;
-  const pruebas = !objeto && <PruebasDePago payouts={payouts} proofUrls={proofUrls} miUserId={miUserId} />;
+  const pruebas = !objeto && <PruebasDePago payouts={payouts} proofUrls={proofUrls} miUserId={miUserId} adminPollaId={adminPollaId} />;
 
   return (
     <div className="mb-5">
