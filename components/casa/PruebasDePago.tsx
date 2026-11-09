@@ -13,6 +13,7 @@ import { CheckCircle2, Clock3 } from "lucide-react";
 import { getPollitoBase } from "@/lib/pollitos";
 import { formatCop, formatShortDate } from "@/lib/casa/format";
 import type { CasaPayout } from "@/lib/casa/types";
+import { PagarGanadorAdmin } from "@/components/casa/PagarGanadorAdmin";
 
 /** «16 sep 2026», en hora de Colombia. */
 export function fechaPago(iso: string): string {
@@ -33,11 +34,14 @@ export function PruebasDePago({
   payouts,
   proofUrls,
   miUserId,
+  adminPollaId,
 }: {
   payouts: CasaPayout[];
   /** id del premio → URL firmada del comprobante. Sin entrada = sin comprobante. */
   proofUrls: Record<string, string>;
   miUserId: string | null;
+  /** Solo para administradores: muestra «Pagar» debajo de cada ganador. */
+  adminPollaId?: string | null;
 }) {
   const money = payouts.filter((p) => (p.prize_kind ?? "pozo") === "pozo");
   if (money.length === 0) return null;
@@ -83,6 +87,11 @@ export function PruebasDePago({
                 </details>
               ) : (
                 <p className="border-t border-border-subtle px-3 py-1.5 text-[13px]">{estado(p, pagado)}</p>
+              )}
+              {adminPollaId && p.id && (
+                <div className="border-t border-border-subtle p-2">
+                  <PagarGanadorAdmin pollaId={adminPollaId} payoutId={p.id} displayName={p.display_name ?? "el ganador"} pagado={pagado} />
+                </div>
               )}
             </li>
           );
