@@ -17,12 +17,15 @@ import { AppBackground } from "@/components/layout/AppBackground";
 import BrandHeader from "@/components/layout/BrandHeader";
 import FontScaleApplier from "@/components/layout/FontScaleApplier";
 import { CortesiaRegalo } from "@/components/casa/CortesiaRegalo";
+import { PremioCuentaAviso } from "@/components/casa/PremioCuentaAviso";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { needsName } from "@/lib/users/needs-name";
 import { acceptsCasaMatchPicks, canEditCasaMatch } from "@/lib/casa/match-rules";
 import { listPendingCourtesies } from "@/lib/casa/courtesies";
 import type { PendingCourtesy } from "@/lib/casa/courtesies-shared";
+import { listPremiosSinCuenta } from "@/lib/casa/prize-account-reminder";
+import type { PremioSinCuenta } from "@/lib/casa/prize-account-reminder-shared";
 import type { CasaPollaStatus } from "@/lib/casa/types";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +36,8 @@ interface NavContext {
   ownerId: string | null;
   /** Cortesías sin aceptar (migración 173): el aviso obligatorio. */
   cortesias: PendingCourtesy[];
+  /** Premios en dinero sin pagar porque falta la cuenta: el aviso para registrarla. */
+  premiosSinCuenta: PremioSinCuenta[];
 }
 
 async function getNavContext(): Promise<NavContext> {
@@ -40,7 +45,7 @@ async function getNavContext(): Promise<NavContext> {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { isAdmin: false, pollasPending: 0, ownerId, cortesias: [] };
+    if (!user) return { isAdmin: false, pollasPending: 0, ownerId, cortesias: [], premiosSinCuenta: [] };
     ownerId = user.id;
 
     const admin = createAdminClient();
@@ -58,14 +63,15 @@ async function getNavContext(): Promise<NavContext> {
     // casa_entries/casa_picks (el modelo nuevo), no sobre el P2P viejo.
     // Las cortesías van aparte: si esa lectura falla, el nav sigue igual y el
     // aviso sale en la próxima carga.
-    const [pollasPending, cortesias] = await Promise.all([
+    const [pollasPending, cortesias, premiosSinCuenta] = await Promise.all([
       contarPendientes(admin, user.id),
       listPendingCourtesies(user.id).catch((): PendingCourtesy[] => []),
+      listPremiosSinCuenta(user.id).catch((): PremioSinCuenta[] => []),
     ]);
 
-    return { isAdmin: perfil?.is_admin === true, pollasPending, ownerId, cortesias };
+    return { isAdmin: perfil?.is_admin === true, pollasPending, ownerId, cortesias, premiosSinCuenta };
   } catch {
-    return { isAdmin: false, pollasPending: 0, ownerId, cortesias: [] };
+    return { isAdmin: false, pollasPending: 0, ownerId, cortesias: [], premiosSinCuenta: [] };
   }
 }
 
@@ -159,7 +165,7 @@ export default async function AppLayout({
     redirect("/onboarding");
   }
 
-  const { isAdmin, pollasPending, ownerId, cortesias } = await getNavContext();
+  const { isAdmin, pollasPending, ownerId, cortesias, premiosSinCuenta } = await getNavContext();
 
   return (
     <ToastProvider>
@@ -191,6 +197,8 @@ export default async function AppLayout({
       <BottomNav isAdmin={isAdmin} pollasPending={pollasPending} />
       {/* Cortesías del administrador: aviso que no se cierra hasta aceptarlas. */}
       <CortesiaRegalo pendientes={cortesias} />
+      {/* Ganador sin cuenta de pago: se puede cerrar y no tapa una cortesía. */}
+      {cortesias.length === 0 && <PremioCuentaAviso premios={premiosSinCuenta} />}
     </ToastProvider>
   );
 }
