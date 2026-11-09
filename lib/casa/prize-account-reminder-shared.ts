@@ -5,3 +5,9 @@ export interface PremioSinCuenta {
   nombre: string;
   montoCop: number;
 }
+
+/** Falta la cuenta de pago: por un premio ganado o por una polla pagada en juego. */
+export interface CuentaPendiente {
+  premios: PremioSinCuenta[];
+  enJuego: boolean;
+}
