@@ -53,10 +53,10 @@ describe("contratos de la captcha", () => {
     expect(source.indexOf("verifySmsCaptcha(")).toBeLessThan(source.indexOf("signInWithOtp("));
   });
 
-  it("/login no deja enviar sin token cuando la captcha es obligatoria", () => {
+  it("/login ya no ofrece SMS: no monta la captcha ni llama a start-otp (2026-11-13, solo WhatsApp)", () => {
     const login = read("app/(auth)/login/LoginClient.tsx");
-    expect(login).toMatch(/smsCaptchaRequired/);
-    expect(read("app/(auth)/login/page.tsx")).toContain("isSmsCaptchaEnforced()");
+    expect(login).not.toMatch(/SmsCaptcha|start-otp|verify-otp|login-password/);
+    expect(read("app/(auth)/login/page.tsx")).not.toMatch(/captcha|turnstile/i);
   });
 
   it("Telegram no depende de la captcha", () => {
@@ -67,14 +67,6 @@ describe("contratos de la captcha", () => {
     ]) {
       expect(read(file)).not.toMatch(/captcha|turnstile/i);
     }
-  });
-
-  it("el widget solo se monta en el paso del SMS de /login", () => {
-    const login = read("app/(auth)/login/LoginClient.tsx");
-    expect(login.match(/<SmsCaptcha\b/g)).toHaveLength(1);
-    const telegramStart = login.indexOf('{step === "telegram"');
-    expect(login.indexOf("<SmsCaptcha")).toBeLessThan(login.indexOf('{step === "otp"'));
-    expect(telegramStart).toBeGreaterThan(0);
   });
 
   it("la CSP permite a Turnstile en script-src y frame-src", () => {

@@ -192,9 +192,8 @@ describe("prefersSameTab — phones and tablets only", () => {
     expect(prefersSameTab()).toBe(false);
   });
 
-  it("LoginClient uses the shared helper, not its own coarse-only query", () => {
+  it("LoginClient never rolls its own coarse-only query", () => {
     const source = readSource("app/(auth)/login/LoginClient.tsx");
-    expect(source).toContain('import { prefersSameTab } from "@/lib/auth/telegram-login/open-mode";');
     expect(source).not.toMatch(/matchMedia\(/);
     expect(source).not.toMatch(/function prefersSameTab/);
   });
@@ -663,19 +662,16 @@ describe("overlays skip the single-use link page", () => {
   });
 });
 
-// ── 6. WhatsApp primero, SMS alternativo y Telegram oculto ──────────────
-describe("/login offers WhatsApp first and hides Telegram", () => {
+// ── 6. Solo WhatsApp (2026-11-13): sin SMS, contraseña ni Telegram ──────
+describe("/login offers only WhatsApp", () => {
   const source = readSource("app/(auth)/login/LoginClient.tsx");
 
-  it("phone step keeps SMS available after the WhatsApp option", () => {
-    const input = source.slice(source.indexOf('{step === "input" && ('), source.indexOf('{step === "otp" && ('));
-    const sms = input.indexOf('channelText("btnSms",');
-    expect(sms).toBeGreaterThan(0);
-    expect(input.indexOf("<WhatsAppLoginButton")).toBeLessThan(input.indexOf("<form"));
-    expect(input.slice(input.lastIndexOf("<button", sms), sms)).toMatch(/type="submit"[\s\S]*SECONDARY_BTN/);
+  it("has no SMS, password or Telegram entry point", () => {
+    expect(source).not.toMatch(/start-otp|verify-otp|login-password|telegram\/request|PhoneInput|PasswordInput|SmsCaptcha/);
+    expect(source).toContain("<TutorialWhatsApp");
   });
 
-  it("server disables Telegram in both steps even with configured credentials", async () => {
+  it("server passes no Telegram, SMS or password options even with configured credentials", async () => {
     vi.stubEnv("TELEGRAM_LOGIN_BOT_TOKEN", BOT_TOKEN);
     vi.stubEnv("TELEGRAM_LOGIN_WEBHOOK_SECRET", "x".repeat(40));
     vi.stubEnv("NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME", "LaPollaLoginBot");
@@ -683,7 +679,7 @@ describe("/login offers WhatsApp first and hides Telegram", () => {
     try {
       const LoginPage = (await import("@/app/(auth)/login/page")).default;
       const page = await LoginPage({ searchParams: Promise.resolve({}) });
-      expect(page.props.telegramBotUsername).toBeNull();
+      expect(Object.keys(page.props).sort()).toEqual(["pollaDestino", "whatsappLoginHref"]);
       expect(page.props.pollaDestino).toBeNull();
     } finally { vi.unstubAllGlobals(); }
   }, 30_000);

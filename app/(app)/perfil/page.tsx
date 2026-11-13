@@ -19,7 +19,6 @@ import FootballLoader from "@/components/ui/FootballLoader";
 import { POLLITO_TYPES, getPollitoBase } from "@/lib/pollitos";
 import FontScalePicker from "@/components/perfil/FontScalePicker";
 import WhatsAppPreference from "@/components/perfil/WhatsAppPreference";
-import PasswordAccess from "@/components/perfil/PasswordAccess";
 import PayoutDefaultEditor, { type PayoutMethod, type PayoutAccountType } from "@/components/perfil/PayoutDefaultEditor";
 import { formatPhone } from "@/lib/format-phone";
 import { retryProfilePatch, loadProfile, saveProfilePatch, type PersistedProfile, type ProfilePatch, type PendingProfileMutation } from "@/lib/users/profile-client";
@@ -323,8 +322,6 @@ export default function PerfilPage() {
             onClear={handlePayoutClear}
           />
         )}
-
-        <PasswordAccess />
 
         {/* (2026-09-19, pedido del dueño) «Mis pollas» y «Terminadas» salieron de
             acá: se repetían tal cual en Pollas (/inicio), que es donde se

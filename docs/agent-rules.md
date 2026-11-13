@@ -61,10 +61,11 @@ read each section here. These rules are as binding as `AGENTS.md`.
   them; all responses are no-store. Casa pools show their payout account to
   authenticated players without a token.
 - Signup stays phone-only.
-- Login channels (OTP, WhatsApp link, optional six-digit password under
-  `PHONE_PASSWORD_ENABLED`) are server-set; never reactivate one by assumption.
-  [Auth details](phone-password.md).
-- The Telegram login button stays hidden; its backend is retained.
+- `/login` offers only WhatsApp (owner, 2026-11-13): the first tap on a device
+  plays the mandatory three-step tutorial (`components/auth/TutorialWhatsApp.tsx`)
+  before opening the chat. SMS OTP, the six-digit password and Telegram keep their
+  endpoints, but no screen offers them (Perfil and onboarding no longer offer a
+  password); never re-add one without the owner. [Auth details](phone-password.md).
 - A login that starts from a pool returns to it. `/login` shows «Vas a entrar a
   <pool>» for a published pool and stores the `returnTo` in the 30-minute
   `lp_return_to` cookie, which `/api/auth/wa-magic` reads because the WhatsApp link
