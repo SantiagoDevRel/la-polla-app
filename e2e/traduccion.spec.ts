@@ -44,7 +44,15 @@ test.describe("página traducida por el navegador", () => {
       }
     });
     await page.goto("/login");
-    await page.waitForSelector('input[type="tel"]');
+    const entrar = page.getByRole("link", { name: "Entrar con WhatsApp" });
+    await expect(entrar).toBeVisible();
+    // El enlace ya viene en el HTML del servidor: el traductor real actúa
+    // cuando la página terminó de cargar, así que se espera a que React tome
+    // la pantalla antes de reescribirla.
+    await page.waitForFunction(() => {
+      const el = document.querySelector('[data-testid="login-whatsapp"]');
+      return !!el && Object.keys(el).some((k) => k.startsWith("__reactFiber"));
+    });
 
     expect(await page.evaluate(TRADUCIR)).toBeGreaterThan(0);
 
@@ -94,7 +102,10 @@ test.describe("página traducida por el navegador", () => {
     expect(resultado.textoFuera, "el nodo que se quita no puede quedarse pegado").toBe(true);
 
     // La app sigue en pie: nada de «Algo salió mal» ni errores sin atrapar.
-    await expect(page.locator('input[type="tel"]')).toBeVisible();
+    // Y React todavía puede cambiar de vista sobre los textos traducidos:
+    // el primer toque abre el tutorial de WhatsApp (solo WhatsApp, 2026-11-13).
+    await entrar.click();
+    await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "tutorial");
     await expect(page.getByText("Algo salió mal")).toHaveCount(0);
     expect(fallos, `errores de JS: ${fallos.join(" | ")}`).toHaveLength(0);
   });
