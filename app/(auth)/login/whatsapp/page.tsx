@@ -23,7 +23,7 @@ export default async function WhatsAppLinkPage({ searchParams }: {
           </span>
           <h1 className={`${LOGIN_TITLE} leading-tight`}>{row ? "Confirma tu ingreso" : unavailable ? "No pudimos iniciar sesión" : "Solicita un nuevo enlace"}</h1>
           <p className="text-sm leading-relaxed text-text-secondary break-words">
-            {row ? "Vas a entrar con el número de WhatsApp:" : unavailable ? "Inténtalo de nuevo desde WhatsApp o ingresa con SMS." : "Este enlace ya se usó, venció o no está disponible. Escribe Hola de nuevo en WhatsApp o ingresa con SMS."}
+            {row ? "Vas a entrar con el número de WhatsApp:" : unavailable ? "Vuelve a pedir el enlace con «Entrar con WhatsApp»." : "Este enlace ya se usó, venció o no está disponible. Pide uno nuevo con «Entrar con WhatsApp»."}
           </p>
           {row && <>
             <p className="font-body text-xl leading-snug font-semibold tracking-wide text-text-primary tabular-nums [overflow-wrap:anywhere]">{maskPhone(row.phone_number)}</p>
@@ -36,7 +36,7 @@ export default async function WhatsAppLinkPage({ searchParams }: {
             <button type="submit" className={PRIMARY_BTN}><LogIn className="h-5 w-5 shrink-0" aria-hidden="true" /><span>Entrar a La Polla</span></button>
           </form>
           <a href="/login" className={GHOST_BTN}>Usar otro número</a>
-        </div> : <a href="/login" className={PRIMARY_BTN}>Volver al inicio de sesión</a>}
+        </div> : <a href="/login" className={PRIMARY_BTN}>Pedir un enlace nuevo</a>}
       </main>
     </div>
   );

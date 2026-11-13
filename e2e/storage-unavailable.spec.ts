@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-// Keep synthetic OTP responses under Playwright's network interception.
+// wa.me stays under Playwright's network interception.
 test.use({ serviceWorkers: "block" });
 
 for (const allStorage of [false, true]) {
-test(`registration stays usable when ${allStorage ? "all browser storage" : "session storage"} is blocked`, async ({ page }) => {
+test(`WhatsApp sign-in stays usable when ${allStorage ? "all browser storage" : "session storage"} is blocked`, async ({ page, context }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.addInitScript((blockAll) => {
@@ -17,12 +17,16 @@ test(`registration stays usable when ${allStorage ? "all browser storage" : "ses
       get() { throw new DOMException("Storage blocked by browser", "SecurityError"); },
     });
   }, allStorage);
-  await page.route("**/api/auth/password", route => route.fulfill({ json: { enabled: false } }));
-  await page.route("**/api/auth/start-otp", route => route.fulfill({ json: { ok: true } }));
+  await context.route(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//, route => route.fulfill({ contentType: "text/html", body: "<title>WhatsApp</title>" }));
   await page.goto("/login?returnTo=%2Fpolla%2Fweekend%2Fpagar");
-  await page.locator('input[type="tel"]').fill("3001234567");
-  await page.locator('button[type="submit"]').click();
-  await expect(page.locator('input[maxlength="6"]')).toBeVisible();
+  await page.getByRole("link", { name: "Entrar con WhatsApp" }).click();
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "tutorial");
+  const open = page.getByRole("link", { name: "Abrir WhatsApp" });
+  await expect(open).toBeVisible({ timeout: 15_000 });
+  const popup = context.waitForEvent("page");
+  await open.click();
+  await popup;
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "sent");
   expect(errors).toEqual([]);
 });
 }

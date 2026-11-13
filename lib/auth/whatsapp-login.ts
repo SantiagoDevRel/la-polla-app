@@ -71,7 +71,7 @@ export async function replyWithWhatsAppLogin(payload: unknown, deliver?: (conver
   if (error) throw new Error("WhatsApp login reservation unavailable");
   if (issued === "limited") {
     await reply(conversation.id, `wa-login-limited-${hash.slice(4)}`, {
-      message: "Ya solicitaste cinco enlaces en la última hora. Usa el más reciente o entra por SMS o contraseña en https://lapollacolombiana.com/login.",
+      message: "Ya solicitaste cinco enlaces en la última hora. Usa el más reciente o vuelve a intentarlo en una hora.",
     });
     return "limited";
   }

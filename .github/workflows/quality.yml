@@ -48,9 +48,23 @@ jobs:
       - run: npm run test:secrets
       - run: npm run build
       - run: npm run test:casa:browser
+      # Fictitious WhatsApp-login settings: /login renders its only entry
+      # (WhatsApp). The browser checks intercept wa.me and nothing is sent.
       - name: Public accessibility checks
+        env:
+          ZERNIO_WHATSAPP_ACCOUNT_ID: '000000000000000000000000'
+          ZERNIO_API_KEY: ci-test-only-zernio-key
+          ZERNIO_WEBHOOK_SECRET: ci-test-only-zernio-webhook
+          WHATSAPP_LOGIN_NUMBER: '15550100000'
+          WHATSAPP_LOGIN_ENABLED: 'true'
         run: npm run test:e2e -- --grep 'a11y:|página traducida'
       - name: Registration and app recovery checks
+        env:
+          ZERNIO_WHATSAPP_ACCOUNT_ID: '000000000000000000000000'
+          ZERNIO_API_KEY: ci-test-only-zernio-key
+          ZERNIO_WEBHOOK_SECRET: ci-test-only-zernio-webhook
+          WHATSAPP_LOGIN_NUMBER: '15550100000'
+          WHATSAPP_LOGIN_ENABLED: 'true'
         run: npm run test:e2e -- e2e/login-reliability.spec.ts e2e/login-hydration.spec.ts e2e/storage-unavailable.spec.ts e2e/welcome-network-failure.spec.ts e2e/app-update.spec.ts
 
   sql:

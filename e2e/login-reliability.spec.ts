@@ -1,103 +1,98 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type BrowserContext } from "@playwright/test";
 
+// Ingreso solo por WhatsApp (2026-11-13). El servidor de prueba necesita la
+// configuración de ingreso por WhatsApp (en CI: valores ficticios del paso de
+// recuperación). wa.me se intercepta: no se abre WhatsApp ni se envía nada.
 test.use({ serviceWorkers: "block" });
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, context }) => {
   await page.addInitScript(() => {
     (window as unknown as { __DISABLE_AGENTATION__: boolean }).__DISABLE_AGENTATION__ = true;
     localStorage.setItem("lp_welcome_seen_v1", "1");
     sessionStorage.setItem("lp_splash_seen_v2", "1");
   });
-  // Only mocked local endpoints may deliver codes; no SMS or email is sent.
-  await page.route("**/api/auth/start-otp", route => route.fulfill({ json: { ok: true } }));
+  await stubWhatsApp(context);
 });
 
-test("OTP survives reload and repeated submit without losing the entered phone", async ({ page }) => {
-  let sends = 0, verifies = 0;
-  await page.route("**/api/auth/start-otp", async route => {
-    sends++;
-    await new Promise(resolve => setTimeout(resolve, 100));
-    await route.fulfill({ json: { ok: true } });
-  });
-  await page.route("**/api/auth/verify-otp", async route => {
-    verifies++;
-    await new Promise(resolve => setTimeout(resolve, 100));
-    await route.fulfill({ status: 401, json: { error: "Código inválido o vencido" } });
-  });
-  await page.goto("/login");
-  await page.locator("#phone").fill("+57 300 123 4567");
-  await expect(page.locator("#phone")).toHaveValue("3001234567");
-  await page.evaluate(() => {
-    for (let i = 0; i < 5; i++) document.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-  });
-  const otp = page.getByRole("textbox", { name: "INGRESA TU CÓDIGO" });
-  await expect(otp).toBeVisible();
-  expect(sends).toBe(1);
-  await page.reload();
-  await expect(otp).toBeVisible();
-  await otp.fill("000000");
-  await page.evaluate(() => {
-    for (let i = 0; i < 5; i++) document.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-  });
-  await expect(page.getByText("Código inválido o vencido", { exact: true })).toBeVisible();
-  expect(verifies).toBe(1);
-  await page.getByRole("button", { name: "Reenviar código o cambiar número" }).click();
-  await expect(page.locator("#phone")).toHaveValue("3001234567");
-});
-
-test("offline send remains retryable after reconnecting", async ({ page, context }) => {
-  await page.goto("/login");
-  await page.locator("#phone").fill("3001234567");
-  await context.setOffline(true);
-  await page.locator("form button[type=submit]").click();
-  await expect(page.locator("form button[type=submit]")).toBeEnabled();
-  await expect(page.locator("#phone")).toHaveValue("3001234567");
-  await context.setOffline(false);
-  await page.locator("form button[type=submit]").click();
-  await expect(page.getByRole("textbox", { name: "INGRESA TU CÓDIGO" })).toBeVisible();
-});
-
-test("unsupported international paste does not silently send to another country", async ({ page }) => {
-  let sends = 0;
-  await page.route("**/api/auth/start-otp", route => { sends++; return route.fulfill({ json: { ok: true } }); });
-  await page.goto("/login");
-  await page.locator("#phone").fill("+44 7700 900123");
-  await expect.poll(() => page.locator("#phone").evaluate((input: HTMLInputElement) => input.validity.valid)).toBe(false);
-  await page.locator("form button[type=submit]").click();
-  expect(sends).toBe(0);
-  await page.locator("#phone").fill("+57 300 123 4567");
-  await expect(page.locator("#phone")).toHaveValue("3001234567");
-  await page.locator("form button[type=submit]").click();
-  await expect(page.getByRole("textbox", { name: "INGRESA TU CÓDIGO" })).toBeVisible();
-  expect(sends).toBe(1);
-});
-
-test("a corrupt persisted cooldown cannot block login indefinitely", async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("lp_otp_cooldown_until", String(Date.now() + 7 * 24 * 60 * 60_000)));
-  await page.goto("/login");
-  await page.locator("#phone").fill("3001234567");
-  await expect(page.locator("form button[type=submit]")).toBeEnabled();
-  await page.locator("form button[type=submit]").click();
-  await expect(page.getByRole("textbox", { name: "INGRESA TU CÓDIGO" })).toBeVisible();
-});
-
-for (const matchingAccount of [true, false]) {
-  test(`lost verification response recovers only the intended account (${matchingAccount})`, async ({ page }) => {
-    await page.route("**/api/auth/verify-otp", route => route.fulfill({ contentType: "application/json", body: '{"ok":' }));
-    await page.route("**/api/users/me", route => route.fulfill({ json: { profile: {
-      id: "local-fixture", profile_revision: 0, display_name: null, avatar_url: null,
-      whatsapp_number: matchingAccount ? "573001234567" : "573009999999", is_admin: false,
-      default_payout_method: null, default_payout_account: null, default_payout_account_name: null, default_payout_account_type: null,
-    } } }));
-    await page.route("**/onboarding?*", route => route.fulfill({ contentType: "text/plain", body: "Confirmed local session" }));
-    await page.goto("/login?returnTo=%2Fpolla%2Ftest%2Fpagar");
-    await page.locator("#phone").fill("3001234567");
-    await page.locator("form button[type=submit]").click();
-    await page.getByRole("textbox", { name: "INGRESA TU CÓDIGO" }).fill("123456");
-    await page.getByRole("button", { name: "Verificar código", exact: true }).click();
-    if (matchingAccount) await expect(page).toHaveURL(/\/onboarding\?returnTo=%2Fpolla%2Ftest%2Fpagar/);
-    else {
-      await expect(page.getByText("No pudimos confirmar el ingreso.", { exact: false })).toBeVisible();
-      await expect(page.getByRole("textbox", { name: "INGRESA TU CÓDIGO" })).toHaveValue("123456");
-    }
-  });
+async function stubWhatsApp(context: BrowserContext) {
+  await context.route(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//, route => route.fulfill({ contentType: "text/html", body: "<title>WhatsApp</title>" }));
 }
+
+test("first WhatsApp tap plays the mandatory three-step tutorial, then opens the chat", async ({ page, context }) => {
+  await page.goto("/login");
+  await expect(page.locator('input[type="tel"]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /SMS|contraseña|Telegram/i })).toHaveCount(0);
+  const start = page.getByRole("link", { name: "Entrar con WhatsApp" });
+  await expect(start).toHaveAttribute("href", /^https:\/\/wa\.me\/\d+\?text=/);
+
+  let popups = 0;
+  context.on("page", () => { popups++; });
+  await start.click();
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "tutorial");
+  expect(popups).toBe(0);
+  const open = page.getByRole("link", { name: "Mira los 3 pasos…" });
+  await expect(open).toHaveAttribute("aria-disabled", "true");
+  await open.click({ force: true });
+  expect(popups).toBe(0);
+  await expect(page.locator("[data-tutorial-whatsapp]")).toHaveAttribute("data-paso", "2");
+  await expect(page.locator("[data-tutorial-whatsapp]")).toHaveAttribute("data-paso", "3");
+
+  const ready = page.getByRole("link", { name: "Abrir WhatsApp" });
+  await expect(ready).toBeVisible({ timeout: 15_000 });
+  const popup = context.waitForEvent("page");
+  await ready.click();
+  expect((await popup).url()).toMatch(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//);
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "sent");
+  await expect(page.getByRole("heading", { name: "TERMINA EN WHATSAPP" })).toBeFocused();
+
+  // The device remembers the tutorial and the pending step survives a reload.
+  await page.reload();
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "sent");
+  await page.getByRole("button", { name: "Volver" }).click();
+  const again = context.waitForEvent("page");
+  await page.getByRole("link", { name: "Entrar con WhatsApp" }).click();
+  await again;
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "sent");
+});
+
+test("returning from WhatsApp with an open session continues to the pool", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("lp_wa_tutorial_visto", "1");
+    sessionStorage.setItem("lp_wa_login_opened", String(Date.now()));
+  });
+  let signedIn = false;
+  await page.route("**/api/users/me", route => signedIn
+    ? route.fulfill({ json: { profile: {
+      id: "local-fixture", profile_revision: 1, display_name: "Ana", avatar_url: "millos",
+      whatsapp_number: "573001234567", is_admin: false,
+      default_payout_method: null, default_payout_account: null, default_payout_account_name: null, default_payout_account_type: null,
+    } } })
+    : route.fulfill({ status: 401, json: { error: "No autenticado" } }));
+  await page.route("**/polla/test/pagar", route => route.fulfill({ contentType: "text/plain", body: "Pool payment" }));
+  await page.goto("/login?returnTo=%2Fpolla%2Ftest%2Fpagar");
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "sent");
+  expect((await page.context().cookies()).find(c => c.name === "lp_return_to")?.value).toBe(encodeURIComponent("/polla/test/pagar"));
+
+  const profileChecks = page.waitForResponse("**/api/users/me");
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  expect((await profileChecks).status()).toBe(401);
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "sent");
+  signedIn = true;
+  await expect.poll(async () => {
+    await page.evaluate(() => window.dispatchEvent(new Event("focus"))).catch(() => undefined);
+    return page.url();
+  }).toMatch(/\/polla\/test\/pagar$/);
+});
+
+test("the tutorial can be replayed and storage loss never blocks the chat", async ({ page, context }) => {
+  await page.addInitScript(() => sessionStorage.setItem("lp_wa_login_opened", "not-a-time"));
+  await page.goto("/login");
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "start");
+  await page.getByRole("link", { name: "Entrar con WhatsApp" }).click();
+  await expect(page.getByRole("link", { name: "Abrir WhatsApp" })).toBeVisible({ timeout: 15_000 });
+  const popup = context.waitForEvent("page");
+  await page.getByRole("link", { name: "Abrir WhatsApp" }).click();
+  await popup;
+  await page.getByRole("button", { name: "Ver cómo se hace" }).click();
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "tutorial");
+  await expect(page.getByRole("link", { name: "Mira los 3 pasos…" })).toHaveAttribute("aria-disabled", "true");
+});

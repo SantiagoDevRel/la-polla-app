@@ -17,7 +17,6 @@ import FootballLoader from "@/components/ui/FootballLoader";
 import { needsName, isValidDisplayName } from "@/lib/users/needs-name";
 import { readLoginStorage, writeLoginStorage } from "@/lib/auth/login-request";
 import { safeReturnTo } from "@/lib/auth/safe-return-to";
-import { requestJson } from "@/lib/http/json-request";
 import { retryProfilePatch, loadProfile, saveProfilePatch, type PendingProfileMutation } from "@/lib/users/profile-client";
 
 function returnDestination() {
@@ -61,7 +60,6 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
-  const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [checkAttempt, setCheckAttempt] = useState(0);
   const [checkIssue, setCheckIssue] = useState<{ error: string; kind: string; code?: string } | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -77,13 +75,9 @@ export default function OnboardingPage() {
     async function checkProfile() {
         setChecking(true);
         setCheckIssue(null);
-        const [result, config] = await Promise.all([
-          loadProfile(ownerId.current ?? undefined),
-          requestJson("/api/auth/password", { method: "GET" },
-            (value): value is { enabled: boolean } => !!value && typeof value === "object" && "enabled" in value && typeof value.enabled === "boolean"),
-        ]);
+        // El ingreso es solo por WhatsApp (2026-11-13): ya no se ofrece crear contraseña.
+        const result = await loadProfile(ownerId.current ?? undefined);
         if (!active) return;
-        setPasswordEnabled(config.ok && config.data.enabled);
         if (!result.ok) {
           setCheckIssue(result);
           setChecking(false);
@@ -155,7 +149,7 @@ export default function OnboardingPage() {
       // safeReturnTo: solo paths internos — cierra open redirect vía
       // sessionStorage envenenado (hallazgo codex 2026-06-11).
       const destination = returnDestination();
-      router.push(passwordEnabled ? `/set-password?returnTo=${encodeURIComponent(destination)}` : destination);
+      router.push(destination);
     } catch {
       setError("No pudimos continuar. Conservamos tu nombre y tu pollito.");
     } finally {

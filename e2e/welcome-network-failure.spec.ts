@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.use({ serviceWorkers: "block" });
-test("a failed optional welcome chunk cannot break registration", async ({ page }) => {
+test("a failed optional welcome chunk cannot break WhatsApp sign-in", async ({ page, context }) => {
   const errors: string[] = [];
   let failedIntroChunks = 0;
   page.on("pageerror", error => errors.push(error.message));
@@ -18,11 +18,10 @@ test("a failed optional welcome chunk cannot break registration", async ({ page 
     }
     await route.fulfill({ response });
   });
-  await page.route("**/api/auth/start-otp", route => route.fulfill({ json: { ok: true } }));
+  await context.route(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//, route => route.fulfill({ contentType: "text/html", body: "<title>WhatsApp</title>" }));
   await page.goto("/login");
   await expect.poll(() => failedIntroChunks).toBeGreaterThan(0);
-  await page.locator("#phone").fill("3001234567");
-  await page.locator('form button[type="submit"]').click();
-  await expect(page.getByRole("textbox", { name: "INGRESA TU CÓDIGO" })).toBeVisible();
+  await page.getByRole("link", { name: "Entrar con WhatsApp" }).click();
+  await expect(page.getByTestId("login-whatsapp")).toHaveAttribute("data-view", "tutorial");
   expect(errors).toEqual([]);
 });
