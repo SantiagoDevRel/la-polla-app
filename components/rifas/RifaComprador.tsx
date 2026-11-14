@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Flag, Trophy, Upload, X } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import UserAvatar from "@/components/ui/UserAvatar";
 import { CopiarDato } from "@/components/casa/CopiarDato";
 import { PayoutAccountButton } from "@/components/casa/PayoutAccountButton";
 import { Label, StreetCard } from "@/components/street";
@@ -161,6 +162,9 @@ export function RifaComprador({ initial, benefitCause = null }: { initial: RifaP
       )}
 
       <ResultBanner rifa={rifa} />
+      {rifa.viewer.is_creator && rifa.status === "abierta" && rifa.closed && (
+        <Link href={`/rifa/${slug}/gestionar`} className="lp-btn lp-btn-primary w-full">¿Qué número ganó?</Link>
+      )}
       {rifa.status === "abierta" && lastDraw?.outcome === "volver_a_jugar" && (
         <p className="rounded-lg border border-border-default bg-bg-card/80 px-3 py-2 text-[13px] text-text-secondary">
           El {rifaNumber(lastDraw.number)} no se vendió. Se vuelve a jugar el {drawLabel(rifa.draw_at)} con {rifa.lottery_name}.
@@ -253,15 +257,26 @@ function ResultBanner({ rifa }: { rifa: RifaPublicView }) {
   if (rifa.status === "abierta" || rifa.winning_number == null) return null;
   const mine = rifa.draws.some((d) => d.outcome === "ganador" && d.mine);
   return (
-    <StreetCard hero className="flex items-center gap-4 p-4">
-      <Trophy aria-hidden="true" className="h-8 w-8 shrink-0 text-gold" />
-      <div className="min-w-0">
-        <Label>{rifa.status === "resuelta" ? "Número ganador" : "Rifa desierta"}</Label>
-        <p className="mt-1 text-[15px] text-text-primary">
-          <span className="font-display text-[28px] leading-none tracking-[0.04em]">{rifaNumber(rifa.winning_number)}</span>{" "}
-          {rifa.status === "resuelta" ? (mine ? "Es tuyo. Ganaste." : `con ${rifa.lottery_name}.`) : "No se vendió y la rifa quedó desierta."}
-        </p>
+    <StreetCard hero className="space-y-4 p-4">
+      <div className="flex items-center gap-4">
+        <Trophy aria-hidden="true" className="h-8 w-8 shrink-0 text-gold" />
+        <div className="min-w-0">
+          <Label>{rifa.status === "resuelta" ? "Número ganador" : "Rifa desierta"}</Label>
+          <p className="mt-1 text-[15px] text-text-primary">
+            <span className="font-display text-[28px] leading-none tracking-[0.04em]">{rifaNumber(rifa.winning_number)}</span>{" "}
+            {rifa.status === "resuelta" ? (mine ? "Es tuyo. Ganaste." : `con ${rifa.lottery_name}.`) : "No se vendió y la rifa quedó desierta."}
+          </p>
+        </div>
       </div>
+      {rifa.show_winner_public && rifa.winner && (
+        <div className="flex items-center gap-3 border-t border-border-subtle pt-3">
+          <UserAvatar avatarUrl={rifa.winner.avatar_url} displayName="Pollito del ganador" size="lg" />
+          <div className="min-w-0">
+            <Label>Ganador</Label>
+            <p className="mt-1 text-[17px] font-semibold [overflow-wrap:anywhere]">{rifa.winner.name ?? "Ganador"}</p>
+          </div>
+        </div>
+      )}
     </StreetCard>
   );
 }

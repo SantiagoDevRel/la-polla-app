@@ -34,9 +34,11 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("pagado"), ticketId: uuid }),
   z.object({ action: z.literal("liberar"), ticketId: uuid, reason: z.string().trim().max(200).optional() }),
   z.object({ action: z.literal("resultado"), number: z.number().int().min(0).max(99),
+    showWinnerPublic: z.boolean().default(false),
     unsold: z.enum(["volver_a_jugar", "desierta"]).nullable(),
     newDrawAt: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).nullable(), newLottery: z.string().trim().max(60).nullable() }),
   z.object({ action: z.literal("visibilidad"), visibility: z.enum(["privada", "publica"]) }),
+  z.object({ action: z.literal("publicar_ganador"), show: z.boolean() }),
   z.object({ action: z.literal("coadmin_agregar"), phone: z.string().regex(/^\+[1-9]\d{7,14}$/) }),
   z.object({ action: z.literal("coadmin_quitar"), userId: uuid }),
 ]);
@@ -86,9 +88,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       if (b.newDrawAt) {
         try { newDrawAt = colombiaDateTimeToIso(b.newDrawAt); } catch { return rifaJson({ error: "Revisa la fecha del nuevo sorteo." }, 400); }
       }
-      const { data, error } = await rifaRpc("rifa_set_result_v1", { p_actor: actor, p_rifa: rifaId, p_number: b.number,
-        p_unsold_action: b.unsold, p_new_draw_at: newDrawAt, p_new_lottery: b.newLottery });
+      const { data, error } = await rifaRpc("rifa_set_result_v2", { p_actor: actor, p_rifa: rifaId, p_number: b.number,
+        p_unsold_action: b.unsold, p_new_draw_at: newDrawAt, p_new_lottery: b.newLottery, p_show_winner_public: b.showWinnerPublic });
       return error ? rifaError(error) : rifaJson({ ok: true, ...(data as object) });
+    }
+    case "publicar_ganador": {
+      const { error } = await rifaRpc("rifa_set_winner_public_v1", { p_actor: actor, p_rifa: rifaId, p_show: b.show });
+      return error ? rifaError(error) : rifaJson({ ok: true });
     }
     case "coadmin_agregar": {
       const { error } = await rifaRpc("rifa_add_manager_v1", { p_actor: actor, p_rifa: rifaId, p_phone: b.phone });

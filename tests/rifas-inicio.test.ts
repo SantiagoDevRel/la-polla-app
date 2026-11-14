@@ -17,7 +17,7 @@ function view(over: Partial<RifaPublicView> = {}): RifaPublicView {
     prize_kind: "texto", prize_cop: null, prize_text: "Camiseta firmada", has_prize_image: false, number_count: 100, price_cop: 30000,
     lottery_name: "Lotería de Medellín", digits_rule: "ultimas_dos", draw_at: new Date(Date.now() + 3 * 86_400_000).toISOString(),
     visibility: "publica", status: "abierta", winning_number: null, hidden: false, hidden_reason: null, closed: false, reservation_minutes: 30,
-    board: [], counts: { pagado: 2, reservado: 1 }, draws: [],
+    board: [], counts: { pagado: 2, reservado: 1 }, draws: [], show_winner_public: false, winner: null,
     viewer: { signed_in: true, is_creator: false, is_admin: false, can_reserve: true, reported: false, pending_amount_cop: 0, has_payout_account: false, tickets: [], proofs: [] },
     payment: null, ...over,
   };

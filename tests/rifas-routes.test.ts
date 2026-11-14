@@ -142,6 +142,35 @@ describe("errores de SQL", () => {
   });
 });
 
+describe("winner publication", () => {
+  it.each([true, false])("records the result with disclosure %s and the session actor", async (show) => {
+    mocks.rifaRpc.mockResolvedValue({ data: { outcome: "ganador", number: 0 }, error: null });
+    const res = await gestionPost(req({ action: "resultado", number: 0, unsold: null, newDrawAt: null,
+      newLottery: null, showWinnerPublic: show, actor: OTHER }), params);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(mocks.rifaRpc).toHaveBeenCalledWith("rifa_set_result_v2", {
+      p_actor: ME, p_rifa: RIFA, p_number: 0, p_unsold_action: null, p_new_draw_at: null,
+      p_new_lottery: null, p_show_winner_public: show,
+    });
+  });
+  it("keeps old clients' results private", async () => {
+    mocks.rifaRpc.mockResolvedValue({ data: { outcome: "ganador" }, error: null });
+    await gestionPost(req({ action: "resultado", number: 7, unsold: null, newDrawAt: null, newLottery: null }), params);
+    expect(mocks.rifaRpc.mock.calls[0][1].p_show_winner_public).toBe(false);
+  });
+  it("only SQL-authorized managers may change disclosure", async () => {
+    mocks.rifaRpc.mockResolvedValue({ data: null, error: { message: "CREATOR_ONLY", code: "42501" } });
+    const res = await gestionPost(req({ action: "publicar_ganador", show: true, actor: OTHER }), params);
+    expect(res.status).toBe(403);
+    expect(mocks.rifaRpc).toHaveBeenCalledWith("rifa_set_winner_public_v1", { p_actor: ME, p_rifa: RIFA, p_show: true });
+  });
+  it.each([null, "yes", 1])("rejects non-boolean disclosure %s", async (show) => {
+    expect((await gestionPost(req({ action: "publicar_ganador", show }), params)).status).toBe(400);
+    expect(mocks.rifaRpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("admin", () => {
   it("un no-admin no llega a SQL", async () => {
     const res = await adminPost(req({ action: "asignar", userId: OTHER }));
