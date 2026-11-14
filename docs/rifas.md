@@ -332,6 +332,14 @@ Cambió lo que se ve:
 
 ## Pruebas
 
+### La Iguana deadline extension (2026-11-13)
+
+Migration 185 extends this raffle's existing sales/draw lock from 22:30 to
+23:00 America/Bogota on November 13, at the owner's explicit request. The existing
+SQL operations, private APIs and management UI read `rifas.draw_at`; no app
+deployment is needed. The migration scopes the production UUID and slug, checks
+the previous deadline and preserves tickets, payments and resolved raffles.
+
 | Prueba | Qué cubre |
 |---|---|
 | `scripts/rifas-check.sql` (ROLLBACK) | A–M: permisos (asignar solo admin, crear sin permiso, `authenticated`/`anon` no ejecutan RPC ni leen tablas, RLS de Privada), reservar, comprobante, aprobar solo el creador (ni un admin), rechazo, vencimiento, venta por fuera y aparición al registrarse, visibilidad, revertir con auditoría, resultado (no vendido/pendiente/ganador), privacidad, ocultar/reportar, embudo |
