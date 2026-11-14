@@ -332,6 +332,19 @@ Cambió lo que se ve:
 
 ## Pruebas
 
+### Manual winner and public identity (migration 186)
+
+After the draw time, the raffle team can open **¿Qué número ganó?**, enter the
+number (including 00), and explicitly choose **Sí/No** for public winner identity.
+The existing result RPC still checks authority, payments and unsold numbers.
+Only **Sí** exposes the winner's name and pollito; **No** omits both from the
+public SQL response. Phone and payout details stay in management. Existing results
+default to private; the team can change disclosure after resolution without
+changing the number. Apply 186 before deploying its API/UI.
+
+Verified by `scripts/rifa-winner-check.sql` in the isolated SQL workflow and
+`tests/rifas-routes.test.ts`.
+
 ### La Iguana deadline extension (2026-11-13)
 
 Migration 185 extends this raffle's existing sales/draw lock from 22:30 to

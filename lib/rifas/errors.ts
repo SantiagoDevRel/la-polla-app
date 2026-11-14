@@ -29,6 +29,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_DRAW_AT: "El sorteo debe ser al menos en 10 minutos y dentro de los próximos 6 meses.",
   INVALID_PRIZE: "Escribe el premio: un valor en pesos o una descripción.",
   INVALID_RIFA: "Revisa los datos de la rifa.",
+  INVALID_INPUT: "Revisa el resultado y si quieres mostrar al ganador.",
   INVALID_VISIBILITY: "Elige Privada o Pública.",
   VISIBILITY_LOCKED: "Ya hay números tomados: la rifa no puede volver a ser privada.",
   REQUEST_CONFLICT: "Este intento corresponde a otro archivo. Vuelve a elegir el comprobante.",

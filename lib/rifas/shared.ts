@@ -40,6 +40,8 @@ export interface RifaPublicView {
   visibility: RifaVisibility;
   status: RifaStatus;
   winning_number: number | null;
+  show_winner_public: boolean;
+  winner: { name: string | null; avatar_url: string | null } | null;
   hidden: boolean;
   hidden_reason: string | null;
   closed: boolean;
@@ -102,6 +104,7 @@ export interface RifaCreatorView {
   visibility: RifaVisibility;
   status: RifaStatus;
   winning_number: number | null;
+  show_winner_public: boolean;
   hidden: boolean;
   hidden_reason: string | null;
   closed: boolean;

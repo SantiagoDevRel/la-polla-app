@@ -32,6 +32,7 @@ const EVENT_LABEL: Record<string, string> = {
   comprobante_enviado: "Comprobante recibido", pago_aprobado: "Pago confirmado", pago_rechazado: "Marcado como no pagado",
   aprobacion_revertida: "Confirmación deshecha", venta_por_fuera: "Venta por fuera", venta_por_fuera_pagada: "Venta por fuera pagada",
   numero_liberado: "Número liberado", resultado: "Resultado", reporte: "Reporte de un usuario",
+  ganador_publico: "Cambió la publicación del ganador",
 };
 
 /** partner: rifa de una barra (lib/rifas/partner.ts) → solo sus plantillas de historia. */
@@ -56,6 +57,10 @@ export function RifaGestion({ initial, shareUrl, partner = null }: { initial: Ri
       if (!res.ok) { setError(data.error ?? "No se pudo completar la operación."); return { ok: false, code: data.code, message: data.error }; }
       if (ok) showToast(ok, "success");
       return { ok: true };
+    } catch {
+      const message = "No se pudo confirmar el cambio. Actualiza para revisar antes de intentar de nuevo.";
+      setError(message);
+      return { ok: false, message };
     } finally {
       setBusy(false);
       await refresh();
@@ -88,7 +93,7 @@ export function RifaGestion({ initial, shareUrl, partner = null }: { initial: Ri
   const drawPassed = new Date(rifa.draw_at).getTime() <= Date.now();
 
   return (
-    <div className="space-y-4 px-4 pt-4">
+    <div className="space-y-4 px-4 pt-4" data-app-update-blocked={busy || undefined}>
       {/* Resumen: cifras de SQL. */}
       <StreetCard className="p-4">
         <dl className="grid grid-cols-3 gap-2 text-center">
@@ -246,6 +251,7 @@ function ResultSection({ rifa, busy, act, drawPassed }: {
   const [choice, setChoice] = useState<"volver_a_jugar" | "desierta">("volver_a_jugar");
   const [newDraw, setNewDraw] = useState(() => toColombiaDateTimeInput(new Date(Date.now() + 7 * 86_400_000)));
   const [lottery, setLottery] = useState(rifa.lottery_name);
+  const [showWinner, setShowWinner] = useState<boolean | null>(rifa.status === "resuelta" ? rifa.show_winner_public : null);
 
   if (rifa.status !== "abierta") {
     const w = rifa.winner;
@@ -276,6 +282,13 @@ function ResultSection({ rifa, busy, act, drawPassed }: {
             {chat && <a href={chat} target="_blank" rel="noopener noreferrer" className="lp-btn lp-btn-ghost w-full"><MessageCircle aria-hidden="true" className="h-5 w-5" /> Escribirle por WhatsApp</a>}
           </div>
         )}
+        {rifa.status === "resuelta" && <>
+          <WinnerVisibility value={showWinner ?? rifa.show_winner_public} onChange={setShowWinner} disabled={busy}
+            dirty={showWinner !== null && showWinner !== rifa.show_winner_public} />
+          <button type="button" disabled={busy || showWinner === null || showWinner === rifa.show_winner_public}
+            onClick={() => void act({ action: "publicar_ganador", show: showWinner }, "Publicación del ganador actualizada.")}
+            className="lp-btn lp-btn-ghost w-full">Guardar publicación</button>
+        </>}
       </StreetCard>
     );
   }
@@ -283,7 +296,7 @@ function ResultSection({ rifa, busy, act, drawPassed }: {
 
   async function submit() {
     const n = Number(number);
-    const res = await act({ action: "resultado", number: n, unsold: unsold ? choice : null,
+    const res = await act({ action: "resultado", number: n, showWinnerPublic: showWinner, unsold: unsold ? choice : null,
       newDrawAt: unsold && choice === "volver_a_jugar" ? newDraw : null, newLottery: unsold && choice === "volver_a_jugar" ? lottery : null },
       "Resultado registrado.");
     if (!res.ok && res.code === "UNSOLD_CHOICE_REQUIRED") setUnsold(true);
@@ -291,11 +304,14 @@ function ResultSection({ rifa, busy, act, drawPassed }: {
 
   return (
     <StreetCard hero className="space-y-3 p-4">
-      <h2 className="lp-display-sm text-[22px]">Resultado del sorteo</h2>
-      <label htmlFor="numero-ganador" className="block text-[13px] text-text-secondary">Número que salió ({rifa.lottery_name})</label>
+      <h2 className="lp-display-sm text-[22px]">¿Qué número ganó?</h2>
+      <label htmlFor="numero-ganador" className="block text-[15px] text-text-secondary">Número ganador ({rifa.lottery_name})</label>
       <input id="numero-ganador" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={number}
+        disabled={busy}
+        data-app-update-blocked={number.length > 0 || undefined}
         onChange={(e) => { setNumber(e.target.value.replace(/\D/g, "").slice(0, 2)); setUnsold(false); }}
         className="lp-input w-24 text-center font-display text-[24px] tracking-[0.08em]" />
+      <WinnerVisibility value={showWinner} onChange={setShowWinner} disabled={busy} dirty={showWinner !== null} />
       {unsold && (
         <fieldset className="space-y-2">
           <legend className="text-[15px] text-text-primary">Ese número no se vendió. ¿Qué pasa con la rifa?</legend>
@@ -310,10 +326,26 @@ function ResultSection({ rifa, busy, act, drawPassed }: {
           <label className="flex min-h-11 items-center gap-2 text-[15px]"><input type="radio" name="unsold" checked={choice === "desierta"} onChange={() => setChoice("desierta")} /> Queda desierta</label>
         </fieldset>
       )}
-      <button type="button" disabled={busy || number.length === 0} onClick={() => void submit()} className="lp-btn lp-btn-primary w-full">Guardar resultado</button>
-      <p className="text-[12px] text-text-muted">Todos ven el resultado. Si el número no se vendió, lo que elijas también se muestra.</p>
+      <button type="button" disabled={busy || number.length === 0 || showWinner === null} onClick={() => void submit()} className="lp-btn lp-btn-primary w-full">Guardar resultado</button>
     </StreetCard>
   );
+}
+
+function WinnerVisibility({ value, onChange, disabled, dirty }: {
+  value: boolean | null; onChange: (value: boolean) => void; disabled: boolean; dirty: boolean;
+}) {
+  return <fieldset disabled={disabled} className="space-y-2" data-app-update-blocked={dirty || undefined}>
+    <legend className="text-[15px] font-semibold">Mostrar ganador públicamente</legend>
+    <div className="flex flex-wrap gap-x-6 gap-y-2">
+      <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[15px]">
+        <input type="radio" name="ganador-publico" checked={value === true} onChange={() => onChange(true)} /> Sí
+      </label>
+      <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[15px]">
+        <input type="radio" name="ganador-publico" checked={value === false} onChange={() => onChange(false)} /> No
+      </label>
+    </div>
+    <p className="text-[13px] text-text-secondary">Con «Sí» se muestran su pollito y nombre. Con «No», solo el número ganador.</p>
+  </fieldset>;
 }
 
 type ShareState = "loading" | "ready" | "error";

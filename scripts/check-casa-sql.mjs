@@ -43,6 +43,8 @@ try {
     catch(e) { throw Error(`${file}: ${e.message}`); }
   }
   sql(read('scripts/local-pg/fixups/post.sql'));
+  sql(read('scripts/rifa-winner-check.sql'));
+  console.log('PASS raffle winner publication and privacy');
   sql("SELECT public.casa_transition_mode((SELECT mode FROM public.casa_operation_control WHERE singleton),'v2');");
   for(const file of ['casa-provisional-timing-check.sql','casa-terminal-balance-check.sql','casa-free-entry-check.sql','casa-rls-check.sql','casa-picks-privacy-check.sql','casa-pending-picks-check.sql','casa-pick-save-check.sql','user-form-save-check.sql','password-save-check.sql','casa-admin-players-check.sql','casa-admin-player-picks-check.sql','casa-admin-random-defaults-check.sql','casa-admin-money-check.sql','polla-participants-insert-check.sql']) {
     sql(read(`scripts/${file}`)); console.log(`PASS ${file}`);
