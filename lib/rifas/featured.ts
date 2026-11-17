@@ -8,7 +8,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FEATURED_RIFA_IDS } from "./benefit";
 import { getPublicView } from "./server";
-import type { RifaPublicView } from "./shared";
+import type { RifaMyList, RifaPublicView } from "./shared";
 
 export async function listFeaturedRifas(viewerId: string): Promise<RifaPublicView[]> {
   if (FEATURED_RIFA_IDS.length === 0) return [];
@@ -19,4 +19,30 @@ export async function listFeaturedRifas(viewerId: string): Promise<RifaPublicVie
   const order = (id: string) => FEATURED_RIFA_IDS.indexOf(id);
   return views.flatMap((v) => (v.data && !v.error && v.data.status === "abierta" && !v.data.hidden ? [v.data] : []))
     .sort((a, b) => order(a.id) - order(b.id));
+}
+
+/** Cuántas rifas terminadas se muestran en Terminadas, las más recientes. */
+const MAX_FINISHED = 10;
+
+/**
+ * (2026-11-16, pedido del dueño) Las rifas que ya jugaron pasan a Terminadas,
+ * junto a las pollas terminadas, y la sección Rifas se queda solo con las
+ * abiertas (sin rifas abiertas, no se dibuja). Entran las destacadas (para
+ * todos, como las pollas terminadas públicas) y las de la persona: las que
+ * opera y donde compró. Quién puede ver cada una lo sigue decidiendo SQL.
+ */
+export async function listFinishedRifas(viewerId: string, mine: RifaMyList | null): Promise<RifaPublicView[]> {
+  const slugs = new Set<string>();
+  if (FEATURED_RIFA_IDS.length > 0) {
+    const { data } = await createAdminClient().from("rifas").select("slug")
+      .in("id", [...FEATURED_RIFA_IDS]).neq("status", "abierta").is("hidden_at", null);
+    for (const r of data ?? []) slugs.add(r.slug);
+  }
+  for (const r of mine?.created ?? []) if (r.status !== "abierta" && !r.hidden) slugs.add(r.slug);
+  for (const r of mine?.bought ?? []) if (r.status !== "abierta") slugs.add(r.slug);
+  if (slugs.size === 0) return [];
+  const views = await Promise.all([...slugs].map((slug) => getPublicView(slug, viewerId)));
+  return views.flatMap((v) => (v.data && !v.error && v.data.status !== "abierta" && !v.data.hidden ? [v.data] : []))
+    .sort((a, b) => Date.parse(b.draw_at) - Date.parse(a.draw_at))
+    .slice(0, MAX_FINISHED);
 }

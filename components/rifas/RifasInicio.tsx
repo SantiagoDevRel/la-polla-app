@@ -8,7 +8,7 @@
 // enlace. Datos: rifa_public_view_v1 (destacadas) y rifa_my_list_v1 (las suyas).
 import Link from "next/link";
 import { ArrowRight, ChevronRight } from "lucide-react";
-import { StreetCard } from "@/components/street";
+import { StreetCard, Tape } from "@/components/street";
 import { PrizeMotion } from "@/components/casa/PrizeShowcase";
 import { CardTypeTag, PollaCardBody } from "@/components/casa/PollaCard";
 import { PollaSection } from "@/components/casa/PollaSection";
@@ -26,17 +26,20 @@ function numbersLabel(numbers: Array<{ number: number; state: string }>): string
   return [paid.length ? `Pagados ${paid.join(", ")}` : "", pending.length ? `Falta el comprobante ${pending.join(", ")}` : ""].filter(Boolean).join(" · ");
 }
 
-/** Las rifas de la persona que no están destacadas, una fila por rifa (la compra manda sobre la visita). */
+/**
+ * Las rifas abiertas de la persona que no están destacadas, una fila por rifa
+ * (la compra manda sobre la visita). Las que ya jugaron van en Terminadas
+ * (RifaTerminada, 2026-11-16).
+ */
 function myRows(mine: RifaMyList | null, skip: ReadonlySet<string>): RifaRow[] {
   if (!mine) return [];
   const rows = new Map<string, RifaRow>();
   const add = (row: RifaRow) => { if (!skip.has(row.slug) && !rows.has(row.slug)) rows.set(row.slug, row); };
-  for (const r of mine.created) add({ slug: r.slug, href: `/rifa/${r.slug}/gestionar`, name: r.name,
+  for (const r of mine.created) if (r.status === "abierta") add({ slug: r.slug, href: `/rifa/${r.slug}/gestionar`, name: r.name,
     badge: r.pending_proofs > 0 ? String(r.pending_proofs) : undefined,
     detail: `Creada por ti · ${r.paid}/${r.number_count} pagados · ${r.visibility === "privada" ? "Privada" : "Pública"}` });
-  for (const r of mine.bought) add({ slug: r.slug, href: `/rifa/${r.slug}`, name: r.name,
-    detail: r.status === "abierta" ? `${drawLabel(r.draw_at)} · ${numbersLabel(r.numbers)}`
-      : `Salió el ${rifaNumber(r.winning_number ?? 0)} · ${numbersLabel(r.numbers)}` });
+  for (const r of mine.bought) if (r.status === "abierta") add({ slug: r.slug, href: `/rifa/${r.slug}`, name: r.name,
+    detail: `${drawLabel(r.draw_at)} · ${numbersLabel(r.numbers)}` });
   for (const r of [...mine.visited, ...mine.listed]) add({ slug: r.slug, href: `/rifa/${r.slug}`, name: r.name,
     detail: `${drawLabel(r.draw_at)} · ${formatCop(r.price_cop)} cada número` });
   return [...rows.values()];
@@ -91,6 +94,54 @@ function FeaturedRifa({ rifa, pendingProofs }: { rifa: RifaPublicView; pendingPr
           {`Elegir número · ${formatCop(rifa.price_cop)}`}
           <ArrowRight className="h-4 w-4 max-w-none shrink-0 text-turf" />
         </span>
+      </StreetCard>
+    </li>
+  );
+}
+
+/**
+ * Una rifa que ya jugó, en Terminadas (2026-11-16): el mismo molde y el mismo
+ * gris de las pollas terminadas. La cinta dice qué número salió; a la derecha,
+ * cuántos números se vendieron.
+ */
+export function RifaTerminada({ rifa }: { rifa: RifaPublicView }) {
+  const benefit = rifaBenefit(rifa.id);
+  const partner = rifaPartner(rifa.id);
+  const participo = rifa.viewer.tickets.length > 0;
+  return (
+    <li className="relative min-w-0">
+      <StreetCard className="relative bg-text-primary/[0.04] p-4 transition-colors hover:border-border-strong [&_img]:opacity-70 [&_img]:grayscale">
+        <Link href={`/rifa/${rifa.slug}`} aria-label={`Ver ${rifa.name}`}
+          className="absolute inset-0 z-10 cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold" />
+        <PollaCardBody
+          tag="rifa"
+          name={rifa.name}
+          tournaments={[]}
+          kind="rifa"
+          muted
+          identity={benefit
+            ? (
+              <span className="flex min-w-0 items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element -- escudo de la barra (lib/rifas/partner.ts), WebP en su tamaño real */}
+                {partner && <img src={partner.escudo} alt="" width={36} height={36} className="h-9 w-9 max-w-none shrink-0" />}
+                <span className="min-w-0 text-[13px] leading-snug text-text-secondary [overflow-wrap:anywhere]">
+                  <span className="block font-semibold">{partner ? `${partner.name} · ` : ""}Sin ánimo de lucro</span>
+                  <span className="block">Para {benefit.cause}</span>
+                </span>
+              </span>
+            )
+            : undefined}
+          prizeVisual={benefit?.jersey
+            ? <PrizeMotion media={benefit.jersey.media} label={benefit.jersey.label} interactive className="relative z-20 h-16 w-14 shrink-0" />
+            : undefined}
+          topRight={<Tape tone="mute" className="shrink-0">
+            {rifa.status === "resuelta" && rifa.winning_number !== null ? `Salió el ${rifaNumber(rifa.winning_number)}` : "Terminada"}
+          </Tape>}
+          premioLabel="Premio"
+          premio={rifa.prize_kind === "dinero" ? formatCop(rifa.prize_cop ?? 0) : rifa.prize_text}
+          objeto={rifa.prize_kind === "texto"}
+          dato={{ label: participo ? "Participaste" : undefined, value: `${rifa.counts.pagado} números vendidos` }}
+        />
       </StreetCard>
     </li>
   );

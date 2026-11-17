@@ -19,6 +19,12 @@ const JAMES_TITLES: Readonly<Record<string, string>> = {
   "95c5a3f0-8131-47af-b167-cf3928db4d9b": "Camiseta Atlético Nacional firmada por James",
 };
 
+/** Boletas para el clásico Nacional–Medellín: POLLA REGALO 2 y OFIBOLETAS. */
+const CLASICO_POLLAS = new Set([
+  "67b3f25f-f94b-4319-9081-517c206d8241",
+  "654307a7-bce2-4b41-9dbb-363c434c3873",
+]);
+
 /** Versioned display assets; publication and access remain enforced by the caller. */
 export function pollaPrizeMedia(id: string, base = "/prizes/v3-30099c32d6c6/"): PollaPrize | null {
   const jamesTitle = JAMES_TITLES[id];
@@ -40,7 +46,8 @@ export function pollaPrizeMedia(id: string, base = "/prizes/v3-30099c32d6c6/"): 
   };
   // POLLA REGALO 2: boletas para el clásico. Escudos vigentes en octubre de 2026;
   // el de Medellín es el que el club estrenó en el segundo semestre (manual de marca 2026).
-  if (id === "67b3f25f-f94b-4319-9081-517c206d8241") return {
+  // OFIBOLETAS (2026-11-16): otra vez 2 boletas para el clásico, mismos escudos.
+  if (CLASICO_POLLAS.has(id)) return {
     kind: "crests",
     crests: [
       { src: `${base}crest-nacional-2026-256.webp`, alt: "Escudo de Atlético Nacional", width: 177, height: 256 },
