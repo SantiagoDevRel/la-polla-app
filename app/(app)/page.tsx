@@ -17,9 +17,9 @@ import { listMyLiveMatches } from "@/lib/casa/live";
 import Image from "next/image";
 import { PollaSection } from "@/components/casa/PollaSection";
 import { ScrollableList } from "@/components/casa/ScrollableList";
-import { RifasInicio } from "@/components/rifas/RifasInicio";
+import { RifaTerminada, RifasInicio } from "@/components/rifas/RifasInicio";
 import { getMyRifas, rifasEnabled } from "@/lib/rifas/server";
-import { listFeaturedRifas } from "@/lib/rifas/featured";
+import { listFeaturedRifas, listFinishedRifas } from "@/lib/rifas/featured";
 import { isIOSAppRequest } from "@/lib/platform/ios-app";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -107,7 +107,7 @@ export default async function CasaPage() {
   // La más reciente primero (recentFirst).
   const cerradas = recentFirst(pollas.filter((p) => !isPollaOpen(p) && !enJuegoIds.has(p.id)
     && (isPublicClosedPolla(p) || joinedIds.has(p.id))), endings);
-  const [pots, pendientes, tournaments, pagos] = await Promise.all([
+  const [pots, pendientes, tournaments, pagos, rifasTerminadas] = await Promise.all([
     getPots(pollas.map((p) => p.id)),
     listPollasConPicksPendientes(user.id),
     getPollaTournamentSlugs(pollas),
@@ -115,7 +115,14 @@ export default async function CasaPage() {
     // Las «Pagada» no la necesitan: su etiqueta ya lo dice.
     getPayoutProgress(cerradas.filter((p) => p.status === "resuelta" && !pagadas.has(p.id)).map((p) => p.id))
       .catch((): Record<string, { total: number; paid: number }> => ({})),
+    // (2026-11-16) Las rifas que ya jugaron van en Terminadas, con las pollas.
+    rifas ? listFinishedRifas(user.id, rifas[1]).catch(() => []) : Promise.resolve([]),
   ]);
+  // Terminadas mezcla pollas y rifas: la que terminó más reciente, primero.
+  const terminadas = [
+    ...cerradas.map((polla) => ({ kind: "polla" as const, polla, at: Date.parse(endings[polla.id] ?? polla.settled_at ?? polla.closes_at) })),
+    ...rifasTerminadas.map((rifa) => ({ kind: "rifa" as const, rifa, at: Date.parse(rifa.draw_at) })),
+  ].sort((a, b) => b.at - a.at);
   const disponibles = abiertas.filter(p => !joinedIds.has(p.id));
 
   // (2026-09-18) Mis pollas y Para entrar ya no son desplegables: salen de una.
@@ -203,13 +210,16 @@ export default async function CasaPage() {
 
         <PollaHighlights className="py-2" />
 
-        {cerradas.length > 0 && (
-        <PollaSection id="pollas-cerradas" kind="closed" title="Terminadas" description="Pollas que ya no reciben inscripciones" count={cerradas.length}>
+        {terminadas.length > 0 && (
+        <PollaSection id="pollas-cerradas" kind="closed" title="Terminadas"
+          description={rifasTerminadas.length > 0 ? "Pollas y rifas que ya terminaron" : "Pollas que ya no reciben inscripciones"} count={terminadas.length}>
               {/* Scroll propio (2026-10-13): el historial crece y no alarga Inicio. */}
-              <ScrollableList label="Pollas terminadas">
+              <ScrollableList label={rifasTerminadas.length > 0 ? "Pollas y rifas terminadas" : "Pollas terminadas"}>
                 <ul className="grid gap-3">
-                  {cerradas.map((polla) => (
-                    <PollaRow tag={conRifas} key={polla.id} polla={polla} pot={pots[polla.id]} tournaments={tournaments[polla.id] ?? []} editable={isAdmin && canEditPolla(polla)} payout={pagos[polla.id]} pagada={pagadas.get(polla.id)} participated={joinedIds.has(polla.id)} closed />
+                  {terminadas.map((item) => item.kind === "rifa"
+                    ? <RifaTerminada key={item.rifa.id} rifa={item.rifa} />
+                    : (
+                    <PollaRow tag={conRifas} key={item.polla.id} polla={item.polla} pot={pots[item.polla.id]} tournaments={tournaments[item.polla.id] ?? []} editable={isAdmin && canEditPolla(item.polla)} payout={pagos[item.polla.id]} pagada={pagadas.get(item.polla.id)} participated={joinedIds.has(item.polla.id)} closed />
                   ))}
                 </ul>
               </ScrollableList>

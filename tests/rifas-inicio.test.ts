@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { RifaMyList, RifaPublicView } from "@/lib/rifas/shared";
 
 vi.mock("server-only", () => ({}));
-const { RifasInicio } = await import("@/components/rifas/RifasInicio");
+const { RifasInicio, RifaTerminada } = await import("@/components/rifas/RifasInicio");
 
 const LA_IGUANA_1 = "495aa5b1-767c-47bb-8487-15223ab44f63";
 
@@ -60,6 +60,27 @@ describe("RifasInicio", () => {
     expect(out).toContain("4 pagos por confirmar");
     // La destacada no se repite en las filas.
     expect(out).not.toContain("Creada por ti");
+  });
+
+  it("(16-nov) una rifa que ya jugó no sale en Rifas: sin abiertas, la sección desaparece", () => {
+    const created = [{ slug: "rifa-solidaria-la-iguana-camiseta", name: "La Iguaná", status: "resuelta" as const, visibility: "publica" as const,
+      draw_at: view().draw_at, hidden: false, number_count: 100, paid: 40, pending_proofs: 0 }];
+    const bought = [{ slug: "otra", name: "Otra", status: "resuelta" as const, draw_at: view().draw_at, winning_number: 24,
+      numbers: [{ number: 24, state: "pagado" as const }] }];
+    expect(html([], { ...emptyList, created, bought })).toBe("");
+    const abierta = { ...created[0], slug: "abierta", name: "Abierta", status: "abierta" as const };
+    const out = html([], { ...emptyList, created: [...created, abierta] });
+    expect(out).toContain("Abierta");
+    expect(out).not.toContain("La Iguaná");
+  });
+
+  it("(16-nov) en Terminadas la rifa dice qué número salió y cuántos se vendieron", () => {
+    const out = renderToStaticMarkup(createElement(RifaTerminada, { rifa: view({ status: "resuelta", winning_number: 4, counts: { pagado: 61, reservado: 0 } }) }));
+    expect(out).toContain(">Rifa</span>");
+    expect(out).toContain("Salió el 04");
+    expect(out).toContain("61 números vendidos");
+    expect(out).toContain('href="/rifa/rifa-solidaria-la-iguana-camiseta"');
+    expect(out).not.toContain("Elegir número");
   });
 
   it("sin rifas no dibuja nada: el inicio queda solo con las pollas", () => {

@@ -66,6 +66,8 @@ describe("premios con imagen propia", () => {
     if (prize?.kind !== "crests") return;
     expect(prize.crests.map((crest) => crest.alt)).toEqual(["Escudo de Atlético Nacional", "Escudo de Independiente Medellín"]);
     for (const crest of prize.crests) expect(exists(crest.src)).toBe(true);
+    // OFIBOLETAS (16-nov): las mismas boletas, los mismos escudos.
+    expect(pollaPrizeMedia("654307a7-bce2-4b41-9dbb-363c434c3873")).toEqual(prize);
   });
 
   it("POLLA JAMES 2 gira la misma camiseta de POLLA JAMES, con su propio título", () => {
